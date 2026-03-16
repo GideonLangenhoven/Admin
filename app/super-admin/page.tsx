@@ -17,6 +17,7 @@ type OnboardForm = {
   waToken: string;
   waPhoneId: string;
   yocoSecretKey: string;
+  yocoWebhookSecret: string;
 };
 
 const DEFAULT_FORM: OnboardForm = {
@@ -30,6 +31,7 @@ const DEFAULT_FORM: OnboardForm = {
   waToken: "",
   waPhoneId: "",
   yocoSecretKey: "",
+  yocoWebhookSecret: "",
 };
 
 export default function SuperAdminPage() {
@@ -85,6 +87,7 @@ export default function SuperAdminPage() {
           wa_token: form.waToken || null,
           wa_phone_id: form.waPhoneId || null,
           yoco_secret_key: form.yocoSecretKey || null,
+          yoco_webhook_secret: form.yocoWebhookSecret || null,
         },
       });
 
@@ -195,7 +198,7 @@ export default function SuperAdminPage() {
           {form.logoUrl && <img src={form.logoUrl} alt="Logo preview" className="mt-3 h-20 w-20 rounded-xl border border-[var(--ck-border-subtle)] object-cover" />}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">WhatsApp Token</label>
             <textarea value={form.waToken} onChange={(e) => setForm({ ...form, waToken: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="EAAG..." />
@@ -207,6 +210,10 @@ export default function SuperAdminPage() {
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Secret Key</label>
             <textarea value={form.yocoSecretKey} onChange={(e) => setForm({ ...form, yocoSecretKey: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="sk_live_..." />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Webhook Secret</label>
+            <textarea value={form.yocoWebhookSecret} onChange={(e) => setForm({ ...form, yocoWebhookSecret: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="whsec_..." />
           </div>
         </div>
 

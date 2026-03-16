@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
     const waToken = String(body.wa_token || "").trim() || null;
     const waPhoneId = String(body.wa_phone_id || "").trim() || null;
     const yocoSecretKey = String(body.yoco_secret_key || "").trim() || null;
+    const yocoWebhookSecret = String(body.yoco_webhook_secret || "").trim() || null;
 
     if (!requesterEmail || !requesterPassword || !businessName || !adminName || !adminEmail) {
       return respond(400, { success: false, error: "requester_email, requester_password, business_name, admin_name, and admin_email are required" });
@@ -104,13 +105,14 @@ Deno.serve(async (req) => {
       throw adminError;
     }
 
-    if (waToken || waPhoneId || yocoSecretKey) {
+    if (waToken || waPhoneId || yocoSecretKey || yocoWebhookSecret) {
       await setEncryptionContextIfNeeded();
       const { error: credentialError } = await supabase.rpc("set_business_credentials", {
         p_business_id: business.id,
         p_wa_token: waToken,
         p_wa_phone_id: waPhoneId,
         p_yoco_secret_key: yocoSecretKey,
+        p_yoco_webhook_secret: yocoWebhookSecret,
       });
       if (credentialError) throw credentialError;
     }

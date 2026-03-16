@@ -28,6 +28,7 @@ export type TenantCredentials = {
   waToken: string;
   waPhoneId: string;
   yocoSecretKey: string;
+  yocoWebhookSecret: string;
 };
 
 export type TenantContext = {
@@ -81,6 +82,7 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     waToken: String(row.wa_token || ""),
     waPhoneId: String(row.wa_phone_id || ""),
     yocoSecretKey: String(row.yoco_secret_key || ""),
+    yocoWebhookSecret: String(row.yoco_webhook_secret || ""),
   };
 }
 
@@ -191,6 +193,47 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
 
 export function trimTrailingSlash(url?: string | null) {
   return String(url || "").replace(/\/+$/, "");
+}
+
+export function urlToOrigin(url?: string | null) {
+  var value = String(url || "").trim();
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch (_error) {
+    return "";
+  }
+}
+
+export function getAdminAppOrigins() {
+  var configured = String(Deno.env.get("ADMIN_APP_ORIGINS") || "")
+    .split(",")
+    .map(function (value) { return value.trim(); })
+    .filter(Boolean);
+  return Array.from(new Set(configured.concat([
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ])));
+}
+
+export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
+  var urls = [
+    business?.booking_site_url,
+    business?.manage_bookings_url,
+    business?.gift_voucher_url,
+    business?.booking_success_url,
+    business?.booking_cancel_url,
+    business?.voucher_success_url,
+  ];
+  var origins = urls
+    .map(function (url) { return urlToOrigin(url); })
+    .filter(Boolean);
+  return Array.from(new Set(getAdminAppOrigins().concat(origins)));
+}
+
+export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
+  if (!origin) return true;
+  return allowedOrigins.includes(origin);
 }
 
 export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?: {

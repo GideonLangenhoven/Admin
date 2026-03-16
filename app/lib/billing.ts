@@ -3,12 +3,8 @@ import { supabase } from "./supabase";
 export interface UsageSnapshot {
   plan_id: string;
   seat_limit: number;
-  monthly_paid_booking_limit: number | null;
-  uncapped_flag: boolean;
-  paid_bookings_count: number;
-  topup_quota_count: number;
-  total_quota: number | null;
-  remaining: number | null;
+  admin_count: number;
+  remaining_admin_seats: number;
 }
 
 export interface PlanRow {
@@ -17,8 +13,6 @@ export interface PlanRow {
   monthly_price_zar: number;
   setup_fee_zar: number;
   seat_limit: number;
-  monthly_paid_booking_limit: number | null;
-  uncapped_flag: boolean;
 }
 
 export interface SubscriptionRow {
@@ -29,14 +23,6 @@ export interface SubscriptionRow {
   period_start: string;
   period_end: string | null;
   created_at: string;
-}
-
-export async function fetchUsageSnapshot(businessId: string): Promise<UsageSnapshot | null> {
-  if (!businessId) return null;
-  const { data, error } = await supabase.rpc("ck_usage_snapshot", { p_business_id: businessId });
-  if (error) return null;
-  if (!Array.isArray(data) || data.length === 0) return null;
-  return data[0] as UsageSnapshot;
 }
 
 export async function fetchActiveSubscription(businessId: string): Promise<SubscriptionRow | null> {
@@ -56,11 +42,46 @@ export async function fetchActiveSubscription(businessId: string): Promise<Subsc
 export async function fetchPlans(): Promise<PlanRow[]> {
   const { data, error } = await supabase
     .from("plans")
-    .select("id, name, monthly_price_zar, setup_fee_zar, seat_limit, monthly_paid_booking_limit, uncapped_flag")
+    .select("id, name, monthly_price_zar, setup_fee_zar, seat_limit")
     .eq("active", true)
     .order("monthly_price_zar", { ascending: true });
   if (error) throw error;
   return (data || []) as PlanRow[];
+}
+
+export async function fetchUsageSnapshot(businessId: string): Promise<UsageSnapshot | null> {
+  if (!businessId) return null;
+
+  const [subscription, adminCountRes] = await Promise.all([
+    fetchActiveSubscription(businessId),
+    supabase
+      .from("admin_users")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId),
+  ]);
+
+  if (adminCountRes.error) {
+    throw adminCountRes.error;
+  }
+
+  var seatLimit = 1;
+  if (subscription?.plan_id) {
+    const { data: plan, error: planError } = await supabase
+      .from("plans")
+      .select("id, seat_limit")
+      .eq("id", subscription.plan_id)
+      .maybeSingle();
+    if (planError) throw planError;
+    seatLimit = Number(plan?.seat_limit || seatLimit);
+  }
+
+  const adminCount = Number(adminCountRes.count || 0);
+  return {
+    plan_id: subscription?.plan_id || "",
+    seat_limit: seatLimit,
+    admin_count: adminCount,
+    remaining_admin_seats: Math.max(0, seatLimit - adminCount),
+  };
 }
 
 export function formatZar(amount: number) {

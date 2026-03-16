@@ -13,7 +13,6 @@
   - `set_app_settings_encryption_key`
   - `set_business_credentials`
   - `get_business_credentials`
-  - `ck_can_accept_paid_booking`
   - shared capacity / external booking RPCs used by current flows
 
 ## 2. Secrets
@@ -32,6 +31,7 @@ Optional platform-wide defaults:
 - `BOOKING_SUCCESS_URL`
 - `BOOKING_CANCEL_URL`
 - `VOUCHER_SUCCESS_URL`
+- `ADMIN_APP_ORIGINS`
 
 Recommended rule:
 - Prefer tenant-specific URLs stored on `businesses`.
@@ -53,6 +53,7 @@ For each new tenant, confirm the super admin sets:
 - waiver URL
 - WhatsApp token + phone ID
 - Yoco secret key
+- Yoco webhook signing secret
 - AI prompt / FAQ / terminology
 
 ## 4. Edge Functions To Deploy
@@ -111,9 +112,9 @@ Watch these logs closely after release:
 - checkout creation failures
 - credential decryption failures
 - webhook tenant resolution failures
+- webhook signature verification failures
 - email send failures
 - WhatsApp send failures
-- booking cap enforcement failures
 - waiver reminder send failures
 
 ## 8. Rollback Priority

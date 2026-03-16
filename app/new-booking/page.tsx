@@ -7,7 +7,6 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
 import { ChevronDown, Check, User, Baby, Activity, Clock, Users } from "lucide-react";
 
 interface Tour {
@@ -244,7 +243,6 @@ export default function NewBookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState("");
   const [missingField, setMissingField] = useState<string | null>(null);
-  const [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<BookingCustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
@@ -265,12 +263,6 @@ export default function NewBookingPage() {
     const rows = (data || []) as Tour[];
     setTours(rows);
     if (!selectedTourId && rows[0]?.id) setSelectedTourId(rows[0].id);
-    try {
-      const usage = await fetchUsageSnapshot(businessId);
-      setUsageSnapshot(usage);
-    } catch (e: any) {
-      setUsageSnapshot(null);
-    }
     setLoadingTours(false);
   }
 
@@ -461,25 +453,6 @@ export default function NewBookingPage() {
         confirmLabel: "Continue",
       })) {
         return;
-      }
-    }
-
-    if (status === "PAID" && totalAmount > 0) {
-      try {
-        const latestUsage = await fetchUsageSnapshot(businessId);
-        setUsageSnapshot(latestUsage);
-        if (latestUsage && !latestUsage.uncapped_flag && (latestUsage.remaining || 0) <= 0) {
-          const goToBilling = await confirmAction({
-            title: "Paid booking cap reached",
-            message: "Paid booking cap reached for this month. Open Plans and Billing to buy a top-up or upgrade?",
-            tone: "warning",
-            confirmLabel: "Open billing",
-          });
-          if (goToBilling) router.push("/billing");
-          return;
-        }
-      } catch (e) {
-        console.error("Failed to check booking cap:", e);
       }
     }
 
@@ -764,14 +737,6 @@ export default function NewBookingPage() {
         return acc;
       }, {}));
       loadSlots();
-      if (status === "PAID" && totalAmount > 0) {
-        try {
-          const updatedUsage = await fetchUsageSnapshot(businessId);
-          setUsageSnapshot(updatedUsage);
-        } catch (e) {
-          console.error("Failed to refresh usage:", e);
-        }
-      }
     } catch (err: unknown) {
       notify({ title: "Booking creation failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
       setSubmitting(false);
@@ -783,12 +748,6 @@ export default function NewBookingPage() {
       <div>
         <h2 className="text-2xl font-bold">➕ New Booking</h2>
         <p className="text-sm text-gray-500">Create manual bookings and send confirmation with payment link.</p>
-        {usageSnapshot && (
-          <p className="mt-2 text-xs text-gray-500">
-            Current month usage: {usageSnapshot.paid_bookings_count} paid bookings
-            {usageSnapshot.uncapped_flag ? " (uncapped plan)." : ` / ${usageSnapshot.total_quota || 0}. Remaining: ${usageSnapshot.remaining || 0}.`}
-          </p>
-        )}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-5">

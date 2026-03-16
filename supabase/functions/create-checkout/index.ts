@@ -1,7 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
+  getBusinessAllowedOrigins,
   getTenantByBusinessId,
+  isAllowedOrigin,
   resolveBusinessSiteUrls,
 } from "../_shared/tenant.ts";
 
@@ -9,12 +11,13 @@ var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 var supabase = createServiceClient();
-
-var ALLOWED_ORIGINS = ["https://admin.capekayak.co.za", "https://caepweb-admin.vercel.app", "https://book.capekayak.co.za", "https://capekayak.co.za", "https://bookingtours.co.za", "https://www.bookingtours.co.za", "http://localhost:3000", "http://localhost:3001"];
-function getCors(req?: any) {
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
+function buildCors(origin?: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Content-Type": "application/json",
+  };
 }
 
 function withQuery(base: string, params: Record<string, string>) {
@@ -63,7 +66,9 @@ async function resolveCheckoutBusiness(params: { bookingId?: string; voucherId?:
 }
 
 Deno.serve(async (req: any) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: buildCors(req?.headers?.get("origin") || "*") });
+  }
 
   try {
     var body = await req.json();
@@ -74,11 +79,20 @@ Deno.serve(async (req: any) => {
     var type = body.type || "BOOKING";
     var topupBusinessId = body.business_id;
 
-    if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: getCors(req) });
+    if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
     var resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
     var tenant = resolved.tenant;
     var businessUrls = resolved.businessUrls;
+    var origin = req?.headers?.get("origin") || "";
+    var allowedOrigins = getBusinessAllowedOrigins(tenant.business);
+    if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
+      return new Response(
+        JSON.stringify({ error: "ORIGIN_NOT_ALLOWED", reason: "This origin is not allowed for the selected business checkout." }),
+        { status: 403, headers: buildCors(allowedOrigins[0] || "*") },
+      );
+    }
+    var corsHeaders = buildCors(origin || allowedOrigins[0] || "*");
     var metadata: any = { type: type };
     var successUrl = businessUrls.bookingSuccessUrl;
     var cancelUrl = businessUrls.bookingCancelUrl;
@@ -88,17 +102,10 @@ Deno.serve(async (req: any) => {
       metadata.voucher_code = voucherCode;
       successUrl = withQuery(businessUrls.voucherSuccessUrl, { code: voucherCode || "" });
     } else if (type === "TOPUP") {
-      if (!topupBusinessId) return new Response(JSON.stringify({ error: "Need business_id for top-up" }), { status: 400, headers: getCors(req) });
-      var topupAmount = Number(amount);
-      var topupQuota = topupAmount === 100 ? 10 : topupAmount === 500 ? 60 : topupAmount === 1000 ? 140 : 0;
-      if (!topupQuota) {
-        return new Response(JSON.stringify({ error: "Unsupported top-up amount. Allowed: 100, 500, 1000." }), { status: 400, headers: getCors(req) });
-      }
-      metadata.business_id = topupBusinessId;
-      metadata.amount_zar = topupAmount;
-      metadata.extra_quota = topupQuota;
-      successUrl = "https://admin.capekayak.co.za/billing?topup=success";
-      cancelUrl = "https://admin.capekayak.co.za/billing?topup=cancelled";
+      return new Response(
+        JSON.stringify({ error: "TOPUPS_DISCONTINUED", reason: "Booking top-ups have been removed. Plans are billed monthly by admin seats." }),
+        { status: 410, headers: corsHeaders },
+      );
     } else {
       metadata.booking_id = bookingId;
       metadata.customer_name = body.customer_name || "";
@@ -111,39 +118,8 @@ Deno.serve(async (req: any) => {
     if (type !== "TOPUP" && !ensureCheckoutUrls(businessUrls, type)) {
       return new Response(
         JSON.stringify({ error: "BUSINESS_BOOKING_URLS_MISSING", reason: "This business is missing configured booking success/cancel URLs." }),
-        { status: 503, headers: getCors(req) },
+        { status: 503, headers: corsHeaders },
       );
-    }
-
-    if (type === "BOOKING" && Number(amount) > 0 && bookingId) {
-      var isAlreadyPaidFlow = ["PAID", "CONFIRMED", "COMPLETED"].includes(resolved.bookingStatus);
-      if (!isAlreadyPaidFlow) {
-        var capRes = await supabase.rpc("ck_can_accept_paid_booking", { p_business_id: resolved.businessId });
-        var capRow = Array.isArray(capRes.data) ? capRes.data[0] : null;
-        if (capRes.error || !capRow) {
-          console.error("PLAN_CAP_CHECK_ERR:", capRes.error?.message || "Missing cap row");
-          return new Response(
-            JSON.stringify({
-              error: "PAID_BOOKING_CAP_CHECK_FAILED",
-              reason: capRes.error?.message || "Monthly billing limit could not be verified",
-            }),
-            { status: 503, headers: getCors(req) },
-          );
-        }
-        if (capRow.allowed === false) {
-          return new Response(
-            JSON.stringify({
-              error: "PAID_BOOKING_CAP_REACHED",
-              reason: capRow.reason,
-              paid_bookings_count: capRow.paid_bookings_count,
-              total_quota: capRow.total_quota,
-              remaining: capRow.remaining,
-              action: "BUY_TOPUP_OR_UPGRADE",
-            }),
-            { status: 402, headers: getCors(req) },
-          );
-        }
-      }
     }
 
     console.log("CREATING CHECKOUT: amount=" + amount + " type=" + type);
@@ -151,7 +127,7 @@ Deno.serve(async (req: any) => {
     if (!tenant.credentials.yocoSecretKey) {
       return new Response(
         JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "No Yoco secret key configured for this business." }),
-        { status: 503, headers: getCors(req) },
+        { status: 503, headers: corsHeaders },
       );
     }
 
@@ -178,7 +154,7 @@ Deno.serve(async (req: any) => {
           reason: yocoData?.message || yocoData?.error?.message || "Unable to create checkout",
           details: yocoData,
         }),
-        { status: 502, headers: getCors(req) },
+        { status: 502, headers: corsHeaders },
       );
     }
 
@@ -189,12 +165,12 @@ Deno.serve(async (req: any) => {
       if (voucherId) {
         await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", voucherId);
       }
-      return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl }), { status: 200, headers: getCors(req) });
+      return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl }), { status: 200, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ error: "Yoco error", details: yocoData }), { status: 500, headers: getCors(req) });
+    return new Response(JSON.stringify({ error: "Yoco error", details: yocoData }), { status: 500, headers: corsHeaders });
   } catch (err: any) {
     console.error("CHECKOUT_ERR:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: getCors(req) });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: buildCors(req?.headers?.get("origin") || "*") });
   }
 });

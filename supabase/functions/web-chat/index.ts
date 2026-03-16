@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getBusinessDisplayName, getTenantByBusinessId } from "../_shared/tenant.ts";
+import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin } from "../_shared/tenant.ts";
 var GK = Deno.env.get("GEMINI_API_KEY");
 var SU = Deno.env.get("SUPABASE_URL");
 var SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -9,7 +9,7 @@ var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 var CURRENT_TIMEZONE = "UTC";
-var AO = ["https://admin.capekayak.co.za", "https://booking-mu-steel.vercel.app", "https://capekayak.co.za", "https://bookingtours.co.za", "https://www.bookingtours.co.za", "http://localhost:3000", "http://localhost:3001"]; function gCors(r) { var o = r?.headers?.get("origin") || ""; var a = AO.includes(o) ? o : AO[0]; return { "Access-Control-Allow-Origin": a, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
+function gCors(r) { var o = typeof r === "string" ? r : (r?.headers?.get("origin") || ""); return { "Access-Control-Allow-Origin": o || "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
 function withQuery(base, params) { var u = new URL(base); for (var k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
 function trimTrailingSlash(url) { return String(url || "").replace(/\/+$/, ""); }
 function appendQuery(base, params) { var u = new URL(base); for (var k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
@@ -85,22 +85,22 @@ async function getSlots(tourId, now) {
     .filter(function (s) { return Number(s.available_capacity || 0) > 0; })
     .map(function (s) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0 }; });
 }
-async function canAcceptPaidBooking(businessId) {
-  if (!businessId) return { allowed: true, reason: "NO_BUSINESS" };
-  var cap = await db.rpc("ck_can_accept_paid_booking", { p_business_id: businessId });
-  var row = Array.isArray(cap.data) ? cap.data[0] : null;
-  if (cap.error) return { allowed: true, reason: "CAP_CHECK_FAILED" };
-  return row || { allowed: true, reason: "UNKNOWN" };
-}
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
   try {
     var body = await req.json(); var hist = body.messages || []; var msg = body.message || ""; var state = body.state || { step: "IDLE" };
     var now = new Date(); var ns = { ...state }; var pay = null; var reply = ""; var buttons = null; var calendar = null;
     var requestedBusinessId = body.business_id || body.businessId || state.bid || "";
+    var requestOrigin = req?.headers?.get("origin") || "";
     if (requestedBusinessId) {
       var requestTenant = await getTenantByBusinessId(db, requestedBusinessId).catch(function () { return null; });
       CURRENT_TIMEZONE = requestTenant?.business?.timezone || "UTC";
+      if (requestTenant && requestOrigin) {
+        var allowedOrigins = getBusinessAllowedOrigins(requestTenant.business);
+        if (!isAllowedOrigin(requestOrigin, allowedOrigins)) {
+          return new Response(JSON.stringify({ reply: "Origin not allowed for this business.", state: { step: "IDLE" } }), { status: 403, headers: gCors(requestOrigin) });
+        }
+      }
     } else {
       CURRENT_TIMEZONE = "UTC";
     }
@@ -365,14 +365,6 @@ Deno.serve(async (req) => {
       if (btnVal === "confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("go ahead") || lo.includes("sure") || lo.includes("yep")) {
         var ft = ns.total || 0;
         var businessId = ns.bid || tours[0]?.business_id;
-        if (ft > 0) {
-          var cap = await canAcceptPaidBooking(businessId);
-          if (cap.allowed === false) {
-            reply = "We’ve reached this month’s paid booking limit on our current plan. Please try again shortly while our team adds a top-up or upgrades the plan.";
-            ns = { step: "IDLE" };
-            return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
-          }
-        }
         var { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: ns.tprice, total_amount: ft, original_total: ns.baseTotal, status: "PENDING", source: "WEB_CHAT", custom_fields: ns.custom_fields || {} }).select().single();
         if (!bk) { reply = "Something went wrong — try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {

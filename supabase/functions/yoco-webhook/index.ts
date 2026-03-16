@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { Webhook } from "npm:standardwebhooks";
 import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 
@@ -10,6 +11,54 @@ function topupQuota(amount: number) {
   if (amount === 500) return 60;
   if (amount === 1000) return 140;
   return 0;
+}
+
+async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
+  var metadata = payload?.metadata || {};
+  var metaType = String(metadata.type || "");
+  var metaBookingId = String(metadata.booking_id || "");
+  var metaVoucherId = String(metadata.voucher_id || "");
+  var metaBusinessId = String(metadata.business_id || "");
+
+  if (metaType === "TOPUP" && metaBusinessId) return metaBusinessId;
+
+  if (metaBookingId) {
+    var bookingLookup = await supabase.from("bookings").select("business_id").eq("id", metaBookingId).maybeSingle();
+    if (bookingLookup.data?.business_id) return String(bookingLookup.data.business_id);
+  }
+
+  if (metaVoucherId) {
+    var voucherLookup = await supabase.from("vouchers").select("business_id").eq("id", metaVoucherId).maybeSingle();
+    if (voucherLookup.data?.business_id) return String(voucherLookup.data.business_id);
+  }
+
+  if (checkoutId) {
+    var bookingByCheckout = await supabase.from("bookings").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
+    if (bookingByCheckout.data?.business_id) return String(bookingByCheckout.data.business_id);
+
+    var voucherByCheckout = await supabase.from("vouchers").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
+    if (voucherByCheckout.data?.business_id) return String(voucherByCheckout.data.business_id);
+  }
+
+  return "";
+}
+
+async function verifyWebhookSignature(req: Request, rawBody: string, businessId: string) {
+  if (!businessId) {
+    throw new Error("Unable to resolve business for Yoco webhook verification");
+  }
+
+  var tenant = await getTenantByBusinessId(supabase, businessId);
+  if (!tenant.credentials.yocoWebhookSecret) {
+    throw new Error("Missing Yoco webhook secret for business " + businessId);
+  }
+
+  var webhook = new Webhook(tenant.credentials.yocoWebhookSecret);
+  await webhook.verify(rawBody, {
+    "webhook-id": req.headers.get("webhook-id") || "",
+    "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
+    "webhook-signature": req.headers.get("webhook-signature") || "",
+  });
 }
 
 async function createInvoice(booking: any, tourName: string, slotTime: string, paymentRef: string) {
@@ -153,7 +202,8 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
 Deno.serve(async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
   try {
-    var body = await req.json();
+    var rawBody = await req.text();
+    var body = rawBody ? JSON.parse(rawBody) : {};
     console.log("YOCO_WEBHOOK:" + JSON.stringify(body).substring(0, 500));
     var type = body.type; var payload = body.payload;
     if (type !== "payment.succeeded" && type !== "payment.failed") { console.log("Ignoring:" + type); return new Response("OK", { status: 200 }); }
@@ -162,6 +212,13 @@ Deno.serve(async (req: any) => {
     var metaBookingId = payload.metadata?.booking_id || "";
     var metaType = String(payload.metadata?.type || "");
     if (!checkoutId && !metaBookingId) { console.log("No checkoutId or booking_id in payload"); return new Response("OK", { status: 200 }); }
+    var businessId = await resolveWebhookBusinessId(checkoutId, payload);
+    try {
+      await verifyWebhookSignature(req, rawBody, businessId);
+    } catch (verifyError) {
+      console.error("YOCO_WEBHOOK_VERIFY_ERROR:", verifyError);
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     if (type === "payment.failed") {
       var fb = checkoutId
@@ -281,12 +338,6 @@ Deno.serve(async (req: any) => {
         event: "payment_confirmed_but_status_update_failed",
         payload: { error: upd.error.message, yoco_payment_id: yocoPaymentId, checkout_id: checkoutId },
       });
-      if (upd.error.message && upd.error.message.includes("PAID_BOOKING_CAP_REACHED")) {
-        try {
-          var limitTenant = await getTenantByBusinessId(supabase, booking.business_id);
-          await sendWhatsappTextForTenant(limitTenant, booking.phone, "We received your payment, but our booking system reached its current monthly paid-booking limit. Our team has been alerted and will confirm your trip shortly.");
-        } catch (_e) { }
-      }
       return new Response("OK", { status: 200 });
     }
     if (!upd.data) {

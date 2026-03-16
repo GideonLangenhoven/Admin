@@ -106,7 +106,6 @@ export default function Dashboard() {
     const [manifestDate, setManifestDate] = useState<"TODAY" | "TOMORROW">("TODAY");
     const [tomorrowPax, setTomorrowPax] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [usageSnapshot, setUsageSnapshot] = useState<any | null>(null);
 
     // Roll call state
     const [activeSlotIdx, setActiveSlotIdx] = useState(0);
@@ -392,14 +391,6 @@ export default function Dashboard() {
         const outstanding = (completedSlots || []).filter((s: any) => !sentSlotIds.has(s.id));
         setPhotosOutstanding(outstanding.length);
 
-        // Plan usage snapshot
-        const usageRes = await supabase.rpc("ck_usage_snapshot", { p_business_id: businessId });
-        if (!usageRes.error && Array.isArray(usageRes.data) && usageRes.data[0]) {
-            setUsageSnapshot(usageRes.data[0]);
-        } else {
-            setUsageSnapshot(null);
-        }
-
         setLoading(false);
     }
 
@@ -448,16 +439,6 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
-
-            {usageSnapshot && usageSnapshot.uncapped_flag !== true && (usageSnapshot.remaining || 0) <= 0 && (
-                <div className="rounded-xl border px-4 py-3 text-sm flex items-center gap-3" style={{ borderColor: "var(--ck-warning-soft)", background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
-                    <AlertTriangle size={18} />
-                    <div>
-                        <span className="font-semibold">Capacity reached.</span> Monthly paid-booking cap reached. Buy a top-up or upgrade on the <Link href="/billing" className="font-bold underline">Plans & Billing</Link> page.
-                    </div>
-                </div>
-            )}
-
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Today Pax */}
                 <Link href="/bookings" className="block p-5 transition-transform hover:-translate-y-1 relative group rounded-2xl shadow-sm" style={{ background: "var(--ck-accent)", color: "#ffffff", border: "1px solid var(--ck-accent)" }}>

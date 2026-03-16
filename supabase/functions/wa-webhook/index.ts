@@ -199,12 +199,6 @@ async function getConvo(tenant: TenantContext, phone: any) {
 async function setConvo(id: any, u: any) { await supabase.from("conversations").update({ ...u, updated_at: new Date().toISOString() }).eq("id", id); }
 async function logE(tenant: TenantContext, evt: any, p?: any, bid?: any) { await supabase.from("logs").insert({ business_id: tenant.business.id, booking_id: bid, event: evt, payload: p }); }
 function fmtTime(tenant: TenantContext, iso: any) { return formatDateTime(tenant, iso, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
-async function canAcceptPaidBooking(businessId: any) {
-  var cap = await supabase.rpc("ck_can_accept_paid_booking", { p_business_id: businessId });
-  var row = Array.isArray(cap.data) ? cap.data[0] : null;
-  if (cap.error) return { allowed: false, reason: cap.error.message || "CAP_CHECK_FAILED" };
-  return row || { allowed: false, reason: "CAP_CHECK_EMPTY" };
-}
 
 async function getSlotPrice(slot: any) {
   if (slot.price_per_person_override) return Number(slot.price_per_person_override);
@@ -1456,14 +1450,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== FINALIZE BOOKING =====
     else if (state === "FINALIZE_BOOKING") {
       var email = sd.email;
-      if (Number(sd.total || 0) > 0) {
-        var cap = await canAcceptPaidBooking(tenant.business.id);
-        if (cap.allowed === false) {
-          await sendText(tenant, phone, "We’ve reached this month’s paid booking limit on our current plan. Please try again shortly while our team adds a top-up or upgrades the plan.");
-          await setConvo(convo.id, { current_state: "MENU", state_data: {} });
-          return;
-        }
-      }
       var br2 = await supabase.from("bookings").insert({
         business_id: tenant.business.id, tour_id: sd.tour_id, slot_id: sd.slot_id,
         customer_name: sd.customer_name, phone: phone, email: email,

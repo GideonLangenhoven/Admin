@@ -728,33 +728,11 @@ export default function Bookings() {
         },
       });
       if (res.error) {
-        if ((res.error.message || "").includes("PAID_BOOKING_CAP_REACHED")) {
-          const goToBilling = await confirmAction({
-            title: "Paid-booking cap reached",
-            message: "Monthly paid-booking cap reached. Open Plans and Billing to buy a top-up or upgrade?",
-            tone: "warning",
-            confirmLabel: "Open billing",
-        });
-        if (goToBilling) router.push("/billing");
-        setPaymentLinkBookingId(null);
-        return;
-      }
         notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
         setPaymentLinkBookingId(null);
         return;
       }
       const data = res.data;
-      if (data?.error === "PAID_BOOKING_CAP_REACHED") {
-        const goToBilling = await confirmAction({
-          title: "Paid-booking cap reached",
-          message: "Monthly paid-booking cap reached. Open Plans and Billing to buy a top-up or upgrade?",
-          tone: "warning",
-          confirmLabel: "Open billing",
-        });
-        if (goToBilling) router.push("/billing");
-        setPaymentLinkBookingId(null);
-        return;
-      }
       if (data?.redirectUrl) {
         const ref = b.id.substring(0, 8).toUpperCase();
         const tourName = b.tours?.name || "Sea Kayak Tour";

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import {
-  currentPeriodKey,
   fetchActiveSubscription,
   fetchPlans,
   fetchUsageSnapshot,
@@ -13,14 +12,6 @@ import {
   type SubscriptionRow,
   type UsageSnapshot,
 } from "../lib/billing";
-
-type TopupOrder = {
-  id: string;
-  amount_zar: number;
-  extra_quota: number;
-  status: string;
-  created_at: string;
-};
 
 type LandingPageOrder = {
   id: string;
@@ -32,17 +23,6 @@ type LandingPageOrder = {
   status: string;
   created_at: string;
 };
-
-const TOPUP_PACKS = [
-  { amount: 100, quota: 10 },
-  { amount: 500, quota: 60 },
-  { amount: 1000, quota: 140 },
-];
-
-function monthlyLimitLabel(plan: PlanRow) {
-  if (plan.uncapped_flag) return "Uncapped";
-  return `${plan.monthly_paid_booking_limit || 0} paid bookings / month`;
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -59,7 +39,6 @@ export default function BillingPage() {
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [usage, setUsage] = useState<UsageSnapshot | null>(null);
   const [activeSub, setActiveSub] = useState<SubscriptionRow | null>(null);
-  const [topups, setTopups] = useState<TopupOrder[]>([]);
   const [landingOrders, setLandingOrders] = useState<LandingPageOrder[]>([]);
 
   const [targetPlan, setTargetPlan] = useState("");
@@ -80,18 +59,10 @@ export default function BillingPage() {
     setLoading(true);
     setError("");
     try {
-      const period = currentPeriodKey();
-      const [planRows, snapshot, sub, topupRows, lpRows] = await Promise.all([
+      const [planRows, snapshot, sub, lpRows] = await Promise.all([
         fetchPlans(),
         fetchUsageSnapshot(businessId),
         fetchActiveSubscription(businessId),
-        supabase
-          .from("topup_orders")
-          .select("id, amount_zar, extra_quota, status, created_at")
-          .eq("business_id", businessId)
-          .eq("period_key", period)
-          .order("created_at", { ascending: false })
-          .limit(20),
         supabase
           .from("landing_page_orders")
           .select("id, base_page_count, extra_page_count, build_total_zar, hosting_active, hosting_fee_zar, status, created_at")
@@ -100,13 +71,11 @@ export default function BillingPage() {
           .limit(20),
       ]);
 
-      if (topupRows.error) throw topupRows.error;
       if (lpRows.error) throw lpRows.error;
 
       setPlans(planRows);
       setUsage(snapshot);
       setActiveSub(sub);
-      setTopups((topupRows.data || []) as TopupOrder[]);
       setLandingOrders((lpRows.data || []) as LandingPageOrder[]);
       setTargetPlan(sub?.plan_id || snapshot?.plan_id || planRows[0]?.id || "");
     } catch (e: unknown) {
@@ -165,36 +134,6 @@ export default function BillingPage() {
     setWorking(false);
   }
 
-  async function buyTopup(amount: number, quota: number) {
-    if (!businessId) return;
-    setWorking(true);
-    setError("");
-    setMessage("");
-    try {
-      const checkoutRes = await supabase.functions.invoke("create-checkout", {
-        body: {
-          type: "TOPUP",
-          amount,
-          business_id: businessId,
-          extra_quota: quota,
-        },
-      });
-
-      if (checkoutRes.error) throw checkoutRes.error;
-
-      const data = checkoutRes.data as { redirectUrl?: string } | null;
-      if (data?.redirectUrl) {
-        window.open(data.redirectUrl, "_blank", "noopener,noreferrer");
-        setMessage(`Top-up checkout opened for ${formatZar(amount)} (+${quota} bookings). Credits will apply after successful payment.`);
-      } else {
-        throw new Error("No payment URL returned for top-up checkout.");
-      }
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
-    }
-    setWorking(false);
-  }
-
   async function createLandingPageOrder() {
     if (!businessId) return;
     setWorking(true);
@@ -244,7 +183,7 @@ export default function BillingPage() {
     <div className="max-w-6xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">💼 Plans &amp; Billing</h1>
-        <p className="text-sm text-gray-500">All features are included on every plan. Plans differ by admin seats and monthly paid booking volume.</p>
+        <p className="text-sm text-gray-500">All features are included on every plan. Plans differ by included admin seats and are billed monthly to each operator.</p>
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -263,7 +202,7 @@ export default function BillingPage() {
               <p className="mt-1 text-xs text-gray-500">Setup fee: {formatZar(plan.setup_fee_zar)} once-off</p>
               <div className="mt-4 space-y-1 text-sm text-gray-700">
                 <p>{plan.seat_limit} admin {plan.seat_limit === 1 ? "seat" : "seats"}</p>
-                <p>{monthlyLimitLabel(plan)}</p>
+                <p>Unlimited bookings included</p>
                 <p>All core features included</p>
               </div>
             </div>
@@ -273,31 +212,29 @@ export default function BillingPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-5 lg:col-span-2">
-          <h3 className="mb-3 text-base font-semibold text-gray-900">Current Usage (This Month)</h3>
+          <h3 className="mb-3 text-base font-semibold text-gray-900">Current Subscription</h3>
           <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-lg bg-gray-50 p-3">
               <p className="text-xs text-gray-500">Plan</p>
               <p className="font-semibold text-gray-900">{activePlan?.name || usage?.plan_id || "-"}</p>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">Paid Bookings</p>
-              <p className="font-semibold text-gray-900">{usage?.paid_bookings_count ?? 0}</p>
+              <p className="text-xs text-gray-500">Admins Added</p>
+              <p className="font-semibold text-gray-900">{usage?.admin_count ?? 0}</p>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">Top-up Quota</p>
-              <p className="font-semibold text-gray-900">+{usage?.topup_quota_count ?? 0}</p>
+              <p className="text-xs text-gray-500">Included Seats</p>
+              <p className="font-semibold text-gray-900">{usage?.seat_limit ?? 0}</p>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">Remaining</p>
-              <p className="font-semibold text-gray-900">{usage?.uncapped_flag ? "Uncapped" : (usage?.remaining ?? 0)}</p>
+              <p className="text-xs text-gray-500">Remaining Seats</p>
+              <p className="font-semibold text-gray-900">{usage?.remaining_admin_seats ?? 0}</p>
             </div>
           </div>
 
-          {!usage?.uncapped_flag && (
-            <p className="mt-3 text-xs text-gray-500">
-              Base quota {usage?.monthly_paid_booking_limit ?? 0} + top-ups {usage?.topup_quota_count ?? 0} = total {usage?.total_quota ?? 0}
-            </p>
-          )}
+          <p className="mt-3 text-xs text-gray-500">
+            Each business is billed monthly for its active plan. Bookings are no longer capped by plan volume.
+          </p>
 
           <div className="mt-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="text-sm text-gray-700 sm:min-w-[220px]">
@@ -315,16 +252,12 @@ export default function BillingPage() {
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-3 text-base font-semibold text-gray-900">Buy Booking Top-up</h3>
-          <div className="space-y-2">
-            {TOPUP_PACKS.map((pack) => (
-              <button key={pack.amount} disabled={working} onClick={() => buyTopup(pack.amount, pack.quota)} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm hover:border-gray-400 disabled:opacity-50">
-                <p className="font-semibold text-gray-900">{formatZar(pack.amount)} top-up</p>
-                <p className="text-xs text-gray-500">Adds +{pack.quota} paid bookings this month</p>
-              </button>
-            ))}
+          <h3 className="mb-3 text-base font-semibold text-gray-900">How billing works</h3>
+          <div className="space-y-3 text-sm text-gray-600">
+            <p>Each business stays on one monthly plan and receives an invoice for that subscription.</p>
+            <p>The only plan difference is how many admin accounts are included: 1, 2, or 3.</p>
+            <p>If you need more admin access, switch to the next plan before inviting another admin.</p>
           </div>
-          <p className="mt-3 text-xs text-gray-500">Top-ups are immediate, prepaid, and expire at month-end.</p>
         </div>
       </div>
 
@@ -355,15 +288,11 @@ export default function BillingPage() {
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-3 text-base font-semibold text-gray-900">Recent Top-ups</h3>
-          <div className="space-y-2">
-            {topups.length === 0 && <p className="text-sm text-gray-500">No top-ups this month.</p>}
-            {topups.map((t) => (
-              <div key={t.id} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                <p className="font-semibold text-gray-900">{formatZar(t.amount_zar)} · +{t.extra_quota}</p>
-                <p className="text-xs text-gray-500">{t.status} · {new Date(t.created_at).toLocaleString("en-ZA")}</p>
-              </div>
-            ))}
+          <h3 className="mb-3 text-base font-semibold text-gray-900">Admin seat policy</h3>
+          <div className="space-y-2 text-sm text-gray-600">
+            <p>Starter includes 1 admin.</p>
+            <p>Growth includes 2 admins.</p>
+            <p>Pro includes 3 admins.</p>
           </div>
         </div>
       </div>

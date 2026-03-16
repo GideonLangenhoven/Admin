@@ -5,9 +5,9 @@ import { Building2, CheckCircle2, Lock, Shield } from "lucide-react";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const plans = [
-  { name: "Starter", price: 1500, seats: 1, bookings: "100 paid bookings / month" },
-  { name: "Growth", price: 3000, seats: 3, bookings: "500 paid bookings / month" },
-  { name: "Pro", price: 6500, seats: 10, bookings: "Uncapped paid bookings (fair-use)" },
+  { name: "Starter", price: 1500, seats: 1 },
+  { name: "Growth", price: 3000, seats: 2 },
+  { name: "Pro", price: 6500, seats: 3 },
 ];
 
 function zar(v: number) {
@@ -20,7 +20,7 @@ function MarketingView() {
       <div className="mx-auto max-w-6xl space-y-10">
         <header className="space-y-4 text-center">
           <p className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">CapeKayak SaaS</p>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">All features from day one. Scale only when your bookings and team grow.</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">All features from day one. Scale only when your admin team grows.</h1>
           <p className="mx-auto max-w-3xl text-base text-slate-600 md:text-lg">From inquiry to paid booking to operations in one system for activity operators.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/case-study/cape-kayak" className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Read the Cape Kayak case study</Link>
@@ -36,7 +36,7 @@ function MarketingView() {
               <p className="mt-1 text-xs text-slate-500">Setup fee: {zar(3500)} once-off</p>
               <ul className="mt-4 space-y-2 text-sm text-slate-700">
                 <li>{p.seats} admin {p.seats === 1 ? "seat" : "seats"}</li>
-                <li>{p.bookings}</li>
+                <li>Unlimited bookings included</li>
                 <li>All core features included</li>
               </ul>
             </div>
@@ -53,13 +53,8 @@ function MarketingView() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h3 className="text-lg font-semibold text-slate-900">Top-up packs</h3>
-          <p className="mt-2 text-sm text-slate-600">When you hit your monthly booking cap, keep selling with instant top-ups:</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">R100</p><p className="text-slate-600">+10 paid bookings</p></div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">R500</p><p className="text-slate-600">+60 paid bookings</p></div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm"><p className="font-semibold text-slate-900">R1,000</p><p className="text-slate-600">+140 paid bookings</p></div>
-          </div>
+          <h3 className="text-lg font-semibold text-slate-900">Billing model</h3>
+          <p className="mt-2 text-sm text-slate-600">Each operator is billed monthly for the selected plan. The plan difference is simply the number of admin seats included: 1, 2, or 3.</p>
         </section>
       </div>
     </div>
