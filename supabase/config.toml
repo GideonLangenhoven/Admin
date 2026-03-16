@@ -1,0 +1,11 @@
+[functions.wa-webhook]
+verify_jwt = false
+
+[functions.web-chat]
+verify_jwt = false
+
+[functions.external-booking]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = true
