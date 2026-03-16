@@ -10,6 +10,7 @@ const ALLOWED_ORIGINS = [
     "https://book.capekayak.co.za",
     "https://capekayak.co.za",
     "https://caepweb-admin.vercel.app",
+    "https://admin-git-main-jerrys-projects-f4e4eaf9.vercel.app",
     "https://bookingtours.co.za",
     "https://www.bookingtours.co.za",
     "http://localhost:3000",
@@ -34,14 +35,15 @@ Deno.serve(async (req: Request) => {
 
     try {
         const bodyText = await req.text();
+        console.log("admin-reply raw body:", bodyText);
         let body;
         try {
             body = JSON.parse(bodyText);
         } catch {
-            return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: getCors(req) });
+            return new Response(JSON.stringify({ error: "Invalid JSON", raw: bodyText }), { status: 400, headers: getCors(req) });
         }
 
-        const to = body.phone;
+        const to = body.phone || body.to || body.to_phone;
         const message = body.message;
         const action = body.action;
 
@@ -49,13 +51,16 @@ Deno.serve(async (req: Request) => {
 
         if (action === "return_to_bot") {
             const { error: rbErr } = await supabase.from("conversations").update({ status: "BOT", current_state: "IDLE", updated_at: new Date().toISOString() }).eq("phone", to);
-            // We return 200 with ok: false so frontend can read the JSON error instead of hitting a generic 500
             if (rbErr) return new Response(JSON.stringify({ ok: false, error: rbErr.message }), { status: 200, headers: getCors(req) });
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
         }
 
         if (!to || !message) {
-            return new Response(JSON.stringify({ ok: false, error: "Missing phone or message" }), { status: 200, headers: getCors(req) });
+            return new Response(JSON.stringify({ 
+                ok: false, 
+                error: `Missing phone (${to}) or message (${message?.length}). Received keys: ${Object.keys(body).join(", ")}`,
+                debug: { body }
+            }), { status: 200, headers: getCors(req) });
         }
 
         // Get conversation to ensure correct business ID and state
