@@ -13,12 +13,12 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
-var DEFAULT_BOOKING_URL = "https://book.capekayak.co.za";
-var DEFAULT_MANAGE_BOOKINGS_URL = "https://book.capekayak.co.za/my-bookings";
-var DEFAULT_GIFT_VOUCHER_URL = "https://book.capekayak.co.za/gift-voucher";
-var DEFAULT_BOOKING_SUCCESS_URL = "https://book.capekayak.co.za/success";
-var DEFAULT_BOOKING_CANCEL_URL = "https://book.capekayak.co.za/cancelled";
-var DEFAULT_VOUCHER_SUCCESS_URL = "https://book.capekayak.co.za/voucher-confirmed";
+var DEFAULT_BOOKING_URL = "https://booking-mu-steel.vercel.app";
+var DEFAULT_MANAGE_BOOKINGS_URL = "https://booking-mu-steel.vercel.app/my-bookings";
+var DEFAULT_GIFT_VOUCHER_URL = "https://booking-mu-steel.vercel.app/gift-voucher";
+var DEFAULT_BOOKING_SUCCESS_URL = "https://booking-mu-steel.vercel.app/success";
+var DEFAULT_BOOKING_CANCEL_URL = "https://booking-mu-steel.vercel.app/cancelled";
+var DEFAULT_VOUCHER_SUCCESS_URL = "https://booking-mu-steel.vercel.app/voucher-success";
 
 var DEFAULT_SITE_SETTINGS = {
     directions: "",
