@@ -188,13 +188,14 @@ export default function Weather() {
               body: {
                 type: "CANCELLATION",
                 data: {
+                  business_id: businessId,
                   email: booking.email,
                   customer_name: booking.customer_name || "Guest",
                   ref,
                   tour_name: tourName,
                   start_time: startTime,
                   reason,
-                  refund_amount: isPaid && refundAmount > 0 ? refundAmount : null,
+                  total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
                 },
               },
             });

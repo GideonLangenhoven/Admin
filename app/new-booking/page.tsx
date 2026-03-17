@@ -676,6 +676,7 @@ export default function NewBookingPage() {
               body: {
                 type: "INVOICE",
                 data: {
+                  business_id: businessId,
                   email: email.trim().toLowerCase(),
                   customer_name: customerName.trim(),
                   customer_email: email.trim().toLowerCase(),

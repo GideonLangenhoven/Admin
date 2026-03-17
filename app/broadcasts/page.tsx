@@ -258,6 +258,7 @@ export default function BroadcastsPage() {
                 body: {
                   type: "CANCELLATION",
                   data: {
+                    business_id: businessId,
                     email: b.email,
                     customer_name: b.customer_name || "Guest",
                     ref,

@@ -210,6 +210,7 @@ export function getAdminAppOrigins() {
     .map(function (value) { return value.trim(); })
     .filter(Boolean);
   return Array.from(new Set(configured.concat([
+    "https://admin-tawny-delta-92.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
   ])));

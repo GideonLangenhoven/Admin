@@ -463,6 +463,7 @@ export default function Invoices() {
         body: {
           type: "INVOICE",
           data: {
+            business_id: businessId,
             email,
             customer_name: asText(inv.customer_name, "Customer"),
             customer_email: email,

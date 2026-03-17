@@ -414,6 +414,7 @@ export default function Bookings() {
         body: {
           type: "INVOICE",
           data: {
+            business_id: businessId,
             email: b.email,
             customer_name: b.customer_name || "Customer",
             customer_email: b.email,
@@ -523,7 +524,7 @@ export default function Bookings() {
   async function cancelBooking(b: Booking) {
     if (!await confirmAction({
       title: "Cancel booking",
-      message: `Cancel booking ${b.id.substring(0, 8).toUpperCase()}?`,
+      message: `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? The customer will be notified via email and WhatsApp.`,
       tone: "warning",
       confirmLabel: "Cancel booking",
     })) return;
@@ -536,12 +537,77 @@ export default function Bookings() {
         cancelled_at: new Date().toISOString(),
       })
       .eq("id", b.id);
-    setActionBookingId(null);
-    if (error) notify({ title: "Cancel failed", message: error.message, tone: "error" });
-    else {
-      notify({ title: "Booking cancelled", message: "The booking was cancelled successfully.", tone: "success" });
-      loadBookings();
+
+    if (error) {
+      setActionBookingId(null);
+      notify({ title: "Cancel failed", message: error.message, tone: "error" });
+      return;
     }
+
+    // Release slot capacity
+    if (b.slot_id) {
+      const slotData = await supabase.from("slots").select("booked, held").eq("id", b.slot_id).single();
+      if (slotData.data) {
+        await supabase.from("slots").update({
+          booked: Math.max(0, slotData.data.booked - (b.qty || 1)),
+          held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? (b.qty || 1) : 0)),
+        }).eq("id", b.slot_id);
+      }
+    }
+
+    // Cancel active holds
+    await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
+
+    const ref = b.id.substring(0, 8).toUpperCase();
+    const tourName = (b as any).tours?.name || (b as any).tour_name || "Tour";
+    const startTime = (b as any).slots?.start_time
+      ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
+      : "";
+    const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
+
+    // WhatsApp notification
+    if (b.phone) {
+      try {
+        await fetch(SU + "/functions/v1/send-whatsapp-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+          body: JSON.stringify({
+            business_id: businessId,
+            to: b.phone,
+            message: "📋 *Booking Cancelled*\n\n" +
+              "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", your booking for " + tourName +
+              (startTime ? " on " + startTime : "") + " has been cancelled.\n\n" +
+              "📋 Ref: " + ref + "\n\n" +
+              "You will receive an email with options to reschedule, get a voucher, or request a refund.",
+          }),
+        });
+      } catch (e) { console.error("WA notify err:", e); }
+    }
+
+    // Email notification
+    if (b.email) {
+      try {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            type: "CANCELLATION",
+            data: {
+              business_id: businessId,
+              email: b.email,
+              customer_name: b.customer_name,
+              ref,
+              tour_name: tourName,
+              start_time: startTime,
+              reason: "cancelled by operator",
+              total_amount: isPaidBooking ? b.total_amount : null,
+            },
+          },
+        });
+      } catch (e) { console.error("Email notify err:", e); }
+    }
+
+    setActionBookingId(null);
+    notify({ title: "Booking cancelled", message: "The booking was cancelled and the customer was notified.", tone: "success" });
+    loadBookings();
   }
 
   async function cancelSlotWeather(group: SlotGroup) {
@@ -611,13 +677,14 @@ export default function Bookings() {
               body: {
                 type: "CANCELLATION",
                 data: {
+                  business_id: businessId,
                   email: b.email,
                   customer_name: b.customer_name,
                   ref,
                   tour_name: tourName,
                   start_time: startTime,
                   reason: "weather conditions",
-                  refund_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
                 },
               },
             });
@@ -747,6 +814,7 @@ export default function Bookings() {
             body: {
               type: "PAYMENT_LINK",
               data: {
+                business_id: businessId,
                 email: b.email,
                 customer_name: b.customer_name || "Customer",
                 ref,

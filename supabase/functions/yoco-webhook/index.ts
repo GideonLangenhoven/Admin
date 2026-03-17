@@ -108,15 +108,19 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
 }
 
 async function sendBookingConfirmation(booking: any, yocoPaymentId: string, checkoutId: string, amount: number) {
-  var existingNotificationLog = await supabase
-    .from("logs")
+  // Atomic idempotency: use an atomic UPDATE on waiver_status to claim the send.
+  // Set a flag column (confirmation_sent_at) that only one webhook can set first.
+  // This prevents the race condition where multiple concurrent webhooks all pass
+  // a SELECT check before any of them write a log entry.
+  var claimLock = await supabase
+    .from("bookings")
+    .update({ confirmation_sent_at: new Date().toISOString() })
+    .eq("id", booking.id)
+    .is("confirmation_sent_at", null)
     .select("id")
-    .eq("booking_id", booking.id)
-    .eq("event", "booking_confirmation_notifications_sent")
-    .limit(1)
     .maybeSingle();
-  if (existingNotificationLog.data?.id) {
-    console.log("CONFIRM_ALREADY_SENT booking:" + booking.id);
+  if (!claimLock.data) {
+    console.log("CONFIRM_ALREADY_SENT (lock claimed by another webhook) booking:" + booking.id);
     return;
   }
 

@@ -278,6 +278,15 @@ Deno.serve(async (req) => {
     var bookingId = String(form?.get("booking") || url.searchParams.get("booking") || "");
     var token = String(form?.get("token") || url.searchParams.get("token") || "");
 
+    // Redirect GET requests to the booking app's waiver page (Supabase Edge Functions
+    // force text/plain content-type which prevents HTML rendering in browsers)
+    if (req.method === "GET" && bookingId && token) {
+      var redirectUrl = new URL("https://booking-mu-steel.vercel.app/waiver");
+      redirectUrl.searchParams.set("booking", bookingId);
+      redirectUrl.searchParams.set("token", token);
+      return Response.redirect(redirectUrl.toString(), 302);
+    }
+
     if (!bookingId || !token) {
       return new Response(pageShell("Waiver unavailable", `<div class="card"><div class="content"><div class="warn">This waiver link is incomplete. Please open the link from your booking confirmation email.</div></div></div>`), {
         status: 400,

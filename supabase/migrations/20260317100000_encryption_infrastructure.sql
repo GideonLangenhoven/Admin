@@ -84,7 +84,7 @@ drop function if exists public.set_wa_credentials(uuid, text, text);
 drop function if exists public.set_yoco_credentials(uuid, text, text);
 
 -- 6. get_business_credentials — single call, key as explicit param
-create function public.get_business_credentials(p_business_id uuid, p_key text)
+create or replace function public.get_business_credentials(p_business_id uuid, p_key text)
 returns table (
   wa_token          text,
   wa_phone_id       text,
@@ -105,7 +105,7 @@ as $$
 $$;
 
 -- 7. set_business_credentials — key as 2nd param (used by onboarding)
-create function public.set_business_credentials(
+create or replace function public.set_business_credentials(
   p_business_id         uuid,
   p_key                 text,
   p_wa_token            text,
@@ -134,7 +134,7 @@ end;
 $$;
 
 -- 8. Partial update — WhatsApp only (key as 2nd param)
-create function public.set_wa_credentials(
+create or replace function public.set_wa_credentials(
   p_business_id  uuid,
   p_key          text,
   p_wa_token     text,
@@ -159,7 +159,7 @@ end;
 $$;
 
 -- 9. Partial update — Yoco only (key as 2nd param)
-create function public.set_yoco_credentials(
+create or replace function public.set_yoco_credentials(
   p_business_id         uuid,
   p_key                 text,
   p_yoco_secret_key     text,

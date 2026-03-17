@@ -172,13 +172,14 @@ function Slots() {
               body: {
                 type: "CANCELLATION",
                 data: {
+                  business_id: businessId,
                   email: b.email,
                   customer_name: b.customer_name,
                   ref,
                   tour_name: tourName,
                   start_time: startTime,
                   reason: "weather conditions",
-                  refund_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
                 },
               },
             });
@@ -301,13 +302,14 @@ function Slots() {
               body: {
                 type: "CANCELLATION",
                 data: {
+                  business_id: businessId,
                   email: b.email,
                   customer_name: b.customer_name,
                   ref,
                   tour_name: tourName,
                   start_time: startTime,
                   reason: "weather conditions",
-                  refund_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
                 },
               },
             });
@@ -561,6 +563,89 @@ function Slots() {
               });
             }
           }
+        }
+      }
+
+      // If status was changed to CLOSED, cancel all active bookings and notify customers
+      if (editForm.status === "CLOSED" && selectedSlot.status !== "CLOSED") {
+        const { data: bookings } = await supabase
+          .from("bookings")
+          .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
+          .eq("business_id", businessId)
+          .eq("slot_id", selectedSlot.id)
+          .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
+
+        const affected = bookings || [];
+        for (const b of affected) {
+          const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
+
+          await supabase.from("bookings").update({
+            status: "CANCELLED",
+            cancellation_reason: "Slot closed by operator",
+            cancelled_at: new Date().toISOString(),
+          }).eq("id", b.id);
+
+          const slotData = await supabase.from("slots").select("booked, held").eq("id", selectedSlot.id).single();
+          if (slotData.data) {
+            await supabase.from("slots").update({
+              booked: Math.max(0, slotData.data.booked - b.qty),
+              held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
+            }).eq("id", selectedSlot.id);
+          }
+
+          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
+
+          const ref = b.id.substring(0, 8).toUpperCase();
+          const tourName = (b as any).tours?.name || "Tour";
+          const startTime = (b as any).slots?.start_time
+            ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
+            : "";
+
+          if (b.phone) {
+            try {
+              await fetch(SU + "/functions/v1/send-whatsapp-text", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+                body: JSON.stringify({
+                  business_id: businessId,
+                  to: b.phone,
+                  message: "📋 *Trip Cancelled*\n\n" +
+                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
+                    " has been cancelled.\n\n" +
+                    "📋 Ref: " + ref + "\n\n" +
+                    "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund.",
+                }),
+              });
+            } catch (e) { console.error("WA notify err:", e); }
+          }
+
+          if (b.email) {
+            try {
+              await supabase.functions.invoke("send-email", {
+                body: {
+                  type: "CANCELLATION",
+                  data: {
+                    business_id: businessId,
+                    email: b.email,
+                    customer_name: b.customer_name,
+                    ref,
+                    tour_name: tourName,
+                    start_time: startTime,
+                    reason: "slot closed by operator",
+                    total_amount: isPaidBooking ? b.total_amount : null,
+                  },
+                },
+              });
+            } catch (e) { console.error("Email notify err:", e); }
+          }
+        }
+
+        if (affected.length > 0) {
+          notify({
+            title: "Bookings cancelled",
+            message: `${affected.length} booking(s) on this slot were cancelled and customers notified.`,
+            tone: "success",
+          });
         }
       }
 

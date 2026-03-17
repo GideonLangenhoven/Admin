@@ -130,6 +130,7 @@ export default function PhotosPage() {
               body: JSON.stringify({
                 type: "TRIP_PHOTOS",
                 data: {
+                  business_id: businessId,
                   email: b.email,
                   customer_name: b.customer_name || "Guest",
                   tour_name: tourName,

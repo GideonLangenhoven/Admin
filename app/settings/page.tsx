@@ -13,6 +13,7 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
+// Default Booking App URLs (separate from Admin Dashboard: https://admin-tawny-delta-92.vercel.app)
 var DEFAULT_BOOKING_URL = "https://booking-mu-steel.vercel.app";
 var DEFAULT_MANAGE_BOOKINGS_URL = "https://booking-mu-steel.vercel.app/my-bookings";
 var DEFAULT_GIFT_VOUCHER_URL = "https://booking-mu-steel.vercel.app/gift-voucher";
