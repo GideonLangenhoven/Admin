@@ -58,7 +58,7 @@ export async function sendAdminSetupLink(
 
   var { error: emailError } = await supabase.functions.invoke("send-email", {
     body: {
-      type: "ADMIN_SETUP",
+      type: "ADMIN_WELCOME",
       data: {
         email: admin.email,
         name: admin.name || "",

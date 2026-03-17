@@ -93,6 +93,7 @@ interface Booking {
   refund_amount: number | null;
   yoco_checkout_id: string | null;
   payment_deadline: string | null;
+  waiver_status: string | null;
   tours: TourRel;
   slots: SlotRel;
 }

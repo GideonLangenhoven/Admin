@@ -7,7 +7,7 @@ var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 var supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
 // Without it, onboarding@resend.dev only delivers to your own Resend account email.
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Adventure Operator <onboarding@resend.dev>";
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Bookings <onboarding@resend.dev>";
 
 var ALLOWED_ORIGINS = [
   "https://admin.capekayak.co.za",
@@ -169,7 +169,7 @@ Deno.serve(async (req: Request) => {
     var { data: business } = businessId
       ? await supabase.from("businesses").select("business_name, name, timezone, notification_email, footer_line_one, footer_line_two").eq("id", businessId).maybeSingle()
       : { data: null as any };
-    var brandName = String(business?.business_name || business?.name || "Adventure Operator");
+    var brandName = String(business?.business_name || business?.name || "Your Booking");
     var businessTimezone = String(business?.timezone || "UTC");
     var footerLineOne = String(business?.footer_line_one || "Thanks for choosing " + brandName + ".");
     var footerLineTwo = String(business?.footer_line_two || "Reply to this email if you need anything.");

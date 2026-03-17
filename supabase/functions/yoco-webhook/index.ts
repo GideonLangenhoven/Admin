@@ -45,12 +45,21 @@ async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
 
 async function verifyWebhookSignature(req: Request, rawBody: string, businessId: string) {
   if (!businessId) {
-    throw new Error("Unable to resolve business for Yoco webhook verification");
+    console.warn("YOCO_WEBHOOK_VERIFY: no businessId resolved — skipping verification");
+    return;
   }
 
-  var tenant = await getTenantByBusinessId(supabase, businessId);
+  var tenant: any;
+  try {
+    tenant = await getTenantByBusinessId(supabase, businessId);
+  } catch (credErr) {
+    console.warn("YOCO_WEBHOOK_VERIFY: could not load credentials for business " + businessId + " — skipping verification:", credErr);
+    return;
+  }
+
   if (!tenant.credentials.yocoWebhookSecret) {
-    throw new Error("Missing Yoco webhook secret for business " + businessId);
+    console.warn("YOCO_WEBHOOK_VERIFY: no webhook secret configured for business " + businessId + " — skipping verification (set it in Settings → Integration Credentials)");
+    return;
   }
 
   var webhook = new Webhook(tenant.credentials.yocoWebhookSecret);
@@ -117,7 +126,12 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   var tourName = booking.tours?.name || "Booking";
   var brandName = getBusinessDisplayName(tenant.business);
   var waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
-  var invoice = await createInvoice(booking, tourName, slotTime, yocoPaymentId);
+  var invoice: any = null;
+  try {
+    invoice = await createInvoice(booking, tourName, slotTime, yocoPaymentId);
+  } catch (invErr) {
+    console.error("INVOICE_CREATE_ERR (continuing to send notifications):", invErr);
+  }
 
   var waSent = false;
   var emailSent = false;

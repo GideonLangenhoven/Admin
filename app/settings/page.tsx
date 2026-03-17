@@ -121,6 +121,11 @@ export default function SettingsPage() {
     var [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
     var [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
 
+    // Email Header Images State
+    var [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
+    var [emailImgsSaving, setEmailImgsSaving] = useState(false);
+    var [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
+
     // Credentials State
     var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean } | null>(null);
     var [waForm, setWaForm] = useState({ token: "", phoneId: "" });
@@ -506,6 +511,18 @@ export default function SettingsPage() {
                 footer_line_two: data.footer_line_two || DEFAULT_SITE_SETTINGS.footer_line_two,
             });
             setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
+            setEmailImgs({
+                payment: data.email_img_payment || "",
+                confirm: data.email_img_confirm || "",
+                invoice: data.email_img_invoice || "",
+                gift: data.email_img_gift || "",
+                cancel: data.email_img_cancel || "",
+                cancel_weather: data.email_img_cancel_weather || "",
+                indemnity: data.email_img_indemnity || "",
+                admin: data.email_img_admin || "",
+                voucher: data.email_img_voucher || "",
+                photos: data.email_img_photos || "",
+            });
         }
     }
 
@@ -764,6 +781,31 @@ export default function SettingsPage() {
             setCredMessage({ type: "error", text: String(err?.message || "Failed to save Yoco credentials.") });
         }
         setYocoSaving(false);
+    }
+
+    async function handleSaveEmailImages(e: React.FormEvent) {
+        e.preventDefault();
+        setEmailImgsSaving(true);
+        setEmailImgsMessage({ type: "", text: "" });
+        var { error } = await supabase.from("businesses").update({
+            email_img_payment: emailImgs.payment || null,
+            email_img_confirm: emailImgs.confirm || null,
+            email_img_invoice: emailImgs.invoice || null,
+            email_img_gift: emailImgs.gift || null,
+            email_img_cancel: emailImgs.cancel || null,
+            email_img_cancel_weather: emailImgs.cancel_weather || null,
+            email_img_indemnity: emailImgs.indemnity || null,
+            email_img_admin: emailImgs.admin || null,
+            email_img_voucher: emailImgs.voucher || null,
+            email_img_photos: emailImgs.photos || null,
+        }).eq("id", businessId);
+        if (error) {
+            setEmailImgsMessage({ type: "error", text: "Error saving: " + error.message });
+        } else {
+            setEmailImgsMessage({ type: "success", text: "Email images saved." });
+            setTimeout(() => setEmailImgsMessage({ type: "", text: "" }), 3000);
+        }
+        setEmailImgsSaving(false);
     }
 
     if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
@@ -1267,12 +1309,13 @@ export default function SettingsPage() {
 
                     {/* Branding & Hero Text */}
                     <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Branding &amp; Hero Text</h3>
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Branding &amp; Hero Text</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">The <strong>Business Name</strong> and <strong>Logo</strong> below control: the admin dashboard sidebar, the browser tab title, all outgoing emails, and the public booking site header.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">— appears in the dashboard header &amp; all emails</span></label>
                                 <input type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Kayaks Adventures" />
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Cape Kayak Adventures" />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
@@ -1280,10 +1323,14 @@ export default function SettingsPage() {
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town's Original Since 1994" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo URL</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo URL <span className="text-[var(--ck-accent)]">— appears next to the business name in the dashboard sidebar</span></label>
                                 <input type="url" value={siteSettings.logo_url} onChange={e => setSiteSettings({ ...siteSettings, logo_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="https://i.ibb.co/your-logo.png" />
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Leave empty to use default emoji. Upload at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a></p>
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="https://your-cdn.com/logo.png" />
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">
+                                    Paste any direct image link here. To get one: right-click your logo on any website → <strong>Copy image address</strong> → paste it above.
+                                    Or upload your logo at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a> → after uploading, click the image thumbnail → copy the <strong>Direct link</strong> (ends in .png or .jpg).
+                                    Leave empty to show the default icon.
+                                </p>
                                 {siteSettings.logo_url && (
                                     <img src={siteSettings.logo_url} alt="Logo preview" className="mt-2 h-10 object-contain rounded border border-[var(--ck-border-subtle)]" />
                                 )}
@@ -1581,6 +1628,79 @@ export default function SettingsPage() {
 
                 </form>
             </div >
+
+            {/* ── Email Header Images ── */}
+            <div className="mt-10 border-t border-[var(--ck-border-subtle)] pt-10">
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Header Images</h2>
+                    <p className="text-sm text-[var(--ck-text-muted)] mt-1">
+                        Customise the banner photo shown at the top of each email type. Paste a direct image URL — upload images to a CDN like{" "}
+                        <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a>{" "}
+                        or <a href="https://cloudinary.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">Cloudinary</a> first.
+                        Leave blank to use the default image. Images must be publicly accessible — avoid imgbb "direct links" that expire.
+                    </p>
+                </div>
+                <form onSubmit={handleSaveEmailImages} className="space-y-6">
+                    {([
+                        { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
+                        { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
+                        { key: "invoice", label: "Invoice", desc: "Sent with the tax invoice attachment" },
+                        { key: "gift", label: "Gift Voucher", desc: "Sent to the gift voucher buyer after purchase" },
+                        { key: "cancel", label: "Cancellation – General", desc: "Sent when a booking is cancelled for any reason" },
+                        { key: "cancel_weather", label: "Cancellation – Weather", desc: "Sent when a booking is cancelled due to weather" },
+                        { key: "indemnity", label: "Waiver Reminder", desc: "Sent the day before the tour as a waiver reminder" },
+                        { key: "admin", label: "Admin Welcome", desc: "Sent to new admin users with their setup link" },
+                        { key: "voucher", label: "Voucher Code", desc: "Sent when a customer receives a voucher code" },
+                        { key: "photos", label: "Trip Photos", desc: "Sent when trip photos are uploaded and shared" },
+                    ] as { key: keyof typeof emailImgs; label: string; desc: string }[]).map(({ key, label, desc }) => (
+                        <div key={key} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                            <div className="flex gap-5 items-start">
+                                {emailImgs[key] ? (
+                                    <img src={emailImgs[key]} alt={label} className="w-24 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0 bg-gray-100" />
+                                ) : (
+                                    <div className="w-24 h-16 rounded-lg border border-dashed border-[var(--ck-border-subtle)] bg-gray-50 flex items-center justify-center shrink-0">
+                                        <span className="text-xs text-[var(--ck-text-muted)]">Default</span>
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <div className="mb-1">
+                                        <span className="text-sm font-semibold text-[var(--ck-text-strong)]">{label}</span>
+                                        <span className="ml-2 text-xs text-[var(--ck-text-muted)]">{desc}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="url"
+                                            value={emailImgs[key]}
+                                            onChange={e => setEmailImgs({ ...emailImgs, [key]: e.target.value })}
+                                            className="ui-control flex-1 px-3 py-2 text-sm rounded-lg outline-none"
+                                            placeholder="https://i.ibb.co/your-image.jpg"
+                                        />
+                                        {emailImgs[key] && (
+                                            <button type="button" onClick={() => setEmailImgs({ ...emailImgs, [key]: "" })}
+                                                className="px-3 py-2 text-xs rounded-lg border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] hover:text-[var(--ck-danger)] hover:border-[var(--ck-danger)] transition-colors">
+                                                Reset
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-2">
+                        <div>
+                            {emailImgsMessage.text && (
+                                <span className={"text-sm font-medium " + (emailImgsMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-[var(--ck-success)]")}>
+                                    {emailImgsMessage.text}
+                                </span>
+                            )}
+                        </div>
+                        <button type="submit" disabled={emailImgsSaving}
+                            className="rounded-xl px-8 bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                            {emailImgsSaving ? "Saving..." : "Save Email Images"}
+                        </button>
+                    </div>
+                </form>
+            </div>
 
             {/* ── Integration Credentials ── */}
             <div className="mt-10">

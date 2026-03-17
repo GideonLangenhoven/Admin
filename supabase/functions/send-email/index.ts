@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { getWaiverContext } from "../_shared/waiver.ts";
 
 var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
@@ -7,7 +8,7 @@ var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 // RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
 // If unset, Resend's onboarding@resend.dev test domain is used — which only delivers to your Resend account email.
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Cape Kayak <onboarding@resend.dev>";
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Bookings <onboarding@resend.dev>";
 var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -101,10 +102,11 @@ async function resolveBrandingBusinessId(d: Record<string, unknown>) {
 async function loadEmailBranding(d: Record<string, unknown>) {
   var businessId = await resolveBrandingBusinessId(d);
   if (!businessId || !supabase) {
+    var fallbackBrand = String(d.business_name || d.brand_name || "Your Booking");
     return {
       businessId: "",
-      brandName: "Adventure Operator",
-      shortBrandName: "Adventure Operator",
+      brandName: fallbackBrand,
+      shortBrandName: fallbackBrand,
       footerLineOne: "Thanks for choosing our team.",
       footerLineTwo: "Reply to this email if you need anything.",
       manageBookingUrl: String(d.manage_bookings_url || MANAGE_BOOKING_URL),
@@ -118,11 +120,11 @@ async function loadEmailBranding(d: Record<string, unknown>) {
 
   var { data } = await supabase
     .from("businesses")
-    .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+    .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
     .eq("id", businessId)
     .maybeSingle();
 
-  var brandName = String(data?.business_name || data?.name || "Adventure Operator");
+  var brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
     businessId,
     brandName,
@@ -135,6 +137,16 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
     fromEmail: Deno.env.get("RESEND_FROM_EMAIL") || brandName + " <onboarding@resend.dev>",
+    imgPayment: String(data?.email_img_payment || ""),
+    imgConfirm: String(data?.email_img_confirm || ""),
+    imgInvoice: String(data?.email_img_invoice || ""),
+    imgGift: String(data?.email_img_gift || ""),
+    imgCancel: String(data?.email_img_cancel || ""),
+    imgCancelWeather: String(data?.email_img_cancel_weather || ""),
+    imgIndemnity: String(data?.email_img_indemnity || ""),
+    imgAdmin: String(data?.email_img_admin || ""),
+    imgVoucher: String(data?.email_img_voucher || ""),
+    imgPhotos: String(data?.email_img_photos || ""),
   };
 }
 
@@ -165,6 +177,23 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
       .join(branding.footerLineOne + "<br>Book at " + branding.voucherUrl + " or reply to this email.")
       .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            Thank you for adventuring with us!")
       .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo);
+  }
+
+  // Replace default email header images with business-specific ones where set
+  var imgSwaps: Array<[string, string]> = [
+    [IMG_PAYMENT, branding.imgPayment],
+    [IMG_CONFIRM, branding.imgConfirm],
+    [IMG_INVOICE, branding.imgInvoice],
+    [IMG_GIFT, branding.imgGift],
+    [IMG_CANCEL_GENERAL, branding.imgCancel],
+    [IMG_CANCEL_WEATHER, branding.imgCancelWeather],
+    [IMG_INDEMNITY, branding.imgIndemnity],
+    [IMG_ADMIN, branding.imgAdmin],
+    [IMG_VOUCHER, branding.imgVoucher],
+    [IMG_PHOTOS, branding.imgPhotos],
+  ];
+  for (var s = 0; s < imgSwaps.length; s++) {
+    if (imgSwaps[s][1]) brandedHtml = brandedHtml.split(imgSwaps[s][0]).join(imgSwaps[s][1]);
   }
 
   var brandedSubject = subject
@@ -931,6 +960,155 @@ function escHtml(raw: string) {
   return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> {
+  var doc = await PDFDocument.create();
+  var page = doc.addPage([595.28, 841.89]); // A4
+  var font = await doc.embedFont(StandardFonts.Helvetica);
+  var fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  var fontMono = await doc.embedFont(StandardFonts.Courier);
+
+  var W = 595.28;
+  var margin = 40;
+  var usable = W - margin * 2;
+  var y = 800;
+  var black = rgb(0, 0, 0);
+  var grey = rgb(0.5, 0.5, 0.5);
+  var lightGrey = rgb(0.85, 0.85, 0.85);
+  var darkGreen = rgb(0.106, 0.231, 0.212);
+
+  // Invoice data
+  var invNo = String(d.invoice_number || "");
+  var ref = String(d.payment_reference || invNo);
+  var toName = String(d.customer_name || "Customer");
+  var toEmail = String(d.customer_email || "");
+  var toPhone = String(d.phone || "");
+  var tourName = String(d.tour_name || "Booking");
+  var tourDate = String(d.tour_date || d.invoice_date || "-");
+  var qty = Number(d.qty) || 1;
+  var totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
+  var total = parseFloat(totalStr) || 0;
+  var subtotal = total / (1 + VAT_RATE);
+  var vatAmt = total - subtotal;
+  var invDate = String(d.invoice_date || "-");
+  function m(n: number) { return "R" + n.toFixed(2); }
+
+  // ── Header ──
+  page.drawText(FROM_COMPANY.name, { x: margin, y, font: fontBold, size: 18, color: black });
+  page.drawText("TAX INVOICE", { x: W - margin - fontBold.widthOfTextAtSize("TAX INVOICE", 22), y, font: fontBold, size: 22, color: grey });
+  y -= 16;
+  page.drawText(FROM_COMPANY.reg + "  VAT: " + FROM_COMPANY.vat, { x: margin, y, font, size: 8, color: grey });
+  y -= 30;
+
+  // ── Horizontal line ──
+  page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: lightGrey });
+  y -= 25;
+
+  // ── From / To ──
+  page.drawText("From:", { x: margin, y, font: fontBold, size: 10, color: black });
+  page.drawText("To:", { x: margin + usable * 0.5, y, font: fontBold, size: 10, color: black });
+  y -= 14;
+  var fromLines = [FROM_COMPANY.name, ...FROM_COMPANY.addressLines];
+  for (var fl of fromLines) {
+    page.drawText(fl, { x: margin, y, font, size: 9, color: black });
+    y -= 12;
+  }
+  var toY = y + 12 + fromLines.length * 12 - 14;
+  var toLines = [toName];
+  if (toPhone) toLines.push(toPhone);
+  toLines.push(toEmail);
+  for (var tl of toLines) {
+    page.drawText(tl, { x: margin + usable * 0.5, y: toY, font, size: 9, color: black });
+    toY -= 12;
+  }
+  y -= 10;
+
+  // ── Invoice details ──
+  page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: lightGrey });
+  y -= 20;
+  var detailLabels = ["Invoice #:", "Booking Ref:", "Date:", "Amount Due:"];
+  var detailValues = [invNo, ref, invDate, "R0.00"];
+  for (var di = 0; di < detailLabels.length; di++) {
+    page.drawText(detailLabels[di], { x: W - margin - 200, y, font: fontBold, size: 9, color: black });
+    page.drawText(detailValues[di], { x: W - margin - 80, y, font: fontMono, size: 9, color: black });
+    y -= 14;
+  }
+  y -= 15;
+
+  // ── Service table ──
+  var tableTop = y;
+  var colWidths = [usable * 0.45, usable * 0.15, usable * 0.15, usable * 0.25];
+  var colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
+  var rowH = 20;
+
+  // Header row
+  page.drawRectangle({ x: margin, y: tableTop - rowH, width: usable, height: rowH, color: lightGrey });
+  var headers = ["Service", "Qty", "Unit Price", "Total (ZAR)"];
+  for (var hi = 0; hi < headers.length; hi++) {
+    page.drawText(headers[hi], { x: colX[hi] + 5, y: tableTop - 14, font: fontBold, size: 9, color: black });
+  }
+  y = tableTop - rowH;
+
+  // Data row
+  page.drawRectangle({ x: margin, y: y - rowH, width: usable, height: rowH, color: rgb(1, 1, 1) });
+  page.drawText(tourName + " (" + tourDate + ")", { x: colX[0] + 5, y: y - 14, font, size: 9, color: black, maxWidth: colWidths[0] - 10 });
+  page.drawText(String(qty), { x: colX[1] + 5, y: y - 14, font, size: 9, color: black });
+  page.drawText(m(total / qty), { x: colX[2] + 5, y: y - 14, font, size: 9, color: black });
+  page.drawText(m(total), { x: colX[3] + 5, y: y - 14, font: fontMono, size: 9, color: black });
+  y -= rowH;
+
+  // Table borders
+  for (var r = 0; r <= 2; r++) {
+    page.drawLine({ start: { x: margin, y: tableTop - r * rowH }, end: { x: W - margin, y: tableTop - r * rowH }, thickness: 0.5, color: grey });
+  }
+  for (var c = 0; c <= 4; c++) {
+    var cx = c < 4 ? colX[c] : W - margin;
+    page.drawLine({ start: { x: cx, y: tableTop }, end: { x: cx, y: tableTop - 2 * rowH }, thickness: 0.5, color: grey });
+  }
+  y -= 10;
+
+  // ── Totals ──
+  var totalsX = W - margin - 200;
+  var totalsValX = W - margin - 60;
+
+  var totalRows = [
+    ["Sub-total (Excl VAT):", m(subtotal)],
+    ["VAT - " + (VAT_RATE * 100).toFixed(1) + "%:", m(vatAmt)],
+    ["Total:", m(total)],
+    ["Amount Paid:", m(total)],
+  ];
+  for (var tr of totalRows) {
+    page.drawText(tr[0], { x: totalsX, y, font: tr[0] === "Total:" ? fontBold : font, size: 9, color: black });
+    page.drawText(tr[1], { x: totalsValX, y, font: fontMono, size: 9, color: black });
+    y -= 14;
+  }
+
+  // Balance due (highlighted)
+  y -= 4;
+  page.drawRectangle({ x: totalsX - 5, y: y - 4, width: W - margin - totalsX + 5, height: 18, color: lightGrey });
+  page.drawText("Balance Due:", { x: totalsX, y, font: fontBold, size: 10, color: black });
+  page.drawText("R0.00", { x: totalsValX, y, font: fontBold, size: 10, color: black });
+  y -= 35;
+
+  // ── Banking Details ──
+  page.drawText("Banking Details", { x: margin, y, font: fontBold, size: 12, color: black });
+  y -= 18;
+  var bankRows = [
+    ["Account Owner:", BANKING_DETAILS.owner],
+    ["Account Number:", BANKING_DETAILS.number],
+    ["Account Type:", BANKING_DETAILS.type],
+    ["Bank Name:", BANKING_DETAILS.bank],
+    ["Branch Code:", BANKING_DETAILS.branchCode],
+    ["Reference:", invNo],
+  ];
+  for (var br of bankRows) {
+    page.drawText(br[0], { x: margin, y, font: fontBold, size: 9, color: black });
+    page.drawText(br[1], { x: margin + 110, y, font, size: 9, color: black });
+    y -= 13;
+  }
+
+  return await doc.save();
+}
+
 function proFormaHtml(d: Record<string, unknown>) {
   var invNo = escHtml(String(d.invoice_number || ""));
   var ref = escHtml(String(d.payment_reference || invNo));
@@ -1173,17 +1351,20 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({ error: "Unknown email type: " + type }), { status: 400, headers: getCors(req) });
     }
 
-    // Build tax invoice attachment for INVOICE emails
+    // Build tax invoice PDF attachment for INVOICE and BOOKING_CONFIRM emails
     var attachments: Array<{ filename: string; content: string }> | undefined;
     if (type === "INVOICE" || type === "BOOKING_CONFIRM") {
       try {
         if (d.invoice_number) {
-          var pfHtml = proFormaHtml(d);
           var invNum = String(d.invoice_number);
-          attachments = [{ filename: "TaxInvoice-" + invNum + ".html", content: toBase64(pfHtml) }];
+          var pdfBytes = await buildInvoicePdf(d);
+          var pdfB64 = "";
+          for (var pi = 0; pi < pdfBytes.length; pi++) pdfB64 += String.fromCharCode(pdfBytes[pi]);
+          pdfB64 = btoa(pdfB64);
+          attachments = [{ filename: "TaxInvoice-" + invNum + ".pdf", content: pdfB64 }];
         }
       } catch (pfErr) {
-        console.error("PRO_FORMA_ERR:", pfErr);
+        console.error("PDF_INVOICE_ERR:", pfErr);
       }
     }
 

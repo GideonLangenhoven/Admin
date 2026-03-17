@@ -8,13 +8,13 @@ function appendQuery(base: string, params: Record<string, string>) {
   return url.toString();
 }
 
-export function resolveWaiverLink(business: Pick<TenantBusiness, "waiver_url"> | null | undefined, bookingId: string, waiverToken?: string | null) {
+export function resolveWaiverLink(business: Pick<TenantBusiness, "waiver_url"> & { booking_site_url?: string | null } | null | undefined, bookingId: string, waiverToken?: string | null) {
   if (!bookingId || !waiverToken) return "";
   var customUrl = String(business?.waiver_url || "").trim();
   if (customUrl) return appendQuery(customUrl, { booking: bookingId, token: waiverToken });
-  var supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  if (!supabaseUrl) return "";
-  return appendQuery(supabaseUrl.replace(/\/+$/, "") + "/functions/v1/waiver-form", {
+  // Use the booking site URL if available, otherwise fall back to a default
+  var bookingSiteUrl = String(business?.booking_site_url || "https://booking-mu-steel.vercel.app").replace(/\/+$/, "");
+  return appendQuery(bookingSiteUrl + "/waiver", {
     booking: bookingId,
     token: waiverToken,
   });
@@ -48,7 +48,7 @@ export async function getWaiverContext(supabase: any, options: {
   if (businessId) {
     var businessRes = await supabase
       .from("businesses")
-      .select("id, name, waiver_url, timezone, currency")
+      .select("id, name, waiver_url, booking_site_url, timezone, currency")
       .eq("id", businessId)
       .maybeSingle();
     business = (businessRes.data || null) as TenantBusiness | null;

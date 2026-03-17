@@ -228,6 +228,7 @@ export default function NewBookingPage() {
   const [loadingAvailabilityPreview, setLoadingAvailabilityPreview] = useState(false);
   const [selectedTourId, setSelectedTourId] = useState("");
   const [bookingDate, setBookingDate] = useState(todayInput());
+  const [matrixStartDate, setMatrixStartDate] = useState(todayInput());
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [pendingMatrixSelection, setPendingMatrixSelection] = useState<{ day: string; slotId: string } | null>(null);
   const [adults, setAdults] = useState("0");
@@ -310,14 +311,14 @@ export default function NewBookingPage() {
   }
 
   async function loadAvailabilityPreview() {
-    if (!bookingDate || !businessId || !selectedTourId) {
+    if (!matrixStartDate || !businessId || !selectedTourId) {
       setAvailabilityPreviewSlots([]);
       setLoadingAvailabilityPreview(false);
       return;
     }
 
     setLoadingAvailabilityPreview(true);
-    const start = new Date(`${bookingDate}T00:00:00`);
+    const start = new Date(`${matrixStartDate}T00:00:00`);
     const end = new Date(start);
     end.setDate(end.getDate() + 5);
 
@@ -352,7 +353,7 @@ export default function NewBookingPage() {
       loadAvailabilityPreview();
     }, 0);
     return () => clearTimeout(t);
-  }, [bookingDate, selectedTourId, businessId]);
+  }, [matrixStartDate, selectedTourId, businessId]);
 
   const selectedTour = useMemo(() => tours.find((t) => t.id === selectedTourId) || null, [tours, selectedTourId]);
   const selectedSlot = useMemo(() => slots.find((s) => s.id === selectedSlotId) || null, [slots, selectedSlotId]);
@@ -375,8 +376,8 @@ export default function NewBookingPage() {
   });
   const availableSeats = availableSlots.reduce((sum, s) => sum + Math.max((s.capacity_total || 0) - (s.booked || 0), 0), 0);
   const availabilityDays = useMemo(
-    () => Array.from({ length: 5 }, (_, index) => addDays(bookingDate, index)),
-    [bookingDate],
+    () => Array.from({ length: 5 }, (_, index) => addDays(matrixStartDate, index)),
+    [matrixStartDate],
   );
   const availabilityTimeRows = useMemo(() => {
     const dayMap = new Map<string, Map<string, number>>();
@@ -798,7 +799,7 @@ export default function NewBookingPage() {
             <div className={`w-full overflow-x-auto rounded-xl transition-colors ${missingField === "date" ? "ring-2 ring-red-500" : ""}`}>
               <AvailabilityCalendar
                 value={bookingDate}
-                onChange={(v) => { setBookingDate(v); setMissingField(null); }}
+                onChange={(v) => { setBookingDate(v); setMatrixStartDate(v); setMissingField(null); }}
                 tourId={selectedTourId}
                 businessId={businessId}
                 minQty={qty}
@@ -866,6 +867,8 @@ export default function NewBookingPage() {
                               setBookingDate(cell.day);
                               setSelectedSlotId(cell.slotId);
                               setMissingField(null);
+                              // Note: matrixStartDate is intentionally NOT changed here so
+                              // the 5-day grid stays in place when selecting a different column.
                             }
                           }}
                           className={`group relative flex flex-col items-center justify-center border-l border-gray-100 px-3 py-3 text-center transition-all cursor-pointer ${

@@ -32,8 +32,14 @@ function isPrivilegedRole(r: string) {
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
   const { businessId, businessName, logoUrl, role } = useBusinessContext();
-  const displayName = businessName || "Kayaks";
+  const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (displayName && displayName !== "Admin") {
+      document.title = displayName + " Admin";
+    }
+  }, [displayName]);
 
   // Strip privileged-only items for plain ADMIN users
   const visibleNav = nav.filter((n) => !n.privilegedOnly || isPrivilegedRole(role));
