@@ -204,7 +204,7 @@ export default function Bookings() {
 
     const { data } = await supabase
       .from("bookings")
-      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
       .eq("business_id", businessId)
       .in("slot_id", slotIds)
       .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT", "COMPLETED", "CANCELLED"])
@@ -1369,6 +1369,9 @@ function SlotRows({
                   >
                     <span className="inline-block w-2 text-gray-400 transition-transform lg:hidden" style={{ transform: actionsOpen ? "rotate(90deg)" : "none" }}>›</span>
                     <span className="font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none">{b.customer_name}</span>
+                    {b.waiver_status === "SIGNED"
+                      ? <span title="Waiver signed" className="text-emerald-500 shrink-0">✓</span>
+                      : <span title="Waiver not signed" className="text-amber-400 shrink-0 text-[10px]">W</span>}
                     <StatusBadge status={b.status} />
                     <SourceBadge source={b.source} />
                   </button>

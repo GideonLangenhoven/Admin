@@ -24,15 +24,7 @@ async function sha256Hex(input: string) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function setEncryptionContextIfNeeded() {
-  if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
-    throw new Error("Missing SETTINGS_ENCRYPTION_KEY");
-  }
-  const { error } = await supabase.rpc("set_app_settings_encryption_key", {
-    p_value: SETTINGS_ENCRYPTION_KEY,
-  });
-  if (error) throw new Error(error.message);
-}
+// Removed: two-step encryption context pattern was replaced with key-as-parameter RPCs.
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -106,9 +98,12 @@ Deno.serve(async (req) => {
     }
 
     if (waToken || waPhoneId || yocoSecretKey || yocoWebhookSecret) {
-      await setEncryptionContextIfNeeded();
+      if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
+        throw new Error("SETTINGS_ENCRYPTION_KEY must be 32+ characters to store credentials.");
+      }
       const { error: credentialError } = await supabase.rpc("set_business_credentials", {
         p_business_id: business.id,
+        p_key: SETTINGS_ENCRYPTION_KEY,
         p_wa_token: waToken,
         p_wa_phone_id: waPhoneId,
         p_yoco_secret_key: yocoSecretKey,

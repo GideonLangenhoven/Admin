@@ -202,27 +202,61 @@ function waiverPage(data: any, business: any, message?: string) {
           <div class="ok">
             <strong>Signed by ${esc(data.waiver_signed_name || data.customer_name || "guest")}</strong><br />
             ${esc(fmtDateTime(data.waiver_signed_at, business?.timezone))}
+            ${data.waiver_payload?.id_number ? `<br /><span style="font-size:0.85rem;opacity:0.75;">ID / Passport: ${esc(data.waiver_payload.id_number)}</span>` : ""}
           </div>
         ` : `
-          <p class="copy">By signing, you confirm that you understand the inherent risks of this activity, will follow guide instructions, are medically fit to participate, and accept responsibility on behalf of the guests in this booking.</p>
+          <div style="border:1px solid #dbe2ea;border-radius:18px;padding:20px 22px;margin-bottom:20px;background:#f8fafc;font-size:0.88rem;line-height:1.75;color:#374151;max-height:320px;overflow-y:auto;">
+            <p style="margin:0 0 12px;font-weight:700;font-size:1rem;color:#0f172a;">Indemnity, Assumption of Risk &amp; Release of Liability</p>
+
+            <p style="margin:0 0 10px;"><strong>1. Nature of Activity &amp; Inherent Risks</strong><br/>
+            I understand that adventure and outdoor activities — including but not limited to kayaking, paddling, hiking, water-based excursions, and associated transfers — involve inherent risks and dangers that cannot be eliminated. These include, without limitation: adverse or unpredictable weather and sea conditions; collision with vessels, rocks, or other obstacles; capsizing or falling into water; exhaustion; hypothermia; marine wildlife encounters; equipment failure; and the physical demands of the activity. I voluntarily and knowingly accept these risks.</p>
+
+            <p style="margin:0 0 10px;"><strong>2. Assumption of Risk</strong><br/>
+            I freely and voluntarily accept and assume all risks of injury, loss, damage, or death arising from my participation and the participation of the guests listed on this booking, whether caused by the negligence of the operator, its employees, guides, or agents, or by any other cause. I acknowledge that no assurance of safety has been given to me.</p>
+
+            <p style="margin:0 0 10px;"><strong>3. Release and Indemnity</strong><br/>
+            In consideration of being permitted to participate, I hereby release, indemnify and hold harmless the operator, its owners, directors, employees, guides, contractors and agents (collectively "the Operator") from any and all claims, actions, damages, liability, costs and expenses — including legal fees — arising from or relating to my participation or the participation of any guest on this booking, even if such loss or damage arises from the Operator's negligence, to the fullest extent permitted by applicable law.</p>
+
+            <p style="margin:0 0 10px;"><strong>4. Medical Fitness</strong><br/>
+            I confirm that I and all guests on this booking are in good physical health and are not aware of any medical condition, disability, or impairment that would increase the risk of participation or endanger themselves or others. I accept full responsibility for disclosing any relevant medical information to the Operator's guides before the activity commences. I authorise the Operator to seek emergency medical treatment on my behalf or on behalf of any guest if deemed necessary, and I accept responsibility for any associated costs.</p>
+
+            <p style="margin:0 0 10px;"><strong>5. Compliance with Instructions</strong><br/>
+            I agree to follow all safety briefings and instructions given by the Operator's guides at all times. I understand that failure to comply may result in removal from the activity without refund.</p>
+
+            <p style="margin:0 0 10px;"><strong>6. Personal Property</strong><br/>
+            I acknowledge that the Operator accepts no liability for loss of or damage to personal property, including electronic devices, valuables, or vehicles, however caused.</p>
+
+            <p style="margin:0 0 10px;"><strong>7. Photography &amp; Media</strong><br/>
+            I consent to the Operator photographing or filming me and the guests on this booking during the activity and using such images for marketing, social media, or promotional purposes without compensation, unless I notify the Operator's guide in person before the activity begins.</p>
+
+            <p style="margin:0 0 10px;"><strong>8. Governing Law</strong><br/>
+            This waiver is governed by the laws of the Republic of South Africa. Any dispute shall be subject to the jurisdiction of the South African courts. This document constitutes the entire agreement between the parties regarding assumption of risk and release of liability and supersedes any prior representations.</p>
+
+            <p style="margin:0;color:#6b7280;font-size:0.82rem;">By submitting this form you confirm that you have read, understood and agreed to all of the above terms on behalf of yourself and all guests listed on this booking.</p>
+          </div>
+
           <form method="POST">
             <input type="hidden" name="booking" value="${esc(data.id)}" />
             <input type="hidden" name="token" value="${esc(data.waiver_token)}" />
             <label>
-              Full name
-              <input type="text" name="signer_name" value="${esc(data.customer_name || "")}" required />
+              Full name of person signing
+              <input type="text" name="signer_name" value="${esc(data.customer_name || "")}" required placeholder="First and last name" />
             </label>
             <label>
-              Notes for the team (optional)
-              <textarea name="notes" placeholder="Add any relevant medical, mobility, dietary, or guest notes here."></textarea>
+              SA ID number or passport number <span style="font-weight:400;color:#64748b;">(optional — strengthens identity verification)</span>
+              <input type="text" name="id_number" placeholder="e.g. 8001015009087 or A12345678" autocomplete="off" />
+            </label>
+            <label>
+              Medical or mobility notes for the team (optional)
+              <textarea name="notes" placeholder="Any medical conditions, injuries, mobility limitations, dietary requirements, or notes about any guest in this booking."></textarea>
             </label>
             <label class="check">
               <input type="checkbox" name="accept_risk" value="yes" required />
-              <span>I confirm that I have read and accept the risk, medical fitness, and liability terms for myself and the guests on this booking.</span>
+              <span>I have read the full Indemnity, Assumption of Risk &amp; Release of Liability above. I understand and accept all terms on behalf of myself and all guests on this booking, including the inherent risks of the activity and the release of the Operator from liability.</span>
             </label>
             <label class="check">
               <input type="checkbox" name="guardian_consent" value="yes" required />
-              <span>If any participant is under 18, I confirm that I am their parent or legal guardian and I accept these terms on their behalf.</span>
+              <span>If any participant in this booking is under 18 years of age, I confirm that I am their parent or legal guardian and I accept all terms on their behalf with full legal authority to do so.</span>
             </label>
             <button class="button" type="submit">Sign waiver</button>
           </form>
@@ -275,6 +309,7 @@ Deno.serve(async (req) => {
       var acceptRisk = String(form?.get("accept_risk") || "") === "yes";
       var guardianConsent = String(form?.get("guardian_consent") || "") === "yes";
       var notes = String(form?.get("notes") || "").trim();
+      var idNumber = String(form?.get("id_number") || "").trim();
 
       if (!signerName || !acceptRisk || !guardianConsent) {
         return new Response(waiverPage(bookingRes.data, businessRes.data, "Please complete all required waiver confirmations."), {
@@ -285,6 +320,7 @@ Deno.serve(async (req) => {
 
       var payload = {
         notes: notes || null,
+        id_number: idNumber || null,
         accept_risk: true,
         guardian_consent: true,
         user_agent: req.headers.get("user-agent") || null,

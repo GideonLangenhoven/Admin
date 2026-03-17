@@ -16,6 +16,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: string;
+  privilegedOnly?: boolean; // if true, hidden for plain ADMIN role
 }
 
 const MARKETING_PATHS = ["/operators", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
@@ -24,11 +25,18 @@ function isMarketingPath(pathname: string) {
   return MARKETING_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
+function isPrivilegedRole(r: string) {
+  return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
+}
+
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
-  const { businessId, businessName, logoUrl } = useBusinessContext();
+  const { businessId, businessName, logoUrl, role } = useBusinessContext();
   const displayName = businessName || "Kayaks";
   const [collapsed, setCollapsed] = useState(false);
+
+  // Strip privileged-only items for plain ADMIN users
+  const visibleNav = nav.filter((n) => !n.privilegedOnly || isPrivilegedRole(role));
 
   useEffect(() => {
     const saved = localStorage.getItem("ck_sidebar_collapsed");
@@ -80,7 +88,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         <div className="flex-1 overflow-auto px-4 pb-4">
           {!collapsed && <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-sidebar-muted)" }}>General</div>}
           <nav className="space-y-1">
-            {nav.map((n) => {
+            {visibleNav.map((n) => {
               const Icon = (LucideIcons as any)[n.icon] || LucideIcons.Circle;
               const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
               return (
@@ -121,7 +129,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--ck-bg)" }}>
         <header className="md:hidden flex items-center justify-between border-b px-4 py-3 backdrop-blur" style={{ background: "color-mix(in srgb, var(--ck-surface) 85%, transparent)", borderColor: "var(--ck-border-strong)" }}>
-          <MobileMenuDrawer nav={nav} />
+          <MobileMenuDrawer nav={visibleNav} />
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {logoUrl && <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />}
             <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
@@ -135,7 +143,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
         <nav className="md:hidden shrink-0 overflow-x-auto border-t py-2 backdrop-blur no-scrollbar" style={{ background: "color-mix(in srgb, var(--ck-surface) 90%, transparent)", borderColor: "var(--ck-border-strong)" }}>
           <div className="flex min-w-max px-2">
-          {nav.map((n) => {
+          {visibleNav.map((n) => {
             const Icon = (LucideIcons as any)[n.icon] || LucideIcons.Circle;
             const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
             return (

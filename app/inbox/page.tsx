@@ -78,11 +78,15 @@ function InboxContent() {
   const [messages, setMessages] = useState<any[]>([]);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const sendingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
   const autoSelectedRef = useRef(false);
+
+  // WhatsApp send warning (cleared when conversation changes)
+  const [waWarning, setWaWarning] = useState<string | null>(null);
 
   // Chat History state
   const [historyConvos, setHistoryConvos] = useState<any[]>([]);
@@ -111,6 +115,11 @@ function InboxContent() {
       loadHistoryConvos();
     }
   }, [activeTab]);
+
+  // Clear warning when the selected conversation changes
+  useEffect(() => {
+    setWaWarning(null);
+  }, [selected?.id]);
 
   useEffect(() => {
     if (!selected) return;
@@ -162,6 +171,14 @@ function InboxContent() {
     }, 3000);
     return () => clearInterval(interval);
   }, [selected]);
+
+  // Show typing indicator bubble while admin is composing
+  useEffect(() => {
+    if (!reply.trim()) { setIsTyping(false); return; }
+    setIsTyping(true);
+    const t = setTimeout(() => setIsTyping(false), 2000);
+    return () => clearTimeout(t);
+  }, [reply]);
 
   async function loadConvos() {
     const { data } = await supabase.from("conversations")
@@ -220,14 +237,25 @@ function InboxContent() {
       });
       if (res.error) {
         notify({ title: "Reply failed", message: res.error.message, tone: "error" });
-      } else if (res.data && res.data.ok === false) {
-        let msgErr = res.data.error || "Unknown Error";
-        if (res.data.details?.error?.error_data?.details) {
-          msgErr += "\nDetails: " + res.data.details.error.error_data.details;
-        } else if (res.data.details?.error?.message) {
-          msgErr += "\nDetails: " + res.data.details.error.message;
+        if (/credential|token|whatsapp|wa_token|not configured/i.test(res.error.message)) {
+          setWaWarning("WhatsApp is not configured for this business. Go to Settings to add your WhatsApp token and Phone ID.");
         }
-        notify({ title: "Reply failed", message: msgErr, tone: "error" });
+      } else if (res.data && res.data.ok === false) {
+        // 24-hour window — friendly guidance, no generic error toast
+        if (res.data.error === "outside_24h_window") {
+          setWaWarning(res.data.message || "WhatsApp requires the customer to message you first. Ask them to send you a WhatsApp message, then you can reply here.");
+        } else {
+          let msgErr = res.data.error || "Unknown Error";
+          if (res.data.details?.error?.error_data?.details) {
+            msgErr += "\nDetails: " + res.data.details.error.error_data.details;
+          } else if (res.data.details?.error?.message) {
+            msgErr += "\nDetails: " + res.data.details.error.message;
+          }
+          notify({ title: "Reply failed", message: msgErr, tone: "error" });
+          if (/credential|token|whatsapp|wa_token|not configured/i.test(msgErr)) {
+            setWaWarning("WhatsApp is not configured for this business. Go to Settings to add your WhatsApp token and Phone ID.");
+          }
+        }
       } else {
         // Refresh updated_at on every admin reply to keep the 2-hour bot-silence window active
         await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("id", target.id);
@@ -368,17 +396,35 @@ function InboxContent() {
                   ) : (
                     <MessageList messages={messages} endRef={chatEndRef} fmtTime={fmtTime} fmtDate={fmtDate} />
                   )}
+                  {isTyping && (
+                    <div className="flex justify-end">
+                      <div className="flex items-center gap-1 rounded-2xl rounded-br-md bg-blue-600 px-3 py-2">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:300ms]" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="p-3 border-t border-gray-200 bg-white">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
-                      rows={2} placeholder="Type your reply... (Enter to send)"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-                    <button onClick={sendReply} disabled={sending || !reply.trim()}
-                      className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
-                      {sending ? "..." : "Send"}
-                    </button>
+                <div className="border-t border-gray-200 bg-white">
+                  {waWarning && (
+                    <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
+                      <span className="shrink-0 text-amber-500 text-sm">⚠️</span>
+                      <p className="flex-1 text-xs text-amber-800 leading-snug">{waWarning}</p>
+                      <button onClick={() => setWaWarning(null)} className="shrink-0 text-amber-400 hover:text-amber-600 text-xs font-medium">✕</button>
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
+                        rows={2} placeholder="Type your reply... (Enter to send)"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                      <button onClick={sendReply} disabled={sending || !reply.trim()}
+                        className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
+                        {sending ? "..." : "Send"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

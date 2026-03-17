@@ -77,8 +77,20 @@ Deno.serve(async (req: Request) => {
         }
         const tenant = await getTenantByBusinessId(supabase, actualBusinessId);
 
+        // Guard: return a structured error instead of a malformed WA API call
+        if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
+            return new Response(JSON.stringify({
+                ok: false,
+                error: "whatsapp_not_configured",
+                message: "WhatsApp credentials are not set for this business. Go to Admin → Settings → Integration Credentials to add them.",
+            }), { status: 200, headers: getCors(req) });
+        }
+
+        // Normalize phone — strip non-digits, convert local 0xx to 27xx
+        const normalizedTo = to.replace(/\D/g, "").replace(/^0/, "27");
+
         // Send WhatsApp Message
-        let waRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+        const waRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
             method: "POST",
             headers: {
                 Authorization: "Bearer " + tenant.credentials.waToken,
@@ -86,42 +98,67 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({
                 messaging_product: "whatsapp",
-                to: to,
+                to: normalizedTo,
                 type: "text",
                 text: { body: message }
             }),
         });
 
-        // If we get an error about outside the 24 hour window (code 131047 or similar), 
-        // fallback to sending a generic template message.
-        if (!waRes.ok) {
-            const waDataCheck = await waRes.clone().json();
-            if (waDataCheck.error && (waDataCheck.error.code === 131047 || waDataCheck.error.message.includes("24"))) {
-                console.log("Outside 24h window. Sending template fallback from admin-reply...");
-                waRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
-                    method: "POST",
-                    headers: {
-                        Authorization: "Bearer " + tenant.credentials.waToken,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        messaging_product: "whatsapp",
-                        to: to,
-                        type: "template",
-                        template: {
-                            name: "hello_world", // Replace with approved template
-                            language: { code: "en_US" }
-                        }
-                    }),
-                });
-            }
-        }
-
         const waData = await waRes.json();
 
         if (!waRes.ok) {
+            const errCode = waData?.error?.code;
+            const errMsg = waData?.error?.message || "";
+
+            // 131047 = outside 24h customer service window
+            // 131026 = recipient hasn't messaged this number before
+            // Fall back to the approved admin_outreach template so the message still reaches the customer.
+            if (errCode === 131047 || errCode === 131026 || errMsg.toLowerCase().includes("24 hour")) {
+                console.log("Outside 24h window — trying admin_outreach template for:", normalizedTo);
+                const firstName = String(convo?.customer_name || "").split(" ")[0] || "there";
+                const templateRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+                    method: "POST",
+                    headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        messaging_product: "whatsapp",
+                        to: normalizedTo,
+                        type: "template",
+                        template: {
+                            name: "admin_outreach",
+                            language: { code: "en" },
+                            components: [{
+                                type: "body",
+                                parameters: [
+                                    { type: "text", text: firstName },
+                                    { type: "text", text: message },
+                                ],
+                            }],
+                        },
+                    }),
+                });
+                const templateData = await templateRes.json().catch(() => ({}));
+                if (templateRes.ok) {
+                    // Log the message so it appears in the chat thread
+                    await supabase.from("chat_messages").insert({
+                        business_id: actualBusinessId,
+                        phone: to,
+                        direction: "OUT",
+                        body: message,
+                        sender: "Admin",
+                    });
+                    await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to);
+                    return new Response(JSON.stringify({ ok: true, via_template: true }), { status: 200, headers: getCors(req) });
+                }
+                // Template also failed — let admin know
+                console.error("admin_outreach template failed:", templateData);
+                return new Response(JSON.stringify({
+                    ok: false,
+                    error: "outside_24h_window",
+                    message: "WhatsApp only allows you to reply within 24 hours of the customer's last message. This customer hasn't messaged your WhatsApp number yet (or their last message was more than 24 hours ago). Ask them to send you a WhatsApp message first, then you can reply here.",
+                }), { status: 200, headers: getCors(req) });
+            }
+
             console.error("WhatsApp Error:", waData);
-            // Return 200 with error details so the frontend can read the JSON, rather than an opaque 500
             return new Response(JSON.stringify({ ok: false, error: "WhatsApp API Error", details: waData }), { status: 200, headers: getCors(req) });
         }
 

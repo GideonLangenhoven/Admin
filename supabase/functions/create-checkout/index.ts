@@ -21,6 +21,7 @@ function buildCors(origin?: string | null) {
 }
 
 function withQuery(base: string, params: Record<string, string>) {
+  if (!base) return "";
   var url = new URL(base);
   for (var [key, value] of Object.entries(params)) {
     if (value) url.searchParams.set(key, value);
@@ -97,15 +98,24 @@ Deno.serve(async (req: any) => {
     var successUrl = businessUrls.bookingSuccessUrl;
     var cancelUrl = businessUrls.bookingCancelUrl;
 
-    if (type === "GIFT_VOUCHER") {
-      metadata.voucher_id = voucherId;
-      metadata.voucher_code = voucherCode;
-      successUrl = withQuery(businessUrls.voucherSuccessUrl, { code: voucherCode || "" });
-    } else if (type === "TOPUP") {
+    if (type === "TOPUP") {
       return new Response(
         JSON.stringify({ error: "TOPUPS_DISCONTINUED", reason: "Booking top-ups have been removed. Plans are billed monthly by admin seats." }),
         { status: 410, headers: corsHeaders },
       );
+    }
+
+    if (!ensureCheckoutUrls(businessUrls, type)) {
+      return new Response(
+        JSON.stringify({ error: "BUSINESS_BOOKING_URLS_MISSING", reason: "This business is missing configured booking success/cancel URLs. Set BOOKING_SUCCESS_URL and BOOKING_CANCEL_URL in Supabase Edge Function secrets." }),
+        { status: 503, headers: corsHeaders },
+      );
+    }
+
+    if (type === "GIFT_VOUCHER") {
+      metadata.voucher_id = voucherId;
+      metadata.voucher_code = voucherCode;
+      successUrl = withQuery(businessUrls.voucherSuccessUrl, { code: voucherCode || "" });
     } else {
       metadata.booking_id = bookingId;
       metadata.customer_name = body.customer_name || "";
@@ -113,13 +123,6 @@ Deno.serve(async (req: any) => {
       if (body.voucher_codes) metadata.voucher_codes = body.voucher_codes.join(",");
       if (body.voucher_ids) metadata.voucher_ids = body.voucher_ids.join(",");
       successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
-    }
-
-    if (type !== "TOPUP" && !ensureCheckoutUrls(businessUrls, type)) {
-      return new Response(
-        JSON.stringify({ error: "BUSINESS_BOOKING_URLS_MISSING", reason: "This business is missing configured booking success/cancel URLs." }),
-        { status: 503, headers: corsHeaders },
-      );
     }
 
     console.log("CREATING CHECKOUT: amount=" + amount + " type=" + type);

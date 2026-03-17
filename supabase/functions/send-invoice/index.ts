@@ -5,7 +5,9 @@ var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 var supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-var FROM_EMAIL = "Adventure Operator <onboarding@resend.dev>";
+// RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
+// Without it, onboarding@resend.dev only delivers to your own Resend account email.
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Adventure Operator <onboarding@resend.dev>";
 
 var ALLOWED_ORIGINS = [
   "https://admin.capekayak.co.za",

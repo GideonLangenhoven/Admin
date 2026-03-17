@@ -50,7 +50,7 @@ export default function Reports() {
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [sortCol, setSortCol] = useState<"created_at" | "slot_time" | "total_amount">("slot_time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [activeTab, setActiveTab] = useState<"bookings" | "financials" | "marketing" | "attendance">("bookings");
+  const [activeTab, setActiveTab] = useState<"bookings" | "financials" | "marketing" | "attendance" | "waivers">("bookings");
 
   useEffect(() => {
     setStartDate(monthStartStr(activeTimezone));
@@ -81,7 +81,7 @@ export default function Reports() {
 
     let query = supabase
       .from("bookings")
-      .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, tours(name), slots(start_time)")
+      .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, tours(name), slots(start_time)")
       .eq("business_id", businessId);
 
     if (filterBy === "slot" && slotIds) {
@@ -125,12 +125,15 @@ export default function Reports() {
 
   const summary = useMemo(() => {
     const paid = filtered.filter(b => ["PAID", "COMPLETED", "CONFIRMED"].includes(b.status));
+    const active = filtered.filter(b => b.status !== "CANCELLED");
     return {
       total: filtered.length,
       pax: filtered.reduce((s, b) => s + Number(b.qty || 0), 0),
       revenue: paid.reduce((s, b) => s + Number(b.total_amount || 0), 0),
       pending: filtered.filter(b => b.status === "PENDING").length,
       cancelled: filtered.filter(b => b.status === "CANCELLED").length,
+      waiverSigned: active.filter(b => b.waiver_status === "SIGNED").length,
+      waiverPending: active.filter(b => b.waiver_status !== "SIGNED").length,
     };
   }, [filtered]);
 
@@ -151,6 +154,14 @@ export default function Reports() {
       return [
         { label: "Checked in", value: filtered.filter((booking) => booking.checked_in).reduce((sum, booking) => sum + Number(booking.qty || 0), 0) },
         { label: "Not checked in", value: filtered.filter((booking) => !booking.checked_in && booking.status !== "CANCELLED").reduce((sum, booking) => sum + Number(booking.qty || 0), 0) },
+      ];
+    }
+
+    if (activeTab === "waivers") {
+      const active = filtered.filter(b => b.status !== "CANCELLED");
+      return [
+        { label: "Signed", value: active.filter(b => b.waiver_status === "SIGNED").length },
+        { label: "Pending", value: active.filter(b => b.waiver_status !== "SIGNED").length },
       ];
     }
 
@@ -275,11 +286,40 @@ export default function Reports() {
       return;
     }
 
+    if (activeTab === "waivers") {
+      const active = filtered.filter(b => b.status !== "CANCELLED");
+      const headers = ["Ref", "Tour Date", "Customer", "Phone", "Email", "Tour", "Pax", "Waiver Status", "Signed By", "Signed At", "Booking Status"];
+      const rows = active.map(b => [
+        b.id.substring(0, 8).toUpperCase(),
+        b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "",
+        b.customer_name || "",
+        b.phone || "",
+        b.email || "",
+        b.tours?.name || "",
+        b.qty || 0,
+        b.waiver_status === "SIGNED" ? "SIGNED" : "PENDING",
+        b.waiver_signed_name || "",
+        b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "",
+        b.status || "",
+      ]);
+      const csv = [headers, ...rows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `waivers-${startDate}-to-${endDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const headers = [
       "Ref", "Booked At", "Customer Name", "Phone", "Email",
       "Tour", "Slot Date", "Slot Time",
       "Qty", "Unit Price", "Original Total", "Discount Type", "Discount %",
-      "Total Amount", "Status", "Source", "Payment Ref",
+      "Total Amount", "Status", "Source", "Payment Ref", "Waiver",
     ];
     const rows = filtered.map(b => [
       b.id.substring(0, 8).toUpperCase(),
@@ -299,6 +339,7 @@ export default function Reports() {
       b.status || "",
       b.source || "",
       b.yoco_payment_id || "",
+      b.waiver_status === "SIGNED" ? "SIGNED" : "PENDING",
     ]);
     const csv = [headers, ...rows]
       .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
@@ -373,9 +414,23 @@ export default function Reports() {
         fmtCurrency(d.revenue),
         fmtCurrency(d.count > 0 ? d.revenue / d.count : 0)
       ]);
+    } else if (activeTab === "waivers") {
+      title = `Waiver Report (${startDate} to ${endDate})`;
+      headers = ["Ref", "Tour Date", "Customer", "Tour", "Pax", "Waiver Status", "Signed By", "Booking Status"];
+      const active = filtered.filter(b => b.status !== "CANCELLED");
+      rows = active.map(b => [
+        b.id.substring(0, 8).toUpperCase(),
+        b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—",
+        b.customer_name || "—",
+        b.tours?.name || "—",
+        b.qty,
+        b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending",
+        b.waiver_signed_name || "—",
+        b.status,
+      ]);
     } else {
       title = `Bookings Report (${startDate} to ${endDate})`;
-      headers = ["Ref", "Date", "Customer", "Tour", "Date/Time", "Qty", "Total", "Status"];
+      headers = ["Ref", "Date", "Customer", "Tour", "Date/Time", "Qty", "Total", "Status", "Waiver"];
       rows = filtered.map(b => [
         b.id.substring(0, 8).toUpperCase(),
         fmtDate(b.created_at, activeTimezone),
@@ -384,7 +439,8 @@ export default function Reports() {
         b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—",
         b.qty,
         fmtCurrency(Number(b.total_amount || 0)),
-        b.status
+        b.status,
+        b.waiver_status === "SIGNED" ? "Signed" : "Pending",
       ]);
     }
 
@@ -452,6 +508,12 @@ export default function Reports() {
           >
             Attendance
           </button>
+          <button
+            onClick={() => setActiveTab("waivers")}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === "waivers" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Waivers
+          </button>
         </div>
       </div>
 
@@ -492,27 +554,43 @@ export default function Reports() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          { label: "Bookings", value: summary.total },
-          { label: "Pax", value: summary.pax },
-          { label: "Revenue", value: fmtCurrency(summary.revenue) },
-          { label: "Pending", value: summary.pending },
-          { label: "Cancelled", value: summary.cancelled },
-        ].map(c => (
-          <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-            <p className="text-xs text-gray-500">{c.label}</p>
-            <p className="text-xl font-bold text-gray-800">{c.value}</p>
-          </div>
-        ))}
-      </div>
+      {activeTab === "waivers" ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Active Bookings", value: summary.total - summary.cancelled },
+            { label: "Waivers Signed", value: summary.waiverSigned, color: "text-emerald-600" },
+            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "text-amber-600" : "text-gray-800" },
+            { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—" },
+          ].map(c => (
+            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
+              <p className="text-xs text-gray-500">{c.label}</p>
+              <p className={`text-xl font-bold ${c.color || "text-gray-800"}`}>{c.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[
+            { label: "Bookings", value: summary.total },
+            { label: "Pax", value: summary.pax },
+            { label: "Revenue", value: fmtCurrency(summary.revenue) },
+            { label: "Pending", value: summary.pending },
+            { label: "Cancelled", value: summary.cancelled },
+          ].map(c => (
+            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
+              <p className="text-xs text-gray-500">{c.label}</p>
+              <p className="text-xl font-bold text-gray-800">{c.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-gray-800">Visual breakdown</h3>
             <span className="text-xs text-gray-500">
-              {activeTab === "financials" ? "Revenue by status" : activeTab === "marketing" ? "Bookings by source" : activeTab === "attendance" ? "Attendance by pax" : "Pax by activity"}
+              {activeTab === "financials" ? "Revenue by status" : activeTab === "marketing" ? "Bookings by source" : activeTab === "attendance" ? "Attendance by pax" : activeTab === "waivers" ? "Signed vs pending" : "Pax by activity"}
             </span>
           </div>
           {visualSeries.length === 0 ? (
@@ -820,6 +898,83 @@ export default function Reports() {
           </table>
         </div>
         </>
+      ) : activeTab === "waivers" ? (
+        (() => {
+          const active = filtered.filter(b => b.status !== "CANCELLED");
+          const signed = active.filter(b => b.waiver_status === "SIGNED");
+          const pending = active.filter(b => b.waiver_status !== "SIGNED");
+          return (
+            <div className="space-y-4">
+              {/* Mobile cards */}
+              <div className="space-y-3 md:hidden">
+                {active.map(b => (
+                  <div key={b.id} className={`rounded-xl border bg-white p-4 ${b.waiver_status === "SIGNED" ? "border-emerald-200 bg-emerald-50/30" : "border-amber-200 bg-amber-50/20"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
+                        <p className="text-xs text-gray-500">{b.tours?.name || "—"} · {b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</p>
+                        <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}</p>
+                      </div>
+                      <span className={`inline-block shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                        {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
+                      </span>
+                    </div>
+                    {b.waiver_status === "SIGNED" && (
+                      <p className="mt-2 text-xs text-emerald-600">Signed by {b.waiver_signed_name || "guest"} · {b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
+                      <th className="p-3">Ref</th>
+                      <th className="p-3">Tour Date</th>
+                      <th className="p-3">Customer</th>
+                      <th className="p-3">Tour</th>
+                      <th className="p-3 text-center">Pax</th>
+                      <th className="p-3 text-center">Waiver</th>
+                      <th className="p-3">Signed By</th>
+                      <th className="p-3">Signed At</th>
+                      <th className="p-3 text-center">Booking</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {active.map(b => (
+                      <tr key={b.id} className={`hover:bg-gray-50/60 ${b.waiver_status === "SIGNED" ? "" : "bg-amber-50/20"}`}>
+                        <td className="p-3 font-mono text-xs text-gray-400">{b.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="p-3 text-gray-700 whitespace-nowrap">{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="p-3 font-medium text-gray-800">{b.customer_name || "—"}</td>
+                        <td className="p-3 text-gray-600">{b.tours?.name || "—"}</td>
+                        <td className="p-3 text-center text-gray-700">{b.qty}</td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-600">{b.waiver_signed_name || "—"}</td>
+                        <td className="p-3 text-gray-500 whitespace-nowrap text-xs">{b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>{b.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm font-semibold">
+                      <td colSpan={5} className="p-3 text-right text-gray-500">{signed.length} signed / {pending.length} pending</td>
+                      <td colSpan={4} className="p-3 text-center text-emerald-700">
+                        {active.length > 0 ? Math.round((signed.length / active.length) * 100) : 0}% compliance
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          );
+        })()
       ) : (
         <>
         <div className="space-y-3 md:hidden">

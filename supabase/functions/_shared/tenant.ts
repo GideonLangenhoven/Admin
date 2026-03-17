@@ -48,25 +48,24 @@ export function normalizePhoneLookup(value?: string | null) {
   return String(value || "").replace(/[^\d]/g, "");
 }
 
-export async function setEncryptionKeyContext(supabase: any) {
+// Kept for backward compatibility — safe to call; the DB stub is a no-op.
+// Credential RPCs now receive the key as an explicit param — no session GUC needed.
+export async function setEncryptionKeyContext(_supabase: any) {
   if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
-    throw new Error("Missing SETTINGS_ENCRYPTION_KEY");
-  }
-
-  var { error } = await supabase.rpc("set_app_settings_encryption_key", {
-    p_value: SETTINGS_ENCRYPTION_KEY,
-  });
-
-  if (error) {
-    throw new Error("Failed to set encryption key context: " + error.message);
+    throw new Error("Missing or too-short SETTINGS_ENCRYPTION_KEY (must be 32+ chars)");
   }
 }
 
 export async function getBusinessCredentials(supabase: any, businessId: string): Promise<TenantCredentials> {
-  await setEncryptionKeyContext(supabase);
+  if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
+    throw new Error("Missing or too-short SETTINGS_ENCRYPTION_KEY (must be 32+ chars)");
+  }
 
+  // Single RPC call — key passed as an explicit parameter.
+  // Fixes the broken two-step GUC pattern that failed with connection pooling.
   var { data, error } = await supabase.rpc("get_business_credentials", {
     p_business_id: businessId,
+    p_key: SETTINGS_ENCRYPTION_KEY,
   });
 
   if (error) {
@@ -75,7 +74,7 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
 
   var row = asRow(data);
   if (!row) {
-    throw new Error("No encrypted credentials found for business " + businessId);
+    throw new Error("No credential record found for business " + businessId);
   }
 
   return {
@@ -296,7 +295,58 @@ export function formatTenantDate(business: TenantBusiness | null | undefined, is
   });
 }
 
-export async function sendWhatsappTextForTenant(tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials }, to: string, message: string) {
+// Send a pre-approved WhatsApp message template.
+// bodyParams maps to {{1}}, {{2}}, ... in the template body in order.
+export async function sendWhatsappTemplate(
+  tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials },
+  to: string,
+  templateName: string,
+  bodyParams: string[],
+  languageCode = "en",
+) {
+  if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
+    throw new Error("WhatsApp is not configured for " + getBusinessDisplayName(tenant.business));
+  }
+  var normalizedTo = String(to || "").replace(/\D/g, "");
+  if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
+
+  var components = bodyParams.length > 0
+    ? [{ type: "body", parameters: bodyParams.map(function (text) { return { type: "text", text: String(text) }; }) }]
+    : [];
+
+  var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: normalizedTo,
+      type: "template",
+      template: { name: templateName, language: { code: languageCode }, components },
+    }),
+  });
+  var data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(String(data?.error?.message || "WhatsApp template send failed: " + templateName));
+  return data;
+}
+
+// Send a free-form WhatsApp text message.
+// If the customer is outside the 24-hour window (error 131047 / 131026) and
+// a templateFallback is provided, the template is sent instead so the message
+// still reaches the customer.
+export async function sendWhatsappTextForTenant(
+  tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials },
+  to: string,
+  message: string,
+  templateFallback?: { name: string; params: string[]; language?: string },
+) {
+  // Guard: fail fast with a clear message instead of a malformed API call
+  if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
+    var bName = getBusinessDisplayName(tenant.business);
+    throw new Error(
+      "WhatsApp is not configured for " + bName + ". " +
+      "Please add the Access Token and Phone Number ID in Admin → Settings → Integration Credentials."
+    );
+  }
   var normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
@@ -313,6 +363,16 @@ export async function sendWhatsappTextForTenant(tenant: TenantContext | { busine
     }),
   });
   var data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(data?.error?.message || data?.message || "WhatsApp send failed"));
+
+  if (!res.ok) {
+    var errCode = data?.error?.code;
+    // 131047 = outside 24h customer service window
+    // 131026 = recipient hasn't messaged this number before
+    if ((errCode === 131047 || errCode === 131026) && templateFallback) {
+      console.log("WA 24h window closed — sending template fallback: " + templateFallback.name + " to " + normalizedTo);
+      return await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+    }
+    throw new Error(String(data?.error?.message || data?.message || "WhatsApp send failed"));
+  }
   return data;
 }

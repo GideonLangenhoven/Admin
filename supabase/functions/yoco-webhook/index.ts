@@ -126,16 +126,30 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
 
   if (booking.phone) {
     try {
-      await sendWhatsappTextForTenant(tenant, booking.phone,
+      var currency = tenant.business.currency || "ZAR";
+      await sendWhatsappTextForTenant(
+        tenant,
+        booking.phone,
         "Booking confirmed\n\n" +
         "Ref: " + ref + "\n" +
         tourName + "\n" +
         slotTime + "\n" +
         booking.qty + " guest" + (booking.qty === 1 ? "" : "s") + "\n" +
-        (tenant.business.currency || "ZAR") + " " + booking.total_amount + " paid\n" +
+        currency + " " + booking.total_amount + " paid\n" +
         "Invoice: " + (invoice?.invoice_number || "pending") + "\n\n" +
         (waiver.waiverStatus !== "SIGNED" && waiver.waiverLink ? "Waiver: " + waiver.waiverLink + "\n\n" : "") +
-        "Thanks for booking with " + brandName + "."
+        "Thanks for booking with " + brandName + ".",
+        // Template fallback for customers outside the 24h window
+        {
+          name: "booking_confirmed",
+          params: [
+            ref,
+            tourName,
+            slotTime,
+            String(booking.qty),
+            currency + " " + booking.total_amount,
+          ],
+        },
       );
       waSent = true;
     } catch (e) {

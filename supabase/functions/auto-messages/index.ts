@@ -88,7 +88,16 @@ async function sendRemindersForBusiness(businessId: string) {
       "Please arrive 15 minutes early.";
 
     try {
-      await sendWhatsappTextForTenant(tenant, booking.phone, message);
+      await sendWhatsappTextForTenant(tenant, booking.phone, message, {
+        name: "booking_reminder",
+        params: [
+          firstName,
+          booking?.tours?.name || "Your booking",
+          formatTenantDateTime(tenant.business, startTime),
+          String(booking.qty),
+          meetingPoint,
+        ],
+      });
       await logSent(businessId, booking.id, booking.phone, "REMINDER");
       sent++;
     } catch (error) {
@@ -180,7 +189,10 @@ async function sendReviewRequestsForBusiness(businessId: string) {
       "We’d love a quick review if you have a moment. Your feedback helps our team a lot.";
 
     try {
-      await sendWhatsappTextForTenant(tenant, booking.phone, message);
+      await sendWhatsappTextForTenant(tenant, booking.phone, message, {
+        name: "review_request",
+        params: [firstName],
+      });
       await logSent(businessId, booking.id, booking.phone, "REVIEW_REQUEST");
       sent++;
     } catch (error) {
@@ -291,11 +303,18 @@ async function autoExpireBookingsForBusiness(businessId: string) {
 
     if (booking.phone) {
       try {
+        var cancelRef = String(booking.id || "").substring(0, 8).toUpperCase();
+        var cancelTourName = booking?.tours?.name || "Experience";
+        var cancelDate = booking?.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "TBC";
         await sendWhatsappTextForTenant(
           tenant,
           booking.phone,
-          "Your booking " + String(booking.id || "").substring(0, 8).toUpperCase() + " was released because the payment deadline passed." +
+          "Your booking " + cancelRef + " was released because the payment deadline passed." +
             (bookingSiteUrl ? "\n\nYou can create a new booking here: " + bookingSiteUrl : ""),
+          {
+            name: "booking_cancelled",
+            params: [cancelRef, cancelTourName, cancelDate, "Payment deadline expired"],
+          },
         );
       } catch (error) {
         console.error("AUTO_CANCEL_WA_ERR", businessId, booking.id, error);

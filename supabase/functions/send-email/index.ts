@@ -5,7 +5,9 @@ import { getWaiverContext } from "../_shared/waiver.ts";
 var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-var FROM_EMAIL = "Cape Kayak <onboarding@resend.dev>";
+// RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
+// If unset, Resend's onboarding@resend.dev test domain is used — which only delivers to your Resend account email.
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Cape Kayak <onboarding@resend.dev>";
 var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -32,7 +34,11 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
     body: JSON.stringify(payload),
   });
   var data = await res.json();
-  if (!res.ok) console.error("RESEND_ERR:", JSON.stringify(data));
+  if (!res.ok) {
+    console.error("RESEND_ERR from=" + (fromEmail || FROM_EMAIL) + " to=" + to + " subject=" + subject + ":", JSON.stringify(data));
+  } else {
+    console.log("RESEND_OK id=" + data?.id + " to=" + to + " subject=" + subject);
+  }
   return data;
 }
 
@@ -128,7 +134,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || data?.booking_site_url || d.booking_site_url || "https://book.capekayak.co.za"),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
-    fromEmail: brandName + " <onboarding@resend.dev>",
+    fromEmail: Deno.env.get("RESEND_FROM_EMAIL") || brandName + " <onboarding@resend.dev>",
   };
 }
 

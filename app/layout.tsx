@@ -27,7 +27,8 @@ const nav = [
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
-  { href: "/settings", label: "Settings", icon: "Settings" },
+  // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
+  { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -8,6 +8,11 @@ import RichTextEditor from "../../components/RichTextEditor";
 import ExternalBookingSettings from "../../components/ExternalBookingSettings";
 import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
 
+// SUPER_ADMIN has every right that MAIN_ADMIN has, plus cross-tenant access.
+function isPrivileged(r: string | null) {
+    return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
+}
+
 var DEFAULT_BOOKING_URL = "https://book.capekayak.co.za";
 var DEFAULT_MANAGE_BOOKINGS_URL = "https://book.capekayak.co.za/my-bookings";
 var DEFAULT_GIFT_VOUCHER_URL = "https://book.capekayak.co.za/gift-voucher";
@@ -116,15 +121,24 @@ export default function SettingsPage() {
     var [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
     var [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
 
+    // Credentials State
+    var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean } | null>(null);
+    var [waForm, setWaForm] = useState({ token: "", phoneId: "" });
+    var [yocoForm, setYocoForm] = useState({ secretKey: "", webhookSecret: "" });
+    var [waSaving, setWaSaving] = useState(false);
+    var [yocoSaving, setYocoSaving] = useState(false);
+    var [credMessage, setCredMessage] = useState({ type: "", text: "" });
+
     useEffect(() => {
         var r = localStorage.getItem("ck_admin_role");
         setRole(r);
-        if (r === "MAIN_ADMIN") {
+        if (isPrivileged(r)) {
             fetchAdmins();
             fetchTours();
             fetchResources();
             fetchSiteSettings();
             fetchPlanUsage();
+            fetchCredStatus();
         } else {
             setLoading(false);
         }
@@ -440,8 +454,8 @@ export default function SettingsPage() {
     }
 
     async function handleDelete(id: string, adminRole: string) {
-        if (adminRole === "MAIN_ADMIN") {
-            notify({ title: "Action blocked", message: "Cannot delete the Main Admin.", tone: "warning" });
+        if (adminRole === "MAIN_ADMIN" || adminRole === "SUPER_ADMIN") {
+            notify({ title: "Action blocked", message: "Cannot delete a Main Admin or Super Admin account.", tone: "warning" });
             return;
         }
         if (!await confirmAction({
@@ -701,9 +715,60 @@ export default function SettingsPage() {
         setSiteSaving(false);
     }
 
+    async function fetchCredStatus() {
+        try {
+            var res = await fetch("/api/credentials?business_id=" + businessId);
+            if (res.ok) setCredStatus(await res.json());
+        } catch (e) {
+            console.error("Failed to load credential status:", e);
+        }
+    }
+
+    async function handleSaveWa(e: React.FormEvent) {
+        e.preventDefault();
+        setWaSaving(true);
+        setCredMessage({ type: "", text: "" });
+        try {
+            var res = await fetch("/api/credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ business_id: businessId, section: "wa", wa_token: waForm.token, wa_phone_id: waForm.phoneId }),
+            });
+            var d = await res.json();
+            if (!res.ok || d.error) throw new Error(d.error || "Save failed");
+            setCredMessage({ type: "success", text: "WhatsApp credentials saved and encrypted successfully." });
+            setWaForm({ token: "", phoneId: "" });
+            fetchCredStatus();
+        } catch (err: any) {
+            setCredMessage({ type: "error", text: String(err?.message || "Failed to save WhatsApp credentials.") });
+        }
+        setWaSaving(false);
+    }
+
+    async function handleSaveYoco(e: React.FormEvent) {
+        e.preventDefault();
+        setYocoSaving(true);
+        setCredMessage({ type: "", text: "" });
+        try {
+            var res = await fetch("/api/credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ business_id: businessId, section: "yoco", yoco_secret_key: yocoForm.secretKey, yoco_webhook_secret: yocoForm.webhookSecret }),
+            });
+            var d = await res.json();
+            if (!res.ok || d.error) throw new Error(d.error || "Save failed");
+            setCredMessage({ type: "success", text: "Yoco credentials saved and encrypted successfully." });
+            setYocoForm({ secretKey: "", webhookSecret: "" });
+            fetchCredStatus();
+        } catch (err: any) {
+            setCredMessage({ type: "error", text: String(err?.message || "Failed to save Yoco credentials.") });
+        }
+        setYocoSaving(false);
+    }
+
     if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
 
-    if (role !== "MAIN_ADMIN") {
+    if (!isPrivileged(role)) {
         return (
             <div className="max-w-2xl">
                 <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
@@ -1162,7 +1227,7 @@ export default function SettingsPage() {
                 )}
             </div>
 
-            {role === "MAIN_ADMIN" && (
+            {isPrivileged(role) && (
                 <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
             )}
 
@@ -1516,6 +1581,115 @@ export default function SettingsPage() {
 
                 </form>
             </div >
+
+            {/* ── Integration Credentials ── */}
+            <div className="mt-10">
+                <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Integration Credentials</h2>
+                <p className="text-sm text-[var(--ck-text-muted)] mb-6">
+                    Credentials are AES-256 encrypted at rest and never displayed after saving. Update each integration independently — saving one section will not affect the other.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                    {/* WhatsApp */}
+                    <form onSubmit={handleSaveWa} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[#25D366]"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">WhatsApp (Meta API)</h3>
+                            </div>
+                            {credStatus !== null && (
+                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.wa ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                    {credStatus.wa ? "✓ Configured" : "⚠ Not set"}
+                                </span>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Access Token</label>
+                            <input
+                                type="password"
+                                value={waForm.token}
+                                onChange={e => setWaForm({ ...waForm, token: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "EAAG..."}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Phone Number ID</label>
+                            <input
+                                type="text"
+                                value={waForm.phoneId}
+                                onChange={e => setWaForm({ ...waForm, phoneId: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "123456789012345"}
+                                autoComplete="off"
+                            />
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in Meta Business Manager → WhatsApp → API Setup → Phone number ID.</p>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={waSaving || !waForm.token.trim() || !waForm.phoneId.trim()}
+                            className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
+                        >
+                            {waSaving ? "Encrypting & saving..." : "Save WhatsApp Credentials"}
+                        </button>
+                    </form>
+
+                    {/* Yoco */}
+                    <form onSubmit={handleSaveYoco} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--ck-accent)]"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco (Payments)</h3>
+                            </div>
+                            {credStatus !== null && (
+                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                    {credStatus.yoco ? "✓ Configured" : "⚠ Not set"}
+                                </span>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Secret Key</label>
+                            <input
+                                type="password"
+                                value={yocoForm.secretKey}
+                                onChange={e => setYocoForm({ ...yocoForm, secretKey: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "sk_live_..."}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Webhook Signing Secret</label>
+                            <input
+                                type="password"
+                                value={yocoForm.webhookSecret}
+                                onChange={e => setYocoForm({ ...yocoForm, webhookSecret: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "whsec_..."}
+                                autoComplete="new-password"
+                            />
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Webhooks → Signing secret.</p>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim()}
+                            className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
+                        >
+                            {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
+                        </button>
+                    </form>
+
+                </div>
+
+                {credMessage.text && (
+                    <div className={"mt-4 p-3 rounded-xl text-sm font-medium " + (credMessage.type === "error" ? "bg-red-50 border border-red-200 text-[var(--ck-danger)]" : "bg-emerald-50 border border-emerald-200 text-emerald-700")}>
+                        {credMessage.text}
+                    </div>
+                )}
+            </div>
+
         </div >
     );
 }

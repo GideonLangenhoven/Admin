@@ -579,7 +579,14 @@ export default function NewBookingPage() {
           });
           const checkoutData = checkoutRes.data;
           if (checkoutRes.error) {
-            console.error("Auto payment link failed (checkout):", checkoutRes.error);
+            // Extract the real error body from the edge function response
+            let checkoutErrDetail = checkoutRes.error.message;
+            try {
+              const errBody = await (checkoutRes.error as any).context?.json?.();
+              if (errBody?.error) checkoutErrDetail = errBody.error;
+              if (errBody?.reason) checkoutErrDetail += " — " + errBody.reason;
+            } catch { /* ignore parse error */ }
+            console.error("Auto payment link failed (checkout):", checkoutErrDetail, checkoutRes.error);
           } else if (checkoutData?.redirectUrl) {
             // Send payment link email
             try {
