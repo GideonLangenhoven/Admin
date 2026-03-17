@@ -118,11 +118,28 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     };
   }
 
-  var { data } = await supabase
-    .from("businesses")
-    .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
-    .eq("id", businessId)
-    .maybeSingle();
+  var data: Record<string, unknown> | null = null;
+  try {
+    var res = await supabase
+      .from("businesses")
+      .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .eq("id", businessId)
+      .maybeSingle();
+    data = res.data;
+  } catch (brandErr) {
+    console.warn("BRANDING_QUERY_ERR (will use fallbacks):", brandErr);
+    // Try a simpler query without the email_img columns in case they don't exist yet
+    try {
+      var res2 = await supabase
+        .from("businesses")
+        .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+        .eq("id", businessId)
+        .maybeSingle();
+      data = res2.data;
+    } catch (fallbackErr) {
+      console.warn("BRANDING_FALLBACK_QUERY_ERR:", fallbackErr);
+    }
+  }
 
   var brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
@@ -1292,10 +1309,18 @@ Deno.serve(async (req: Request) => {
     var body = await req.json();
     var type = body.type as string;
     var d = body.data as Record<string, unknown>;
-    var branding = await loadEmailBranding(d);
+
+    var branding: Awaited<ReturnType<typeof loadEmailBranding>>;
+    try {
+      branding = await loadEmailBranding(d);
+    } catch (brandErr) {
+      console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
+      var fb = String(d.business_name || d.brand_name || "Your Booking");
+      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: "https://book.capekayak.co.za", voucherUrl: "https://book.capekayak.co.za", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL };
+    }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {
-      d = await enrichWaiverEmailData(d);
+      try { d = await enrichWaiverEmailData(d); } catch (wErr) { console.error("WAIVER_ENRICH_ERR:", wErr); }
     }
 
     console.log("SEND_EMAIL type=" + type + " to=" + (d.email || "?"));
@@ -1370,6 +1395,9 @@ Deno.serve(async (req: Request) => {
 
     var branded = applyBranding(subject, html, branding);
     var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments);
+    if (result?.statusCode && result.statusCode >= 400) {
+      return new Response(JSON.stringify({ ok: false, error: result.message || "Resend API error", result }), { status: 200, headers: getCors(req) });
+    }
     return new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: getCors(req) });
   } catch (err: unknown) {
     console.error("SEND_EMAIL_ERR:", err);

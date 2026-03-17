@@ -580,18 +580,18 @@ export default function NewBookingPage() {
           });
           const checkoutData = checkoutRes.data;
           if (checkoutRes.error) {
-            // Extract the real error body from the edge function response
             let checkoutErrDetail = checkoutRes.error.message;
             try {
               const errBody = await (checkoutRes.error as any).context?.json?.();
               if (errBody?.error) checkoutErrDetail = errBody.error;
               if (errBody?.reason) checkoutErrDetail += " — " + errBody.reason;
             } catch { /* ignore parse error */ }
-            console.error("Auto payment link failed (checkout):", checkoutErrDetail, checkoutRes.error);
+            console.error("Auto payment link failed (checkout):", checkoutErrDetail);
+            notify({ title: "Payment link failed", message: "Could not create checkout: " + checkoutErrDetail + ". You can resend from the bookings page.", tone: "error", duration: 8000 });
           } else if (checkoutData?.redirectUrl) {
             // Send payment link email
             try {
-              await supabase.functions.invoke("send-email", {
+              const emailRes = await supabase.functions.invoke("send-email", {
                 body: {
                   type: "PAYMENT_LINK",
                   data: {
@@ -610,9 +610,15 @@ export default function NewBookingPage() {
                   },
                 },
               });
-              paymentLinkSent = true;
+              if (emailRes.error) {
+                console.error("Payment link email error:", emailRes.error);
+                notify({ title: "Payment email failed", message: "Email could not be sent: " + (emailRes.error.message || "unknown error") + ". Resend from bookings page.", tone: "error", duration: 8000 });
+              } else {
+                paymentLinkSent = true;
+              }
             } catch (emailErr) {
               console.error("Payment link email failed:", emailErr);
+              notify({ title: "Payment email failed", message: "Email send threw an error. Resend from bookings page.", tone: "error", duration: 8000 });
             }
 
             // Send WhatsApp with payment link
@@ -637,9 +643,12 @@ export default function NewBookingPage() {
                 console.error("Payment link WhatsApp failed:", waErr);
               }
             }
+          } else {
+            notify({ title: "Payment link failed", message: "Checkout did not return a payment URL. Resend from bookings page.", tone: "error", duration: 8000 });
           }
         } catch (err) {
           console.error("Auto payment link flow failed:", err);
+          notify({ title: "Payment link failed", message: "Payment link flow failed: " + (err instanceof Error ? err.message : String(err)), tone: "error", duration: 8000 });
         }
       }
 
@@ -648,7 +657,7 @@ export default function NewBookingPage() {
       if (status === "PAID" || status === "CONFIRMED") {
         if (email.trim()) {
           try {
-            await supabase.functions.invoke("send-email", {
+            const confirmRes = await supabase.functions.invoke("send-email", {
               body: {
                 type: "BOOKING_CONFIRM",
                 data: {
@@ -666,13 +675,18 @@ export default function NewBookingPage() {
                 },
               },
             });
+            if (confirmRes.error) {
+              console.error("Confirmation email error:", confirmRes.error);
+              notify({ title: "Confirmation email failed", message: "Error: " + (confirmRes.error.message || "unknown") + ". Resend from bookings page.", tone: "error", duration: 8000 });
+            }
           } catch (e) {
             console.error("Confirmation email failed:", e);
+            notify({ title: "Confirmation email failed", message: "Could not send confirmation email. Resend from bookings page.", tone: "error", duration: 8000 });
           }
 
           // Send invoice email with pro forma PDF attachment
           try {
-            await supabase.functions.invoke("send-email", {
+            const invoiceRes = await supabase.functions.invoke("send-email", {
               body: {
                 type: "INVOICE",
                 data: {
@@ -693,6 +707,9 @@ export default function NewBookingPage() {
                 },
               },
             });
+            if (invoiceRes.error) {
+              console.error("Invoice email error:", invoiceRes.error);
+            }
           } catch (e) {
             console.error("Invoice email failed:", e);
           }
