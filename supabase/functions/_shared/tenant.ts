@@ -210,7 +210,14 @@ export function getAdminAppOrigins() {
     .map(function (value) { return value.trim(); })
     .filter(Boolean);
   return Array.from(new Set(configured.concat([
+    "https://admin.capekayak.co.za",
+    "https://caepweb-admin.vercel.app",
     "https://admin-tawny-delta-92.vercel.app",
+    "https://book.capekayak.co.za",
+    "https://booking-mu-steel.vercel.app",
+    "https://capekayak.co.za",
+    "https://bookingtours.co.za",
+    "https://www.bookingtours.co.za",
     "http://localhost:3000",
     "http://localhost:3001",
   ])));
