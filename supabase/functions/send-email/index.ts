@@ -7,7 +7,8 @@ import { getAdminAppOrigins } from "../_shared/tenant.ts";
 var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-// RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
+// RESEND_FROM_EMAIL must be a verified sender on a domain you control (e.g. "bookings@capekayakplatform.com")
+// to pass DMARC/SPF checks. Tenant-specific reply addresses go in the Reply-To header instead.
 // If unset, Resend's onboarding@resend.dev test domain is used — which only delivers to your Resend account email.
 var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Bookings <onboarding@resend.dev>";
 var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
@@ -26,8 +27,26 @@ function getCors(req?: Request) {
   };
 }
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>) {
+// Basic email format validation — catches obviously malformed addresses before hitting the API
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// NOTE: For production bounce/complaint handling, configure a Resend webhook endpoint
+// (POST /functions/v1/resend-webhook) to receive bounce, complaint, and delivery events.
+// See: https://resend.com/docs/dashboard/webhooks/introduction
+// This lets you mark bad emails in the database and stop future sends to them.
+
+async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string) {
+  // Validate email format before attempting to send
+  if (!to || !isValidEmail(to)) {
+    console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
+    return { error: "invalid_email_format", message: "Email address '" + to + "' has an invalid format" };
+  }
+  // Always send FROM a platform-controlled domain to pass DMARC/SPF.
+  // The tenant's email goes in Reply-To so customers reply to the right place.
   var payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html };
+  if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
   var res = await fetch("https://api.resend.com/emails", {
@@ -37,7 +56,14 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   });
   var data = await res.json();
   if (!res.ok) {
-    console.error("RESEND_ERR from=" + (fromEmail || FROM_EMAIL) + " to=" + to + " subject=" + subject + ":", JSON.stringify(data));
+    console.error("RESEND_ERR status=" + res.status + " from=" + (fromEmail || FROM_EMAIL) + " to=" + to + " subject=" + subject + ":", JSON.stringify(data));
+    // Log specific failure reasons for operational visibility
+    if (data?.name === "validation_error") {
+      console.warn("RESEND_VALIDATION_FAIL to=" + to + ": " + (data?.message || "unknown validation error"));
+    }
+    if (res.status === 422) {
+      console.warn("RESEND_BOUNCE_LIKELY to=" + to + " — address may be invalid or previously bounced");
+    }
   } else {
     console.log("RESEND_OK id=" + data?.id + " to=" + to + " subject=" + subject);
   }
@@ -116,6 +142,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       waiverUrl: String(d.waiver_url || ""),
       directions: String(d.directions || ""),
       fromEmail: FROM_EMAIL,
+      replyToEmail: "",
     };
   }
 
@@ -123,7 +150,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -133,7 +160,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     try {
       var res2 = await supabase
         .from("businesses")
-        .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+        .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
         .eq("id", businessId)
         .maybeSingle();
       data = res2.data;
@@ -154,7 +181,11 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || data?.booking_site_url || d.booking_site_url || "https://book.capekayak.co.za"),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
-    fromEmail: Deno.env.get("RESEND_FROM_EMAIL") || brandName + " <onboarding@resend.dev>",
+    // FROM must always be a platform-controlled domain for DMARC/SPF compliance.
+    // Use the brand name as the display name but send from the platform email domain.
+    fromEmail: FROM_EMAIL.includes("@") ? brandName + " <" + FROM_EMAIL.replace(/^[^<]*</, "").replace(/>.*$/, "") + ">" : FROM_EMAIL,
+    // Reply-To uses the tenant's notification_email so customer replies go to the right place
+    replyToEmail: String(data?.notification_email || ""),
     imgPayment: String(data?.email_img_payment || ""),
     imgConfirm: String(data?.email_img_confirm || ""),
     imgInvoice: String(data?.email_img_invoice || ""),
@@ -541,7 +572,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 }
 
 function cancellationHtml(d: Record<string, unknown>) {
-  var isWeather = typeof d.reason === "string" && d.reason.toLowerCase().includes("weather");
+  var isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
   var headerImg = isWeather ? IMG_CANCEL_WEATHER : IMG_CANCEL_GENERAL;
   var cancelText = isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
@@ -552,6 +583,48 @@ function cancellationHtml(d: Record<string, unknown>) {
                 <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 15px; text-align: right;">R${d.total_amount}</td>
               </tr>` : "";
   var btnStyle = "display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; padding: 16px 20px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;";
+
+  // Weather cancellations get a prominent self-service block with a single "Manage My Booking" CTA
+  var optionsBlock = isWeather
+    ? `
+        <!-- Weather self-service notice -->
+        <tr>
+          <td style="padding: 0 40px 10px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;">
+              <tr>
+                <td style="padding: 24px; text-align: center;">
+                  <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #047857;">Your options</p>
+                  <h3 style="margin: 0 0 10px 0; font-family: Georgia, serif; font-size: 20px; color: #14532d;">Reschedule, get a voucher, or request a refund</h3>
+                  <p style="margin: 0 0 18px 0; font-size: 14px; color: #166534; line-height: 1.6;">Use the link below to manage your booking at any time. You can pick a new date, convert to a gift voucher, or request a full refund &mdash; it only takes a minute.</p>
+                  <a href="${MANAGE_BOOKING_URL}" style="display: inline-block; background-color: #166534; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">Manage My Booking</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 40px 30px; text-align: center;">
+            <p style="font-size: 13px; color: #888; margin: 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
+          </td>
+        </tr>
+      `
+    : `
+        <!-- Options -->
+        <tr>
+          <td style="padding: 10px 40px 10px; text-align: center;">
+            <p style="font-size: 17px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 20px 0;">How would you like us to handle your booking?</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 40px; text-align: center;">
+            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #1b3b36; color: #ffffff !important;">Reschedule My Trip</a>
+            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #2563eb; color: #ffffff !important;">Convert to Voucher</a>
+            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #059669; color: #ffffff !important;">Request a Refund</a>
+            <p style="font-size: 13px; color: #888; margin: 8px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
+          </td>
+        </tr>
+      `;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -600,20 +673,7 @@ function cancellationHtml(d: Record<string, unknown>) {
             </table>
           </td>
         </tr>
-        <!-- Options -->
-        <tr>
-          <td style="padding: 10px 40px 10px; text-align: center;">
-            <p style="font-size: 17px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 20px 0;">How would you like us to handle your booking?</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 0 40px 40px; text-align: center;">
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #1b3b36; color: #ffffff !important;">Reschedule My Trip</a>
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #2563eb; color: #ffffff !important;">Convert to Voucher</a>
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #059669; color: #ffffff !important;">Request a Refund</a>
-            <p style="font-size: 13px; color: #888; margin: 8px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
-          </td>
-        </tr>
+        ${optionsBlock}
         <!-- Footer -->
         <tr>
           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
@@ -798,6 +858,97 @@ function voucherHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function voucherBalanceHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #F7F7F6; font-family: Arial, Helvetica, sans-serif; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <!-- Hero Banner -->
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Voucher Balance Update</h1>
+          </td>
+        </tr>
+        <!-- Hero Image -->
+        <tr>
+          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
+            <img src="${IMG_VOUCHER}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
+          </td>
+        </tr>
+        <!-- Greeting -->
+        <tr>
+          <td style="text-align: center; padding: 30px 40px 10px;">
+            <p style="font-size: 16px; color: #333; margin: 0;">Hi ${d.customer_name || "there"},</p>
+            <p style="font-size: 15px; color: #6b7280; margin: 10px 0 0 0;">Your voucher was used for a booking. Here's a summary of your remaining balance.</p>
+          </td>
+        </tr>
+        <!-- Booking Details -->
+        <tr>
+          <td style="padding: 20px 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb;">
+              <tr>
+                <td style="padding: 20px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Booking Ref</td>
+                      <td style="padding: 8px 0; font-size: 14px; font-weight: bold; text-align: right; color: #333;">${d.booking_ref || ""}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Tour</td>
+                      <td style="padding: 8px 0; font-size: 14px; font-weight: bold; text-align: right; color: #333;">${d.tour_name || ""}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 14px; color: #6b7280;">Amount Used</td>
+                      <td style="padding: 8px 0; font-size: 14px; font-weight: bold; text-align: right; color: #B91C1C;">-R${d.amount_used || 0}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Voucher Balance Box -->
+        <tr>
+          <td style="padding: 0 40px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: #f0fdf4; border: 2px dashed #2a5a52; border-radius: 12px;">
+              <tr>
+                <td style="padding: 24px; text-align: center;">
+                  <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">Your Voucher Code</p>
+                  <p style="margin: 0 0 12px 0; font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #2a5a52;">${d.voucher_code || ""}</p>
+                  <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Remaining Balance</p>
+                  <p style="margin: 0; font-size: 36px; font-weight: bold; color: #2a5a52;">R${d.remaining_balance || 0}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Instructions -->
+        <tr>
+          <td style="padding: 0 40px 30px; text-align: center;">
+            <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
+              You can use the remaining R${d.remaining_balance || 0} credit on your next booking at <a href="https://book.capekayak.co.za" style="color: #2a5a52; font-weight: bold; text-decoration: none;">book.capekayak.co.za</a>
+            </p>
+            <a href="https://book.capekayak.co.za" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Again</a>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+            <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
+            If you have any questions, reply to this email or contact us on WhatsApp.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 function tripPhotosHtml(d: Record<string, unknown>) {
   return `
     <!DOCTYPE html>
@@ -842,7 +993,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
               <tr>
                 <td style="padding: 24px; text-align: center;">
                   <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">Your trip photos are ready!</p>
-                  <p style="margin: 0 0 16px 0; font-size: 13px; color: #888; line-height: 1.5;">We captured some great moments from your trip. Click below to view and download your photos.</p>
+                  <p style="margin: 0 0 16px 0; font-size: 13px; color: #888; line-height: 1.5;">We captured some great moments from your trip. Click below to view and download your photos.<br><strong>Share this link with your group!</strong></p>
                   <a href="${d.photo_url}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">View Photos</a>
                 </td>
               </tr>
@@ -1317,12 +1468,20 @@ Deno.serve(async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       var fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: "https://book.capekayak.co.za", voucherUrl: "https://book.capekayak.co.za", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL };
+      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: "https://book.capekayak.co.za", voucherUrl: "https://book.capekayak.co.za", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {
       try { d = await enrichWaiverEmailData(d); } catch (wErr) { console.error("WAIVER_ENRICH_ERR:", wErr); }
     }
+
+    // Validate recipient email before processing the template
+    var recipientEmail = String(d.email || "").trim();
+    if (!recipientEmail || !isValidEmail(recipientEmail)) {
+      console.warn("SEND_EMAIL_SKIP type=" + type + " invalid_email=" + recipientEmail);
+      return new Response(JSON.stringify({ ok: false, error: "invalid_email", message: "Recipient email '" + recipientEmail + "' is missing or invalid" }), { status: 200, headers: getCors(req) });
+    }
+    d.email = recipientEmail;
 
     console.log("SEND_EMAIL type=" + type + " to=" + (d.email || "?"));
 
@@ -1361,6 +1520,10 @@ Deno.serve(async (req: Request) => {
         subject = "Cape Kayak - Your Voucher Code";
         html = voucherHtml(d);
         break;
+      case "VOUCHER_BALANCE":
+        subject = "Cape Kayak - Voucher Balance: R" + (d.remaining_balance || 0) + " remaining";
+        html = voucherBalanceHtml(d);
+        break;
       case "BROADCAST":
         subject = d.subject ? String(d.subject) : "Cape Kayak - Important Update";
         html = broadcastHtml(d);
@@ -1395,7 +1558,7 @@ Deno.serve(async (req: Request) => {
     }
 
     var branded = applyBranding(subject, html, branding);
-    var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments);
+    var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
     if (result?.statusCode && result.statusCode >= 400) {
       return new Response(JSON.stringify({ ok: false, error: result.message || "Resend API error", result }), { status: 200, headers: getCors(req) });
     }

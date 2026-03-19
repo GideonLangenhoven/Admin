@@ -48,6 +48,27 @@ export function normalizePhoneLookup(value?: string | null) {
   return String(value || "").replace(/[^\d]/g, "");
 }
 
+/**
+ * Normalise any phone input to E.164-like digits-only format.
+ * Examples:
+ *   "+27 71 614 5061"  → "27716145061"
+ *   "071 614 5061"     → "27716145061"
+ *   "0716145061"       → "27716145061"
+ *   "27716145061"      → "27716145061"
+ *   "+44 7911 123456"  → "447911123456"
+ * Returns empty string for falsy / empty input.
+ */
+export function normalizePhone(value?: string | null): string {
+  if (!value) return "";
+  var digits = String(value).replace(/[^\d]/g, "");
+  if (!digits) return "";
+  // South-African local numbers starting with 0 → prepend 27
+  if (digits.startsWith("0")) {
+    digits = "27" + digits.substring(1);
+  }
+  return digits;
+}
+
 // Kept for backward compatibility — safe to call; the DB stub is a no-op.
 // Credential RPCs now receive the key as an explicit param — no session GUC needed.
 export async function setEncryptionKeyContext(_supabase: any) {
@@ -261,6 +282,24 @@ export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?:
     voucherSuccessUrl: data?.voucher_success_url || (bookingSiteUrl ? bookingSiteUrl + "/voucher-confirmed" : defaultVoucherSuccessUrl),
   };
 }
+
+// ──────────────────────────────────────────────────────────────────
+// AUDIT LOGGING — Edge Functions that perform sensitive operations
+// (refunds, price overrides, booking deletions, credential changes)
+// should log to the `audit_logs` table. Example:
+//
+//   await supabase.from("audit_logs").insert({
+//     actor_id:      adminUserId,
+//     business_id:   businessId,
+//     action_type:   "REFUND",
+//     target_entity: "bookings",
+//     target_id:     bookingId,
+//     before_state:  { status: "CONFIRMED", amount_paid: 500 },
+//     after_state:   { status: "REFUNDED",  refund_amount: 500 },
+//   });
+//
+// The audit_logs table is append-only (no UPDATE/DELETE policies).
+// ──────────────────────────────────────────────────────────────────
 
 export function createServiceClient() {
   var supabaseUrl = Deno.env.get("SUPABASE_URL");

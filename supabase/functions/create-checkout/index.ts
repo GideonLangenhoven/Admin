@@ -82,6 +82,50 @@ Deno.serve(async (req: any) => {
 
     if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
+    // FIX 4: Server-side price verification for BOOKING checkouts
+    // Never trust frontend pricing — calculate from DB for standard bookings
+    if (type === "BOOKING" && bookingId) {
+      var bookingRow = await supabase
+        .from("bookings")
+        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount")
+        .eq("id", bookingId)
+        .maybeSingle();
+      if (bookingRow.data) {
+        var bk = bookingRow.data;
+        // Look up current base price from tour
+        var tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();
+        var basePrice = Number(tourRow.data?.base_price_per_person || 0);
+        // Check for slot-level price override (peak pricing)
+        if (bk.slot_id) {
+          var slotRow = await supabase.from("slots").select("price_per_person_override").eq("id", bk.slot_id).maybeSingle();
+          if (slotRow.data?.price_per_person_override != null) {
+            basePrice = Number(slotRow.data.price_per_person_override);
+          }
+        }
+        var serverTotal = basePrice * Number(bk.qty || 1);
+        // Apply discount if present
+        if (bk.discount_type === "PERCENT" && bk.discount_percent) {
+          serverTotal = serverTotal * (1 - Number(bk.discount_percent) / 100);
+        } else if (bk.discount_amount) {
+          serverTotal = serverTotal - Number(bk.discount_amount);
+        }
+        serverTotal = Math.max(0, serverTotal);
+        // Subtract any voucher portion already applied
+        var voucherApplied = Number(bk.voucher_amount_paid || 0);
+        var serverCashDue = Math.max(0, serverTotal - voucherApplied);
+        // Round to 2 decimals
+        serverCashDue = Math.round(serverCashDue * 100) / 100;
+
+        if (Math.abs(Number(amount) - serverCashDue) > 0.01) {
+          console.warn("CHECKOUT_PRICE_MISMATCH: frontend=" + amount + " server=" + serverCashDue + " booking=" + bookingId);
+          // Use server-calculated amount (never trust frontend)
+          amount = serverCashDue;
+          // Also update the booking record to reflect corrected total
+          await supabase.from("bookings").update({ total_amount: serverTotal }).eq("id", bookingId);
+        }
+      }
+    }
+
     var resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
     var tenant = resolved.tenant;
     var businessUrls = resolved.businessUrls;
@@ -116,6 +160,10 @@ Deno.serve(async (req: any) => {
       metadata.voucher_id = voucherId;
       metadata.voucher_code = voucherCode;
       successUrl = withQuery(businessUrls.voucherSuccessUrl, { code: voucherCode || "" });
+    } else if (type === "RESCHEDULE") {
+      metadata.booking_id = bookingId;
+      metadata.pending_reschedule_id = body.pending_reschedule_id || "";
+      successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
     } else {
       metadata.booking_id = bookingId;
       metadata.customer_name = body.customer_name || "";

@@ -72,6 +72,13 @@ Deno.serve(async (req: any) => {
     var waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
     var currency = tenant.business.currency || "ZAR";
 
+    // Last-minute booking: if trip is within 24 hours, always include waiver link
+    var isLastMinute = false;
+    if (booking.slots?.start_time) {
+      var hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
+      isLastMinute = hoursUntilTrip < 24 && hoursUntilTrip > 0;
+    }
+
     var invR = await supabase
       .from("invoices")
       .select("invoice_number, payment_reference")
@@ -98,7 +105,9 @@ Deno.serve(async (req: any) => {
           booking.qty + " guest" + (booking.qty === 1 ? "" : "s") + "\n" +
           currency + " " + booking.total_amount + " paid\n" +
           "Invoice: " + (invoice?.invoice_number || "pending") + "\n\n" +
-          (waiver.waiverStatus !== "SIGNED" && waiver.waiverLink ? "Waiver: " + waiver.waiverLink + "\n\n" : "") +
+          (waiver.waiverStatus !== "SIGNED" && waiver.waiverLink
+            ? (isLastMinute ? "IMPORTANT - Please sign your waiver before the trip:\n" : "Waiver: ") + waiver.waiverLink + "\n\n"
+            : "") +
           "Thanks for booking with " + brandName + ".",
           {
             name: "booking_confirmed",
@@ -125,6 +134,7 @@ Deno.serve(async (req: any) => {
               business_id: booking.business_id,
               waiver_status: waiver.waiverStatus,
               waiver_url: waiver.waiverLink,
+              is_last_minute: isLastMinute,
               customer_name: booking.customer_name,
               customer_email: booking.email,
               ref: ref,

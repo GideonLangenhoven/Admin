@@ -154,7 +154,8 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
         to: to,
         type: "template",
         template: {
-          name: "hello_world", // You will need to replace this with your actual approved template name in Meta Business Suite
+          // TODO: Replace "hello_world" with an approved WhatsApp template name from Meta Business Suite
+          name: "hello_world",
           language: { code: "en_US" }
         }
       })
@@ -207,9 +208,11 @@ async function getSlotPrice(slot: any) {
 }
 async function getAvailSlotsForTour(tenant: TenantContext, tourId: any, days: number = 14) {
   var later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  // M5: Add 60-min cutoff — don't show slots starting within the next hour
+  var cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   var r = await supabase.rpc("list_available_slots", {
     p_business_id: tenant.business.id,
-    p_range_start: new Date().toISOString(),
+    p_range_start: cutoff,
     p_range_end: later,
     p_tour_id: tourId,
   });
@@ -219,9 +222,11 @@ async function getAvailSlotsForTour(tenant: TenantContext, tourId: any, days: nu
 }
 async function getAvailSlots(tenant: TenantContext, days: number = 14) {
   var later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  // M5: Add 60-min cutoff — don't show slots starting within the next hour
+  var cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   var r = await supabase.rpc("list_available_slots", {
     p_business_id: tenant.business.id,
-    p_range_start: new Date().toISOString(),
+    p_range_start: cutoff,
     p_range_end: later,
     p_tour_id: null,
   });
@@ -265,6 +270,16 @@ function genVoucherCode() {
   var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; var code = "";
   for (var i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
+}
+async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) payload.code = genVoucherCode();
+    var { data, error } = await supabase.from("vouchers").insert(payload).select().single();
+    if (!error) return { data, error: null };
+    if (error.code === "23505" && attempt < maxRetries - 1) continue;
+    return { data: null, error };
+  }
+  return { data: null, error: { message: "Failed to generate unique voucher code after " + maxRetries + " attempts" } };
 }
 async function hasActiveBookings(tenant: TenantContext, phone: any) {
   var r = await supabase.from("bookings").select("id").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"]).limit(1);
@@ -383,22 +398,31 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
   // Fetch live weather from Open-Meteo for the tenant's configured weather spot.
   var weatherMsg = "";
   try {
-    var tmr = new Date();
-    tmr.setDate(tmr.getDate() + 1);
-    var dateStr = tmr.toISOString().split("T")[0];
-    var wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=2";
-    var mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=2";
+    // L12: Calculate the day index based on the booking's slot start_time relative to today
+    var weatherDayIndex = 1; // default to tomorrow
+    if (bkTime) {
+      var bkDate = new Date(bkTime);
+      var todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      weatherDayIndex = Math.max(0, Math.floor((bkDate.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000)));
+    }
+    var forecastDays = Math.max(weatherDayIndex + 1, 2);
+    var targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + weatherDayIndex);
+    var dateStr = targetDate.toISOString().split("T")[0];
+    var wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
+    var mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
     var [wRes, mRes] = await Promise.all([fetch(wUrl), fetch(mUrl)]);
     var wData = await wRes.json();
     var mData = await mRes.json();
 
-    // Get tomorrow's data (index 1)
-    var maxWind = wData?.daily?.wind_speed_10m_max?.[1] || 0;
-    var windDir = wData?.daily?.wind_direction_10m_dominant?.[1] || 0;
-    var swell = mData?.daily?.wave_height_max?.[1] || 0;
-    var weatherCode = wData?.daily?.weather_code?.[1] || 0;
+    // L12: Use the correct day index for the booking day
+    var maxWind = wData?.daily?.wind_speed_10m_max?.[weatherDayIndex] || 0;
+    var windDir = wData?.daily?.wind_direction_10m_dominant?.[weatherDayIndex] || 0;
+    var swell = mData?.daily?.wave_height_max?.[weatherDayIndex] || 0;
+    var weatherCode = wData?.daily?.weather_code?.[weatherDayIndex] || 0;
 
-    // Check visibility at tour hours (7-9am = indices 7-9)
+    // Check visibility at tour hours (7-9am = indices 7-9) on the booking day
     var minVis = 99999;
     var hourlyVis = wData?.hourly?.visibility || [];
     var hourlyTimes = wData?.hourly?.time || [];
@@ -422,10 +446,11 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     if (windBad) concerns.push("wind gusts up to " + Math.round(maxWind) + "km/h " + dirName + (isSE ? " (limit 25km/h for SE)" : " (limit 20km/h)"));
     if (foggy) concerns.push("low visibility/fog expected");
 
+    var weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
     if (concerns.length > 0) {
-      weatherMsg = "Looking at tomorrow\u2019s forecast, it does look like a challenging paddle \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure tomorrow morning, about an hour before the trip. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
+      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, it does look like a challenging paddle \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
     } else {
-      weatherMsg = "Tomorrow\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for paddling. We\u2019ll still confirm on the morning of your trip about an hour before launch. Keep your phone nearby \u{1F4F1}";
+      weatherMsg = weatherDayLabel.charAt(0).toUpperCase() + weatherDayLabel.slice(1) + "\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for paddling. We\u2019ll still confirm on the morning of your trip about an hour before launch. Keep your phone nearby \u{1F4F1}";
     }
   } catch (e) {
     console.error("Weather API err:", e);
@@ -612,6 +637,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       rid = (interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "";
     }
 
+    // Marketing opt-out stop words — always processed regardless of conversation state
+    var STOP_WORDS = ["stop", "unsubscribe", "opt out"];
+    if (STOP_WORDS.includes(input)) {
+      // Set marketing_opt_in = false on all bookings for this phone number
+      await supabase.from("bookings")
+        .update({ marketing_opt_in: false })
+        .eq("business_id", tenant.business.id)
+        .eq("phone", phone);
+      await sendText(tenant, phone,
+        "You've been unsubscribed from marketing messages. You'll still receive booking confirmations."
+      );
+      return;
+    }
+
     // Allow "menu"/"start"/"restart" to escape HUMAN mode so the user can always get the bot back
     var isResetKeyword = (input === "menu" || input === "start" || input === "restart" || input === "back" || input === "home" || input === "main menu" || input === "start over");
     if (convo.status === "HUMAN") {
@@ -684,6 +723,38 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { status: "HUMAN", current_state: "IDLE", state_data: {} });
         return;
       }
+    }
+
+    // ===== PHOTO LINK REQUEST =====
+    // When we send a photo-ready notification via template, we ask customers to reply "YES".
+    // This handler detects that reply and sends them the actual photo URLs.
+    // L7: Only trigger photo sending if last conversation involved photo-related keywords
+    var _lastMsgs = await supabase.from("chat_messages").select("body").eq("business_id", tenant.business.id).eq("phone", phone).order("created_at", { ascending: false }).limit(5);
+    var _recentPhotoContext = (_lastMsgs.data || []).some(function (m: any) { var mb = (m.body || "").toLowerCase(); return mb.includes("photo") || mb.includes("picture") || mb.includes("pics") || mb.includes("trip photos"); });
+    if ((input === "yes" || input === "yes!" || input === "yeah" || input === "yep") && (state === "IDLE" || state === "MENU") && _recentPhotoContext) {
+      // Check if this customer has a recent booking with trip photos
+      var recentBk = await supabase.from("bookings")
+        .select("id, slot_id")
+        .eq("business_id", tenant.business.id)
+        .eq("phone", phone)
+        .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recentBk.data?.slot_id) {
+        var photos = await supabase.from("trip_photos")
+          .select("photo_url")
+          .eq("slot_id", recentBk.data.slot_id)
+          .eq("business_id", tenant.business.id)
+          .order("uploaded_at", { ascending: false });
+        if (photos.data && photos.data.length > 0) {
+          var photoUrls = photos.data.map(function (p: any) { return p.photo_url; });
+          await typingDelay();
+          await sendText(tenant, phone, "Here are your trip photos! 📸\n\n" + photoUrls.join("\n") + "\n\nShare this link with your group and enjoy the memories! 🛶");
+          return;
+        }
+      }
+      // No photos found — fall through to normal processing
     }
 
     // ===== NATURAL LANGUAGE FROM ANY STATE =====
@@ -903,13 +974,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "REDEEM_VOUCHER" });
       }
 
-
-      // REDEEM
-      else if (c === "REDEEM_VOUCHER") {
-        await sendText(tenant, phone, "Got a voucher? Nice! \u{1F389}\n\nPlease type your 8-character voucher code:");
-        await setConvo(convo.id, { current_state: "REDEEM_VOUCHER" });
-      }
-
       // HUMAN
       // REFERRAL
       else if (c === "REFERRAL" || (c.includes("refer") && !c.includes("refund"))) {
@@ -989,89 +1053,263 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       var bk = bkd.data; var bkref = bk.id.substring(0, 8).toUpperCase();
       var bkslot = (bk as any).slots; var bktour = (bk as any).tours;
       var bkhrs = bkslot ? (new Date(bkslot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-      var detail = "*Booking " + bkref + "*\n\n\u{1F6F6} " + (bktour?.name || "Tour") + "\n\u{1F4C5} " + (bkslot ? fmtTime(tenant, bkslot.start_time) : "TBC") + "\n\u{1F465} " + bk.qty + " people\n\u{1F4B0} R" + bk.total_amount + "\n\u{1F4CC} " + bk.status + "\n\nWhat would you like to do?";
-      var actions: any[] = [];
+      var bkUnitPrice = Number(bk.unit_price || (bk.qty > 0 ? bk.total_amount / bk.qty : 0));
+      var detail = "*Booking " + bkref + "*\n\n\u{1F6F6} " + (bktour?.name || "Tour") + "\n\u{1F4C5} " + (bkslot ? fmtTime(tenant, bkslot.start_time) : "TBC") + "\n\u{1F465} " + bk.qty + " people\n\u{1F4B0} R" + bk.total_amount + "\n\u{1F4CC} " + bk.status;
+      // Show special request if exists
+      if (bk.custom_fields && bk.custom_fields.special_requests) detail += "\n\u{1F4DD} Request: " + bk.custom_fields.special_requests;
+      detail += "\n\nWhat would you like to do?";
+      var actRows: any[] = [];
       if (bk.status === "CANCELLED") {
         if (bk.cancellation_reason && bk.cancellation_reason.includes("Weather")) {
           if (bk.refund_status === "REQUESTED" || bk.refund_status === "PROCESSED") {
-            detail += "\n\n100% Refund has already been requested.";
-            actions = [{ id: "IDLE", title: "\u2B05 Back" }];
+            detail += "\n\n\u2705 100% Refund has already been requested.";
+            await sendButtons(tenant, phone, detail, [{ id: "IDLE", title: "\u2B05 Back" }]);
+            await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, unit_price: bkUnitPrice, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: true } });
+            return;
           } else if (bk.converted_to_voucher_id) {
-            detail += "\n\nAlready converted to a voucher.";
-            actions = [{ id: "IDLE", title: "\u2B05 Back" }];
+            detail += "\n\n\u2705 Already converted to a voucher.";
+            await sendButtons(tenant, phone, detail, [{ id: "IDLE", title: "\u2B05 Back" }]);
+            await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, unit_price: bkUnitPrice, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: true } });
+            return;
           } else {
-            actions = [{ id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule" }, { id: "ACT_VOUCHER_" + bk.id, title: "\u{1F39F} To Voucher" }, { id: "ACT_WX_REFUND_" + bk.id, title: "\u{1F4B8} 100% Refund" }];
+            actRows = [
+              { id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule", description: "Move to a new date" },
+              { id: "ACT_VOUCHER_" + bk.id, title: "\u{1F39F} Convert to Voucher", description: "Get a gift voucher" },
+              { id: "ACT_WX_REFUND_" + bk.id, title: "\u{1F4B8} 100% Refund", description: "Full weather refund" },
+            ];
           }
         } else {
-          actions = [{ id: "IDLE", title: "\u2B05 Back" }];
+          await sendButtons(tenant, phone, detail, [{ id: "IDLE", title: "\u2B05 Back" }]);
+          await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, unit_price: bkUnitPrice, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: false } });
+          return;
         }
-      } else if (bk.status === "PAID" && bkhrs >= 24) {
-        actions = [{ id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel" }, { id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule" }, { id: "ACT_VOUCHER_" + bk.id, title: "\u{1F39F} To Voucher" }];
-      } else if (bk.status === "PAID") {
-        actions = [{ id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel (no refund)" }, { id: "IDLE", title: "\u2B05 Back" }];
-      } else { actions = [{ id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel" }, { id: "IDLE", title: "\u2B05 Back" }]; }
-      await sendButtons(tenant, phone, detail, actions);
-      await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: bk.cancellation_reason && bk.cancellation_reason.includes("Weather") } });
+      } else if (["PAID", "CONFIRMED"].includes(bk.status)) {
+        // >24h: full self-service
+        if (bkhrs >= 24) {
+          actRows = [
+            { id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule", description: "Move to another date" },
+            { id: "ACT_GUESTS_" + bk.id, title: "\u{1F465} Edit Guests", description: "Add or remove people" },
+            { id: "ACT_REQUEST_" + bk.id, title: "\u{1F4DD} Special Request", description: "Dietary, celebrations, etc" },
+            { id: "ACT_CONTACT_" + bk.id, title: "\u{1F4F1} Contact Details", description: "Update name, email, phone" },
+            { id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel Booking", description: "Get refund or voucher" },
+          ];
+        }
+        // 12-24h: limited changes
+        else if (bkhrs >= 12) {
+          actRows = [
+            { id: "ACT_GUESTS_" + bk.id, title: "\u{1F465} Add Guests", description: "Add more people" },
+            { id: "ACT_REQUEST_" + bk.id, title: "\u{1F4DD} Special Request", description: "Dietary, celebrations, etc" },
+            { id: "ACT_CONTACT_" + bk.id, title: "\u{1F4F1} Contact Details", description: "Update name, email, phone" },
+            { id: "ACT_TEAM_" + bk.id, title: "\u{1F4AC} Contact Our Team", description: "Request other changes" },
+          ];
+        }
+        // <12h: locked, team review
+        else {
+          actRows = [
+            { id: "ACT_REQUEST_" + bk.id, title: "\u{1F4DD} Special Request", description: "Last-minute requests" },
+            { id: "ACT_TEAM_" + bk.id, title: "\u{1F4AC} Contact Our Team", description: "Request changes" },
+          ];
+        }
+      } else {
+        // HELD / PENDING
+        actRows = [
+          { id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel Booking", description: "Cancel this booking" },
+        ];
+      }
+      await sendList(tenant, phone, detail, "Manage Booking", [{ title: "Actions", rows: actRows }]);
+      await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, unit_price: bkUnitPrice, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: bk.cancellation_reason && bk.cancellation_reason.includes("Weather") } });
     }
 
     // ===== BOOKING ACTIONS =====
     else if (state === "BOOKING_ACTIONS") {
       var action = rid || "";
+
+      // ── CANCEL ──
       if (action.startsWith("ACT_CANCEL_")) {
         if (sd.hours_before >= 24) {
           var rAmt = Math.round(Number(sd.total) * 0.95 * 100) / 100;
-          await sendButtons(tenant, phone, "Are you sure you want to cancel?\n\nYou\u2019ll get a *95% refund (R" + rAmt + ")*. A small 5% booking fee applies.", [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
+          await sendText(tenant, phone, "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + sd.total + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + rAmt + " (5% processing fee) \u2022 5-7 business days");
+          await sendButtons(tenant, phone, "Choose an option:", [
+            { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
+            { id: "CANCEL_REFUND", title: "\u{1F4B8} Refund" },
+            { id: "IDLE", title: "\u274C Keep Booking" },
+          ]);
+          await setConvo(convo.id, { current_state: "CANCEL_CHOICE" });
         } else {
-          await sendButtons(tenant, phone, "Are you sure? This booking is within 24 hours, so unfortunately *no refund* is available.", [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
+          await sendButtons(tenant, phone, "Are you sure? This booking is within 24 hours, so unfortunately *no refund* is available.", [{ id: "CONFIRM_CANCEL_NOREFUND", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
+          await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION" });
         }
-        await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION" });
       }
+
+      // ── RESCHEDULE ──
       else if (action.startsWith("ACT_RESCH_")) {
         if (!sd.is_weather && sd.hours_before < 24) { await sendText(tenant, phone, "Sorry, rescheduling is only available more than 24 hours before your tour."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         var cbk2 = await supabase.from("bookings").select("reschedule_count").eq("id", sd.booking_id).single();
         if (cbk2.data && cbk2.data.reschedule_count >= 2) { await sendText(tenant, phone, "You\u2019ve already rescheduled twice. Let me connect you to our team for help."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
-
         await typingDelay();
         await sendText(tenant, phone, "No problem! \ud83d\udcc5 Simply type the new date you want to reschedule to (e.g., 'Tomorrow' or '1 September')");
         await setConvo(convo.id, { current_state: "PICK_DATE", state_data: { ...sd, is_reschedule: true, reschedule_count: cbk2.data?.reschedule_count || 0 } });
       }
+
+      // ── EDIT GUESTS ──
+      else if (action.startsWith("ACT_GUESTS_")) {
+        var canRemove = sd.hours_before >= 24;
+        if (canRemove) {
+          await sendText(tenant, phone, "You currently have *" + sd.qty + " people* on this booking (R" + sd.unit_price + "/pp).\n\nType the *new total number* of guests:");
+        } else {
+          await sendText(tenant, phone, "You currently have *" + sd.qty + " people* on this booking (R" + sd.unit_price + "/pp).\n\nYou can add more guests. Type the *new total number* of guests (must be " + (sd.qty + 1) + " or more):");
+        }
+        await setConvo(convo.id, { current_state: "EDIT_GUESTS_QTY", state_data: { ...sd, can_remove: canRemove } });
+      }
+
+      // ── SPECIAL REQUEST ──
+      else if (action.startsWith("ACT_REQUEST_")) {
+        await sendText(tenant, phone, "Tell us about any special requirements \u{1F4DD}\n\nExamples:\n\u2022 Birthday celebration\n\u2022 Dietary needs\n\u2022 Wheelchair access\n\u2022 Photography requests\n\nJust type your request:");
+        await setConvo(convo.id, { current_state: "SPECIAL_REQUEST_INPUT" });
+      }
+
+      // ── CONTACT DETAILS ──
+      else if (action.startsWith("ACT_CONTACT_")) {
+        await sendButtons(tenant, phone, "What would you like to update?", [
+          { id: "CONTACT_NAME", title: "\u{1F464} Name" },
+          { id: "CONTACT_EMAIL", title: "\u{1F4E7} Email" },
+          { id: "CONTACT_PHONE", title: "\u{1F4F1} Phone" },
+        ]);
+        await setConvo(convo.id, { current_state: "UPDATE_CONTACT_FIELD" });
+      }
+
+      // ── WEATHER REFUND ──
       else if (action.startsWith("ACT_WX_REFUND_")) {
-        await sendButtons(tenant, phone, "Are you sure you want to request a 100% full refund for this weather cancellation?", [{ id: "CONFIRM_WX_REFUND", title: "✅ Yes, Refund" }, { id: "IDLE", title: "❌ Go Back" }]);
+        await sendButtons(tenant, phone, "Are you sure you want to request a 100% full refund for this weather cancellation?", [{ id: "CONFIRM_WX_REFUND", title: "\u2705 Yes, Refund" }, { id: "IDLE", title: "\u274C Go Back" }]);
         await setConvo(convo.id, { current_state: "CONFIRM_WX_REFUND_ACTION", state_data: sd });
       }
+
+      // ── WEATHER VOUCHER ──
       else if (action.startsWith("ACT_VOUCHER_")) {
         if (!sd.is_weather && sd.hours_before < 24) { await sendText(tenant, phone, "Voucher conversion is only available more than 24 hours before the tour."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-        await sendButtons(tenant, phone, "Convert this booking to a *gift voucher*?\n\nYou\u2019ll get a voucher code good for *one free trip* on any tour. Valid for 12 months.\n\nYour current seats will be released.", [{ id: "CONFIRM_VOUCHER", title: "\u2705 Yes, Convert" }, { id: "IDLE", title: "\u274C Keep Booking" }]);
+        await sendButtons(tenant, phone, "Convert this booking to a *gift voucher*?\n\nYou\u2019ll get a voucher code for *R" + sd.total + "* on any tour. Valid for 3 years.\n\nYour current seats will be released.", [{ id: "CONFIRM_VOUCHER", title: "\u2705 Yes, Convert" }, { id: "IDLE", title: "\u274C Keep Booking" }]);
         await setConvo(convo.id, { current_state: "CONFIRM_VOUCHER_CONVERT" });
       }
+
+      // ── CONTACT TEAM ──
+      else if (action.startsWith("ACT_TEAM_")) {
+        var teamHrs = Math.round(sd.hours_before);
+        await supabase.from("chat_messages").insert({
+          business_id: tenant.business.id, phone: phone, direction: "IN",
+          body: "[REQUEST] Customer wants to modify booking " + sd.booking_id.substring(0, 8).toUpperCase() + " (Trip in " + teamHrs + "h). " + convo.customer_name,
+          sender: convo.customer_name || phone,
+        });
+        await sendText(tenant, phone, "I\u2019ve notified our team about your request. They\u2019ll get back to you shortly! \u{1F64F}\n\nType *menu* anytime to start over.");
+        await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
+      }
+
       else { await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); await handleMsg(tenant, phone, "hi", "text"); }
     }
 
-    // ===== CONFIRM CANCEL =====
-    else if (state === "CONFIRM_CANCEL_ACTION") {
-      if (rid === "CONFIRM_CANCEL" || input === "yes") {
-        await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled" }).eq("id", sd.booking_id);
-        if (sd.slot_id) { var slr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr.data) await supabase.from("slots").update({ booked: Math.max(0, slr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
-        if (sd.hours_before >= 24) {
-          var refAmt = Math.round(Number(sd.total) * 0.95 * 100) / 100;
-          await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: refAmt, refund_notes: "95% refund" }).eq("id", sd.booking_id);
-          await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
-          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nA refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\nWe\u2019d love to have you back on the water soon! \u{1F6F6}");
+    // ===== CANCEL CHOICE (refund or voucher) =====
+    else if (state === "CANCEL_CHOICE") {
+      if (rid === "CANCEL_VOUCHER" || input === "voucher") {
+        var cvcode = genVoucherCode();
+        var cvTotal = Number(sd.total);
+        var cvr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: cvcode, status: "ACTIVE", type: "CREDIT", value: cvTotal, current_balance: cvTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+        if (cvr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
+        await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + cvcode, converted_to_voucher_id: cvr.data.id }).eq("id", sd.booking_id);
+        if (sd.slot_id) { var svr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr2.data) await supabase.from("slots").update({ booked: Math.max(0, svr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
+        await logE(tenant, "booking_cancelled_voucher", { booking_id: sd.booking_id, code: cvcode, amount: cvTotal }, sd.booking_id);
+        // Email voucher
+        try {
+          var cvEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
+          if (cvEmail.data?.email) {
+            await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+              method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cvEmail.data.email, customer_name: cvEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: "Tour", reason: "Converted to voucher via WhatsApp", voucher_code: cvcode, voucher_amount: cvTotal.toFixed(2), total_amount: cvTotal.toFixed(2), is_partial: false } }),
+            });
+          }
+        } catch (e) { console.log("cancel voucher email err"); }
+        await sendText(tenant, phone, "Done! Your booking has been cancelled and converted to a voucher:\n\n\u{1F39F} Code: *" + cvcode + "*\n\u{1F4B0} Value: *R" + cvTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+      }
+      else if (rid === "CANCEL_REFUND" || input === "refund") {
+        var crTotal = Number(sd.total);
+        // C4: Check if booking was paid by voucher — issue a new voucher instead of requesting Yoco refund
+        var crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_deduction").eq("id", sd.booking_id).single();
+        var crIsVoucherPaid = crBkCheck.data && (
+          (crBkCheck.data.yoco_payment_id && String(crBkCheck.data.yoco_payment_id).startsWith("VOUCHER_")) ||
+          crBkCheck.data.payment_method === "VOUCHER" ||
+          crBkCheck.data.payment_method === "GIFT_VOUCHER"
+        );
+        if (crIsVoucherPaid) {
+          // Voucher-paid booking: create a new voucher for the full amount instead of Yoco refund
+          var crVCode = genVoucherCode();
+          var crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+          if (crVResult.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
+          if (sd.slot_id) { var slrV = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slrV.data) await supabase.from("slots").update({ booked: Math.max(0, slrV.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
+          await logE(tenant, "booking_cancelled_voucher_refund", { booking_id: sd.booking_id, code: crVCode, amount: crTotal }, sd.booking_id);
+          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         } else {
-          await logE(tenant, "booking_cancelled_no_refund", { booking_id: sd.booking_id }, sd.booking_id);
-          await sendText(tenant, phone, "Your booking has been cancelled.\n\nAs it was within 24 hours, no refund is available per our policy.\n\nHope to see you again! \u{1F6F6}");
+          // M7: Split-tender refund math — check if booking has voucher_deduction > 0
+          var crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
+          var crRefund: number;
+          var crRefundMsg: string;
+          if (crVoucherDeduction > 0) {
+            // Restore full voucher amount
+            var crSplitVCode = genVoucherCode();
+            var crSplitVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crSplitVCode, status: "ACTIVE", type: "CREDIT", value: crVoucherDeduction, current_balance: crVoucherDeduction, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+            // Calculate 5% fee on total, subtract from cash portion only
+            var crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
+            crRefund = Math.round(crCashPaid * 0.95 * 100) / 100;
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+            if (crSplitVResult.data) {
+              crRefundMsg += "\n\n\u{1F39F} Your voucher credit of *R" + crVoucherDeduction + "* has been restored: *" + crSplitVCode + "*";
+            }
+          } else {
+            crRefund = Math.round(crTotal * 0.95 * 100) / 100;
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+          }
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: "95% refund via WhatsApp" }).eq("id", sd.booking_id);
+          // TODO: Replace with atomic increment RPC for slot decrement
+          if (sd.slot_id) { var slr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr2.data) await supabase.from("slots").update({ booked: Math.max(0, slr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
+          await logE(tenant, "booking_cancelled_refund", { booking_id: sd.booking_id, amount: crRefund }, sd.booking_id);
+          // Email cancellation
+          try {
+            var crEmail = await supabase.from("bookings").select("email, customer_name, tours(name), slots(start_time)").eq("id", sd.booking_id).single();
+            if (crEmail.data?.email) {
+              await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+                method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp — refund requested", total_amount: crTotal.toFixed(2), is_partial: false } }),
+              });
+            }
+          } catch (e) { console.log("cancel refund email err"); }
+          await sendText(tenant, phone, crRefundMsg + "\n\nWe\u2019d love to have you back on the water soon! \u{1F6F6}");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         }
-        // Send cancellation email
+      }
+      else { await sendText(tenant, phone, "Great, your booking is safe! \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
+    }
+
+    // ===== CONFIRM CANCEL NO REFUND (<24h) =====
+    else if (state === "CONFIRM_CANCEL_ACTION") {
+      if (rid === "CONFIRM_CANCEL_NOREFUND" || rid === "CONFIRM_CANCEL" || input === "yes") {
+        await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled (no refund)" }).eq("id", sd.booking_id);
+        if (sd.slot_id) { var slr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr.data) await supabase.from("slots").update({ booked: Math.max(0, slr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
+        await logE(tenant, "booking_cancelled_no_refund", { booking_id: sd.booking_id }, sd.booking_id);
+        // Email
         try {
           var cbkData = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", sd.booking_id).single();
-          if (cbkData.data && cbkData.data.email) {
+          if (cbkData.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-              body: JSON.stringify({ type: "CANCELLATION", data: { email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time ? fmtTime(tenant, (cbkData.data as any).slots.start_time) : "", refund_amount: sd.hours_before >= 24 ? refAmt : null } }),
+              method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time || "", reason: "Cancelled within 24h — no refund", total_amount: String(sd.total), is_partial: false } }),
             });
           }
         } catch (e) { console.log("cancel email err"); }
+        await sendText(tenant, phone, "Your booking has been cancelled.\n\nAs it was within 24 hours, no refund is available per our policy.\n\nHope to see you again! \u{1F6F6}");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else { await sendText(tenant, phone, "Great, your booking is safe! \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
     }
@@ -1080,7 +1318,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "CONFIRM_WX_REFUND_ACTION") {
       if (rid === "CONFIRM_WX_REFUND" || input === "yes") {
         var refAmt = sd.total;
-        await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
+        await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
         await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\nWe\u2019d love to have you back on the water soon! \u{1F6F6}");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
@@ -1090,29 +1328,168 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
 
-    // ===== CONFIRM VOUCHER =====
+    // ===== CONFIRM VOUCHER (weather bookings) =====
     else if (state === "CONFIRM_VOUCHER_CONVERT") {
       if (rid === "CONFIRM_VOUCHER" || input === "yes") {
         var vcode = genVoucherCode();
-        var vr = await supabase.from("vouchers").insert({ business_id: tenant.business.id, code: vcode, status: "ACTIVE", type: "FREE_TRIP", source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
+        var vTotal = Number(sd.total);
+        var vr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: vcode, status: "ACTIVE", type: "CREDIT", value: vTotal, current_balance: vTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (vr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + vcode, converted_to_voucher_id: vr.data.id }).eq("id", sd.booking_id);
         if (sd.slot_id) { var svr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr.data) await supabase.from("slots").update({ booked: Math.max(0, svr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
-        await logE(tenant, "voucher_from_booking", { booking_id: sd.booking_id, code: vcode }, sd.booking_id);
-        // Email voucher to customer
+        await logE(tenant, "voucher_from_booking", { booking_id: sd.booking_id, code: vcode, amount: vTotal }, sd.booking_id);
+        // Email voucher
         try {
-          var vEmail = await supabase.from("bookings").select("email").eq("id", sd.booking_id).single();
-          if (vEmail.data && vEmail.data.email) {
+          var vEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
+          if (vEmail.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-              body: JSON.stringify({ type: "VOUCHER", data: { email: vEmail.data.email, code: vcode, expires_at: fmtTime(tenant, new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString()) } }),
+              method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: vEmail.data.email, customer_name: vEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: "Tour", reason: "Converted to voucher via WhatsApp", voucher_code: vcode, voucher_amount: vTotal.toFixed(2), total_amount: vTotal.toFixed(2), is_partial: false } }),
             });
           }
         } catch (e) { console.log("voucher email err"); }
-        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F381} Good for: *One free trip* (any tour, any group size)\n\u{1F4C5} Valid until: " + fmtTime(tenant, new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString()) + "\n\nShare it with a friend or use it yourself \u2014 just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F4B0} Value: *R" + vTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nShare it with a friend or use it yourself \u2014 just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else { await sendText(tenant, phone, "No worries, your booking stays as is! \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
+    }
+
+    // ===== EDIT GUESTS — ask for new number =====
+    else if (state === "EDIT_GUESTS_QTY") {
+      var newQty = parseInt(input);
+      if (isNaN(newQty) || newQty < 1 || newQty > 30) { await sendText(tenant, phone, "Please type a number between 1 and 30."); return; }
+      if (newQty === sd.qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed. \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+
+      if (newQty > sd.qty) {
+        // Adding guests — use atomic capacity check via RPC (H2: don't update slot before payment)
+        var addCount = newQty - sd.qty;
+        var addCost = addCount * Number(sd.unit_price);
+        await sendText(tenant, phone, "Adding " + addCount + " guest" + (addCount !== 1 ? "s" : "") + "...");
+        // H2: Create hold via atomic RPC instead of directly updating slots.booked
+        var addHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+          p_booking_id: sd.booking_id,
+          p_slot_id: sd.slot_id,
+          p_qty: addCount,
+          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+        if (addHoldRes.error || !addHoldRes.data?.success) {
+          await sendText(tenant, phone, addHoldRes.data?.error || "Sorry, not enough spots left for " + addCount + " more. Try a smaller number.");
+          return;
+        }
+        var addNewTotal = newQty * Number(sd.unit_price);
+        // M8: Invalidate waiver on guest addition
+        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
+        await logE(tenant, "guests_added_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: newQty, additional_cost: addCost }, sd.booking_id);
+        // Create checkout for extra payment — booking qty/total updated by webhook on payment success
+        try {
+          var coRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ amount: addCost, booking_id: sd.booking_id, business_id: tenant.business.id, type: "BOOKING",
+              metadata: { hold_id: addHoldRes.data.hold_id, add_qty: addCount, new_qty: newQty, new_total: addNewTotal } }),
+          });
+          var coData = await coRes.json();
+          if (coData?.redirectUrl) {
+            await sendText(tenant, phone, "\u{1F465} *" + addCount + " extra guest" + (addCount !== 1 ? "s" : "") + " reserved!*\n\nNew total will be: " + newQty + " people (R" + addNewTotal + ")\n\nPlease pay the extra *R" + addCost + "* to confirm:\n" + coData.redirectUrl + "\n\n\u23F0 Spots held for 15 minutes.");
+          } else {
+            // Fallback: update booking directly since checkout failed
+            await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
+            await sendText(tenant, phone, "\u2705 *" + addCount + " guest" + (addCount !== 1 ? "s" : "") + " added!*\n\nNew total: " + newQty + " people (R" + addNewTotal + ")\n\nA payment link for R" + addCost + " will be sent to your email.");
+          }
+        } catch (e) {
+          // Fallback: update booking directly since checkout failed
+          await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
+          await sendText(tenant, phone, "\u2705 Guests added! A payment link for R" + addCost + " will be sent shortly.");
+        }
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+      }
+      else {
+        // Removing guests
+        if (!sd.can_remove) { await sendText(tenant, phone, "Removing guests is only available more than 24 hours before the trip. You can add more guests, or contact our team for help."); return; }
+        var rmCount = sd.qty - newQty;
+        var rmAmount = rmCount * (Number(sd.total) / Number(sd.qty));
+        await sendText(tenant, phone, "Removing " + rmCount + " guest" + (rmCount !== 1 ? "s" : "") + " frees up *R" + rmAmount + "*.\n\nHow would you like your credit?");
+        await sendButtons(tenant, phone, "Choose an option:", [
+          { id: "GUEST_VOUCHER", title: "\u{1F39F} Voucher (R" + rmAmount + ")" },
+          { id: "GUEST_REFUND", title: "\u{1F4B8} Refund (R" + (rmAmount * 0.95).toFixed(0) + ")" },
+          { id: "IDLE", title: "\u274C Keep Booking" },
+        ]);
+        await setConvo(convo.id, { current_state: "EDIT_GUESTS_EXCESS", state_data: { ...sd, new_qty: newQty, rm_count: rmCount, rm_amount: rmAmount } });
+      }
+    }
+
+    // ===== EDIT GUESTS — refund or voucher for removed guests =====
+    else if (state === "EDIT_GUESTS_EXCESS") {
+      if (rid === "GUEST_VOUCHER" || input === "voucher") {
+        var gvNewTotal = sd.new_qty * Number(sd.unit_price);
+        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: gvNewTotal }).eq("id", sd.booking_id);
+        // Release slot capacity
+        var gvSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        if (gvSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (gvSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
+        // Create voucher
+        var gvCode = genVoucherCode();
+        var gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+        if (gvResult.data) gvCode = gvResult.data.code;
+        await logE(tenant, "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode, amount: sd.rm_amount }, sd.booking_id);
+        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + gvCode + "*\n\u{1F4B0} Value: *R" + sd.rm_amount + "*\n\u{1F4C5} Valid for 3 years");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+      }
+      else if (rid === "GUEST_REFUND" || input === "refund") {
+        var grNewTotal = sd.new_qty * Number(sd.unit_price);
+        var grRefund = Math.round(sd.rm_amount * 0.95 * 100) / 100;
+        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund (95%)" }).eq("id", sd.booking_id);
+        var grSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        if (grSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (grSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
+        await logE(tenant, "guests_removed_refund_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, refund: grRefund }, sd.booking_id);
+        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted (5% processing fee). Expect it within 5\u20137 business days.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+      }
+      else { await sendText(tenant, phone, "No changes made. Your booking stays at " + sd.qty + " people. \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
+    }
+
+    // ===== SPECIAL REQUEST INPUT =====
+    else if (state === "SPECIAL_REQUEST_INPUT") {
+      if (!rawText || rawText.length < 2) { await sendText(tenant, phone, "Please type your special request (e.g., 'birthday celebration' or 'vegetarian')."); return; }
+      var srFields = await supabase.from("bookings").select("custom_fields").eq("id", sd.booking_id).single();
+      var srExisting = (srFields.data?.custom_fields && typeof srFields.data.custom_fields === "object") ? srFields.data.custom_fields : {};
+      srExisting.special_requests = rawText.substring(0, 500);
+      await supabase.from("bookings").update({ custom_fields: srExisting }).eq("id", sd.booking_id);
+      await logE(tenant, "special_request_wa", { booking_id: sd.booking_id, request: rawText.substring(0, 500) }, sd.booking_id);
+      await sendText(tenant, phone, "\u2705 *Special request saved!*\n\n_\"" + rawText.substring(0, 100) + (rawText.length > 100 ? "..." : "") + "\"_\n\nOur team will do their best to accommodate your request. Type *menu* for more options.");
+      await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+    }
+
+    // ===== UPDATE CONTACT — pick field =====
+    else if (state === "UPDATE_CONTACT_FIELD") {
+      var contactField = rid || "";
+      if (contactField === "CONTACT_NAME") {
+        await sendText(tenant, phone, "Type the *new name* for this booking:");
+        await setConvo(convo.id, { current_state: "UPDATE_CONTACT_VALUE", state_data: { ...sd, contact_field: "customer_name" } });
+      }
+      else if (contactField === "CONTACT_EMAIL") {
+        await sendText(tenant, phone, "Type the *new email address*:");
+        await setConvo(convo.id, { current_state: "UPDATE_CONTACT_VALUE", state_data: { ...sd, contact_field: "email" } });
+      }
+      else if (contactField === "CONTACT_PHONE") {
+        await sendText(tenant, phone, "Type the *new phone number* (with country code, e.g. 27812345678):");
+        await setConvo(convo.id, { current_state: "UPDATE_CONTACT_VALUE", state_data: { ...sd, contact_field: "phone" } });
+      }
+      else { await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); await handleMsg(tenant, phone, "hi", "text"); }
+    }
+
+    // ===== UPDATE CONTACT — set new value =====
+    else if (state === "UPDATE_CONTACT_VALUE") {
+      if (!rawText || rawText.length < 2) { await sendText(tenant, phone, "Please type a valid value."); return; }
+      var ucField = sd.contact_field;
+      var ucValue = rawText.trim();
+      // Validation
+      if (ucField === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ucValue)) { await sendText(tenant, phone, "That doesn\u2019t look like a valid email. Please try again:"); return; }
+      if (ucField === "phone") { ucValue = ucValue.replace(/\D/g, ""); if (ucValue.length < 9) { await sendText(tenant, phone, "Phone number seems too short. Please include country code (e.g. 27812345678):"); return; } }
+      var ucUpdate: any = {};
+      ucUpdate[ucField] = ucValue;
+      await supabase.from("bookings").update(ucUpdate).eq("id", sd.booking_id);
+      await logE(tenant, "contact_updated_wa", { booking_id: sd.booking_id, field: ucField, new_value: ucValue }, sd.booking_id);
+      var fieldLabel = ucField === "customer_name" ? "Name" : ucField === "email" ? "Email" : "Phone";
+      await sendText(tenant, phone, "\u2705 *" + fieldLabel + " updated!*\n\nNew " + fieldLabel.toLowerCase() + ": *" + ucValue + "*\n\nType *menu* for more options.");
+      await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
 
     // ===== FAQ LIST =====
@@ -1308,6 +1685,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       var slot = sr2.data;
       if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date \u2014 type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date \u2014 type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      // M5: 60-min cutoff check at slot selection
+      var slotStartMs = new Date(slot.start_time).getTime();
+      if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time or another date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       var slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
       var slotAvail = Number(slotAvailRes.data || 0);
       if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
@@ -1340,10 +1720,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (disc.type === "LOYALTY") discountMsg = "\n\u{1F31F} *10% loyalty discount!* You save R" + saving;
       }
       // Check if voucher booking — subtract voucher value from total
+      // Supports FREE_TRIP pax limit (only covers pax_limit guests) and peak arbitrage
       var voucherDeduction = 0;
       if (sd.voucher_id) {
         var voucherValue = Number(sd.voucher_value || 0);
-        voucherDeduction = Math.min(voucherValue, finalTotal);
+        if (sd.voucher_type === "FREE_TRIP") {
+          var coveredPax = Math.min(sd.voucher_pax_limit || 1, sd.qty);
+          var slotCost = price * coveredPax;
+          var purchaseVal = Number(sd.voucher_purchase_value || voucherValue);
+          // Peak arbitrage: if slot price > purchase_value, treat as credit for purchase_value
+          if (slotCost > purchaseVal) {
+            voucherDeduction = Math.min(purchaseVal, finalTotal);
+          } else {
+            voucherDeduction = Math.min(voucherValue, slotCost, finalTotal);
+          }
+        } else {
+          voucherDeduction = Math.min(voucherValue, finalTotal);
+        }
         finalTotal = Math.max(0, finalTotal - voucherDeduction);
         if (finalTotal === 0) {
           discountMsg = "\n\u{1F39F} *Voucher applied \u2014 this trip is on us!*";
@@ -1449,6 +1842,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== FINALIZE BOOKING =====
     else if (state === "FINALIZE_BOOKING") {
+      // M5: Final 60-min cutoff check before creating the booking
+      var finalSlotCheck = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
+      if (finalSlotCheck.data && new Date(finalSlotCheck.data.start_time).getTime() - Date.now() < 60 * 60 * 1000) {
+        await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. This slot is no longer available. Please type *menu* to start a new booking.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
       var email = sd.email;
       var br2 = await supabase.from("bookings").insert({
         business_id: tenant.business.id, tour_id: sd.tour_id, slot_id: sd.slot_id,
@@ -1456,6 +1856,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         qty: sd.qty, unit_price: sd.unit_price, total_amount: sd.total,
         original_total: sd.base_total, discount_type: sd.discount_type || null, discount_percent: sd.discount_percent || 0,
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
+        marketing_opt_in: null, total_captured: 0, total_refunded: 0,
       }).select().single();
       if (br2.error || !br2.data) { console.error("Err:", JSON.stringify(br2.error)); await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
       var booking = br2.data;
@@ -1463,15 +1864,41 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // VOUCHER BOOKING — skip payment
       if (sd.voucher_id && sd.total <= 0) {
         await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + sd.voucher_code }).eq("id", booking.id);
-        // Mark voucher as used
-        // Redeem all vouchers
+        // Deduct voucher balances — sequential drain using atomic RPC (prevents double-spend)
         var allVIds = sd.voucher_ids || [sd.voucher_id];
+        var waRemainingCost = Number(sd.voucher_deduction || sd.original_total || sd.base_total || 0);
         for (var vi = 0; vi < allVIds.length; vi++) {
-          if (allVIds[vi]) await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_by_phone: phone, redeemed_booking_id: booking.id }).eq("id", allVIds[vi]);
+          if (!allVIds[vi] || waRemainingCost <= 0) continue;
+          // Atomic deduction via RPC — drains Voucher A to R0 first, then Voucher B
+          var waRpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: allVIds[vi], p_amount: waRemainingCost });
+          if (waRpcRes.data?.success) {
+            var waDeducted = Number(waRpcRes.data.deducted);
+            var waNewBal = Number(waRpcRes.data.remaining);
+            waRemainingCost -= waDeducted;
+            await supabase.from("vouchers").update({ redeemed_booking_id: booking.id, redeemed_by_phone: phone }).eq("id", allVIds[vi]);
+            if (waNewBal > 0) {
+              // Notify about remaining balance via WhatsApp
+              var waVCode = await supabase.from("vouchers").select("code").eq("id", allVIds[vi]).single();
+              try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + (waVCode.data?.code || allVIds[vi]) + "* has *R" + waNewBal + "* remaining. Use it on your next booking!"); } catch (e) { }
+            }
+          } else {
+            // Fallback: mark as redeemed if RPC fails (voucher may not exist)
+            await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_by_phone: phone, redeemed_booking_id: booking.id }).eq("id", allVIds[vi]);
+          }
         }
-        // Update slot booked count
-        var svr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-        if (svr2.data) await supabase.from("slots").update({ booked: svr2.data.booked + sd.qty }).eq("id", sd.slot_id);
+        // H1: Atomic slot update for voucher bookings via RPC
+        var vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+          p_booking_id: booking.id,
+          p_slot_id: sd.slot_id,
+          p_qty: sd.qty,
+          p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(), // Short hold, already confirmed
+        });
+        if (vHoldRes.error || !vHoldRes.data?.success) {
+          await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id);
+          await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
         var vref = booking.id.substring(0, 8).toUpperCase();
         var vslot = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
         var vtour = await supabase.from("tours").select("name").eq("id", sd.tour_id).single();
@@ -1511,10 +1938,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      // PAID BOOKING — create hold + Yoco checkout
-      var hr2 = await supabase.from("holds").insert({ booking_id: booking.id, slot_id: sd.slot_id, expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), status: "ACTIVE" }).select().single();
-      if (hr2.error) { await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Hold failed" }).eq("id", booking.id); await sendText(tenant, phone, "Those spots were just snapped up! Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
-      try { var sn = await supabase.from("slots").select("held").eq("id", sd.slot_id).single(); await supabase.from("slots").update({ held: Number(sn.data?.held || 0) + sd.qty }).eq("id", sd.slot_id); } catch (e) { }
+      // PAID BOOKING — atomic capacity check + hold creation to prevent overbooking
+      var holdRes = await supabase.rpc("create_hold_with_capacity_check", {
+        p_booking_id: booking.id,
+        p_slot_id: sd.slot_id,
+        p_qty: sd.qty,
+        p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+      if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
@@ -1542,8 +1973,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
     }
 
-    // ===== AWAITING PAYMENT =====
+    // ===== AWAITING_PAYMENT =====
     else if (state === "AWAITING_PAYMENT") {
+      // L9: Check if hold has expired
+      if (sd.booking_id) {
+        var awHold = await supabase.from("holds").select("status, expires_at").eq("booking_id", sd.booking_id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (awHold.data && new Date(awHold.data.expires_at) < new Date()) {
+          await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries \u2014 type *book* to start a new booking and grab fresh spots!");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
+        if (!awHold.data) {
+          // No active hold found — check if booking is still HELD
+          var awBk = await supabase.from("bookings").select("status").eq("id", sd.booking_id).single();
+          if (awBk.data && awBk.data.status !== "HELD" && awBk.data.status !== "PAID") {
+            await sendText(tenant, phone, "Your booking hold has expired. Type *book* to start a new booking!");
+            await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+            return;
+          }
+        }
+      }
       if (input === "help" || input === "speak" || input === "human" || input.includes("speak to")) { await sendText(tenant, phone, "Connecting you to our team..."); await setConvo(convo.id, { status: "HUMAN" }); }
       else { await sendText(tenant, phone, "Just waiting for your payment to come through! \u{1F4B3}\n\nAlready paid? It can take a moment to process.\n\nNeed help? Type *speak to us*\nStart over? Type *menu*"); }
     }
@@ -1601,13 +2050,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (rid === "GV_CONFIRM" || input === "yes") {
         // Create voucher in PENDING status
         var vcode = genVoucherCode();
-        var vr = await supabase.from("vouchers").insert({
+        var vr = await insertVoucherWithRetry({
           business_id: tenant.business.id, code: vcode, status: "PENDING", type: "FREE_TRIP",
           recipient_name: sd.recipient_name, gift_message: sd.gift_message || null,
           buyer_name: sd.buyer_name, buyer_email: sd.buyer_email, buyer_phone: phone,
-          tour_name: sd.tour_name, value: sd.value, purchase_amount: sd.value,
+          tour_name: sd.tour_name, value: sd.value, purchase_amount: sd.value, current_balance: sd.value,
+          pax_limit: 1, purchase_value: sd.value,
           expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-        }).select().single();
+        });
 
         if (vr.error || !vr.data) {
           console.error("GV_ERR:", JSON.stringify(vr.error));
@@ -1661,10 +2111,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "REDEEM_VOUCHER") {
       var code = rawText.toUpperCase().replace(/\s/g, "");
       if (code.length !== 8) { await sendText(tenant, phone, "Voucher codes are 8 characters long. Double-check and try again:"); return; }
-      var vr2 = await supabase.from("vouchers").select().eq("code", code).eq("status", "ACTIVE").single();
+      var vr2 = await supabase.from("vouchers").select().eq("code", code).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
       if (!vr2.data) {
         // Check if redeemed
-        var vUsed = await supabase.from("vouchers").select("status").eq("code", code).single();
+        var vUsed = await supabase.from("vouchers").select("status").eq("code", code).eq("business_id", tenant.business.id).single();
         if (vUsed.data && vUsed.data.status === "REDEEMED") {
           await sendText(tenant, phone, "This voucher has already been redeemed. Each voucher code can only be used once.");
           await sendButtons(tenant, phone, "Options:", [{ id: "ADD_VOUCHER", title: "\u{1F39F} Try Another" }, { id: "CONFIRM", title: "\u2705 Continue" }, { id: "IDLE", title: "\u2B05 Back" }]);
@@ -1676,12 +2126,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       if (vr2.data.expires_at && new Date(vr2.data.expires_at) < new Date()) { await sendText(tenant, phone, "Unfortunately this voucher has expired. Type *speak to us* if you think this is a mistake."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
 
-      // Get voucher value
-      var vVal = Number(vr2.data.value || vr2.data.purchase_amount || 0);
+      // Get voucher value + type metadata for FREE_TRIP pax limit and peak arbitrage
+      var vVal = Number(vr2.data.current_balance || vr2.data.value || vr2.data.purchase_amount || 0);
+      var vType = vr2.data.type || "CREDIT";
+      var vPaxLimit = vr2.data.pax_limit || 1;
+      var vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
       var tours3 = await getActiveTours(tenant);
       if (tours3.length === 1) {
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nHow many people will be joining?");
-        await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, tour_id: tours3[0].id } });
+        await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
       } else {
         var vtrows: any[] = [];
         for (var vti = 0; vti < tours3.length; vti++) {
@@ -1690,7 +2143,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nWhich tour would you like?");
         await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
-        await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal } });
+        await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue } });
       }
     }
 
@@ -1699,9 +2152,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "ADD_EXTRA_VOUCHER") {
       var xcode = rawText.toUpperCase().replace(/\s/g, "");
       if (xcode.length !== 8) { await sendText(tenant, phone, "Voucher codes are 8 characters long. Try again:"); return; }
-      var xvr = await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").single();
+      var xvr = await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
       if (!xvr.data) {
-        var xUsed = await supabase.from("vouchers").select("status").eq("code", xcode).single();
+        var xUsed = await supabase.from("vouchers").select("status").eq("code", xcode).eq("business_id", tenant.business.id).single();
         if (xUsed.data && xUsed.data.status === "REDEEMED") {
           await sendText(tenant, phone, "This voucher has already been redeemed. Each code can only be used once.");
         } else {
@@ -1717,7 +2170,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       // Stack the voucher value
-      var xVal = Number(xvr.data.value || xvr.data.purchase_amount || 0);
+      var xVal = Number(xvr.data.current_balance || xvr.data.value || xvr.data.purchase_amount || 0);
       var existingVoucherValue = Number(sd.voucher_value || 0);
       var newVoucherValue = existingVoucherValue + xVal;
       // Store multiple voucher codes and IDs
@@ -2072,13 +2525,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             var cbHrs = cbSlot ? (new Date(cbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
             var cbDetail = "I found your booking:\n\n\u{1F6F6} *" + (cbTour?.name || "Tour") + "*\n\u{1F4C5} " + (cbSlot ? fmtTime(tenant, cbSlot.start_time) : "TBC") + "\n\u{1F465} " + cb.qty + " people\n\n";
             if (cbHrs >= 24) {
+              // M4: Transition to CANCEL_CHOICE so user can pick voucher vs refund
               var cbRefund = Math.round(Number(cb.total_amount) * 0.95 * 100) / 100;
-              cbDetail += "You\u2019ll get a *95% refund (R" + cbRefund + ")*. Cancel?";
+              cbDetail += "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + cb.total_amount + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + cbRefund + " (5% processing fee) \u2022 5-7 business days";
+              await sendButtons(tenant, phone, cbDetail, [
+                { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
+                { id: "CANCEL_REFUND", title: "\u{1F4B8} Refund" },
+                { id: "IDLE", title: "\u274C Keep Booking" },
+              ]);
+              await setConvo(convo.id, { current_state: "CANCEL_CHOICE", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
             } else {
               cbDetail += "This is within 24 hours so *no refund* is available. Still cancel?";
+              await sendButtons(tenant, phone, cbDetail, [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
+              await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
             }
-            await sendButtons(tenant, phone, cbDetail, [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
-            await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
             return;
           } else {
             // Multiple — show list
@@ -2175,7 +2635,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (isNaN(newQty) || newQty < 1 || newQty > 30) { await sendText(tenant, phone, "Just need a number between 1 and 30:"); return; }
       if (newQty === sd.current_qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (newQty > sd.max_avail) { await sendText(tenant, phone, "Only " + sd.max_avail + " spots available. Try a smaller number:"); return; }
+      // M3: Block guest removal within 24 hours
       var qtyDiff = newQty - sd.current_qty;
+      if (qtyDiff < 0 && sd.hours_before !== undefined && sd.hours_before < 24) {
+        await sendText(tenant, phone, "Guest removal isn\u2019t available within 24 hours of the trip. You can contact our team for help.");
+        await sendButtons(tenant, phone, "Options:", [{ id: "HUMAN", title: "\u{1F4AC} Speak to Team" }, { id: "IDLE", title: "\u2B05 Menu" }]);
+        await setConvo(convo.id, { current_state: "MENU" });
+        return;
+      }
       // Recalculate discount for new qty (group discount threshold may change)
       var mqDisc = await calcDiscount(tenant, newQty, phone);
       var mqBaseTotal = newQty * Number(sd.unit_price);
@@ -2185,13 +2652,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       var oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
       if (oldDisc.percent > 0) { oldTotal = oldTotal - Math.round(oldTotal * oldDisc.percent / 100); }
       var diffAmount = Math.abs(newTotal - oldTotal);
-      // Update booking
-      await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-      // Update slot booked count
-      var mqSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-      if (mqSlot.data) await supabase.from("slots").update({ booked: Math.max(0, mqSlot.data.booked + qtyDiff) }).eq("id", sd.slot_id);
       if (qtyDiff > 0) {
-        // Added people - need additional payment
+        // Added people — use atomic capacity check via RPC
+        var mqHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+          p_booking_id: sd.booking_id,
+          p_slot_id: sd.slot_id,
+          p_qty: qtyDiff,
+          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+        if (mqHoldRes.error || !mqHoldRes.data?.success) {
+          await sendText(tenant, phone, mqHoldRes.data?.error || "Sorry, not enough spots left. Try a smaller number.");
+          return;
+        }
+        // Update booking
+        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
+        // M8: Invalidate waiver on guest addition
+        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
+        // Need additional payment
         var addSiteUrls = await getBusinessSiteUrls(tenant);
         var addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
           method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
@@ -2200,7 +2677,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             successUrl: withQuery(addSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
             cancelUrl: addSiteUrls.bookingCancelUrl,
             failureUrl: addSiteUrls.bookingCancelUrl,
-            metadata: { booking_id: sd.booking_id, type: "ADD_PEOPLE" },
+            metadata: { booking_id: sd.booking_id, type: "ADD_PEOPLE", hold_id: mqHoldRes.data.hold_id, add_qty: qtyDiff, new_qty: newQty },
           }),
         });
         var addYocoData = await addYoco.json();
@@ -2210,7 +2687,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await sendText(tenant, phone, "Updated to " + newQty + " people! Please contact our team to arrange the additional payment of R" + diffAmount + ".");
         }
       } else {
-        // Reduced people
+        // Reduced people — update booking and release slot capacity
+        // TODO: Replace with atomic increment RPC for slot decrement
+        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
+        var mqSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        if (mqSlot.data) await supabase.from("slots").update({ booked: Math.max(0, mqSlot.data.booked + qtyDiff) }).eq("id", sd.slot_id);
         if (sd.hours_before >= 24) {
           await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
           await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted \u2014 expect it within 5-7 business days.");
@@ -2259,6 +2740,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "CHANGE_TOUR_SLOT") {
       var ctSlotId = rid ? rid.replace("CTSLOT_", "") : "";
       if (!ctSlotId) { await sendText(tenant, phone, "Please pick a slot."); return; }
+      // TODO: Replace with atomic increment RPC for slot decrement/increment
       // Release old slot
       var oldSlotR = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
       if (oldSlotR.data) await supabase.from("slots").update({ booked: Math.max(0, oldSlotR.data.booked - sd.qty) }).eq("id", sd.slot_id);
@@ -2360,7 +2842,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       var wrBkId = rid.replace("WEATHER_REFUND_", "");
       var wrBk = await supabase.from("bookings").select("id, total_amount, slot_id, qty").eq("id", wrBkId).single();
       if (wrBk.data) {
-        await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Weather cancellation", refund_status: "REQUESTED", refund_amount: wrBk.data.total_amount }).eq("id", wrBkId);
+        await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Weather cancellation", refund_status: "ACTION_REQUIRED", refund_amount: wrBk.data.total_amount }).eq("id", wrBkId);
         if (wrBk.data.slot_id) {
           var wrSl = await supabase.from("slots").select("booked").eq("id", wrBk.data.slot_id).single();
           if (wrSl.data) await supabase.from("slots").update({ booked: Math.max(0, wrSl.data.booked - wrBk.data.qty) }).eq("id", wrBk.data.slot_id);

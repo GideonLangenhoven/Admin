@@ -25,6 +25,32 @@ Deno.serve(async (req: any) => {
       .eq("id", booking_id)
       .single();
     if (bErr || !booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
+
+    // Guard: voucher-paid bookings must not hit Yoco — they should be refunded via voucher
+    var pm = (booking.payment_method || "").toUpperCase();
+    if (pm === "VOUCHER" || pm === "GIFT_VOUCHER") {
+      return new Response(JSON.stringify({ error: "This booking was paid via voucher. Refunds for voucher-paid bookings must be issued as vouchers, not via Yoco. Use the cancel-to-voucher flow instead." }), { status: 400, headers: getCors(req) });
+    }
+
+    // Guard: manual payments (cash/EFT) cannot be refunded via Yoco — flag for manual processing
+    if (pm === "MANUAL" || pm === "CASH" || pm === "EFT") {
+      var manualRefundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
+      await supabase.from("bookings").update({
+        refund_status: "MANUAL_EFT_REQUIRED",
+        refund_amount: manualRefundAmount,
+        refund_notes: "Manual/EFT refund required — payment was made via " + pm + ". Admin must process refund manually.",
+      }).eq("id", booking.id);
+
+      await supabase.from("logs").insert({
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        event: "refund_manual_required",
+        payload: { amount: manualRefundAmount, payment_method: pm },
+      });
+
+      return new Response(JSON.stringify({ ok: true, refund_status: "MANUAL_EFT_REQUIRED", amount: manualRefundAmount, message: "This booking was paid via " + pm + ". An admin must process the refund manually." }), { status: 200, headers: getCors(req) });
+    }
+
     if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking — manual refund only" }), { status: 400, headers: getCors(req) });
 
     var tenant = await getTenantByBusinessId(supabase, booking.business_id);
@@ -33,8 +59,14 @@ Deno.serve(async (req: any) => {
     if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Invalid refund amount" }), { status: 400, headers: getCors(req) });
 
     var totalAmount = Number(booking.total_amount || 0);
-    if (refundAmount > totalAmount) refundAmount = totalAmount;
-    var isPartial = refundAmount < totalAmount;
+    var totalCaptured = Number(booking.total_captured || totalAmount);
+    var totalRefunded = Number(booking.total_refunded || 0);
+    var refundableAmount = totalCaptured - totalRefunded;
+
+    // Cap at what was actually captured via Yoco (prevents refunding more than the Yoco portion in split-tender)
+    if (refundAmount > refundableAmount) refundAmount = refundableAmount;
+    if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Nothing left to refund (captured: " + totalCaptured + ", already refunded: " + totalRefunded + ")" }), { status: 400, headers: getCors(req) });
+    var isPartial = refundAmount < totalCaptured;
 
     var refundAmountCents = Math.round(refundAmount * 100);
     var yocoBody: any = {};
@@ -56,6 +88,7 @@ Deno.serve(async (req: any) => {
       await supabase.from("bookings").update({
         refund_status: "FAILED",
         refund_amount: refundAmount,
+        refund_error: errMsg,
         refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund failed: " + errMsg,
       }).eq("id", booking.id);
 
@@ -69,11 +102,13 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, error: errMsg }), { status: 200, headers: getCors(req) });
     }
 
+    var newTotalRefunded = totalRefunded + refundAmount;
     await supabase.from("bookings").update({
       status: "CANCELLED",
       refund_status: "REFUNDED",
       refund_amount: refundAmount,
-      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund — " + refundAmount.toFixed(2) + " of " + totalAmount.toFixed(2),
+      total_refunded: newTotalRefunded,
+      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund — " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")",
       cancellation_reason: "Auto-cancelled — refund processed by admin",
       cancelled_at: new Date().toISOString(),
     }).eq("id", booking.id);

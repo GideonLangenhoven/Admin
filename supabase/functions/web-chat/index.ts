@@ -8,7 +8,9 @@ var db = createClient(SU, SK);
 var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
-var CURRENT_TIMEZONE = "UTC";
+// L10: Request-scoped timezone. Set at the start of each request handler.
+// Deno edge functions process one request per isolate, so this is safe.
+var _requestTimezone = "UTC";
 function gCors(r) { var o = typeof r === "string" ? r : (r?.headers?.get("origin") || ""); return { "Access-Control-Allow-Origin": o || "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
 function withQuery(base, params) { var u = new URL(base); for (var k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
 function trimTrailingSlash(url) { return String(url || "").replace(/\/+$/, ""); }
@@ -47,13 +49,13 @@ function promptForCustomField(field) {
   if (!field) return "Please share the next booking detail.";
   return field.label + (field.required ? " *" : "") + (field.placeholder ? "\n" + field.placeholder : "");
 }
-function fmt(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: CURRENT_TIMEZONE }) + " at " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: CURRENT_TIMEZONE }); }
-function fmtS(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: CURRENT_TIMEZONE }) + " " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: CURRENT_TIMEZONE }); }
-function fmtDate(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: CURRENT_TIMEZONE }); }
-function fmtTime(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: CURRENT_TIMEZONE }); }
-function dateKey(iso) { var d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CURRENT_TIMEZONE }).format(d); }
+function fmt(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: _requestTimezone }) + " at " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
+function fmtS(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: _requestTimezone }) + " " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
+function fmtDate(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: _requestTimezone }); }
+function fmtTime(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
+function dateKey(iso) { var d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: _requestTimezone }).format(d); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
-function normP(p) { if (!p) return ""; var c = p.replace(/[\s\-\(\)]/g, ""); if (c.startsWith("00")) c = "+" + c.substring(2); if (!c.startsWith("+")) c = "+" + c; return c; }
+function normP(p) { if (!p) return ""; var c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); return c; }
 async function gemChat(hist, msg, toursList, businessId) {
   try {
     var c = []; for (var h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] });
@@ -73,11 +75,14 @@ async function gemChat(hist, msg, toursList, businessId) {
 }
 async function getSlots(tourId, now) {
   var in30 = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+  // M5: 60-minute cutoff — don't show slots starting within the next hour
+  // to give customers and staff adequate preparation time
+  var cutoff = new Date(now.getTime() + 60 * 60 * 1000);
   var { data: tour } = await db.from("tours").select("business_id").eq("id", tourId).maybeSingle();
   if (!tour?.business_id) return [];
   var { data } = await db.rpc("list_available_slots", {
     p_business_id: tour.business_id,
-    p_range_start: now.toISOString(),
+    p_range_start: cutoff.toISOString(),
     p_range_end: in30.toISOString(),
     p_tour_id: tourId,
   });
@@ -92,9 +97,11 @@ Deno.serve(async (req) => {
     var now = new Date(); var ns = { ...state }; var pay = null; var reply = ""; var buttons = null; var calendar = null;
     var requestedBusinessId = body.business_id || body.businessId || state.bid || "";
     var requestOrigin = req?.headers?.get("origin") || "";
+    // L10: Reset timezone at start of each request
+    _requestTimezone = "UTC";
     if (requestedBusinessId) {
       var requestTenant = await getTenantByBusinessId(db, requestedBusinessId).catch(function () { return null; });
-      CURRENT_TIMEZONE = requestTenant?.business?.timezone || "UTC";
+      _requestTimezone = requestTenant?.business?.timezone || "UTC";
       if (requestTenant && requestOrigin) {
         var allowedOrigins = getBusinessAllowedOrigins(requestTenant.business);
         if (!isAllowedOrigin(requestOrigin, allowedOrigins)) {
@@ -102,7 +109,7 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      CURRENT_TIMEZONE = "UTC";
+      _requestTimezone = "UTC";
     }
     var toursQuery = db.from("tours").select("*").eq("active", true).order("base_price_per_person");
     if (requestedBusinessId) toursQuery = toursQuery.eq("business_id", requestedBusinessId);
@@ -110,6 +117,37 @@ Deno.serve(async (req) => {
     var tours = (allT || []).filter(function (t) { return !t.hidden; });
     var lo = msg.toLowerCase().trim(); var step = state.step || "IDLE";
     var isBtnClick = lo.startsWith("btn:"); var btnVal = isBtnClick ? lo.replace("btn:", "") : "";
+
+    // L8: "Go back" navigation — map each step to its previous step
+    var isGoBack = !isBtnClick && (lo === "back" || lo === "go back" || lo === "previous");
+    if (isGoBack && step !== "IDLE") {
+      var backMap = {
+        "PICK_TOUR": "IDLE", "PICK_DATE": "PICK_TOUR", "PICK_TIME": "PICK_DATE",
+        "ASK_QTY": "PICK_TIME", "ASK_DETAILS": "ASK_QTY", "ASK_CUSTOM_FIELD": "ASK_DETAILS",
+        "ASK_VOUCHER": "ASK_DETAILS", "ENTER_VOUCHER": "ASK_VOUCHER", "CONFIRM": "ASK_VOUCHER",
+        "LOOKUP": "IDLE", "PICK_ACTION": "LOOKUP", "CONFIRM_CANCEL": "PICK_ACTION",
+        "RESCH_DATE": "PICK_ACTION", "REVIEW_REQUEST": "PICK_ACTION",
+        "MODIFY_QTY": "PICK_ACTION", "CHANGE_TOUR": "PICK_ACTION", "CHANGE_TOUR_SLOT": "CHANGE_TOUR",
+        "UPDATE_NAME": "PICK_ACTION", "RESEND_CONFIRM": "PICK_ACTION",
+        "GIFT_PICK_TOUR": "IDLE", "GIFT_RECIPIENT": "GIFT_PICK_TOUR", "GIFT_MESSAGE": "GIFT_RECIPIENT",
+        "GIFT_BUYER_NAME": "GIFT_MESSAGE", "GIFT_BUYER_EMAIL": "GIFT_BUYER_NAME", "GIFT_CONFIRM": "GIFT_BUYER_EMAIL",
+      };
+      var prevStep = backMap[step] || "IDLE";
+      ns = { ...ns, step: prevStep };
+      reply = "OK, going back.";
+      if (prevStep === "IDLE") {
+        ns = { step: "IDLE" };
+        buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
+      } else if (prevStep === "PICK_TOUR") {
+        buttons = tours.map(function (t) { return { label: t.name + " — R" + t.base_price_per_person, value: t.id }; });
+        reply = "Which tour are you keen on?";
+      } else if (prevStep === "ASK_VOUCHER") {
+        reply = "Do you have a voucher or promo code?";
+        buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+      }
+      return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+    }
+
     // ===== IDLE =====
     // Handle button clicks in IDLE state (e.g., "btn:book", "btn:question")
     if (step === "IDLE" && isBtnClick) {
@@ -253,7 +291,12 @@ Deno.serve(async (req) => {
     // ===== PICK_TIME =====
     if (step === "PICK_TIME") {
       var slotId = null; var slotTime = null;
-      if (isBtnClick) { var { data: sl } = await db.from("slots").select("id,start_time").eq("id", btnVal).single(); if (sl) { slotId = sl.id; slotTime = sl.start_time; } }
+      if (isBtnClick) {
+        // L22: Verify slot belongs to the selected tour to prevent slot ownership tampering
+        var { data: sl } = await db.from("slots").select("id,start_time,tour_id").eq("id", btnVal).single();
+        if (sl && sl.tour_id === ns.tid) { slotId = sl.id; slotTime = sl.start_time; }
+        else if (sl) { /* Slot exists but belongs to a different tour — ignore */ }
+      }
       if (slotId && slotTime) {
         ns = { ...ns, step: "ASK_QTY", slotId: slotId, slotTime: slotTime };
         reply = pick([fmt(slotTime) + " — great pick! How many people?", fmt(slotTime) + " it is! 🙌 How many of you are coming?"]);
@@ -337,8 +380,9 @@ Deno.serve(async (req) => {
       else {
         var vc = msg.toUpperCase().replace(/\s/g, "");
         if (vc.length === 8) {
-          var { data: vd } = await db.from("vouchers").select("*").eq("code", vc).single();
-          if (vd && vd.status === "ACTIVE") { var vv = Number(vd.value || vd.purchase_amount || 0); var dd = Math.min(vv, ns.total); var nt = Math.max(0, ns.total - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+          // C2: Filter vouchers by business_id to prevent cross-tenant usage
+          var { data: vd } = await db.from("vouchers").select("*").eq("code", vc).eq("business_id", requestedBusinessId).single();
+          if (vd && vd.status === "ACTIVE") { var vv = Number(vd.current_balance || vd.value || vd.purchase_amount || 0); var dd = vv; if (vd.type === "FREE_TRIP") { var ftPax = Math.min(vd.pax_limit || 1, ns.qty); var ftSlotCost = ns.tprice * ftPax; var ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, ns.total); } else { dd = Math.min(vv, ftSlotCost, ns.total); } } else { dd = Math.min(vv, ns.total); } var nt = Math.max(0, ns.total - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
           else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
           else { reply = "Can't find that code — double-check it?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
         } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
@@ -351,8 +395,9 @@ Deno.serve(async (req) => {
       if (noVc) { ns = { ...ns, step: "CONFIRM" }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " people \u2022 R" + ns.total + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay R" + ns.total, value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       var vc2 = msg.toUpperCase().replace(/\s/g, "");
       if (vc2.length === 8) {
-        var { data: vd2 } = await db.from("vouchers").select("*").eq("code", vc2).single();
-        if (vd2 && vd2.status === "ACTIVE") { var vv2 = Number(vd2.value || vd2.purchase_amount || 0); var dd2 = Math.min(vv2, ns.total); var nt2 = Math.max(0, ns.total - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2 }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+        // C2: Filter vouchers by business_id to prevent cross-tenant usage
+        var { data: vd2 } = await db.from("vouchers").select("*").eq("code", vc2).eq("business_id", requestedBusinessId).single();
+        if (vd2 && vd2.status === "ACTIVE") { var vv2 = Number(vd2.current_balance || vd2.value || vd2.purchase_amount || 0); var dd2 = vv2; if (vd2.type === "FREE_TRIP") { var ft2Pax = Math.min(vd2.pax_limit || 1, ns.qty); var ft2SlotCost = ns.tprice * ft2Pax; var ft2PurchaseVal = Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0); if (ft2SlotCost > ft2PurchaseVal) { dd2 = Math.min(ft2PurchaseVal, ns.total); } else { dd2 = Math.min(vv2, ft2SlotCost, ns.total); } } else { dd2 = Math.min(vv2, ns.total); } var nt2 = Math.max(0, ns.total - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type, vpaxlimit: vd2.pax_limit || 1, vpurchasevalue: Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0) }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
         else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
         else { reply = "Code not found. Check and try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
       } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
@@ -365,29 +410,123 @@ Deno.serve(async (req) => {
       if (btnVal === "confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("go ahead") || lo.includes("sure") || lo.includes("yep")) {
         var ft = ns.total || 0;
         var businessId = ns.bid || tours[0]?.business_id;
-        var { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: ns.tprice, total_amount: ft, original_total: ns.baseTotal, status: "PENDING", source: "WEB_CHAT", custom_fields: ns.custom_fields || {} }).select().single();
+        // L1: Fetch meeting point dynamically from tour or business record
+        var { data: _tourData } = await db.from("tours").select("meeting_point, base_price_per_person, business_id").eq("id", ns.tid).maybeSingle();
+        var meetingPointText = _tourData?.meeting_point || "";
+        if (!meetingPointText) {
+          var { data: _bizData } = await db.from("businesses").select("meeting_point").eq("id", businessId).maybeSingle();
+          meetingPointText = _bizData?.meeting_point || "Check your confirmation email for meeting point details";
+        }
+
+        // C1: Server-side price re-verification to prevent client state tampering
+        var serverUnitPrice = _tourData?.base_price_per_person || 0;
+        // Check for slot-level price override (peak pricing)
+        var { data: _slotData } = await db.from("slots").select("price_per_person_override").eq("id", ns.slotId).maybeSingle();
+        if (_slotData?.price_per_person_override != null) {
+          serverUnitPrice = Number(_slotData.price_per_person_override);
+        }
+        var serverBaseTotal = ns.qty * serverUnitPrice;
+        var serverDiscount = 0;
+        if (ns.qty >= 6) { serverDiscount = Math.round(serverBaseTotal * 0.05); }
+        var serverTotal = serverBaseTotal - serverDiscount;
+        // Apply voucher deduction if applicable
+        var serverVded = 0;
+        if (ns.vid && ns.vded > 0) {
+          serverVded = Math.min(ns.vded, serverTotal);
+          serverTotal = Math.max(0, serverTotal - serverVded);
+        }
+
+        // H2: Re-validate voucher at finalization time
+        if (ns.vid) {
+          var { data: _voucherRecheck } = await db.from("vouchers").select("status, current_balance").eq("id", ns.vid).eq("business_id", requestedBusinessId).maybeSingle();
+          if (!_voucherRecheck || _voucherRecheck.status !== "ACTIVE") {
+            reply = "Sorry, your voucher is no longer valid. Please try again without a voucher.";
+            ns = { ...ns, step: "ASK_VOUCHER", vid: null, vcode: null, vded: 0, total: serverBaseTotal - serverDiscount };
+            buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+            return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+          }
+          if (Number(_voucherRecheck.current_balance) < serverVded) {
+            reply = "Sorry, the voucher balance has changed. Please try applying your voucher again.";
+            ns = { ...ns, step: "ASK_VOUCHER", vid: null, vcode: null, vded: 0, total: serverBaseTotal - serverDiscount };
+            buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+            return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+          }
+        }
+
+        // C1: Reject if server-calculated total differs from client total by more than R1
+        if (Math.abs(serverTotal - ft) > 1) {
+          reply = "The price has changed since you started. The correct total is R" + serverTotal + ". Please review and confirm again.";
+          ns = { ...ns, total: serverTotal, baseTotal: serverBaseTotal, discount: serverDiscount, tprice: serverUnitPrice, vded: serverVded };
+          buttons = [{ label: "✅ Confirm" + (serverTotal > 0 ? " & Pay R" + serverTotal : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }];
+          return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+        }
+        // Use server-verified values for the booking
+        ft = serverTotal;
+
+        // L18: Store group discount fields; L20: Store total_captured/total_refunded
+        var { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "GROUP_5PCT" : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", custom_fields: ns.custom_fields || {} }).select().single();
         if (!bk) { reply = "Something went wrong — try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {
-          await db.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_CHAT" }).eq("id", bk.id);
-          if (ns.vid) await db.from("vouchers").update({ status: "REDEEMED", redeemed_at: now.toISOString(), redeemed_booking_id: bk.id }).eq("id", ns.vid);
-          var { data: su } = await db.from("slots").select("booked").eq("id", ns.slotId).single();
-          if (su) await db.from("slots").update({ booked: su.booked + ns.qty }).eq("id", ns.slotId);
+          // L20: Set total_captured for voucher bookings (full amount captured via voucher)
+          await db.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_CHAT", total_captured: ft }).eq("id", bk.id);
+          if (ns.vid) {
+            // Atomic deduction via RPC — prevents double-spend race condition
+            var chatDeductionAmount = Number(ns.vded || ns.baseTotal || ns.tprice * ns.qty || 0);
+            var chatRpcRes = await db.rpc("deduct_voucher_balance", { p_voucher_id: ns.vid, p_amount: chatDeductionAmount });
+            if (chatRpcRes.data?.success) {
+              await db.from("vouchers").update({ redeemed_booking_id: bk.id }).eq("id", ns.vid);
+            } else {
+              // Fallback if RPC fails
+              await db.from("vouchers").update({ status: "REDEEMED", redeemed_at: now.toISOString(), redeemed_booking_id: bk.id }).eq("id", ns.vid);
+            }
+          }
+          // H1: Use atomic RPC for capacity check even for voucher bookings, then convert hold to booking
+          var voucherHoldRes = await db.rpc("create_hold_with_capacity_check", {
+            p_booking_id: bk.id,
+            p_slot_id: ns.slotId,
+            p_qty: ns.qty,
+            p_expires_at: new Date(now.getTime() + 2 * 60 * 1000).toISOString(), // Short 2-min expiry
+          });
+          if (voucherHoldRes.error || !voucherHoldRes.data?.success) {
+            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", bk.id);
+            reply = voucherHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.";
+            ns = { step: "IDLE" };
+            return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+          }
           var waiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
           // Send booking confirmation email for voucher bookings
           var vRef = bk.id.substring(0, 8).toUpperCase();
           try { await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: bk.id, business_id: businessId, email: ns.email, customer_name: ns.name, ref: vRef, tour_name: ns.tname, start_time: fmtS(ns.slotTime), qty: ns.qty, total_amount: "FREE (voucher)" } }) }); } catch (e) { console.log("webchat voucher confirm email err"); }
           // Send WhatsApp confirmation if phone provided
-          if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\nCape Kayak Adventures\n180 Beach Rd, Three Anchor Bay\nCape Town, 8005\nArrive 15 min early\n\n\u{1F5FA} https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures%2C+180+Beach+Rd%2C+Three+Anchor+Bay%2C+Cape+Town%2C+8005\n\n\u{1F392} *Bring:* Sunscreen, hat, towel, water bottle\n\nSee you on the water! \u{1F30A}" }) }); } catch (e) { console.log("webchat voucher wa err"); } }
-          reply = "🎉 You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\nMeet us at 180 Beach Rd, Three Anchor Bay — 15 min early. See you on the water! 🛶"; ns = { step: "IDLE" };
+          // L1: Use dynamic meeting point instead of hardcoded address
+          if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n\n\u{1F392} *Bring:* Sunscreen, hat, towel, water bottle\n\nSee you on the water! \u{1F30A}" }) }); } catch (e) { console.log("webchat voucher wa err"); } }
+          // L1: Use dynamic meeting point
+          reply = "🎉 You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n📍 " + meetingPointText + " — arrive 15 min early. See you on the water! 🛶"; ns = { step: "IDLE" };
         } else {
-          await db.from("holds").insert({ booking_id: bk.id, slot_id: ns.slotId, expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(), status: "ACTIVE" });
-          var { data: sh } = await db.from("slots").select("held").eq("id", ns.slotId).single();
-          if (sh) await db.from("slots").update({ held: (sh.held || 0) + ns.qty }).eq("id", ns.slotId);
+          // Atomic capacity check + hold creation to prevent overbooking
+          var holdRes = await db.rpc("create_hold_with_capacity_check", {
+            p_booking_id: bk.id,
+            p_slot_id: ns.slotId,
+            p_qty: ns.qty,
+            p_expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+          });
+          if (holdRes.error || !holdRes.data?.success) {
+            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", bk.id);
+            reply = holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.";
+            ns = { step: "IDLE" };
+            return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, paymentUrl: pay }), { status: 200, headers: gCors(req) });
+          }
           await db.from("bookings").update({ status: "HELD" }).eq("id", bk.id);
           var bookingUrls = await getBusinessSiteUrls(businessId);
           var yr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ft, booking_id: bk.id, business_id: businessId, type: "BOOKING" }) });
           var yd = await yr.json();
-          if (yd && yd.redirectUrl) { await db.from("bookings").update({ yoco_checkout_id: yd.id }).eq("id", bk.id); pay = yd.redirectUrl; reply = "🙌 Spots held for 15 minutes!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nClick below to complete payment."; }
+          if (yd && yd.redirectUrl) {
+            await db.from("bookings").update({ yoco_checkout_id: yd.id }).eq("id", bk.id);
+            pay = yd.redirectUrl;
+            // M9: Generate waiver link for paid bookings
+            var paidWaiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
+            reply = "🙌 Spots held for 15 minutes!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nClick below to complete payment." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "");
+          }
           else { reply = "Payment link didn't work — try the Book Now page?"; }
           ns = { step: "IDLE" };
         }
@@ -403,11 +542,9 @@ Deno.serve(async (req) => {
     if (step === "LOOKUP") {
       var em2 = lo.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
       if (em2) {
-        var { data: bks } = await db.from("bookings").select("id, business_id, customer_name, qty, total_amount, status, refund_status, slots(start_time), tours(name)").eq("email", em2[0].toLowerCase()).order("created_at", { ascending: false }).limit(5);
-        var activeBks = (bks || []).filter(function(b: any) {
-          if (b.status === "CANCELLED" && b.refund_status === "REFUNDED") return false;
-          return true;
-        });
+        // L16: Only show bookings with actionable statuses (exclude CANCELLED, HELD, PENDING)
+        var { data: bks } = await db.from("bookings").select("id, business_id, customer_name, email, phone, qty, total_amount, unit_price, status, refund_status, slot_id, tour_id, slots(start_time), tours(name)").eq("email", em2[0].toLowerCase()).in("status", ["PAID", "CONFIRMED", "COMPLETED"]).order("created_at", { ascending: false }).limit(5);
+        var activeBks = bks || [];
         if (activeBks.length > 0) {
           reply = "Found your bookings:\n\n";
           for (var b of activeBks) {
@@ -416,7 +553,21 @@ Deno.serve(async (req) => {
             reply += (b.tours?.name || "Tour") + " \u2014 " + bTime + "\n" + b.qty + " people \u2014 " + b.status + "\nRef: " + bRef + "\n\n";
           }
           reply += "What would you like to do with your booking?";
-          buttons = [{ label: "Reschedule", value: "btn:reschedule" }, { label: "Cancel / Refund", value: "btn:cancel" }];
+          // M2: Show comprehensive action buttons based on booking timing
+          var lookupB = activeBks[0];
+          var lookupHrs = lookupB?.slots?.start_time ? (new Date(lookupB.slots.start_time).getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
+          var lookupButtons: any[] = [];
+          if (lookupHrs >= 24) {
+            lookupButtons.push({ label: "📅 Reschedule", value: "btn:reschedule" });
+            lookupButtons.push({ label: "❌ Cancel / Refund", value: "btn:cancel" });
+            lookupButtons.push({ label: "👥 Edit Guests", value: "btn:edit guest" });
+            lookupButtons.push({ label: "🔄 Change Tour", value: "btn:change tour" });
+          } else if (lookupHrs >= 12) {
+            lookupButtons.push({ label: "👥 Add Guests", value: "btn:add people" });
+          }
+          lookupButtons.push({ label: "✏️ Update Name", value: "btn:update name" });
+          lookupButtons.push({ label: "📧 Resend Confirmation", value: "btn:resend confirmation email" });
+          buttons = lookupButtons;
           ns = { step: "PICK_ACTION", bookings: activeBks };
         } else { reply = "No active bookings found under that email. Try a different one?"; }
       } else { reply = "What email did you use when you booked?"; }
@@ -436,10 +587,18 @@ Deno.serve(async (req) => {
           buttons = [{ label: "✅ Send Review Request", value: "btn:req_reschedule" }, { label: "No, nevermind", value: "btn:cancel_action" }];
           ns = { ...ns, step: "REVIEW_REQUEST", booking: b, action: "reschedule" };
         } else {
-          ns = { ...ns, step: "RESCH_CALENDAR", booking_id: b.id, tour_id: b.tour_id, qty: b.qty };
-          reply = "Pick a new date for your reschedule:";
-          // Need to fetch slots...
-          return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+          // M1: Fetch slots and show calendar for reschedule (was a dead end before)
+          ns = { ...ns, step: "RESCH_DATE", booking_id: b.id, tour_id: b.tour_id, qty: b.qty };
+          var reschSlots = await getSlots(b.tour_id, now);
+          var reschFit = reschSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= (b.qty || 1); });
+          if (reschFit.length > 0) {
+            reply = "Pick a new time for your reschedule:";
+            buttons = reschFit.slice(0, 10).map(function (s: any) { return { label: fmtS(s.start_time) + " (" + (s.capacity_total - s.booked - (s.held || 0)) + " spots)", value: s.id }; });
+          } else {
+            reply = "No available slots right now. Contact our team for assistance.";
+            ns = { step: "IDLE" };
+          }
+          return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
         }
       } else if (act.includes("cancel") || act.includes("refund")) {
         if (hrs < 24) {
@@ -452,7 +611,57 @@ Deno.serve(async (req) => {
           buttons = [{ label: "✅ Yes, Cancel", value: "btn:confirm_cancel" }, { label: "No, keep it", value: "btn:cancel_action" }];
           ns = { ...ns, step: "CONFIRM_CANCEL", booking_id: b.id, qty: b.qty, refund: refAmt, hours: hrs, slot_id: b.slot_id };
         }
-      } else { reply = "Would you like to reschedule or cancel?"; buttons = [{ label: "Reschedule", value: "btn:reschedule" }, { label: "Cancel", value: "btn:cancel" }]; }
+      // M2: Handle all unreachable states — Edit Guests, Update Name, Resend Confirmation, Change Tour
+      else if (act.includes("edit") && act.includes("guest") || act.includes("modify") && act.includes("qty") || act.includes("change") && act.includes("people") || act.includes("add") && act.includes("people") || act.includes("remove") && act.includes("people")) {
+        if (hrs < 12) {
+          reply = "Changes to guest numbers aren't available within 12 hours of the trip. Contact our team for help.";
+          ns = { step: "IDLE" };
+        } else if (hrs < 24) {
+          // 12-24h: can only add, not remove
+          var { data: mqSc } = await db.rpc("slot_available_capacity", { p_slot_id: b.slot_id });
+          ns = { ...ns, step: "MODIFY_QTY", booking_id: b.id, slot_id: b.slot_id, current_qty: b.qty, unit_price: b.total_amount / b.qty, max_avail: b.qty + Number(mqSc || 0), hours_before: hrs, add_only: true };
+          reply = "Your booking currently has " + b.qty + " people. You can add more guests (removal not available within 24 hours). How many total?";
+        } else {
+          var { data: mqSc2 } = await db.rpc("slot_available_capacity", { p_slot_id: b.slot_id });
+          ns = { ...ns, step: "MODIFY_QTY", booking_id: b.id, slot_id: b.slot_id, current_qty: b.qty, unit_price: b.total_amount / b.qty, max_avail: b.qty + Number(mqSc2 || 0), hours_before: hrs, add_only: false };
+          reply = "Your booking currently has " + b.qty + " people. How many should it be?";
+        }
+      }
+      else if (act.includes("update") && act.includes("name") || act.includes("change") && act.includes("name")) {
+        ns = { ...ns, step: "UPDATE_NAME", booking_id: b.id };
+        reply = "What should the new name on the booking be?";
+      }
+      else if (act.includes("resend") || act.includes("confirmation") && act.includes("email")) {
+        ns = { ...ns, step: "RESEND_CONFIRM", booking_id: b.id, bid: b.business_id, email: b.email, customer_name: b.customer_name };
+        reply = "Want me to resend the confirmation email?";
+        buttons = [{ label: "✅ Resend Email", value: "resend_email" }, { label: "No thanks", value: "btn:cancel_action" }];
+      }
+      else if (act.includes("change") && act.includes("tour") || act.includes("switch") && act.includes("tour") || act.includes("different") && act.includes("tour")) {
+        if (hrs < 24) {
+          reply = "Tour changes aren't available within 24 hours. Contact our team.";
+          ns = { step: "IDLE" };
+        } else {
+          ns = { ...ns, step: "CHANGE_TOUR", booking_id: b.id, slot_id: b.slot_id, tour_id: b.tour_id, qty: b.qty };
+          reply = "Which tour would you like to switch to?";
+          buttons = tours.filter(function (t: any) { return t.id !== b.tour_id; }).map(function (t: any) { return { label: t.name + " — R" + t.base_price_per_person, value: "chtour_" + t.id }; });
+        }
+      }
+      else {
+        // M2: Show all available actions based on booking state
+        reply = "What would you like to do with your booking?";
+        var actionButtons: any[] = [];
+        if (hrs >= 24) {
+          actionButtons.push({ label: "📅 Reschedule", value: "btn:reschedule" });
+          actionButtons.push({ label: "❌ Cancel / Refund", value: "btn:cancel" });
+          actionButtons.push({ label: "👥 Edit Guests", value: "btn:edit guest" });
+          actionButtons.push({ label: "🔄 Change Tour", value: "btn:change tour" });
+        } else if (hrs >= 12) {
+          actionButtons.push({ label: "👥 Add Guests", value: "btn:add people" });
+        }
+        actionButtons.push({ label: "✏️ Update Name", value: "btn:update name" });
+        actionButtons.push({ label: "📧 Resend Confirmation", value: "btn:resend confirmation email" });
+        buttons = actionButtons;
+      }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
 
@@ -465,7 +674,8 @@ Deno.serve(async (req) => {
         reply = "Request sent! \u2705 I've notified our team that you'd like to " + rType + " your booking *" + rRef + "*. They will review it and get back to you shortly.";
         // Log for admin
         var adminMsg = `[URGENT] Website chat request to ${rType.toUpperCase()} booking ${rRef}. Customer: ${rb.customer_name}`;
-        await db.from("chat_messages").insert({ business_id: rb.business_id || "c8b439f5-c11e-4d46-b347-943df6f172b4", phone: rb.phone, direction: "IN", body: adminMsg, sender: rb.customer_name });
+        // L2: Use requestedBusinessId instead of hardcoded UUID
+        await db.from("chat_messages").insert({ business_id: rb.business_id || requestedBusinessId, phone: rb.phone, direction: "IN", body: adminMsg, sender: rb.customer_name });
         ns = { step: "IDLE" };
       } else { reply = "No problem! Anything else I can help with?"; ns = { step: "IDLE" }; }
       return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
@@ -496,6 +706,8 @@ Deno.serve(async (req) => {
     if (step === "CONFIRM_CANCEL") {
       if (btnVal === "confirm_cancel" || lo.includes("yes") || lo.includes("cancel")) {
         await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Customer request via web chat", cancelled_at: new Date().toISOString(), refund_status: ns.hours >= 24 ? "REQUESTED" : "NONE", refund_amount: ns.refund || 0 }).eq("id", ns.booking_id);
+        // L14: Release capacity immediately on cancellation so the slot is available for others.
+        // The refund processor handles payment reversal separately from capacity management.
         var { data: cSl } = await db.from("slots").select("booked").eq("id", ns.slot_id).single();
         if (cSl) await db.from("slots").update({ booked: Math.max(0, cSl.booked - ns.qty) }).eq("id", ns.slot_id);
         reply = ns.hours >= 24 ? "Booking cancelled. A refund request of R" + ns.refund + " has been sent to our team for approval \u2705 Once approved, you can expect it in 5-7 business days." : "Booking cancelled. As this was within 24 hours, no refund applies.";
@@ -510,8 +722,16 @@ Deno.serve(async (req) => {
       if (isNaN(newQ) || newQ < 1 || newQ > 30) { reply = "Please enter a number between 1 and 30."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       if (newQ === ns.current_qty) { reply = "That\u2019s the same! No changes needed \u{1F60A}"; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       if (newQ > ns.max_avail) { reply = "Only " + ns.max_avail + " spots available. Try a smaller number."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
+      // M2: Enforce add-only restriction within 12-24h window
+      if (ns.add_only && newQ < ns.current_qty) { reply = "Within 24 hours of the trip, you can only add guests, not remove them. Current: " + ns.current_qty + " people."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       var qDiff = newQ - ns.current_qty; var newTot = newQ * Number(ns.unit_price); var diffAmt = Math.abs(newTot - ns.current_qty * Number(ns.unit_price));
-      await db.from("bookings").update({ qty: newQ, total_amount: newTot }).eq("id", ns.booking_id);
+      // M8: When qty increases, invalidate waiver so a new one must be signed
+      var mqUpdateFields: any = { qty: newQ, total_amount: newTot };
+      if (qDiff > 0) {
+        mqUpdateFields.waiver_status = "PENDING";
+        mqUpdateFields.waiver_token = crypto.randomUUID();
+      }
+      await db.from("bookings").update(mqUpdateFields).eq("id", ns.booking_id);
       var { data: mqSl } = await db.from("slots").select("booked").eq("id", ns.slot_id).single();
       if (mqSl) await db.from("slots").update({ booked: Math.max(0, mqSl.booked + qDiff) }).eq("id", ns.slot_id);
       if (qDiff > 0) {
@@ -618,7 +838,14 @@ Deno.serve(async (req) => {
     if (step === "GIFT_CONFIRM") {
       if (btnVal === "gift_confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("sure") || lo.includes("yep")) {
         var vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
-        var { data: gv } = await db.from("vouchers").insert({ business_id: ns.gbid, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
+        // Retry on unique constraint violation (code collision)
+        var gv: any = null;
+        for (var _retry = 0; _retry < 5; _retry++) {
+          if (_retry > 0) vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
+          var _ins = await db.from("vouchers").insert({ business_id: ns.gbid, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, current_balance: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
+          if (!_ins.error) { gv = _ins.data; break; }
+          if (_ins.error.code !== "23505") break;
+        }
         if (gv) {
           var giftUrls = await getBusinessSiteUrls(ns.gbid);
           var gyr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ns.gtprice, business_id: ns.gbid, voucher_id: gv.id, voucher_code: vcode, type: "GIFT_VOUCHER" }) });

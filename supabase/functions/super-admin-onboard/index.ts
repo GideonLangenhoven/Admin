@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    const idempotencyKey = String(body.idempotency_key || "").trim();
     const requesterEmail = String(body.requester_email || "").trim().toLowerCase();
     const requesterPassword = String(body.requester_password || "");
     const businessName = String(body.business_name || "").trim();
@@ -45,6 +46,7 @@ Deno.serve(async (req) => {
     const waPhoneId = String(body.wa_phone_id || "").trim() || null;
     const yocoSecretKey = String(body.yoco_secret_key || "").trim() || null;
     const yocoWebhookSecret = String(body.yoco_webhook_secret || "").trim() || null;
+    const customDomain = String(body.custom_domain || "").trim() || null;
 
     if (!requesterEmail || !requesterPassword || !businessName || !adminName || !adminEmail) {
       return respond(400, { success: false, error: "requester_email, requester_password, business_name, admin_name, and admin_email are required" });
@@ -62,6 +64,43 @@ Deno.serve(async (req) => {
     const requesterHash = await sha256Hex(requesterPassword);
     if (!requester.password_hash || requester.password_hash !== requesterHash) {
       return respond(403, { success: false, error: "Super admin password verification failed" });
+    }
+
+    // ── IDEMPOTENCY CHECK ──
+    if (idempotencyKey) {
+      const idempKey = "onboard:" + idempotencyKey;
+      const idempInsert = await supabase
+        .from("idempotency_keys")
+        .insert({ key: idempKey })
+        .select("id")
+        .maybeSingle();
+
+      if (idempInsert.error && idempInsert.error.code === "23505") {
+        console.log("ONBOARD_IDEMPOTENCY_SKIP: already processed key=" + idempKey);
+
+        const { data: existingBusiness } = await supabase
+          .from("businesses")
+          .select("id, business_name, timezone, currency, logo_url")
+          .eq("name", businessName)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { data: existingAdmin } = await supabase
+          .from("admin_users")
+          .select("id, email, name, business_id")
+          .eq("email", adminEmail)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        return respond(200, {
+          success: true,
+          business: existingBusiness || { id: "unknown" },
+          admin: existingAdmin || { id: "unknown" },
+          idempotent: true,
+        });
+      }
     }
 
     const { data: business, error: businessError } = await supabase
@@ -97,6 +136,32 @@ Deno.serve(async (req) => {
       throw adminError;
     }
 
+    // ── Validate Yoco API keys before saving ──
+    if (yocoSecretKey) {
+      try {
+        const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${yocoSecretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: 100, currency: "ZAR" }),
+        });
+        if (yocoRes.status === 401) {
+          return respond(400, {
+            success: false,
+            error: "Invalid Yoco API keys. Please verify your Secret Key.",
+          });
+        }
+        // Any non-401 response (including 400 for missing fields) means the key is valid
+      } catch (yocoErr) {
+        return respond(500, {
+          success: false,
+          error: `Could not validate Yoco credentials: ${yocoErr instanceof Error ? yocoErr.message : "Network error"}`,
+        });
+      }
+    }
+
     if (waToken || waPhoneId || yocoSecretKey || yocoWebhookSecret) {
       if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
         throw new Error("SETTINGS_ENCRYPTION_KEY must be 32+ characters to store credentials.");
@@ -110,6 +175,17 @@ Deno.serve(async (req) => {
         p_yoco_webhook_secret: yocoWebhookSecret,
       });
       if (credentialError) throw credentialError;
+    }
+
+    // TODO: Integrate with Vercel Domains API to programmatically add custom domain and provision SSL certificate.
+    // For now, custom domain requires manual DNS configuration and Vercel dashboard setup.
+    if (customDomain) {
+      // Save custom_domain on the business record for future reference
+      await supabase.from("businesses").update({ custom_domain: customDomain }).eq("id", business.id);
+      console.warn(
+        `ACTION REQUIRED: Custom domain "${customDomain}" specified for business "${businessName}" (${business.id}). ` +
+        `Manual DNS/Vercel configuration is needed: add CNAME record and configure domain in Vercel dashboard.`
+      );
     }
 
     return respond(200, {
