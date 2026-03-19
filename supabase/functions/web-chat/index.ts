@@ -611,6 +611,7 @@ Deno.serve(async (req) => {
           buttons = [{ label: "✅ Yes, Cancel", value: "btn:confirm_cancel" }, { label: "No, keep it", value: "btn:cancel_action" }];
           ns = { ...ns, step: "CONFIRM_CANCEL", booking_id: b.id, qty: b.qty, refund: refAmt, hours: hrs, slot_id: b.slot_id };
         }
+      }
       // M2: Handle all unreachable states — Edit Guests, Update Name, Resend Confirmation, Change Tour
       else if (act.includes("edit") && act.includes("guest") || act.includes("modify") && act.includes("qty") || act.includes("change") && act.includes("people") || act.includes("add") && act.includes("people") || act.includes("remove") && act.includes("people")) {
         if (hrs < 12) {
