@@ -352,6 +352,57 @@ export default function Bookings() {
     return days;
   }, [filteredBookings]);
 
+  const searchDayGroups: DayGroup[] = useMemo(() => {
+    if (!searchResults || searchResults.length === 0) return [];
+    const dayMap = new Map<string, Map<string, Booking[]>>();
+    for (const b of searchResults) {
+      const startTime = b.slots?.start_time;
+      const dk = startTime ? dateKey(startTime) : "no-slot";
+      const tk = startTime ? fmtTime(startTime) : "—";
+      if (!dayMap.has(dk)) dayMap.set(dk, new Map());
+      const slotMap = dayMap.get(dk)!;
+      if (!slotMap.has(tk)) slotMap.set(tk, []);
+      slotMap.get(tk)!.push(b);
+    }
+    const days: DayGroup[] = [];
+    for (const [dk, slotMap] of dayMap) {
+      const slots: SlotGroup[] = [];
+      for (const [tk, bks] of slotMap) {
+        const activeBks = bks.filter((b) => b.status !== "CANCELLED");
+        const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
+        const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+        const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
+        slots.push({ timeLabel: tk, sortKey: tk, bookings: bks, totalPax, totalPrice, totalPaid, totalDue: totalPrice - totalPaid });
+      }
+      slots.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      const totalPax = slots.reduce((s, sl) => s + sl.totalPax, 0);
+      const totalPrice = slots.reduce((s, sl) => s + sl.totalPrice, 0);
+      const totalPaid = slots.reduce((s, sl) => s + sl.totalPaid, 0);
+      const first = searchResults.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
+      days.push({
+        dateLabel: first?.slots?.start_time ? fmtDate(first.slots.start_time) : "No slot assigned",
+        sortKey: dk,
+        slots,
+        totalPax,
+        totalPrice,
+        totalPaid,
+        totalDue: totalPrice - totalPaid,
+      });
+    }
+    days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    return days;
+  }, [searchResults]);
+
+  // Auto-expand all search result slots so bookings are immediately visible
+  useEffect(() => {
+    if (!searchResults || searchResults.length === 0) return;
+    const keys = new Set<string>();
+    searchDayGroups.forEach((day) => {
+      day.slots.forEach((_, si) => keys.add(`search-${day.sortKey}-${si}`));
+    });
+    setExpandedSlots((prev) => new Set([...prev, ...keys]));
+  }, [searchResults]);
+
   function toggleSlot(key: string) {
     setExpandedSlots((prev) => {
       const next = new Set(prev);
@@ -1317,46 +1368,69 @@ export default function Bookings() {
       </div>
 
       {searchResults !== null ? (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 text-sm font-medium text-gray-700">
-            Search Results ({searchResults.length})
+        searchResults.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+            No bookings found for &quot;{searchRef}&quot;
           </div>
-          {searchResults.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No bookings found for &quot;{searchRef}&quot;</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
-                  <th className="px-4 py-2">Ref</th>
-                  <th className="px-4 py-2">Customer</th>
-                  <th className="px-4 py-2 hidden sm:table-cell">Tour</th>
-                  <th className="px-4 py-2 hidden sm:table-cell">Date</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {searchResults.map((b) => (
-                  <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-xs">{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="px-4 py-2">
-                      <div>{b.customer_name}</div>
-                      <div className="text-[10px] text-gray-400">{b.email}</div>
-                    </td>
-                    <td className="px-4 py-2 hidden sm:table-cell">{b.tours?.name || "—"}</td>
-                    <td className="px-4 py-2 hidden sm:table-cell text-xs">{b.slots?.start_time ? fmtDate(b.slots.start_time) + " " + fmtTime(b.slots.start_time) : "—"}</td>
-                    <td className="px-4 py-2"><StatusBadge status={b.status} /></td>
-                    <td className="px-4 py-2 text-right">{fmtCurrency(Number(b.total_amount || 0))}</td>
-                    <td className="px-4 py-2">
-                      <button onClick={() => router.push(`/bookings/${b.id}`)} className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100">View</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        ) : (
+          <div className="space-y-6 pb-48">
+            <div className="text-sm text-gray-500">{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for &quot;{searchRef}&quot;</div>
+            {searchDayGroups.map((day) => {
+              const slotKeys = day.slots.map((_, i) => `search-${day.sortKey}-${i}`);
+              return (
+                <div key={day.sortKey}>
+                  <h3 className="mb-2 text-xl font-semibold text-gray-800">{day.dateLabel}</h3>
+                  <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto no-scrollbar lg:overflow-visible">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50">
+                          <th className="w-24 lg:w-36 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Time</th>
+                          <th className="w-10 lg:w-16 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Pax</th>
+                          <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Details</th>
+                          <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Service</th>
+                          <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Price</th>
+                          <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Paid</th>
+                          <th className="p-1.5 lg:p-3 text-right font-semibold text-gray-600 text-[11px] lg:text-sm">Due</th>
+                          <th className="hidden p-3 text-left font-semibold text-gray-600 lg:table-cell">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {day.slots.map((slot, si) => {
+                          const slotKey = `search-${day.sortKey}-${si}`;
+                          const isOpen = expandedSlots.has(slotKey);
+                          const services = [...new Set(slot.bookings.map((b) => b.tours?.name).filter(Boolean))].join(", ");
+                          return (
+                            <SlotRows
+                              key={slotKey}
+                              slot={slot}
+                              services={services}
+                              isOpen={isOpen}
+                              onToggle={() => toggleSlot(slotKey)}
+                              actionBookingId={actionBookingId}
+                              resendingInvoiceId={resendingInvoiceId}
+                              onEdit={openEditModal}
+                              onRebook={openRebookModal}
+                              onMarkPaid={markPaid}
+                              onRefund={openRefundDialog}
+                              onCancel={cancelBooking}
+                              onResendInvoice={resendInvoiceForBooking}
+                              paymentLinkBookingId={paymentLinkBookingId}
+                              onSendPaymentLink={sendPaymentLink}
+                              onWhatsApp={openWhatsApp}
+                              onView={(b) => router.push(`/bookings/${b.id}`)}
+                              onCancelSlot={cancelSlotWeather}
+                              cancellingWeatherId={cancellingWeatherId}
+                            />
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       ) : loading ? (
         <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
