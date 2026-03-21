@@ -126,6 +126,17 @@ async function resolveBrandingBusinessId(d: Record<string, unknown>) {
   return "";
 }
 
+function deriveAccentColor(hex: string): string {
+  var r = parseInt(hex.slice(1, 3), 16);
+  var g = parseInt(hex.slice(3, 5), 16);
+  var b = parseInt(hex.slice(5, 7), 16);
+  // Blend 60% toward white for a muted light accent
+  r = Math.round(r + (255 - r) * 0.6);
+  g = Math.round(g + (255 - g) * 0.6);
+  b = Math.round(b + (255 - b) * 0.6);
+  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
+}
+
 async function loadEmailBranding(d: Record<string, unknown>) {
   var businessId = await resolveBrandingBusinessId(d);
   if (!businessId || !supabase) {
@@ -150,7 +161,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -186,6 +197,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     fromEmail: FROM_EMAIL.includes("@") ? brandName + " <" + FROM_EMAIL.replace(/^[^<]*</, "").replace(/>.*$/, "") + ">" : FROM_EMAIL,
     // Reply-To uses the tenant's notification_email so customer replies go to the right place
     replyToEmail: String(data?.notification_email || ""),
+    emailColor: String(data?.email_color || "#1b3b36"),
     imgPayment: String(data?.email_img_payment || ""),
     imgConfirm: String(data?.email_img_confirm || ""),
     imgInvoice: String(data?.email_img_invoice || ""),
@@ -243,6 +255,13 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   ];
   for (var s = 0; s < imgSwaps.length; s++) {
     if (imgSwaps[s][1]) brandedHtml = brandedHtml.split(imgSwaps[s][0]).join(imgSwaps[s][1]);
+  }
+
+  // Replace email brand color
+  if (branding.emailColor && branding.emailColor !== "#1b3b36") {
+    var accent = deriveAccentColor(branding.emailColor);
+    brandedHtml = brandedHtml.split("#1b3b36").join(branding.emailColor);
+    brandedHtml = brandedHtml.split("#A8C2B8").join(accent);
   }
 
   var brandedSubject = subject
@@ -447,6 +466,78 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function bookingUpdatedHtml(d: Record<string, unknown>) {
+  var eventLabel = String(d.event || "updated");
+  var eventTitle = eventLabel === "rescheduled" ? "Booking Rescheduled" : "Booking Updated";
+  var eventMessage = eventLabel === "rescheduled"
+    ? "Your booking has been moved to a new date/time. Here are your updated details."
+    : String(d.message || "Your booking details have been updated.");
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <!-- Hero Banner -->
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${eventTitle}</h1>
+          </td>
+        </tr>
+        <!-- Hero Image -->
+        <tr>
+          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
+            <img src="${IMG_CONFIRM}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
+          </td>
+        </tr>
+        <!-- Content -->
+        <tr>
+          <td style="padding: 40px 40px 10px; text-align: center;">
+            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${eventMessage}</p>
+          </td>
+        </tr>
+        <!-- Details Box -->
+        <tr>
+          <td style="padding: 0 40px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px;">
+              <tr>
+                <td width="40%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 15px;">Reference:</td>
+                <td width="60%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; text-align: right;">${d.ref}</td>
+              </tr>
+              <tr>
+                <td width="40%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 15px;">Tour:</td>
+                <td width="60%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; text-align: right;">${d.tour_name}</td>
+              </tr>
+              <tr>
+                <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">New Date &amp; Time:</td>
+                <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 15px; text-align: right;">${d.start_time}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- CTA -->
+        <tr>
+          <td style="padding: 10px 40px 40px; text-align: center;">
+            <a href="${MANAGE_BOOKING_URL}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">View My Booking</a>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+            <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
+            If you have any questions, reply to this email or contact us on WhatsApp.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 function invoiceHtml(d: Record<string, unknown>) {
   return `
     <!DOCTYPE html>
@@ -507,7 +598,7 @@ function invoiceHtml(d: Record<string, unknown>) {
         <!-- Payment Meta -->
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
-            <p style="font-size: 13px; color: #888; margin: 0;">Payment Method: <strong>${d.payment_method}</strong> &nbsp;|&nbsp; Ref: <strong>${d.payment_reference}</strong></p>
+            <p style="font-size: 13px; color: #888; margin: 0;">Payment Method: <strong>${d.payment_method}</strong> &nbsp;|&nbsp; Ref: <strong>${String(d.payment_reference || "").substring(0, 8).toUpperCase()}</strong></p>
           </td>
         </tr>
         <!-- Footer -->
@@ -1147,7 +1238,7 @@ async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> 
 
   // Invoice data
   var invNo = String(d.invoice_number || "");
-  var ref = String(d.payment_reference || invNo);
+  var ref = String(d.payment_reference || invNo).substring(0, 8).toUpperCase();
   var toName = String(d.customer_name || "Customer");
   var toEmail = String(d.customer_email || "");
   var toPhone = String(d.phone || "");
@@ -1280,7 +1371,7 @@ async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> 
 
 function proFormaHtml(d: Record<string, unknown>) {
   var invNo = escHtml(String(d.invoice_number || ""));
-  var ref = escHtml(String(d.payment_reference || invNo));
+  var ref = escHtml(String(d.payment_reference || invNo).substring(0, 8).toUpperCase());
   var toName = escHtml(String(d.customer_name || "Customer"));
   var toEmail = escHtml(String(d.customer_email || ""));
   var tourName = escHtml(String(d.tour_name || "Kayak Booking"));
@@ -1497,6 +1588,10 @@ Deno.serve(async (req: Request) => {
       case "BOOKING_CONFIRM":
         subject = "Cape Kayak - Booking Confirmed! (Ref: " + d.ref + ")";
         html = bookingConfirmHtml(d);
+        break;
+      case "BOOKING_UPDATED":
+        subject = "Cape Kayak - Booking Updated (Ref: " + d.ref + ")";
+        html = bookingUpdatedHtml(d);
         break;
       case "INVOICE":
         subject = "Cape Kayak - Invoice " + d.invoice_number;
