@@ -158,27 +158,26 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   }
 
   var data: Record<string, unknown> | null = null;
-  try {
-    var res = await supabase
+  // Full query with email_color + email_img columns
+  var res = await supabase
+    .from("businesses")
+    .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (res.error) {
+    console.warn("BRANDING_QUERY_ERR (trying fallback):", res.error.message);
+    // Fallback query without newer columns
+    var res2 = await supabase
       .from("businesses")
-      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
       .eq("id", businessId)
       .maybeSingle();
+    data = res2.data;
+    if (res2.error) console.warn("BRANDING_FALLBACK_ERR:", res2.error.message);
+  } else {
     data = res.data;
-  } catch (brandErr) {
-    console.warn("BRANDING_QUERY_ERR (will use fallbacks):", brandErr);
-    // Try a simpler query without the email_img columns in case they don't exist yet
-    try {
-      var res2 = await supabase
-        .from("businesses")
-        .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
-        .eq("id", businessId)
-        .maybeSingle();
-      data = res2.data;
-    } catch (fallbackErr) {
-      console.warn("BRANDING_FALLBACK_QUERY_ERR:", fallbackErr);
-    }
   }
+  console.log("BRANDING_LOADED biz=" + businessId + " email_color=" + (data?.email_color || "default") + " has_imgs=" + !!(data?.email_img_payment || data?.email_img_confirm));
 
   var brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
