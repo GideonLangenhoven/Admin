@@ -1036,6 +1036,7 @@ export default function Bookings() {
     setActionBookingId(rebookBooking.id);
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
       body: {
+        action: "RESCHEDULE",
         booking_id: rebookBooking.id,
         new_slot_id: rebookSlotId,
         excess_action: rebookExcessAction,
