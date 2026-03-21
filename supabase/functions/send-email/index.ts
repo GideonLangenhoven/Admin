@@ -158,18 +158,20 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   }
 
   var data: Record<string, unknown> | null = null;
+  var _queryErr = "none";
   // Full query with email_color + email_img columns
   var res = await supabase
     .from("businesses")
-    .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+    .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
     .eq("id", businessId)
     .maybeSingle();
   if (res.error) {
-    console.warn("BRANDING_QUERY_ERR (trying fallback):", res.error.message);
+    _queryErr = res.error.message;
+    console.warn("BRANDING_QUERY_ERR (trying fallback):", _queryErr);
     // Fallback query without newer columns
     var res2 = await supabase
       .from("businesses")
-      .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+      .select("id, name, business_name, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
       .eq("id", businessId)
       .maybeSingle();
     data = res2.data;
@@ -177,7 +179,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   } else {
     data = res.data;
   }
-  console.log("BRANDING_LOADED biz=" + businessId + " email_color=" + (data?.email_color || "default") + " has_imgs=" + !!(data?.email_img_payment || data?.email_img_confirm));
+  if (_queryErr !== "none") console.warn("BRANDING_QUERY_ERR:", _queryErr);
 
   var brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
@@ -1652,6 +1654,7 @@ Deno.serve(async (req: Request) => {
     }
 
     var branded = applyBranding(subject, html, branding);
+
     var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
     if (result?.statusCode && result.statusCode >= 400) {
       return new Response(JSON.stringify({ ok: false, error: result.message || "Resend API error", result }), { status: 200, headers: getCors(req) });
