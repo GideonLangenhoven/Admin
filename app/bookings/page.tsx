@@ -93,7 +93,9 @@ interface Booking {
   refund_amount: number | null;
   yoco_checkout_id: string | null;
   payment_deadline: string | null;
+  payment_method?: string | null;
   waiver_status: string | null;
+  custom_fields: Record<string, string> | null;
   tours: TourRel;
   slots: SlotRel;
 }
@@ -141,8 +143,9 @@ interface EditForm {
 const STATUS_OPTIONS = ["PENDING", "PENDING PAYMENT", "HELD", "CONFIRMED", "PAID", "COMPLETED", "CANCELLED"];
 
 export default function Bookings() {
-  const { businessId } = useBusinessContext();
+  const { businessId, role } = useBusinessContext();
   const router = useRouter();
+  const isPrivilegedRole = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
@@ -184,33 +187,34 @@ export default function Bookings() {
   const [waDialog, setWaDialog] = useState<{ phone: string; name: string } | null>(null);
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [searchRef, setSearchRef] = useState("");
+  const [searchResults, setSearchResults] = useState<Booking[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   async function loadBookings() {
     setLoading(true);
 
-    // Two-step approach: first get slot IDs in the date range, then query bookings
-    const { data: slotRows } = await supabase
-      .from("slots")
-      .select("id")
-      .eq("business_id", businessId)
-      .gte("start_time", rangeStart.toISOString())
-      .lte("start_time", rangeEnd.toISOString());
-
-    const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
-    if (slotIds.length === 0) {
+    if (!businessId) {
       setBookings([]);
       setLoading(false);
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("bookings")
-      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots!inner(id,start_time,tour_id,capacity_total,booked,status)")
       .eq("business_id", businessId)
-      .in("slot_id", slotIds)
+      .gte("slots.start_time", rangeStart.toISOString())
+      .lte("slots.start_time", rangeEnd.toISOString())
       .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT", "COMPLETED", "CANCELLED"])
       .order("created_at", { ascending: true })
-      .limit(2000);
+      .limit(3000);
+
+    if (error) {
+      console.error("Error loading bookings:", error);
+      notify({ title: "Failed to load bookings", message: error.message, tone: "error" });
+    }
 
     const normalized = ((data || []) as Array<Booking & { tours: unknown; slots: unknown }>)
       .map((b) => ({
@@ -221,6 +225,46 @@ export default function Bookings() {
       .filter((b) => Boolean(b.slots?.start_time));
     setBookings(normalized as Booking[]);
     setLoading(false);
+  }
+
+  async function searchByRef(ref: string) {
+    const term = ref.trim();
+    if (!term || !businessId) { setSearchResults(null); return; }
+    setSearching(true);
+    const selectCols = "id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)";
+    let results: any[] = [];
+    // If it looks like a hex booking ref, search by ID prefix
+    const hexClean = term.toLowerCase().replace(/[^a-f0-9]/g, "");
+    if (hexClean.length >= 4 && /^[a-f0-9]+$/.test(hexClean)) {
+      const { data } = await supabase.rpc("search_bookings_by_ref", { p_business_id: businessId, p_ref: hexClean });
+      if (data && data.length > 0) {
+        const ids = data.map((r: any) => r.id);
+        const { data: full } = await supabase
+          .from("bookings")
+          .select(selectCols)
+          .in("id", ids);
+        results = full || [];
+      }
+    }
+    // Also search by customer name or email
+    if (results.length === 0) {
+      const { data } = await supabase
+        .from("bookings")
+        .select(selectCols)
+        .eq("business_id", businessId)
+        .or(`customer_name.ilike.%${term}%,email.ilike.%${term}%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      results = data || [];
+    }
+    const normalized = (results as Array<Booking & { tours: unknown; slots: unknown }>)
+      .map((b) => ({
+        ...b,
+        tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
+        slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
+      }));
+    setSearchResults(normalized as Booking[]);
+    setSearching(false);
   }
 
   useEffect(() => {
@@ -243,9 +287,24 @@ export default function Bookings() {
     return () => { supabase.removeChannel(channel); };
   }, [rangeStart, rangeEnd]);
 
+  const STATUS_FILTER_MAP: Record<string, string[]> = {
+    ALL: [],
+    PENDING: ["PENDING", "PENDING PAYMENT", "HELD"],
+    PAID: ["PAID"],
+    CONFIRMED: ["CONFIRMED"],
+    COMPLETED: ["COMPLETED"],
+    CANCELLED: ["CANCELLED"],
+  };
+
+  const filteredBookings = useMemo(() => {
+    if (statusFilter === "ALL") return bookings;
+    const allowed = STATUS_FILTER_MAP[statusFilter] || [];
+    return bookings.filter((b) => allowed.includes(b.status));
+  }, [bookings, statusFilter]);
+
   const dayGroups: DayGroup[] = useMemo(() => {
     const dayMap = new Map<string, Map<string, Booking[]>>();
-    for (const b of bookings) {
+    for (const b of filteredBookings) {
       const startTime = b.slots?.start_time;
       if (!startTime) continue;
       const dk = dateKey(startTime);
@@ -278,7 +337,7 @@ export default function Bookings() {
       const totalPax = slots.reduce((s, sl) => s + sl.totalPax, 0);
       const totalPrice = slots.reduce((s, sl) => s + sl.totalPrice, 0);
       const totalPaid = slots.reduce((s, sl) => s + sl.totalPaid, 0);
-      const first = bookings.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
+      const first = filteredBookings.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
       days.push({
         dateLabel: first?.slots?.start_time ? fmtDate(first.slots.start_time) : dk,
         sortKey: dk,
@@ -291,7 +350,7 @@ export default function Bookings() {
     }
     days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     return days;
-  }, [bookings]);
+  }, [filteredBookings]);
 
   function toggleSlot(key: string) {
     setExpandedSlots((prev) => {
@@ -383,7 +442,7 @@ export default function Bookings() {
       } else {
         // Create invoice if it doesn't exist
         try {
-          const invNumRes = await supabase.rpc("next_invoice_number");
+          const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
           invoiceNumber = invNumRes.data || ref;
 
           const { data: invData } = await supabase.from("invoices").insert({
@@ -459,22 +518,44 @@ export default function Bookings() {
 
     const isChangingToPaid = editForm.status === "PAID" && editBooking.status !== "PAID";
 
+    // Detect if price or qty changed on a PENDING booking with an existing payment link
+    const isPending = ["PENDING", "PENDING PAYMENT", "HELD"].includes(editBooking.status);
+    const priceOrQtyChanged = qty !== editBooking.qty || total !== Number(editBooking.total_amount || 0);
+    const shouldInvalidatePaymentLink = isPending && priceOrQtyChanged && editBooking.yoco_checkout_id;
+
+    const updateData: Record<string, unknown> = {
+      customer_name: editForm.customer_name.trim(),
+      phone: normalizePhone(editForm.phone),
+      email: editForm.email.trim().toLowerCase(),
+      qty,
+      total_amount: total,
+      status: isChangingToPaid ? editBooking.status : editForm.status,
+    };
+
+    // Invalidate stale payment link if price/qty changed on a pending booking
+    if (shouldInvalidatePaymentLink) {
+      updateData.yoco_checkout_id = null;
+    }
+
     const { error } = await supabase
       .from("bookings")
-      .update({
-        customer_name: editForm.customer_name.trim(),
-        phone: normalizePhone(editForm.phone),
-        email: editForm.email.trim().toLowerCase(),
-        qty,
-        total_amount: total,
-        status: isChangingToPaid ? editBooking.status : editForm.status,
-      })
+      .update(updateData)
       .eq("id", editBooking.id);
 
     if (error) {
       setActionBookingId(null);
       notify({ title: "Booking update failed", message: error.message, tone: "error" });
       return;
+    }
+
+    if (shouldInvalidatePaymentLink) {
+      // Note: Yoco Checkout API does not currently support cancelling an existing checkout.
+      // The old checkout link will simply expire or fail if the customer tries to use it.
+      notify({
+        title: "Payment link invalidated",
+        message: "Previous payment link has been invalidated because the price or guest count changed. Send a new payment link.",
+        tone: "warning",
+      });
     }
 
     if (isChangingToPaid) {
@@ -492,7 +573,7 @@ export default function Bookings() {
       } catch (err: unknown) {
         notify({ title: "Mark paid failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
       }
-    } else {
+    } else if (!shouldInvalidatePaymentLink) {
       notify({ title: "Booking updated", message: "Booking details were saved successfully.", tone: "success" });
     }
 
@@ -522,13 +603,47 @@ export default function Bookings() {
   }
 
   async function cancelBooking(b: Booking) {
+    const isVoucherPaid = (b.payment_method || "").toUpperCase() === "VOUCHER" || (b.payment_method || "").toUpperCase() === "GIFT_VOUCHER";
+    const confirmMsg = isVoucherPaid
+      ? `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? This booking was paid via voucher — a new voucher will be issued for the full amount (no refund to card).`
+      : `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? The customer will be notified via email and WhatsApp.`;
+
     if (!await confirmAction({
       title: "Cancel booking",
-      message: `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? The customer will be notified via email and WhatsApp.`,
+      message: confirmMsg,
       tone: "warning",
       confirmLabel: "Cancel booking",
     })) return;
     setActionBookingId(b.id);
+
+    // For voucher-paid bookings, use rebook-booking CANCEL_VOUCHER to issue a voucher instead of Yoco refund
+    if (isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
+      try {
+        const res = await fetch(SU + "/functions/v1/rebook-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+          body: JSON.stringify({ booking_id: b.id, action: "CANCEL_VOUCHER" }),
+        });
+        const data = await res.json();
+        setActionBookingId(null);
+        if (data.ok) {
+          notify({
+            title: "Booking cancelled — voucher issued",
+            message: `Voucher ${data.voucher_code} for R${Number(data.voucher_amount).toFixed(2)} issued to customer.`,
+            tone: "success",
+          });
+        } else {
+          notify({ title: "Cancel failed", message: data.error || "Unknown error", tone: "error" });
+        }
+        loadBookings();
+        return;
+      } catch (e: any) {
+        setActionBookingId(null);
+        notify({ title: "Cancel failed", message: e.message || "Network error", tone: "error" });
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from("bookings")
       .update({
@@ -665,7 +780,7 @@ export default function Bookings() {
                   "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
                   " has been cancelled due to weather conditions.\n\n" +
                   "📋 Ref: " + ref + "\n\n" +
-                  "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund. 🛶",
+                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
               }),
             });
           } catch (e) { console.error("WA notify err:", e); }
@@ -685,6 +800,7 @@ export default function Bookings() {
                   start_time: startTime,
                   reason: "weather conditions",
                   total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  is_weather: true,
                 },
               },
             });
@@ -957,9 +1073,83 @@ export default function Bookings() {
     }
   }
 
+  function escapeCsvField(val: string) {
+    if (!val) return "";
+    if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+      return '"' + val.replace(/"/g, '""') + '"';
+    }
+    return val;
+  }
+
+  function exportCsv(includeSensitive: boolean) {
+    const tz = getAdminTimezone();
+    const headers = ["Ref", "Customer", "Phone", "Email", "Tour", "Date", "Time", "Guests", "Total", "Status", "Source", "Waiver", "Special Requests"];
+    const rows = filteredBookings.map((b) => {
+      const specialRequests = b.custom_fields?.special_requests || "";
+      const maskedRequests = includeSensitive ? specialRequests : (specialRequests ? "[Protected - View in Dashboard]" : "");
+      return [
+        b.id.substring(0, 8).toUpperCase(),
+        b.customer_name || "",
+        b.phone || "",
+        b.email || "",
+        b.tours?.name || "",
+        b.slots?.start_time ? fmtDate(b.slots.start_time) : "",
+        b.slots?.start_time ? fmtTime(b.slots.start_time) : "",
+        String(b.qty || 0),
+        String(b.total_amount || 0),
+        b.status || "",
+        b.source || "",
+        b.waiver_status || "",
+        maskedRequests,
+      ].map(escapeCsvField).join(",");
+    });
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bookings-" + new Date().toISOString().split("T")[0] + (includeSensitive ? "-sensitive" : "") + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Log audit entry when sensitive data is exported
+    if (includeSensitive) {
+      supabase.from("logs").insert({
+        business_id: businessId,
+        event: "sensitive_csv_export",
+        payload: {
+          exported_by_role: role,
+          booking_count: filteredBookings.length,
+          exported_at: new Date().toISOString(),
+        },
+      }).then(() => {});
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold">📋 Bookings</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">📋 Bookings</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportCsv(false)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="Export CSV (special requests masked)"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+          {isPrivilegedRole && (
+            <button
+              onClick={() => exportCsv(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+              title="Export with sensitive data (special requests visible)"
+            >
+              <Download className="h-4 w-4" /> Export with Sensitive Data
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* WhatsApp compose dialog */}
       {waDialog && (
@@ -1064,12 +1254,117 @@ export default function Bookings() {
         </div>
       </div>
 
-      {loading ? (
+      {/* Search by booking ref */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Search by name, email, or booking ref"
+          value={searchRef}
+          onChange={(e) => {
+            const v = e.target.value;
+            setSearchRef(v);
+            if (!v.trim()) setSearchResults(null);
+          }}
+          onKeyDown={(e) => { if (e.key === "Enter") searchByRef(searchRef); }}
+          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-gray-500 sm:w-64"
+        />
+        <button
+          onClick={() => searchByRef(searchRef)}
+          disabled={searching || !searchRef.trim()}
+          className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {searching ? "Searching..." : "Search"}
+        </button>
+        {searchResults !== null && (
+          <button
+            onClick={() => { setSearchRef(""); setSearchResults(null); }}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex flex-wrap gap-1.5">
+        {[
+          { key: "ALL", label: "All" },
+          { key: "PENDING", label: "Pending" },
+          { key: "PAID", label: "Paid" },
+          { key: "CONFIRMED", label: "Confirmed" },
+          { key: "COMPLETED", label: "Completed" },
+          { key: "CANCELLED", label: "Cancelled" },
+        ].map((tab) => {
+          const isActive = statusFilter === tab.key;
+          const count = tab.key === "ALL"
+            ? bookings.length
+            : bookings.filter((b) => (STATUS_FILTER_MAP[tab.key] || []).includes(b.status)).length;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
+                (isActive
+                  ? "bg-gray-900 text-white"
+                  : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50")
+              }
+            >
+              {tab.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {searchResults !== null ? (
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 text-sm font-medium text-gray-700">
+            Search Results ({searchResults.length})
+          </div>
+          {searchResults.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No bookings found for &quot;{searchRef}&quot;</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+                  <th className="px-4 py-2">Ref</th>
+                  <th className="px-4 py-2">Customer</th>
+                  <th className="px-4 py-2 hidden sm:table-cell">Tour</th>
+                  <th className="px-4 py-2 hidden sm:table-cell">Date</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2 text-right">Amount</th>
+                  <th className="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.map((b) => (
+                  <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-2 font-mono text-xs">{b.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="px-4 py-2">
+                      <div>{b.customer_name}</div>
+                      <div className="text-[10px] text-gray-400">{b.email}</div>
+                    </td>
+                    <td className="px-4 py-2 hidden sm:table-cell">{b.tours?.name || "—"}</td>
+                    <td className="px-4 py-2 hidden sm:table-cell text-xs">{b.slots?.start_time ? fmtDate(b.slots.start_time) + " " + fmtTime(b.slots.start_time) : "—"}</td>
+                    <td className="px-4 py-2"><StatusBadge status={b.status} /></td>
+                    <td className="px-4 py-2 text-right">{fmtCurrency(Number(b.total_amount || 0))}</td>
+                    <td className="px-4 py-2">
+                      <button onClick={() => router.push(`/bookings/${b.id}`)} className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100">View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : loading ? (
         <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
         </div>
       ) : dayGroups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">No bookings in this date range.</div>
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+          {statusFilter !== "ALL" ? "No " + statusFilter.toLowerCase() + " bookings in this date range." : "No bookings in this date range."}
+        </div>
       ) : (
         <div className="space-y-6 pb-48">
           {dayGroups.map((day) => {
