@@ -182,6 +182,8 @@ export default function Bookings() {
   const [paymentLinkBookingId, setPaymentLinkBookingId] = useState<string | null>(null);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
   const [paymentLinkRef, setPaymentLinkRef] = useState<string>("");
+  const [paymentLinkDialog, setPaymentLinkDialog] = useState<Booking | null>(null);
+  const [paymentLinkHoldHours, setPaymentLinkHoldHours] = useState("24");
   const [refundDialog, setRefundDialog] = useState<{ booking: Booking; amount: string } | null>(null);
   const [refunding, setRefunding] = useState(false);
   const [waDialog, setWaDialog] = useState<{ phone: string; name: string } | null>(null);
@@ -946,13 +948,24 @@ export default function Bookings() {
     setRebookSlots([]);
   }
 
-  async function sendPaymentLink(b: Booking) {
+  function openPaymentLinkDialog(b: Booking) {
     if (!b.email) {
       notify({ title: "Missing email", message: "No email address on this booking. Please edit the booking to add an email first.", tone: "warning" });
       return;
     }
+    setPaymentLinkHoldHours("24");
+    setPaymentLinkDialog(b);
+  }
+
+  async function sendPaymentLink(b: Booking, holdHours: string) {
+    setPaymentLinkDialog(null);
     setPaymentLinkBookingId(b.id);
     try {
+      // Set payment_deadline on the booking
+      const hours = Number(holdHours);
+      const deadline = new Date(Date.now() + hours * 3600000).toISOString();
+      await supabase.from("bookings").update({ payment_deadline: deadline }).eq("id", b.id);
+
       const res = await supabase.functions.invoke("create-checkout", {
         body: {
           amount: Number(b.total_amount || 0),
@@ -975,6 +988,13 @@ export default function Bookings() {
           ? new Date(b.slots.start_time).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
           : "TBC";
 
+        // Format expiry for the email
+        const expiresDate = new Date(deadline);
+        const expiresText = expiresDate.toLocaleString("en-ZA", {
+          weekday: "long", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
+        });
+
         // Send email with payment link
         try {
           await supabase.functions.invoke("send-email", {
@@ -990,6 +1010,8 @@ export default function Bookings() {
                 qty: b.qty,
                 total_amount: Number(b.total_amount || 0).toFixed(2),
                 payment_url: data.redirectUrl,
+                expires_text: expiresText,
+                hold_hours: holdHours,
               },
             },
           });
@@ -1416,7 +1438,7 @@ export default function Bookings() {
                               onCancel={cancelBooking}
                               onResendInvoice={resendInvoiceForBooking}
                               paymentLinkBookingId={paymentLinkBookingId}
-                              onSendPaymentLink={sendPaymentLink}
+                              onSendPaymentLink={openPaymentLinkDialog}
                               onWhatsApp={openWhatsApp}
                               onView={(b) => router.push(`/bookings/${b.id}`)}
                               onCancelSlot={cancelSlotWeather}
@@ -1495,7 +1517,7 @@ export default function Bookings() {
                             onCancel={cancelBooking}
                             onResendInvoice={resendInvoiceForBooking}
                             paymentLinkBookingId={paymentLinkBookingId}
-                            onSendPaymentLink={sendPaymentLink}
+                            onSendPaymentLink={openPaymentLinkDialog}
                             onWhatsApp={openWhatsApp}
                             onView={(b) => router.push(`/bookings/${b.id}`)}
                             onCancelSlot={cancelSlotWeather}
@@ -1660,6 +1682,43 @@ export default function Bookings() {
                 className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {actionBookingId === rebookBooking.id ? "Saving..." : "Rebook"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentLinkDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-xl">
+            <h3 className="mb-1 text-lg font-semibold">Send Payment Link</h3>
+            <p className="mb-4 text-xs text-gray-500">
+              {paymentLinkDialog.customer_name} &middot; {paymentLinkDialog.tours?.name || "Tour"} &middot; R{Number(paymentLinkDialog.total_amount || 0).toFixed(2)}
+            </p>
+            <label className="block text-sm text-gray-600">
+              Payment link expires after
+              <select
+                value={paymentLinkHoldHours}
+                onChange={(e) => setPaymentLinkHoldHours(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="2">2 hours</option>
+                <option value="6">6 hours</option>
+                <option value="12">12 hours</option>
+                <option value="24">24 hours</option>
+                <option value="48">48 hours</option>
+              </select>
+            </label>
+            <p className="mt-2 text-xs text-gray-500">The expiry will be shown in the email sent to the customer.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setPaymentLinkDialog(null)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                onClick={() => sendPaymentLink(paymentLinkDialog, paymentLinkHoldHours)}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Send Payment Link
               </button>
             </div>
           </div>

@@ -89,7 +89,6 @@ async function handleReschedule(req: any, booking: any, body: any) {
     var holdRes = await supabase.from("holds").insert({
       booking_id: booking.id,
       slot_id: newSlotId,
-      business_id: booking.business_id,
       expires_at: holdExpiry,
       status: "ACTIVE",
       hold_type: "RESCHEDULE",
