@@ -121,88 +121,26 @@ export default function Weather() {
   async function cancelSlot(slotId: string) {
     if (!await confirmAction({
       title: "Cancel weather-affected slot",
-      message: "This will cancel all bookings on this slot, notify all customers, and queue full refunds. Continue?",
+      message: "This will cancel all bookings on this slot, notify all customers with a self-service link, and process refunds server-side. Continue?",
       tone: "warning",
       confirmLabel: "Cancel slot",
     })) return;
     setCancelling(slotId);
     try {
-      await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slotId);
-      const { data: bookings } = await supabase
-        .from("bookings")
-        .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
-        .eq("business_id", businessId)
-        .eq("slot_id", slotId)
-        .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
-
-      const affected = bookings || [];
-      for (const booking of affected) {
-        const isPaid = ["PAID", "CONFIRMED"].includes(booking.status);
-        const refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
-        await supabase.from("bookings").update({
-          status: "CANCELLED",
-          cancellation_reason: "Weather cancellation: " + reason,
-          cancelled_at: new Date().toISOString(),
-          ...(isPaid && refundAmount > 0 ? {
-            refund_status: "REQUESTED",
-            refund_amount: refundAmount,
-            refund_notes: "100% refund — weather cancellation",
-          } : {}),
-        }).eq("id", booking.id);
-
-        const slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
-        if (slotData.data) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, slotData.data.booked - booking.qty),
-            held: Math.max(0, (slotData.data.held || 0) - (booking.status === "HELD" ? booking.qty : 0)),
-          }).eq("id", slotId);
-        }
-
-        await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
-        const ref = booking.id.substring(0, 8).toUpperCase();
-        const tourName = (booking as any).tours?.name || "Tour";
-        const startTime = (booking as any).slots?.start_time ? fmtTime((booking as any).slots.start_time) : "";
-
-        if (booking.phone) {
-          try {
-            await fetch(SU + "/functions/v1/send-whatsapp-text", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({
-                business_id: businessId,
-                to: booking.phone,
-                message: "Trip Cancelled — Weather\n\n" +
-                  "Hi " + (booking.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                  " has been cancelled due to " + reason + ".\n\n" +
-                  "Ref: " + ref + "\n" +
-                  (isPaid && refundAmount > 0 ? "A full refund of R" + refundAmount + " has been submitted.\n\n" : "") +
-                  "You’re welcome to rebook anytime.",
-              }),
-            });
-          } catch { }
-        }
-
-        if (booking.email) {
-          try {
-            await supabase.functions.invoke("send-email", {
-              body: {
-                type: "CANCELLATION",
-                data: {
-                  business_id: businessId,
-                  email: booking.email,
-                  customer_name: booking.customer_name || "Guest",
-                  ref,
-                  tour_name: tourName,
-                  start_time: startTime,
-                  reason,
-                  total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
-                },
-              },
-            });
-          } catch { }
-        }
+      const r = await fetch(SU + "/functions/v1/weather-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        body: JSON.stringify({ slot_ids: [slotId], business_id: businessId, reason }),
+      });
+      const d = await r.json();
+      if (!r.ok || d?.error) {
+        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      } else {
+        const refundMsg = d.refunds_queued > 0
+          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+          : "";
+        notify({ title: "Weather cancellation completed", message: `${d.bookings_cancelled} booking(s) cancelled and notified.${refundMsg}`, tone: "success" });
       }
-      notify({ title: "Weather cancellation completed", message: "Refunds were queued where needed.", tone: "success" });
     } catch (err: any) {
       notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });
     }
@@ -214,39 +152,40 @@ export default function Weather() {
     if (slots.length === 0) return;
     if (!await confirmAction({
       title: "Cancel all weather slots",
-      message: `This will cancel all ${slots.length} slot(s) in the next ${DAYS} days and notify customers. Continue?`,
+      message: `This will cancel all ${slots.length} slot(s) in the next ${DAYS} days, notify customers with self-service links, and process refunds server-side. Continue?`,
       tone: "warning",
       confirmLabel: "Cancel all slots",
     })) return;
     setCancellingAll(true);
-    for (const slot of slots) {
-      await cancelSlot(slot.id);
+    try {
+      const allSlotIds = slots.map((s: any) => s.id);
+      const r = await fetch(SU + "/functions/v1/weather-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        body: JSON.stringify({ slot_ids: allSlotIds, business_id: businessId, reason }),
+      });
+      const d = await r.json();
+      if (!r.ok || d?.error) {
+        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      } else {
+        const refundMsg = d.refunds_queued > 0
+          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+          : "";
+        notify({ title: "All slots cancelled", message: `${d.slots_closed} slot(s) closed, ${d.bookings_cancelled} booking(s) cancelled.${refundMsg}`, tone: "success" });
+      }
+    } catch (err: any) {
+      notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });
     }
     setCancellingAll(false);
+    void load();
   }
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Weather operations</h2>
-            <p className="mt-2 max-w-2xl text-sm text-gray-500">Review live wind and swell context before deciding whether trips should run, then action weather cancellations from the same screen.</p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-center text-sm">
-            <div className="rounded-xl bg-emerald-50 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Low risk</p>
-              <p className="mt-1 font-semibold text-emerald-900">Wind under 12kt</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Review</p>
-              <p className="mt-1 font-semibold text-amber-900">12kt to 18kt</p>
-            </div>
-            <div className="rounded-xl bg-red-50 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">High risk</p>
-              <p className="mt-1 font-semibold text-red-900">18kt+ or large swell</p>
-            </div>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Weather operations</h2>
+          <p className="mt-2 max-w-2xl text-sm text-gray-500">Review live wind and swell context before deciding whether trips should run, then action weather cancellations from the same screen.</p>
         </div>
       </div>
 
@@ -291,23 +230,12 @@ export default function Weather() {
           </div>
         </div>
 
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <h3 className="text-lg font-semibold text-gray-900">Decision notes</h3>
-            <div className="mt-4 space-y-3 text-sm text-gray-600">
-              <div className="rounded-xl bg-gray-50 px-3 py-3">Check wind speed, gust spread, and wave height together. Strong gust variance usually matters more than a single average wind number.</div>
-              <div className="rounded-xl bg-gray-50 px-3 py-3">Use swell period and direction for exposed routes. Long-period swell with onshore wind should be treated as operationally higher risk.</div>
-              <div className="rounded-xl bg-gray-50 px-3 py-3">If the widget fails, the screen stays usable and the cancellation queue remains available below.</div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 text-amber-500" size={18} />
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Upcoming slots at risk</h3>
-                <p className="mt-1 text-sm text-gray-500">{slots.length} upcoming booked slot(s) in the next {DAYS} days can be cancelled from this page if conditions turn unsafe.</p>
-              </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 text-amber-500" size={18} />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming slots at risk</h3>
+              <p className="mt-1 text-sm text-gray-500">{slots.length} upcoming booked slot(s) in the next {DAYS} days can be cancelled from this page if conditions turn unsafe.</p>
             </div>
           </div>
         </div>
