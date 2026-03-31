@@ -88,6 +88,18 @@ function InboxContent() {
   // WhatsApp send warning (cleared when conversation changes)
   const [waWarning, setWaWarning] = useState<string | null>(null);
 
+  // 24-hour window tracking
+  const [windowExpired, setWindowExpired] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+
+  const TEMPLATE_OPTIONS = [
+    { value: "", label: "-- Select a template --" },
+    { value: "Hi {{name}}, we have an update regarding your booking. Please reply to this message so we can assist you further.", label: "Booking update — ask to reply" },
+    { value: "Hi {{name}}, just checking in! Do you have any questions about your upcoming trip? Reply here and we'll help.", label: "Check-in — upcoming trip" },
+    { value: "Hi {{name}}, we tried to reach you earlier. Please send us a message when you get a chance so we can help.", label: "Follow-up — missed contact" },
+    { value: "Hi {{name}}, thank you for joining us! We'd love your feedback. Reply to this message to share your experience.", label: "Post-trip — feedback request" },
+  ];
+
   // Chat History state
   const [historyConvos, setHistoryConvos] = useState<any[]>([]);
   const [historySelected, setHistorySelected] = useState<any>(null);
@@ -95,6 +107,49 @@ function InboxContent() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const historyLoadedRef = useRef(false);
   const historyChatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Page Visibility API: disconnect realtime & halt polling when tab is hidden ──
+  const tabVisibleRef = useRef(true);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        // Tab hidden/minimized — disconnect realtime to prevent idle WebSocket connections
+        tabVisibleRef.current = false;
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      } else {
+        // Tab visible again — reconnect and refresh data
+        tabVisibleRef.current = true;
+        loadConvos();
+        if (selected) {
+          loadMessages(selected.phone);
+          // Re-subscribe to realtime for the current conversation
+          const channel = supabase
+            .channel("inbox-chat-" + Date.now())
+            .on("postgres_changes", {
+              event: "INSERT",
+              schema: "public",
+              table: "chat_messages",
+            }, (payload: any) => {
+              if (payload.new.phone === selected.phone) {
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === payload.new.id)) return prev;
+                  return [...prev, payload.new];
+                });
+              }
+            })
+            .subscribe();
+          channelRef.current = channel;
+        }
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [selected, businessId]);
 
   useEffect(() => { loadConvos(); }, [businessId]);
 
@@ -116,9 +171,36 @@ function InboxContent() {
     }
   }, [activeTab]);
 
-  // Clear warning when the selected conversation changes
+  // Clear warning and check 24h window when the selected conversation changes
   useEffect(() => {
     setWaWarning(null);
+    setWindowExpired(false);
+    setSelectedTemplate("");
+
+    if (!selected) return;
+
+    // Check the last inbound customer message to determine if the 24h window is still open
+    (async () => {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("created_at")
+        .eq("business_id", businessId)
+        .eq("phone", selected.phone)
+        .eq("direction", "IN")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        const lastInbound = new Date(data[0].created_at).getTime();
+        const now = Date.now();
+        const hoursSince = (now - lastInbound) / (1000 * 60 * 60);
+        if (hoursSince >= 24) {
+          setWindowExpired(true);
+        }
+      } else {
+        // No inbound messages at all — window is expired
+        setWindowExpired(true);
+      }
+    })();
   }, [selected?.id]);
 
   useEffect(() => {
@@ -130,12 +212,18 @@ function InboxContent() {
       supabase.removeChannel(channelRef.current);
     }
 
+    // IMPORTANT: Filter realtime subscription by business_id to prevent
+    // cross-tenant data bleed. Without this filter, messages from ALL businesses
+    // would arrive on the channel.
+    // NOTE: RLS policies on the chat_messages table must also restrict realtime
+    // payloads by business_id to enforce server-side tenant isolation.
     const channel = supabase
       .channel("inbox-chat-" + Date.now())
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
+        filter: "business_id=eq." + businessId,
       }, (payload: any) => {
         if (payload.new.phone === selected.phone) {
           setMessages((prev) => {
@@ -163,11 +251,13 @@ function InboxContent() {
     historyChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historyMessages]);
 
-  // Polling fallback for inbox
+  // Polling fallback for inbox — skip when tab is hidden to avoid DDoS-ing the DB
   useEffect(() => {
     if (!selected) return;
     const interval = setInterval(() => {
-      loadMessages(selected.phone);
+      if (tabVisibleRef.current) {
+        loadMessages(selected.phone);
+      }
     }, 3000);
     return () => clearInterval(interval);
   }, [selected]);
@@ -269,6 +359,7 @@ function InboxContent() {
           }
         }
         setReply("");
+        setSelectedTemplate("");
         notify({ title: "Reply sent", message: "The conversation remains in human handoff mode.", tone: "success" });
       }
     } catch (err: any) {
@@ -294,6 +385,7 @@ function InboxContent() {
         setMessages([]);
         loadConvos();
         loadHistoryConvos();
+        window.dispatchEvent(new Event("inbox-updated"));
         notify({ title: "Returned to bot", message: "The conversation was handed back to the bot.", tone: "success" });
       }
     } catch (err: any) {
@@ -416,15 +508,43 @@ function InboxContent() {
                     </div>
                   )}
                   <div className="p-3">
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
-                        rows={2} placeholder="Type your reply... (Enter to send)"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-                      <button onClick={sendReply} disabled={sending || !reply.trim()}
-                        className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
-                        {sending ? "..." : "Send"}
-                      </button>
-                    </div>
+                    {windowExpired ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                          <span className="text-amber-500 text-sm shrink-0">&#9888;&#65039;</span>
+                          <p className="text-xs text-amber-800">24-hour window expired. Only pre-approved templates can be sent.</p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <select
+                            value={selectedTemplate}
+                            onChange={(e) => {
+                              setSelectedTemplate(e.target.value);
+                              const firstName = (selected?.customer_name || "").split(" ")[0] || "there";
+                              setReply(e.target.value.replace(/\{\{name\}\}/g, firstName));
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          >
+                            {TEMPLATE_OPTIONS.map((opt) => (
+                              <option key={opt.label} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <button onClick={() => sendReply()} disabled={sending || !selectedTemplate}
+                            className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
+                            {sending ? "..." : "Send Template"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
+                          rows={2} placeholder="Type your reply... (Enter to send)"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                        <button onClick={sendReply} disabled={sending || !reply.trim()}
+                          className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
+                          {sending ? "..." : "Send"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

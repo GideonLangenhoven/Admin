@@ -126,6 +126,8 @@ export default function SettingsPage() {
     var [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     var [emailImgsSaving, setEmailImgsSaving] = useState(false);
     var [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
+    var [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
+    var [emailColor, setEmailColor] = useState("#1b3b36");
 
     // Credentials State
     var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean } | null>(null);
@@ -426,6 +428,23 @@ export default function SettingsPage() {
     }
 
     async function handleDeleteTour(id: string, name: string) {
+        // Check for active unredeemed vouchers linked to this tour
+        var { count: activeVoucherCount } = await supabase
+            .from("vouchers")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", businessId)
+            .eq("tour_name", name)
+            .eq("status", "ACTIVE");
+
+        if ((activeVoucherCount || 0) > 0) {
+            notify({
+                title: "Cannot delete tour",
+                message: activeVoucherCount + " active voucher(s) are linked to \"" + name + "\". Deactivate the tour instead, or wait until vouchers are redeemed/expired.",
+                tone: "warning",
+            });
+            return;
+        }
+
         if (!await confirmAction({
             title: "Delete tour",
             message: "Delete \"" + name + "\"? This cannot be undone.",
@@ -524,6 +543,7 @@ export default function SettingsPage() {
                 voucher: data.email_img_voucher || "",
                 photos: data.email_img_photos || "",
             });
+            setEmailColor(data.email_color || "#1b3b36");
         }
     }
 
@@ -784,11 +804,29 @@ export default function SettingsPage() {
         setYocoSaving(false);
     }
 
+    async function handleUploadEmailImage(key: string, file: File) {
+        setEmailImgUploading(key);
+        try {
+            var ext = file.name.split(".").pop() || "jpg";
+            var path = `${businessId}/${key}.${ext}`;
+            var { error } = await supabase.storage.from("email-images").upload(path, file, { upsert: true });
+            if (error) { notify("Upload failed: " + error.message); return; }
+            var { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
+            setEmailImgs(prev => ({ ...prev, [key]: urlData.publicUrl }));
+            notify("Image uploaded — click Save Email Images to persist.");
+        } catch (err: any) {
+            notify("Upload failed: " + (err?.message || "Unknown error"));
+        } finally {
+            setEmailImgUploading(null);
+        }
+    }
+
     async function handleSaveEmailImages(e: React.FormEvent) {
         e.preventDefault();
         setEmailImgsSaving(true);
         setEmailImgsMessage({ type: "", text: "" });
         var { error } = await supabase.from("businesses").update({
+            email_color: emailColor,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
             email_img_invoice: emailImgs.invoice || null,
@@ -1390,74 +1428,133 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
-                    <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Site Links &amp; Redirects</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Booking Site URL</label>
-                                <input type="url" value={siteSettings.booking_site_url} onChange={e => setSiteSettings({ ...siteSettings, booking_site_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_URL} />
+                    {role === "SUPER_ADMIN" && (
+                        <div>
+                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Site Links &amp; Redirects</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Booking Site URL</label>
+                                    <input type="url" value={siteSettings.booking_site_url} onChange={e => setSiteSettings({ ...siteSettings, booking_site_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_URL} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Manage Bookings URL</label>
+                                    <input type="url" value={siteSettings.manage_bookings_url} onChange={e => setSiteSettings({ ...siteSettings, manage_bookings_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_MANAGE_BOOKINGS_URL} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Page URL</label>
+                                    <input type="url" value={siteSettings.gift_voucher_url} onChange={e => setSiteSettings({ ...siteSettings, gift_voucher_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_GIFT_VOUCHER_URL} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Success URL</label>
+                                    <input type="url" value={siteSettings.booking_success_url} onChange={e => setSiteSettings({ ...siteSettings, booking_success_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_SUCCESS_URL} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Cancel URL</label>
+                                    <input type="url" value={siteSettings.booking_cancel_url} onChange={e => setSiteSettings({ ...siteSettings, booking_cancel_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_CANCEL_URL} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Voucher Success URL</label>
+                                    <input type="url" value={siteSettings.voucher_success_url} onChange={e => setSiteSettings({ ...siteSettings, voucher_success_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_VOUCHER_SUCCESS_URL} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Waiver URL</label>
+                                    <input type="url" value={siteSettings.waiver_url} onChange={e => setSiteSettings({ ...siteSettings, waiver_url: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Leave blank to use the built-in waiver form" />
+                                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">If left blank, the platform will generate a booking-specific waiver form automatically. If you use a custom URL, booking and token query params are appended.</p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Manage Bookings URL</label>
-                                <input type="url" value={siteSettings.manage_bookings_url} onChange={e => setSiteSettings({ ...siteSettings, manage_bookings_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_MANAGE_BOOKINGS_URL} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Page URL</label>
-                                <input type="url" value={siteSettings.gift_voucher_url} onChange={e => setSiteSettings({ ...siteSettings, gift_voucher_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_GIFT_VOUCHER_URL} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Success URL</label>
-                                <input type="url" value={siteSettings.booking_success_url} onChange={e => setSiteSettings({ ...siteSettings, booking_success_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_SUCCESS_URL} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Cancel URL</label>
-                                <input type="url" value={siteSettings.booking_cancel_url} onChange={e => setSiteSettings({ ...siteSettings, booking_cancel_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_CANCEL_URL} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Voucher Success URL</label>
-                                <input type="url" value={siteSettings.voucher_success_url} onChange={e => setSiteSettings({ ...siteSettings, voucher_success_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_VOUCHER_SUCCESS_URL} />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Waiver URL</label>
-                                <input type="url" value={siteSettings.waiver_url} onChange={e => setSiteSettings({ ...siteSettings, waiver_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Leave blank to use the built-in waiver form" />
-                                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">If left blank, the platform will generate a booking-specific waiver form automatically. If you use a custom URL, booking and token query params are appended.</p>
+                            <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Use full URLs here. Payment links, admin weather broadcasts, and related booking actions can reuse these values instead of hardcoded paths.</p>
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
+                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
+                            <p className="text-xs text-[var(--ck-text-muted)]">
+                                Use this section to ask your customers additional questions during checkout (e.g., allergies, hotel pickups, or experience levels). 
+                                Click the buttons below to instantly add common questions, or write your own using the text box.
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Quick Insert Templates</label>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "dietary_" + Date.now().toString().slice(-4), label: "Any dietary requirements or allergies?", type: "textarea", required: false, placeholder: "e.g. Vegetarian, nut allergy, none" });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Dietary Requirements</button>
+
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "hotel_" + Date.now().toString().slice(-4), label: "Where are you staying in Cape Town? (For pickup routing)", type: "text", required: false, placeholder: "Hotel name or address" });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Hotel / Pickup</button>
+
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "experience_" + Date.now().toString().slice(-4), label: "Have you ever kayaked before?", type: "text", required: true, placeholder: "Yes, No, or A little bit" });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Kayaking Experience</button>
+
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "emergency_" + Date.now().toString().slice(-4), label: "Emergency Contact (Name & Phone Number)", type: "text", required: true, placeholder: "John Doe - +27 123 456 789" });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Emergency Contact</button>
+
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "medical_" + Date.now().toString().slice(-4), label: "Do you have any medical conditions we should be aware of?", type: "textarea", required: false, placeholder: "List any relevant medical conditions" });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Medical Conditions</button>
+
+                                <button type="button" onClick={() => {
+                                    try {
+                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
+                                        if (!Array.isArray(current)) current = [];
+                                        current.push({ key: "referral_" + Date.now().toString().slice(-4), label: "How did you hear about us?", type: "text", required: false, placeholder: "Google, TripAdvisor, Friend, etc." });
+                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
+                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
+                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Referral Source</button>
                             </div>
                         </div>
-                        <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Use full URLs here. Payment links, admin weather broadcasts, and related booking actions can reuse these values instead of hardcoded paths.</p>
-                    </div>
 
-                    <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Custom Booking Intake Fields</h3>
-                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Booking field schema (JSON)</label>
-                        <textarea
-                            value={bookingCustomFieldsJson}
-                            onChange={e => setBookingCustomFieldsJson(e.target.value)}
-                            rows={12}
-                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                            placeholder={`[
-  {
-    "key": "dietary_requirements",
-    "label": "Dietary Requirements",
-    "type": "textarea",
-    "required": false,
-    "placeholder": "List allergies or dietary needs"
-  },
-  {
-    "key": "hotel_pickup",
-    "label": "Hotel Pickup Location",
-    "type": "text",
-    "required": true
-  }
-]`}
-                        />
-                        <p className="mt-2 text-xs text-[var(--ck-text-muted)]">Each field should define a unique <code>key</code>, a visible <code>label</code>, optional <code>type</code> (<code>text</code>, <code>textarea</code>, or <code>number</code>), optional <code>placeholder</code>, and optional <code>required</code>.</p>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Configuration Code (JSON)</label>
+                            <textarea
+                                value={bookingCustomFieldsJson}
+                                onChange={e => setBookingCustomFieldsJson(e.target.value)}
+                                rows={12}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono tracking-tight"
+                                placeholder={`[\n  {\n    "key": "dietary_1234",\n    "label": "Dietary Requirements",\n    "type": "textarea",\n    "required": false,\n    "placeholder": "List allergies..."\n  }\n]`}
+                            />
+                            <p className="mt-2 text-xs text-[var(--ck-text-muted)] leading-relaxed">
+                                This box stores the questions in a computer-readable format (JSON). It must always start with <code>[</code> and end with <code>]</code>.
+                                Each question has a <code>key</code> (internal ID), <code>label</code> (the public question), <code>type</code> (<code>text</code> or <code>textarea</code>), <code>placeholder</code> (hint text), and <code>required</code> (true/false).
+                            </p>
+                        </div>
                     </div>
 
                     <div>
@@ -1633,15 +1730,41 @@ export default function SettingsPage() {
             {/* ── Email Header Images ── */}
             <div className="mt-10 border-t border-[var(--ck-border-subtle)] pt-10">
                 <div className="mb-6">
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Header Images</h2>
+                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Customisation</h2>
                     <p className="text-sm text-[var(--ck-text-muted)] mt-1">
-                        Customise the banner photo shown at the top of each email type. Paste a direct image URL — upload images to a CDN like{" "}
-                        <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a>{" "}
-                        or <a href="https://cloudinary.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">Cloudinary</a> first.
-                        Leave blank to use the default image. Images must be publicly accessible — avoid imgbb "direct links" that expire.
+                        Choose a colour theme for your emails and customise the banner image for each email type.
+                        Upload an image directly or paste an external URL. Leave blank to use the default. Recommended size: 80×65 px.
                     </p>
                 </div>
                 <form onSubmit={handleSaveEmailImages} className="space-y-6">
+                    {/* Email Color Picker */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                        <div className="mb-3">
+                            <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Email Colour</span>
+                            <span className="ml-2 text-xs text-[var(--ck-text-muted)]">Header, footer, and button colour used in all emails</span>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            {([
+                                { color: "#1b3b36", name: "Teal" },
+                                { color: "#1e3a5f", name: "Navy" },
+                                { color: "#2d3436", name: "Charcoal" },
+                                { color: "#2c3e50", name: "Midnight" },
+                                { color: "#1a472a", name: "Forest" },
+                                { color: "#4a1942", name: "Plum" },
+                                { color: "#5b2c3f", name: "Burgundy" },
+                                { color: "#3c1518", name: "Maroon" },
+                                { color: "#2b2d42", name: "Slate" },
+                                { color: "#4e3629", name: "Espresso" },
+                            ]).map(({ color, name }) => (
+                                <button key={color} type="button" onClick={() => setEmailColor(color)}
+                                    className={"flex flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 border-2 transition-all " + (emailColor === color ? "border-[var(--ck-accent)] shadow-sm" : "border-transparent hover:border-[var(--ck-border-subtle)]")}>
+                                    <div className="w-10 h-10 rounded-lg shadow-sm" style={{ backgroundColor: color }} />
+                                    <span className="text-[11px] font-medium text-[var(--ck-text-muted)]">{name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {([
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
                         { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
@@ -1674,8 +1797,16 @@ export default function SettingsPage() {
                                             value={emailImgs[key]}
                                             onChange={e => setEmailImgs({ ...emailImgs, [key]: e.target.value })}
                                             className="ui-control flex-1 px-3 py-2 text-sm rounded-lg outline-none"
-                                            placeholder="https://i.ibb.co/your-image.jpg"
+                                            placeholder="https://example.com/your-image.jpg"
                                         />
+                                        <label className={"px-3 py-2 text-xs rounded-lg border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] hover:text-[var(--ck-accent)] hover:border-[var(--ck-accent)] transition-colors cursor-pointer inline-flex items-center gap-1.5" + (emailImgUploading === key ? " opacity-50 pointer-events-none" : "")}>
+                                            {emailImgUploading === key ? (
+                                                <><svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Uploading</>
+                                            ) : (
+                                                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> Upload</>
+                                            )}
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => { var f = e.target.files?.[0]; if (f) handleUploadEmailImage(key, f); e.target.value = ""; }} />
+                                        </label>
                                         {emailImgs[key] && (
                                             <button type="button" onClick={() => setEmailImgs({ ...emailImgs, [key]: "" })}
                                                 className="px-3 py-2 text-xs rounded-lg border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] hover:text-[var(--ck-danger)] hover:border-[var(--ck-danger)] transition-colors">

@@ -532,7 +532,7 @@ export default function NewBookingPage() {
       // ── Create invoice for every booking ──
       let invoiceNumber = ref;
       try {
-        const invNumRes = await supabase.rpc("next_invoice_number");
+        const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
         invoiceNumber = invNumRes.data || ref;
         const subtotal = baseTotal;
         const discountAmt = Math.max(0, subtotal - totalAmount);
@@ -1072,9 +1072,10 @@ export default function NewBookingPage() {
             <label className="rounded-lg bg-gray-50 p-3 text-sm">
               <span className="text-xs text-gray-500">Hold booking for</span>
               <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm">
+                <option value="2">2 hours</option>
+                <option value="6">6 hours</option>
                 <option value="12">12 hours</option>
                 <option value="24">24 hours</option>
-                <option value="36">36 hours</option>
                 <option value="48">48 hours</option>
               </select>
             </label>

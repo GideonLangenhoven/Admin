@@ -121,88 +121,26 @@ export default function Weather() {
   async function cancelSlot(slotId: string) {
     if (!await confirmAction({
       title: "Cancel weather-affected slot",
-      message: "This will cancel all bookings on this slot, notify all customers, and queue full refunds. Continue?",
+      message: "This will cancel all bookings on this slot, notify all customers with a self-service link, and process refunds server-side. Continue?",
       tone: "warning",
       confirmLabel: "Cancel slot",
     })) return;
     setCancelling(slotId);
     try {
-      await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slotId);
-      const { data: bookings } = await supabase
-        .from("bookings")
-        .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
-        .eq("business_id", businessId)
-        .eq("slot_id", slotId)
-        .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
-
-      const affected = bookings || [];
-      for (const booking of affected) {
-        const isPaid = ["PAID", "CONFIRMED"].includes(booking.status);
-        const refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
-        await supabase.from("bookings").update({
-          status: "CANCELLED",
-          cancellation_reason: "Weather cancellation: " + reason,
-          cancelled_at: new Date().toISOString(),
-          ...(isPaid && refundAmount > 0 ? {
-            refund_status: "REQUESTED",
-            refund_amount: refundAmount,
-            refund_notes: "100% refund — weather cancellation",
-          } : {}),
-        }).eq("id", booking.id);
-
-        const slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
-        if (slotData.data) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, slotData.data.booked - booking.qty),
-            held: Math.max(0, (slotData.data.held || 0) - (booking.status === "HELD" ? booking.qty : 0)),
-          }).eq("id", slotId);
-        }
-
-        await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
-        const ref = booking.id.substring(0, 8).toUpperCase();
-        const tourName = (booking as any).tours?.name || "Tour";
-        const startTime = (booking as any).slots?.start_time ? fmtTime((booking as any).slots.start_time) : "";
-
-        if (booking.phone) {
-          try {
-            await fetch(SU + "/functions/v1/send-whatsapp-text", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({
-                business_id: businessId,
-                to: booking.phone,
-                message: "Trip Cancelled — Weather\n\n" +
-                  "Hi " + (booking.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                  " has been cancelled due to " + reason + ".\n\n" +
-                  "Ref: " + ref + "\n" +
-                  (isPaid && refundAmount > 0 ? "A full refund of R" + refundAmount + " has been submitted.\n\n" : "") +
-                  "You’re welcome to rebook anytime.",
-              }),
-            });
-          } catch { }
-        }
-
-        if (booking.email) {
-          try {
-            await supabase.functions.invoke("send-email", {
-              body: {
-                type: "CANCELLATION",
-                data: {
-                  business_id: businessId,
-                  email: booking.email,
-                  customer_name: booking.customer_name || "Guest",
-                  ref,
-                  tour_name: tourName,
-                  start_time: startTime,
-                  reason,
-                  total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
-                },
-              },
-            });
-          } catch { }
-        }
+      const r = await fetch(SU + "/functions/v1/weather-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        body: JSON.stringify({ slot_ids: [slotId], business_id: businessId, reason }),
+      });
+      const d = await r.json();
+      if (!r.ok || d?.error) {
+        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      } else {
+        const refundMsg = d.refunds_queued > 0
+          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+          : "";
+        notify({ title: "Weather cancellation completed", message: `${d.bookings_cancelled} booking(s) cancelled and notified.${refundMsg}`, tone: "success" });
       }
-      notify({ title: "Weather cancellation completed", message: "Refunds were queued where needed.", tone: "success" });
     } catch (err: any) {
       notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });
     }
@@ -214,15 +152,32 @@ export default function Weather() {
     if (slots.length === 0) return;
     if (!await confirmAction({
       title: "Cancel all weather slots",
-      message: `This will cancel all ${slots.length} slot(s) in the next ${DAYS} days and notify customers. Continue?`,
+      message: `This will cancel all ${slots.length} slot(s) in the next ${DAYS} days, notify customers with self-service links, and process refunds server-side. Continue?`,
       tone: "warning",
       confirmLabel: "Cancel all slots",
     })) return;
     setCancellingAll(true);
-    for (const slot of slots) {
-      await cancelSlot(slot.id);
+    try {
+      const allSlotIds = slots.map((s: any) => s.id);
+      const r = await fetch(SU + "/functions/v1/weather-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        body: JSON.stringify({ slot_ids: allSlotIds, business_id: businessId, reason }),
+      });
+      const d = await r.json();
+      if (!r.ok || d?.error) {
+        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      } else {
+        const refundMsg = d.refunds_queued > 0
+          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+          : "";
+        notify({ title: "All slots cancelled", message: `${d.slots_closed} slot(s) closed, ${d.bookings_cancelled} booking(s) cancelled.${refundMsg}`, tone: "success" });
+      }
+    } catch (err: any) {
+      notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });
     }
     setCancellingAll(false);
+    void load();
   }
 
   return (

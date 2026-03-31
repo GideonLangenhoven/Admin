@@ -232,6 +232,9 @@ function waiverPage(data: any, business: any, message?: string) {
             <p style="margin:0 0 10px;"><strong>8. Governing Law</strong><br/>
             This waiver is governed by the laws of the Republic of South Africa. Any dispute shall be subject to the jurisdiction of the South African courts. This document constitutes the entire agreement between the parties regarding assumption of risk and release of liability and supersedes any prior representations.</p>
 
+            <p style="margin:0 0 10px;"><strong>9. Minors &amp; Guardian Consent</strong><br/>
+            If any participant is under 18 years of age, a parent or legal guardian must provide their full name, ID number, and countersignature below. The guardian assumes full responsibility for the minor&apos;s participation and agrees to all terms of this waiver on their behalf.</p>
+
             <p style="margin:0;color:#6b7280;font-size:0.82rem;">By submitting this form you confirm that you have read, understood and agreed to all of the above terms on behalf of yourself and all guests listed on this booking.</p>
           </div>
 
@@ -296,13 +299,49 @@ Deno.serve(async (req) => {
 
     var bookingRes = await supabase
       .from("bookings")
-      .select("id, business_id, customer_name, qty, waiver_status, waiver_token, waiver_signed_at, waiver_signed_name, waiver_payload, slots(start_time)")
+      .select("id, business_id, customer_name, qty, waiver_status, waiver_token, waiver_token_expires_at, waiver_signed_at, waiver_signed_name, waiver_payload, slots(start_time)")
       .eq("id", bookingId)
       .maybeSingle();
 
     if (!bookingRes.data || bookingRes.data.waiver_token !== token) {
       return new Response(pageShell("Waiver unavailable", `<div class="card"><div class="content"><div class="warn">This waiver link is invalid or has expired.</div></div></div>`), {
         status: 404,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Check token expiry (public access only — admin auth bypasses this in the admin app).
+    // The expiry is set to slot_time + duration_minutes so the waiver stays signable
+    // until the trip actually ends, not just when it starts.
+    var expiresAt = bookingRes.data.waiver_token_expires_at;
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return new Response(pageShell("Waiver link expired", `<div class="card"><div class="content"><div class="warn">This waiver link has expired. The signing window closes when the trip ends. Please contact the operator to request a new link if needed.</div></div></div>`), {
+        status: 410,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // If already signed, return a confirmation-only page without PII
+    if (bookingRes.data.waiver_status === "SIGNED") {
+      var signedBusiness = await supabase
+        .from("businesses")
+        .select("id, name, timezone")
+        .eq("id", bookingRes.data.business_id)
+        .maybeSingle();
+      var safeData = {
+        id: bookingRes.data.id,
+        customer_name: bookingRes.data.customer_name,
+        qty: bookingRes.data.qty,
+        waiver_status: "SIGNED",
+        waiver_signed_name: bookingRes.data.waiver_signed_name,
+        waiver_signed_at: bookingRes.data.waiver_signed_at,
+        // Strip PII from public response — no id_number, no notes, no full payload
+        waiver_payload: null,
+        waiver_token: token,
+        slots: bookingRes.data.slots,
+      };
+      return new Response(waiverPage(safeData, signedBusiness.data, "This waiver has already been signed."), {
+        status: 200,
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
@@ -345,13 +384,20 @@ Deno.serve(async (req) => {
         })
         .eq("id", bookingId);
 
-      var refreshed = await supabase
-        .from("bookings")
-        .select("id, business_id, customer_name, qty, waiver_status, waiver_token, waiver_signed_at, waiver_signed_name, waiver_payload, slots(start_time)")
-        .eq("id", bookingId)
-        .maybeSingle();
+      // Return confirmation without PII
+      var signedData = {
+        id: bookingRes.data.id,
+        customer_name: bookingRes.data.customer_name,
+        qty: bookingRes.data.qty,
+        waiver_status: "SIGNED" as const,
+        waiver_signed_name: signerName,
+        waiver_signed_at: new Date().toISOString(),
+        waiver_payload: null,
+        waiver_token: token,
+        slots: bookingRes.data.slots,
+      };
 
-      return new Response(waiverPage(refreshed.data || bookingRes.data, businessRes.data, "Waiver saved successfully."), {
+      return new Response(waiverPage(signedData, businessRes.data, "Waiver saved successfully."), {
         status: 200,
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });

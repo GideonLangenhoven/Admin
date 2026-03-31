@@ -155,11 +155,8 @@ function Slots() {
                 message: "⛈ *Trip Cancelled — Weather*\n\n" +
                   "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
                   " has been cancelled due to weather conditions.\n\n" +
-                  "📋 Ref: " + ref + "\n" +
-                  (isPaidBooking && refundAmount > 0
-                    ? "\n"
-                    : "\n") +
-                  "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund. 🛶",
+                  "📋 Ref: " + ref + "\n\n" +
+                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
               }),
             });
           } catch (e) { console.error("WA notify err:", e); }
@@ -180,6 +177,7 @@ function Slots() {
                   start_time: startTime,
                   reason: "weather conditions",
                   total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  is_weather: true,
                 },
               },
             });
@@ -290,7 +288,7 @@ function Slots() {
                   "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
                   " has been cancelled due to weather conditions.\n\n" +
                   "📋 Ref: " + ref + "\n\n" +
-                  "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund. 🛶",
+                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
               }),
             });
           } catch (e) { console.error("WA notify err:", e); }
@@ -310,6 +308,7 @@ function Slots() {
                   start_time: startTime,
                   reason: "weather conditions",
                   total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
+                  is_weather: true,
                 },
               },
             });
@@ -773,7 +772,26 @@ function Slots() {
       return;
     }
 
-    const { error } = await supabase.from("slots").insert(rows);
+    // Check for existing slots to avoid duplicates (business_id + tour_id + start_time)
+    const startTimes = rows.map(r => r.start_time);
+    const { data: existing } = await supabase
+      .from("slots")
+      .select("start_time")
+      .eq("business_id", businessId)
+      .eq("tour_id", addForm.tourId)
+      .in("start_time", startTimes);
+
+    const existingSet = new Set((existing || []).map((e: any) => e.start_time));
+    const newRows = rows.filter(r => !existingSet.has(r.start_time));
+    const skippedCount = rows.length - newRows.length;
+
+    if (newRows.length === 0) {
+      notify({ title: "All slots already exist", message: `Skipped ${skippedCount} duplicate slot(s). No new slots were created.`, tone: "warning" });
+      setSavingAdd(false);
+      return;
+    }
+
+    const { error } = await supabase.from("slots").insert(newRows);
     setSavingAdd(false);
 
     if (error) {
@@ -783,7 +801,7 @@ function Slots() {
       setAddForm({ tourId: "", time: "06:00", startDate: "", endDate: "", capacity: "12", price: "" });
       notify({
         title: "Slots created",
-        message: rows.length + " slot(s) created successfully.",
+        message: `Created ${newRows.length} new slot(s)` + (skippedCount > 0 ? `, skipped ${skippedCount} duplicate(s).` : "."),
         tone: "success",
       });
       load();

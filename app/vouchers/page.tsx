@@ -176,9 +176,19 @@ export default function Vouchers() {
       expires_at: expiresAt,
       gift_message: form.gift_message.trim() || null,
     };
-    const { error } = await supabase.from("vouchers").insert(payload);
-    if (error) {
-      setCreateMessage(error.message);
+    // Retry on unique constraint violation (code collision)
+    let lastError: any = null;
+    let created = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) payload.code = generateVoucherCode();
+      const { error } = await supabase.from("vouchers").insert(payload);
+      if (!error) { created = true; break; }
+      if (error.code === "23505" && attempt < 4) { lastError = error; continue; }
+      lastError = error;
+      break;
+    }
+    if (!created && lastError) {
+      setCreateMessage(lastError.message);
     } else {
       setCreateMessage(`Voucher ${payload.code} created.`);
       setForm({

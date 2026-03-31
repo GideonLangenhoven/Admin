@@ -136,6 +136,9 @@ interface TimelineEvent {
   color: string;
 }
 
+// TODO: Accept audit_logs as an additional parameter and merge into the timeline.
+// Each audit_log entry should display the actor_id (admin user) who performed the action.
+// This will provide a full admin audit trail showing who did what and when.
 function buildTimeline(
   booking: BookingDetail,
   logs: LogEntry[],
@@ -448,6 +451,14 @@ export default function BookingDetailPage() {
               </button>
             )}
           </div>
+          {editingCustomer && isPending && booking.yoco_checkout_id && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
+              <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-snug">
+                <span className="font-semibold">Warning:</span> An existing payment link will be invalidated if you save changes. The customer will need a new payment link.
+              </p>
+            </div>
+          )}
           {editingCustomer ? (
             <div className="space-y-3">
               <label className="block text-xs font-medium text-gray-500">
@@ -654,7 +665,12 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {/* Activity Timeline */}
+      {/* Activity Timeline
+          TODO: Extend this timeline to also pull from the `audit_logs` table to show
+          all admin actions (edits, status changes, refunds, etc.) with the actor_id
+          (admin user who performed the action) displayed alongside each event.
+          Query: supabase.from("audit_logs").select("*").eq("booking_id", bookingId).order("created_at")
+          Each audit_logs row should include actor_id which maps to admin_users.id. */}
       <Card title="Activity Timeline" className="mt-2">
         {timeline.length === 0 ? (
           <p className="text-sm text-gray-400 py-2">No activity recorded</p>

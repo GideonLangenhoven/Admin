@@ -106,7 +106,36 @@ export default function BillingPage() {
 
       const adminCount = adminCountRes.count || 0;
       if (adminCount > targetPlanRow.seat_limit) {
-        throw new Error(`This business has ${adminCount} admins. ${targetPlanRow.name} allows ${targetPlanRow.seat_limit}. Remove admins first or choose a higher plan.`);
+        // Suspend the most recently added admins that exceed the new plan limit
+        const excessCount = adminCount - targetPlanRow.seat_limit;
+        const { data: excessAdmins, error: excessErr } = await supabase
+          .from("admin_users")
+          .select("id, email, name")
+          .eq("business_id", businessId)
+          .neq("role", "MAIN_ADMIN")
+          .order("created_at", { ascending: false })
+          .limit(excessCount);
+
+        if (excessErr) throw excessErr;
+
+        if (!excessAdmins || excessAdmins.length < excessCount) {
+          throw new Error(
+            `This business has ${adminCount} admins (including the main admin). ${targetPlanRow.name} allows ${targetPlanRow.seat_limit}. Cannot suspend enough non-main admins to fit the new plan.`
+          );
+        }
+
+        const suspendIds = excessAdmins.map((a) => a.id);
+        const { error: suspendErr } = await supabase
+          .from("admin_users")
+          .update({ suspended: true })
+          .in("id", suspendIds);
+
+        if (suspendErr) throw suspendErr;
+
+        const suspendedNames = excessAdmins.map((a) => a.name || a.email).join(", ");
+        setMessage(
+          `Plan downgraded. The following admin(s) were suspended to fit the new seat limit: ${suspendedNames}. They can be re-activated if you upgrade.`
+        );
       }
 
       const today = new Date().toISOString().slice(0, 10);

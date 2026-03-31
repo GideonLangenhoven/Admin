@@ -181,7 +181,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     if (endTime > twoHoursAgo || endTime < sixHoursAgo) continue;
     if (await alreadySent(booking.id, "REVIEW_REQUEST")) continue;
 
-    await db.from("bookings").update({ status: "COMPLETED" }).eq("id", booking.id);
+    await db.from("bookings").update({ status: "COMPLETED" }).eq("id", booking.id).in("status", ["PAID", "CONFIRMED"]);
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
     var message =
@@ -216,7 +216,8 @@ async function sendReEngagementForBusiness(businessId: string) {
     .in("status", ["COMPLETED", "PAID"])
     .lt("created_at", threeMonthsAgo.toISOString())
     .gt("created_at", fourMonthsAgo.toISOString())
-    .not("phone", "is", null);
+    .not("phone", "is", null)
+    .not("marketing_opt_in", "eq", false);
 
   var sent = 0;
   var seenPhones = new Set<string>();
@@ -231,6 +232,16 @@ async function sendReEngagementForBusiness(businessId: string) {
       .gt("created_at", threeMonthsAgo.toISOString())
       .limit(1);
     if ((recent || []).length > 0) continue;
+
+    // Skip customers who have future bookings (paid or confirmed)
+    var { data: futureBookings } = await db.from("bookings")
+      .select("id, slots!inner(start_time)")
+      .eq("phone", booking.phone)
+      .eq("business_id", businessId)
+      .in("status", ["PAID", "CONFIRMED"])
+      .gt("slots.start_time", new Date().toISOString())
+      .limit(1);
+    if ((futureBookings || []).length > 0) continue;
 
     var { data: alreadyEngaged } = await db.from("auto_messages").select("id")
       .eq("phone", booking.phone)
@@ -253,6 +264,30 @@ async function sendReEngagementForBusiness(businessId: string) {
   }
 
   return sent;
+}
+
+async function autoTimeoutHumanChatsForBusiness(businessId: string) {
+  var fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  // Find conversations stuck in HUMAN state with no recent messages
+  var { data: staleConvos } = await db.from("conversations")
+    .select("id, phone, last_message_at, updated_at")
+    .eq("business_id", businessId)
+    .eq("state", "HUMAN")
+    .lt("updated_at", fortyEightHoursAgo);
+
+  var reverted = 0;
+  for (var i = 0; i < (staleConvos || []).length; i++) {
+    var convo: any = staleConvos?.[i];
+    // Double-check last_message_at if available
+    if (convo.last_message_at && convo.last_message_at > fortyEightHoursAgo) continue;
+
+    await db.from("conversations").update({ state: "IDLE" }).eq("id", convo.id);
+    console.log("HUMAN_TIMEOUT_REVERTED convo=" + convo.id + " phone=" + convo.phone);
+    reverted++;
+  }
+
+  return reverted;
 }
 
 async function autoExpireBookingsForBusiness(businessId: string) {
@@ -341,6 +376,7 @@ Deno.serve(async (req) => {
       reviews: 0,
       re_engage: 0,
       auto_expire: 0,
+      human_timeout: 0,
     };
 
     for (var i = 0; i < businesses.length; i++) {
@@ -351,6 +387,7 @@ Deno.serve(async (req) => {
       if (action === "all" || action === "reviews") results.reviews += await sendReviewRequestsForBusiness(businessId);
       if (action === "all" || action === "re_engage") results.re_engage += await sendReEngagementForBusiness(businessId);
       if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
+      if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
     }
 
     return new Response(JSON.stringify({ ok: true, results }), { status: 200, headers: getHeaders(req.headers.get("origin")) });

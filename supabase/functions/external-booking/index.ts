@@ -122,8 +122,11 @@ function normalizeEmail(value: unknown): string | null {
 }
 
 function normalizePhone(value: unknown): string | null {
-  const phone = String(value || "").trim();
-  return phone || null;
+  if (!value) return null;
+  var digits = String(value).replace(/[^\d]/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("0")) digits = "27" + digits.substring(1);
+  return digits;
 }
 
 function normalizeDate(value: unknown): string | null {
@@ -598,6 +601,19 @@ Deno.serve(async (req: Request) => {
       if (body.date !== undefined && body.date !== null && !normalizeDate(body.date)) return await send(400, "INVALID_DATE", "date must be in YYYY-MM-DD format", {}, "REJECTED");
       if (body.time !== undefined && body.time !== null && !normalizeTime(body.time)) return await send(400, "INVALID_TIME", "time must be in HH:MM format", {}, "REJECTED");
 
+      // B2B partners can specify a longer hold duration (up to 24 hours / 1440 minutes).
+      // Direct consumers default to 15 minutes.
+      const DEFAULT_HOLD_MINUTES = 15;
+      const MAX_HOLD_MINUTES = 1440; // 24 hours
+      let holdDurationMinutes = DEFAULT_HOLD_MINUTES;
+      if (body.hold_duration_minutes !== undefined && body.hold_duration_minutes !== null) {
+        const parsed = Number(body.hold_duration_minutes);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > MAX_HOLD_MINUTES) {
+          return await send(400, "INVALID_HOLD_DURATION", `hold_duration_minutes must be between 1 and ${MAX_HOLD_MINUTES}`, {}, "REJECTED");
+        }
+        holdDurationMinutes = Math.floor(parsed);
+      }
+
       const tour = await resolveTour(businessId, source, body);
       if (!tour) return await send(404, "TOUR_MAPPING_NOT_FOUND", "Tour mapping not found");
 
@@ -633,6 +649,9 @@ Deno.serve(async (req: Request) => {
       if (code === "INSUFFICIENT_CAPACITY") return await send(409, code, "Not enough remaining capacity");
       if (!result.success) return await send(400, code, "Booking creation failed");
 
+      // Calculate hold expiry based on the requested hold duration
+      const holdExpiresAt = new Date(Date.now() + holdDurationMinutes * 60 * 1000).toISOString();
+
       return await send(200, code, code === "ALREADY_EXISTS" ? "Booking already exists" : "Booking created", {
         business_id: businessId,
         booking_id: result.booking_id || null,
@@ -641,6 +660,8 @@ Deno.serve(async (req: Request) => {
         status: result.status || String(body.status || "PAID").trim().toUpperCase(),
         qty,
         total_paid: totalPaid,
+        hold_duration_minutes: holdDurationMinutes,
+        hold_expires_at: holdExpiresAt,
         slot: slotSummary(slot, businessTimezone),
         idempotent: code === "ALREADY_EXISTS",
       });

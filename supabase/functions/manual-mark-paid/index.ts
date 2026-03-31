@@ -23,7 +23,7 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
     return existing.data;
   }
 
-  var invNumR = await supabase.rpc("next_invoice_number");
+  var invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id });
   var invNum = invNumR.data || "INV-0";
   var subtotal = Number(booking.original_total || booking.total_amount);
   var discountAmt = Math.max(subtotal - Number(booking.total_amount), 0);

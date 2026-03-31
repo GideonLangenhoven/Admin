@@ -5,11 +5,13 @@ import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 
-var PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
+var PUBLIC_PATHS = ["/change-password", "/forgot-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
 var MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
 var SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
 var MAX_ATTEMPTS = 5;
-var LOCKOUT_DURATION = 30 * 60 * 1000;
+// No hard lockout duration — after MAX_ATTEMPTS we send an unlock email instead.
+// The legitimate admin can instantly regain access via the emailed link.
+// Brute-force bots remain blocked because they don't have email access.
 
 interface OperatorOption {
   id: string;
@@ -37,6 +39,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   var [role, setRole] = useState("");
   var [operators, setOperators] = useState<OperatorOption[]>([]);
   var [notice, setNotice] = useState("");
+  var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
 
   useEffect(() => {
     validateSession();
@@ -44,23 +47,25 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   function checkLockout() {
-    var lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
-    if (lockUntil > Date.now()) {
+    // Locked state is now purely in-memory (React state) per session.
+    // After 5 failed attempts we send an unlock email; the admin resets
+    // their password via the emailed link to regain access immediately.
+    var failCount = Number(localStorage.getItem("ck_fail_count") || "0");
+    if (failCount >= MAX_ATTEMPTS) {
       setLocked(true);
-    } else if (lockUntil > 0) {
-      localStorage.removeItem("ck_lock_until");
-      localStorage.removeItem("ck_fail_count");
     }
   }
 
   async function loadBusinessContext(adminRole: string, defaultBusinessId: string) {
     var isMultiOperator = /super/i.test(adminRole);
-    var overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
+    // Use sessionStorage for operator override so each browser tab has its own
+    // isolated tenant context. localStorage would bleed across tabs.
+    var overrideBusinessId = sessionStorage.getItem("ck_operator_override_business_id") || "";
     var targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
     var baseQuery = supabase
       .from("businesses")
-      .select("id, name, business_name, logo_url, timezone")
+      .select("id, name, business_name, logo_url, timezone, subscription_status")
       .order("business_name", { ascending: true });
 
     var businessesRes = isMultiOperator
@@ -73,6 +78,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       business_name: string | null;
       logo_url: string | null;
       timezone: string | null;
+      subscription_status: string | null;
     }>;
 
     var operatorOptions = businessRows.map((biz) => ({
@@ -82,13 +88,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       timezone: biz.timezone || "UTC",
     }));
 
-    var activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
+    var activeOperator = businessRows.find((biz) => biz.id === targetBusinessId) || businessRows[0] || null;
 
     return {
       businessId: activeOperator?.id || defaultBusinessId,
-      businessName: activeOperator?.name || "",
-      logoUrl: activeOperator?.logoUrl || "",
+      businessName: activeOperator?.business_name || activeOperator?.name || "",
+      logoUrl: activeOperator?.logo_url || "",
       timezone: activeOperator?.timezone || "UTC",
+      subscriptionStatus: activeOperator?.subscription_status || "ACTIVE",
       operators: operatorOptions,
     };
   }
@@ -117,6 +124,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setLogoUrl(context.logoUrl);
       setTimezone(context.timezone);
       setOperators(context.operators);
+      setSubscriptionStatus(context.subscriptionStatus);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
       localStorage.setItem("ck_admin_timezone", context.timezone);
@@ -143,8 +151,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("ck_admin_time");
     localStorage.removeItem("ck_admin_business_id");
     localStorage.removeItem("ck_admin_timezone");
-    localStorage.removeItem("ck_operator_override_business_id");
     localStorage.removeItem("ck_admin_name");
+    // Operator override lives in sessionStorage (tab-scoped)
+    sessionStorage.removeItem("ck_operator_override_business_id");
+    sessionStorage.removeItem("ck_admin_business_id");
+    sessionStorage.removeItem("ck_admin_timezone");
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
@@ -155,8 +166,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function login() {
-    var lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
-    if (lockUntil > Date.now()) {
+    // If already locked (5+ failures this session), block further attempts.
+    // The admin must use the unlock email to reset their password.
+    var failCount = Number(localStorage.getItem("ck_fail_count") || "0");
+    if (failCount >= MAX_ATTEMPTS) {
       setLocked(true);
       setError("");
       return;
@@ -189,7 +202,6 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     if (user && user.password_hash === hash) {
       localStorage.removeItem("ck_fail_count");
-      localStorage.removeItem("ck_lock_until");
       localStorage.setItem("ck_admin_auth", "true");
       localStorage.setItem("ck_admin_role", user.role);
       localStorage.setItem("ck_admin_email", email.trim().toLowerCase());
@@ -208,6 +220,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setLogoUrl(context.logoUrl);
         setTimezone(context.timezone);
         setOperators(context.operators);
+        setSubscriptionStatus(context.subscriptionStatus);
       }
 
       setAuthed(true);
@@ -216,7 +229,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_fail_count", String(failCount));
 
       if (failCount >= MAX_ATTEMPTS) {
-        localStorage.setItem("ck_lock_until", String(Date.now() + LOCKOUT_DURATION));
+        // No hard timer — send an unlock/reset email instead.
+        // The legitimate admin clicks the link to reset and regain access instantly.
+        // Bots remain blocked because they don't have email access.
         setLocked(true);
         sendResetEmail(email.trim().toLowerCase());
       } else {
@@ -243,15 +258,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   function switchOperator(nextBusinessId: string) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
-    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-    localStorage.setItem("ck_admin_business_id", nextBusinessId);
+    // Store operator override in sessionStorage (tab-scoped) to prevent
+    // cross-tab data bleed. Each tab maintains its own operator context.
+    // NOTE: Every Edge Function should independently verify booking ownership
+    // via business_id — never trust client-side context alone.
+    sessionStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+    sessionStorage.setItem("ck_admin_business_id", nextBusinessId);
     var nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
     setBusinessId(nextOperator.id);
     setBusinessName(nextOperator.name);
     setLogoUrl(nextOperator.logoUrl || "");
     setTimezone(nextOperator.timezone || "UTC");
-    localStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
+    sessionStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
   }
 
   if (PUBLIC_PATHS.includes(pathname)) {
@@ -284,10 +303,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-4">
               <p className="text-sm font-semibold text-red-700 mb-2">Account Locked</p>
               <p className="text-xs text-red-600 leading-relaxed">
-                Too many failed attempts. Your account has been locked for 30 minutes.
-                {resetSent
-                  ? " A password setup email has been sent."
-                  : " If this is your account, a password setup email will be sent."}
+                Too many attempts. We've sent an unlock link to your email.
+                Check your inbox and click the link to reset your password and regain access instantly.
               </p>
             </div>
             <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">
@@ -318,13 +335,35 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             </button>
 
             <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
-              <a href="/change-password" className="hover:underline">Set up or reset password</a>
+              <a href="/forgot-password" className="hover:underline">Forgot password?</a>
+              <span className="mx-1.5 text-gray-300">|</span>
+              <a href="/change-password" className="hover:underline">Set up password</a>
             </p>
           </>
         )}
       </div>
     </div>
   );
+
+  if (subscriptionStatus === "SUSPENDED") {
+    return (
+      <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, operators, switchOperator }}>
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--ck-bg)] px-4">
+          <div className="ui-surface-elevated w-full max-w-lg p-8 text-center">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 mb-4">
+              <h2 className="text-lg font-semibold text-red-800 mb-2">Account Suspended</h2>
+              <p className="text-sm text-red-700">
+                Your subscription has been suspended due to a billing issue. Please contact support or update your payment details to restore access.
+              </p>
+            </div>
+            <a href="/billing" className="text-sm text-[var(--ck-text-muted)] hover:underline">Go to Billing</a>
+            <span className="mx-2 text-gray-300">|</span>
+            <button onClick={() => { clearSession(); }} className="text-sm text-[var(--ck-text-muted)] hover:underline">Sign Out</button>
+          </div>
+        </div>
+      </BusinessProvider>
+    );
+  }
 
   return (
     <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, operators, switchOperator }}>
