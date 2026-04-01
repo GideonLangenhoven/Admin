@@ -1,0 +1,11 @@
+GRANT ALL ON public.marketing_contacts TO authenticated;
+GRANT ALL ON public.marketing_templates TO authenticated;
+GRANT ALL ON public.marketing_campaigns TO authenticated;
+GRANT ALL ON public.marketing_queue TO authenticated;
+GRANT ALL ON public.marketing_events TO authenticated;
+GRANT ALL ON public.marketing_unsubscribe_tokens TO authenticated;
+GRANT ALL ON public.marketing_usage_monthly TO authenticated;
+GRANT ALL ON public.marketing_automations TO authenticated;
+GRANT ALL ON public.marketing_automation_steps TO authenticated;
+GRANT ALL ON public.marketing_automation_enrollments TO authenticated;
+GRANT ALL ON public.marketing_automation_logs TO authenticated;
