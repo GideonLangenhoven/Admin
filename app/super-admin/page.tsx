@@ -60,6 +60,12 @@ export default function SuperAdminPage() {
   const [savingSeatId, setSavingSeatId] = useState<string | null>(null);
   const [editingSubdomain, setEditingSubdomain] = useState<{ id: string; value: string } | null>(null);
   const [savingSubdomain, setSavingSubdomain] = useState(false);
+  const [expandedBiz, setExpandedBiz] = useState<string | null>(null);
+  const [bizDetail, setBizDetail] = useState<Record<string, any> | null>(null);
+  const [bizDetailLoading, setBizDetailLoading] = useState(false);
+  const [bizDetailSaving, setBizDetailSaving] = useState(false);
+  const [bizTours, setBizTours] = useState<any[]>([]);
+  const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
 
   async function loadBusinesses() {
     setLoadingBiz(true);
@@ -124,6 +130,82 @@ export default function SuperAdminPage() {
     }
     setEditingSubdomain(null);
     setSavingSubdomain(false);
+  }
+
+  async function loadBizDetail(bizId: string) {
+    if (expandedBiz === bizId) { setExpandedBiz(null); return; }
+    setBizDetailLoading(true);
+    setExpandedBiz(bizId);
+
+    const { data } = await supabase.from("businesses").select("*").eq("id", bizId).single();
+    setBizDetail(data || {});
+
+    // Load tours
+    const { data: tours } = await supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order");
+    setBizTours(tours || []);
+
+    // Parse FAQs
+    const faqRaw = data?.faq_json;
+    if (faqRaw && typeof faqRaw === "object") {
+      if (Array.isArray(faqRaw)) {
+        setBizFaqs(faqRaw.map((f: any) => ({ q: f.question || f.q || "", a: f.answer || f.a || "" })));
+      } else {
+        setBizFaqs(Object.entries(faqRaw).map(([q, a]) => ({ q, a: String(a) })));
+      }
+    } else { setBizFaqs([]); }
+
+    setBizDetailLoading(false);
+  }
+
+  async function saveBizDetail() {
+    if (!bizDetail || !expandedBiz) return;
+    setBizDetailSaving(true);
+
+    // Rebuild faq_json from array
+    const faqObj: Record<string, string> = {};
+    bizFaqs.filter(f => f.q.trim()).forEach(f => { faqObj[f.q.trim()] = f.a.trim(); });
+
+    const { error } = await supabase.from("businesses").update({
+      business_name: bizDetail.business_name,
+      business_tagline: bizDetail.business_tagline,
+      operator_email: bizDetail.operator_email,
+      timezone: bizDetail.timezone,
+      currency: bizDetail.currency,
+      logo_url: bizDetail.logo_url,
+      hero_eyebrow: bizDetail.hero_eyebrow,
+      hero_title: bizDetail.hero_title,
+      hero_subtitle: bizDetail.hero_subtitle,
+      chatbot_avatar: bizDetail.chatbot_avatar,
+      color_main: bizDetail.color_main,
+      color_secondary: bizDetail.color_secondary,
+      color_cta: bizDetail.color_cta,
+      color_bg: bizDetail.color_bg,
+      color_nav: bizDetail.color_nav,
+      color_hover: bizDetail.color_hover,
+      directions: bizDetail.directions,
+      what_to_bring: bizDetail.what_to_bring,
+      what_to_wear: bizDetail.what_to_wear,
+      terms_conditions: bizDetail.terms_conditions,
+      privacy_policy: bizDetail.privacy_policy,
+      cookies_policy: bizDetail.cookies_policy,
+      ai_system_prompt: bizDetail.ai_system_prompt,
+      faq_json: faqObj,
+      nav_gift_voucher_label: bizDetail.nav_gift_voucher_label,
+      nav_my_bookings_label: bizDetail.nav_my_bookings_label,
+      card_cta_label: bizDetail.card_cta_label,
+      chat_widget_label: bizDetail.chat_widget_label,
+      footer_line_one: bizDetail.footer_line_one,
+      footer_line_two: bizDetail.footer_line_two,
+      booking_custom_fields: bizDetail.booking_custom_fields,
+    }).eq("id", expandedBiz);
+
+    if (error) { notify({ title: "Save failed", message: error.message, tone: "error" }); }
+    else { notify({ title: "Saved", message: "Business details updated.", tone: "success" }); }
+    setBizDetailSaving(false);
+  }
+
+  function updateDetail(key: string, value: any) {
+    setBizDetail((prev: any) => prev ? { ...prev, [key]: value } : prev);
   }
 
   useEffect(() => {
@@ -408,7 +490,205 @@ export default function SuperAdminPage() {
                       </button>
                     </div>
                   )}
+                  {/* View/Edit Details toggle */}
+                  <button onClick={() => loadBizDetail(b.id)} className="mt-2 text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
+                    {expandedBiz === b.id ? "▲ Hide Details" : "▼ View / Edit Details"}
+                  </button>
                 </div>
+
+                {/* ── Expanded Detail Panel ── */}
+                {expandedBiz === b.id && (
+                  <div className="mt-3 border-t pt-4 space-y-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    {bizDetailLoading ? (
+                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" /></div>
+                    ) : bizDetail ? (
+                      <>
+                        {/* ── Business Info ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Business Info</legend>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              ["business_name", "Business Name"],
+                              ["business_tagline", "Tagline"],
+                              ["operator_email", "Operator Email"],
+                              ["timezone", "Timezone"],
+                              ["currency", "Currency"],
+                              ["logo_url", "Logo URL"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Branding ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Branding & Colors</legend>
+                          <div className="grid grid-cols-3 gap-3">
+                            {[
+                              ["hero_eyebrow", "Hero Eyebrow"],
+                              ["hero_title", "Hero Title"],
+                              ["hero_subtitle", "Hero Subtitle"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-6 gap-2 mt-2">
+                            {[
+                              ["color_main", "Main"],
+                              ["color_secondary", "Secondary"],
+                              ["color_cta", "CTA"],
+                              ["color_bg", "Background"],
+                              ["color_nav", "Nav"],
+                              ["color_hover", "Hover"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-center text-[var(--ck-text-muted)]">
+                                {label}
+                                <input type="color" value={bizDetail[key] || "#000000"} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 mx-auto block h-8 w-10 cursor-pointer rounded border-0" />
+                              </label>
+                            ))}
+                          </div>
+                          <label className="mt-2 block text-xs text-[var(--ck-text-muted)]">
+                            Chatbot Avatar URL
+                            <input value={bizDetail.chatbot_avatar || ""} onChange={(e) => updateDetail("chatbot_avatar", e.target.value)}
+                              className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                          </label>
+                        </fieldset>
+
+                        {/* ── Operations ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Operations & Content</legend>
+                          <div className="grid grid-cols-1 gap-3">
+                            {[
+                              ["directions", "Meeting Point / Directions"],
+                              ["what_to_bring", "What to Bring"],
+                              ["what_to_wear", "What to Wear"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <textarea value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)} rows={2}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Navigation & Footer Labels ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Booking Page Labels</legend>
+                          <div className="grid grid-cols-3 gap-3">
+                            {[
+                              ["nav_gift_voucher_label", "Gift Voucher Label"],
+                              ["nav_my_bookings_label", "My Bookings Label"],
+                              ["card_cta_label", "Tour Card CTA"],
+                              ["chat_widget_label", "Chat Widget Label"],
+                              ["footer_line_one", "Footer Line 1"],
+                              ["footer_line_two", "Footer Line 2"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── AI & Chatbot ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>AI Chatbot Configuration</legend>
+                          <label className="text-xs text-[var(--ck-text-muted)]">
+                            AI System Prompt
+                            <textarea value={bizDetail.ai_system_prompt || ""} onChange={(e) => updateDetail("ai_system_prompt", e.target.value)} rows={4}
+                              className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs font-mono"
+                              placeholder="You are a friendly booking assistant for [business]. Keep replies short..." />
+                          </label>
+                        </fieldset>
+
+                        {/* ── FAQs ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                            FAQs ({bizFaqs.length}) — Powers chatbot responses
+                          </legend>
+                          <div className="space-y-2">
+                            {bizFaqs.map((faq, i) => (
+                              <div key={i} className="flex gap-2 items-start">
+                                <div className="flex-1 grid grid-cols-2 gap-2">
+                                  <input value={faq.q} onChange={(e) => { const next = [...bizFaqs]; next[i].q = e.target.value; setBizFaqs(next); }}
+                                    className="ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="Question" />
+                                  <input value={faq.a} onChange={(e) => { const next = [...bizFaqs]; next[i].a = e.target.value; setBizFaqs(next); }}
+                                    className="ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="Answer" />
+                                </div>
+                                <button onClick={() => setBizFaqs(bizFaqs.filter((_, j) => j !== i))} className="text-red-500 text-xs mt-1">✕</button>
+                              </div>
+                            ))}
+                            <button onClick={() => setBizFaqs([...bizFaqs, { q: "", a: "" }])}
+                              className="text-xs font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>+ Add FAQ</button>
+                          </div>
+                        </fieldset>
+
+                        {/* ── Policies / Legal ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Legal & Policies</legend>
+                          <div className="grid grid-cols-1 gap-3">
+                            {[
+                              ["terms_conditions", "Terms & Conditions"],
+                              ["privacy_policy", "Privacy Policy"],
+                              ["cookies_policy", "Cookies Policy"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <textarea value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)} rows={3}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Tours (read-only overview) ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                            Tours ({bizTours.length})
+                          </legend>
+                          {bizTours.length === 0 ? (
+                            <p className="text-xs italic text-[var(--ck-text-muted)]">No tours configured. Tours can be added in Settings when logged in as this business.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {bizTours.map((t) => (
+                                <div key={t.id} className="rounded-lg border p-2.5 flex items-center gap-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                  {t.image_url && <img src={t.image_url} alt="" className="h-10 w-10 rounded object-cover shrink-0" />}
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">{t.name}</div>
+                                    <div className="text-[10px] text-[var(--ck-text-muted)]">
+                                      R{t.base_price_per_person} · {t.duration_minutes}min · Cap {t.default_capacity}
+                                      {t.hidden && <span className="ml-1 text-amber-500">(Hidden)</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </fieldset>
+
+                        {/* ── Save ── */}
+                        <div className="flex justify-end pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                          <button onClick={saveBizDetail} disabled={bizDetailSaving}
+                            className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                            {bizDetailSaving ? "Saving..." : "Save All Changes"}
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
               </div>
             ))}
           </div>
