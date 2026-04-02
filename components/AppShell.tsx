@@ -31,7 +31,7 @@ function isPrivilegedRole(r: string) {
 
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
-  const { businessId, businessName, logoUrl, role } = useBusinessContext();
+  const { businessId, businessName, logoUrl, role, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
 
@@ -90,6 +90,38 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             </button>
           </div>
         </div>
+
+        {/* Business switcher for SUPER_ADMIN with multiple operators */}
+        {operators && operators.length > 1 && switchOperator && !collapsed && (
+          <div className="px-6 pb-3">
+            <select
+              value={businessId}
+              onChange={(e) => switchOperator(e.target.value)}
+              className="w-full rounded-lg border px-2.5 py-2 text-xs font-medium truncate"
+              style={{ borderColor: "var(--ck-sidebar-border)", background: "var(--ck-sidebar)", color: "var(--ck-sidebar-text)" }}
+            >
+              {operators.map((op) => (
+                <option key={op.id} value={op.id}>{op.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {operators && operators.length > 1 && switchOperator && collapsed && (
+          <div className="px-2 pb-3 flex justify-center">
+            <button
+              onClick={() => {
+                var idx = operators.findIndex((o) => o.id === businessId);
+                var next = operators[(idx + 1) % operators.length];
+                if (next) switchOperator(next.id);
+              }}
+              className="rounded-lg border p-2 text-xs"
+              style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-text)" }}
+              title={"Switch to: " + (operators.find((o) => o.id !== businessId)?.name || "next")}
+            >
+              <LucideIcons.ArrowLeftRight size={16} />
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto px-4 pb-4">
           {!collapsed && <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-sidebar-muted)" }}>General</div>}
