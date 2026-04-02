@@ -103,6 +103,9 @@ Deno.serve(async (req) => {
       }
     }
 
+    const subdomain = String(body.subdomain || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || null;
+    const bookingSiteUrl = String(body.booking_site_url || "").trim() || null;
+
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .insert({
@@ -112,8 +115,10 @@ Deno.serve(async (req) => {
         logo_url: logoUrl,
         timezone,
         currency,
+        subdomain,
+        booking_site_url: bookingSiteUrl,
       })
-      .select("id, business_name, timezone, currency, logo_url")
+      .select("id, business_name, timezone, currency, logo_url, subdomain")
       .single();
 
     if (businessError) throw businessError;

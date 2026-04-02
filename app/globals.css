@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Preflight safety net — ensures base resets apply even if Turbopack
+   caching skips @tailwind base processing. These match Tailwind's
+   built-in preflight. Remove if Tailwind preflight loads reliably. */
+@layer base {
+  a { color: inherit; text-decoration: inherit; }
+  img, video { max-width: 100%; height: auto; display: block; }
+  h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; }
+  ol, ul { list-style: none; margin: 0; padding: 0; }
+  blockquote, dl, dd, figure, hr, pre { margin: 0; }
+  fieldset { margin: 0; padding: 0; }
+  button, [role="button"] { cursor: pointer; }
+  table { border-collapse: collapse; border-spacing: 0; }
+}
+
 :root,
 html.light {
   color-scheme: light;

@@ -9,6 +9,7 @@ import { useBusinessContext } from "../../components/BusinessContext";
 type OnboardForm = {
   businessName: string;
   businessTagline: string;
+  subdomain: string;
   adminName: string;
   adminEmail: string;
   timezone: string;
@@ -23,6 +24,7 @@ type OnboardForm = {
 const DEFAULT_FORM: OnboardForm = {
   businessName: "",
   businessTagline: "",
+  subdomain: "",
   adminName: "",
   adminEmail: "",
   timezone: "UTC",
@@ -34,9 +36,12 @@ const DEFAULT_FORM: OnboardForm = {
   yocoWebhookSecret: "",
 };
 
+const BOOKING_DOMAIN = "bookingtours.co.za";
+
 type BusinessRow = {
   id: string;
   business_name: string;
+  subdomain: string | null;
   max_admin_seats: number;
   admin_count?: number;
 };
@@ -53,13 +58,15 @@ export default function SuperAdminPage() {
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
   const [loadingBiz, setLoadingBiz] = useState(false);
   const [savingSeatId, setSavingSeatId] = useState<string | null>(null);
+  const [editingSubdomain, setEditingSubdomain] = useState<{ id: string; value: string } | null>(null);
+  const [savingSubdomain, setSavingSubdomain] = useState(false);
 
   async function loadBusinesses() {
     setLoadingBiz(true);
     // Anon role has SELECT on businesses (RLS allows it)
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, business_name, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+      .select("id, business_name, subdomain, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
       .order("business_name");
     if (error) {
       console.error("LOAD_BIZ_ERR:", error.message);
@@ -101,6 +108,24 @@ export default function SuperAdminPage() {
     setSavingSeatId(null);
   }
 
+  async function saveSubdomain(businessId: string, raw: string) {
+    setSavingSubdomain(true);
+    var slug = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
+    if (!slug) { notify({ title: "Invalid", message: "Subdomain must contain at least one letter or number.", tone: "error" }); setSavingSubdomain(false); return; }
+    var { error } = await supabase.from("businesses").update({
+      subdomain: slug,
+      booking_site_url: `https://${slug}.${BOOKING_DOMAIN}`,
+    }).eq("id", businessId);
+    if (error) {
+      notify({ title: "Failed", message: error.code === "23505" ? "This subdomain is already taken." : error.message, tone: "error" });
+    } else {
+      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN}`, tone: "success" });
+      setBusinesses((prev) => prev.map((b) => b.id === businessId ? { ...b, subdomain: slug } : b));
+    }
+    setEditingSubdomain(null);
+    setSavingSubdomain(false);
+  }
+
   useEffect(() => {
     setRequesterEmail(localStorage.getItem("ck_admin_email") || "");
     if (/super/i.test(role || "")) loadBusinesses();
@@ -139,6 +164,8 @@ export default function SuperAdminPage() {
           requester_password: requesterPassword,
           business_name: form.businessName,
           business_tagline: form.businessTagline,
+          subdomain: form.subdomain || null,
+          booking_site_url: form.subdomain ? `https://${form.subdomain}.${BOOKING_DOMAIN}` : null,
           admin_name: form.adminName,
           admin_email: form.adminEmail,
           timezone: form.timezone,
@@ -234,6 +261,23 @@ export default function SuperAdminPage() {
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Business Tagline</label>
             <input value={form.businessTagline} onChange={(e) => setForm({ ...form, businessTagline: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Small-group desert and mountain tours" />
           </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Booking Subdomain</label>
+            <div className="flex items-center gap-0">
+              <input
+                value={form.subdomain}
+                onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                className="ui-control rounded-r-none rounded-lg px-3 py-2 text-sm outline-none flex-1"
+                placeholder="atlas-adventures"
+              />
+              <span className="inline-flex items-center rounded-r-lg border border-l-0 px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
+            </div>
+            {form.subdomain && (
+              <p className="mt-1 text-[10px]" style={{ color: "var(--ck-accent)" }}>
+                Booking page: https://{form.subdomain}.{BOOKING_DOMAIN}
+              </p>
+            )}
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Main Admin Name</label>
             <input value={form.adminName} onChange={(e) => setForm({ ...form, adminName: e.target.value })} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Aisha Khan" />
@@ -288,12 +332,12 @@ export default function SuperAdminPage() {
         </div>
       </form>
 
-      {/* ── Business Admin Seat Management ── */}
+      {/* ── Business Management ── */}
       <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Admin Seats</h2>
-            <p className="text-xs text-[var(--ck-text-muted)] mt-1">Set how many admin users each business can add.</p>
+            <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Management</h2>
+            <p className="text-xs text-[var(--ck-text-muted)] mt-1">Manage subdomains, admin seats, and booking page routes per business.</p>
           </div>
           <button onClick={loadBusinesses} disabled={loadingBiz} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
             {loadingBiz ? "Loading..." : "Refresh"}
@@ -305,44 +349,65 @@ export default function SuperAdminPage() {
         )}
 
         {businesses.length > 0 && (
-          <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
-            {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--ck-bg-subtle)] text-xs font-medium text-[var(--ck-text-muted)]">
-              <div className="col-span-5">Business</div>
-              <div className="col-span-2 text-center">Current Admins</div>
-              <div className="col-span-3 text-center">Seat Limit</div>
-              <div className="col-span-2 text-center">Action</div>
-            </div>
+          <div className="space-y-3">
             {businesses.map((b) => (
-              <div key={b.id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
-                <div className="col-span-5">
-                  <div className="font-medium text-[var(--ck-text-strong)]">{b.business_name}</div>
-                  <div className="text-[10px] text-[var(--ck-text-muted)] font-mono">{b.id.substring(0, 8)}</div>
+              <div key={b.id} className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left: Name + ID */}
+                  <div>
+                    <div className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5">{b.id}</div>
+                  </div>
+                  {/* Right: Seat controls */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
+                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
+                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">−</button>
+                    <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
+                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
+                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">+</button>
+                    <span className={"ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold " +
+                      ((b.admin_count || 0) >= b.max_admin_seats ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                      {b.admin_count || 0}/{b.max_admin_seats}
+                    </span>
+                  </div>
                 </div>
-                <div className="col-span-2 text-center">
-                  <span className={"inline-flex items-center justify-center min-w-[24px] rounded-full px-2 py-0.5 text-xs font-bold " +
-                    ((b.admin_count || 0) >= b.max_admin_seats
-                      ? "bg-red-100 text-red-700"
-                      : "bg-emerald-100 text-emerald-700")
-                  }>
-                    {b.admin_count || 0}
-                  </span>
-                </div>
-                <div className="col-span-3 flex items-center justify-center gap-1">
-                  <button
-                    onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)}
-                    disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
-                    className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30"
-                  >−</button>
-                  <span className="w-8 text-center font-semibold text-[var(--ck-text-strong)]">{b.max_admin_seats}</span>
-                  <button
-                    onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)}
-                    disabled={savingSeatId === b.id}
-                    className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30"
-                  >+</button>
-                </div>
-                <div className="col-span-2 text-center text-xs text-[var(--ck-text-muted)]">
-                  {savingSeatId === b.id ? "Saving..." : `${Math.max(0, b.max_admin_seats - (b.admin_count || 0))} left`}
+
+                {/* Subdomain row */}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs font-medium text-[var(--ck-text-muted)] w-20 shrink-0">Subdomain:</span>
+                  {editingSubdomain?.id === b.id ? (
+                    <div className="flex items-center gap-0 flex-1">
+                      <input
+                        value={editingSubdomain.value}
+                        onChange={(e) => setEditingSubdomain({ id: b.id, value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                        className="ui-control rounded-r-none py-1 px-2 text-xs flex-1"
+                        placeholder="my-business"
+                        autoFocus
+                      />
+                      <span className="inline-flex items-center border border-l-0 rounded-r-lg px-2 py-1 text-[10px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
+                      <button onClick={() => saveSubdomain(b.id, editingSubdomain.value)} disabled={savingSubdomain}
+                        className="ml-2 rounded-lg px-3 py-1 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+                        {savingSubdomain ? "..." : "Save"}
+                      </button>
+                      <button onClick={() => setEditingSubdomain(null)} className="ml-1 text-xs text-[var(--ck-text-muted)]">Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-1">
+                      {b.subdomain ? (
+                        <a href={`https://${b.subdomain}.${BOOKING_DOMAIN}`} target="_blank" rel="noopener noreferrer"
+                          className="text-xs font-mono font-medium" style={{ color: "var(--ck-accent)" }}>
+                          {b.subdomain}.{BOOKING_DOMAIN}
+                        </a>
+                      ) : (
+                        <span className="text-xs italic text-[var(--ck-text-muted)]">Not configured</span>
+                      )}
+                      <button onClick={() => setEditingSubdomain({ id: b.id, value: b.subdomain || "" })}
+                        className="text-[10px] font-medium text-[var(--ck-accent)] hover:underline">
+                        {b.subdomain ? "Change" : "Set up"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
