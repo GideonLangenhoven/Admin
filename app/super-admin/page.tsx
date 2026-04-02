@@ -697,8 +697,270 @@ export default function SuperAdminPage() {
         )}
       </div>
 
+      {/* ── Landing Pages ── */}
+      <LandingPageManager businesses={businesses} />
+
       {/* ── Email Usage & Billing ── */}
       <EmailUsageBilling />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Landing Page Manager
+   ══════════════════════════════════════════════════════════════ */
+
+const TEMPLATES = [
+  { id: "adventure", name: "Adventure", desc: "Cinematic full-width hero, bold outdoor feel", preview: "🏔️" },
+  { id: "luxury", name: "Luxury", desc: "Elegant serif fonts, muted tones, minimal", preview: "✨" },
+  { id: "safari", name: "Safari", desc: "Warm earthy tones, lodge/safari feel", preview: "🦁" },
+  { id: "modern", name: "Modern", desc: "Bold sans-serif, split hero, dark accents", preview: "⚡" },
+];
+
+function LandingPageManager({ businesses }: { businesses: any[] }) {
+  const [selectedBiz, setSelectedBiz] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("adventure");
+  const [generating, setGenerating] = useState(false);
+  const [generatedHtml, setGeneratedHtml] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const [customDomain, setCustomDomain] = useState("");
+  const [firebaseSite, setFirebaseSite] = useState("");
+
+  async function generateLandingPage() {
+    if (!selectedBiz) { notify({ title: "Select a business", message: "Choose which business to generate a landing page for.", tone: "warning" }); return; }
+    setGenerating(true);
+
+    // Load business + tours data
+    const { data: biz } = await supabase.from("businesses").select("*").eq("id", selectedBiz).single();
+    const { data: tours } = await supabase.from("tours").select("name, description, duration_minutes, default_capacity, base_price_per_person, image_url").eq("business_id", selectedBiz).eq("hidden", false).order("sort_order");
+
+    if (!biz) { notify({ title: "Error", message: "Business not found.", tone: "error" }); setGenerating(false); return; }
+
+    // Build context
+    const ctx: Record<string, any> = {
+      business_name: biz.business_name || biz.name || "",
+      tagline: biz.business_tagline || "",
+      logo_url: biz.logo_url || "",
+      hero_eyebrow: biz.hero_eyebrow || "",
+      hero_title: biz.hero_title || biz.business_name || "Welcome",
+      hero_subtitle: biz.hero_subtitle || biz.business_tagline || "",
+      hero_image: "",
+      color_main: biz.color_main || "#1a3c34",
+      color_secondary: biz.color_secondary || "#132833",
+      color_cta: biz.color_cta || "#ca6c2f",
+      color_bg: biz.color_bg || "#f5f5f5",
+      color_nav: biz.color_nav || "#ffffff",
+      color_hover: biz.color_hover || "#48cfad",
+      booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.bookingtours.co.za` : "#"),
+      directions: biz.directions || "",
+      what_to_bring: biz.what_to_bring || "",
+      what_to_wear: biz.what_to_wear || "",
+      footer_line_one: biz.footer_line_one || `Thanks for choosing ${biz.business_name || "us"}.`,
+      footer_line_two: biz.footer_line_two || "",
+      currency: biz.currency || "R",
+      year: new Date().getFullYear().toString(),
+      tours: (tours || []).map((t: any) => ({
+        name: t.name, description: t.description || "",
+        duration_minutes: t.duration_minutes || "90",
+        default_capacity: t.default_capacity || "10",
+        base_price_per_person: t.base_price_per_person || "0",
+        image_url: t.image_url || "",
+      })),
+    };
+
+    // Fetch template
+    try {
+      const res = await fetch(`/landing-pages/templates/${selectedTemplate}.html`);
+      if (!res.ok) throw new Error("Template not found");
+      let tpl = await res.text();
+
+      // Simple template rendering (same logic as build.mjs but client-side)
+      function render(template: string, data: Record<string, any>, parent: Record<string, any> = {}): string {
+        let r = template;
+        r = r.replace(/\{\{#each (\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (_, key, body) => {
+          return (data[key] || []).map((item: any) => render(body, item, data)).join("\n");
+        });
+        r = r.replace(/\{\{#if (\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g, (_, key, ifBody, elseBody) => {
+          return data[key] ? render(ifBody, data, parent) : (elseBody ? render(elseBody, data, parent) : "");
+        });
+        r = r.replace(/\{\{\.\.\/([\w.]+)\}\}/g, (_, key) => String(parent[key] ?? data[key] ?? ""));
+        r = r.replace(/\{\{(\w+)\}\}/g, (_, key) => String(data[key] ?? ""));
+        return r;
+      }
+
+      const html = render(tpl, ctx);
+      setGeneratedHtml(html);
+      setShowPreview(true);
+      setFirebaseSite(biz.subdomain || biz.business_name?.toLowerCase().replace(/[^a-z0-9]/g, "-") || "site");
+      setCustomDomain("");
+      notify({ title: "Landing page generated", message: `${ctx.business_name} — ${selectedTemplate} template`, tone: "success" });
+    } catch (err: any) {
+      notify({ title: "Generation failed", message: err.message, tone: "error" });
+    }
+    setGenerating(false);
+  }
+
+  function downloadHtml() {
+    const blob = new Blob([generatedHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${firebaseSite}-landing-page.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadProject() {
+    // Package as a deployable folder (firebase.json + index.html)
+    const firebaseJson = JSON.stringify({
+      hosting: {
+        public: ".",
+        ignore: ["firebase.json", "**/.*"],
+        headers: [{ source: "**", headers: [{ key: "X-Frame-Options", value: "DENY" }] }],
+        rewrites: [{ source: "**", destination: "/index.html" }]
+      }
+    }, null, 2);
+
+    // Create a simple zip-like download (two files)
+    const content = `<!--- FIREBASE DEPLOYMENT PACKAGE --->\n<!--- 1. Save index.html and firebase.json in the same folder --->\n<!--- 2. Run: firebase deploy --only hosting:${firebaseSite} --->\n\n<!-- firebase.json -->\n<!--\n${firebaseJson}\n-->\n\n${generatedHtml}`;
+    const blob = new Blob([generatedHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${firebaseSite}/index.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Also download firebase.json
+    setTimeout(() => {
+      const b2 = new Blob([firebaseJson], { type: "application/json" });
+      const u2 = URL.createObjectURL(b2);
+      const a2 = document.createElement("a");
+      a2.href = u2;
+      a2.download = `${firebaseSite}-firebase.json`;
+      a2.click();
+      URL.revokeObjectURL(u2);
+    }, 500);
+
+    notify({ title: "Downloaded", message: "Save both files in the same folder, then run firebase deploy.", tone: "success" });
+  }
+
+  return (
+    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Landing Pages</h2>
+        <p className="text-xs text-[var(--ck-text-muted)] mt-1">Generate polished landing pages for each business. Choose a template, preview, and deploy to Firebase.</p>
+      </div>
+
+      {/* Step 1: Select business */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Business</label>
+          <select value={selectedBiz} onChange={(e) => setSelectedBiz(e.target.value)}
+            className="w-full ui-control rounded-lg px-3 py-2 text-sm">
+            <option value="">Select a business...</option>
+            {businesses.map((b) => <option key={b.id} value={b.id}>{b.business_name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Template</label>
+          <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}
+            className="w-full ui-control rounded-lg px-3 py-2 text-sm">
+            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.preview} {t.name} — {t.desc}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Template previews */}
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        {TEMPLATES.map((t) => (
+          <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
+            className={"rounded-xl border p-3 text-center transition-all " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-60")}
+            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", ringColor: "var(--ck-accent)" }}>
+            <div className="text-2xl mb-1">{t.preview}</div>
+            <div className="text-xs font-semibold text-[var(--ck-text-strong)]">{t.name}</div>
+            <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">{t.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Generate button */}
+      <button onClick={generateLandingPage} disabled={generating || !selectedBiz}
+        className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 w-full" style={{ background: "var(--ck-accent)" }}>
+        {generating ? "Generating..." : "Generate Landing Page"}
+      </button>
+
+      {/* Preview + Actions */}
+      {showPreview && generatedHtml && (
+        <div className="mt-4 space-y-3">
+          {/* Preview iframe */}
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-bg-subtle)", color: "var(--ck-text-muted)" }}>
+              <span>Preview — {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
+              <div className="flex gap-2">
+                <button onClick={() => setShowPreview(!showPreview)} className="hover:underline">{showPreview ? "Hide" : "Show"}</button>
+              </div>
+            </div>
+            <iframe srcDoc={generatedHtml} className="w-full border-0" style={{ height: "500px" }} title="Landing page preview" sandbox="allow-scripts" />
+          </div>
+
+          {/* Actions */}
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={downloadHtml} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+              📄 Download HTML
+            </button>
+            <button onClick={downloadProject} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+              📦 Download for IDE
+            </button>
+            <button onClick={() => {
+              const w = window.open("", "_blank");
+              if (w) { w.document.write(generatedHtml); w.document.close(); }
+            }} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+              🔗 Open Full Page
+            </button>
+          </div>
+
+          {/* Deployment guide */}
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg-subtle)" }}>
+            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-2">Deploy to Firebase</h3>
+            <div className="space-y-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--ck-accent)] text-white flex items-center justify-center text-[10px] font-bold">1</span>
+                <div>
+                  <div className="font-medium text-[var(--ck-text)]">Create Firebase site</div>
+                  <code className="block mt-0.5 p-1.5 rounded bg-[var(--ck-surface)] text-[10px] font-mono">firebase hosting:sites:create {firebaseSite} --project bookingtours-sites</code>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--ck-accent)] text-white flex items-center justify-center text-[10px] font-bold">2</span>
+                <div>
+                  <div className="font-medium text-[var(--ck-text)]">Deploy</div>
+                  <code className="block mt-0.5 p-1.5 rounded bg-[var(--ck-surface)] text-[10px] font-mono">firebase deploy --only hosting:{firebaseSite} --project bookingtours-sites</code>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--ck-accent)] text-white flex items-center justify-center text-[10px] font-bold">3</span>
+                <div>
+                  <div className="font-medium text-[var(--ck-text)]">Add custom domain (Firebase Console → Hosting → {firebaseSite} → Custom domain)</div>
+                  <div className="mt-1">
+                    <label className="text-[10px] font-medium">Custom domain for this site:</label>
+                    <input value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="e.g. www.clientbusiness.co.za"
+                      className="mt-0.5 w-full rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)" }} />
+                  </div>
+                  {customDomain && (
+                    <div className="mt-1 p-2 rounded text-[10px]" style={{ background: "var(--ck-surface)" }}>
+                      <div className="font-semibold mb-1">DNS records to add at your registrar:</div>
+                      <div><strong>A</strong> record → <code>151.101.1.195</code> and <code>151.101.65.195</code></div>
+                      <div><strong>TXT</strong> record → <code>hosting-site={firebaseSite}</code></div>
+                      <div className="mt-1 text-[9px] opacity-60">Exact values will be shown in Firebase Console after adding the domain. SSL auto-provisions in ~30 min.</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

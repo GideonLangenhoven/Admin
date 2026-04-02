@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--main:{{color_main}};--secondary:{{color_secondary}};--cta:{{color_cta}};--bg:{{color_bg}};--nav:{{color_nav}};--black:#0a0a0a;--white:#fff;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-400:#9ca3af;--gray-600:#4b5563;--gray-800:#1f2937}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--black);background:var(--white);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-weight:800;letter-spacing:-0.03em}
+a{text-decoration:none;color:inherit}
+img{max-width:100%;height:auto;display:block}
+
+/* Nav — bold modern (inspired by kayak.co.za) */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(255,255,255,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--gray-100)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:0 1.5rem;height:64px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:1.2rem;font-weight:800;color:var(--black);letter-spacing:-0.02em}
+.nav-logo img{height:36px}
+.nav-links{display:flex;gap:2rem;font-size:0.85rem;font-weight:500;color:var(--gray-600)}
+.nav-links a:hover{color:var(--black)}
+.nav-cta{padding:0.6rem 1.6rem;border-radius:10px;background:var(--black);color:#fff;font-weight:600;font-size:0.85rem;transition:transform 0.2s,box-shadow 0.2s}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+
+/* Hero — bold split layout */
+.hero{margin-top:64px;display:grid;grid-template-columns:1fr 1fr;min-height:85vh;overflow:hidden}
+.hero-text{display:flex;flex-direction:column;justify-content:center;padding:4rem 3rem}
+.hero-badge{display:inline-block;padding:0.4rem 1rem;border-radius:999px;background:var(--gray-100);color:var(--gray-600);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:1.5rem;width:fit-content}
+.hero h1{font-size:clamp(2.8rem,4.5vw,4.2rem);line-height:1.05;margin-bottom:1.2rem}
+.hero p{font-size:1.1rem;color:var(--gray-600);line-height:1.6;max-width:45ch;margin-bottom:2rem}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap}
+.hero-cta{display:inline-block;padding:1rem 2.2rem;border-radius:12px;background:var(--black);color:#fff;font-weight:700;font-size:0.95rem;transition:transform 0.2s,box-shadow 0.2s}
+.hero-cta:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.15)}
+.hero-cta.outline{background:transparent;border:2px solid var(--black);color:var(--black)}
+.hero-cta.outline:hover{background:var(--gray-50)}
+.hero-img{position:relative;overflow:hidden}
+.hero-img img{width:100%;height:100%;object-fit:cover}
+.hero-img::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0.05),transparent)}
+
+/* Stats row */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--gray-100);border-top:1px solid var(--gray-100);border-bottom:1px solid var(--gray-100)}
+.stat{padding:2rem;background:var(--white);text-align:center}
+.stat-value{font-size:2rem;font-weight:800;color:var(--black)}
+.stat-label{font-size:0.8rem;color:var(--gray-400);margin-top:0.3rem;font-weight:500}
+
+/* Tours */
+.section{padding:5rem 1.5rem}
+.section-inner{max-width:1200px;margin:0 auto}
+.section-header{margin-bottom:3rem}
+.section-header h2{font-size:clamp(2rem,3.5vw,3rem);color:var(--black)}
+.section-header p{margin-top:0.6rem;color:var(--gray-600);font-size:1rem;line-height:1.6}
+
+.tours-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem}
+.tour-card{border-radius:16px;overflow:hidden;background:var(--white);border:1px solid var(--gray-100);transition:transform 0.3s,box-shadow 0.3s}
+.tour-card:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,0.08)}
+.tour-img{aspect-ratio:16/10;overflow:hidden}
+.tour-img img{width:100%;height:100%;object-fit:cover;transition:transform 0.4s}
+.tour-card:hover .tour-img img{transform:scale(1.04)}
+.tour-body{padding:1.5rem}
+.tour-body h3{font-size:1.2rem;margin-bottom:0.4rem}
+.tour-tags{display:flex;gap:0.5rem;margin-bottom:0.8rem}
+.tour-tag{padding:0.25rem 0.6rem;border-radius:6px;background:var(--gray-100);color:var(--gray-600);font-size:0.72rem;font-weight:500}
+.tour-body p{color:var(--gray-600);font-size:0.88rem;line-height:1.55;margin-bottom:1rem}
+.tour-footer{display:flex;align-items:center;justify-content:space-between}
+.tour-price{font-size:1.3rem;font-weight:800}
+.tour-price span{font-size:0.75rem;font-weight:400;color:var(--gray-400)}
+.tour-book{padding:0.6rem 1.5rem;border-radius:10px;background:var(--black);color:#fff;font-weight:600;font-size:0.82rem;transition:transform 0.2s}
+.tour-book:hover{transform:translateY(-1px)}
+
+/* Info */
+.info-section{background:var(--gray-50)}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+.info-card{padding:2rem;border-radius:16px;background:var(--white);border:1px solid var(--gray-100)}
+.info-icon{width:48px;height:48px;border-radius:12px;background:var(--black);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:1rem}
+.info-card h3{font-size:1rem;font-weight:700;margin-bottom:0.5rem}
+.info-card p{color:var(--gray-600);font-size:0.88rem;line-height:1.6}
+
+/* CTA */
+.cta-banner{text-align:center;padding:6rem 1.5rem;background:var(--black);color:#fff}
+.cta-banner h2{font-size:clamp(2rem,4vw,3.5rem);margin-bottom:1rem}
+.cta-banner p{font-size:1rem;opacity:0.5;margin-bottom:2rem;font-weight:300}
+.cta-banner .hero-cta{background:#fff;color:var(--black)}
+
+.footer{padding:2.5rem 1.5rem;text-align:center;font-size:0.82rem;color:var(--gray-400)}
+.footer a{color:var(--black);font-weight:500}
+
+.chat-bubble{position:fixed;bottom:1.5rem;right:1.5rem;z-index:90;width:56px;height:56px;border-radius:16px;background:var(--black);box-shadow:0 4px 20px rgba(0,0,0,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.2s}
+.chat-bubble:hover{transform:scale(1.06)}
+.chat-bubble svg{width:24px;height:24px;fill:#fff}
+
+@media(max-width:768px){
+  .nav-links{display:none}
+  .hero{grid-template-columns:1fr;min-height:auto}
+  .hero-text{padding:3rem 1.5rem}
+  .hero-img{aspect-ratio:16/10}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .tours-grid,.info-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner"><a href="#" class="nav-logo">{{#if logo_url}}<img src="{{logo_url}}" alt="{{business_name}}">{{else}}{{business_name}}{{/if}}</a><div class="nav-links"><a href="#tours">Tours</a><a href="#info">Info</a><a href="#contact">Contact</a></div><a href="{{booking_url}}" class="nav-cta">Book Now</a></div></nav>
+
+<section class="hero">
+  <div class="hero-text">
+    <div class="hero-badge">{{hero_eyebrow}}</div>
+    <h1>{{hero_title}}</h1>
+    <p>{{hero_subtitle}}</p>
+    <div class="hero-actions">
+      <a href="{{booking_url}}" class="hero-cta">Book Now →</a>
+      <a href="#tours" class="hero-cta outline">View Tours</a>
+    </div>
+  </div>
+  <div class="hero-img">{{#if hero_image}}<img src="{{hero_image}}" alt="{{business_name}}">{{/if}}</div>
+</section>
+
+<section id="tours" class="section"><div class="section-inner"><div class="section-header"><h2>Our Experiences</h2><p>Choose your adventure. Every trip includes expert guides and quality equipment.</p></div><div class="tours-grid">{{#each tours}}<div class="tour-card"><div class="tour-img">{{#if image_url}}<img src="{{image_url}}" alt="{{name}}">{{/if}}</div><div class="tour-body"><h3>{{name}}</h3><div class="tour-tags"><span class="tour-tag">{{duration_minutes}} min</span><span class="tour-tag">Max {{default_capacity}}</span></div><p>{{description}}</p><div class="tour-footer"><div class="tour-price">{{../currency}}{{base_price_per_person}} <span>/ person</span></div><a href="{{../booking_url}}" class="tour-book">Book</a></div></div></div>{{/each}}</div></div></section>
+
+<section id="info" class="section info-section"><div class="section-inner"><div class="section-header"><h2>Before You Go</h2></div><div class="info-grid"><div class="info-card"><div class="info-icon">📍</div><h3>Meeting Point</h3><p>{{directions}}</p></div><div class="info-card"><div class="info-icon">🎒</div><h3>What to Bring</h3><p>{{what_to_bring}}</p></div><div class="info-card"><div class="info-icon">👕</div><h3>What to Wear</h3><p>{{what_to_wear}}</p></div></div></div></section>
+
+<section class="cta-banner"><h2>Ready to go?</h2><p>Book online. Secure your spot in seconds.</p><a href="{{booking_url}}" class="hero-cta">Book Now →</a></section>
+
+<footer id="contact" class="footer"><p>{{footer_line_one}}</p><p style="margin-top:0.4rem">{{footer_line_two}}</p><p style="margin-top:1rem">© {{year}} {{business_name}} · Powered by <a href="https://bookingtours.co.za">BookingTours</a></p></footer>
+
+<a href="{{booking_url}}" class="chat-bubble"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg></a>
+</body>
+</html>
