@@ -128,6 +128,12 @@ Deno.serve(async (_req: Request) => {
           continue;
         }
 
+        // Load per-business from_email
+        const { data: bizRow } = await supabase.from("businesses").select("business_name, from_email").eq("id", enrollment.business_id).maybeSingle();
+        const bizFromEmail = bizRow?.from_email
+          ? (bizRow.business_name || "Marketing") + " <" + bizRow.from_email + ">"
+          : FROM_EMAIL;
+
         // Load steps
         const { data: steps } = await supabase
           .from("marketing_automation_steps")
@@ -226,7 +232,7 @@ Deno.serve(async (_req: Request) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: FROM_EMAIL,
+                from: bizFromEmail,
                 to: [contact.email],
                 subject,
                 html,

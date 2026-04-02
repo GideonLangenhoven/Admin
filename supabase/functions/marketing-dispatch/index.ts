@@ -58,6 +58,18 @@ Deno.serve(async (_req: Request) => {
       };
     }
 
+    // ── 2b. Load per-business from_email for sender customization ──
+    const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
+    const bizFromMap: Record<string, string> = {};
+    if (bizIds.length > 0) {
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, from_email").in("id", bizIds);
+      for (const b of (bizRows || []) as any[]) {
+        if (b.from_email) {
+          bizFromMap[b.id] = (b.business_name || "Marketing") + " <" + b.from_email + ">";
+        }
+      }
+    }
+
     // ── 3. Generate unsubscribe tokens + prepare emails ──
     const sentIds: string[] = [];
     const failedIds: { id: string; error: string; retryable: boolean }[] = [];
@@ -112,7 +124,7 @@ Deno.serve(async (_req: Request) => {
       });
 
       emailPayloads.push({
-        from: FROM_EMAIL,
+        from: bizFromMap[item.business_id] || FROM_EMAIL,
         to: [item.email],
         subject,
         html,

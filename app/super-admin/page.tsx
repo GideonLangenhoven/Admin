@@ -169,6 +169,7 @@ export default function SuperAdminPage() {
       business_name: bizDetail.business_name,
       business_tagline: bizDetail.business_tagline,
       operator_email: bizDetail.operator_email,
+      from_email: bizDetail.from_email || null,
       timezone: bizDetail.timezone,
       currency: bizDetail.currency,
       logo_url: bizDetail.logo_url,
@@ -514,6 +515,7 @@ export default function SuperAdminPage() {
                               ["timezone", "Timezone"],
                               ["currency", "Currency"],
                               ["logo_url", "Logo URL"],
+                              ["from_email", "Sender Email (Resend verified)"],
                             ].map(([key, label]) => (
                               <label key={key} className="text-xs text-[var(--ck-text-muted)]">
                                 {label}
