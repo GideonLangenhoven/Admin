@@ -4,7 +4,8 @@ import { confirmAction } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
-import RichTextEditor from "../../components/RichTextEditor";
+import dynamic from "next/dynamic";
+const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
 
 var SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 var SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;

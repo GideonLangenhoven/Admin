@@ -1,6 +1,6 @@
 /* ── Block type definitions (13 types) ── */
 
-export type TextBlock = { type: "text"; id: string; content: string };
+export type TextBlock = { type: "text"; id: string; content: string; fontFamily?: string; fontSize?: number; fontWeight?: string; color?: string; textAlign?: string };
 export type ImageBlock = { type: "image"; id: string; src: string; alt: string; width: string };
 export type DividerBlock = { type: "divider"; id: string };
 export type ButtonBlock = { type: "button"; id: string; text: string; url: string; color: string };

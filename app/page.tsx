@@ -5,6 +5,7 @@ import { confirmAction, notify } from "./lib/app-notify";
 import { getAdminTimezone } from "./lib/admin-timezone";
 import { useBusinessContext } from "../components/BusinessContext";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { 
     AlertTriangle, ArrowUpRight, TrendingUp, TrendingDown, Plus, 
     List, CalendarOff, ClipboardCheck, ChevronLeft, ChevronRight, 
@@ -34,40 +35,11 @@ const DEFAULT_LOCATIONS: WeatherLocation[] = [
     { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 18 },
 ];
 
-/* ── Windguru Widget Component ── */
-function WindguruWidget({ spotId, refreshKey }: { spotId: number; refreshKey: number }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        container.innerHTML = "";
-
-        // uid must match the id of the target div — Windguru looks for document.getElementById(uid)
-        const uid = `wg_fwdg_${spotId}_100`;
-        const args = [
-            `s=${spotId}`, `uid=${uid}`, `wj=knots`, `tj=c`,
-            `p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING`, `b=1`, `hc=#333`,
-            `dc=gray`, `tc=#333`, `stl=`, `lng=en`, `wl=3`,
-        ];
-
-        // Target div the widget script will inject into
-        const target = document.createElement("div");
-        target.id = uid;
-        container.appendChild(target);
-
-        const script = document.createElement("script");
-        script.src = `https://www.windguru.cz/js/widget.php?${args.join("&")}`;
-        script.async = true;
-        container.appendChild(script);
-
-        return () => {
-            if (container) container.innerHTML = "";
-        };
-    }, [spotId, refreshKey]);
-
-    return <div ref={containerRef} className="w-full min-h-[350px] overflow-x-auto" style={{ background: "var(--ck-surface-elevated)", color: "var(--ck-text-muted)" }}>Loading Windguru...</div>;
-}
+/* ── Windguru Widget (lazy-loaded to reduce initial bundle) ── */
+const WindguruWidget = dynamic(() => import("../components/WindguruWidget"), {
+    ssr: false,
+    loading: () => <div className="w-full min-h-[350px] flex items-center justify-center text-sm text-gray-400">Loading weather...</div>,
+});
 
 /* ── types ── */
 interface ManifestBooking {
@@ -299,96 +271,59 @@ export default function Dashboard() {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
         const dayAfter = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const nowISO = new Date().toISOString();
 
-        // Two-step: get slot IDs first, then query bookings by slot_id
-        const { data: todaySlots } = await supabase
-            .from("slots")
-            .select("id")
-            .eq("business_id", businessId)
-            .gte("start_time", today.toISOString())
-            .lt("start_time", tomorrow.toISOString());
-
-        const todaySlotIds = (todaySlots || []).map((s: any) => s.id);
-
-        let filtered: ManifestBooking[] = [];
-        if (todaySlotIds.length > 0) {
-            const { data: bks } = await supabase
-                .from("bookings")
+        // Helper to fetch bookings for a date range's slots (two-step: slots → bookings)
+        async function fetchManifest(from: Date, to: Date): Promise<ManifestBooking[]> {
+            const { data: slots } = await supabase.from("slots").select("id")
+                .eq("business_id", businessId).gte("start_time", from.toISOString()).lt("start_time", to.toISOString());
+            const slotIds = (slots || []).map((s: any) => s.id);
+            if (slotIds.length === 0) return [];
+            const { data: bks } = await supabase.from("bookings")
                 .select("id, customer_name, phone, qty, total_amount, status, checked_in, slots(start_time), tours(name)")
-                .eq("business_id", businessId)
-                .neq("status", "CANCELLED")
-                .in("slot_id", todaySlotIds)
+                .eq("business_id", businessId).neq("status", "CANCELLED").in("slot_id", slotIds)
                 .order("created_at", { ascending: true });
-
-            filtered = (bks || []).map((b: any) => ({
+            return (bks || []).map((b: any) => ({
                 ...b,
                 tours: Array.isArray(b.tours) ? b.tours[0] : b.tours,
                 slots: Array.isArray(b.slots) ? b.slots[0] : b.slots,
             })).filter((b: any) => b.slots?.start_time);
         }
 
-        setManifest(filtered);
-        setTodayBookings(filtered.length);
-        setTodayPax(filtered.reduce((s, b) => s + b.qty, 0));
+        // Run ALL independent queries in parallel
+        const [todayManifest, tomorrowData, refundsData, inboxData, photosData] = await Promise.all([
+            fetchManifest(today, tomorrow),
+            fetchManifest(tomorrow, dayAfter),
+            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).eq("refund_status", "REQUESTED"),
+            supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
+            Promise.all([
+                supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
+                supabase.from("trip_photos").select("slot_id").eq("business_id", businessId).gt("uploaded_at", weekAgo),
+            ]),
+        ]);
 
-        // Tomorrow's manifest (two-step)
-        const { data: tomorrowSlots } = await supabase
-            .from("slots")
-            .select("id")
-            .eq("business_id", businessId)
-            .gte("start_time", tomorrow.toISOString())
-            .lt("start_time", dayAfter.toISOString());
+        // Today
+        setManifest(todayManifest);
+        setTodayBookings(todayManifest.length);
+        setTodayPax(todayManifest.reduce((s, b) => s + b.qty, 0));
 
-        const tomorrowSlotIds = (tomorrowSlots || []).map((s: any) => s.id);
-        let tFiltered: ManifestBooking[] = [];
-        if (tomorrowSlotIds.length > 0) {
-            const { data: tbks } = await supabase
-                .from("bookings")
-                .select("id, customer_name, phone, qty, total_amount, status, checked_in, slots(start_time), tours(name)")
-                .eq("business_id", businessId)
-                .neq("status", "CANCELLED")
-                .in("slot_id", tomorrowSlotIds)
-                .order("created_at", { ascending: true });
+        // Tomorrow
+        setTomorrowManifest(tomorrowData);
+        setTomorrowPax(tomorrowData.reduce((s, b) => s + b.qty, 0));
 
-            tFiltered = (tbks || []).map((b: any) => ({
-                ...b,
-                tours: Array.isArray(b.tours) ? b.tours[0] : b.tours,
-                slots: Array.isArray(b.slots) ? b.slots[0] : b.slots,
-            })).filter((b: any) => b.slots?.start_time);
-        }
-        setTomorrowManifest(tFiltered);
-        setTomorrowPax(tFiltered.reduce((s, b) => s + b.qty, 0));
+        // Refunds
+        const refunds = refundsData.data || [];
+        setRefundCount(refunds.length);
+        setRefundTotal(refunds.reduce((s: number, b: any) => s + Number(b.refund_amount || 0), 0));
 
-        // Refunds pending
-        const { data: refunds } = await supabase.from("bookings")
-            .select("id, refund_amount")
-            .eq("business_id", businessId)
-            .eq("refund_status", "REQUESTED");
-        setRefundCount((refunds || []).length);
-        setRefundTotal((refunds || []).reduce((s: number, b: any) => s + Number(b.refund_amount || 0), 0));
-
-        // Inbox messages
-        const { count: ic } = await supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN");
-        setInboxCount(ic || 0);
+        // Inbox
+        setInboxCount(inboxData.count || 0);
 
         // Photos outstanding
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const now = new Date().toISOString();
-        const { data: completedSlots } = await supabase.from("slots")
-            .select("id, start_time, booked")
-            .eq("business_id", businessId)
-            .lt("start_time", now)
-            .gt("start_time", weekAgo)
-            .gt("booked", 0);
-        let sentSlotIds = new Set<string>();
-        const { data: sentPhotos, error: photosErr } = await supabase.from("trip_photos")
-            .select("slot_id")
-            .eq("business_id", businessId)
-            .gt("uploaded_at", weekAgo);
-        if (!photosErr && sentPhotos) {
-            sentSlotIds = new Set(sentPhotos.map((p: any) => p.slot_id));
-        }
-        const outstanding = (completedSlots || []).filter((s: any) => !sentSlotIds.has(s.id));
+        const [completedSlotsRes, sentPhotosRes] = photosData;
+        const sentSlotIds = new Set((sentPhotosRes.data || []).map((p: any) => p.slot_id));
+        const outstanding = (completedSlotsRes.data || []).filter((s: any) => !sentSlotIds.has(s.id));
         setPhotosOutstanding(outstanding.length);
 
         setLoading(false);

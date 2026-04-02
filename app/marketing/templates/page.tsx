@@ -224,10 +224,31 @@ export default function TemplatesPage() {
       ...(isScheduled ? {} : { started_at: new Date().toISOString() }),
     }).eq("id", campaign!.id);
 
-    var msg = isScheduled
-      ? `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} — ${contacts.length} recipients.`
-      : `Campaign queued — ${contacts.length} recipients. Emails will be sent in batches.`;
-    notify({ message: msg, tone: "success" });
+    // 5. For immediate sends, trigger the dispatch function directly
+    //    (don't rely solely on the cron job — fire it now for instant delivery)
+    if (!isScheduled) {
+      // Fire dispatch in batches until all queue items are processed
+      var dispatchedTotal = 0;
+      for (var attempt = 0; attempt < Math.ceil(contacts.length / 50) + 1; attempt++) {
+        try {
+          var dispRes = await supabase.functions.invoke("marketing-dispatch", { body: {} });
+          var processed = dispRes.data?.sent || 0;
+          dispatchedTotal += processed;
+          if (processed === 0) break; // no more items to process
+        } catch (dispErr) {
+          console.warn("Dispatch batch error (cron will retry):", dispErr);
+          break;
+        }
+      }
+      if (dispatchedTotal > 0) {
+        notify({ message: `${dispatchedTotal} of ${contacts.length} emails sent. Remaining will be sent by background process.`, tone: "success" });
+      } else {
+        notify({ message: `Campaign queued — ${contacts.length} recipients. Emails will be sent in batches by the background process.`, tone: "success" });
+      }
+    } else {
+      notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} — ${contacts.length} recipients.`, tone: "success" });
+    }
+
     setSending(null);
     setSendForm({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
     setSendingInProgress(false);

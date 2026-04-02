@@ -1,16 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Marketing <onboarding@resend.dev>";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const BATCH_SIZE = 100;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 
 const supabase = createServiceClient();
 
 Deno.serve(async (_req: Request) => {
   try {
+    if (!RESEND_API_KEY) {
+      console.error("MARKETING_DISPATCH: RESEND_API_KEY not configured — skipping");
+      return new Response(JSON.stringify({ error: "RESEND_API_KEY not set" }), { status: 503 });
+    }
+
     // ── 0. Activate any scheduled campaigns that are due ──
     await supabase.from("marketing_campaigns")
       .update({ status: "sending", started_at: new Date().toISOString() })

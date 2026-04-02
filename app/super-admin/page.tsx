@@ -34,6 +34,13 @@ const DEFAULT_FORM: OnboardForm = {
   yocoWebhookSecret: "",
 };
 
+type BusinessRow = {
+  id: string;
+  business_name: string;
+  max_admin_seats: number;
+  admin_count?: number;
+};
+
 export default function SuperAdminPage() {
   const { role } = useBusinessContext();
   const [requesterEmail, setRequesterEmail] = useState("");
@@ -42,9 +49,62 @@ export default function SuperAdminPage() {
   const [submitting, setSubmitting] = useState(false);
   const [createdClient, setCreatedClient] = useState<{ businessId: string; businessName: string; adminEmail: string } | null>(null);
 
+  // Business admin seat management
+  const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
+  const [loadingBiz, setLoadingBiz] = useState(false);
+  const [savingSeatId, setSavingSeatId] = useState<string | null>(null);
+
+  async function loadBusinesses() {
+    setLoadingBiz(true);
+    // Anon role has SELECT on businesses (RLS allows it)
+    const { data, error } = await supabase
+      .from("businesses")
+      .select("id, business_name, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+      .order("business_name");
+    if (error) {
+      console.error("LOAD_BIZ_ERR:", error.message);
+      notify({ title: "Failed to load businesses", message: error.message, tone: "error" });
+      setLoadingBiz(false);
+      return;
+    }
+    if (data) {
+      // Get admin counts per business in parallel
+      const withCounts = await Promise.all(
+        (data as any[]).map(async (b: any) => {
+          const { count } = await supabase
+            .from("admin_users")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", b.id);
+          return { ...b, admin_count: count || 0 };
+        })
+      );
+      setBusinesses(withCounts);
+    }
+    setLoadingBiz(false);
+  }
+
+  async function updateSeatLimit(businessId: string, newLimit: number) {
+    setSavingSeatId(businessId);
+    const val = Math.max(1, newLimit);
+    const { error } = await supabase
+      .from("businesses")
+      .update({ max_admin_seats: val })
+      .eq("id", businessId);
+    if (error) {
+      notify({ title: "Failed", message: error.message, tone: "error" });
+    } else {
+      notify({ title: "Updated", message: "Admin seat limit updated.", tone: "success" });
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? { ...b, max_admin_seats: val } : b))
+      );
+    }
+    setSavingSeatId(null);
+  }
+
   useEffect(() => {
     setRequesterEmail(localStorage.getItem("ck_admin_email") || "");
-  }, []);
+    if (/super/i.test(role || "")) loadBusinesses();
+  }, [role]);
 
   async function handleLogoUpload(file: File | null) {
     if (!file) return;
@@ -227,6 +287,346 @@ export default function SuperAdminPage() {
           </button>
         </div>
       </form>
+
+      {/* ── Business Admin Seat Management ── */}
+      <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Admin Seats</h2>
+            <p className="text-xs text-[var(--ck-text-muted)] mt-1">Set how many admin users each business can add.</p>
+          </div>
+          <button onClick={loadBusinesses} disabled={loadingBiz} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+            {loadingBiz ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+
+        {businesses.length === 0 && !loadingBiz && (
+          <p className="text-sm text-[var(--ck-text-muted)]">No businesses found.</p>
+        )}
+
+        {businesses.length > 0 && (
+          <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--ck-bg-subtle)] text-xs font-medium text-[var(--ck-text-muted)]">
+              <div className="col-span-5">Business</div>
+              <div className="col-span-2 text-center">Current Admins</div>
+              <div className="col-span-3 text-center">Seat Limit</div>
+              <div className="col-span-2 text-center">Action</div>
+            </div>
+            {businesses.map((b) => (
+              <div key={b.id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+                <div className="col-span-5">
+                  <div className="font-medium text-[var(--ck-text-strong)]">{b.business_name}</div>
+                  <div className="text-[10px] text-[var(--ck-text-muted)] font-mono">{b.id.substring(0, 8)}</div>
+                </div>
+                <div className="col-span-2 text-center">
+                  <span className={"inline-flex items-center justify-center min-w-[24px] rounded-full px-2 py-0.5 text-xs font-bold " +
+                    ((b.admin_count || 0) >= b.max_admin_seats
+                      ? "bg-red-100 text-red-700"
+                      : "bg-emerald-100 text-emerald-700")
+                  }>
+                    {b.admin_count || 0}
+                  </span>
+                </div>
+                <div className="col-span-3 flex items-center justify-center gap-1">
+                  <button
+                    onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)}
+                    disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
+                    className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30"
+                  >−</button>
+                  <span className="w-8 text-center font-semibold text-[var(--ck-text-strong)]">{b.max_admin_seats}</span>
+                  <button
+                    onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)}
+                    disabled={savingSeatId === b.id}
+                    className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30"
+                  >+</button>
+                </div>
+                <div className="col-span-2 text-center text-xs text-[var(--ck-text-muted)]">
+                  {savingSeatId === b.id ? "Saving..." : `${Math.max(0, b.max_admin_seats - (b.admin_count || 0))} left`}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Email Usage & Billing ── */}
+      <EmailUsageBilling />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Email Usage Dashboard + Invoice Generator (separate component
+   to keep state isolated)
+   ══════════════════════════════════════════════════════════════ */
+
+type EmailUsageRow = {
+  business_id: string;
+  business_name: string;
+  period: string;
+  emails_sent: number;
+  included: number;
+  overage: number;
+  rate_zar: number;
+  overage_cost: number;
+};
+
+function EmailUsageBilling() {
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [rows, setRows] = useState<EmailUsageRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingRate, setEditingRate] = useState<{ id: string; value: string } | null>(null);
+  const [savingRate, setSavingRate] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState<string | null>(null);
+
+  async function loadUsage() {
+    setLoading(true);
+
+    const { data: bizData, error: bizErr } = await supabase
+      .from("businesses")
+      .select("id, business_name, marketing_included_emails, marketing_overage_rate_zar")
+      .order("business_name");
+    if (bizErr) {
+      console.error("LOAD_BIZ_USAGE_ERR:", bizErr.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!bizData) { setLoading(false); return; }
+
+    // Get usage for the selected period
+    const { data: usageData } = await supabase
+      .from("marketing_usage_monthly")
+      .select("business_id, emails_sent")
+      .eq("period", period);
+
+    const usageMap = new Map((usageData || []).map((u: any) => [u.business_id, u.emails_sent]));
+
+    const combined: EmailUsageRow[] = bizData.map((b: any) => {
+      const sent = usageMap.get(b.id) || 0;
+      const included = Number(b.marketing_included_emails || 500);
+      const rate = Number(b.marketing_overage_rate_zar || 0.15);
+      const overage = Math.max(0, sent - included);
+      return {
+        business_id: b.id,
+        business_name: b.business_name,
+        period,
+        emails_sent: sent,
+        included,
+        overage,
+        rate_zar: rate,
+        overage_cost: Math.round(overage * rate * 100) / 100,
+      };
+    });
+
+    setRows(combined);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadUsage(); }, [period]);
+
+  async function saveRate(businessId: string, newRate: number) {
+    setSavingRate(true);
+    const { error } = await supabase
+      .from("businesses")
+      .update({ marketing_overage_rate_zar: Math.max(0, newRate) })
+      .eq("id", businessId);
+    if (error) {
+      notify({ title: "Failed", message: error.message, tone: "error" });
+    } else {
+      notify({ title: "Rate updated", message: `Email rate set to R${newRate.toFixed(2)}/email`, tone: "success" });
+      setRows((prev) => prev.map((r) =>
+        r.business_id === businessId
+          ? { ...r, rate_zar: newRate, overage_cost: Math.round(r.overage * newRate * 100) / 100 }
+          : r
+      ));
+    }
+    setEditingRate(null);
+    setSavingRate(false);
+  }
+
+  async function generateInvoice(row: EmailUsageRow) {
+    if (row.overage_cost <= 0) {
+      notify({ title: "No overage", message: "This business has no overage charges for this period.", tone: "warning" });
+      return;
+    }
+    setGeneratingInvoice(row.business_id);
+
+    try {
+      // Create invoice in invoices table
+      const periodLabel = new Date(row.period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+
+      // Get next invoice number
+      const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: row.business_id });
+      if (invNumRes.error) console.warn("next_invoice_number RPC failed, using fallback");
+      const invNum = invNumRes.data || `MKT-${row.period}-${row.business_id.substring(0, 4).toUpperCase()}`;
+
+      const { data: inv, error: invErr } = await supabase.from("invoices").insert({
+        business_id: row.business_id,
+        invoice_number: invNum,
+        customer_name: row.business_name,
+        customer_email: "",
+        tour_name: "Marketing Email Overage",
+        qty: row.overage,
+        unit_price: row.rate_zar,
+        subtotal: row.overage_cost,
+        total_amount: row.overage_cost,
+        payment_method: "Pending",
+        discount_type: null,
+        discount_percent: 0,
+        discount_amount: 0,
+        discount_notes: `${row.emails_sent} emails sent in ${periodLabel}. ${row.included} included, ${row.overage} overage at R${row.rate_zar.toFixed(2)}/email.`,
+      }).select("id, invoice_number").single();
+
+      if (invErr) throw invErr;
+
+      notify({
+        title: "Invoice created",
+        message: `Invoice ${inv.invoice_number} for R${row.overage_cost.toFixed(2)} — ${row.overage} overage emails in ${periodLabel}`,
+        tone: "success",
+      });
+    } catch (err: any) {
+      notify({ title: "Invoice failed", message: err.message || "Unknown error", tone: "error" });
+    }
+    setGeneratingInvoice(null);
+  }
+
+  const totalSent = rows.reduce((s, r) => s + r.emails_sent, 0);
+  const totalOverageCost = rows.reduce((s, r) => s + r.overage_cost, 0);
+  const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+
+  return (
+    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Usage & Billing</h2>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track emails sent per business, set per-email pricing, and generate overage invoices.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="month"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="ui-control rounded-lg px-3 py-1.5 text-sm outline-none"
+          />
+          <button onClick={loadUsage} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
+          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{totalSent.toLocaleString()}</div>
+          <div className="text-xs text-[var(--ck-text-muted)]">Emails sent in {periodLabel}</div>
+        </div>
+        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
+          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{rows.filter((r) => r.overage > 0).length}</div>
+          <div className="text-xs text-[var(--ck-text-muted)]">Businesses over limit</div>
+        </div>
+        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
+          <div className={"text-2xl font-bold " + (totalOverageCost > 0 ? "text-amber-600" : "text-[var(--ck-text-strong)]")}>R{totalOverageCost.toFixed(2)}</div>
+          <div className="text-xs text-[var(--ck-text-muted)]">Total overage charges</div>
+        </div>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--ck-bg-subtle)] text-xs font-medium text-[var(--ck-text-muted)]">
+            <div className="col-span-3">Business</div>
+            <div className="col-span-2 text-center">Emails Sent</div>
+            <div className="col-span-1 text-center">Included</div>
+            <div className="col-span-1 text-center">Overage</div>
+            <div className="col-span-2 text-center">Rate (R/email)</div>
+            <div className="col-span-1 text-center">Owed</div>
+            <div className="col-span-2 text-center">Invoice</div>
+          </div>
+
+          {rows.map((r) => (
+            <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+              {/* Business name */}
+              <div className="col-span-3">
+                <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
+              </div>
+
+              {/* Emails sent */}
+              <div className="col-span-2 text-center">
+                <span className="font-semibold text-[var(--ck-text-strong)]">{r.emails_sent.toLocaleString()}</span>
+              </div>
+
+              {/* Included */}
+              <div className="col-span-1 text-center text-[var(--ck-text-muted)]">{r.included}</div>
+
+              {/* Overage */}
+              <div className="col-span-1 text-center">
+                {r.overage > 0 ? (
+                  <span className="text-amber-600 font-semibold">{r.overage}</span>
+                ) : (
+                  <span className="text-emerald-600">0</span>
+                )}
+              </div>
+
+              {/* Rate */}
+              <div className="col-span-2 flex items-center justify-center gap-1">
+                {editingRate?.id === r.business_id ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs">R</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editingRate.value}
+                      onChange={(e) => setEditingRate({ id: r.business_id, value: e.target.value })}
+                      className="w-16 rounded border border-[var(--ck-border-subtle)] px-1.5 py-0.5 text-xs text-center outline-none"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => saveRate(r.business_id, Number(editingRate.value))}
+                      disabled={savingRate}
+                      className="text-xs text-emerald-600 font-semibold hover:underline"
+                    >Save</button>
+                    <button onClick={() => setEditingRate(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline">Cancel</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setEditingRate({ id: r.business_id, value: r.rate_zar.toFixed(2) })}
+                    className="text-xs font-medium hover:underline"
+                    title="Click to edit rate"
+                  >
+                    R{r.rate_zar.toFixed(2)}
+                  </button>
+                )}
+              </div>
+
+              {/* Owed */}
+              <div className="col-span-1 text-center">
+                {r.overage_cost > 0 ? (
+                  <span className="font-bold text-amber-600">R{r.overage_cost.toFixed(2)}</span>
+                ) : (
+                  <span className="text-emerald-600 text-xs">R0</span>
+                )}
+              </div>
+
+              {/* Invoice button */}
+              <div className="col-span-2 text-center">
+                <button
+                  onClick={() => generateInvoice(r)}
+                  disabled={r.overage_cost <= 0 || generatingInvoice === r.business_id}
+                  className="rounded-lg bg-[var(--ck-text-strong)] px-3 py-1 text-xs font-medium text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-30 transition-opacity"
+                >
+                  {generatingInvoice === r.business_id ? "..." : r.overage_cost > 0 ? "Generate Invoice" : "No charge"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

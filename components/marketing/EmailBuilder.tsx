@@ -200,10 +200,14 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         </div>
       </div>
 
-      {/* Variable hint */}
-      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-        Use <code className="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{"{first_name}"}</code> in text to personalise emails.
-      </p>
+      {/* Variable hints */}
+      <div className="text-xs flex flex-wrap gap-x-3 gap-y-1" style={{ color: "var(--ck-text-muted)" }}>
+        <span>Variables:</span>
+        {["{first_name}", "{last_name}", "{email}", "{promo_code}", "{promo_discount}", "{voucher_code}", "{voucher_amount}"].map((v) => (
+          <code key={v} className="rounded bg-gray-100 px-1 py-0.5 text-[11px] cursor-pointer hover:bg-gray-200" onClick={() => navigator.clipboard.writeText(v)}>{v}</code>
+        ))}
+        <span className="text-[10px] opacity-60">(click to copy)</span>
+      </div>
 
       {preview ? (
         /* Preview */
@@ -238,17 +242,22 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
           {blocks.map((block, index) => (
             <div
               key={block.id}
-              draggable
-              onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
               className={`group rounded-xl border p-3 transition-colors ${dragIndex === index ? "ring-2 ring-blue-400" : ""}`}
               style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
             >
               <div className="flex items-start gap-2">
                 {/* Drag handle + controls */}
                 <div className="flex flex-col items-center gap-1 pt-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                  <GripVertical size={14} className="cursor-grab" />
+                  <div
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragEnd={handleDragEnd}
+                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-bg-subtle)]"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical size={14} />
+                  </div>
                   <button onClick={() => moveBlock(index, -1)} disabled={index === 0}><ArrowUp size={12} /></button>
                   <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}><ArrowDown size={12} /></button>
                   <button onClick={() => removeBlock(block.id)} className="text-red-500 mt-1"><Trash2 size={12} /></button>

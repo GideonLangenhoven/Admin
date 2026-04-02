@@ -77,6 +77,8 @@ Deno.serve(async (req: any) => {
     var bookingId = body.booking_id;
     var voucherId = body.voucher_id;
     var voucherCode = body.voucher_code;
+    var promoCode = body.promo_code || "";
+    var customerEmail = body.customer_email || "";
     var type = body.type || "BOOKING";
     var topupBusinessId = body.business_id;
 
@@ -84,14 +86,20 @@ Deno.serve(async (req: any) => {
 
     // FIX 4: Server-side price verification for BOOKING checkouts
     // Never trust frontend pricing — calculate from DB for standard bookings
+    var promoDiscount = 0;
+    var promoId: string | null = null;
+    var appliedPromoCode = "";
+
     if (type === "BOOKING" && bookingId) {
       var bookingRow = await supabase
         .from("bookings")
-        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount")
+        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, customer_email")
         .eq("id", bookingId)
         .maybeSingle();
       if (bookingRow.data) {
         var bk = bookingRow.data;
+        var resolvedEmail = customerEmail || bk.customer_email || "";
+
         // Look up current base price from tour
         var tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();
         var basePrice = Number(tourRow.data?.base_price_per_person || 0);
@@ -103,10 +111,46 @@ Deno.serve(async (req: any) => {
           }
         }
         var serverTotal = basePrice * Number(bk.qty || 1);
-        // Apply discount if present
+
+        // Apply promo code if provided (before other discounts)
+        if (promoCode) {
+          var promoResult = await supabase.rpc("validate_promo_code", {
+            p_business_id: bk.business_id,
+            p_code: promoCode,
+            p_order_amount: serverTotal,
+            p_customer_email: resolvedEmail,
+          });
+          if (promoResult.data?.valid) {
+            var promo = promoResult.data;
+            promoId = promo.promo_id;
+            appliedPromoCode = promo.code;
+            if (promo.discount_type === "PERCENT") {
+              promoDiscount = serverTotal * (Number(promo.discount_value) / 100);
+            } else {
+              promoDiscount = Number(promo.discount_value);
+            }
+            promoDiscount = Math.min(promoDiscount, serverTotal);
+            serverTotal = serverTotal - promoDiscount;
+            // Store promo on booking
+            await supabase.from("bookings").update({
+              promo_code: appliedPromoCode,
+              discount_amount: promoDiscount,
+            }).eq("id", bookingId);
+            console.log("PROMO_APPLIED: code=" + appliedPromoCode + " discount=" + promoDiscount + " booking=" + bookingId);
+          } else {
+            // Invalid promo — return error to frontend
+            return new Response(JSON.stringify({
+              error: "PROMO_INVALID",
+              reason: promoResult.data?.error || "Invalid promo code",
+            }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+          }
+        }
+
+        // Apply admin discount if present (on top of promo)
         if (bk.discount_type === "PERCENT" && bk.discount_percent) {
           serverTotal = serverTotal * (1 - Number(bk.discount_percent) / 100);
-        } else if (bk.discount_amount) {
+        } else if (bk.discount_amount && !promoCode) {
+          // Only apply stored discount_amount if not from a promo (promo already applied above)
           serverTotal = serverTotal - Number(bk.discount_amount);
         }
         serverTotal = Math.max(0, serverTotal);
@@ -121,7 +165,14 @@ Deno.serve(async (req: any) => {
           // Use server-calculated amount (never trust frontend)
           amount = serverCashDue;
           // Also update the booking record to reflect corrected total
-          await supabase.from("bookings").update({ total_amount: serverTotal }).eq("id", bookingId);
+          await supabase.from("bookings").update({ total_amount: serverTotal + promoDiscount }).eq("id", bookingId);
+        }
+
+        // If promo covers the entire amount, skip payment
+        if (serverCashDue <= 0 && promoId) {
+          // Apply promo usage
+          await supabase.rpc("apply_promo_code", { p_promo_id: promoId, p_customer_email: resolvedEmail, p_booking_id: bookingId });
+          return new Response(JSON.stringify({ fully_covered: true, promo_applied: appliedPromoCode, discount: promoDiscount }), { headers: buildCors(req?.headers?.get("origin") || "*") });
         }
       }
     }
@@ -170,6 +221,7 @@ Deno.serve(async (req: any) => {
       metadata.qty = String(body.qty || 1);
       if (body.voucher_codes) metadata.voucher_codes = body.voucher_codes.join(",");
       if (body.voucher_ids) metadata.voucher_ids = body.voucher_ids.join(",");
+      if (promoId) { metadata.promo_id = promoId; metadata.promo_code = appliedPromoCode; metadata.customer_email = customerEmail; }
       successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
     }
 

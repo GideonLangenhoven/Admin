@@ -620,8 +620,32 @@ Deno.serve(async (req: Request) => {
       const slot = await resolveSlot(businessId, tour.id, body, "create", businessTimezone);
       if (!slot) return await send(404, "SLOT_NOT_FOUND", "Open slot not found for the supplied date/time");
 
-      const totalPaid = totalPaidForPayload(body, slot, tour, qty);
+      var totalPaid = totalPaidForPayload(body, slot, tour, qty);
       if (!Number.isFinite(totalPaid)) return await send(400, "INVALID_TOTAL_PAID", "total_paid must be numeric", {}, "REJECTED");
+
+      // Validate and apply promo code if provided
+      var extPromoCode = String(body.promo_code || "").trim();
+      var extPromoId: string | null = null;
+      var extPromoDiscount = 0;
+      if (extPromoCode) {
+        const pv = await db.rpc("validate_promo_code", {
+          p_business_id: businessId,
+          p_code: extPromoCode,
+          p_order_amount: totalPaid,
+          p_customer_email: normalizeEmail(body.email) || null,
+        });
+        if (pv.data?.valid) {
+          extPromoId = pv.data.promo_id;
+          if (pv.data.discount_type === "PERCENT") {
+            extPromoDiscount = totalPaid * (Number(pv.data.discount_value) / 100);
+          } else {
+            extPromoDiscount = Math.min(Number(pv.data.discount_value), totalPaid);
+          }
+          totalPaid = Math.max(0, totalPaid - extPromoDiscount);
+        } else {
+          return await send(400, "PROMO_INVALID", pv.data?.error || "Invalid promo code", {}, "REJECTED");
+        }
+      }
 
       const { data, error } = await db.rpc("ck_external_create_booking", {
         p_business_id: businessId,
@@ -648,6 +672,12 @@ Deno.serve(async (req: Request) => {
       if (code === "SLOT_CLOSED") return await send(409, code, "Slot is closed");
       if (code === "INSUFFICIENT_CAPACITY") return await send(409, code, "Not enough remaining capacity");
       if (!result.success) return await send(400, code, "Booking creation failed");
+
+      // Apply promo if used
+      if (extPromoId && result.booking_id) {
+        await db.from("bookings").update({ promo_code: extPromoCode, discount_amount: extPromoDiscount }).eq("id", result.booking_id).catch(() => {});
+        await db.rpc("apply_promo_code", { p_promo_id: extPromoId, p_customer_email: normalizeEmail(body.email) || "", p_booking_id: result.booking_id }).catch(() => {});
+      }
 
       // Calculate hold expiry based on the requested hold duration
       const holdExpiresAt = new Date(Date.now() + holdDurationMinutes * 60 * 1000).toISOString();

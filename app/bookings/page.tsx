@@ -93,7 +93,6 @@ interface Booking {
   refund_amount: number | null;
   yoco_checkout_id: string | null;
   payment_deadline: string | null;
-  payment_method?: string | null;
   waiver_status: string | null;
   custom_fields: Record<string, string> | null;
   tours: TourRel;
@@ -158,7 +157,7 @@ export default function Bookings() {
   });
   const [rangeEnd, setRangeEnd] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 7);
+    d.setDate(d.getDate() + 30);
     d.setHours(23, 59, 59, 999);
     return d;
   });
@@ -182,91 +181,82 @@ export default function Bookings() {
   const [paymentLinkBookingId, setPaymentLinkBookingId] = useState<string | null>(null);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
   const [paymentLinkRef, setPaymentLinkRef] = useState<string>("");
-  const [paymentLinkDialog, setPaymentLinkDialog] = useState<Booking | null>(null);
-  const [paymentLinkHoldHours, setPaymentLinkHoldHours] = useState("24");
   const [refundDialog, setRefundDialog] = useState<{ booking: Booking; amount: string } | null>(null);
   const [refunding, setRefunding] = useState(false);
   const [waDialog, setWaDialog] = useState<{ phone: string; name: string } | null>(null);
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [searchRef, setSearchRef] = useState("");
-  const [searchResults, setSearchResults] = useState<Booking[] | null>(null);
-  const [searching, setSearching] = useState(false);
 
   async function loadBookings() {
+    if (!businessId) return;
     setLoading(true);
 
-    if (!businessId) {
-      setBookings([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots!inner(id,start_time,tour_id,capacity_total,booked,status)")
+    // Step 1: Get slot IDs in the date range
+    const { data: slotRows, error: slotErr } = await supabase
+      .from("slots")
+      .select("id")
       .eq("business_id", businessId)
-      .gte("slots.start_time", rangeStart.toISOString())
-      .lte("slots.start_time", rangeEnd.toISOString())
-      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT", "COMPLETED", "CANCELLED"])
-      .order("created_at", { ascending: true })
-      .limit(3000);
+      .gte("start_time", rangeStart.toISOString())
+      .lte("start_time", rangeEnd.toISOString());
 
-    if (error) {
-      console.error("Error loading bookings:", error);
-      notify({ title: "Failed to load bookings", message: error.message, tone: "error" });
+    if (slotErr) {
+      console.error("LOAD_SLOTS_ERR:", slotErr.message, slotErr.code, slotErr.details);
     }
 
-    const normalized = ((data || []) as Array<Booking & { tours: unknown; slots: unknown }>)
-      .map((b) => ({
-        ...b,
-        tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
-        slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
-      }))
-      .filter((b) => Boolean(b.slots?.start_time));
-    setBookings(normalized as Booking[]);
-    setLoading(false);
-  }
+    const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
 
-  async function searchByRef(ref: string) {
-    const term = ref.trim();
-    if (!term || !businessId) { setSearchResults(null); return; }
-    setSearching(true);
-    const selectCols = "id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)";
-    let results: any[] = [];
-    // If it looks like a hex booking ref, search by ID prefix
-    const hexClean = term.toLowerCase().replace(/[^a-f0-9]/g, "");
-    if (hexClean.length >= 4 && /^[a-f0-9]+$/.test(hexClean)) {
-      const { data } = await supabase.rpc("search_bookings_by_ref", { p_business_id: businessId, p_ref: hexClean });
-      if (data && data.length > 0) {
-        const ids = data.map((r: any) => r.id);
-        const { data: full } = await supabase
+    // Step 2: Fetch bookings matching those slots
+    let allBookings: any[] = [];
+
+    if (slotIds.length > 0) {
+      // Supabase .in() has a limit — batch if needed
+      const BATCH = 500;
+      for (let i = 0; i < slotIds.length; i += BATCH) {
+        const batch = slotIds.slice(i, i + BATCH);
+        const { data, error } = await supabase
           .from("bookings")
-          .select(selectCols)
-          .in("id", ids);
-        results = full || [];
+          .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .eq("business_id", businessId)
+          .in("slot_id", batch)
+          .order("created_at", { ascending: true })
+          .limit(2000);
+        if (error) {
+          console.error("LOAD_BOOKINGS_ERR:", error.message, error.code, error.details, error.hint);
+        }
+        if (data) allBookings.push(...data);
       }
     }
-    // Also search by customer name or email
-    if (results.length === 0) {
-      const { data } = await supabase
-        .from("bookings")
-        .select(selectCols)
-        .eq("business_id", businessId)
-        .or(`customer_name.ilike.%${term}%,email.ilike.%${term}%`)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      results = data || [];
-    }
-    const normalized = (results as Array<Booking & { tours: unknown; slots: unknown }>)
+
+    // Step 3: Also fetch unslotted bookings (created in range, no slot assigned)
+    const { data: unslotted } = await supabase
+      .from("bookings")
+      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+      .eq("business_id", businessId)
+      .is("slot_id", null)
+      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
+      .gte("created_at", rangeStart.toISOString())
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (unslotted) allBookings.push(...unslotted);
+
+    // Deduplicate
+    const seen = new Set<string>();
+    const deduped = allBookings.filter((b: any) => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+
+    const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
       .map((b) => ({
         ...b,
         tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
         slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
       }));
-    setSearchResults(normalized as Booking[]);
-    setSearching(false);
+
+    setBookings(normalized as Booking[]);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -278,10 +268,11 @@ export default function Bookings() {
 
   // Auto-refresh when a booking status changes (e.g. payment received)
   useEffect(() => {
+    supabase.removeChannel(supabase.channel("bookings-status"));
     const channel = supabase
       .channel("bookings-status")
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         { event: "UPDATE", schema: "public", table: "bookings" },
         () => loadBookings()
       )
@@ -308,9 +299,8 @@ export default function Bookings() {
     const dayMap = new Map<string, Map<string, Booking[]>>();
     for (const b of filteredBookings) {
       const startTime = b.slots?.start_time;
-      if (!startTime) continue;
-      const dk = dateKey(startTime);
-      const tk = fmtTime(startTime);
+      const dk = startTime ? dateKey(startTime) : "9999-99-99";
+      const tk = startTime ? fmtTime(startTime) : "Unscheduled";
       if (!dayMap.has(dk)) dayMap.set(dk, new Map());
       const slotMap = dayMap.get(dk)!;
       if (!slotMap.has(tk)) slotMap.set(tk, []);
@@ -353,57 +343,6 @@ export default function Bookings() {
     days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     return days;
   }, [filteredBookings]);
-
-  const searchDayGroups: DayGroup[] = useMemo(() => {
-    if (!searchResults || searchResults.length === 0) return [];
-    const dayMap = new Map<string, Map<string, Booking[]>>();
-    for (const b of searchResults) {
-      const startTime = b.slots?.start_time;
-      const dk = startTime ? dateKey(startTime) : "no-slot";
-      const tk = startTime ? fmtTime(startTime) : "—";
-      if (!dayMap.has(dk)) dayMap.set(dk, new Map());
-      const slotMap = dayMap.get(dk)!;
-      if (!slotMap.has(tk)) slotMap.set(tk, []);
-      slotMap.get(tk)!.push(b);
-    }
-    const days: DayGroup[] = [];
-    for (const [dk, slotMap] of dayMap) {
-      const slots: SlotGroup[] = [];
-      for (const [tk, bks] of slotMap) {
-        const activeBks = bks.filter((b) => b.status !== "CANCELLED");
-        const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
-        const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
-        const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
-        slots.push({ timeLabel: tk, sortKey: tk, bookings: bks, totalPax, totalPrice, totalPaid, totalDue: totalPrice - totalPaid });
-      }
-      slots.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-      const totalPax = slots.reduce((s, sl) => s + sl.totalPax, 0);
-      const totalPrice = slots.reduce((s, sl) => s + sl.totalPrice, 0);
-      const totalPaid = slots.reduce((s, sl) => s + sl.totalPaid, 0);
-      const first = searchResults.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
-      days.push({
-        dateLabel: first?.slots?.start_time ? fmtDate(first.slots.start_time) : "No slot assigned",
-        sortKey: dk,
-        slots,
-        totalPax,
-        totalPrice,
-        totalPaid,
-        totalDue: totalPrice - totalPaid,
-      });
-    }
-    days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-    return days;
-  }, [searchResults]);
-
-  // Auto-expand all search result slots so bookings are immediately visible
-  useEffect(() => {
-    if (!searchResults || searchResults.length === 0) return;
-    const keys = new Set<string>();
-    searchDayGroups.forEach((day) => {
-      day.slots.forEach((_, si) => keys.add(`search-${day.sortKey}-${si}`));
-    });
-    setExpandedSlots((prev) => new Set([...prev, ...keys]));
-  }, [searchResults]);
 
   function toggleSlot(key: string) {
     setExpandedSlots((prev) => {
@@ -656,7 +595,7 @@ export default function Bookings() {
   }
 
   async function cancelBooking(b: Booking) {
-    const isVoucherPaid = (b.payment_method || "").toUpperCase() === "VOUCHER" || (b.payment_method || "").toUpperCase() === "GIFT_VOUCHER";
+    const isVoucherPaid = ((b as any).payment_method || "").toUpperCase() === "VOUCHER" || ((b as any).payment_method || "").toUpperCase() === "GIFT_VOUCHER";
     const confirmMsg = isVoucherPaid
       ? `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? This booking was paid via voucher — a new voucher will be issued for the full amount (no refund to card).`
       : `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? The customer will be notified via email and WhatsApp.`;
@@ -948,24 +887,13 @@ export default function Bookings() {
     setRebookSlots([]);
   }
 
-  function openPaymentLinkDialog(b: Booking) {
+  async function sendPaymentLink(b: Booking) {
     if (!b.email) {
       notify({ title: "Missing email", message: "No email address on this booking. Please edit the booking to add an email first.", tone: "warning" });
       return;
     }
-    setPaymentLinkHoldHours("24");
-    setPaymentLinkDialog(b);
-  }
-
-  async function sendPaymentLink(b: Booking, holdHours: string) {
-    setPaymentLinkDialog(null);
     setPaymentLinkBookingId(b.id);
     try {
-      // Set payment_deadline on the booking
-      const hours = Number(holdHours);
-      const deadline = new Date(Date.now() + hours * 3600000).toISOString();
-      await supabase.from("bookings").update({ payment_deadline: deadline }).eq("id", b.id);
-
       const res = await supabase.functions.invoke("create-checkout", {
         body: {
           amount: Number(b.total_amount || 0),
@@ -988,13 +916,6 @@ export default function Bookings() {
           ? new Date(b.slots.start_time).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
           : "TBC";
 
-        // Format expiry for the email
-        const expiresDate = new Date(deadline);
-        const expiresText = expiresDate.toLocaleString("en-ZA", {
-          weekday: "long", day: "numeric", month: "short",
-          hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
-        });
-
         // Send email with payment link
         try {
           await supabase.functions.invoke("send-email", {
@@ -1010,8 +931,6 @@ export default function Bookings() {
                 qty: b.qty,
                 total_amount: Number(b.total_amount || 0).toFixed(2),
                 payment_url: data.redirectUrl,
-                expires_text: expiresText,
-                hold_hours: holdHours,
               },
             },
           });
@@ -1058,7 +977,6 @@ export default function Bookings() {
     setActionBookingId(rebookBooking.id);
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
       body: {
-        action: "RESCHEDULE",
         booking_id: rebookBooking.id,
         new_slot_id: rebookSlotId,
         excess_action: rebookExcessAction,
@@ -1328,37 +1246,6 @@ export default function Bookings() {
         </div>
       </div>
 
-      {/* Search by booking ref */}
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Search by name, email, or booking ref"
-          value={searchRef}
-          onChange={(e) => {
-            const v = e.target.value;
-            setSearchRef(v);
-            if (!v.trim()) setSearchResults(null);
-          }}
-          onKeyDown={(e) => { if (e.key === "Enter") searchByRef(searchRef); }}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-gray-500 sm:w-64"
-        />
-        <button
-          onClick={() => searchByRef(searchRef)}
-          disabled={searching || !searchRef.trim()}
-          className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {searching ? "Searching..." : "Search"}
-        </button>
-        {searchResults !== null && (
-          <button
-            onClick={() => { setSearchRef(""); setSearchResults(null); }}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
       {/* Status filter tabs */}
       <div className="flex flex-wrap gap-1.5">
         {[
@@ -1390,71 +1277,7 @@ export default function Bookings() {
         })}
       </div>
 
-      {searchResults !== null ? (
-        searchResults.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-            No bookings found for &quot;{searchRef}&quot;
-          </div>
-        ) : (
-          <div className="space-y-6 pb-48">
-            <div className="text-sm text-gray-500">{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for &quot;{searchRef}&quot;</div>
-            {searchDayGroups.map((day) => {
-              const slotKeys = day.slots.map((_, i) => `search-${day.sortKey}-${i}`);
-              return (
-                <div key={day.sortKey}>
-                  <h3 className="mb-2 text-xl font-semibold text-gray-800">{day.dateLabel}</h3>
-                  <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto no-scrollbar lg:overflow-visible">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50">
-                          <th className="w-24 lg:w-36 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Time</th>
-                          <th className="w-10 lg:w-16 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Pax</th>
-                          <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Details</th>
-                          <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Service</th>
-                          <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Price</th>
-                          <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Paid</th>
-                          <th className="p-1.5 lg:p-3 text-right font-semibold text-gray-600 text-[11px] lg:text-sm">Due</th>
-                          <th className="hidden p-3 text-left font-semibold text-gray-600 lg:table-cell">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {day.slots.map((slot, si) => {
-                          const slotKey = `search-${day.sortKey}-${si}`;
-                          const isOpen = expandedSlots.has(slotKey);
-                          const services = [...new Set(slot.bookings.map((b) => b.tours?.name).filter(Boolean))].join(", ");
-                          return (
-                            <SlotRows
-                              key={slotKey}
-                              slot={slot}
-                              services={services}
-                              isOpen={isOpen}
-                              onToggle={() => toggleSlot(slotKey)}
-                              actionBookingId={actionBookingId}
-                              resendingInvoiceId={resendingInvoiceId}
-                              onEdit={openEditModal}
-                              onRebook={openRebookModal}
-                              onMarkPaid={markPaid}
-                              onRefund={openRefundDialog}
-                              onCancel={cancelBooking}
-                              onResendInvoice={resendInvoiceForBooking}
-                              paymentLinkBookingId={paymentLinkBookingId}
-                              onSendPaymentLink={openPaymentLinkDialog}
-                              onWhatsApp={openWhatsApp}
-                              onView={(b) => router.push(`/bookings/${b.id}`)}
-                              onCancelSlot={cancelSlotWeather}
-                              cancellingWeatherId={cancellingWeatherId}
-                            />
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : loading ? (
+      {loading ? (
         <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
         </div>
@@ -1517,7 +1340,7 @@ export default function Bookings() {
                             onCancel={cancelBooking}
                             onResendInvoice={resendInvoiceForBooking}
                             paymentLinkBookingId={paymentLinkBookingId}
-                            onSendPaymentLink={openPaymentLinkDialog}
+                            onSendPaymentLink={sendPaymentLink}
                             onWhatsApp={openWhatsApp}
                             onView={(b) => router.push(`/bookings/${b.id}`)}
                             onCancelSlot={cancelSlotWeather}
@@ -1682,43 +1505,6 @@ export default function Bookings() {
                 className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {actionBookingId === rebookBooking.id ? "Saving..." : "Rebook"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {paymentLinkDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-xl">
-            <h3 className="mb-1 text-lg font-semibold">Send Payment Link</h3>
-            <p className="mb-4 text-xs text-gray-500">
-              {paymentLinkDialog.customer_name} &middot; {paymentLinkDialog.tours?.name || "Tour"} &middot; R{Number(paymentLinkDialog.total_amount || 0).toFixed(2)}
-            </p>
-            <label className="block text-sm text-gray-600">
-              Payment link expires after
-              <select
-                value={paymentLinkHoldHours}
-                onChange={(e) => setPaymentLinkHoldHours(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="2">2 hours</option>
-                <option value="6">6 hours</option>
-                <option value="12">12 hours</option>
-                <option value="24">24 hours</option>
-                <option value="48">48 hours</option>
-              </select>
-            </label>
-            <p className="mt-2 text-xs text-gray-500">The expiry will be shown in the email sent to the customer.</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setPaymentLinkDialog(null)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={() => sendPaymentLink(paymentLinkDialog, paymentLinkHoldHours)}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Send Payment Link
               </button>
             </div>
           </div>

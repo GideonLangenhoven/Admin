@@ -146,12 +146,24 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
     console.warn("CONFIRM_LOCK_ERR (proceeding anyway):", lockErr);
   }
 
-  var tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  var tenant: any = null;
+  try {
+    tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  } catch (tenantErr) {
+    console.error("CONFIRM_TENANT_ERR (will still attempt email via send-email):", tenantErr);
+  }
   var ref = booking.id.substring(0, 8).toUpperCase();
-  var slotTime = booking.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "See email";
+  var slotTime = booking.slots?.start_time
+    ? (tenant ? formatTenantDateTime(tenant.business, booking.slots.start_time) : new Date(booking.slots.start_time).toLocaleString())
+    : "See email";
   var tourName = booking.tours?.name || "Booking";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
+  var brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
+  var waiver: any = { waiverStatus: "PENDING", waiverLink: "" };
+  try {
+    waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
+  } catch (waiverErr) {
+    console.error("CONFIRM_WAIVER_ERR (proceeding without waiver info):", waiverErr);
+  }
 
   // Last-minute booking: if trip is within 24 hours, always include waiver link prominently
   var isLastMinute = false;
@@ -172,7 +184,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   var waError = "";
   var emailError = "";
 
-  if (booking.phone) {
+  if (booking.phone && tenant) {
     try {
       var currency = tenant.business.currency || "ZAR";
       await sendWhatsappTextForTenant(
@@ -536,7 +548,7 @@ Deno.serve(async (req: any) => {
                   customer_name: rBk.customer_name,
                   ref: rRef,
                   tour_name: rTourName,
-                  start_time: rBk.slots?.start_time || "",
+                  start_time: rSlotTime || rBk.slots?.start_time || "",
                   message: "Your booking has been moved to a new date/time.",
                   event: "rescheduled",
                 },
@@ -641,12 +653,13 @@ Deno.serve(async (req: any) => {
             });
           }
 
-          // Send notification
+          // Send notification (WhatsApp + email)
           try {
             var agTenant = await getTenantByBusinessId(supabase, agBk.business_id);
             var agRef = agBookingId.substring(0, 8).toUpperCase();
             var agTourName = agBk.tours?.name || "Booking";
             var agBrandName = getBusinessDisplayName(agTenant.business);
+            var agSlotTime = agBk.slots?.start_time ? formatTenantDateTime(agTenant.business, agBk.slots.start_time) : "";
 
             if (agBk.phone) {
               try {
@@ -659,6 +672,28 @@ Deno.serve(async (req: any) => {
                   "Thanks, " + agBrandName + "."
                 );
               } catch (e) { console.error("ADD_GUESTS_WA_ERR:", e); }
+            }
+
+            if (agBk.email) {
+              try {
+                await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+                  body: JSON.stringify({
+                    type: "BOOKING_UPDATED",
+                    data: {
+                      business_id: agBk.business_id,
+                      email: agBk.email,
+                      customer_name: agBk.customer_name,
+                      ref: agRef,
+                      tour_name: agTourName,
+                      start_time: agSlotTime || agBk.slots?.start_time || "",
+                      message: agDelta + " guest" + (agDelta === 1 ? "" : "s") + " added. Your booking now has " + agNewQty + " guest" + (agNewQty === 1 ? "" : "s") + " total.",
+                      event: "guests_added",
+                    },
+                  }),
+                });
+              } catch (e) { console.error("ADD_GUESTS_EMAIL_ERR:", e); }
             }
           } catch (e) { console.error("ADD_GUESTS_NOTIFY_ERR:", e); }
 
@@ -680,6 +715,7 @@ Deno.serve(async (req: any) => {
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
           body: JSON.stringify({
             type: "GIFT_VOUCHER", data: {
+              business_id: gv.business_id,
               email: gv.buyer_email,
               code: gv.code,
               recipient_name: gv.recipient_name,
@@ -720,7 +756,11 @@ Deno.serve(async (req: any) => {
     var booking = br.data;
     if (booking.status === "PAID" || booking.status === "COMPLETED") {
       console.log("Already paid, ensuring confirmation delivery:" + booking.id);
-      await sendBookingConfirmation(booking, booking.yoco_payment_id || yocoPaymentId, checkoutId, payload.amount);
+      try {
+        await sendBookingConfirmation(booking, booking.yoco_payment_id || yocoPaymentId, checkoutId, payload.amount);
+      } catch (confirmErr) {
+        console.error("CONFIRM_RESEND_ERR booking=" + booking.id + ":", confirmErr);
+      }
       return new Response("OK", { status: 200 });
     }
 
@@ -920,7 +960,7 @@ Deno.serve(async (req: any) => {
     }
 
     // Atomically update to PAID — if already updated by a concurrent webhook, skip
-    var upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
+    var upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: booking.total_amount, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
     if (upd.error) {
       console.log("BOOKING_PAID_UPDATE_FAILED booking=" + booking.id + " err=" + upd.error.message);
       await supabase.from("logs").insert({
@@ -933,7 +973,11 @@ Deno.serve(async (req: any) => {
     }
     if (!upd.data) {
       console.log("Already processed (concurrent webhook), ensuring confirmation delivery:" + booking.id);
-      await sendBookingConfirmation(booking, booking.yoco_payment_id || yocoPaymentId, checkoutId, payload.amount);
+      try {
+        await sendBookingConfirmation(booking, booking.yoco_payment_id || yocoPaymentId, checkoutId, payload.amount);
+      } catch (confirmErr) {
+        console.error("CONFIRM_CONCURRENT_ERR booking=" + booking.id + ":", confirmErr);
+      }
       return new Response("OK", { status: 200 });
     }
     var holdConvert = await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE").select("id").maybeSingle();
@@ -1003,9 +1047,33 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_confirmed", payload: { yoco_payment_id: yocoPaymentId, checkout_id: checkoutId, amount: payload.amount } });
+    // Apply promo code usage if one was used during checkout
+    var metaPromoId = payload?.metadata?.promo_id;
+    var metaPromoEmail = payload?.metadata?.customer_email || booking.customer_email || "";
+    if (metaPromoId) {
+      try {
+        await supabase.rpc("apply_promo_code", { p_promo_id: metaPromoId, p_customer_email: metaPromoEmail, p_booking_id: booking.id });
+        console.log("PROMO_USAGE_RECORDED: promo=" + metaPromoId + " booking=" + booking.id);
+      } catch (promoErr) { console.error("PROMO_APPLY_ERR:", promoErr); }
+    }
+
+    await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_confirmed", payload: { yoco_payment_id: yocoPaymentId, checkout_id: checkoutId, amount: payload.amount, promo_code: payload?.metadata?.promo_code || null } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);
-    await sendBookingConfirmation({ ...booking, status: "PAID", yoco_payment_id: yocoPaymentId }, yocoPaymentId, checkoutId, payload.amount);
+
+    // Send confirmation email + WhatsApp — wrapped in try-catch so a notification failure
+    // does NOT prevent the webhook from returning 200 (booking is already marked PAID above)
+    try {
+      await sendBookingConfirmation({ ...booking, status: "PAID", yoco_payment_id: yocoPaymentId }, yocoPaymentId, checkoutId, payload.amount);
+    } catch (confirmErr) {
+      console.error("CONFIRM_SEND_ERR booking=" + booking.id + ":", confirmErr);
+      // Log the failure so it can be retried manually from admin
+      await supabase.from("logs").insert({
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        event: "booking_confirmation_failed",
+        payload: { error: confirmErr instanceof Error ? confirmErr.message : String(confirmErr), yoco_payment_id: yocoPaymentId },
+      }).catch(() => {});
+    }
 
     console.log("PAYMENT CONFIRMED booking:" + booking.id);
     return new Response("OK", { status: 200 });

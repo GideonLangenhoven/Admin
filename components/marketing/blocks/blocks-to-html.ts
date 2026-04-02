@@ -16,8 +16,14 @@ export function escapeAttr(str: string): string {
 
 function blockToHtml(b: Block): string {
   switch (b.type) {
-    case "text":
-      return `<div style="padding:8px 0;font-size:15px;line-height:1.6;color:#374151;">${b.content}</div>`;
+    case "text": {
+      const ff = b.fontFamily ? `font-family:${b.fontFamily};` : "";
+      const fs = b.fontSize ? `font-size:${b.fontSize}px;` : "font-size:15px;";
+      const fw = b.fontWeight ? `font-weight:${b.fontWeight};` : "";
+      const fc = b.color ? `color:${b.color};` : "color:#374151;";
+      const ta = b.textAlign ? `text-align:${b.textAlign};` : "";
+      return `<div style="padding:8px 0;line-height:1.6;${ff}${fs}${fw}${fc}${ta}">${b.content}</div>`;
+    }
 
     case "image":
       return `<div style="padding:8px 0;text-align:center;"><img src="${escapeAttr(b.src)}" alt="${escapeAttr(b.alt)}" style="max-width:${escapeAttr(b.width || "100%")};height:auto;border-radius:8px;" /></div>`;
@@ -43,11 +49,11 @@ function blockToHtml(b: Block): string {
         .map(([key, url]) => {
           var platform = SOCIAL_PLATFORMS[key];
           if (!platform) return "";
-          return `<a href="${escapeAttr(url)}" style="display:inline-block;margin:0 6px;text-decoration:none;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="24" height="24" style="display:block;" /></a>`;
+          return `<a href="${escapeAttr(url)}" target="_blank" style="display:inline-block;margin:0 5px;text-decoration:none;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="36" height="36" style="display:block;border-radius:8px;" /></a>`;
         })
         .filter(Boolean)
         .join("");
-      return `<div style="padding:12px 0;text-align:center;">${links}</div>`;
+      return `<div style="padding:16px 0;text-align:center;">${links}</div>`;
     }
 
     case "video": {
@@ -125,7 +131,7 @@ ${attrHtml}
         .map(([key, url]) => {
           var platform = SOCIAL_PLATFORMS[key];
           if (!platform) return "";
-          return `<a href="${escapeAttr(url)}" style="display:inline-block;margin:0 6px;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="20" height="20" style="display:block;" /></a>`;
+          return `<a href="${escapeAttr(url)}" target="_blank" style="display:inline-block;margin:0 4px;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="28" height="28" style="display:block;border-radius:6px;" /></a>`;
         })
         .filter(Boolean)
         .join("");

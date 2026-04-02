@@ -238,9 +238,12 @@ export default function NewBookingPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("PENDING");
   const [holdHours, setHoldHours] = useState("24");
-  const [discountType, setDiscountType] = useState<"none" | "manual">("none");
+  const [discountType, setDiscountType] = useState<"none" | "manual" | "promo">("none");
   const [discountValue, setDiscountValue] = useState("0");
   const [discountReason, setDiscountReason] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [promoResult, setPromoResult] = useState<{ valid: boolean; error?: string; discount_type?: string; discount_value?: number; promo_id?: string; code?: string } | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState("");
   const [missingField, setMissingField] = useState<string | null>(null);
@@ -366,10 +369,14 @@ export default function NewBookingPage() {
   );
   const baseTotal = qty * unitPrice;
   const discountNum = Math.max(0, Number(discountValue) || 0);
-  const discountAmount = 0; // no percent/fixed discounts — manual override only
+  const promoDiscountCalc = discountType === "promo" && promoResult?.valid
+    ? promoResult.discount_type === "PERCENT"
+      ? baseTotal * (Number(promoResult.discount_value) / 100)
+      : Math.min(Number(promoResult.discount_value), baseTotal)
+    : 0;
   const totalAmount = discountType === "manual"
     ? Math.max(0, discountNum)
-    : baseTotal;
+    : Math.max(0, baseTotal - promoDiscountCalc);
   const availableSlots = slots.filter((s) => {
     const avail = Math.max(Number(s.available_capacity || 0), 0);
     return avail > 0 && (qty <= 0 || avail >= qty);
@@ -499,6 +506,10 @@ export default function NewBookingPage() {
         insertPayload.original_total = baseTotal;
         insertPayload.discount_type = "MANUAL";
         insertPayload.discount_notes = discountReason.trim();
+      } else if (discountType === "promo" && promoResult?.valid) {
+        insertPayload.promo_code = promoResult.code;
+        insertPayload.discount_amount = promoDiscountCalc;
+        insertPayload.original_total = baseTotal;
       }
 
       insertPayload.custom_fields = customFieldDefinitions.reduce<Record<string, string>>((acc, field) => {
@@ -516,6 +527,16 @@ export default function NewBookingPage() {
         setSubmitting(false);
         notify({ title: "Booking creation failed", message: formatSupabaseError(insertError), tone: "error" });
         return;
+      }
+
+      // Record promo usage if applied
+      if (discountType === "promo" && promoResult?.valid && promoResult.promo_id) {
+        const { error: promoErr } = await supabase.rpc("apply_promo_code", {
+          p_promo_id: promoResult.promo_id,
+          p_customer_email: email.trim().toLowerCase(),
+          p_booking_id: createdBooking.id,
+        });
+        if (promoErr) console.error("Promo apply error:", promoErr);
       }
 
       const ref = createdBooking.id.substring(0, 8).toUpperCase();
@@ -1088,6 +1109,51 @@ export default function NewBookingPage() {
         <h3 className="mb-4 text-base font-semibold text-gray-700">Price Adjustment</h3>
 
         {/* Toggle */}
+        {/* Promo code input */}
+        <div className="flex items-end gap-2 mb-4">
+          <label className="flex-1 text-sm text-gray-600">
+            Promo code
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+              className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm uppercase"
+              placeholder="Enter promo code"
+              disabled={discountType === "manual"}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={!promoCode.trim() || promoChecking || discountType === "manual"}
+            onClick={async () => {
+              setPromoChecking(true);
+              const { data } = await supabase.rpc("validate_promo_code", {
+                p_business_id: businessId,
+                p_code: promoCode.trim(),
+                p_order_amount: baseTotal,
+                p_customer_email: email || null,
+              });
+              setPromoResult(data);
+              if (data?.valid) setDiscountType("promo");
+              setPromoChecking(false);
+            }}
+            className="rounded bg-[#0f595e] px-4 py-2 text-sm font-medium text-white hover:bg-[#0b4347] disabled:opacity-50"
+          >
+            {promoChecking ? "..." : "Apply"}
+          </button>
+          {promoResult && !promoResult.valid && (
+            <span className="text-xs text-red-500">{promoResult.error}</span>
+          )}
+        </div>
+
+        {discountType === "promo" && promoResult?.valid && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
+            <span className="font-semibold">{promoResult.code}</span>
+            <span>— {promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : "R" + promoResult.discount_value + " off"}</span>
+            <button type="button" onClick={() => { setDiscountType("none"); setPromoCode(""); setPromoResult(null); }} className="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+          </div>
+        )}
+
         <label className="flex items-center gap-3 cursor-pointer select-none mb-4">
           <input
             type="checkbox"
@@ -1096,6 +1162,7 @@ export default function NewBookingPage() {
               setDiscountType(e.target.checked ? "manual" : "none");
               setDiscountValue("0");
               setDiscountReason("");
+              setPromoCode(""); setPromoResult(null);
             }}
             className="h-4 w-4 rounded border-gray-300 accent-[#0f595e]"
           />

@@ -17,7 +17,7 @@ function jsonRes(data: any, status: number, cors: Record<string, string>) {
 }
 
 async function handleCreate(body: any, cors: Record<string, string>) {
-  var { combo_offer_id, slot_a_id, slot_b_id, qty, customer_name, customer_email, customer_phone } = body;
+  var { combo_offer_id, slot_a_id, slot_b_id, qty, customer_name, customer_email, customer_phone, promo_code } = body;
   if (!combo_offer_id || !slot_a_id || !slot_b_id || !qty) {
     return jsonRes({ error: "combo_offer_id, slot_a_id, slot_b_id, and qty are required" }, 400, cors);
   }
@@ -45,8 +45,37 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   if (availA < qty) return jsonRes({ error: "Slot A does not have enough capacity (available: " + availA + ")" }, 400, cors);
   if (availB < qty) return jsonRes({ error: "Slot B does not have enough capacity (available: " + availB + ")" }, 400, cors);
 
-  // Calculate totals based on split type
+  // Validate and apply promo code if provided
+  var promoDiscount = 0;
+  var promoId: string | null = null;
+  var appliedPromoCode = "";
   var comboTotal = Number(offer.combo_price) * qty;
+
+  if (promo_code) {
+    var promoResult = await supabase.rpc("validate_promo_code", {
+      p_business_id: offer.business_a_id,
+      p_code: promo_code,
+      p_order_amount: comboTotal,
+      p_customer_email: customer_email || null,
+    });
+    if (promoResult.data?.valid) {
+      var promo = promoResult.data;
+      promoId = promo.promo_id;
+      appliedPromoCode = promo.code;
+      if (promo.discount_type === "PERCENT") {
+        promoDiscount = comboTotal * (Number(promo.discount_value) / 100);
+      } else {
+        promoDiscount = Math.min(Number(promo.discount_value), comboTotal);
+      }
+      promoDiscount = Math.round(promoDiscount * 100) / 100;
+      comboTotal = comboTotal - promoDiscount;
+      console.log("COMBO_PROMO_APPLIED: code=" + appliedPromoCode + " discount=" + promoDiscount);
+    } else {
+      return jsonRes({ error: promoResult.data?.error || "Invalid promo code" }, 400, cors);
+    }
+  }
+
+  // Calculate totals based on split type
   var splitA: number;
   var splitB: number;
   if (offer.split_type === "PERCENT") {
@@ -76,6 +105,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
     unit_price: splitA / qty,
     source: "WEB",
     payment_method: "PAYSAFE_COMBO",
+    ...(appliedPromoCode ? { promo_code: appliedPromoCode, discount_amount: promoDiscount } : {}),
   }).select("id").single();
   if (bookAErr || !bookingA) {
     return jsonRes({ error: "Failed to create booking A: " + (bookAErr?.message || "unknown") }, 500, cors);

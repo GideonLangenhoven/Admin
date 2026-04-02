@@ -11,10 +11,13 @@ export default function RefundBadge() {
         if (!businessId) return;
         fetchCount();
 
-        const channel = supabase
-            .channel("refund-badge")
+        const channelName = "refund-badge-" + businessId;
+        // Remove any stale channel from a previous mount (React StrictMode / re-render)
+        supabase.removeChannel(supabase.channel(channelName));
+
+        const channel = supabase.channel(channelName)
             .on(
-                "postgres_changes",
+                "postgres_changes" as any,
                 { event: "*", schema: "public", table: "bookings" },
                 () => fetchCount()
             )

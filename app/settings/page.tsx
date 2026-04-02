@@ -1,11 +1,36 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { generateSecureToken, sendAdminSetupLink, sha256 } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
-import RichTextEditor from "../../components/RichTextEditor";
-import ExternalBookingSettings from "../../components/ExternalBookingSettings";
+import dynamic from "next/dynamic";
+import { ChevronDown } from "lucide-react";
+
+function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
+    id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
+    openSections: Record<string, boolean>; toggle: (id: string) => void;
+}) {
+    const isOpen = openSections[id] ?? defaultOpen;
+    return (
+        <div className="border border-[var(--ck-border-subtle)] rounded-xl overflow-hidden">
+            <button
+                type="button"
+                onClick={() => toggle(id)}
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[var(--ck-bg-subtle)] transition-colors"
+            >
+                <div>
+                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">{title}</h2>
+                    {subtitle && <p className="text-xs text-[var(--ck-text-muted)] mt-0.5">{subtitle}</p>}
+                </div>
+                <ChevronDown size={20} className={"text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
+            </button>
+            {isOpen && <div className="px-5 pb-5 pt-2 border-t border-[var(--ck-border-subtle)]">{children}</div>}
+        </div>
+    );
+}
+const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
+const ExternalBookingSettings = dynamic(() => import("../../components/ExternalBookingSettings"), { ssr: false });
 import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
 
 // SUPER_ADMIN has every right that MAIN_ADMIN has, plus cross-tenant access.
@@ -89,6 +114,10 @@ export default function SettingsPage() {
     var [admins, setAdmins] = useState<any[]>([]);
     var [loading, setLoading] = useState(true);
     var [role, setRole] = useState<string | null>(null);
+
+    // Collapsible section state
+    var [openSections, setOpenSections] = useState<Record<string, boolean>>({ admins: true });
+    function toggleSection(id: string) { setOpenSections((prev) => ({ ...prev, [id]: !(prev[id] ?? false) })); }
 
     // New Admin Form
     var [newName, setNewName] = useState("");
@@ -864,14 +893,14 @@ export default function SettingsPage() {
         <div className="max-w-4xl">
             <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
 
-                {/* Admin List */}
+            <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Admin Users</h2>
                         <span className="text-xs font-medium px-2 py-1 rounded-full bg-[var(--ck-bg-subtle)] text-[var(--ck-text-muted)]">
-                            {admins.length} / {usageSnapshot?.seat_limit || 10}
+                            {admins.length} / {usageSnapshot?.seat_limit || 10} seats
                         </span>
                     </div>
 
@@ -949,12 +978,10 @@ export default function SettingsPage() {
                         )}
                     </form>
                 </div>
+                </div>
+            </CollapsibleSection>
 
-            </div>
-
-            {/* ── Tours / Activities ── */}
-            <div className="mt-10">
-                <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-4">Tours &amp; Activities</h2>
+            <CollapsibleSection id="tours" title="Tours & Activities" openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* Tour List */}
@@ -1161,12 +1188,9 @@ export default function SettingsPage() {
                     </div>
 
                 </div>
-            </div>
+            </CollapsibleSection>
 
-            <div className="mt-10">
-                <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-4">Shared Resources &amp; Capacity Pools</h2>
-                <p className="text-sm text-[var(--ck-text-muted)] mb-5">Use shared resources for assets like vans, guides, kayaks, bikes, or permits that should reduce availability across multiple tours when their time windows overlap.</p>
-
+            <CollapsibleSection id="resources" title="Shared Resources & Capacity Pools" subtitle="Assets like vans, guides, kayaks that reduce availability across tours" openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                         <div className="flex items-center justify-between mb-3">
@@ -1306,21 +1330,15 @@ export default function SettingsPage() {
                         {resourceMessage.text}
                     </div>
                 )}
-            </div>
+            </CollapsibleSection>
 
             {isPrivileged(role) && (
-                <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
+                <CollapsibleSection id="external" title="External Booking Integration" subtitle="B2B partner API keys and mappings" openSections={openSections} toggle={toggleSection}>
+                    <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
+                </CollapsibleSection>
             )}
 
-            {/* ── Site Configuration ── */}
-            <div className="mt-10 border-t border-[var(--ck-border-subtle)] pt-10 pb-20">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Booking Site Configuration</h2>
-                        <p className="text-xs text-[var(--ck-text-muted)] mt-1">These settings directly affect the public booking page.</p>
-                    </div>
-                </div>
-
+            <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="These settings directly affect the public booking page" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={handleSaveSiteSettings} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-8">
 
                     {/* Legal & Text Policies */}
@@ -1725,17 +1743,9 @@ export default function SettingsPage() {
                     </div>
 
                 </form>
-            </div >
+            </CollapsibleSection>
 
-            {/* ── Email Header Images ── */}
-            <div className="mt-10 border-t border-[var(--ck-border-subtle)] pt-10">
-                <div className="mb-6">
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Customisation</h2>
-                    <p className="text-sm text-[var(--ck-text-muted)] mt-1">
-                        Choose a colour theme for your emails and customise the banner image for each email type.
-                        Upload an image directly or paste an external URL. Leave blank to use the default. Recommended size: 80×65 px.
-                    </p>
-                </div>
+            <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={handleSaveEmailImages} className="space-y-6">
                     {/* Email Color Picker */}
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
@@ -1832,15 +1842,9 @@ export default function SettingsPage() {
                         </button>
                     </div>
                 </form>
-            </div>
+            </CollapsibleSection>
 
-            {/* ── Integration Credentials ── */}
-            <div className="mt-10">
-                <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Integration Credentials</h2>
-                <p className="text-sm text-[var(--ck-text-muted)] mb-6">
-                    Credentials are AES-256 encrypted at rest and never displayed after saving. Update each integration independently — saving one section will not affect the other.
-                </p>
-
+            <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
@@ -1940,8 +1944,9 @@ export default function SettingsPage() {
                         {credMessage.text}
                     </div>
                 )}
-            </div>
+            </CollapsibleSection>
 
+            </div>
         </div >
     );
 }

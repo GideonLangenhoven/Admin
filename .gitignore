@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — NEVER commit secrets
 .env*
+.env.local
+.env.production
+.env.staging
 
 # vercel
 .vercel
@@ -39,3 +42,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# security — prevent accidental credential leaks
+*.pem
+*.key
+*.cert
+credentials.json
+service-account.json
+secrets/
+
+# backups & temp files
+.backups/
+node_modules_old/
+.git_broken/
+*.log
+
+# editor & OS
+.vscode/settings.json
+.idea/
+Thumbs.db

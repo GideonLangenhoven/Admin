@@ -13,10 +13,13 @@ export default function NotificationBadge() {
         if (!businessId) return;
         fetchCount();
 
+        // Remove stale channel from previous mount (React StrictMode)
+        supabase.removeChannel(supabase.channel("inbox-badge"));
+
         const channel = supabase
             .channel("inbox-badge")
             .on(
-                "postgres_changes",
+                "postgres_changes" as any,
                 { event: "*", schema: "public", table: "conversations" },
                 () => fetchCount()
             )

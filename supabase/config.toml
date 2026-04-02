@@ -1,3 +1,6 @@
+[functions.yoco-webhook]
+verify_jwt = false
+
 [functions.wa-webhook]
 verify_jwt = false
 
@@ -9,3 +12,21 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = true
+
+[functions.process-refund]
+verify_jwt = false
+
+[functions.marketing-dispatch]
+verify_jwt = false
+
+[functions.marketing-automation-dispatch]
+verify_jwt = false
+
+[functions.marketing-track]
+verify_jwt = false
+
+[functions.marketing-unsubscribe]
+verify_jwt = false
+
+[functions.paysafe-webhook]
+verify_jwt = false

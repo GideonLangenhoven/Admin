@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { Image as ImageIcon, Plus, Trash2, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { Image as ImageIcon, Plus, Trash2, X, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import type {
   Block,
   TextBlock,
@@ -75,18 +75,175 @@ export function BlockEditor({
 
 /* ── Individual editors ── */
 
+var EMAIL_FONTS = [
+  { label: "Default", value: "" },
+  { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
+  { label: "Courier New", value: "'Courier New', Courier, monospace" },
+  { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
+  { label: "Trebuchet MS", value: "'Trebuchet MS', sans-serif" },
+  { label: "Tahoma", value: "Tahoma, Geneva, sans-serif" },
+  { label: "Palatino", value: "'Palatino Linotype', 'Book Antiqua', Palatino, serif" },
+  { label: "Lucida Sans", value: "'Lucida Sans Unicode', 'Lucida Grande', sans-serif" },
+];
+
+var FONT_WEIGHTS = [
+  { label: "Light", value: "300" },
+  { label: "Normal", value: "400" },
+  { label: "Medium", value: "500" },
+  { label: "Semi-Bold", value: "600" },
+  { label: "Bold", value: "700" },
+  { label: "Extra Bold", value: "800" },
+];
+
+var FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
+
 function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Partial<TextBlock>) => void }) {
+  var editorRef = useRef<HTMLDivElement>(null);
+  // Track whether the user is actively editing so we don't clobber the DOM
+  var editingRef = useRef(false);
+
+  function execCmd(cmd: string) {
+    // Re-focus the editor before executing (toolbar clicks steal focus)
+    editorRef.current?.focus();
+    document.execCommand(cmd, false);
+    // Sync after a tick so the DOM settles
+    setTimeout(() => {
+      if (editorRef.current) onUpdate({ content: editorRef.current.innerHTML });
+    }, 0);
+  }
+
+  function handleBlur() {
+    editingRef.current = false;
+    if (editorRef.current) {
+      onUpdate({ content: editorRef.current.innerHTML });
+    }
+  }
+
+  function handleFocus() {
+    editingRef.current = true;
+  }
+
+  // Only set innerHTML from props when NOT actively editing (initial load / block switch)
+  var lastSetRef = useRef(block.content);
+  if (editorRef.current && !editingRef.current && block.content !== lastSetRef.current) {
+    editorRef.current.innerHTML = block.content;
+    lastSetRef.current = block.content;
+  }
+
+  var btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-bg-subtle)] transition-colors";
+  var btnActive = "bg-[var(--ck-bg-subtle)]";
+  var selectCls = "rounded border px-1.5 py-1 text-[11px] outline-none";
+
   return (
     <div>
       <Label>Text</Label>
-      <textarea
-        value={block.content}
-        onChange={(e) => onUpdate({ content: e.target.value })}
-        rows={4}
-        className={`mt-1 w-full ${inputCls} font-mono`}
-        style={inputStyle}
-        placeholder="Write HTML content... Use <p>, <b>, <a> tags. {first_name} for personalization."
+
+      {/* ── Formatting Toolbar ── */}
+      <div className="mt-1 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 px-2 py-1.5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle)" }}
+        onMouseDown={(e) => e.preventDefault()} /* prevent toolbar clicks from stealing focus/selection */
+      >
+        {/* Font family */}
+        <select
+          value={block.fontFamily || ""}
+          onChange={(e) => { onUpdate({ fontFamily: e.target.value || undefined }); editorRef.current?.focus(); }}
+          className={selectCls}
+          style={{ ...inputStyle, width: 110 }}
+          title="Font"
+          onMouseDown={(e) => e.stopPropagation()} /* allow select to open */
+        >
+          {EMAIL_FONTS.map((f) => (
+            <option key={f.value} value={f.value} style={{ fontFamily: f.value || "inherit" }}>{f.label}</option>
+          ))}
+        </select>
+
+        {/* Font size */}
+        <select
+          value={block.fontSize || 15}
+          onChange={(e) => { onUpdate({ fontSize: Number(e.target.value) }); editorRef.current?.focus(); }}
+          className={selectCls}
+          style={{ ...inputStyle, width: 52 }}
+          title="Font size"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {FONT_SIZES.map((s) => (
+            <option key={s} value={s}>{s}px</option>
+          ))}
+        </select>
+
+        {/* Font weight */}
+        <select
+          value={block.fontWeight || "400"}
+          onChange={(e) => { onUpdate({ fontWeight: e.target.value }); editorRef.current?.focus(); }}
+          className={selectCls}
+          style={{ ...inputStyle, width: 85 }}
+          title="Font weight"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {FONT_WEIGHTS.map((w) => (
+            <option key={w.value} value={w.value}>{w.label}</option>
+          ))}
+        </select>
+
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+
+        {/* Inline formatting */}
+        <button type="button" onClick={() => execCmd("bold")} className={btnCls} title="Bold"><Bold size={14} /></button>
+        <button type="button" onClick={() => execCmd("italic")} className={btnCls} title="Italic"><Italic size={14} /></button>
+        <button type="button" onClick={() => execCmd("underline")} className={btnCls} title="Underline"><Underline size={14} /></button>
+
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+
+        {/* Alignment */}
+        <button type="button" onClick={() => { onUpdate({ textAlign: "left" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "left" || !block.textAlign ? btnActive : ""}`} title="Align left"><AlignLeft size={14} /></button>
+        <button type="button" onClick={() => { onUpdate({ textAlign: "center" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "center" ? btnActive : ""}`} title="Align center"><AlignCenter size={14} /></button>
+        <button type="button" onClick={() => { onUpdate({ textAlign: "right" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "right" ? btnActive : ""}`} title="Align right"><AlignRight size={14} /></button>
+
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+
+        {/* Text color */}
+        <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+          <input
+            type="color"
+            value={block.color || "#374151"}
+            onChange={(e) => onUpdate({ color: e.target.value })}
+            className="h-6 w-6 cursor-pointer rounded border-0 p-0"
+            title="Text color"
+          />
+          <span className="text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Color</span>
+        </div>
+      </div>
+
+      {/* ── Content Editable Area ── */}
+      <div
+        ref={(el) => {
+          (editorRef as any).current = el;
+          // Set initial content once
+          if (el && !editingRef.current && el.innerHTML !== block.content) {
+            el.innerHTML = block.content;
+            lastSetRef.current = block.content;
+          }
+        }}
+        contentEditable
+        suppressContentEditableWarning
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className="w-full min-h-[100px] rounded-b-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--ck-accent)]"
+        style={{
+          ...inputStyle,
+          fontFamily: block.fontFamily || "inherit",
+          fontSize: (block.fontSize || 15) + "px",
+          fontWeight: block.fontWeight || "400",
+          color: block.color || "#374151",
+          textAlign: (block.textAlign as any) || "left",
+          lineHeight: 1.6,
+        }}
       />
+
+      <p className="mt-1 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
+        Type directly — use the toolbar for formatting. Variables: {"{first_name}"}, {"{promo_code}"}, {"{voucher_code}"}
+      </p>
     </div>
   );
 }
@@ -196,22 +353,24 @@ function SocialEditor({ block, onUpdate }: { block: SocialBlock; onUpdate: (u: P
   return (
     <div>
       <Label>Social Links</Label>
-      <div className="mt-1 flex flex-wrap gap-1">
+      <div className="mt-1 flex flex-wrap gap-1.5">
         {Object.entries(SOCIAL_PLATFORMS).map(([key, p]) => (
           <button
             key={key}
             onClick={() => togglePlatform(key)}
-            className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${key in block.platforms ? "ring-1" : "opacity-50"}`}
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)", ...(key in block.platforms ? { ringColor: "var(--ck-accent)" } : {}) }}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${key in block.platforms ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
+            style={{ borderColor: key in block.platforms ? p.brandColor : "var(--ck-border)", color: "var(--ck-text)", outlineColor: key in block.platforms ? p.brandColor : undefined }}
           >
+            <img src={p.icon} alt="" width="18" height="18" className="rounded" />
             {p.label}
           </button>
         ))}
       </div>
-      <div className="mt-2 space-y-1">
+      <div className="mt-2 space-y-1.5">
         {Object.entries(block.platforms).map(([key, url]) => (
           <div key={key} className="flex items-center gap-2">
-            <span className="w-20 text-[11px] font-medium" style={{ color: "var(--ck-text-muted)" }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
+            <img src={SOCIAL_PLATFORMS[key]?.icon} alt="" width="22" height="22" className="rounded" />
+            <span className="w-16 text-[11px] font-semibold" style={{ color: SOCIAL_PLATFORMS[key]?.brandColor || "var(--ck-text-muted)" }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
             <input value={url} onChange={(e) => updateUrl(key, e.target.value)} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
           </div>
         ))}
@@ -399,21 +558,23 @@ function FooterEditor({ block, onUpdate }: { block: FooterBlock; onUpdate: (u: P
         </div>
         <div>
           <span className="text-[10px] font-medium" style={{ color: "var(--ck-text-muted)" }}>Social links</span>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             {Object.entries(SOCIAL_PLATFORMS).map(([key, p]) => (
               <button
                 key={key}
                 onClick={() => toggleSocial(key)}
-                className={`rounded border px-1.5 py-0.5 text-[10px] ${key in (block.socials || {}) ? "font-semibold" : "opacity-50"}`}
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-all ${key in (block.socials || {}) ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
+                style={{ borderColor: key in (block.socials || {}) ? p.brandColor : "var(--ck-border)", color: "var(--ck-text)", outlineColor: key in (block.socials || {}) ? p.brandColor : undefined }}
               >
+                <img src={p.icon} alt="" width="16" height="16" className="rounded" />
                 {p.label}
               </button>
             ))}
           </div>
           {Object.entries(block.socials || {}).map(([key, url]) => (
             <div key={key} className="mt-1 flex items-center gap-2">
-              <span className="w-20 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
+              <img src={SOCIAL_PLATFORMS[key]?.icon} alt="" width="20" height="20" className="rounded" />
+              <span className="w-16 text-[10px] font-semibold" style={{ color: SOCIAL_PLATFORMS[key]?.brandColor }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
               <input value={url} onChange={(e) => updateSocial(key, e.target.value)} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
             </div>
           ))}
