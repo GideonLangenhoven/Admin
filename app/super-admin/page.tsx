@@ -42,6 +42,7 @@ type BusinessRow = {
   id: string;
   business_name: string;
   subdomain: string | null;
+  subscription_status: string;
   max_admin_seats: number;
   admin_count?: number;
 };
@@ -72,7 +73,7 @@ export default function SuperAdminPage() {
     // Anon role has SELECT on businesses (RLS allows it)
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, business_name, subdomain, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+      .select("id, business_name, subdomain, subscription_status, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
       .order("business_name");
     if (error) {
       console.error("LOAD_BIZ_ERR:", error.message);
@@ -437,9 +438,17 @@ export default function SuperAdminPage() {
             {businesses.map((b) => (
               <div key={b.id} className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <div className="flex items-start justify-between gap-4">
-                  {/* Left: Name + ID */}
+                  {/* Left: Name + ID + Status */}
                   <div>
-                    <div className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</span>
+                      <span className={"inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider " +
+                        (b.subscription_status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
+                         b.subscription_status === "PAUSED" ? "bg-amber-100 text-amber-700" :
+                         "bg-red-100 text-red-700")}>
+                        {b.subscription_status || "ACTIVE"}
+                      </span>
+                    </div>
                     <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5">{b.id}</div>
                   </div>
                   {/* Right: Seat controls */}
@@ -455,6 +464,35 @@ export default function SuperAdminPage() {
                       {b.admin_count || 0}/{b.max_admin_seats}
                     </span>
                   </div>
+                </div>
+
+                {/* Status controls */}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs font-medium text-[var(--ck-text-muted)] w-20 shrink-0">Status:</span>
+                  <div className="flex gap-1.5">
+                    {["ACTIVE", "PAUSED", "SUSPENDED"].map((s) => (
+                      <button key={s} onClick={async () => {
+                        await supabase.from("businesses").update({ subscription_status: s }).eq("id", b.id);
+                        setBusinesses((prev) => prev.map((bz) => bz.id === b.id ? { ...bz, subscription_status: s } : bz));
+                        notify({ title: "Status updated", message: `${b.business_name} → ${s}`, tone: "success" });
+                      }}
+                        className={"rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-all " +
+                          (b.subscription_status === s ? "ring-2 shadow-sm" :
+                           s === "ACTIVE" ? "bg-emerald-50 text-emerald-600 opacity-50" :
+                           s === "PAUSED" ? "bg-amber-50 text-amber-600 opacity-50" :
+                           "bg-red-50 text-red-600 opacity-50")}
+                        style={b.subscription_status === s ? {
+                          background: s === "ACTIVE" ? "#d1fae5" : s === "PAUSED" ? "#fef3c7" : "#fee2e2",
+                          color: s === "ACTIVE" ? "#065f46" : s === "PAUSED" ? "#92400e" : "#991b1b",
+                          outlineColor: s === "ACTIVE" ? "#10b981" : s === "PAUSED" ? "#f59e0b" : "#ef4444",
+                        } : {}}>
+                        {s === "ACTIVE" ? "● Active" : s === "PAUSED" ? "⏸ Paused" : "⛔ Suspended"}
+                      </button>
+                    ))}
+                  </div>
+                  {b.subscription_status === "PAUSED" && (
+                    <span className="text-[10px] text-amber-600 italic">Off-season — booking page shows closed message</span>
+                  )}
                 </div>
 
                 {/* Subdomain row */}
