@@ -698,8 +698,26 @@ export default function SuperAdminPage() {
                           )}
                         </fieldset>
 
-                        {/* ── Save ── */}
-                        <div className="flex justify-end pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                        {/* ── Save + Export ── */}
+                        <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                          <button onClick={() => {
+                            const exportData = {
+                              ...bizDetail,
+                              tours: bizTours,
+                              faqs: bizFaqs,
+                              exported_at: new Date().toISOString(),
+                            };
+                            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `${(bizDetail.subdomain || bizDetail.business_name || "business").replace(/\s+/g, "-").toLowerCase()}-data.json`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            notify({ title: "Exported", message: "Business data downloaded as JSON.", tone: "success" });
+                          }} className="rounded-lg border px-4 py-2 text-xs font-semibold" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>
+                            📥 Export Business Data
+                          </button>
                           <button onClick={saveBizDetail} disabled={bizDetailSaving}
                             className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                             {bizDetailSaving ? "Saving..." : "Save All Changes"}
