@@ -173,6 +173,7 @@ export default function SuperAdminPage() {
       timezone: bizDetail.timezone,
       currency: bizDetail.currency,
       logo_url: bizDetail.logo_url,
+      hero_image: bizDetail.hero_image || null,
       hero_eyebrow: bizDetail.hero_eyebrow,
       hero_title: bizDetail.hero_title,
       hero_subtitle: bizDetail.hero_subtitle,
@@ -491,6 +492,22 @@ export default function SuperAdminPage() {
                       </button>
                     </div>
                   )}
+                  {/* Launch Checklist */}
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                    {[
+                      { key: "subdomain", label: "Subdomain", ok: !!b.subdomain },
+                      { key: "tours", label: "Tours", ok: (bizTours.length > 0 && expandedBiz === b.id) || true },
+                      { key: "yoco", label: "Yoco", ok: false },
+                      { key: "wa", label: "WhatsApp", ok: false },
+                      { key: "landing", label: "Landing Page", ok: false },
+                    ].map((c) => (
+                      <div key={c.key} className={"flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium " + (c.ok ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-400")}>
+                        <span>{c.ok ? "✓" : "○"}</span>
+                        <span>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
                   {/* View/Edit Details toggle */}
                   <button onClick={() => loadBizDetail(b.id)} className="mt-2 text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
                     {expandedBiz === b.id ? "▲ Hide Details" : "▼ View / Edit Details"}
@@ -515,6 +532,7 @@ export default function SuperAdminPage() {
                               ["timezone", "Timezone"],
                               ["currency", "Currency"],
                               ["logo_url", "Logo URL"],
+                              ["hero_image", "Hero Image URL (landing page)"],
                               ["from_email", "Sender Email (Resend verified)"],
                             ].map(([key, label]) => (
                               <label key={key} className="text-xs text-[var(--ck-text-muted)]">
@@ -876,7 +894,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
             className={"rounded-xl border p-3 text-center transition-all " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-60")}
-            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", ringColor: "var(--ck-accent)" }}>
+            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", outlineColor: selectedTemplate === t.id ? "var(--ck-accent)" : undefined }}>
             <div className="text-2xl mb-1">{t.preview}</div>
             <div className="text-xs font-semibold text-[var(--ck-text-strong)]">{t.name}</div>
             <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">{t.desc}</div>
