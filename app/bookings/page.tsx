@@ -772,7 +772,7 @@ export default function Bookings() {
                   "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
                   " has been cancelled due to weather conditions.\n\n" +
                   "📋 Ref: " + ref + "\n\n" +
-                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
+                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund.",
               }),
             });
           } catch (e) { console.error("WA notify err:", e); }

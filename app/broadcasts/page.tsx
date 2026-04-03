@@ -25,7 +25,7 @@ type SlotData = { id: string; start_time: string; capacity_total: number; booked
 
 export default function BroadcastsPage() {
   var { businessId } = useBusinessContext();
-  var [manageBookingUrl, setManageBookingUrl] = useState("https://book.capekayak.co.za/my-bookings");
+  var [manageBookingUrl, setManageBookingUrl] = useState("");
   var [vMonth, setVMonth] = useState(new Date().getMonth());
   var [vYear, setVYear] = useState(new Date().getFullYear());
   var [allSlots, setAllSlots] = useState<SlotData[]>([]);
@@ -48,7 +48,7 @@ export default function BroadcastsPage() {
   async function loadBusinessLinks() {
     var { data } = await supabase.from("businesses").select("booking_site_url, manage_bookings_url").eq("id", businessId).maybeSingle();
     var bookingSiteUrl = String(data?.booking_site_url || "").replace(/\/+$/, "");
-    setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : "https://book.capekayak.co.za/my-bookings"));
+    setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : ""));
   }
 
   async function loadSlots() {

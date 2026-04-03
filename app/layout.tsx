@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Admin Dashboard",
-  description: "ActivityHub Admin Dashboard",
+  description: "BookingTours Admin Dashboard",
 };
 
 const nav = [

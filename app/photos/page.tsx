@@ -19,7 +19,7 @@ type SlotGroup = { date: string; label: string; slots: any[] };
 
 export default function PhotosPage() {
   var { businessId } = useBusinessContext();
-  var [bookingSiteUrl, setBookingSiteUrl] = useState("https://book.capekayak.co.za");
+  var [bookingSiteUrl, setBookingSiteUrl] = useState("");
   var [slots, setSlots] = useState<SlotGroup[]>([]);
   var [selectedSlot, setSelectedSlot] = useState<any>(null);
   var [urls, setUrls] = useState<string[]>([""]);
@@ -33,7 +33,7 @@ export default function PhotosPage() {
 
   async function loadBusinessLinks() {
     var { data } = await supabase.from("businesses").select("booking_site_url").eq("id", businessId).maybeSingle();
-    setBookingSiteUrl(data?.booking_site_url || "https://book.capekayak.co.za");
+    setBookingSiteUrl(data?.booking_site_url || "");
   }
 
   async function loadSlots() {
