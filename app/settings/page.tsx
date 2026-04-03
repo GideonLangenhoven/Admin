@@ -1441,7 +1441,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line Two</label>
                                 <input type="text" value={siteSettings.footer_line_two} onChange={e => setSiteSettings({ ...siteSettings, footer_line_two: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Established: 1994 · ActivityHub Platform" />
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Established: 1994 · BookingTours Platform" />
                             </div>
                         </div>
                     </div>
@@ -1596,7 +1596,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="px-6 py-6 border-t border-[var(--ck-border-subtle)] text-center text-sm">
                                 <div style={{ color: siteSettings.color_secondary }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
-                                <div className="mt-2" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.footer_line_two || "Established: 1994 · ActivityHub Platform"}</div>
+                                <div className="mt-2" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
                                 <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={{ background: siteSettings.color_nav, color: siteSettings.color_secondary, boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)" }}>{siteSettings.chat_widget_label || "Book here"}</div>
                             </div>
                         </div>

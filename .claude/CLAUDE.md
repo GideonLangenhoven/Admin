@@ -1,7 +1,15 @@
-# CapeKayak Admin Dashboard
+# BookingTours Admin Dashboard
 
 ## Project Overview
-Multi-tenant Next.js 16 admin dashboard for adventure tourism booking operations. Built with React 19, Supabase (PostgreSQL + Edge Functions), and TailwindCSS.
+Multi-tenant Next.js 16 admin dashboard for the BookingTours platform — a complete booking system for adventure/tourism businesses. Built with React 19, Supabase (PostgreSQL + Edge Functions), and TailwindCSS.
+
+**Platform:** BookingTours (bookingtours.co.za)
+**Pricing:** R1,500/month + R750/additional admin user. Clients can pause for off-season (no charge).
+
+## Related Apps
+- **Booking Site:** `~/Desktop/booking` — customer-facing booking pages (multi-tenant via subdomain)
+- **Onboarding App:** `~/Desktop/ActvityHub/Onboarding` — client self-service setup form
+- **Landing Pages:** `landing-pages/` folder — 4 templates (adventure, luxury, safari, modern) + generator
 
 **Stack:** Next.js 16 · React 19 · Supabase · TailwindCSS 3 · TypeScript · Deno (edge functions)
 
