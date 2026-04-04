@@ -42,13 +42,20 @@ type BusinessRow = {
   id: string;
   business_name: string;
   subdomain: string | null;
-  subscription_status: string;
   max_admin_seats: number;
   admin_count?: number;
 };
 
 export default function SuperAdminPage() {
   const { role } = useBusinessContext();
+
+  if (role !== "SUPER_ADMIN") {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-[var(--ck-text-muted)] text-sm">You do not have permission to view this page.</p>
+      </div>
+    );
+  }
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPassword, setRequesterPassword] = useState("");
   const [form, setForm] = useState<OnboardForm>(DEFAULT_FORM);
@@ -73,7 +80,7 @@ export default function SuperAdminPage() {
     // Anon role has SELECT on businesses (RLS allows it)
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, business_name, subdomain, subscription_status, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+      .select("id, business_name, subdomain, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
       .order("business_name");
     if (error) {
       console.error("LOAD_BIZ_ERR:", error.message);
@@ -174,7 +181,6 @@ export default function SuperAdminPage() {
       timezone: bizDetail.timezone,
       currency: bizDetail.currency,
       logo_url: bizDetail.logo_url,
-      hero_image: bizDetail.hero_image || null,
       hero_eyebrow: bizDetail.hero_eyebrow,
       hero_title: bizDetail.hero_title,
       hero_subtitle: bizDetail.hero_subtitle,
@@ -438,17 +444,9 @@ export default function SuperAdminPage() {
             {businesses.map((b) => (
               <div key={b.id} className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <div className="flex items-start justify-between gap-4">
-                  {/* Left: Name + ID + Status */}
+                  {/* Left: Name + ID */}
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</span>
-                      <span className={"inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider " +
-                        (b.subscription_status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
-                         b.subscription_status === "PAUSED" ? "bg-amber-100 text-amber-700" :
-                         "bg-red-100 text-red-700")}>
-                        {b.subscription_status || "ACTIVE"}
-                      </span>
-                    </div>
+                    <div className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</div>
                     <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5">{b.id}</div>
                   </div>
                   {/* Right: Seat controls */}
@@ -464,35 +462,6 @@ export default function SuperAdminPage() {
                       {b.admin_count || 0}/{b.max_admin_seats}
                     </span>
                   </div>
-                </div>
-
-                {/* Status controls */}
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs font-medium text-[var(--ck-text-muted)] w-20 shrink-0">Status:</span>
-                  <div className="flex gap-1.5">
-                    {["ACTIVE", "PAUSED", "SUSPENDED"].map((s) => (
-                      <button key={s} onClick={async () => {
-                        await supabase.from("businesses").update({ subscription_status: s }).eq("id", b.id);
-                        setBusinesses((prev) => prev.map((bz) => bz.id === b.id ? { ...bz, subscription_status: s } : bz));
-                        notify({ title: "Status updated", message: `${b.business_name} → ${s}`, tone: "success" });
-                      }}
-                        className={"rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-all " +
-                          (b.subscription_status === s ? "ring-2 shadow-sm" :
-                           s === "ACTIVE" ? "bg-emerald-50 text-emerald-600 opacity-50" :
-                           s === "PAUSED" ? "bg-amber-50 text-amber-600 opacity-50" :
-                           "bg-red-50 text-red-600 opacity-50")}
-                        style={b.subscription_status === s ? {
-                          background: s === "ACTIVE" ? "#d1fae5" : s === "PAUSED" ? "#fef3c7" : "#fee2e2",
-                          color: s === "ACTIVE" ? "#065f46" : s === "PAUSED" ? "#92400e" : "#991b1b",
-                          outlineColor: s === "ACTIVE" ? "#10b981" : s === "PAUSED" ? "#f59e0b" : "#ef4444",
-                        } : {}}>
-                        {s === "ACTIVE" ? "● Active" : s === "PAUSED" ? "⏸ Paused" : "⛔ Suspended"}
-                      </button>
-                    ))}
-                  </div>
-                  {b.subscription_status === "PAUSED" && (
-                    <span className="text-[10px] text-amber-600 italic">Off-season — booking page shows closed message</span>
-                  )}
                 </div>
 
                 {/* Subdomain row */}
@@ -530,22 +499,6 @@ export default function SuperAdminPage() {
                       </button>
                     </div>
                   )}
-                  {/* Launch Checklist */}
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-                    {[
-                      { key: "subdomain", label: "Subdomain", ok: !!b.subdomain },
-                      { key: "tours", label: "Tours", ok: (bizTours.length > 0 && expandedBiz === b.id) || true },
-                      { key: "yoco", label: "Yoco", ok: false },
-                      { key: "wa", label: "WhatsApp", ok: false },
-                      { key: "landing", label: "Landing Page", ok: false },
-                    ].map((c) => (
-                      <div key={c.key} className={"flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium " + (c.ok ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-400")}>
-                        <span>{c.ok ? "✓" : "○"}</span>
-                        <span>{c.label}</span>
-                      </div>
-                    ))}
-                  </div>
-
                   {/* View/Edit Details toggle */}
                   <button onClick={() => loadBizDetail(b.id)} className="mt-2 text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
                     {expandedBiz === b.id ? "▲ Hide Details" : "▼ View / Edit Details"}
@@ -570,7 +523,6 @@ export default function SuperAdminPage() {
                               ["timezone", "Timezone"],
                               ["currency", "Currency"],
                               ["logo_url", "Logo URL"],
-                              ["hero_image", "Hero Image URL (landing page)"],
                               ["from_email", "Sender Email (Resend verified)"],
                             ].map(([key, label]) => (
                               <label key={key} className="text-xs text-[var(--ck-text-muted)]">
@@ -736,26 +688,8 @@ export default function SuperAdminPage() {
                           )}
                         </fieldset>
 
-                        {/* ── Save + Export ── */}
-                        <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                          <button onClick={() => {
-                            const exportData = {
-                              ...bizDetail,
-                              tours: bizTours,
-                              faqs: bizFaqs,
-                              exported_at: new Date().toISOString(),
-                            };
-                            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `${(bizDetail.subdomain || bizDetail.business_name || "business").replace(/\s+/g, "-").toLowerCase()}-data.json`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                            notify({ title: "Exported", message: "Business data downloaded as JSON.", tone: "success" });
-                          }} className="rounded-lg border px-4 py-2 text-xs font-semibold" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>
-                            📥 Export Business Data
-                          </button>
+                        {/* ── Save ── */}
+                        <div className="flex justify-end pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           <button onClick={saveBizDetail} disabled={bizDetailSaving}
                             className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                             {bizDetailSaving ? "Saving..." : "Save All Changes"}
@@ -785,10 +719,20 @@ export default function SuperAdminPage() {
    ══════════════════════════════════════════════════════════════ */
 
 const TEMPLATES = [
-  { id: "adventure", name: "Adventure", desc: "Cinematic full-width hero, bold outdoor feel", preview: "🏔️" },
-  { id: "luxury", name: "Luxury", desc: "Elegant serif fonts, muted tones, minimal", preview: "✨" },
-  { id: "safari", name: "Safari", desc: "Warm earthy tones, lodge/safari feel", preview: "🦁" },
-  { id: "modern", name: "Modern", desc: "Bold sans-serif, split hero, dark accents", preview: "⚡" },
+  { id: "adventure", name: "Adventure", desc: "Cinematic fullscreen hero, scroll-reveal animations, glassmorphism nav", preview: "A" },
+  { id: "modern", name: "Modern", desc: "Bold split-hero layout, stat counters, sharp geometric design", preview: "M" },
+  { id: "luxury", name: "Luxury", desc: "Elegant serif typography, gold accents, refined whitespace", preview: "L" },
+  { id: "safari", name: "Safari", desc: "Warm earthy tones, bottom-aligned hero, lodge aesthetic", preview: "S" },
+  { id: "coastal", name: "Coastal", desc: "Ocean blues, wave dividers, fresh beach vibes", preview: "C" },
+  { id: "minimal", name: "Minimal", desc: "Ultra-clean whitespace, no decoration, typography-focused", preview: "Mi" },
+  { id: "dark", name: "Dark", desc: "Full dark mode, neon glow accents, cinematic moody feel", preview: "D" },
+  { id: "retro", name: "Retro", desc: "Vintage serif fonts, warm film tones, nostalgic charm", preview: "R" },
+  { id: "tropical", name: "Tropical", desc: "Lush greens, vibrant gradients, paradise island energy", preview: "T" },
+  { id: "bold", name: "Bold", desc: "Oversized typography, editorial magazine style, high contrast", preview: "B" },
+  { id: "zen", name: "Zen", desc: "Japanese-inspired minimalism, extreme calm, soft neutrals", preview: "Z" },
+  { id: "vibrant", name: "Vibrant", desc: "Colorful gradients, glassmorphism cards, energetic youth feel", preview: "V" },
+  { id: "nordic", name: "Nordic", desc: "Scandinavian clean lines, muted blues, geometric accents", preview: "N" },
+  { id: "heritage", name: "Heritage", desc: "South African warmth, terracotta tones, cultural patterns", preview: "H" },
 ];
 
 function LandingPageManager({ businesses }: { businesses: any[] }) {
@@ -940,21 +884,19 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Template</label>
           <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}
             className="w-full ui-control rounded-lg px-3 py-2 text-sm">
-            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.preview} {t.name} — {t.desc}</option>)}
+            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.desc}</option>)}
           </select>
         </div>
       </div>
 
       {/* Template previews */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-7 gap-2 mb-4">
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
-            className={"rounded-xl border p-3 text-center transition-all " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-60")}
-            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", outlineColor: selectedTemplate === t.id ? "var(--ck-accent)" : undefined }}>
-            <div className="text-2xl mb-1">{t.preview}</div>
-            <div className="text-xs font-semibold text-[var(--ck-text-strong)]">{t.name}</div>
-            <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">{t.desc}</div>
-          </button>
+            className={"rounded-xl border p-2.5 text-center transition-all cursor-pointer " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-50 hover:opacity-80")}
+            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", ringColor: "var(--ck-accent)" }}>
+            <div className="w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center text-xs font-bold text-white" style={{ background: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>{t.preview}</div>
+            <div className="text-[11px] font-semibold text-[var(--ck-text-strong)] leading-tight">{t.name}</div>
         ))}
       </div>
 

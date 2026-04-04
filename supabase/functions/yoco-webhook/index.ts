@@ -959,6 +959,12 @@ Deno.serve(async (req: any) => {
       return new Response("OK", { status: 200 });
     }
 
+    // Verify payment amount matches expected booking total
+    var webhookAmountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
+    if (webhookAmountZar > 0 && Math.abs(webhookAmountZar - Number(booking.total_amount || 0)) > 1) {
+      console.warn("YOCO_AMOUNT_MISMATCH: booking=" + booking.id + " expected=" + booking.total_amount + " received=" + webhookAmountZar);
+    }
+
     // Atomically update to PAID — if already updated by a concurrent webhook, skip
     var upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: booking.total_amount, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
     if (upd.error) {

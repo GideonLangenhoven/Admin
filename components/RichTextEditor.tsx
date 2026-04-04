@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import DOMPurify from "dompurify";
 
 interface Props {
   value: string;
@@ -38,8 +39,9 @@ export default function RichTextEditor({ value, onChange, rows = 10, placeholder
   // Sync external value changes into the editor
   useEffect(() => {
     if (editorRef.current && !internalUpdate.current) {
-      if (editorRef.current.innerHTML !== value) {
-        editorRef.current.innerHTML = value;
+      var clean = DOMPurify.sanitize(value);
+      if (editorRef.current.innerHTML !== clean) {
+        editorRef.current.innerHTML = clean;
       }
     }
     internalUpdate.current = false;

@@ -10,7 +10,20 @@ import SignOutButton from "./SignOutButton";
 import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
-import * as LucideIcons from "lucide-react";
+import {
+  ArrowLeftRight, Check, Circle,
+  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
+  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign, LineChart, Mail, Settings, Shield,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const iconMap: Record<string, LucideIcon> = {
+  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
+  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign, LineChart, Mail, Settings, Shield,
+  ArrowLeftRight, Check, Circle,
+};
 
 interface NavItem {
   href: string;
@@ -118,7 +131,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-text)" }}
               title={"Switch to: " + (operators.find((o) => o.id !== businessId)?.name || "next")}
             >
-              <LucideIcons.ArrowLeftRight size={16} />
+              <ArrowLeftRight size={16} />
             </button>
           </div>
         )}
@@ -127,7 +140,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           {!collapsed && <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-sidebar-muted)" }}>General</div>}
           <nav className="space-y-1">
             {visibleNav.map((n) => {
-              const Icon = (LucideIcons as any)[n.icon] || LucideIcons.Circle;
+              const Icon = iconMap[n.icon] || Circle;
               const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
               return (
                 <Link key={n.href} href={n.href}
@@ -145,7 +158,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   <span className="flex items-center justify-center" style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
                     {isActive && n.href === "/" ? (
                       <div className="flex items-center justify-center h-[18px] w-[18px] rounded-full" style={{ background: "var(--ck-accent)" }}>
-                        <LucideIcons.Check size={12} color="white" strokeWidth={4} />
+                        <Check size={12} color="white" strokeWidth={4} />
                       </div>
                     ) : (
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
@@ -182,7 +195,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         <nav className="md:hidden shrink-0 overflow-x-auto border-t py-2 backdrop-blur no-scrollbar" style={{ background: "color-mix(in srgb, var(--ck-surface) 90%, transparent)", borderColor: "var(--ck-border-strong)" }}>
           <div className="flex min-w-max px-2">
           {visibleNav.map((n) => {
-            const Icon = (LucideIcons as any)[n.icon] || LucideIcons.Circle;
+            const Icon = iconMap[n.icon] || Circle;
             const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
             return (
               <Link key={n.href} href={n.href} className="relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] font-medium" style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>

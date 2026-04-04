@@ -4,6 +4,15 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format, parse, isValid, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { listAvailableSlots } from "../app/lib/slot-availability";
+import { getAdminTimezone } from "../app/lib/admin-timezone";
+
+/* ── timezone offset helper ── */
+function getTimezoneOffsetMs() {
+    var now = new Date();
+    var tzLocal = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
+    var tzUtc = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
+    return tzLocal.getTime() - tzUtc.getTime();
+}
 
 /* ── types ── */
 interface SlotInfo {
@@ -123,14 +132,12 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
     var fetchMonthSlots = useCallback(async () => {
         if (!tourId || !businessId) { setDaySlots({}); return; }
 
-        // Month range in SAST → convert to UTC
+        // Month range in admin timezone → convert to UTC
         var mStart = startOfMonth(displayMonth);
         var mEnd = endOfMonth(displayMonth);
-        // SAST = UTC+2 so subtract 2h to get UTC
-        var utcStart = new Date(mStart.getFullYear(), mStart.getMonth(), mStart.getDate(), 0, 0, 0);
-        utcStart.setHours(utcStart.getHours() - 2);
-        var utcEnd = new Date(mEnd.getFullYear(), mEnd.getMonth(), mEnd.getDate(), 23, 59, 59);
-        utcEnd.setHours(utcEnd.getHours() - 2);
+        var offsetMs = getTimezoneOffsetMs();
+        var utcStart = new Date(new Date(mStart.getFullYear(), mStart.getMonth(), mStart.getDate(), 0, 0, 0).getTime() - offsetMs);
+        var utcEnd = new Date(new Date(mEnd.getFullYear(), mEnd.getMonth(), mEnd.getDate(), 23, 59, 59).getTime() - offsetMs);
 
         var data = await listAvailableSlots({
             businessId,
@@ -141,9 +148,9 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
 
         var map: DaySlotMap = {};
         for (var slot of (data || [])) {
-            // Convert UTC start_time to SAST date key
+            // Convert UTC start_time to admin timezone date key
             var dt = new Date(slot.start_time);
-            var sastDate = new Date(dt.getTime() + 2 * 60 * 60 * 1000);
+            var sastDate = new Date(dt.getTime() + getTimezoneOffsetMs());
             var key = format(sastDate, "yyyy-MM-dd");
             var time = format(sastDate, "HH:mm");
             var available = Math.max(0, Number(slot.available_capacity || 0));

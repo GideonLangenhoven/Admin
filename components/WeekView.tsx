@@ -76,11 +76,10 @@ export default function WeekView({ slots, currentDate, onSlotClick, selectedCanc
                 {days.map((day) => {
                     const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
                     const isSelected = selectedCancelDates?.includes(dateStr);
-                    const isToday = day.toDateString() === new Date().toDateString();
-
-                    const todayObj = new Date();
-                    todayObj.setHours(0, 0, 0, 0);
-                    const isPast = day < todayObj;
+                    const todayInTz = new Date(new Date().toLocaleString("en-US", { timeZone: getAdminTimezone() }));
+                    todayInTz.setHours(0, 0, 0, 0);
+                    const isToday = day.toDateString() === todayInTz.toDateString();
+                    const isPast = day < todayInTz;
 
                     return (
                         <div key={dateStr} className="flex min-w-0 flex-col">

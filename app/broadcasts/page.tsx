@@ -25,7 +25,7 @@ type SlotData = { id: string; start_time: string; capacity_total: number; booked
 
 export default function BroadcastsPage() {
   var { businessId } = useBusinessContext();
-  var [manageBookingUrl, setManageBookingUrl] = useState("");
+  var [manageBookingUrl, setManageBookingUrl] = useState("https://book.capekayak.co.za/my-bookings");
   var [vMonth, setVMonth] = useState(new Date().getMonth());
   var [vYear, setVYear] = useState(new Date().getFullYear());
   var [allSlots, setAllSlots] = useState<SlotData[]>([]);
@@ -48,16 +48,19 @@ export default function BroadcastsPage() {
   async function loadBusinessLinks() {
     var { data } = await supabase.from("businesses").select("booking_site_url, manage_bookings_url").eq("id", businessId).maybeSingle();
     var bookingSiteUrl = String(data?.booking_site_url || "").replace(/\/+$/, "");
-    setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : ""));
+    setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : "https://book.capekayak.co.za/my-bookings"));
   }
 
   async function loadSlots() {
-    // Start of today in SAST (UTC+2)
+    // Start of today in admin timezone, converted back to UTC for the query
     var now = new Date();
     var saDate = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
     saDate.setHours(0, 0, 0, 0);
-    // Convert back to UTC for the query
-    var todayStart = new Date(saDate.getTime() - 2 * 60 * 60 * 1000);
+    // Compute dynamic offset between local-interpreted timezone and UTC
+    var offsetMs = saDate.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+    var todayMidnightLocal = new Date(saDate.getTime());
+    todayMidnightLocal.setHours(0, 0, 0, 0);
+    var todayStart = new Date(todayMidnightLocal.getTime() - offsetMs);
     var future = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     var { data } = await supabase.from("slots")
       .select("id, start_time, capacity_total, booked, held, tours(name), status")
@@ -159,7 +162,7 @@ export default function BroadcastsPage() {
       var r = await fetch(SU + "/functions/v1/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-        body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, send_email: true, send_whatsapp: true }),
+        body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, send_email: true, send_whatsapp: true, business_id: businessId }),
       });
       var d = await r.json();
       setResult(d);

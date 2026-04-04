@@ -37,12 +37,12 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
     const isSelected = selectedCancelDates?.includes(dateStr);
 
-    const todayObj = new Date();
-    todayObj.setHours(0, 0, 0, 0);
+    const todayInTz = new Date(new Date().toLocaleString("en-US", { timeZone: getAdminTimezone() }));
+    todayInTz.setHours(0, 0, 0, 0);
     const dayObj = new Date(currentDate);
     dayObj.setHours(0, 0, 0, 0);
-    const isPast = dayObj < todayObj;
-    const isToday = dayObj.getTime() === todayObj.getTime();
+    const isPast = dayObj < todayInTz;
+    const isToday = dayObj.getTime() === todayInTz.getTime();
     const nowLabel = new Date().toLocaleTimeString("en-ZA", {
         hour: "2-digit",
         minute: "2-digit",

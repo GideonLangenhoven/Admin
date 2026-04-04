@@ -9,8 +9,8 @@ var supabase = createServiceClient();
 /* ───── Paysafe webhook signature verification ───── */
 async function verifyPaysafeSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
   if (!PAYSAFE_WEBHOOK_SECRET) {
-    console.warn("PAYSAFE_SIGNATURE_VERIFY: PAYSAFE_WEBHOOK_SECRET not set — skipping verification");
-    return true; // Allow through if secret not configured yet (graceful rollout)
+    console.error("PAYSAFE_SIGNATURE_VERIFY: PAYSAFE_WEBHOOK_SECRET not set — rejecting request");
+    return false;
   }
   if (!signatureHeader) return false;
   var key = new TextEncoder().encode(PAYSAFE_WEBHOOK_SECRET);

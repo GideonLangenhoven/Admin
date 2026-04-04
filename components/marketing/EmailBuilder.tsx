@@ -76,18 +76,21 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
     setBlocks(arr);
   }
 
-  // Drag and drop
-  function handleDragStart(index: number) { setDragIndex(index); }
+  // Drag and drop — track by block ID to prevent index drift during rapid drags
+  var dragBlockIdRef = useRef<string | null>(null);
+  function handleDragStart(index: number) { setDragIndex(index); dragBlockIdRef.current = blocks[index]?.id || null; }
   function handleDragOver(e: React.DragEvent, index: number) {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === index) return;
+    if (dragBlockIdRef.current === null) return;
+    var currentIdx = blocks.findIndex(b => b.id === dragBlockIdRef.current);
+    if (currentIdx === -1 || currentIdx === index) return;
     var arr = [...blocks];
-    var [moved] = arr.splice(dragIndex, 1);
+    var [moved] = arr.splice(currentIdx, 1);
     arr.splice(index, 0, moved);
     setBlocks(arr);
     setDragIndex(index);
   }
-  function handleDragEnd() { setDragIndex(null); }
+  function handleDragEnd() { setDragIndex(null); dragBlockIdRef.current = null; }
 
   // Image upload to Supabase storage
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {

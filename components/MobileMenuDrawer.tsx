@@ -8,7 +8,18 @@ import NotificationBadge from "./NotificationBadge";
 import RefundBadge from "./RefundBadge";
 import SignOutButton from "./SignOutButton";
 import ThemeToggle from "./ThemeToggle";
-import * as LucideIcons from "lucide-react";
+import {
+  Circle, LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
+  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign, LineChart, Mail, Settings, Shield,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const iconMap: Record<string, LucideIcon> = {
+  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
+  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign, LineChart, Mail, Settings, Shield, Circle,
+};
 
 type NavItem = { href: string; label: string; icon: string };
 
@@ -70,7 +81,7 @@ export default function MobileMenuDrawer({ nav }: { nav: NavItem[] }) {
 
         <nav className="flex-1 space-y-1.5 overflow-y-auto p-3">
           {nav.map((n) => {
-            const Icon = (LucideIcons as any)[n.icon] || LucideIcons.Circle;
+            const Icon = iconMap[n.icon] || Circle;
             const active = n.href === "/" ? pathname === "/" : pathname === n.href || pathname?.startsWith(n.href + "/");
             return (
               <Link

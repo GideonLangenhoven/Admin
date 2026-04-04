@@ -225,11 +225,11 @@ Deno.serve(async (_req: Request) => {
         await supabase.rpc("increment_campaign_counter", { p_campaign_id: campId, p_column: "total_failed", p_amount: campFailed });
       }
 
-      // Check if campaign is complete
+      // Check if campaign is complete — use status guard to prevent concurrent double-marking
       if (campSent > 0 || campFailed > 0) {
-        const { data: campRow } = await supabase.from("marketing_campaigns").select("total_sent, total_failed, total_recipients").eq("id", campId).single();
-        if (campRow && (campRow.total_sent || 0) + (campRow.total_failed || 0) >= (campRow.total_recipients || 0)) {
-          await supabase.from("marketing_campaigns").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", campId);
+        const { data: campRow } = await supabase.from("marketing_campaigns").select("total_sent, total_failed, total_recipients, status").eq("id", campId).single();
+        if (campRow && campRow.status !== "done" && (campRow.total_sent || 0) + (campRow.total_failed || 0) >= (campRow.total_recipients || 0)) {
+          await supabase.from("marketing_campaigns").update({ status: "done", completed_at: new Date().toISOString() }).eq("id", campId).neq("status", "done");
         }
       }
     }

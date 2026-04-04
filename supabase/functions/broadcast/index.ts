@@ -1,12 +1,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAdminAppOrigins } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 function getCors(req: Request) {
+  const allowed = getAdminAppOrigins();
+  const origin = req.headers.get("origin") || "";
   return {
-    "Access-Control-Allow-Origin": req.headers.get("origin") || "*",
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0],
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
@@ -17,7 +20,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { action, message, target_group, slot_ids, send_email, send_whatsapp } = body;
+    const { action, message, target_group, slot_ids, send_email, send_whatsapp, business_id } = body;
+
+    if (!business_id) {
+      return new Response(JSON.stringify({ error: "business_id is required" }), { status: 400, headers: getCors(req) });
+    }
 
     if (action !== "broadcast_targeted" || !message) {
       return new Response(JSON.stringify({ error: "Invalid parameters" }), { status: 400, headers: getCors(req) });
@@ -28,8 +35,11 @@ Deno.serve(async (req: Request) => {
     // Default limit
     let limit = 500;
 
-    // Get all bookings that match the criteria
-    let query = supabase.from("bookings").select("id, customer_name, email, phone, slot_id, status").in("status", ["PAID", "CONFIRMED"]);
+    // Get bookings scoped to this business
+    let query = supabase.from("bookings")
+      .select("id, customer_name, email, phone, slot_id, status")
+      .eq("business_id", business_id)
+      .in("status", ["PAID", "CONFIRMED"]);
 
     if (target_group === "SLOT" && Array.isArray(slot_ids) && slot_ids.length > 0) {
       query = query.in("slot_id", slot_ids);
@@ -57,7 +67,7 @@ Deno.serve(async (req: Request) => {
           const waRes = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-            body: JSON.stringify({ to: b.phone, message: parsedMessage })
+            body: JSON.stringify({ to: b.phone, message: parsedMessage, business_id })
           });
           if (waRes.ok) waSent++;
           sentToCustomer = true;
@@ -74,6 +84,7 @@ Deno.serve(async (req: Request) => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
             body: JSON.stringify({
               type: "BROADCAST",
+              business_id,
               data: {
                 email: b.email,
                 customer_name: b.customer_name,
@@ -97,11 +108,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // Log broadcast
-    const businessId = bookings.length > 0 ? (await supabase.from("bookings").select("business_id").eq("id", bookings[0].id).single())?.data?.business_id : null;
-
-    if (businessId && totalSent > 0) {
+    if (totalSent > 0) {
       await supabase.from("broadcasts").insert({
-        business_id: businessId,
+        business_id,
         message: message,
         target_group: target_group || "CUSTOM",
         sent_count: totalSent

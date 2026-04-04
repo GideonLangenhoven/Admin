@@ -5,7 +5,7 @@ import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { Send, Download, ExternalLink } from "lucide-react";
+import { Send, Download, ExternalLink, Loader2 } from "lucide-react";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -128,6 +128,8 @@ interface RebookSlot {
   status: string;
   tour_name?: string | null;
   available_capacity: number;
+  price_per_person_override?: number | null;
+  base_price_per_person?: number | null;
 }
 
 interface EditForm {
@@ -187,6 +189,7 @@ export default function Bookings() {
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [quickResendingId, setQuickResendingId] = useState<string | null>(null);
 
   async function loadBookings() {
     if (!businessId) return;
@@ -772,7 +775,7 @@ export default function Bookings() {
                   "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
                   " has been cancelled due to weather conditions.\n\n" +
                   "📋 Ref: " + ref + "\n\n" +
-                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund.",
+                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
               }),
             });
           } catch (e) { console.error("WA notify err:", e); }
@@ -948,6 +951,61 @@ export default function Bookings() {
       notify({ title: "Payment link failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
     }
     setPaymentLinkBookingId(null);
+  }
+
+  async function quickResendPaymentLink(b: Booking) {
+    if (!b.email) {
+      notify({ title: "Missing email", message: "No email address on this booking.", tone: "warning" });
+      return;
+    }
+    setQuickResendingId(b.id);
+    try {
+      const res = await supabase.functions.invoke("create-checkout", {
+        body: {
+          amount: Number(b.total_amount || 0),
+          booking_id: b.id,
+          type: "BOOKING",
+          customer_name: b.customer_name || "",
+          qty: b.qty || 1,
+        },
+      });
+      if (res.error) {
+        notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
+        setQuickResendingId(null);
+        return;
+      }
+      const data = res.data;
+      if (data?.redirectUrl) {
+        const ref = b.id.substring(0, 8).toUpperCase();
+        const tourName = b.tours?.name || "Sea Kayak Tour";
+        const tourDate = b.slots?.start_time
+          ? new Date(b.slots.start_time).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
+          : "TBC";
+        await supabase.functions.invoke("send-email", {
+          body: {
+            type: "PAYMENT_LINK",
+            data: {
+              business_id: businessId,
+              email: b.email,
+              customer_name: b.customer_name || "Customer",
+              ref,
+              tour_name: tourName,
+              tour_date: tourDate,
+              qty: b.qty,
+              total_amount: Number(b.total_amount || 0).toFixed(2),
+              payment_url: data.redirectUrl,
+            },
+          },
+        });
+        notify({ title: "Payment link sent", message: `Emailed to ${b.email}`, tone: "success" });
+        loadBookings();
+      } else {
+        notify({ title: "Payment link failed", message: "No redirect URL returned", tone: "error" });
+      }
+    } catch (err: unknown) {
+      notify({ title: "Payment link failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
+    }
+    setQuickResendingId(null);
   }
 
   async function loadRebookSlots(dateInput: string) {
@@ -1345,6 +1403,8 @@ export default function Bookings() {
                             onView={(b) => router.push(`/bookings/${b.id}`)}
                             onCancelSlot={cancelSlotWeather}
                             cancellingWeatherId={cancellingWeatherId}
+                            quickResendingId={quickResendingId}
+                            onQuickResend={quickResendPaymentLink}
                           />
                         );
                       })}
@@ -1484,6 +1544,35 @@ export default function Bookings() {
             </label>
             <p className="mt-2 text-xs text-gray-500">{loadingRebookSlots ? "Loading slots..." : `${rebookSlots.length} open slots found`}</p>
 
+            {/* Price comparison preview */}
+            {rebookSlotId && (() => {
+              const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
+              if (!selectedSlot) return null;
+              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
+              const newUnitPrice = selectedSlot.price_per_person_override ?? selectedSlot.base_price_per_person ?? 0;
+              const diff = newUnitPrice - currentUnitPrice;
+              return (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Current</span>
+                    <span className="font-medium">{fmtCurrency(currentUnitPrice)}/pp</span>
+                  </div>
+                  <div className="mt-1 flex justify-between">
+                    <span className="text-gray-600">New</span>
+                    <span className="font-medium">{fmtCurrency(newUnitPrice)}/pp</span>
+                  </div>
+                  {diff !== 0 && (
+                    <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
+                      <span className="text-gray-600">Difference</span>
+                      <span className={`font-semibold ${diff > 0 ? "text-red-600" : "text-green-600"}`}>
+                        {diff > 0 ? "+" : ""}{fmtCurrency(diff)}/pp
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <label className="mt-3 block text-sm text-gray-600">
               If the new tour costs LESS, how should we handle the leftover credit?
               <select
@@ -1576,6 +1665,8 @@ function SlotRows({
   onView,
   onCancelSlot,
   cancellingWeatherId,
+  quickResendingId,
+  onQuickResend,
 }: {
   slot: SlotGroup;
   services: string;
@@ -1595,6 +1686,8 @@ function SlotRows({
   onView: (b: Booking) => void;
   onCancelSlot: (group: SlotGroup) => void;
   cancellingWeatherId: string | null;
+  quickResendingId: string | null;
+  onQuickResend: (b: Booking) => void;
 }) {
   const [openActions, setOpenActions] = useState<string | null>(null);
   useEffect(() => {
@@ -1657,6 +1750,19 @@ function SlotRows({
                       ? <span title="Waiver signed" className="text-emerald-500 shrink-0">✓</span>
                       : <span title="Waiver not signed" className="text-amber-400 shrink-0 text-[10px]">W</span>}
                     <StatusBadge status={b.status} />
+                    {["PENDING", "PENDING PAYMENT"].includes(b.status) && !b.yoco_checkout_id && (
+                      <button
+                        type="button"
+                        title="Quick send payment link"
+                        disabled={quickResendingId === b.id}
+                        onClick={(e) => { e.stopPropagation(); onQuickResend(b); }}
+                        className="inline-flex items-center justify-center rounded p-0.5 text-blue-600 hover:bg-blue-100 disabled:opacity-50 transition-colors shrink-0"
+                      >
+                        {quickResendingId === b.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Send className="h-3 w-3" />}
+                      </button>
+                    )}
                     <SourceBadge source={b.source} />
                   </button>
                   {b.external_ref && (
@@ -1668,12 +1774,7 @@ function SlotRows({
                     {b.tours?.name || "—"} · {b.phone || "No mobile"}
                   </span>
                   {b.payment_deadline && !isPaid(b.status) && b.status !== "CANCELLED" && (
-                    <span className={`text-[9px] font-medium lg:pl-0 pl-[10px] ${new Date(b.payment_deadline) < new Date() ? "text-red-600" : "text-amber-600"}`}>
-                      {new Date(b.payment_deadline) < new Date()
-                        ? "Deadline expired"
-                        : `Expires ${new Date(b.payment_deadline).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })}`
-                      }
-                    </span>
+                    <PaymentExpiryBadge deadline={b.payment_deadline} />
                   )}
                   {/* Collapsible actions on mobile */}
                   {actionsOpen && (
@@ -1860,5 +1961,44 @@ function ActionMenuItem({
     >
       {label}
     </button>
+  );
+}
+
+function PaymentExpiryBadge({ deadline }: { deadline: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const deadlineMs = new Date(deadline).getTime();
+  const diffMs = deadlineMs - now;
+
+  if (diffMs <= 0) {
+    return (
+      <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold bg-red-100 text-red-700 lg:ml-0 ml-[10px]">
+        Expired
+      </span>
+    );
+  }
+
+  const totalMin = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  const label = hours > 0 ? `Expires in ${hours}h ${mins}m` : `Expires in ${mins}m`;
+
+  // Red if within 2 hours, amber if within 6 hours, otherwise gray
+  const urgency =
+    diffMs <= 2 * 60 * 60_000
+      ? "bg-red-100 text-red-700"
+      : diffMs <= 6 * 60 * 60_000
+        ? "bg-amber-100 text-amber-700"
+        : "bg-gray-100 text-gray-500";
+
+  return (
+    <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold lg:ml-0 ml-[10px] ${urgency}`}>
+      {label}
+    </span>
   );
 }

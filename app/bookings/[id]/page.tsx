@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
 import { ArrowLeft, User, MapPin, CreditCard, Clock, AlertTriangle, CheckCircle2, XCircle, MessageSquare, Mail, Bell, FileText, Shield, Star, RotateCcw, Banknote } from "lucide-react";
+import { useBusinessContext } from "../../../components/BusinessContext";
 
 /* ── helpers ── */
 function fmtDate(iso: string) {
@@ -136,6 +137,9 @@ interface TimelineEvent {
   color: string;
 }
 
+// TODO: Accept audit_logs as an additional parameter and merge into the timeline.
+// Each audit_log entry should display the actor_id (admin user) who performed the action.
+// This will provide a full admin audit trail showing who did what and when.
 function buildTimeline(
   booking: BookingDetail,
   logs: LogEntry[],
@@ -280,6 +284,7 @@ export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;
+  const { businessId } = useBusinessContext();
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -293,7 +298,7 @@ export default function BookingDetailPage() {
   const [customerDraft, setCustomerDraft] = useState({ name: "", phone: "", email: "" });
 
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || !businessId) return;
     async function load() {
       setLoading(true);
       setError(null);
@@ -303,6 +308,7 @@ export default function BookingDetailPage() {
           .from("bookings")
           .select("*, tours(name, duration_minutes, base_price_per_person), slots(start_time, capacity_total, booked, status)")
           .eq("id", bookingId)
+          .eq("business_id", businessId)
           .maybeSingle(),
         supabase
           .from("invoices")
@@ -347,7 +353,7 @@ export default function BookingDetailPage() {
       setLoading(false);
     }
     load();
-  }, [bookingId]);
+  }, [bookingId, businessId]);
 
   if (loading) {
     return (
@@ -448,6 +454,14 @@ export default function BookingDetailPage() {
               </button>
             )}
           </div>
+          {editingCustomer && isPending && booking.yoco_checkout_id && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
+              <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-snug">
+                <span className="font-semibold">Warning:</span> An existing payment link will be invalidated if you save changes. The customer will need a new payment link.
+              </p>
+            </div>
+          )}
           {editingCustomer ? (
             <div className="space-y-3">
               <label className="block text-xs font-medium text-gray-500">
@@ -654,7 +668,12 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {/* Activity Timeline */}
+      {/* Activity Timeline
+          TODO: Extend this timeline to also pull from the `audit_logs` table to show
+          all admin actions (edits, status changes, refunds, etc.) with the actor_id
+          (admin user who performed the action) displayed alongside each event.
+          Query: supabase.from("audit_logs").select("*").eq("booking_id", bookingId).order("created_at")
+          Each audit_logs row should include actor_id which maps to admin_users.id. */}
       <Card title="Activity Timeline" className="mt-2">
         {timeline.length === 0 ? (
           <p className="text-sm text-gray-400 py-2">No activity recorded</p>

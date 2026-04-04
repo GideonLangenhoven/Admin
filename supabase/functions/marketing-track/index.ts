@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
     }).eq("id", contactId);
 
     // Log to automation logs if this is an automation-sourced event
-    if (automationId) {
+    if (automationId && businessId) {
       await supabase.from("marketing_automation_logs").insert({
         enrollment_id: enrollmentId,
         automation_id: automationId,
@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // Log to automation logs if this is an automation-sourced event
-    if (automationId) {
+    if (automationId && businessId) {
       await supabase.from("marketing_automation_logs").insert({
         enrollment_id: enrollmentId,
         automation_id: automationId,

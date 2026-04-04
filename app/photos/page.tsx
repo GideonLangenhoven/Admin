@@ -19,7 +19,7 @@ type SlotGroup = { date: string; label: string; slots: any[] };
 
 export default function PhotosPage() {
   var { businessId } = useBusinessContext();
-  var [bookingSiteUrl, setBookingSiteUrl] = useState("");
+  var [bookingSiteUrl, setBookingSiteUrl] = useState("https://book.capekayak.co.za");
   var [slots, setSlots] = useState<SlotGroup[]>([]);
   var [selectedSlot, setSelectedSlot] = useState<any>(null);
   var [urls, setUrls] = useState<string[]>([""]);
@@ -33,7 +33,7 @@ export default function PhotosPage() {
 
   async function loadBusinessLinks() {
     var { data } = await supabase.from("businesses").select("booking_site_url").eq("id", businessId).maybeSingle();
-    setBookingSiteUrl(data?.booking_site_url || "");
+    setBookingSiteUrl(data?.booking_site_url || "https://book.capekayak.co.za");
   }
 
   async function loadSlots() {
@@ -83,7 +83,7 @@ export default function PhotosPage() {
     if (validUrls.length === 0) { notify({ title: "No photo links", message: "Add at least one photo URL.", tone: "warning" }); return; }
     if (!await confirmAction({
       title: "Send trip photos",
-      message: "Send photos and a thank-you email to all guests on this trip?",
+      message: "Send photos and a thank-you email to lead bookers on this trip? They'll be asked to share the link with their group.",
       tone: "info",
       confirmLabel: "Send photos",
     })) return;
@@ -105,20 +105,23 @@ export default function PhotosPage() {
 
       var sent = 0;
       for (var b of (bookings || [])) {
-        // Send WhatsApp with photo links
+        // Send WhatsApp photo notification via template (24h compliant).
+        // Uses send-whatsapp-text which has built-in template fallback for
+        // customers outside the 24h window. The message is kept short and
+        // asks the customer to reply YES to receive the photo link,
+        // ensuring we open a new 24h window for follow-up.
         if (b.phone) {
           var waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
-            "! 📸 Thank you for joining us on the " + tourName +
-            "! Here are your trip photos:\n\n" +
-            validUrls.join("\n") +
-            "\n\nWe hope you had an amazing time and would love to see you again! Book your next adventure at " + bookingSiteUrl;
+            "! 📸 Your trip photos from the " + tourName +
+            " are ready! Reply YES to this message to receive the photo link." +
+            "\n\nShare with your group once you get it!";
           try {
             await fetch(SU + "/functions/v1/send-whatsapp-text", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
               body: JSON.stringify({ business_id: businessId, to: b.phone, message: waMsg }),
             });
-          } catch { }
+          } catch (e) { console.error("WA photo send failed:", b.phone, e); }
         }
 
         // Send thank-you email with photo link
@@ -138,7 +141,7 @@ export default function PhotosPage() {
                 },
               }),
             });
-          } catch { }
+          } catch (e) { console.error("Email photo send failed:", b.email, e); }
         }
         sent++;
         setSendProgress(35 + Math.round((sent / Math.max((bookings || []).length, 1)) * 45));
@@ -259,7 +262,7 @@ export default function PhotosPage() {
 
           <button onClick={sendPhotos} disabled={sending || !selectedSlot || urls.every(u => !u.trim())}
             className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-            {sending ? "Sending..." : "📸 Send Photos & Thank You to " + (selectedSlot?.booked || 0) + " Guests"}
+            {sending ? "Sending..." : "📸 Send Photos to Lead Bookers"}
           </button>
 
           {sending && (
@@ -276,7 +279,7 @@ export default function PhotosPage() {
 
           {result && (
             <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
-              {result.error ? "Error: " + result.error : "✅ Photos & thank-you email sent to " + result.sent + " guests!"}
+              {result.error ? "Error: " + result.error : "✅ Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
             </div>
           )}
         </div>

@@ -69,10 +69,10 @@ export default function Refunds() {
         body: JSON.stringify({ booking_id: id, amount }),
       });
       var d = await r.json();
-      setResults({ ...results, [id]: d });
+      setResults(prev => ({ ...prev, [id]: d }));
       load();
     } catch (e) {
-      setResults({ ...results, [id]: { error: String(e) } });
+      setResults(prev => ({ ...prev, [id]: { error: String(e) } }));
     }
     setProcessing(null);
   }

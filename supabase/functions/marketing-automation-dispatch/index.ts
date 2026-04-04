@@ -174,7 +174,12 @@ Deno.serve(async (_req: Request) => {
           case "send_email": {
             const config = currentStep.config as any;
             const templateId = config?.template_id;
-            if (!templateId) break;
+            if (!templateId) {
+              console.error("AUTOMATION_DISPATCH: missing template_id in step config for enrollment " + enrollment.id);
+              await supabase.from("marketing_automation_enrollments").update({ status: "failed" }).eq("id", enrollment.id);
+              results.errors++;
+              break;
+            }
 
             // Load template
             const { data: template } = await supabase
@@ -182,7 +187,12 @@ Deno.serve(async (_req: Request) => {
               .select("html_content, subject_line")
               .eq("id", templateId)
               .single();
-            if (!template) break;
+            if (!template) {
+              console.error("AUTOMATION_DISPATCH: template " + templateId + " not found for enrollment " + enrollment.id);
+              await supabase.from("marketing_automation_enrollments").update({ status: "failed" }).eq("id", enrollment.id);
+              results.errors++;
+              break;
+            }
 
             // Variable replacement
             let html = template.html_content
