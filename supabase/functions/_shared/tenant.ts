@@ -231,12 +231,9 @@ export function getAdminAppOrigins() {
     .map(function (value) { return value.trim(); })
     .filter(Boolean);
   return Array.from(new Set(configured.concat([
-    "https://admin.capekayak.co.za",
     "https://caepweb-admin.vercel.app",
     "https://admin-tawny-delta-92.vercel.app",
-    "https://book.capekayak.co.za",
     "https://booking-mu-steel.vercel.app",
-    "https://capekayak.co.za",
     "https://bookingtours.co.za",
     "https://www.bookingtours.co.za",
     "http://localhost:3000",
@@ -259,9 +256,25 @@ export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
   return Array.from(new Set(getAdminAppOrigins().concat(origins)));
 }
 
+// Wildcard patterns for bookingtours.co.za subdomains
+var WILDCARD_ORIGINS = [
+  ".admin.bookingtours.co.za",
+  ".booking.bookingtours.co.za",
+  ".bookingtours.co.za",
+];
+
 export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
-  if (!origin) return true;
-  return allowedOrigins.includes(origin);
+  if (!origin) return false;
+  // Exact match against known origins
+  if (allowedOrigins.includes(origin)) return true;
+  // Wildcard match: any *.admin.bookingtours.co.za or *.booking.bookingtours.co.za
+  try {
+    var hostname = new URL(origin).hostname;
+    for (var i = 0; i < WILDCARD_ORIGINS.length; i++) {
+      if (hostname.endsWith(WILDCARD_ORIGINS[i])) return true;
+    }
+  } catch (_) { /* invalid URL */ }
+  return false;
 }
 
 export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?: {
@@ -281,6 +294,14 @@ export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?:
     bookingCancelUrl: data?.booking_cancel_url || (bookingSiteUrl ? bookingSiteUrl + "/cancelled" : defaultCancelUrl),
     voucherSuccessUrl: data?.voucher_success_url || (bookingSiteUrl ? bookingSiteUrl + "/voucher-confirmed" : defaultVoucherSuccessUrl),
   };
+}
+
+export function resolveManageBookingsUrl(business?: TenantBusiness | null): string {
+  if (business?.manage_bookings_url) return String(business.manage_bookings_url);
+  var bookingSiteUrl = trimTrailingSlash(business?.booking_site_url);
+  if (bookingSiteUrl) return bookingSiteUrl + "/my-bookings";
+  if (business?.subdomain) return "https://" + business.subdomain + ".booking.bookingtours.co.za/my-bookings";
+  return "https://booking-mu-steel.vercel.app/my-bookings";
 }
 
 // ──────────────────────────────────────────────────────────────────

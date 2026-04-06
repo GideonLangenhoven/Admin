@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Marketing <onboarding@resend.dev>";
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const supabase = createServiceClient();
 
@@ -128,11 +128,13 @@ Deno.serve(async (_req: Request) => {
           continue;
         }
 
-        // Load per-business from_email
-        const { data: bizRow } = await supabase.from("businesses").select("business_name, from_email").eq("id", enrollment.business_id).maybeSingle();
+        // Load per-business from_email (explicit > subdomain-derived > platform default)
+        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain, from_email").eq("id", enrollment.business_id).maybeSingle();
         const bizFromEmail = bizRow?.from_email
           ? (bizRow.business_name || "Marketing") + " <" + bizRow.from_email + ">"
-          : FROM_EMAIL;
+          : bizRow?.subdomain
+            ? (bizRow.business_name || "Marketing") + " <noreply@" + bizRow.subdomain + ".bookingtours.co.za>"
+            : FROM_EMAIL;
 
         // Load steps
         const { data: steps } = await supabase
@@ -249,6 +251,18 @@ Deno.serve(async (_req: Request) => {
               }),
             });
 
+            // Log the attempt
+            await supabase.from("marketing_automation_logs").insert({
+              enrollment_id: enrollment.id,
+              automation_id: enrollment.automation_id,
+              contact_id: contact.id,
+              business_id: enrollment.business_id,
+              step_position: currentStep.position,
+              step_type: "send_email",
+              action: res.ok ? "email_sent" : "email_failed",
+              metadata: { template_id: templateId, subject },
+            });
+
             if (res.ok) {
               // Increment usage
               const currentPeriod = new Date().toISOString().slice(0, 7);
@@ -268,39 +282,28 @@ Deno.serve(async (_req: Request) => {
                 .eq("id", contact.id);
 
               results.sent++;
+
+              // Only advance to next step if email was actually sent
+              const nextStep = steps.find((s: any) => s.position > currentStep.position);
+              if (nextStep) {
+                await supabase.from("marketing_automation_enrollments")
+                  .update({ current_step: nextStep.position, next_action_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+                  .eq("id", enrollment.id);
+              } else {
+                await supabase.from("marketing_automation_enrollments")
+                  .update({ status: "completed", updated_at: new Date().toISOString() })
+                  .eq("id", enrollment.id);
+                await supabase.rpc("increment_automation_counter", {
+                  p_automation_id: enrollment.automation_id,
+                  p_column: "completed_count",
+                  p_amount: 1,
+                });
+                results.completed++;
+              }
             } else {
               console.error("AUTOMATION_SEND_FAIL:", enrollment.id, await res.text());
               results.errors++;
-            }
-
-            // Log
-            await supabase.from("marketing_automation_logs").insert({
-              enrollment_id: enrollment.id,
-              automation_id: enrollment.automation_id,
-              contact_id: contact.id,
-              business_id: enrollment.business_id,
-              step_position: currentStep.position,
-              step_type: "send_email",
-              action: res.ok ? "email_sent" : "email_failed",
-              metadata: { template_id: templateId, subject },
-            });
-
-            // Advance to next step
-            const nextStep = steps.find((s: any) => s.position > currentStep.position);
-            if (nextStep) {
-              await supabase.from("marketing_automation_enrollments")
-                .update({ current_step: nextStep.position, next_action_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-                .eq("id", enrollment.id);
-            } else {
-              await supabase.from("marketing_automation_enrollments")
-                .update({ status: "completed", updated_at: new Date().toISOString() })
-                .eq("id", enrollment.id);
-              await supabase.rpc("increment_automation_counter", {
-                p_automation_id: enrollment.automation_id,
-                p_column: "completed_count",
-                p_amount: 1,
-              });
-              results.completed++;
+              // Email failed — do NOT advance. Enrollment stays on current step for retry on next dispatch cycle.
             }
             break;
           }

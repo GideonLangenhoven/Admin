@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Marketing <onboarding@resend.dev>";
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
@@ -23,6 +23,8 @@ Deno.serve(async (_req: Request) => {
       .lte("scheduled_at", new Date().toISOString());
 
     // ── 1. Fetch pending queue items (oldest first, respecting retry backoff) ──
+    // Atomically claim items by updating status to "processing" in the same query.
+    // This prevents a concurrent dispatch invocation from picking up the same items.
     const { data: items, error: fetchErr } = await supabase
       .from("marketing_queue")
       .select("id, business_id, campaign_id, contact_id, email, first_name, retry_count")
@@ -39,6 +41,10 @@ Deno.serve(async (_req: Request) => {
     if (!items || items.length === 0) {
       return jsonRes({ ok: true, processed: 0, message: "Queue empty" }, 200);
     }
+
+    // Mark items as "processing" to prevent concurrent dispatch from picking them up
+    const itemIds = items.map((i: any) => i.id);
+    await supabase.from("marketing_queue").update({ status: "processing" }).in("id", itemIds).eq("status", "pending");
 
     // ── 2. Load campaigns + templates (only campaigns in "sending" status) ──
     const campaignIds = [...new Set(items.map((i: any) => i.campaign_id))];
@@ -62,10 +68,12 @@ Deno.serve(async (_req: Request) => {
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, from_email").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, subdomain, from_email").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
         if (b.from_email) {
           bizFromMap[b.id] = (b.business_name || "Marketing") + " <" + b.from_email + ">";
+        } else if (b.subdomain) {
+          bizFromMap[b.id] = (b.business_name || "Marketing") + " <noreply@" + b.subdomain + ".bookingtours.co.za>";
         }
       }
     }
@@ -203,6 +211,7 @@ Deno.serve(async (_req: Request) => {
         } else {
           const backoffMs = Math.pow(2, retryCount) * 60000; // 2min, 4min, 8min
           await supabase.from("marketing_queue").update({
+            status: "pending",
             retry_count: retryCount,
             next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
             error_message: fail.error,

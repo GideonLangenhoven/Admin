@@ -20,7 +20,7 @@ Deno.serve(async (req: Request) => {
   // Look up token
   const { data: tokenRow } = await supabase
     .from("marketing_unsubscribe_tokens")
-    .select("id, contact_id, campaign_id, business_id, used_at")
+    .select("id, contact_id, campaign_id, business_id, used_at, created_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -31,6 +31,14 @@ Deno.serve(async (req: Request) => {
   // Check if token was already used
   if (tokenRow.used_at) {
     return htmlRes("<h2>Already processed</h2><p>This unsubscribe link has already been used.</p>", 200);
+  }
+
+  // Reject tokens older than 90 days
+  if (tokenRow.created_at) {
+    const tokenAge = Date.now() - new Date(tokenRow.created_at).getTime();
+    if (tokenAge > 90 * 24 * 60 * 60 * 1000) {
+      return htmlRes("<h2>Link expired</h2><p>This unsubscribe link has expired. Please contact us directly to manage your preferences.</p>", 410);
+    }
   }
 
   // Get contact info

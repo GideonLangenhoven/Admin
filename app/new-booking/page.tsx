@@ -257,6 +257,7 @@ export default function NewBookingPage() {
   }
 
   async function loadTours() {
+    console.log("[NEW_BOOKING] loadTours started", { businessId });
     setLoadingTours(true);
     const { data } = await supabase
       .from("tours")
@@ -265,6 +266,7 @@ export default function NewBookingPage() {
       .eq("active", true)
       .order("sort_order", { ascending: true });
     const rows = (data || []) as Tour[];
+    console.log("[NEW_BOOKING] loadTours complete", { tourCount: rows.length });
     setTours(rows);
     if (!selectedTourId && rows[0]?.id) setSelectedTourId(rows[0].id);
     setLoadingTours(false);
@@ -293,6 +295,7 @@ export default function NewBookingPage() {
 
   async function loadSlots() {
     if (!bookingDate) return;
+    console.log("[NEW_BOOKING] loadSlots started", { bookingDate, selectedTourId });
     setLoadingSlots(true);
     const { startIso, endIso } = dayRange(bookingDate);
     const nextSlots = await listAvailableSlots({
@@ -301,6 +304,7 @@ export default function NewBookingPage() {
       endIso,
       tourId: selectedTourId || null,
     }) as Slot[];
+    console.log("[NEW_BOOKING] loadSlots complete", { slotCount: nextSlots.length });
     setSlots(nextSlots);
     setSelectedSlotId((current) => {
       const desiredSlotId = pendingMatrixSelection?.day === bookingDate ? pendingMatrixSelection.slotId : current;
@@ -418,6 +422,7 @@ export default function NewBookingPage() {
   }, [availabilityPreviewSlots, availabilityDays, qty]);
 
   async function createBooking() {
+    console.log("[NEW_BOOKING] createBooking started", { selectedTourId, selectedSlotId, bookingDate, qty, customerName, status, totalAmount });
     setMissingField(null);
     const missingFields = [];
 
@@ -444,6 +449,7 @@ export default function NewBookingPage() {
     }
 
     if (missingFields.length > 0) {
+      console.log("[NEW_BOOKING] createBooking validation failed", { missingFields });
       setMissingField(missingFields[0]);
       if (missingFields.includes("mobile_format")) {
         notify({ title: "Invalid mobile format", message: "Please include the correct international country code for the mobile number (for example +27 or +44).", tone: "warning" });
@@ -524,6 +530,7 @@ export default function NewBookingPage() {
         .select("id, business_id, waiver_status, waiver_token")
         .single();
       if (insertError || !createdBooking) {
+        console.error("[NEW_BOOKING] createBooking insert error", insertError);
         setSubmitting(false);
         notify({ title: "Booking creation failed", message: formatSupabaseError(insertError), tone: "error" });
         return;
@@ -597,6 +604,7 @@ export default function NewBookingPage() {
               type: "BOOKING",
               customer_name: customerName.trim(),
               qty,
+              skip_notifications: true, // admin dashboard sends its own notifications below
             },
           });
           const checkoutData = checkoutRes.data;
@@ -649,6 +657,7 @@ export default function NewBookingPage() {
                 await supabase.functions.invoke("send-whatsapp-text", {
                   body: {
                     to: normalizePhone(mobile),
+                    business_id: businessId,
                     message:
                       "Hi " + firstName + "!\n\n" +
                       "Here\u2019s your payment link to confirm your booking:\n\n" +
@@ -741,6 +750,7 @@ export default function NewBookingPage() {
             await supabase.functions.invoke("send-whatsapp-text", {
               body: {
                 to: normalizePhone(mobile),
+                business_id: businessId,
                 message: "\u{1F389} *Booking Confirmed!*\n\n" +
                   "\u{1F4CB} Ref: " + ref + "\n" +
                   "\u{1F6F6} " + (tourObj?.name || "Tour") + "\n" +
@@ -759,6 +769,7 @@ export default function NewBookingPage() {
         }
       }
 
+      console.log("[NEW_BOOKING] createBooking success", { bookingId, ref, status, paymentLinkSent });
       notify({
         title: "Booking created",
         message: status === "PENDING" && paymentLinkSent
@@ -785,6 +796,7 @@ export default function NewBookingPage() {
       }, {}));
       loadSlots();
     } catch (err: unknown) {
+      console.error("[NEW_BOOKING] createBooking error", err);
       notify({ title: "Booking creation failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
       setSubmitting(false);
     }

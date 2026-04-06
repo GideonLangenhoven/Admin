@@ -69,10 +69,10 @@ async function cleanupExpiredHolds() {
         // Release held capacity on the new slot
         const qty = (hold.bookings as any)?.qty || 0;
         if (qty > 0) {
-          const slotData = await supabase.from("slots").select("held").eq("id", pr.new_slot_id).single();
-          if (slotData.data) {
+          const { data: slotHeldData } = await supabase.from("slots").select("held").eq("id", pr.new_slot_id).maybeSingle();
+          if (slotHeldData) {
             await supabase.from("slots").update({
-              held: Math.max(0, (slotData.data.held || 0) - qty),
+              held: Math.max(0, (slotHeldData.held || 0) - qty),
             }).eq("id", pr.new_slot_id);
           }
         }

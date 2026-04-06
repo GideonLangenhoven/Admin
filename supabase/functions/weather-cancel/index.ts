@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappTextForTenant, getAdminAppOrigins, formatTenantDateTime } from "../_shared/tenant.ts";
+import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappTextForTenant, resolveManageBookingsUrl, getAdminAppOrigins, isAllowedOrigin, formatTenantDateTime } from "../_shared/tenant.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -8,7 +8,7 @@ var supabase = createServiceClient();
 function getCors(req?: any) {
   var origins = getAdminAppOrigins();
   var origin = req?.headers?.get("origin") || "";
-  var allowed = origins.includes(origin) ? origin : origins[0];
+  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
@@ -25,7 +25,7 @@ Deno.serve(async (req: any) => {
     var tenant = await getTenantByBusinessId(supabase, business_id);
     var brandName = getBusinessDisplayName(tenant.business);
     var cancelReason = reason || "weather conditions";
-    var manageBookingUrl = tenant.business.manage_bookings_url || "https://book.capekayak.co.za/my-bookings";
+    var manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
     await supabase.from("slots").update({ status: "CLOSED" }).in("id", slot_ids);
@@ -58,11 +58,11 @@ Deno.serve(async (req: any) => {
       }).eq("id", b.id);
 
       // Release slot capacity
-      var slotData = await supabase.from("slots").select("booked, held").eq("id", b.slot_id).single();
-      if (slotData.data) {
+      var { data: slotCancelData } = await supabase.from("slots").select("booked, held").eq("id", b.slot_id).maybeSingle();
+      if (slotCancelData) {
         await supabase.from("slots").update({
-          booked: Math.max(0, slotData.data.booked - b.qty),
-          held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
+          booked: Math.max(0, (slotCancelData.booked || 0) - b.qty),
+          held: Math.max(0, (slotCancelData.held || 0) - (b.status === "HELD" ? b.qty : 0)),
         }).eq("id", b.slot_id);
       }
 
@@ -78,21 +78,31 @@ Deno.serve(async (req: any) => {
       // WhatsApp notification — paid customers get compensation options, unpaid get simple notice
       if (b.phone) {
         try {
+          var firstName = b.customer_name?.split(" ")[0] || "there";
           var waMessage = isPaid
-            ? "Trip Cancelled — Weather\n\n" +
-              "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
+            ? "Trip Cancelled \u26C5\n\n" +
+              "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
-              "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\n" +
+              "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
               manageBookingUrl + "\n\n" +
-              "Thanks for your understanding — " + brandName
-            : "Trip Cancelled — Weather\n\n" +
-              "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
+              "We hope to see you on the water soon \u2014 " + brandName
+            : "Trip Cancelled \u26C5\n\n" +
+              "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
-              "No payment was taken so no further action is needed.\n\n" +
-              "Thanks for your understanding — " + brandName;
-          await sendWhatsappTextForTenant(tenant, b.phone, waMessage);
+              "No payment was taken, so no action is needed on your side.\n\n" +
+              "We hope to see you on the water soon \u2014 " + brandName;
+          await sendWhatsappTextForTenant(tenant, b.phone, waMessage, {
+            name: "weather_cancellation",
+            params: [
+              b.customer_name?.split(" ")[0] || "there",
+              tourName,
+              startTime,
+              ref,
+              manageBookingUrl,
+            ],
+          });
         } catch (e) { console.error("WA weather-cancel err:", e); }
       }
 

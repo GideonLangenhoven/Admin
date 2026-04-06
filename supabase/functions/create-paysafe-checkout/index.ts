@@ -221,7 +221,8 @@ async function handleProcess(body: any, cors: Record<string, string>) {
 
   var totalCents = Math.round(Number(combo.combo_total) * 100);
   var splitACents = Math.round(Number(combo.split_a_amount) * 100);
-  var splitBCents = Math.round(Number(combo.split_b_amount) * 100);
+  // Derive splitB from total to guarantee splitA + splitB === totalCents (avoids rounding mismatch)
+  var splitBCents = totalCents - splitACents;
 
   // Build Paysafe payment request
   var authHeader = "Basic " + btoa(credsA.paysafeApiKey + ":" + credsA.paysafeApiSecret);

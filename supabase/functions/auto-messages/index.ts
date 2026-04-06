@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -47,8 +47,18 @@ async function alreadySent(bookingId: string, type: string) {
   return (data || []).length > 0;
 }
 
-async function logSent(businessId: string, bookingId: string, phone: string, type: string) {
-  await db.from("auto_messages").insert({ business_id: businessId, booking_id: bookingId, phone, type });
+async function logSent(businessId: string, bookingId: string, phone: string, type: string): Promise<boolean> {
+  // Use upsert with onConflict to atomically prevent duplicate sends.
+  // If the row already exists (same booking_id + type), this is a no-op and returns false.
+  var { data, error } = await db.from("auto_messages")
+    .upsert({ business_id: businessId, booking_id: bookingId, phone, type }, { onConflict: "booking_id,type", ignoreDuplicates: true })
+    .select("id");
+  if (error) {
+    console.error("LOG_SENT_ERR", bookingId, type, error.message);
+    return false;
+  }
+  // If ignoreDuplicates took effect, data will be empty (row already existed)
+  return (data || []).length > 0;
 }
 
 async function getBusinesses() {
@@ -79,23 +89,31 @@ async function sendRemindersForBusiness(businessId: string) {
     if (await alreadySent(booking.id, "REMINDER")) continue;
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
+    var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+    var tourNameR = booking?.tours?.name || "Your booking";
+    var timeStr = formatTenantDateTime(tenant.business, startTime);
+    var qtyStr = String(booking.qty);
     var message =
-      "Hi " + firstName + ", reminder for tomorrow.\n\n" +
-      (booking?.tours?.name || "Your booking") + "\n" +
-      formatTenantDateTime(tenant.business, startTime) + "\n" +
-      booking.qty + " guest" + (Number(booking.qty || 0) === 1 ? "" : "s") + "\n\n" +
-      "Meeting point: " + meetingPoint + "\n" +
-      "Please arrive 15 minutes early.";
+      "Reminder \u{1F4C5}\n\n" +
+      "Hi " + firstName + ", your trip is tomorrow!\n\n" +
+      tourNameR + "\n" +
+      timeStr + "\n" +
+      qtyStr + " guest" + (Number(booking.qty || 0) === 1 ? "" : "s") + "\n\n" +
+      "\u{1F4CD} Meeting point: " + meetingPoint + "\n" +
+      "Please arrive 15 minutes early.\n\n" +
+      "\u{1F392} Bring: Sunscreen, hat, towel, water bottle\n\n" +
+      "Need to make changes? " + myBookingsUrl;
 
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
         name: "booking_reminder",
         params: [
           firstName,
-          booking?.tours?.name || "Your booking",
-          formatTenantDateTime(tenant.business, startTime),
-          String(booking.qty),
+          tourNameR,
+          timeStr,
+          qtyStr,
           meetingPoint,
+          myBookingsUrl,
         ],
       });
       await logSent(businessId, booking.id, booking.phone, "REMINDER");
@@ -184,14 +202,16 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     await db.from("bookings").update({ status: "COMPLETED" }).eq("id", booking.id).in("status", ["PAID", "CONFIRMED"]);
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
+    var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
     var message =
-      "Hi " + firstName + ", thanks for joining " + brandName + " today.\n\n" +
-      "We’d love a quick review if you have a moment. Your feedback helps our team a lot.";
+      "Hi " + firstName + ", thanks for joining " + brandName + " today! \u{1F30A}\n\n" +
+      "We\u2019d love a quick review if you have a moment \u2014 it really helps other adventurers find us and means the world to our small team.\n\n" +
+      "Your trip photos and booking details: " + myBookingsUrl;
 
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
         name: "review_request",
-        params: [firstName],
+        params: [firstName, brandName, myBookingsUrl],
       });
       await logSent(businessId, booking.id, booking.phone, "REVIEW_REQUEST");
       sent++;
@@ -252,10 +272,14 @@ async function sendReEngagementForBusiness(businessId: string) {
     if ((alreadyEngaged || []).length > 0) continue;
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
-    var message = "Hi " + firstName + ", it’s been a while since your last trip with " + brandName + ". We’d love to welcome you back.";
+    var bookingSiteUrl = tenant.business.booking_site_url || resolveManageBookingsUrl(tenant.business).replace("/my-bookings", "");
+    var message = "Hi " + firstName + ", it\u2019s been a while since your last trip with " + brandName + "! \u{1F6F6}\n\nWe\u2019d love to welcome you back on the water. Browse our latest trips and availability:\n" + bookingSiteUrl;
 
     try {
-      await sendWhatsappTextForTenant(tenant, booking.phone, message);
+      await sendWhatsappTextForTenant(tenant, booking.phone, message, {
+        name: "re_engage",
+        params: [firstName, brandName, bookingSiteUrl],
+      });
       await db.from("auto_messages").insert({ business_id: businessId, phone: booking.phone, type: "RE_ENGAGE" });
       sent++;
     } catch (error) {
@@ -273,7 +297,7 @@ async function autoTimeoutHumanChatsForBusiness(businessId: string) {
   var { data: staleConvos } = await db.from("conversations")
     .select("id, phone, last_message_at, updated_at")
     .eq("business_id", businessId)
-    .eq("state", "HUMAN")
+    .eq("status", "HUMAN")
     .lt("updated_at", fortyEightHoursAgo);
 
   var reverted = 0;
@@ -282,7 +306,7 @@ async function autoTimeoutHumanChatsForBusiness(businessId: string) {
     // Double-check last_message_at if available
     if (convo.last_message_at && convo.last_message_at > fortyEightHoursAgo) continue;
 
-    await db.from("conversations").update({ state: "IDLE" }).eq("id", convo.id);
+    await db.from("conversations").update({ status: "BOT", current_state: "IDLE" }).eq("id", convo.id);
     console.log("HUMAN_TIMEOUT_REVERTED convo=" + convo.id + " phone=" + convo.phone);
     reverted++;
   }

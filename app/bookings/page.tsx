@@ -193,6 +193,7 @@ export default function Bookings() {
 
   async function loadBookings() {
     if (!businessId) return;
+    console.log("[BOOKINGS] loadBookings started", { businessId, rangeStart: rangeStart.toISOString(), rangeEnd: rangeEnd.toISOString() });
     setLoading(true);
 
     // Step 1: Get slot IDs in the date range
@@ -204,7 +205,7 @@ export default function Bookings() {
       .lte("start_time", rangeEnd.toISOString());
 
     if (slotErr) {
-      console.error("LOAD_SLOTS_ERR:", slotErr.message, slotErr.code, slotErr.details);
+      console.error("[BOOKINGS] loadBookings slot fetch error:", slotErr.message, slotErr.code, slotErr.details);
     }
 
     const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
@@ -225,7 +226,7 @@ export default function Bookings() {
           .order("created_at", { ascending: true })
           .limit(2000);
         if (error) {
-          console.error("LOAD_BOOKINGS_ERR:", error.message, error.code, error.details, error.hint);
+          console.error("[BOOKINGS] loadBookings batch fetch error:", error.message, error.code, error.details, error.hint);
         }
         if (data) allBookings.push(...data);
       }
@@ -258,6 +259,7 @@ export default function Bookings() {
         slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
       }));
 
+    console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length });
     setBookings(normalized as Booking[]);
     setLoading(false);
   }
@@ -393,6 +395,7 @@ export default function Bookings() {
 
   function handleMonthChange(value: string) {
     if (!value) return;
+    console.log("[BOOKINGS] handleMonthChange", { value });
     const [year, month] = value.split("-");
 
     // Set to 1st of the selected month
@@ -407,6 +410,7 @@ export default function Bookings() {
   }
 
   async function resendInvoiceForBooking(bookingId: string) {
+    console.log("[BOOKINGS] resendInvoiceForBooking", { bookingId });
     setResendingInvoiceId(bookingId);
     try {
       // Find the booking in our local state
@@ -507,6 +511,7 @@ export default function Bookings() {
 
   async function saveEditBooking() {
     if (!editBooking) return;
+    console.log("[BOOKINGS] saveEditBooking", { bookingId: editBooking.id, editForm });
     const qty = Math.max(1, Number(editForm.qty) || 1);
     const total = Number(editForm.total_amount) || 0;
     setActionBookingId(editBooking.id);
@@ -578,6 +583,7 @@ export default function Bookings() {
   }
 
   async function markPaid(b: Booking) {
+    console.log("[BOOKINGS] markPaid", { bookingId: b.id, currentStatus: b.status });
     setActionBookingId(b.id);
     try {
       const res = await supabase.functions.invoke("manual-mark-paid", {
@@ -598,6 +604,7 @@ export default function Bookings() {
   }
 
   async function cancelBooking(b: Booking) {
+    console.log("[BOOKINGS] cancelBooking", { bookingId: b.id, status: b.status, customerName: b.customer_name });
     const isVoucherPaid = ((b as any).payment_method || "").toUpperCase() === "VOUCHER" || ((b as any).payment_method || "").toUpperCase() === "GIFT_VOUCHER";
     const confirmMsg = isVoucherPaid
       ? `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? This booking was paid via voucher — a new voucher will be issued for the full amount (no refund to card).`
@@ -721,6 +728,7 @@ export default function Bookings() {
   }
 
   async function cancelSlotWeather(group: SlotGroup) {
+    console.log("[BOOKINGS] cancelSlotWeather", { timeLabel: group.timeLabel, bookingCount: group.bookings.length });
     const activeBks = group.bookings.filter(b => !["CANCELLED", "REFUNDED"].includes(b.status));
     const slotId = group.bookings[0]?.slot_id;
     if (!slotId) return;
@@ -837,6 +845,7 @@ export default function Bookings() {
     if (!refundDialog || refunding) return;
     const b = refundDialog.booking;
     const amount = parseFloat(refundDialog.amount);
+    console.log("[BOOKINGS] processRefund", { bookingId: b.id, amount, hasYocoCheckout: !!b.yoco_checkout_id });
     if (isNaN(amount) || amount <= 0) { notify({ title: "Invalid refund amount", message: "Enter a valid refund amount.", tone: "warning" }); return; }
     if (amount > Number(b.total_amount || 0)) { notify({ title: "Refund too high", message: "Refund cannot exceed the booking total.", tone: "warning" }); return; }
     if (!checkRefundLimit()) return;
@@ -891,6 +900,7 @@ export default function Bookings() {
   }
 
   async function sendPaymentLink(b: Booking) {
+    console.log("[BOOKINGS] sendPaymentLink", { bookingId: b.id, email: b.email, amount: b.total_amount });
     if (!b.email) {
       notify({ title: "Missing email", message: "No email address on this booking. Please edit the booking to add an email first.", tone: "warning" });
       return;
@@ -913,34 +923,8 @@ export default function Bookings() {
       }
       const data = res.data;
       if (data?.redirectUrl) {
+        // create-checkout now sends WhatsApp + email notifications automatically
         const ref = b.id.substring(0, 8).toUpperCase();
-        const tourName = b.tours?.name || "Sea Kayak Tour";
-        const tourDate = b.slots?.start_time
-          ? new Date(b.slots.start_time).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
-          : "TBC";
-
-        // Send email with payment link
-        try {
-          await supabase.functions.invoke("send-email", {
-            body: {
-              type: "PAYMENT_LINK",
-              data: {
-                business_id: businessId,
-                email: b.email,
-                customer_name: b.customer_name || "Customer",
-                ref,
-                tour_name: tourName,
-                tour_date: tourDate,
-                qty: b.qty,
-                total_amount: Number(b.total_amount || 0).toFixed(2),
-                payment_url: data.redirectUrl,
-              },
-            },
-          });
-        } catch (emailErr) {
-          console.error("Email send failed:", emailErr);
-        }
-
         setPaymentLinkUrl(data.redirectUrl);
         setPaymentLinkRef(ref);
         loadBookings();
@@ -954,6 +938,7 @@ export default function Bookings() {
   }
 
   async function quickResendPaymentLink(b: Booking) {
+    console.log("[BOOKINGS] quickResendPaymentLink", { bookingId: b.id, email: b.email });
     if (!b.email) {
       notify({ title: "Missing email", message: "No email address on this booking.", tone: "warning" });
       return;
@@ -976,28 +961,8 @@ export default function Bookings() {
       }
       const data = res.data;
       if (data?.redirectUrl) {
-        const ref = b.id.substring(0, 8).toUpperCase();
-        const tourName = b.tours?.name || "Sea Kayak Tour";
-        const tourDate = b.slots?.start_time
-          ? new Date(b.slots.start_time).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
-          : "TBC";
-        await supabase.functions.invoke("send-email", {
-          body: {
-            type: "PAYMENT_LINK",
-            data: {
-              business_id: businessId,
-              email: b.email,
-              customer_name: b.customer_name || "Customer",
-              ref,
-              tour_name: tourName,
-              tour_date: tourDate,
-              qty: b.qty,
-              total_amount: Number(b.total_amount || 0).toFixed(2),
-              payment_url: data.redirectUrl,
-            },
-          },
-        });
-        notify({ title: "Payment link sent", message: `Emailed to ${b.email}`, tone: "success" });
+        // create-checkout now sends WhatsApp + email notifications automatically
+        notify({ title: "Payment link sent", message: `Sent to ${b.email}${b.phone ? " & WhatsApp" : ""}`, tone: "success" });
         loadBookings();
       } else {
         notify({ title: "Payment link failed", message: "No redirect URL returned", tone: "error" });
@@ -1032,6 +997,7 @@ export default function Bookings() {
 
   async function saveRebook() {
     if (!rebookBooking || !rebookSlotId) return;
+    console.log("[BOOKINGS] saveRebook", { bookingId: rebookBooking.id, newSlotId: rebookSlotId, excessAction: rebookExcessAction });
     setActionBookingId(rebookBooking.id);
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
       body: {
@@ -1069,6 +1035,7 @@ export default function Bookings() {
 
   async function sendWhatsAppGreeting() {
     if (!waDialog || !waMessage.trim() || waSending) return;
+    console.log("[BOOKINGS] sendWhatsAppGreeting", { phone: waDialog.phone, name: waDialog.name });
     setWaSending(true);
     try {
       const phone = waDialog.phone;

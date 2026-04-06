@@ -682,6 +682,105 @@ Deno.serve(async (req: Request) => {
       // Calculate hold expiry based on the requested hold duration
       const holdExpiresAt = new Date(Date.now() + holdDurationMinutes * 60 * 1000).toISOString();
 
+      // ── Post-booking notifications (payment link or confirmation) ──
+      const bookingStatus = result.status || String(body.status || "PAID").trim().toUpperCase();
+      const customerEmail = normalizeEmail(body.email);
+      const customerPhone = normalizePhone(body.phone);
+      const customerName = String(body.customer_name || "").trim();
+      const firstName = customerName.split(" ")[0] || "there";
+      const bookingRef = String(result.booking_id || "").slice(0, 8).toUpperCase();
+      const slotInfo = slotSummary(slot, businessTimezone);
+      var paymentUrl: string | null = null;
+
+      if (result.booking_id && code !== "ALREADY_EXISTS") {
+        if ((bookingStatus === "PENDING" || bookingStatus === "HELD") && totalPaid > 0) {
+          // Create Yoco checkout for pending bookings — create-checkout handles WA + email notifications
+          try {
+            const checkoutRes = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                amount: totalPaid,
+                booking_id: result.booking_id,
+                type: "BOOKING",
+                customer_name: customerName,
+                qty,
+                business_id: businessId,
+              }),
+            });
+            const checkoutData = await checkoutRes.json();
+
+            if (checkoutData?.redirectUrl) {
+              paymentUrl = checkoutData.redirectUrl;
+              console.log("EXT_BOOKING_CHECKOUT_OK booking=" + result.booking_id + " url=" + paymentUrl);
+            } else {
+              console.error("EXT_BOOKING_CHECKOUT_NO_URL booking=" + result.booking_id + " response=" + JSON.stringify(checkoutData));
+            }
+          } catch (checkoutErr) {
+            console.error("EXT_BOOKING_CHECKOUT_ERR booking=" + result.booking_id + ":", checkoutErr);
+          }
+        } else if (bookingStatus === "PAID" || bookingStatus === "CONFIRMED") {
+          // Send confirmation for already-paid bookings
+          if (customerPhone) {
+            try {
+              await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  to: customerPhone,
+                  business_id: businessId,
+                  message:
+                    "\uD83C\uDF89 *Booking Confirmed!*\n\n" +
+                    "\uD83D\uDCCB Ref: " + bookingRef + "\n" +
+                    "\uD83D\uDEF6 " + tour.name + "\n" +
+                    "\uD83D\uDCC5 " + slotInfo.start_time_local + "\n" +
+                    "\uD83D\uDC65 " + qty + " people\n" +
+                    "\uD83D\uDCB0 R" + totalPaid.toFixed(2) + "\n\n" +
+                    "We can\u2019t wait to see you! \uD83C\uDF0A",
+                }),
+              });
+              console.log("EXT_BOOKING_WA_CONFIRM_SENT booking=" + result.booking_id);
+            } catch (waErr) {
+              console.error("EXT_BOOKING_WA_CONFIRM_ERR:", waErr);
+            }
+          }
+          if (customerEmail) {
+            try {
+              await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  type: "BOOKING_CONFIRM",
+                  data: {
+                    email: customerEmail,
+                    booking_id: result.booking_id,
+                    business_id: businessId,
+                    customer_name: customerName || firstName,
+                    ref: bookingRef,
+                    tour_name: tour.name,
+                    start_time: slotInfo.start_time_local,
+                    qty,
+                    total_amount: totalPaid.toFixed(2),
+                  },
+                }),
+              });
+              console.log("EXT_BOOKING_EMAIL_CONFIRM_SENT booking=" + result.booking_id);
+            } catch (emailErr) {
+              console.error("EXT_BOOKING_EMAIL_CONFIRM_ERR:", emailErr);
+            }
+          }
+        }
+      }
+
       return await send(200, code, code === "ALREADY_EXISTS" ? "Booking already exists" : "Booking created", {
         business_id: businessId,
         booking_id: result.booking_id || null,
@@ -694,6 +793,7 @@ Deno.serve(async (req: Request) => {
         hold_expires_at: holdExpiresAt,
         slot: slotSummary(slot, businessTimezone),
         idempotent: code === "ALREADY_EXISTS",
+        payment_url: paymentUrl,
       });
     }
 

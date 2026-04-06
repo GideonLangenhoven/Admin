@@ -2,15 +2,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { getAdminAppOrigins } from "../_shared/tenant.ts";
+import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
-var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-// RESEND_FROM_EMAIL must be a verified sender on a domain you control (e.g. "bookings@capekayakplatform.com")
-// to pass DMARC/SPF checks. Tenant-specific reply addresses go in the Reply-To header instead.
-// If unset, Resend's onboarding@resend.dev test domain is used — which only delivers to your Resend account email.
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Bookings <onboarding@resend.dev>";
+// Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
+// Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -18,7 +17,7 @@ var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
 function getCors(req?: Request) {
   var origins = getAdminAppOrigins();
   var origin = req?.headers?.get("origin") || "";
-  var allowed = origins.includes(origin) ? origin : origins[0];
+  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -83,8 +82,8 @@ var IMG_PHOTOS = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80
 
 
 var SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
-var MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures%2C+180+Beach+Rd%2C+Three+Anchor+Bay%2C+Cape+Town%2C+8005";
-var MANAGE_BOOKING_URL = "https://book.capekayak.co.za/my-bookings";
+var MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005";
+var MANAGE_BOOKING_URL = "https://booking-mu-steel.vercel.app/my-bookings";
 
 async function enrichWaiverEmailData(d: Record<string, unknown>) {
   if (!supabase) return d;
@@ -148,8 +147,8 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       footerLineOne: "Thanks for choosing our team.",
       footerLineTwo: "Reply to this email if you need anything.",
       manageBookingUrl: String(d.manage_bookings_url || MANAGE_BOOKING_URL),
-      bookingSiteUrl: String(d.booking_site_url || "https://book.capekayak.co.za"),
-      voucherUrl: String(d.gift_voucher_url || d.booking_site_url || "https://book.capekayak.co.za"),
+      bookingSiteUrl: String(d.booking_site_url || MANAGE_BOOKING_URL.replace("/my-bookings", "")),
+      voucherUrl: String(d.gift_voucher_url || d.booking_site_url || MANAGE_BOOKING_URL.replace("/my-bookings", "/gift-voucher")),
       waiverUrl: String(d.waiver_url || ""),
       directions: String(d.directions || ""),
       fromEmail: FROM_EMAIL,
@@ -161,7 +160,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, notification_email, from_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, subdomain, notification_email, from_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -187,15 +186,17 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     shortBrandName: brandName,
     footerLineOne: String(data?.footer_line_one || "Thanks for choosing " + brandName + "."),
     footerLineTwo: String(data?.footer_line_two || "Reply to this email if you need anything."),
-    manageBookingUrl: String(data?.manage_bookings_url || d.manage_bookings_url || MANAGE_BOOKING_URL),
-    bookingSiteUrl: String(data?.booking_site_url || d.booking_site_url || "https://book.capekayak.co.za"),
-    voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || data?.booking_site_url || d.booking_site_url || "https://book.capekayak.co.za"),
+    manageBookingUrl: String(data?.manage_bookings_url || d.manage_bookings_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/my-bookings" : MANAGE_BOOKING_URL)),
+    bookingSiteUrl: String(data?.booking_site_url || d.booking_site_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za" : "https://booking-mu-steel.vercel.app")),
+    voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/gift-voucher" : "https://booking-mu-steel.vercel.app/gift-voucher")),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
-    // Per-business from_email if configured (must be verified in Resend), otherwise fall back to platform default
+    // Per-business from_email: explicit > subdomain-derived > platform default
     fromEmail: data?.from_email
       ? brandName + " <" + data.from_email + ">"
-      : (FROM_EMAIL.includes("@") ? brandName + " <" + FROM_EMAIL.replace(/^[^<]*</, "").replace(/>.*$/, "") + ">" : FROM_EMAIL),
+      : data?.subdomain
+        ? brandName + " <noreply@" + data.subdomain + ".bookingtours.co.za>"
+        : (FROM_EMAIL.includes("@") ? brandName + " <" + FROM_EMAIL.replace(/^[^<]*</, "").replace(/>.*$/, "") + ">" : FROM_EMAIL),
     // Reply-To uses the tenant's notification_email so customer replies go to the right place
     replyToEmail: String(data?.notification_email || ""),
     emailColor: String(data?.email_color || "#1b3b36"),
@@ -220,8 +221,8 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     ["Cape Kayak Admin Dashboard", branding.brandName + " Admin Dashboard"],
     ["Cape Kayak Admin", branding.brandName + " Admin"],
     ["Cape Kayak", branding.shortBrandName],
-    ["https://book.capekayak.co.za/my-bookings", branding.manageBookingUrl],
-    ["https://book.capekayak.co.za", branding.bookingSiteUrl],
+    ["{{BOOKING_URL}}/my-bookings", branding.manageBookingUrl],
+    ["{{BOOKING_URL}}", branding.bookingSiteUrl],
   ];
 
   for (var i = 0; i < replacements.length; i++) {
@@ -229,13 +230,13 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   }
 
   if (branding.voucherUrl) {
-    brandedHtml = brandedHtml.split("book at book.capekayak.co.za").join("book at " + branding.voucherUrl);
+    brandedHtml = brandedHtml.split("book at {{BOOKING_URL}}").join("book at " + branding.voucherUrl);
   }
   if (branding.directions) {
     brandedHtml = brandedHtml
       .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            If you have any questions, reply to this email or contact us on WhatsApp.")
       .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo)
-      .split("Three Anchor Bay, Sea Point, Cape Town<br>Book at book.capekayak.co.za or WhatsApp us.")
+      .split("Three Anchor Bay, Sea Point, Cape Town<br>Book at {{BOOKING_URL}} or WhatsApp us.")
       .join(branding.footerLineOne + "<br>Book at " + branding.voucherUrl + " or reply to this email.")
       .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            Thank you for adventuring with us!")
       .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo);
@@ -655,7 +656,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
-            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Book at book.capekayak.co.za or WhatsApp us.</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Book at {{BOOKING_URL}} or WhatsApp us.</p>
           </td>
         </tr>
       </table>
@@ -932,9 +933,9 @@ function voucherHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
-              Use this code when booking at <a href="https://book.capekayak.co.za" style="color: #2a5a52; font-weight: bold; text-decoration: none;">book.capekayak.co.za</a>
+              Use this code when booking at <a href="{{BOOKING_URL}}" style="color: #2a5a52; font-weight: bold; text-decoration: none;">{{BOOKING_URL}}</a>
             </p>
-            <a href="https://book.capekayak.co.za" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Now</a>
+            <a href="{{BOOKING_URL}}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Now</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -1023,9 +1024,9 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
-              You can use the remaining R${d.remaining_balance || 0} credit on your next booking at <a href="https://book.capekayak.co.za" style="color: #2a5a52; font-weight: bold; text-decoration: none;">book.capekayak.co.za</a>
+              You can use the remaining R${d.remaining_balance || 0} credit on your next booking at <a href="{{BOOKING_URL}}" style="color: #2a5a52; font-weight: bold; text-decoration: none;">{{BOOKING_URL}}</a>
             </p>
-            <a href="https://book.capekayak.co.za" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Again</a>
+            <a href="{{BOOKING_URL}}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Again</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -1105,9 +1106,9 @@ function tripPhotosHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
-              We'd love to see you again! Book your next adventure anytime at <a href="https://book.capekayak.co.za" style="color: #2a5a52; font-weight: bold; text-decoration: none;">book.capekayak.co.za</a>
+              We'd love to see you again! Book your next adventure anytime at <a href="{{BOOKING_URL}}" style="color: #2a5a52; font-weight: bold; text-decoration: none;">{{BOOKING_URL}}</a>
             </p>
-            <a href="https://book.capekayak.co.za" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 30px; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Book Again</a>
+            <a href="{{BOOKING_URL}}" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 30px; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Book Again</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -1550,9 +1551,21 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
+    if (!RESEND_API_KEY) {
+      console.error("SEND_EMAIL: RESEND_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "Email service not configured" }), { status: 503, headers: getCors(req) });
+    }
+
     var body = await req.json();
     var type = body.type as string;
     var d = body.data as Record<string, unknown>;
+
+    // Escape user-controlled fields to prevent HTML injection in email templates
+    var fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
+    for (var fi = 0; fi < fieldsToEscape.length; fi++) {
+      var fk = fieldsToEscape[fi];
+      if (d[fk] && typeof d[fk] === "string") d[fk] = escHtml(d[fk] as string);
+    }
 
     var branding: Awaited<ReturnType<typeof loadEmailBranding>>;
     try {
@@ -1560,7 +1573,7 @@ Deno.serve(async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       var fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: "https://book.capekayak.co.za", voucherUrl: "https://book.capekayak.co.za", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "" };
+      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: MANAGE_BOOKING_URL.replace("/my-bookings", ""), voucherUrl: MANAGE_BOOKING_URL.replace("/my-bookings", "/gift-voucher"), waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {

@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getAdminAppOrigins } from "../_shared/tenant.ts";
+import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -9,7 +9,7 @@ function getCors(req: Request) {
   const allowed = getAdminAppOrigins();
   const origin = req.headers.get("origin") || "";
   return {
-    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0],
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin, allowed) ? origin : allowed[0],
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
@@ -69,8 +69,7 @@ Deno.serve(async (req: Request) => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
             body: JSON.stringify({ to: b.phone, message: parsedMessage, business_id })
           });
-          if (waRes.ok) waSent++;
-          sentToCustomer = true;
+          if (waRes.ok) { waSent++; sentToCustomer = true; }
         } catch (e) {
           errors.push(`WA to ${b.phone}: ${e}`);
         }
@@ -94,11 +93,11 @@ Deno.serve(async (req: Request) => {
           });
           if (emailRes.ok) {
             emailSent++;
+            sentToCustomer = true;
           } else {
             const errText = await emailRes.text();
             errors.push(`Email err [${emailRes.status}]: ${errText}`);
           }
-          sentToCustomer = true;
         } catch (e) {
           errors.push(`Email to ${b.email}: ${e}`);
         }

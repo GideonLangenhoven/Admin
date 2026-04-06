@@ -1,11 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins } from "../_shared/tenant.ts";
+import { createServiceClient, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 function getCors(req?: any) {
   var origins = getAdminAppOrigins();
   var origin = req?.headers?.get("origin") || "";
-  var allowed = origins.includes(origin) ? origin : origins[0];
-  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
+  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
 Deno.serve(async (req: any) => {
@@ -27,7 +27,11 @@ Deno.serve(async (req: any) => {
     if (!businessId) return new Response(JSON.stringify({ error: "business_id or booking_id is required" }), { status: 400, headers: getCors(req) });
 
     var tenant = await getTenantByBusinessId(supabase, businessId);
-    await sendWhatsappTextForTenant(tenant, to, message);
+    // Support template fallback for outbound messages outside the 24h window
+    var templateFallback = body.template_fallback
+      ? { name: body.template_fallback.name, params: body.template_fallback.params || [], language: body.template_fallback.language }
+      : undefined;
+    await sendWhatsappTextForTenant(tenant, to, message, templateFallback);
 
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
   } catch (err) {

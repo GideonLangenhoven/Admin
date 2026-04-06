@@ -81,6 +81,7 @@ Deno.serve(async (req: any) => {
     var customerEmail = body.customer_email || "";
     var type = body.type || "BOOKING";
     var topupBusinessId = body.business_id;
+    var skipNotifications = body.skip_notifications === true;
 
     if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
@@ -268,6 +269,97 @@ Deno.serve(async (req: any) => {
       if (voucherId) {
         await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", voucherId);
       }
+
+      // Send payment link via WhatsApp + email for BOOKING checkouts (unless caller already handles notifications)
+      if (type === "BOOKING" && bookingId && !skipNotifications) {
+        try {
+          var SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
+          var SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+          // Fetch full booking details for notification
+          var bkNotif = await supabase.from("bookings")
+            .select("id, business_id, customer_name, email, phone, qty, total_amount, slots(start_time), tours(name)")
+            .eq("id", bookingId)
+            .maybeSingle();
+          var bk = bkNotif.data;
+          if (bk && SERVICE_ROLE_KEY_ENV) {
+            var notifEmail = String(bk.email || customerEmail || "").trim().toLowerCase();
+            var notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
+            if (notifPhone && notifPhone.startsWith("0")) notifPhone = "27" + notifPhone.substring(1);
+            var notifName = String(bk.customer_name || body.customer_name || "").trim();
+            var notifFirst = notifName.split(" ")[0] || "there";
+            var notifRef = String(bk.id || "").slice(0, 8).toUpperCase();
+            var notifTour = (bk.tours as any)?.name || "Tour";
+            var notifSlot = bk.slots as any;
+            var notifTime = "";
+            if (notifSlot?.start_time) {
+              try {
+                var tz = tenant.business?.timezone || "Africa/Johannesburg";
+                notifTime = new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz }).format(new Date(notifSlot.start_time));
+              } catch { notifTime = String(notifSlot.start_time || ""); }
+            }
+            var notifAmount = Number(bk.total_amount || amount || 0);
+            var notifQty = Number(bk.qty || body.qty || 1);
+
+            // Send WhatsApp with payment link
+            if (notifPhone) {
+              try {
+                await fetch(SUPABASE_URL_ENV + "/functions/v1/send-whatsapp-text", {
+                  method: "POST",
+                  headers: { Authorization: "Bearer " + SERVICE_ROLE_KEY_ENV, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: notifPhone,
+                    business_id: bk.business_id,
+                    message:
+                      "Hi " + notifFirst + "!\n\n" +
+                      "Here\u2019s your payment link to confirm your booking:\n\n" +
+                      "\uD83D\uDEF6 " + notifTour + "\n" +
+                      "\uD83D\uDCC5 " + notifTime + "\n" +
+                      "\uD83D\uDC65 " + notifQty + " people\n" +
+                      "\uD83D\uDCB0 R" + notifAmount.toFixed(2) + "\n\n" +
+                      "\uD83D\uDD17 Pay here: " + yocoData.redirectUrl + "\n\n" +
+                      "\u23F0 Please complete payment to secure your spot.",
+                  }),
+                });
+                console.log("CHECKOUT_WA_PAYMENT_LINK_SENT booking=" + bookingId);
+              } catch (waErr) {
+                console.error("CHECKOUT_WA_PAYMENT_LINK_ERR:", waErr);
+              }
+            }
+
+            // Send email with payment link
+            if (notifEmail && notifEmail.includes("@")) {
+              try {
+                await fetch(SUPABASE_URL_ENV + "/functions/v1/send-email", {
+                  method: "POST",
+                  headers: { Authorization: "Bearer " + SERVICE_ROLE_KEY_ENV, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "PAYMENT_LINK",
+                    data: {
+                      email: notifEmail,
+                      booking_id: bookingId,
+                      business_id: bk.business_id,
+                      customer_name: notifName || notifFirst,
+                      ref: notifRef,
+                      tour_name: notifTour,
+                      tour_date: notifTime,
+                      qty: notifQty,
+                      total_amount: notifAmount.toFixed(2),
+                      payment_url: yocoData.redirectUrl,
+                    },
+                  }),
+                });
+                console.log("CHECKOUT_EMAIL_PAYMENT_LINK_SENT booking=" + bookingId);
+              } catch (emailErr) {
+                console.error("CHECKOUT_EMAIL_PAYMENT_LINK_ERR:", emailErr);
+              }
+            }
+          }
+        } catch (notifErr) {
+          // Notifications are best-effort — don't fail the checkout
+          console.error("CHECKOUT_NOTIFICATION_ERR:", notifErr);
+        }
+      }
+
       return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl }), { status: 200, headers: corsHeaders });
     }
 

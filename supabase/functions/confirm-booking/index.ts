@@ -4,6 +4,7 @@ import {
   formatTenantDateTime,
   getBusinessDisplayName,
   getTenantByBusinessId,
+  resolveManageBookingsUrl,
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
@@ -49,16 +50,17 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, reason: "Booking not paid yet" }), { status: 200, headers: cors() });
     }
 
-    // Idempotency: skip if confirmation was already sent
-    var existing = await supabase
+    // Idempotency: atomically insert the log FIRST to claim the send.
+    // If another request already inserted it, this returns null (conflict) and we skip.
+    var { data: claimData } = await supabase
       .from("logs")
-      .select("id")
-      .eq("booking_id", bookingId)
-      .eq("event", "booking_confirmation_notifications_sent")
-      .limit(1)
-      .maybeSingle();
+      .upsert(
+        { booking_id: bookingId, business_id: booking.business_id, event: "booking_confirmation_notifications_sent", payload: { claimed_at: new Date().toISOString() } },
+        { onConflict: "booking_id,event", ignoreDuplicates: true }
+      )
+      .select("id");
 
-    if (existing.data?.id) {
+    if (!claimData || claimData.length === 0) {
       return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
     }
 
@@ -95,23 +97,24 @@ Deno.serve(async (req: any) => {
 
     if (booking.phone) {
       try {
+        var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
         await sendWhatsappTextForTenant(
           tenant,
           booking.phone,
-          "Booking confirmed\n\n" +
+          "Booking Confirmed \u2705\n\n" +
           "Ref: " + ref + "\n" +
           tourName + "\n" +
           slotTime + "\n" +
           booking.qty + " guest" + (booking.qty === 1 ? "" : "s") + "\n" +
-          currency + " " + booking.total_amount + " paid\n" +
-          "Invoice: " + (invoice?.invoice_number || "pending") + "\n\n" +
+          currency + " " + booking.total_amount + " paid\n\n" +
           (waiver.waiverStatus !== "SIGNED" && waiver.waiverLink
-            ? (isLastMinute ? "IMPORTANT - Please sign your waiver before the trip:\n" : "Waiver: ") + waiver.waiverLink + "\n\n"
+            ? (isLastMinute ? "\u26A0\uFE0F Please sign your waiver before the trip:\n" : "\u{1F4DD} Waiver: ") + waiver.waiverLink + "\n\n"
             : "") +
-          "Thanks for booking with " + brandName + ".",
+          "Manage your booking anytime:\n" + myBookingsUrl + "\n\n" +
+          "Thanks for booking with " + brandName + " \u2014 see you on the water!",
           {
             name: "booking_confirmed",
-            params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount],
+            params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount, myBookingsUrl],
           },
         );
         waSent = true;
