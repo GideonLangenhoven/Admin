@@ -11,18 +11,18 @@ import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import {
-  ArrowLeftRight, Check, Circle,
-  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
-  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
-  BadgeDollarSign, LineChart, Mail, Settings, Shield,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+  ArrowsLeftRight, Check, Circle,
+  SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
+  ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
+} from "@phosphor-icons/react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
-const iconMap: Record<string, LucideIcon> = {
-  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
-  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
-  BadgeDollarSign, LineChart, Mail, Settings, Shield,
-  ArrowLeftRight, Check, Circle,
+const iconMap: Record<string, PhosphorIcon> = {
+  LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
+  MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
+  ArrowLeftRight: ArrowsLeftRight, Check, Circle,
 };
 
 interface NavItem {
@@ -131,7 +131,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-text)" }}
               title={"Switch to: " + (operators.find((o) => o.id !== businessId)?.name || "next")}
             >
-              <ArrowLeftRight size={16} />
+              <ArrowsLeftRight size={16} />
             </button>
           </div>
         )}
@@ -158,10 +158,10 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   <span className="flex items-center justify-center" style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
                     {isActive && n.href === "/" ? (
                       <div className="flex items-center justify-center h-[18px] w-[18px] rounded-full" style={{ background: "var(--ck-accent)" }}>
-                        <Check size={12} color="white" strokeWidth={4} />
+                        <Check size={12} color="white" />
                       </div>
                     ) : (
-                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                      <Icon size={18} />
                     )}
                   </span>
                   {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
@@ -200,7 +200,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             return (
               <Link key={n.href} href={n.href} className="relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] font-medium" style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                 <div className="relative mb-1">
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  <Icon size={20} />
                   {n.href === "/inbox" && <div className="absolute -top-1 -right-2 transform scale-75"><NotificationBadge /></div>}
                   {n.href === "/refunds" && <div className="absolute -top-1 -right-2 transform scale-75"><RefundBadge /></div>}
                 </div>

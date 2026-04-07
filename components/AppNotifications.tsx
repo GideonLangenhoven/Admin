@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
+import { Warning, CheckCircle, Info, X } from "@phosphor-icons/react";
 import {
   registerAppNotifications,
   unregisterAppNotifications,
@@ -20,9 +20,9 @@ type ConfirmState = AppConfirmPayload & {
 
 const TONE_STYLES: Record<AppNoticeTone, { card: string; icon: string; Icon: typeof Info }> = {
   info: { card: "border-sky-200 bg-sky-50 text-sky-900", icon: "text-sky-600", Icon: Info },
-  success: { card: "border-emerald-200 bg-emerald-50 text-emerald-900", icon: "text-emerald-600", Icon: CheckCircle2 },
-  warning: { card: "border-amber-200 bg-amber-50 text-amber-900", icon: "text-amber-600", Icon: TriangleAlert },
-  error: { card: "border-red-200 bg-red-50 text-red-900", icon: "text-red-600", Icon: AlertTriangle },
+  success: { card: "border-emerald-200 bg-emerald-50 text-emerald-900", icon: "text-emerald-600", Icon: CheckCircle },
+  warning: { card: "border-amber-200 bg-amber-50 text-amber-900", icon: "text-amber-600", Icon: Warning },
+  error: { card: "border-red-200 bg-red-50 text-red-900", icon: "text-red-600", Icon: Warning },
 };
 
 export default function AppNotifications() {
@@ -125,7 +125,7 @@ export default function AppNotifications() {
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[101] flex justify-center px-4">
           <div className={`pointer-events-auto w-full max-w-2xl rounded-3xl border p-5 shadow-2xl ${TONE_STYLES[confirmState.tone || "warning"].card}`}>
             <div className="flex items-start gap-3">
-              <TriangleAlert className={`mt-0.5 shrink-0 ${TONE_STYLES[confirmState.tone || "warning"].icon}`} size={20} />
+              <Warning className={`mt-0.5 shrink-0 ${TONE_STYLES[confirmState.tone || "warning"].icon}`} size={20} />
               <div className="min-w-0 flex-1">
                 <p className="text-base font-semibold">{confirmState.title || "Please confirm"}</p>
                 <p className="mt-1 text-sm leading-6">{confirmState.message}</p>

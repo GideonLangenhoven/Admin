@@ -9,16 +9,16 @@ import RefundBadge from "./RefundBadge";
 import SignOutButton from "./SignOutButton";
 import ThemeToggle from "./ThemeToggle";
 import {
-  Circle, LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
-  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
-  BadgeDollarSign, LineChart, Mail, Settings, Shield,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+  Circle, SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
+  ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
+} from "@phosphor-icons/react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
-const iconMap: Record<string, LucideIcon> = {
-  LayoutDashboard, ClipboardList, PlusSquare, CalendarRange, Landmark,
-  MessageSquareText, Ticket, Receipt, CloudSun, Camera, Megaphone,
-  BadgeDollarSign, LineChart, Mail, Settings, Shield, Circle,
+const iconMap: Record<string, PhosphorIcon> = {
+  LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
+  MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck, Circle,
 };
 
 type NavItem = { href: string; label: string; icon: string };
@@ -97,7 +97,7 @@ export default function MobileMenuDrawer({ nav }: { nav: NavItem[] }) {
                   : { color: "var(--ck-sidebar-text)" }}
               >
                 <span className="flex items-center justify-center" style={{ color: active ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
-                  <Icon size={18} strokeWidth={active ? 2.4 : 2} />
+                  <Icon size={18} />
                 </span>
                 <span className="flex-1">{n.label}</span>
                 {n.href === "/inbox" && <NotificationBadge />}

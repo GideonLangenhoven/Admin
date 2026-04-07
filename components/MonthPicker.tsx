@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { format, parse, isValid } from "date-fns";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarBlank as CalendarIcon, CaretLeft as ChevronLeft, CaretRight as ChevronRight } from "@phosphor-icons/react";
 
 interface MonthPickerProps {
     value: string; // YYYY-MM

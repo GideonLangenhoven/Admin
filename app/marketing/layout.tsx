@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, LayoutTemplate, BarChart3, Zap, Tag } from "lucide-react";
+import { UsersThree, Layout, ChartBar, Lightning, Tag } from "@phosphor-icons/react";
 
 var tabs = [
-  { href: "/marketing", label: "Overview", icon: BarChart3, exact: true },
-  { href: "/marketing/contacts", label: "Contacts", icon: Users },
-  { href: "/marketing/templates", label: "Templates", icon: LayoutTemplate },
-  { href: "/marketing/automations", label: "Automations", icon: Zap },
+  { href: "/marketing", label: "Overview", icon: ChartBar, exact: true },
+  { href: "/marketing/contacts", label: "Contacts", icon: UsersThree },
+  { href: "/marketing/templates", label: "Templates", icon: Layout },
+  { href: "/marketing/automations", label: "Automations", icon: Lightning },
   { href: "/marketing/promotions", label: "Promos", icon: Tag },
 ];
 

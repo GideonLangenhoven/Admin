@@ -894,9 +894,10 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
             className={"rounded-xl border p-2.5 text-center transition-all cursor-pointer " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-50 hover:opacity-80")}
-            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", ringColor: "var(--ck-accent)" }}>
+            style={{ borderColor: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-border-subtle)", ["--tw-ring-color" as any]: "var(--ck-accent)" }}>
             <div className="w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center text-xs font-bold text-white" style={{ background: selectedTemplate === t.id ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>{t.preview}</div>
             <div className="text-[11px] font-semibold text-[var(--ck-text-strong)] leading-tight">{t.name}</div>
+          </button>
         ))}
       </div>
 
@@ -923,16 +924,16 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           {/* Actions */}
           <div className="grid grid-cols-3 gap-2">
             <button onClick={downloadHtml} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
-              📄 Download HTML
+              Download HTML
             </button>
             <button onClick={downloadProject} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
-              📦 Download for IDE
+              Download for IDE
             </button>
             <button onClick={() => {
               const w = window.open("", "_blank");
               if (w) { w.document.write(generatedHtml); w.document.close(); }
             }} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
-              🔗 Open Full Page
+              Open Full Page
             </button>
           </div>
 

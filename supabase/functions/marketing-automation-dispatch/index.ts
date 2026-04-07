@@ -128,13 +128,11 @@ Deno.serve(async (_req: Request) => {
           continue;
         }
 
-        // Load per-business from_email (explicit > subdomain-derived > platform default)
-        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain, from_email").eq("id", enrollment.business_id).maybeSingle();
-        const bizFromEmail = bizRow?.from_email
-          ? (bizRow.business_name || "Marketing") + " <" + bizRow.from_email + ">"
-          : bizRow?.subdomain
-            ? (bizRow.business_name || "Marketing") + " <noreply@" + bizRow.subdomain + ".bookingtours.co.za>"
-            : FROM_EMAIL;
+        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain").eq("id", enrollment.business_id).maybeSingle();
+        const bizName = bizRow?.business_name || "Marketing";
+        const bizFromEmail = bizRow?.subdomain
+          ? bizName + " <noreply@" + bizRow.subdomain + ".bookingtours.co.za>"
+          : FROM_EMAIL;
 
         // Load steps
         const { data: steps } = await supabase

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, Search, Upload, Trash2, X, Tag } from "lucide-react";
+import { Plus, MagnifyingGlass, UploadSimple, Trash, X, Tag } from "@phosphor-icons/react";
 import * as XLSX from "xlsx";
 
 interface Contact {
@@ -518,10 +518,10 @@ export default function ContactsPage() {
             <Tag size={14} /> Validate & Segment
           </button>
           <button onClick={previewCleanList} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            <Trash2 size={14} /> Clean List
+            <Trash size={14} /> Clean List
           </button>
           <button onClick={() => { setShowImport(true); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            <Upload size={14} /> Import CSV
+            <UploadSimple size={14} /> Import CSV
           </button>
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
             <Plus size={14} /> Add Contact
@@ -532,7 +532,7 @@ export default function ContactsPage() {
       {/* Search + filter */}
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
@@ -580,6 +580,7 @@ export default function ContactsPage() {
               <tr style={{ background: "var(--ck-surface)" }}>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>DOB</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Tags</th>
                 <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Engagement</th>
                 <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
@@ -592,6 +593,19 @@ export default function ContactsPage() {
                   <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.email}</td>
                   <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>
                     {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="date"
+                      value={c.date_of_birth || ""}
+                      onChange={async (e) => {
+                        var val = e.target.value || null;
+                        await supabase.from("marketing_contacts").update({ date_of_birth: val }).eq("id", c.id);
+                        setContacts(contacts.map((x) => x.id === c.id ? { ...x, date_of_birth: val } : x));
+                      }}
+                      className="rounded-lg border px-2 py-1 text-xs w-[120px]"
+                      style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1 items-center">
@@ -644,7 +658,7 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => deleteContact(c.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
-                      <Trash2 size={14} />
+                      <Trash size={14} />
                     </button>
                   </td>
                 </tr>
@@ -748,7 +762,7 @@ export default function ContactsPage() {
               {csvStep === "upload" && (
                 <div className="space-y-4">
                   <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border)" }}>
-                    <Upload size={32} className="mx-auto mb-3 opacity-40" />
+                    <UploadSimple size={32} className="mx-auto mb-3 opacity-40" />
                     <p className="text-sm font-medium mb-2" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
                     <input type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
                     <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>

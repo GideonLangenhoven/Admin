@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, Pencil, Trash2, Copy, Send, X, Calendar, TestTube2, Tag } from "lucide-react";
+import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, CalendarBlank, Flask, Tag } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
 import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
 
@@ -62,8 +62,12 @@ export default function TemplatesPage() {
       .eq("status", "active");
     var tagSet = new Set<string>();
     for (var row of (data || []) as any[]) {
-      if (Array.isArray(row.tags)) {
-        for (var t of row.tags) tagSet.add(t);
+      var tags = row.tags;
+      if (Array.isArray(tags)) {
+        for (var t of tags) if (typeof t === "string" && t.trim()) tagSet.add(t.trim().toLowerCase());
+      } else if (typeof tags === "string" && tags.trim()) {
+        // Handle tags stored as a plain string or comma-separated
+        for (var s of tags.split(",")) if (s.trim()) tagSet.add(s.trim().toLowerCase());
       }
     }
     setAvailableTags([...tagSet].sort());
@@ -321,19 +325,19 @@ export default function TemplatesPage() {
               </div>
               <div className="flex items-center gap-1.5 pt-1">
                 <button onClick={() => setEditing(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-                  <Pencil size={12} /> Edit
+                  <PencilSimple size={12} /> Edit
                 </button>
                 <button onClick={() => openSendModal(t)} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
-                  <Send size={12} /> Send
+                  <PaperPlaneTilt size={12} /> Send
                 </button>
                 <button onClick={() => sendTestEmail(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }} title="Send test to yourself">
-                  <TestTube2 size={12} /> Test
+                  <Flask size={12} /> Test
                 </button>
                 <button onClick={() => duplicateTemplate(t)} className="p-1.5 rounded-lg border" style={{ borderColor: "var(--ck-border)" }} title="Duplicate">
                   <Copy size={12} />
                 </button>
                 <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-red-500 hover:text-red-700" title="Delete">
-                  <Trash2 size={12} />
+                  <Trash size={12} />
                 </button>
               </div>
             </div>
@@ -477,7 +481,7 @@ export default function TemplatesPage() {
               {/* Schedule */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
-                  <Calendar size={12} className="inline mr-1" />Schedule (optional)
+                  <CalendarBlank size={12} className="inline mr-1" />Schedule (optional)
                 </label>
                 <input
                   type="datetime-local"

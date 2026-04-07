@@ -6,9 +6,7 @@ var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 var supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-// RESEND_FROM_EMAIL should be set to a verified sender, e.g. "Cape Kayak <bookings@capekayak.co.za>"
-// Without it, onboarding@resend.dev only delivers to your own Resend account email.
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Bookings <onboarding@resend.dev>";
+var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 
 function getCors(req?: Request) {
   var origins = getAdminAppOrigins();
@@ -22,7 +20,7 @@ function getCors(req?: Request) {
   };
 }
 
-var IMG_INVOICE = "https://i.ibb.co/SX19rypd/6.jpg";
+var IMG_INVOICE = "";
 var SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
 
 function money(n: number) {
@@ -53,11 +51,7 @@ function invoiceHtml(d: Record<string, unknown>, brandName: string, footerLineOn
         <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.invoice_number}</h1>
       </td>
     </tr>
-    <tr>
-      <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-        <img src="${IMG_INVOICE}" alt="${brandName}" style="${SQ_IMG_STYLE}" />
-      </td>
-    </tr>
+    ${IMG_INVOICE ? `<tr><td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;"><img src="${IMG_INVOICE}" alt="${brandName}" style="${SQ_IMG_STYLE}" /></td></tr>` : ""}
     <tr>
       <td style="padding: 30px 40px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #E5E5E5; padding-bottom: 20px; margin-bottom: 20px; font-size: 14px; color: #555; line-height: 1.6;">
@@ -158,7 +152,7 @@ Deno.serve(async (req: Request) => {
     var ref = resolvedBookingId ? resolvedBookingId.substring(0, 8).toUpperCase() : (invoiceId || "").substring(0, 8).toUpperCase();
     var businessId = bookingRow?.business_id || invoiceRow?.business_id;
     var { data: business } = businessId
-      ? await supabase.from("businesses").select("business_name, name, timezone, notification_email, footer_line_one, footer_line_two").eq("id", businessId).maybeSingle()
+      ? await supabase.from("businesses").select("business_name, name, subdomain, timezone, notification_email, footer_line_one, footer_line_two").eq("id", businessId).maybeSingle()
       : { data: null as any };
     var brandName = String(business?.business_name || business?.name || "Your Booking");
     var businessTimezone = String(business?.timezone || "UTC");
@@ -201,7 +195,11 @@ Deno.serve(async (req: Request) => {
     var html = invoiceHtml(emailData, brandName, footerLineOne, footerLineTwo);
 
     // Send via Resend
-    var payload: Record<string, unknown> = { from: brandName + " <onboarding@resend.dev>", to: [customerEmail], subject, html };
+    // Always derive from subdomain: noreply@{slug}.bookingtours.co.za
+    var fromAddr = business?.subdomain
+      ? brandName + " <noreply@" + business.subdomain + ".bookingtours.co.za>"
+      : FROM_EMAIL;
+    var payload: Record<string, unknown> = { from: fromAddr, to: [customerEmail], subject, html };
     if (adminEmail) payload.bcc = [adminEmail];
 
     var resendRes = await fetch("https://api.resend.com/emails", {

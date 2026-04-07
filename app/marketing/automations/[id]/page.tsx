@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { notify } from "../../../lib/app-notify";
 import { useBusinessContext } from "../../../../components/BusinessContext";
-import { ArrowLeft, Plus, Trash2, Mail, Clock, GitBranch, Gift, Tag, ChevronUp, ChevronDown, Search, Play, Pause, Zap } from "lucide-react";
+import { ArrowLeft, Plus, Trash, Envelope, Clock, GitBranch, Gift, Tag, CaretUp, CaretDown, MagnifyingGlass, Play, Pause, Lightning } from "@phosphor-icons/react";
 
 interface Step {
   id?: string;
@@ -36,7 +36,7 @@ interface Contact {
 }
 
 var stepTypeInfo: Record<string, { label: string; icon: any; color: string }> = {
-  send_email: { label: "Send Email", icon: Mail, color: "text-blue-600" },
+  send_email: { label: "Send Email", icon: Envelope, color: "text-blue-600" },
   delay: { label: "Delay", icon: Clock, color: "text-orange-600" },
   condition: { label: "Condition", icon: GitBranch, color: "text-purple-600" },
   generate_voucher: { label: "Generate Voucher", icon: Gift, color: "text-emerald-600" },
@@ -452,7 +452,7 @@ export default function AutomationBuilderPage() {
             className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium"
             style={{ borderColor: "var(--ck-accent)", background: "var(--ck-surface)", color: "var(--ck-accent)" }}
           >
-            <Zap size={16} />
+            <Lightning size={16} />
             Trigger: {automation.trigger_type.replace(/_/g, " ")}
           </div>
         </div>
@@ -495,7 +495,7 @@ export default function AutomationBuilderPage() {
                       className="p-1 rounded border disabled:opacity-30"
                       style={{ borderColor: "var(--ck-border)" }}
                     >
-                      <ChevronUp size={14} />
+                      <CaretUp size={14} />
                     </button>
                     <button
                       onClick={() => moveStep(idx, 1)}
@@ -503,13 +503,13 @@ export default function AutomationBuilderPage() {
                       className="p-1 rounded border disabled:opacity-30"
                       style={{ borderColor: "var(--ck-border)" }}
                     >
-                      <ChevronDown size={14} />
+                      <CaretDown size={14} />
                     </button>
                     <button
                       onClick={() => removeStep(idx)}
                       className="p-1 text-red-500 hover:text-red-700"
                     >
-                      <Trash2 size={14} />
+                      <Trash size={14} />
                     </button>
                   </div>
                 </div>
@@ -781,7 +781,7 @@ export default function AutomationBuilderPage() {
           </p>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+              <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
               <input
                 value={enrollSearch}
                 onChange={(e) => setEnrollSearch(e.target.value)}
@@ -845,7 +845,7 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
   }, [open]);
 
   var types = [
-    { type: "send_email", label: "Send Email", icon: Mail, color: "text-blue-600" },
+    { type: "send_email", label: "Send Email", icon: Envelope, color: "text-blue-600" },
     { type: "delay", label: "Delay", icon: Clock, color: "text-orange-600" },
     { type: "condition", label: "Condition", icon: GitBranch, color: "text-purple-600" },
     { type: "generate_voucher", label: "Generate Voucher", icon: Gift, color: "text-emerald-600" },

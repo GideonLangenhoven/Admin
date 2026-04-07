@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-import { Image as ImageIcon, Plus, Trash2, X, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { Image as ImageIcon, Plus, Trash, X, TextB, TextItalic, TextUnderline, TextAlignLeft, TextAlignCenter, TextAlignRight } from "@phosphor-icons/react";
 import type {
   Block,
   TextBlock,
@@ -189,16 +189,16 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
         <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
 
         {/* Inline formatting */}
-        <button type="button" onClick={() => execCmd("bold")} className={btnCls} title="Bold"><Bold size={14} /></button>
-        <button type="button" onClick={() => execCmd("italic")} className={btnCls} title="Italic"><Italic size={14} /></button>
-        <button type="button" onClick={() => execCmd("underline")} className={btnCls} title="Underline"><Underline size={14} /></button>
+        <button type="button" onClick={() => execCmd("bold")} className={btnCls} title="Bold"><TextB size={14} /></button>
+        <button type="button" onClick={() => execCmd("italic")} className={btnCls} title="Italic"><TextItalic size={14} /></button>
+        <button type="button" onClick={() => execCmd("underline")} className={btnCls} title="Underline"><TextUnderline size={14} /></button>
 
         <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
 
         {/* Alignment */}
-        <button type="button" onClick={() => { onUpdate({ textAlign: "left" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "left" || !block.textAlign ? btnActive : ""}`} title="Align left"><AlignLeft size={14} /></button>
-        <button type="button" onClick={() => { onUpdate({ textAlign: "center" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "center" ? btnActive : ""}`} title="Align center"><AlignCenter size={14} /></button>
-        <button type="button" onClick={() => { onUpdate({ textAlign: "right" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "right" ? btnActive : ""}`} title="Align right"><AlignRight size={14} /></button>
+        <button type="button" onClick={() => { onUpdate({ textAlign: "left" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "left" || !block.textAlign ? btnActive : ""}`} title="Align left"><TextAlignLeft size={14} /></button>
+        <button type="button" onClick={() => { onUpdate({ textAlign: "center" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "center" ? btnActive : ""}`} title="Align center"><TextAlignCenter size={14} /></button>
+        <button type="button" onClick={() => { onUpdate({ textAlign: "right" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "right" ? btnActive : ""}`} title="Align right"><TextAlignRight size={14} /></button>
 
         <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
 
@@ -477,7 +477,7 @@ function ColumnsEditor({ block, onUpdate }: { block: ColumnsBlock; onUpdate: (u:
                     </div>
                   )}
                 </div>
-                <button onClick={() => removeSubBlock(ci, si)} className="text-red-500 p-0.5"><Trash2 size={10} /></button>
+                <button onClick={() => removeSubBlock(ci, si)} className="text-red-500 p-0.5"><Trash size={10} /></button>
               </div>
             ))}
             <div className="flex gap-1">

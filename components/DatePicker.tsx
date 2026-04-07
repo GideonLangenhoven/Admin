@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format, parse, isValid } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { CalendarBlank as CalendarIcon } from "@phosphor-icons/react";
 
 interface DatePickerProps {
     value: string; // YYYY-MM-DD

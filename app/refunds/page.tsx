@@ -163,19 +163,19 @@ export default function Refunds() {
     <div className="max-w-4xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">💰 Refund Queue</h2>
+          <h2 className="text-2xl font-bold">Refund Queue</h2>
           <p className="text-sm text-gray-500 mt-1">{refunds.length} pending · R{totalRefund.toLocaleString()}</p>
         </div>
         {refunds.length > 1 && (
           <button onClick={refundAll}
             className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto">
-            ⚡ Refund All ({refunds.length})
+            Refund All ({refunds.length})
           </button>
         )}
       </div>
 
       {refunds.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">No pending refunds ✓</div>
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">No pending refunds</div>
       ) : (
         <div className="space-y-3">
           {refunds.map((b: any) => {
@@ -190,7 +190,7 @@ export default function Refunds() {
                     <p className="text-sm text-gray-500">{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"} · {b.qty} pax</p>
                     <p className="text-sm text-gray-500">{b.phone} · {b.email}</p>
                     {b.cancellation_reason && <p className="text-xs text-gray-400 mt-1">Reason: {b.cancellation_reason}</p>}
-                    {!hasCheckout && <p className="text-xs text-amber-600 mt-1">⚠ No Yoco checkout ID — manual refund only</p>}
+                    {!hasCheckout && <p className="text-xs text-amber-600 mt-1">No Yoco checkout ID — manual refund only</p>}
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="sm:text-right">
@@ -220,19 +220,19 @@ export default function Refunds() {
                       {hasCheckout && (
                         <button onClick={() => autoRefund(b.id)} disabled={isProcessing}
                           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap">
-                          {isProcessing ? "⏳ Processing..." : "⚡ Auto Refund"}
+                          {isProcessing ? "Processing..." : "Auto Refund"}
                         </button>
                       )}
                       <button onClick={() => manualRefund(b.id)}
                         className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 whitespace-nowrap">
-                        ✋ Manual
+                        Manual
                       </button>
                     </div>
                   </div>
                 </div>
                 {res && (
                   <div className={"text-sm p-3 rounded-lg mt-3 " + (res.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
-                    {res.ok ? "✅ Refund processed — customer notified via WhatsApp & email" : "❌ " + (res.error || res.message || "Failed")}
+                    {res.ok ? "Refund processed — customer notified via WhatsApp & email" : (res.error || res.message || "Failed")}
                   </div>
                 )}
               </div>
@@ -256,7 +256,7 @@ export default function Refunds() {
                   <p className="text-xs text-gray-400">{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"}</p>
                 </div>
                 <span className={"text-xs font-medium px-2 py-1 rounded-full " + (b.refund_status === "PROCESSED" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
-                  {b.refund_status === "PROCESSED" ? "✅ Refunded" : "❌ Failed"}
+                  {b.refund_status === "PROCESSED" ? "Refunded" : "Failed"}
                 </span>
                 <p className="text-sm font-semibold text-gray-600">R{b.refund_amount}</p>
               </div>

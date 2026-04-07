@@ -69,19 +69,25 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   return data;
 }
 
-var IMG_PAYMENT = "https://i.ibb.co/B2yM8wMf/8.jpg";
-var IMG_CONFIRM = "https://i.ibb.co/35S5Qrj5/7.jpg";
-var IMG_INVOICE = "https://i.ibb.co/SX19rypd/6.jpg";
-var IMG_GIFT = "https://i.ibb.co/KxfvFSWG/5.jpg";
-var IMG_CANCEL_GENERAL = "https://i.ibb.co/bRN0Hct9/Gemini-Generated-Image-539vy9539vy9539v-2.png";
-var IMG_CANCEL_WEATHER = "https://i.ibb.co/QjYg8y0w/Gemini-Generated-Image-539vy9539vy9539v-2.png";
-var IMG_INDEMNITY = "https://i.ibb.co/GQc9RTLn/3.jpg";
-var IMG_ADMIN = "https://i.ibb.co/qMRzpgRH/2.jpg";
-var IMG_VOUCHER = "https://i.ibb.co/pv599ykx/1.jpg";
-var IMG_PHOTOS = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=600&auto=format&fit=crop"; // Placeholder - please update
-
+// Default email images — empty means no image shown unless business uploads one via Settings
+var IMG_PAYMENT = "";
+var IMG_CONFIRM = "";
+var IMG_INVOICE = "";
+var IMG_GIFT = "";
+var IMG_CANCEL_GENERAL = "";
+var IMG_CANCEL_WEATHER = "";
+var IMG_INDEMNITY = "";
+var IMG_ADMIN = "";
+var IMG_VOUCHER = "";
+var IMG_PHOTOS = "";
 
 var SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
+
+// Render hero image placeholder — uses {{IMG_KEY}} markers that get resolved after branding
+function heroImg(key: string, alt: string, bgColor = "#1b3b36") {
+  return `<!--HERO_IMG:${key}:${bgColor}:${alt}-->`;
+}
+
 var MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005";
 var MANAGE_BOOKING_URL = "https://booking-mu-steel.vercel.app/my-bookings";
 
@@ -160,7 +166,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, notification_email, from_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -191,12 +197,10 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/gift-voucher" : "https://booking-mu-steel.vercel.app/gift-voucher")),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
-    // Per-business from_email: explicit > subdomain-derived > platform default
-    fromEmail: data?.from_email
-      ? brandName + " <" + data.from_email + ">"
-      : data?.subdomain
-        ? brandName + " <noreply@" + data.subdomain + ".bookingtours.co.za>"
-        : (FROM_EMAIL.includes("@") ? brandName + " <" + FROM_EMAIL.replace(/^[^<]*</, "").replace(/>.*$/, "") + ">" : FROM_EMAIL),
+    // Always derive from subdomain: noreply@{slug}.bookingtours.co.za
+    fromEmail: data?.subdomain
+      ? brandName + " <noreply@" + data.subdomain + ".bookingtours.co.za>"
+      : FROM_EMAIL,
     // Reply-To uses the tenant's notification_email so customer replies go to the right place
     replyToEmail: String(data?.notification_email || ""),
     emailColor: String(data?.email_color || "#1b3b36"),
@@ -242,22 +246,24 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
       .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo);
   }
 
-  // Replace default email header images with business-specific ones where set
-  var imgSwaps: Array<[string, string]> = [
-    [IMG_PAYMENT, branding.imgPayment],
-    [IMG_CONFIRM, branding.imgConfirm],
-    [IMG_INVOICE, branding.imgInvoice],
-    [IMG_GIFT, branding.imgGift],
-    [IMG_CANCEL_GENERAL, branding.imgCancel],
-    [IMG_CANCEL_WEATHER, branding.imgCancelWeather],
-    [IMG_INDEMNITY, branding.imgIndemnity],
-    [IMG_ADMIN, branding.imgAdmin],
-    [IMG_VOUCHER, branding.imgVoucher],
-    [IMG_PHOTOS, branding.imgPhotos],
-  ];
-  for (var s = 0; s < imgSwaps.length; s++) {
-    if (imgSwaps[s][1]) brandedHtml = brandedHtml.split(imgSwaps[s][0]).join(imgSwaps[s][1]);
-  }
+  // Resolve hero image markers — show uploaded image or remove the block entirely
+  var imgMap: Record<string, string> = {
+    IMG_PAYMENT: branding.imgPayment,
+    IMG_CONFIRM: branding.imgConfirm,
+    IMG_INVOICE: branding.imgInvoice,
+    IMG_GIFT: branding.imgGift,
+    IMG_CANCEL: branding.imgCancel,
+    IMG_CANCEL_WEATHER: branding.imgCancelWeather,
+    IMG_INDEMNITY: branding.imgIndemnity,
+    IMG_ADMIN: branding.imgAdmin,
+    IMG_VOUCHER: branding.imgVoucher,
+    IMG_PHOTOS: branding.imgPhotos,
+  };
+  brandedHtml = brandedHtml.replace(/<!--HERO_IMG:(\w+):([^:]*):([^>]*)-->/g, (_match, key, bgColor, alt) => {
+    var url = imgMap[key] || "";
+    if (!url) return "";
+    return `<tr><td style="background-color: ${bgColor}; padding: 0 30px 30px; text-align: center;"><img src="${url}" alt="${alt}" style="${SQ_IMG_STYLE}" /></td></tr>`;
+  });
 
   // Replace email brand color
   if (branding.emailColor && branding.emailColor !== "#1b3b36") {
@@ -289,12 +295,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Complete Your Reservation</h1>
           </td>
         </tr>
-        <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_PAYMENT}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_PAYMENT", brandName)}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -392,12 +393,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 32px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Booking Confirmed</h1>
           </td>
         </tr>
-        <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_CONFIRM}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_CONFIRM", brandName)}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -489,12 +485,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${eventTitle}</h1>
           </td>
         </tr>
-        <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_CONFIRM}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_CONFIRM", brandName)}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -556,12 +547,7 @@ function invoiceHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.invoice_number}</h1>
           </td>
         </tr>
-        <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_INVOICE}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_INVOICE", brandName)}
         <!-- Customer Info -->
         <tr>
           <td style="padding: 30px 40px 20px;">
@@ -629,11 +615,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Gift Voucher</h1>
           </td>
         </tr>
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_GIFT}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_GIFT", brandName)}
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.buyer_name},</h2>
@@ -666,7 +648,6 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 
 function cancellationHtml(d: Record<string, unknown>) {
   var isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
-  var headerImg = isWeather ? IMG_CANCEL_WEATHER : IMG_CANCEL_GENERAL;
   var cancelText = isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
     : `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. We sincerely apologise for the inconvenience.`;
@@ -734,11 +715,7 @@ function cancellationHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${headerImg}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg(isWeather ? "IMG_CANCEL_WEATHER" : "IMG_CANCEL", brandName)}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -799,11 +776,7 @@ function indemnityHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_INDEMNITY}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_INDEMNITY", brandName)}
         <!-- Intro -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -904,11 +877,7 @@ function voucherHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_VOUCHER}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_VOUCHER", brandName)}
         <!-- Thank You -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -968,11 +937,7 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_VOUCHER}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_VOUCHER", brandName)}
         <!-- Greeting -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -1059,11 +1024,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_PHOTOS}" alt="Cape Kayak Trip Photos" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_PHOTOS", brandName)}
         <!-- Sub-header -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -1141,11 +1102,7 @@ function adminWelcomeHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        <tr>
-          <td style="background-color: #1b3b36; padding: 0 30px 30px; text-align: center;">
-            <img src="${IMG_ADMIN}" alt="Cape Kayak Adventure" style="${SQ_IMG_STYLE}" />
-          </td>
-        </tr>
+        ${heroImg("IMG_ADMIN", brandName)}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">

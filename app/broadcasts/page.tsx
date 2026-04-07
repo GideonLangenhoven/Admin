@@ -304,10 +304,10 @@ export default function BroadcastsPage() {
   return (
     <div className="max-w-6xl">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">📢 Broadcasts</h1>
+        <h1 className="text-2xl font-bold">Broadcasts</h1>
         <button onClick={() => { setWeatherMode(!weatherMode); setWeatherResult(null); }}
           className={"w-full rounded-lg border px-4 py-2 text-sm font-semibold transition-colors sm:w-auto " + (weatherMode ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}>
-          {weatherMode ? "⛈ Weather Mode ON" : "⛈ Weather Cancel"}
+          {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
         </button>
       </div>
 
@@ -443,8 +443,8 @@ export default function BroadcastsPage() {
                         <td className="hidden py-2 text-gray-500 sm:table-cell">{(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</td>
                         <td className="py-2 text-center">{b.qty}</td>
                         <td className="py-2 text-center">
-                          {b.phone && <span className="text-emerald-600 mr-1" title="WhatsApp">📱</span>}
-                          {b.email && <span className="text-blue-600" title="Email">✉</span>}
+                          {b.phone && <span className="text-emerald-600 mr-1 text-xs font-medium" title="WhatsApp">WA</span>}
+                          {b.email && <span className="text-blue-600 text-xs font-medium" title="Email">Email</span>}
                         </td>
                       </tr>
                     ))}
@@ -457,7 +457,7 @@ export default function BroadcastsPage() {
           {/* Compose */}
           {weatherMode ? (
             <div className="bg-red-50 border border-red-200 rounded-xl p-5">
-              <h2 className="font-semibold text-lg text-red-800 mb-2">⛈ Weather Cancellation</h2>
+              <h2 className="font-semibold text-lg text-red-800 mb-2">Weather Cancellation</h2>
               <p className="text-sm text-red-600 mb-4">Cancels selected slots, sends refund/reschedule options via WhatsApp, and a professional cancellation email.</p>
               <div className="mb-4">
                 <label className="text-xs text-red-700 font-medium block mb-1">Reason</label>
@@ -466,7 +466,7 @@ export default function BroadcastsPage() {
               </div>
               <button onClick={sendWeatherCancel} disabled={cancellingWeather || selectedSlotIds.length === 0}
                 className="w-full bg-red-600 text-white py-3 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
-                {cancellingWeather ? "Cancelling..." : "⛈ Cancel & Notify " + bookings.length + " Customers"}
+                {cancellingWeather ? "Cancelling..." : "Cancel & Notify " + bookings.length + " Customers"}
               </button>
               {weatherResult && (
                 <div className={"text-sm p-3 rounded-lg mt-3 " + (weatherResult.error ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
@@ -476,7 +476,7 @@ export default function BroadcastsPage() {
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="font-semibold text-lg mb-3">📝 Compose</h2>
+              <h2 className="font-semibold text-lg mb-3">Compose</h2>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-500 font-medium block mb-1">WhatsApp Message</label>
@@ -492,11 +492,11 @@ export default function BroadcastsPage() {
                 </div>
                 <button onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
                   className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                  {sending ? "Sending..." : "📢 Send to " + bookings.length + " Customers (WhatsApp + Email)"}
+                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers (WhatsApp + Email)"}
                 </button>
                 {result && (
                   <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
-                    {result.error ? "Error: " + result.error : "✅ " + (result.wa_sent || 0) + " WhatsApp + " + (result.email_sent || 0) + " emails sent"}
+                    {result.error ? "Error: " + result.error : (result.wa_sent || 0) + " WhatsApp + " + (result.email_sent || 0) + " emails sent"}
                   </div>
                 )}
               </div>
@@ -511,7 +511,7 @@ export default function BroadcastsPage() {
                 {history.map(h => (
                   <div key={h.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:gap-3">
                     <span className={"text-xs font-medium px-2 py-0.5 rounded-full shrink-0 " + (h.target_group === "AFFECTED_BOOKINGS" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")}>
-                      {h.target_group === "AFFECTED_BOOKINGS" ? "⛈" : "📢"}
+                      {h.target_group === "AFFECTED_BOOKINGS" ? "WX" : "BC"}
                     </span>
                     <p className="text-sm text-gray-700 flex-1 line-clamp-1">{h.message}</p>
                     <span className="text-xs text-gray-400 shrink-0">{h.sent_count} sent</span>

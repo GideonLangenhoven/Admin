@@ -3,7 +3,7 @@
 Required env vars:
 
 - `RESEND_API_KEY`
-- `EMAIL_FROM` optional, defaults to `Cape Kayak Adventures <bookings@capekayak.co.za>`
+- `RESEND_FROM_EMAIL` optional, platform default. Per-business from address derives from subdomain: `noreply@{slug}.bookingtours.co.za`
 
 Supported `type` values:
 

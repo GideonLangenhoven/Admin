@@ -6,11 +6,11 @@ import { getAdminTimezone } from "./lib/admin-timezone";
 import { useBusinessContext } from "../components/BusinessContext";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { 
-    AlertTriangle, ArrowUpRight, TrendingUp, TrendingDown, Plus, 
-    List, CalendarOff, ClipboardCheck, ChevronLeft, ChevronRight, 
-    CheckCircle2, CloudSun, Settings, X, Trash2, MapPin, RefreshCw
-} from "lucide-react";
+import {
+    Warning, ArrowUpRight, TrendUp, TrendDown, Plus,
+    List, CalendarX, ClipboardText, CaretLeft, CaretRight,
+    CheckCircle, CloudSun, GearSix, X, Trash, MapPin, ArrowsClockwise
+} from "@phosphor-icons/react";
 
 /* ── helpers ── */
 function fmtTime(iso: string) {
@@ -380,7 +380,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-[15px] font-medium text-white/90">Today's Pax</span>
                         <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
-                            <ArrowUpRight size={18} strokeWidth={2.5} style={{ color: "var(--ck-accent)" }} />
+                            <ArrowUpRight size={18} style={{ color: "var(--ck-accent)" }} />
                         </div>
                     </div>
                     <div>
@@ -389,7 +389,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] text-white/90 font-medium">
                             <span className="flex items-center justify-center border border-white/40 rounded px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10">
-                                <TrendingUp size={12} className="mr-1" /> {todayBookings}
+                                <TrendUp size={12} className="mr-1" /> {todayBookings}
                             </span>
                             <span>trips booked vs {tomorrowPax} tmrw</span>
                         </div>
@@ -401,7 +401,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Pending Refunds</span>
                         <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} strokeWidth={2.5} style={{ color: "var(--ck-text-strong)" }} />
+                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
                         </div>
                     </div>
                     <div>
@@ -410,7 +410,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {refundCount > 0 ? <><TrendingDown size={12} className="mr-1" /> {refundCount}</> : "0"} req
+                                {refundCount > 0 ? <><TrendDown size={12} className="mr-1" /> {refundCount}</> : "0"} req
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>awaiting approval</span>
                         </div>
@@ -422,7 +422,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Inbox Action</span>
                         <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} strokeWidth={2.5} style={{ color: "var(--ck-text-strong)" }} />
+                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
                         </div>
                     </div>
                     <div>
@@ -431,7 +431,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {inboxCount > 0 ? <><TrendingUp size={12} className="mr-1" /> Waiting</> : "Clear"}
+                                {inboxCount > 0 ? <><TrendUp size={12} className="mr-1" /> Waiting</> : "Clear"}
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>conversations</span>
                         </div>
@@ -443,7 +443,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Photos Out</span>
                         <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} strokeWidth={2.5} style={{ color: "var(--ck-text-strong)" }} />
+                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
                         </div>
                     </div>
                     <div>
@@ -452,7 +452,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {photosOutstanding > 0 ? <><TrendingUp size={12} className="mr-1" /> Missing</> : "Clear"}
+                                {photosOutstanding > 0 ? <><TrendUp size={12} className="mr-1" /> Missing</> : "Clear"}
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>photo uploads</span>
                         </div>
@@ -466,7 +466,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--ck-success-soft)" }}>
-                                <List size={16} strokeWidth={2.5} style={{ color: "var(--ck-success)" }} />
+                                <List size={16} style={{ color: "var(--ck-success)" }} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
@@ -478,13 +478,13 @@ export default function Dashboard() {
                                             onClick={() => { setManifestDate("TODAY"); setActiveSlotIdx(0); }}
                                             className={`p-1 rounded transition-colors ${manifestDate === "TODAY" ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
                                         >
-                                            <ChevronLeft size={16} />
+                                            <CaretLeft size={16} />
                                         </button>
                                         <button 
                                             onClick={() => { setManifestDate("TOMORROW"); setActiveSlotIdx(0); }}
                                             className={`p-1 rounded transition-colors ${manifestDate === "TOMORROW" ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
                                         >
-                                            <ChevronRight size={16} />
+                                            <CaretRight size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -492,14 +492,14 @@ export default function Dashboard() {
                             </div>
                         </div>
                         <Link href="/new-booking" className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors shadow-sm hover:-translate-y-0.5" style={{ background: "var(--ck-accent)", color: "#fff" }}>
-                            <Plus size={14} strokeWidth={2.5} /> Add Booking
+                            <Plus size={14} /> Add Booking
                         </Link>
                     </div>
 
                     <div className="flex-1 overflow-x-auto">
                         {slotGroups.length === 0 ? (
                             <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <CalendarOff size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
+                                <CalendarX size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
                                 <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
                                     {manifestDate === "TODAY" ? "No bookings today." : "No bookings tomorrow."}
                                 </p>
@@ -571,7 +571,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--ck-accent-soft)" }}>
-                                <ClipboardCheck size={16} strokeWidth={2.5} style={{ color: "var(--ck-accent)" }} />
+                                <ClipboardText size={16} style={{ color: "var(--ck-accent)" }} />
                             </div>
                             <div>
                                 <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
@@ -588,7 +588,7 @@ export default function Dashboard() {
                                     className="p-1.5 rounded-lg border transition-colors disabled:opacity-30"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
-                                    <ChevronLeft size={16} />
+                                    <CaretLeft size={16} />
                                 </button>
                                 <span className="text-[12px] font-semibold px-2" style={{ color: "var(--ck-text-muted)" }}>
                                     {activeSlotIdx + 1} / {slotGroups.length}
@@ -599,7 +599,7 @@ export default function Dashboard() {
                                     className="p-1.5 rounded-lg border transition-colors disabled:opacity-30"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
-                                    <ChevronRight size={16} />
+                                    <CaretRight size={16} />
                                 </button>
                                 {manualSlotNav && (
                                     <button
@@ -618,7 +618,7 @@ export default function Dashboard() {
                     <div className="flex-1 overflow-x-auto">
                         {!activeSlot ? (
                             <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <CalendarOff size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
+                                <CalendarX size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
                                 <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>No bookings today.</p>
                             </div>
                         ) : (
@@ -679,7 +679,7 @@ export default function Dashboard() {
                                     </span>
                                     {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 && (
                                         <span className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--ck-success)" }}>
-                                            <CheckCircle2 size={14} /> All present
+                                            <CheckCircle size={14} /> All present
                                         </span>
                                     )}
                                 </div>
@@ -695,12 +695,12 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center p-1.5" style={{ background: "var(--ck-accent-soft)" }}>
-                                <CloudSun size={16} strokeWidth={2.5} style={{ color: "var(--ck-accent)" }} />
+                                <CloudSun size={16} style={{ color: "var(--ck-accent)" }} />
                             </div>
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
                         </div>
                         <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium border rounded-full transition-colors hover:bg-gray-50 bg-white" style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}>
-                            Manage Locations <Settings size={14} />
+                            Manage Locations <GearSix size={14} />
                         </button>
                     </div>
 
@@ -726,9 +726,9 @@ export default function Dashboard() {
                         {/* Windguru */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>🏄 Windguru{location ? ` — ${location.name}` : ""}</span>
+                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` — ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
-                                    <button onClick={() => setWgRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><RefreshCw size={14} /></button>
+                                    <button onClick={() => setWgRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
                                     {location && <a href={`https://www.windguru.cz/${location.wgSpot}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}
                                 </div>
                             </div>
@@ -752,9 +752,9 @@ export default function Dashboard() {
                         {/* Windy */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>🌊 Windy{location ? ` — ${location.name}` : ""}</span>
+                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` — ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
-                                    <button onClick={() => setWindyRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><RefreshCw size={14} /></button>
+                                    <button onClick={() => setWindyRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
                                     {location && <a href={`https://www.windy.com/${location.lat}/${location.lon}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}
                                 </div>
                             </div>
@@ -790,7 +790,7 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     {l.isDefault && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wider uppercase" style={{ color: "var(--ck-success)", background: "var(--ck-success-soft)" }}>Default</span>}
-                                                    <button onClick={() => removeLocation(l.id)} className="transition-colors" style={{ color: "var(--ck-text-muted)" }}><Trash2 size={16} /></button>
+                                                    <button onClick={() => removeLocation(l.id)} className="transition-colors" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
                                                 </div>
                                             </div>
                                         ))}

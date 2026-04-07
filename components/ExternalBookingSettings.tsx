@@ -469,7 +469,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
               {generatedSecrets && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🔑</span>
+                    <span className="text-lg font-bold text-emerald-700">*</span>
                     <div>
                       <div className="text-xs font-bold text-emerald-900">Save these credentials now.</div>
                       <div className="text-[10px] text-emerald-700">They are only shown once and cannot be recovered.</div>

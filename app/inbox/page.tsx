@@ -410,7 +410,7 @@ function InboxContent() {
                 <div className="border-t border-gray-200 bg-white">
                   {waWarning && (
                     <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
-                      <span className="shrink-0 text-amber-500 text-sm">⚠️</span>
+                      <span className="shrink-0 text-amber-500 text-sm font-bold">!</span>
                       <p className="flex-1 text-xs text-amber-800 leading-snug">{waWarning}</p>
                       <button onClick={() => setWaWarning(null)} className="shrink-0 text-amber-400 hover:text-amber-600 text-xs font-medium">✕</button>
                     </div>

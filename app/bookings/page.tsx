@@ -5,7 +5,7 @@ import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { Send, Download, ExternalLink, Loader2 } from "lucide-react";
+import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -1147,14 +1147,14 @@ export default function Bookings() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">📋 Bookings</h2>
+        <h2 className="text-2xl font-bold">Bookings</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => exportCsv(false)}
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             title="Export CSV (special requests masked)"
           >
-            <Download className="h-4 w-4" /> Export CSV
+            <DownloadSimple className="h-4 w-4" /> Export CSV
           </button>
           {isPrivilegedRole && (
             <button
@@ -1162,7 +1162,7 @@ export default function Bookings() {
               className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
               title="Export with sensitive data (special requests visible)"
             >
-              <Download className="h-4 w-4" /> Export with Sensitive Data
+              <DownloadSimple className="h-4 w-4" /> Export with Sensitive Data
             </button>
           )}
         </div>
@@ -1726,8 +1726,8 @@ function SlotRows({
                         className="inline-flex items-center justify-center rounded p-0.5 text-blue-600 hover:bg-blue-100 disabled:opacity-50 transition-colors shrink-0"
                       >
                         {quickResendingId === b.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <Send className="h-3 w-3" />}
+                          ? <SpinnerGap className="h-3 w-3 animate-spin" />
+                          : <PaperPlaneTilt className="h-3 w-3" />}
                       </button>
                     )}
                     <SourceBadge source={b.source} />

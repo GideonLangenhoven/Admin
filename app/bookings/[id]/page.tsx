@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
-import { ArrowLeft, User, MapPin, CreditCard, Clock, AlertTriangle, CheckCircle2, XCircle, MessageSquare, Mail, Bell, FileText, Shield, Star, RotateCcw, Banknote } from "lucide-react";
+import { ArrowLeft, User, MapPin, CreditCard, Clock, Warning, CheckCircle, XCircle, ChatCircle, Envelope, Bell, FileText, ShieldCheck, Star, ArrowCounterClockwise, Money } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../../components/BusinessContext";
 
 /* ── helpers ── */
@@ -133,7 +133,7 @@ interface TimelineEvent {
   time: string;
   label: string;
   detail?: string;
-  icon: typeof CheckCircle2;
+  icon: typeof CheckCircle;
   color: string;
 }
 
@@ -183,7 +183,7 @@ function buildTimeline(
           time: log.created_at,
           label: "Payment confirmed (Yoco)",
           detail: `Payment ID: ${p.yoco_payment_id || "—"} | Amount: ${p.amount ? fmtCurrency(Number(p.amount) / 100) : "—"}`,
-          icon: CheckCircle2,
+          icon: CheckCircle,
           color: "text-green-600",
         });
         break;
@@ -192,7 +192,7 @@ function buildTimeline(
           time: log.created_at,
           label: "Marked as paid (Admin)",
           detail: "Payment recorded manually by admin",
-          icon: Banknote,
+          icon: Money,
           color: "text-green-600",
         });
         break;
@@ -201,7 +201,7 @@ function buildTimeline(
           time: log.created_at,
           label: "Payment received — status update failed",
           detail: `Error: ${p.error || "Unknown"} | Payment ID: ${p.yoco_payment_id || "—"}`,
-          icon: AlertTriangle,
+          icon: Warning,
           color: "text-red-600",
         });
         break;
@@ -218,13 +218,13 @@ function buildTimeline(
 
   // Auto-messages
   for (const am of autoMessages) {
-    const labels: Record<string, { label: string; icon: typeof Mail; color: string }> = {
+    const labels: Record<string, { label: string; icon: typeof Envelope; color: string }> = {
       REMINDER: { label: "Day-before reminder sent (WhatsApp)", icon: Bell, color: "text-blue-600" },
-      INDEMNITY: { label: "Indemnity email sent", icon: Shield, color: "text-indigo-600" },
+      INDEMNITY: { label: "Indemnity email sent", icon: ShieldCheck, color: "text-indigo-600" },
       REVIEW_REQUEST: { label: "Review request sent (WhatsApp)", icon: Star, color: "text-amber-600" },
       AUTO_CANCEL: { label: "Auto-cancellation notification sent", icon: XCircle, color: "text-red-600" },
     };
-    const info = labels[am.type] || { label: `Auto message: ${am.type}`, icon: MessageSquare, color: "text-gray-500" };
+    const info = labels[am.type] || { label: `Auto message: ${am.type}`, icon: ChatCircle, color: "text-gray-500" };
     events.push({
       time: am.created_at,
       label: info.label,
@@ -456,7 +456,7 @@ export default function BookingDetailPage() {
           </div>
           {editingCustomer && isPending && booking.yoco_checkout_id && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
-              <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+              <Warning size={16} className="shrink-0 text-amber-600 mt-0.5" />
               <p className="text-xs text-amber-800 leading-snug">
                 <span className="font-semibold">Warning:</span> An existing payment link will be invalidated if you save changes. The customer will need a new payment link.
               </p>

@@ -64,16 +64,15 @@ Deno.serve(async (_req: Request) => {
       };
     }
 
-    // ── 2b. Load per-business from_email for sender customization ──
+    // ── 2b. Load per-business subdomain for sender address ──
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, subdomain, from_email").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, subdomain").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
-        if (b.from_email) {
-          bizFromMap[b.id] = (b.business_name || "Marketing") + " <" + b.from_email + ">";
-        } else if (b.subdomain) {
-          bizFromMap[b.id] = (b.business_name || "Marketing") + " <noreply@" + b.subdomain + ".bookingtours.co.za>";
+        const name = b.business_name || "Marketing";
+        if (b.subdomain) {
+          bizFromMap[b.id] = name + " <noreply@" + b.subdomain + ".bookingtours.co.za>";
         }
       }
     }

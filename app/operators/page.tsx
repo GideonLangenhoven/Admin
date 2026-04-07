@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CheckCircle2, Lock, Shield } from "lucide-react";
+import { Buildings, CheckCircle, Lock, ShieldCheck } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const plans = [
@@ -92,7 +92,7 @@ export default function OperatorsPage() {
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="flex items-center gap-2">
-            <Building2 size={18} className="text-emerald-600" />
+            <Buildings size={18} className="text-emerald-600" />
             <h2 className="text-lg font-semibold text-gray-900">Available operators</h2>
           </div>
           <div className="mt-4 space-y-3">
@@ -118,7 +118,7 @@ export default function OperatorsPage() {
                   </div>
                   {isActive ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
-                      <CheckCircle2 size={14} />
+                      <CheckCircle size={14} />
                       Active
                     </span>
                   ) : !canSwitch ? (
@@ -138,7 +138,7 @@ export default function OperatorsPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
             <div className="flex items-center gap-2">
-              <Shield size={18} className="text-gray-700" />
+              <ShieldCheck size={18} className="text-gray-700" />
               <h2 className="text-lg font-semibold text-gray-900">Isolation checks</h2>
             </div>
             <ul className="mt-4 space-y-3 text-sm text-gray-600">

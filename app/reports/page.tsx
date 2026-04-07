@@ -461,7 +461,7 @@ export default function Reports() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">📊 Reports</h2>
+          <h2 className="text-2xl font-bold">Reports</h2>
           <p className="text-sm text-gray-500">All bookings — filter by tour date or booking date, download as CSV or PDF.</p>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
@@ -470,14 +470,14 @@ export default function Reports() {
             disabled={filtered.length === 0}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
           >
-            ⬇ CSV ({filtered.length})
+            CSV ({filtered.length})
           </button>
           <button
             onClick={downloadPDF}
             disabled={filtered.length === 0}
             className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
           >
-            📄 PDF
+            PDF
           </button>
         </div>
       </div>

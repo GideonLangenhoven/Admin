@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Warning, ArrowsClockwise } from "@phosphor-icons/react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -201,7 +201,7 @@ export default function Weather() {
                 {locations.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
               </select>
               <button type="button" onClick={() => setWgRefreshKey((key) => key + 1)} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                <RefreshCw size={14} />
+                <ArrowsClockwise size={14} />
                 Refresh
               </button>
             </div>
@@ -232,7 +232,7 @@ export default function Weather() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 text-amber-500" size={18} />
+            <Warning className="mt-0.5 text-amber-500" size={18} />
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Upcoming slots at risk</h3>
               <p className="mt-1 text-sm text-gray-500">{slots.length} upcoming booked slot(s) in the next {DAYS} days can be cancelled from this page if conditions turn unsafe.</p>

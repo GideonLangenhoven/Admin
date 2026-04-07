@@ -3,10 +3,10 @@ import { useState, useRef } from "react";
 import { supabase } from "../../app/lib/supabase";
 import { notify } from "../../app/lib/app-notify";
 import {
-  Trash2, GripVertical, Type, Image as ImageIcon, Minus, ArrowUp, ArrowDown,
-  Eye, Code, Save, MousePointerClick, MoveVertical, Heading, Share2, Play,
-  Quote, Columns2, Timer, MapPin, FileText, Monitor, Smartphone,
-} from "lucide-react";
+  Trash, DotsSixVertical, TextT, Image as ImageIcon, Minus, ArrowUp, ArrowDown,
+  Eye, Code, FloppyDisk, CursorClick, ArrowsDownUp, TextH, ShareNetwork, Play,
+  Quotes, Columns, Timer, MapPin, FileText, Monitor, DeviceMobile,
+} from "@phosphor-icons/react";
 import type { Block } from "./blocks/block-types";
 import { uid, createBlock } from "./blocks/block-types";
 import { blocksToHtml } from "./blocks/blocks-to-html";
@@ -15,16 +15,16 @@ import { BlockEditor } from "./blocks/block-editors";
 /* ── Toolbar block definitions ── */
 
 var BLOCK_DEFS: { type: Block["type"]; label: string; icon: React.ReactNode }[] = [
-  { type: "text", label: "Text", icon: <Type size={12} /> },
+  { type: "text", label: "Text", icon: <TextT size={12} /> },
   { type: "image", label: "Image", icon: <ImageIcon size={12} /> },
-  { type: "button", label: "Button", icon: <MousePointerClick size={12} /> },
+  { type: "button", label: "Button", icon: <CursorClick size={12} /> },
   { type: "divider", label: "Divider", icon: <Minus size={12} /> },
-  { type: "spacer", label: "Spacer", icon: <MoveVertical size={12} /> },
-  { type: "header", label: "Header", icon: <Heading size={12} /> },
-  { type: "social", label: "Social", icon: <Share2 size={12} /> },
+  { type: "spacer", label: "Spacer", icon: <ArrowsDownUp size={12} /> },
+  { type: "header", label: "Header", icon: <TextH size={12} /> },
+  { type: "social", label: "Social", icon: <ShareNetwork size={12} /> },
   { type: "video", label: "Video", icon: <Play size={12} /> },
-  { type: "quote", label: "Quote", icon: <Quote size={12} /> },
-  { type: "columns", label: "Columns", icon: <Columns2 size={12} /> },
+  { type: "quote", label: "Quote", icon: <Quotes size={12} /> },
+  { type: "columns", label: "Columns", icon: <Columns size={12} /> },
   { type: "countdown", label: "Countdown", icon: <Timer size={12} /> },
   { type: "tourcard", label: "Tour Card", icon: <MapPin size={12} /> },
   { type: "footer", label: "Footer", icon: <FileText size={12} /> },
@@ -190,7 +190,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
                   color: previewMode === "mobile" ? "#fff" : "var(--ck-text)",
                 }}
               >
-                <Smartphone size={12} /> Mobile
+                <DeviceMobile size={12} /> Mobile
               </button>
             </div>
           )}
@@ -198,7 +198,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
             {preview ? <><Code size={12} /> Editor</> : <><Eye size={12} /> Preview</>}
           </button>
           <button onClick={handleSave} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
-            <Save size={12} /> Save Template
+            <FloppyDisk size={12} /> Save Template
           </button>
         </div>
       </div>
@@ -259,11 +259,11 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
                     className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-bg-subtle)]"
                     title="Drag to reorder"
                   >
-                    <GripVertical size={14} />
+                    <DotsSixVertical size={14} />
                   </div>
                   <button onClick={() => moveBlock(index, -1)} disabled={index === 0}><ArrowUp size={12} /></button>
                   <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}><ArrowDown size={12} /></button>
-                  <button onClick={() => removeBlock(block.id)} className="text-red-500 mt-1"><Trash2 size={12} /></button>
+                  <button onClick={() => removeBlock(block.id)} className="text-red-500 mt-1"><Trash size={12} /></button>
                 </div>
 
                 {/* Block content */}

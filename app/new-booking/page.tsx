@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { ChevronDown, Check, User, Baby, Activity, Clock, Users } from "lucide-react";
+import { CaretDown, Check, User, Baby, Pulse, Clock, UsersThree } from "@phosphor-icons/react";
 
 interface Tour {
   id: string;
@@ -148,7 +148,7 @@ function CustomSelect({ label, value, options, onChange, placeholder, error }: C
         <span className={selected ? "text-[#111827]" : "text-gray-400"}>
           {selected ? selected.name : placeholder}
         </span>
-        <ChevronDown size={18} className={`text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <CaretDown size={18} className={`text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -173,7 +173,7 @@ function CustomSelect({ label, value, options, onChange, placeholder, error }: C
                   }`}
                 >
                   <span className="truncate">{opt.name}</span>
-                  {value === opt.id && <Check size={16} strokeWidth={3} className="shrink-0" />}
+                  {value === opt.id && <Check size={16} className="shrink-0" />}
                 </button>
               ))
             )}
@@ -816,7 +816,7 @@ export default function NewBookingPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-1">
               <label className="text-sm font-semibold text-[#374151] flex items-center gap-1.5">
-                <Activity size={14} className="text-gray-400" />
+                <Pulse size={14} className="text-gray-400" />
                 To attend <span className="text-red-500">*</span>
               </label>
               <CustomSelect
@@ -948,7 +948,7 @@ export default function NewBookingPage() {
 
                           {isSelected && (
                             <div className="absolute top-1 right-1">
-                              <Check size={10} className="text-white" strokeWidth={4} />
+                              <Check size={10} className="text-white" />
                             </div>
                           )}
                         </div>

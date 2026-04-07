@@ -5,10 +5,10 @@ import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import {
-  Plus, Trash2, Play, Pause, Zap, Mail, Clock, Gift, Star, Users,
-  RefreshCw, Heart, CalendarDays, Tag, TrendingUp, ShoppingCart,
-  Camera, Award, Sparkles, ChevronRight, X, ArrowRight, Info,
-} from "lucide-react";
+  Plus, Trash, Play, Pause, Lightning, Envelope, Clock, Gift, Star, UsersThree,
+  ArrowsClockwise, Heart, CalendarDots, Tag, TrendUp, ShoppingCart,
+  Camera, Medal, Sparkle, CaretRight, X, ArrowRight, Info,
+} from "@phosphor-icons/react";
 
 interface Automation {
   id: string;
@@ -60,7 +60,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Welcome Series",
     description: "Greet new subscribers with your brand story, showcase your best tours, and convert them into first-time bookers with a special discount.",
     benefit: "Welcome flows generate R21+ revenue per recipient. Sets the tone for your entire customer relationship.",
-    icon: Sparkles,
+    icon: Sparkle,
     iconColor: "text-blue-600",
     iconBg: "bg-blue-50",
     tier: "must-have",
@@ -115,7 +115,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Win-Back Campaign",
     description: "Re-engage customers who haven't booked in 90+ days with a 3-step escalating sequence: nostalgia, then incentive, then final offer.",
     benefit: "It costs 5x more to acquire a new customer than re-engage an existing one. Win-back emails recover 10-15% of lapsed customers.",
-    icon: RefreshCw,
+    icon: ArrowsClockwise,
     iconColor: "text-indigo-600",
     iconBg: "bg-indigo-50",
     tier: "must-have",
@@ -170,7 +170,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Referral Request",
     description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive — they get a voucher, their friend gets a discount.",
     benefit: "Referred customers convert 25-30% better and have 16% higher lifetime value. Delivers new customers at 1/5th the cost of ads.",
-    icon: Users,
+    icon: UsersThree,
     iconColor: "text-green-600",
     iconBg: "bg-green-50",
     tier: "high-value",
@@ -222,7 +222,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "VIP Customer Treatment",
     description: "Give your best customers the VIP treatment with exclusive benefits, early access to new tours, and a generous loyalty discount.",
     benefit: "Top 20% of customers typically generate 80% of revenue. VIP recognition increases rebooking rates by 40-60%.",
-    icon: Award,
+    icon: Medal,
     iconColor: "text-violet-600",
     iconBg: "bg-violet-50",
     tier: "high-value",
@@ -248,7 +248,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "New Season Announcement",
     description: "Build excitement for the new season with a 2-part campaign: preview what's coming, then offer early-bird pricing to drive pre-season bookings.",
     benefit: "Pre-season campaigns can generate 20-30% of total season bookings before the season even starts.",
-    icon: CalendarDays,
+    icon: CalendarDots,
     iconColor: "text-teal-600",
     iconBg: "bg-teal-50",
     tier: "growth",
@@ -275,7 +275,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Booking Anniversary",
     description: "Reach out on the 1-year anniversary of a customer's tour with a 'this time last year' nostalgia email and incentive to rebook.",
     benefit: "High emotional resonance drives 35-45% open rates. Targets a natural decision-making moment at very low cost.",
-    icon: CalendarDays,
+    icon: CalendarDots,
     iconColor: "text-rose-600",
     iconBg: "bg-rose-50",
     tier: "growth",
@@ -455,9 +455,9 @@ export default function AutomationsPage() {
     var Icon = t.icon;
     var tier = TIER_INFO[t.tier];
     var stepIcons: Record<string, { icon: any; label: string; color: string }> = {
-      send_email: { icon: Mail, label: "Send Email", color: "text-blue-600" },
+      send_email: { icon: Envelope, label: "Send Email", color: "text-blue-600" },
       delay: { icon: Clock, label: "Wait", color: "text-orange-600" },
-      condition: { icon: TrendingUp, label: "Check", color: "text-purple-600" },
+      condition: { icon: TrendUp, label: "Check", color: "text-purple-600" },
       generate_voucher: { icon: Gift, label: "Create Voucher", color: "text-emerald-600" },
     };
     return (
@@ -508,7 +508,7 @@ export default function AutomationsPage() {
           style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
         >
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={16} className="text-emerald-600" />
+            <TrendUp size={16} className="text-emerald-600" />
             <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Why This Works</h2>
           </div>
           <p className="text-sm" style={{ color: "var(--ck-text)" }}>{t.benefit}</p>
@@ -548,7 +548,7 @@ export default function AutomationsPage() {
               className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
               style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}
             >
-              <Zap size={14} />
+              <Lightning size={14} />
               Trigger: {t.triggerType.replace(/_/g, " ")}
               {t.triggerConfig.tag && <span className="opacity-70">({t.triggerConfig.tag})</span>}
               {t.triggerConfig.field && <span className="opacity-70">({t.triggerConfig.field})</span>}
@@ -682,7 +682,7 @@ export default function AutomationsPage() {
                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
                               {t.name}
                             </h3>
-                            <ChevronRight size={14} style={{ color: "var(--ck-text-muted)" }} />
+                            <CaretRight size={14} style={{ color: "var(--ck-text-muted)" }} />
                           </div>
                           <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--ck-text-muted)" }}>
                             {t.description}
@@ -744,7 +744,7 @@ export default function AutomationsPage() {
             className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
             style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
           >
-            <Sparkles size={14} /> Browse Templates
+            <Sparkle size={14} /> Browse Templates
           </button>
           <button
             onClick={createBlankAutomation}
@@ -763,7 +763,7 @@ export default function AutomationsPage() {
             className="rounded-xl border p-8 text-center"
             style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
           >
-            <Zap size={32} className="mx-auto mb-3 opacity-30" />
+            <Lightning size={32} className="mx-auto mb-3 opacity-30" />
             <h2 className="text-base font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
               No automations yet
             </h2>
@@ -775,7 +775,7 @@ export default function AutomationsPage() {
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
               style={{ background: "var(--ck-accent)" }}
             >
-              <Sparkles size={14} /> Browse Templates to Get Started
+              <Sparkle size={14} /> Browse Templates to Get Started
             </button>
           </div>
 
@@ -925,7 +925,7 @@ export default function AutomationsPage() {
                           className="p-1.5 text-red-500 hover:text-red-700"
                           title="Delete"
                         >
-                          <Trash2 size={13} />
+                          <Trash size={13} />
                         </button>
                       </div>
                     </td>

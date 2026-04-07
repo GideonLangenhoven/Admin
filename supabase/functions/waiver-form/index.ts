@@ -246,6 +246,10 @@ function waiverPage(data: any, business: any, message?: string) {
               <input type="text" name="signer_name" value="${esc(data.customer_name || "")}" required placeholder="First and last name" />
             </label>
             <label>
+              Date of birth
+              <input type="date" name="date_of_birth" style="border:1px solid var(--line);border-radius:16px;padding:14px 16px;font:inherit;width:100%;" />
+            </label>
+            <label>
               SA ID number or passport number <span style="font-weight:400;color:#64748b;">(optional — strengthens identity verification)</span>
               <input type="text" name="id_number" placeholder="e.g. 8001015009087 or A12345678" autocomplete="off" />
             </label>
@@ -358,6 +362,7 @@ Deno.serve(async (req) => {
       var guardianConsent = String(form?.get("guardian_consent") || "") === "yes";
       var notes = String(form?.get("notes") || "").trim();
       var idNumber = String(form?.get("id_number") || "").trim();
+      var dateOfBirth = String(form?.get("date_of_birth") || "").trim();
 
       if (!signerName || !acceptRisk || !guardianConsent) {
         return new Response(waiverPage(bookingRes.data, businessRes.data, "Please complete all required waiver confirmations."), {
@@ -369,6 +374,7 @@ Deno.serve(async (req) => {
       var payload = {
         notes: notes || null,
         id_number: idNumber || null,
+        date_of_birth: dateOfBirth || null,
         accept_risk: true,
         guardian_consent: true,
         user_agent: req.headers.get("user-agent") || null,
@@ -383,6 +389,47 @@ Deno.serve(async (req) => {
           waiver_payload: payload,
         })
         .eq("id", bookingId);
+
+      // Upsert DOB into marketing_contacts for birthday promotions
+      if (dateOfBirth) {
+        var booking = bookingRes.data;
+        // Find the contact by email from the booking
+        var { data: bookingFull } = await supabase
+          .from("bookings")
+          .select("email, customer_name, business_id")
+          .eq("id", bookingId)
+          .maybeSingle();
+        if (bookingFull?.email) {
+          // Update existing contact's DOB, or create one tagged as "waiver"
+          var { data: existing } = await supabase
+            .from("marketing_contacts")
+            .select("id, date_of_birth")
+            .eq("business_id", bookingFull.business_id)
+            .eq("email", bookingFull.email.toLowerCase())
+            .maybeSingle();
+          if (existing) {
+            // Only update DOB if not already set
+            if (!existing.date_of_birth) {
+              await supabase
+                .from("marketing_contacts")
+                .update({ date_of_birth: dateOfBirth })
+                .eq("id", existing.id);
+            }
+          } else {
+            // Create a new marketing contact from the waiver signer
+            var nameParts = (bookingFull.customer_name || signerName || "").split(" ");
+            await supabase.from("marketing_contacts").insert({
+              business_id: bookingFull.business_id,
+              email: bookingFull.email.toLowerCase(),
+              first_name: nameParts[0] || null,
+              last_name: nameParts.slice(1).join(" ") || null,
+              date_of_birth: dateOfBirth,
+              source: "waiver",
+              tags: ["waiver"],
+            });
+          }
+        }
+      }
 
       // Return confirmation without PII
       var signedData = {

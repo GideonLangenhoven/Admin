@@ -165,7 +165,7 @@ export default function PhotosPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">📸 Trip Photos</h1>
+      <h1 className="text-2xl font-bold">Trip Photos</h1>
       <p className="text-sm text-gray-500">Send trip photos and a thank-you email to guests. Select a recent trip, add a batch of links, and confirm the gallery preview before sending.</p>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -262,7 +262,7 @@ export default function PhotosPage() {
 
           <button onClick={sendPhotos} disabled={sending || !selectedSlot || urls.every(u => !u.trim())}
             className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-            {sending ? "Sending..." : "📸 Send Photos to Lead Bookers"}
+            {sending ? "Sending..." : "Send Photos to Lead Bookers"}
           </button>
 
           {sending && (
@@ -279,7 +279,7 @@ export default function PhotosPage() {
 
           {result && (
             <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
-              {result.error ? "Error: " + result.error : "✅ Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
+              {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
             </div>
           )}
         </div>

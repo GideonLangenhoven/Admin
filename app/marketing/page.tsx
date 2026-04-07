@@ -2,8 +2,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { Send, Users, LayoutTemplate, CheckCircle2, Eye, MousePointerClick, UserMinus, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+} from "recharts";
 
 interface CampaignRow {
   id: string;
@@ -20,26 +23,13 @@ interface CampaignRow {
   scheduled_at: string | null;
 }
 
-function StatCard({ label, value, sub, icon: Icon, color }: { label: string; value: string | number; sub?: string; icon: any; color: string }) {
-  return (
-    <div className="rounded-xl border p-5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
-          <Icon size={20} className="text-white" />
-        </div>
-        <div>
-          <p className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{value}</p>
-          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{label}</p>
-          {sub && <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>{sub}</p>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function pct(num: number, den: number) {
   if (!den) return "0%";
   return (num / den * 100).toFixed(1) + "%";
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
 }
 
 export default function MarketingOverview() {
@@ -87,81 +77,212 @@ export default function MarketingOverview() {
   }, [businessId]);
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
+    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--ck-accent)" }} /></div>;
   }
 
-  // Aggregate totals across all campaigns
   var totalSent = campaigns.reduce((s, c) => s + (c.total_sent || 0), 0);
   var totalOpens = campaigns.reduce((s, c) => s + (c.total_opens || 0), 0);
   var totalClicks = campaigns.reduce((s, c) => s + (c.total_clicks || 0), 0);
+  var totalUnsub = campaigns.reduce((s, c) => s + (c.total_unsubscribes || 0), 0);
+
+  // Build campaign performance data for charts (most recent first → reverse for chronological)
+  var campaignChartData = [...campaigns]
+    .filter(c => c.total_sent > 0)
+    .reverse()
+    .slice(-8)
+    .map(c => ({
+      name: c.name.length > 16 ? c.name.slice(0, 14) + "…" : c.name,
+      sent: c.total_sent,
+      opens: c.total_opens,
+      clicks: c.total_clicks,
+      openRate: c.total_sent ? +(c.total_opens / c.total_sent * 100).toFixed(1) : 0,
+      clickRate: c.total_sent ? +(c.total_clicks / c.total_sent * 100).toFixed(1) : 0,
+    }));
+
+  // Audience breakdown for donut chart
+  var audienceData = [
+    { name: "Active", value: contacts, color: "#10b981" },
+    { name: "Unsubscribed", value: unsubscribed, color: "#f59e0b" },
+    { name: "Bounced", value: bounced, color: "#ef4444" },
+  ].filter(d => d.value > 0);
+  var totalAudience = contacts + unsubscribed + bounced;
+
+  // Usage percentage
+  var usagePct = includedEmails > 0 ? Math.min(100, (monthlyUsage / includedEmails) * 100) : 0;
+  var usageColor = monthlyUsage >= includedEmails ? "#ef4444" : monthlyUsage >= includedEmails * 0.8 ? "#f59e0b" : "var(--ck-accent)";
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
+      {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Active Contacts" value={contacts} sub={`${unsubscribed} unsub · ${bounced} bounced`} icon={Users} color="bg-blue-600" />
-        <StatCard label="Templates" value={templates} icon={LayoutTemplate} color="bg-purple-600" />
-        <StatCard label="Emails Sent" value={emailsSent.toLocaleString()} icon={CheckCircle2} color="bg-emerald-600" />
-        <StatCard label="Campaigns" value={campaigns.length} icon={Send} color="bg-amber-600" />
+        {[
+          { label: "Active Contacts", value: contacts.toLocaleString(), delta: unsubscribed > 0 ? `${unsubscribed} unsub` : undefined, accent: "#3b82f6" },
+          { label: "Templates", value: templates, accent: "#8b5cf6" },
+          { label: "Emails Sent", value: emailsSent.toLocaleString(), delta: monthlyUsage > 0 ? `${monthlyUsage} this month` : undefined, accent: "#10b981" },
+          { label: "Campaigns", value: campaigns.length, delta: campaigns.filter(c => c.status === "done").length > 0 ? `${campaigns.filter(c => c.status === "done").length} completed` : undefined, accent: "#f59e0b" },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-xl border p-5 relative overflow-hidden" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+            <div className="absolute top-0 left-0 w-full h-0.5" style={{ background: kpi.accent }} />
+            <p className="text-xs font-medium tracking-wide uppercase" style={{ color: "var(--ck-text-muted)" }}>{kpi.label}</p>
+            <p className="text-3xl font-bold mt-1" style={{ color: "var(--ck-text-strong)" }}>{kpi.value}</p>
+            {kpi.delta && <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>{kpi.delta}</p>}
+          </div>
+        ))}
       </div>
 
-      {/* Usage card */}
+      {/* ── Email Usage ── */}
       <div className="rounded-xl border p-5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Email Usage This Month</h3>
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: "var(--ck-border)" }}>
-              <div className="h-full rounded-full transition-all" style={{
-                width: Math.min(100, (monthlyUsage / includedEmails) * 100) + "%",
-                background: monthlyUsage >= includedEmails ? "#ef4444" : monthlyUsage >= includedEmails * 0.8 ? "#f59e0b" : "var(--ck-accent)"
-              }} />
-            </div>
-            <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
-              {monthlyUsage.toLocaleString()} / {includedEmails.toLocaleString()} included emails
-            </p>
-          </div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Email Usage This Month</h3>
+          <span className="text-xs font-mono font-semibold" style={{ color: usageColor }}>{usagePct.toFixed(0)}%</span>
         </div>
-        {monthlyUsage >= includedEmails && (
-          <div className="mt-3 rounded-lg p-3 text-xs font-medium" style={{ background: "#fef2f2", color: "#dc2626" }}>
-            You've exceeded your included emails. Overage: R{overageRate.toFixed(2)}/email — {(monthlyUsage - includedEmails).toLocaleString()} extra emails = R{((monthlyUsage - includedEmails) * overageRate).toFixed(2)}
-          </div>
-        )}
-        {monthlyUsage >= includedEmails * 0.8 && monthlyUsage < includedEmails && (
-          <div className="mt-3 rounded-lg p-3 text-xs font-medium" style={{ background: "#fffbeb", color: "#d97706" }}>
-            Approaching limit: {((monthlyUsage / includedEmails) * 100).toFixed(0)}% used. Overage rate: R{overageRate.toFixed(2)}/email
-          </div>
-        )}
+        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "var(--ck-border)" }}>
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: usagePct + "%", background: usageColor }} />
+        </div>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{monthlyUsage.toLocaleString()} of {includedEmails.toLocaleString()} included</p>
+          {monthlyUsage >= includedEmails && (
+            <p className="text-xs font-medium" style={{ color: "#ef4444" }}>
+              Overage: R{((monthlyUsage - includedEmails) * overageRate).toFixed(2)}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Engagement rates */}
-      {totalSent > 0 && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <div className="rounded-xl border p-4 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-            <Eye size={18} className="mx-auto mb-1 text-blue-500" />
-            <p className="text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{pct(totalOpens, totalSent)}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Open Rate</p>
-          </div>
-          <div className="rounded-xl border p-4 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-            <MousePointerClick size={18} className="mx-auto mb-1 text-emerald-500" />
-            <p className="text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{pct(totalClicks, totalSent)}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Click Rate</p>
-          </div>
-          <div className="rounded-xl border p-4 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-            <UserMinus size={18} className="mx-auto mb-1 text-orange-500" />
-            <p className="text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{unsubscribed}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Unsubscribes</p>
-          </div>
-          <div className="rounded-xl border p-4 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-            <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
-            <p className="text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{bounced}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Bounced</p>
-          </div>
+      {/* ── Charts Row ── */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Engagement Rates */}
+        <div className="rounded-xl border p-5 lg:col-span-1" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Engagement Overview</h3>
+          {totalSent > 0 ? (
+            <div className="space-y-4">
+              {[
+                { label: "Open Rate", value: pct(totalOpens, totalSent), raw: totalOpens, color: "#3b82f6", pctNum: totalSent ? totalOpens / totalSent * 100 : 0 },
+                { label: "Click Rate", value: pct(totalClicks, totalSent), raw: totalClicks, color: "#10b981", pctNum: totalSent ? totalClicks / totalSent * 100 : 0 },
+                { label: "Unsubscribe Rate", value: pct(totalUnsub, totalSent), raw: totalUnsub, color: "#f59e0b", pctNum: totalSent ? totalUnsub / totalSent * 100 : 0 },
+                { label: "Bounce Rate", value: pct(bounced, totalSent), raw: bounced, color: "#ef4444", pctNum: totalSent ? bounced / totalSent * 100 : 0 },
+              ].map((m) => (
+                <div key={m.label}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium" style={{ color: "var(--ck-text)" }}>{m.label}</span>
+                    <span className="text-sm font-bold" style={{ color: m.color }}>{m.value}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--ck-border)" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: Math.min(100, m.pctNum) + "%", background: m.color }} />
+                  </div>
+                  <p className="text-[10px] mt-0.5 text-right" style={{ color: "var(--ck-text-muted)" }}>{m.raw.toLocaleString()} total</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40">
+              <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Send your first campaign to see engagement data</p>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Quick actions */}
+        {/* Campaign Performance Chart */}
+        <div className="rounded-xl border p-5 lg:col-span-2" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Campaign Performance</h3>
+          {campaignChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={campaignChartData} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ck-border-strong)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--ck-text-muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--ck-text-muted)" }} axisLine={false} tickLine={false} width={35} />
+                <Tooltip
+                  contentStyle={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)", borderRadius: 10, fontSize: 12, color: "var(--ck-text-strong)" }}
+                  labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+                />
+                <Bar dataKey="sent" name="Sent" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="opens" name="Opens" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="clicks" name="Clicks" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-60">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: "var(--ck-border)" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ck-text-muted)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17V13M12 17V9M17 17V5"/></svg>
+                </div>
+                <p className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>No campaign data yet</p>
+                <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>Charts will appear after your first send</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Audience + Open Rate Trend ── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Audience Breakdown Donut */}
+        <div className="rounded-xl border p-5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Audience Breakdown</h3>
+          {totalAudience > 0 ? (
+            <div className="flex items-center gap-6">
+              <div className="w-32 h-32 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={audienceData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                      {audienceData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)", borderRadius: 10, fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3 flex-1">
+                {audienceData.map((seg) => (
+                  <div key={seg.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: seg.color }} />
+                      <span className="text-sm" style={{ color: "var(--ck-text)" }}>{seg.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{seg.value.toLocaleString()}</span>
+                      <span className="text-xs ml-1.5" style={{ color: "var(--ck-text-muted)" }}>{(seg.value / totalAudience * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Import contacts to see audience breakdown</p>
+            </div>
+          )}
+        </div>
+
+        {/* Open Rate Trend */}
+        <div className="rounded-xl border p-5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Open Rate Trend</h3>
+          {campaignChartData.length > 1 ? (
+            <ResponsiveContainer width="100%" height={140}>
+              <AreaChart data={campaignChartData}>
+                <defs>
+                  <linearGradient id="openRateGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ck-border-strong)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--ck-text-muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--ck-text-muted)" }} axisLine={false} tickLine={false} width={30} unit="%" />
+                <Tooltip contentStyle={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)", borderRadius: 10, fontSize: 12 }} />
+                <Area type="monotone" dataKey="openRate" name="Open Rate" stroke="#3b82f6" fill="url(#openRateGrad)" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
+                <Area type="monotone" dataKey="clickRate" name="Click Rate" stroke="#10b981" fill="none" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#10b981" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-36">
+              <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Need 2+ campaigns to show trends</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Quick Actions ── */}
       <div className="flex flex-wrap gap-3">
-        <Link href="/marketing/contacts" className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+        <Link href="/marketing/contacts" className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: "var(--ck-accent)", color: "var(--ck-btn-primary-text)" }}>
           + Add Contacts
         </Link>
         <Link href="/marketing/templates" className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
@@ -169,61 +290,58 @@ export default function MarketingOverview() {
         </Link>
       </div>
 
-      {/* Recent campaigns */}
+      {/* ── Recent Campaigns Table ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Recent Campaigns</h2>
+        <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Recent Campaigns</h2>
         {campaigns.length === 0 ? (
-          <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-            <Send size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No campaigns yet. Create a template, then send your first campaign.</p>
+          <div className="rounded-xl border p-10 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+            <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: "var(--ck-border)" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ck-text-muted)" strokeWidth="1.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+            </div>
+            <p className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>No campaigns yet</p>
+            <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>Create a template, then send your first campaign</p>
           </div>
         ) : (
-          <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--ck-border)" }}>
-            <table className="w-full text-sm min-w-[700px]">
-              <thead>
-                <tr style={{ background: "var(--ck-surface)" }}>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Campaign</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Sent</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Opens</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Clicks</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Unsub</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
-                    <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.name}</td>
-                    <td className="px-4 py-3">
-                      <CampaignStatusBadge status={c.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text)" }}>
-                      {c.total_sent}/{c.total_recipients}
-                      {c.total_failed > 0 && <span className="text-red-500 ml-1">({c.total_failed} failed)</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text)" }}>
-                      {c.total_opens > 0 ? (
-                        <span>{c.total_opens} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_opens, c.total_sent)})</span></span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text)" }}>
-                      {c.total_clicks > 0 ? (
-                        <span>{c.total_clicks} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_clicks, c.total_sent)})</span></span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: c.total_unsubscribes > 0 ? "var(--ck-warning, #f59e0b)" : "var(--ck-text-muted)" }}>
-                      {c.total_unsubscribes || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text-muted)" }}>
-                      {c.scheduled_at && c.status === "scheduled"
-                        ? new Date(c.scheduled_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-                        : new Date(c.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
-                    </td>
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border)" }}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
+                <thead>
+                  <tr style={{ background: "var(--ck-surface)" }}>
+                    <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Campaign</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Sent</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Opens</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Clicks</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Unsub</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => (
+                    <tr key={c.id} className="border-t transition-colors hover:opacity-80" style={{ borderColor: "var(--ck-border)" }}>
+                      <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.name}</td>
+                      <td className="px-4 py-3"><CampaignStatusBadge status={c.status} /></td>
+                      <td className="px-4 py-3 text-right font-mono text-xs" style={{ color: "var(--ck-text)" }}>
+                        {c.total_sent}/{c.total_recipients}
+                        {c.total_failed > 0 && <span className="text-red-500 ml-1">({c.total_failed})</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text)" }}>
+                        {c.total_opens > 0 ? <>{c.total_opens} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_opens, c.total_sent)})</span></> : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text)" }}>
+                        {c.total_clicks > 0 ? <>{c.total_clicks} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_clicks, c.total_sent)})</span></> : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right" style={{ color: c.total_unsubscribes > 0 ? "#f59e0b" : "var(--ck-text-muted)" }}>
+                        {c.total_unsubscribes || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                        {c.scheduled_at && c.status === "scheduled" ? fmtDate(c.scheduled_at) : fmtDate(c.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -232,17 +350,19 @@ export default function MarketingOverview() {
 }
 
 function CampaignStatusBadge({ status }: { status: string }) {
-  var styles: Record<string, string> = {
-    draft: "bg-gray-100 text-gray-600",
-    pending: "bg-amber-100 text-amber-700",
-    scheduled: "bg-violet-100 text-violet-700",
-    sending: "bg-blue-100 text-blue-700",
-    paused: "bg-yellow-100 text-yellow-700",
-    done: "bg-emerald-100 text-emerald-700",
-    cancelled: "bg-red-100 text-red-700",
+  var config: Record<string, { bg: string; text: string; dot: string }> = {
+    draft: { bg: "rgba(107,114,128,0.1)", text: "#6b7280", dot: "#6b7280" },
+    pending: { bg: "rgba(245,158,11,0.1)", text: "#d97706", dot: "#f59e0b" },
+    scheduled: { bg: "rgba(139,92,246,0.1)", text: "#7c3aed", dot: "#8b5cf6" },
+    sending: { bg: "rgba(59,130,246,0.1)", text: "#2563eb", dot: "#3b82f6" },
+    paused: { bg: "rgba(234,179,8,0.1)", text: "#ca8a04", dot: "#eab308" },
+    done: { bg: "rgba(16,185,129,0.1)", text: "#059669", dot: "#10b981" },
+    cancelled: { bg: "rgba(239,68,68,0.1)", text: "#dc2626", dot: "#ef4444" },
   };
+  var c = config[status] || config.draft;
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || "bg-gray-100 text-gray-600"}`}>
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: c.bg, color: c.text }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.dot }} />
       {status}
     </span>
   );

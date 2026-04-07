@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, Trash2, Copy, RefreshCw } from "lucide-react";
+import { Plus, Trash, Copy, ArrowsClockwise } from "@phosphor-icons/react";
 
 interface Promotion {
   id: string;
@@ -192,7 +192,7 @@ export default function PromotionsPage() {
                   style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
                   title="Generate random code"
                 >
-                  <RefreshCw size={14} />
+                  <ArrowsClockwise size={14} />
                 </button>
               </div>
             </div>
@@ -367,7 +367,7 @@ export default function PromotionsPage() {
                             Edit
                           </button>
                           <button onClick={() => deletePromo(p)} className="p-1 text-red-500 hover:text-red-700">
-                            <Trash2 size={14} />
+                            <Trash size={14} />
                           </button>
                         </div>
                       </td>
