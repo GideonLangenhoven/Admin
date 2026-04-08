@@ -295,7 +295,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Complete Your Reservation</h1>
           </td>
         </tr>
-        ${heroImg("IMG_PAYMENT", brandName)}
+        ${heroImg("IMG_PAYMENT", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -378,6 +378,24 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `;
+  // Activity-aware messaging based on tour name
+  var tourLower = String(d.tour_name || "").toLowerCase();
+  var activityFlavor = "Get ready for an unforgettable experience.";
+  if (/kayak|paddle|canoe/.test(tourLower)) activityFlavor = "Get ready for an unforgettable experience on the water.";
+  else if (/hike|hiking|trail|walk|mountain/.test(tourLower)) activityFlavor = "Lace up your boots and get ready for an incredible adventure on the trail.";
+  else if (/surf|wave/.test(tourLower)) activityFlavor = "Get ready to catch some waves and have an amazing time.";
+  else if (/dive|diving|snorkel/.test(tourLower)) activityFlavor = "Get ready to explore the incredible underwater world.";
+  else if (/bike|cycling|cycle|mtb/.test(tourLower)) activityFlavor = "Get ready to hit the road and enjoy an unforgettable ride.";
+  else if (/safari|game|wildlife/.test(tourLower)) activityFlavor = "Get ready for an unforgettable wildlife experience.";
+  else if (/climb|abseil|rappel|bouldering/.test(tourLower)) activityFlavor = "Get ready to reach new heights on an unforgettable adventure.";
+  else if (/zip\s?line|canopy/.test(tourLower)) activityFlavor = "Get ready to soar through the air on an unforgettable adventure.";
+  else if (/fish|fishing|angling/.test(tourLower)) activityFlavor = "Get ready to cast your line and enjoy a fantastic day out.";
+  else if (/sunset|sunrise/.test(tourLower)) activityFlavor = "Get ready for a breathtaking experience you won't forget.";
+  else if (/boat|cruise|sail|yacht|catamaran/.test(tourLower)) activityFlavor = "Get ready to set sail on an unforgettable experience.";
+  else if (/horse|riding/.test(tourLower)) activityFlavor = "Saddle up and get ready for an unforgettable ride.";
+  else if (/wine|tasting|cellar/.test(tourLower)) activityFlavor = "Get ready to savour every sip on an unforgettable tasting experience.";
+  else if (/paraglid|skydiv|tandem/.test(tourLower)) activityFlavor = "Get ready for the thrill of a lifetime up in the sky.";
+
   return `
     <!DOCTYPE html>
     <html>
@@ -393,12 +411,12 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 32px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Booking Confirmed</h1>
           </td>
         </tr>
-        ${heroImg("IMG_CONFIRM", brandName)}
+        ${heroImg("IMG_CONFIRM", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">We can't wait to see you, ${d.customer_name}.</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Your spots for the <strong>${d.tour_name}</strong> are officially locked in. Get ready for an unforgettable experience on the water.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Your spots for the <strong>${d.tour_name}</strong> are officially locked in. ${activityFlavor}</p>
           </td>
         </tr>
         <!-- Details Box -->
@@ -448,7 +466,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 10px 40px 40px; text-align: center;">
             <p style="font-size: 14px; font-family: Georgia, serif; color: #1b3b36; font-style: italic; margin: 0 0 15px 0;">Need to amend your booking?</p>
-            <a href="${MANAGE_BOOKING_URL}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Manage Your Booking</a>
+            <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Manage Your Booking</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -485,7 +503,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${eventTitle}</h1>
           </td>
         </tr>
-        ${heroImg("IMG_CONFIRM", brandName)}
+        ${heroImg("IMG_CONFIRM", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -515,7 +533,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
         <!-- CTA -->
         <tr>
           <td style="padding: 10px 40px 40px; text-align: center;">
-            <a href="${MANAGE_BOOKING_URL}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">View My Booking</a>
+            <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">View My Booking</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -547,7 +565,7 @@ function invoiceHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.invoice_number}</h1>
           </td>
         </tr>
-        ${heroImg("IMG_INVOICE", brandName)}
+        ${heroImg("IMG_INVOICE", "Cape Kayak")}
         <!-- Customer Info -->
         <tr>
           <td style="padding: 30px 40px 20px;">
@@ -615,7 +633,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Gift Voucher</h1>
           </td>
         </tr>
-        ${heroImg("IMG_GIFT", brandName)}
+        ${heroImg("IMG_GIFT", "Cape Kayak")}
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.buyer_name},</h2>
@@ -670,7 +688,7 @@ function cancellationHtml(d: Record<string, unknown>) {
                   <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #047857;">Your options</p>
                   <h3 style="margin: 0 0 10px 0; font-family: Georgia, serif; font-size: 20px; color: #14532d;">Reschedule, get a voucher, or request a refund</h3>
                   <p style="margin: 0 0 18px 0; font-size: 14px; color: #166534; line-height: 1.6;">Use the link below to manage your booking at any time. You can pick a new date, convert to a gift voucher, or request a full refund &mdash; it only takes a minute.</p>
-                  <a href="${MANAGE_BOOKING_URL}" style="display: inline-block; background-color: #166534; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">Manage My Booking</a>
+                  <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #166534; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">Manage My Booking</a>
                 </td>
               </tr>
             </table>
@@ -691,9 +709,9 @@ function cancellationHtml(d: Record<string, unknown>) {
         </tr>
         <tr>
           <td style="padding: 0 40px 40px; text-align: center;">
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #1b3b36; color: #ffffff !important;">Reschedule My Trip</a>
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #2563eb; color: #ffffff !important;">Convert to Voucher</a>
-            <a href="${MANAGE_BOOKING_URL}" style="${btnStyle} background-color: #059669; color: #ffffff !important;">Request a Refund</a>
+            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #1b3b36; color: #ffffff !important;">Reschedule My Trip</a>
+            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #2563eb; color: #ffffff !important;">Convert to Voucher</a>
+            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #059669; color: #ffffff !important;">Request a Refund</a>
             <p style="font-size: 13px; color: #888; margin: 8px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>
@@ -715,7 +733,7 @@ function cancellationHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg(isWeather ? "IMG_CANCEL_WEATHER" : "IMG_CANCEL", brandName)}
+        ${heroImg(isWeather ? "IMG_CANCEL_WEATHER" : "IMG_CANCEL", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -776,7 +794,7 @@ function indemnityHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg("IMG_INDEMNITY", brandName)}
+        ${heroImg("IMG_INDEMNITY", "Cape Kayak")}
         <!-- Intro -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
@@ -877,7 +895,7 @@ function voucherHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg("IMG_VOUCHER", brandName)}
+        ${heroImg("IMG_VOUCHER", "Cape Kayak")}
         <!-- Thank You -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -937,7 +955,7 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg("IMG_VOUCHER", brandName)}
+        ${heroImg("IMG_VOUCHER", "Cape Kayak")}
         <!-- Greeting -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -989,7 +1007,7 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
-              You can use the remaining R${d.remaining_balance || 0} credit on your next booking at <a href="{{BOOKING_URL}}" style="color: #2a5a52; font-weight: bold; text-decoration: none;">{{BOOKING_URL}}</a>
+              You have R${d.remaining_balance || 0} credit remaining on your voucher. Use it on your next booking.
             </p>
             <a href="{{BOOKING_URL}}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Book Again</a>
           </td>
@@ -1024,7 +1042,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg("IMG_PHOTOS", brandName)}
+        ${heroImg("IMG_PHOTOS", "Cape Kayak")}
         <!-- Sub-header -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
@@ -1102,12 +1120,12 @@ function adminWelcomeHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         <!-- Hero Image -->
-        ${heroImg("IMG_ADMIN", brandName)}
+        ${heroImg("IMG_ADMIN", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">You've been added as an admin</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">You now have access to the Cape Kayak Admin Dashboard. A temporary password has been set for your account — please change it as soon as possible.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">You now have access to the Cape Kayak Admin Dashboard. Click the button below to set your password and get started.</p>
           </td>
         </tr>
         <!-- Details Box -->
@@ -1117,10 +1135,6 @@ function adminWelcomeHtml(d: Record<string, unknown>) {
               <tr>
                 <td width="40%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 15px;">Email:</td>
                 <td width="60%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; text-align: right;">${d.email}</td>
-              </tr>
-              <tr>
-                <td width="40%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 15px;">Temp Password:</td>
-                <td width="60%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; font-weight: bold; text-align: right;">${d.temp_password}</td>
               </tr>
               <tr>
                 <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Role:</td>
@@ -1141,7 +1155,7 @@ function adminWelcomeHtml(d: Record<string, unknown>) {
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px;">
               <tr>
                 <td style="padding: 16px; text-align: center;">
-                  <p style="margin: 0; font-size: 13px; color: #78350F; line-height: 1.5;">For security, please change your temporary password immediately after your first login.</p>
+                  <p style="margin: 0; font-size: 13px; color: #78350F; line-height: 1.5;">This setup link expires in 48 hours. If you didn't expect this email, please contact the main admin.</p>
                 </td>
               </tr>
             </table>

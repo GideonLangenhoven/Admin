@@ -50,17 +50,26 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, reason: "Booking not paid yet" }), { status: 200, headers: cors() });
     }
 
-    // Idempotency: atomically insert the log FIRST to claim the send.
-    // If another request already inserted it, this returns null (conflict) and we skip.
+    // Idempotency: check if confirmation was already sent for this booking.
+    var { data: existingClaim } = await supabase
+      .from("logs")
+      .select("id")
+      .eq("booking_id", bookingId)
+      .eq("event", "booking_confirmation_notifications_sent")
+      .maybeSingle();
+
+    if (existingClaim) {
+      return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
+    }
+
+    // Claim the send by inserting the log entry first
     var { data: claimData } = await supabase
       .from("logs")
-      .upsert(
-        { booking_id: bookingId, business_id: booking.business_id, event: "booking_confirmation_notifications_sent", payload: { claimed_at: new Date().toISOString() } },
-        { onConflict: "booking_id,event", ignoreDuplicates: true }
-      )
-      .select("id");
+      .insert({ booking_id: bookingId, business_id: booking.business_id, event: "booking_confirmation_notifications_sent", payload: { claimed_at: new Date().toISOString() } })
+      .select("id")
+      .single();
 
-    if (!claimData || claimData.length === 0) {
+    if (!claimData) {
       return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
     }
 
@@ -126,10 +135,8 @@ Deno.serve(async (req: any) => {
 
     if (booking.email) {
       try {
-        var emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-          body: JSON.stringify({
+        var { data: emailData, error: emailInvokeErr } = await supabase.functions.invoke("send-email", {
+          body: {
             type: "BOOKING_CONFIRM",
             data: {
               email: booking.email,
@@ -149,11 +156,10 @@ Deno.serve(async (req: any) => {
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
             },
-          }),
+          },
         });
-        var emailData = await emailRes.json().catch(() => ({}));
-        if (!emailRes.ok || emailData?.error) {
-          emailError = String(emailData?.error || emailRes.statusText || "Email send failed");
+        if (emailInvokeErr || emailData?.error) {
+          emailError = String(emailInvokeErr?.message || emailData?.error || "Email send failed");
           console.error("CONFIRM_BOOKING_EMAIL_ERR:", emailError);
         } else {
           emailSent = true;
@@ -164,10 +170,7 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    await supabase.from("logs").insert({
-      business_id: booking.business_id,
-      booking_id: booking.id,
-      event: "booking_confirmation_notifications_sent",
+    await supabase.from("logs").update({
       payload: {
         source: "confirm-booking-fallback",
         wa_sent: waSent,
@@ -175,7 +178,7 @@ Deno.serve(async (req: any) => {
         wa_error: waError || null,
         email_error: emailError || null,
       },
-    });
+    }).eq("id", claimData.id);
 
     return new Response(
       JSON.stringify({ ok: true, email_sent: emailSent, wa_sent: waSent }),
