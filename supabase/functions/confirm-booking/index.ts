@@ -122,7 +122,7 @@ Deno.serve(async (req: any) => {
           "Manage your booking anytime:\n" + myBookingsUrl + "\n\n" +
           "Thanks for booking with " + brandName + " \u2014 see you on the water!",
           {
-            name: "booking_confirmed",
+            name: "booking_confirmed1",
             params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount, myBookingsUrl],
           },
         );

@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Webhook } from "npm:standardwebhooks";
-import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -187,6 +187,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   if (booking.phone && tenant) {
     try {
       var currency = tenant.business.currency || "ZAR";
+      var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
       await sendWhatsappTextForTenant(
         tenant,
         booking.phone,
@@ -203,13 +204,14 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
         "Thanks for booking with " + brandName + ".",
         // Template fallback for customers outside the 24h window
         {
-          name: "booking_confirmed",
+          name: "booking_confirmed1",
           params: [
             ref,
             tourName,
             slotTime,
             String(booking.qty),
             currency + " " + booking.total_amount,
+            myBookingsUrl,
           ],
         },
       );

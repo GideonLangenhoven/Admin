@@ -216,6 +216,11 @@ Deno.serve(async (req: any) => {
       metadata.booking_id = bookingId;
       metadata.pending_reschedule_id = body.pending_reschedule_id || "";
       successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
+    } else if (type === "ADD_GUESTS") {
+      metadata.booking_id = bookingId;
+      metadata.hold_id = body.hold_id || "";
+      metadata.new_qty = String(body.new_qty || 0);
+      successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
     } else {
       metadata.booking_id = bookingId;
       metadata.customer_name = body.customer_name || "";
