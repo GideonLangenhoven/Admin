@@ -65,6 +65,11 @@ async function handleReschedule(req: any, booking: any, body: any) {
   if (slotRes.error || !slotRes.data) return fail(req, "New slot not found", 404);
   var newSlot = slotRes.data;
 
+  // Enforce same-activity rescheduling: new slot must be for the same tour
+  if (newSlot.tour_id !== booking.tour_id) {
+    return fail(req, "Cannot reschedule to a different activity", 400);
+  }
+
   var available = newSlot.capacity_total - (newSlot.booked || 0) - (newSlot.held || 0);
   if (available < booking.qty) return fail(req, "Not enough capacity on new slot (" + available + " available, need " + booking.qty + ")", 400);
 

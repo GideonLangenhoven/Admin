@@ -47,20 +47,21 @@ interface InvoiceDayGroup {
 }
 
 const VAT_RATE = 0.15;
-const FROM_COMPANY = {
-  name: "Adventure Operator",
-  addressLines: ["179 Beach Road Three Anchor Bay", "Cape Town", "8005"],
-  reg: "Reg. 1995/051404/23",
-  vat: "4290176926",
-};
 
-const BANKING_DETAILS = {
-  owner: "Adventure Operator",
-  number: "070631824",
-  type: "Current / Cheque",
-  bank: "Standard Bank",
-  branchCode: "020909",
-};
+interface CompanyInfo {
+  name: string;
+  addressLines: string[];
+  reg: string;
+  vat: string;
+}
+
+interface BankingInfo {
+  owner: string;
+  number: string;
+  type: string;
+  bank: string;
+  branchCode: string;
+}
 
 function asNumber(value: unknown, fallback = 0) {
   const n = Number(value);
@@ -165,7 +166,7 @@ function dayLabelFromRaw(raw: unknown) {
   });
 }
 
-function buildProFormaHtml(inv: InvoiceRecord) {
+function buildProFormaHtml(inv: InvoiceRecord, fromCompany: CompanyInfo, bankingDetails: BankingInfo) {
   const invNo = escapeHtml(invoiceNumber(inv));
   const ref = escapeHtml(bookingRef(inv));
   const toName = escapeHtml(asText(inv.customer_name, "Customer"));
@@ -215,8 +216,8 @@ function buildProFormaHtml(inv: InvoiceRecord) {
     <div class="row">
       <div>
         <div class="brand">~</div>
-        <div class="company">${escapeHtml(FROM_COMPANY.name)}</div>
-        <div class="muted" style="margin-top:4mm;">${escapeHtml(FROM_COMPANY.reg)} VAT: ${escapeHtml(FROM_COMPANY.vat)}</div>
+        <div class="company">${escapeHtml(fromCompany.name)}</div>
+        <div class="muted" style="margin-top:4mm;">${escapeHtml(fromCompany.reg)} VAT: ${escapeHtml(fromCompany.vat)}</div>
       </div>
       <div style="flex:1;">
         <h1 class="section-title">PROFORMA INVOICE</h1>
@@ -231,7 +232,7 @@ function buildProFormaHtml(inv: InvoiceRecord) {
           <th>To:</th>
         </tr>
         <tr>
-          <td class="to-line">${escapeHtml(FROM_COMPANY.name)}\n${escapeHtml(FROM_COMPANY.addressLines.join("\n"))}</td>
+          <td class="to-line">${escapeHtml(fromCompany.name)}\n${escapeHtml(fromCompany.addressLines.join("\n"))}</td>
           <td class="to-line">${toName}${toEmail ? `\n${toEmail}` : ""}${toPhone ? `\n${toPhone}` : ""}</td>
         </tr>
       </table>
@@ -298,11 +299,11 @@ function buildProFormaHtml(inv: InvoiceRecord) {
 
     <div class="bank-title">Banking Details</div>
     <table class="bank">
-      <tr><td class="label">Account Owner:</td><td>${escapeHtml(BANKING_DETAILS.owner)}</td></tr>
-      <tr><td class="label">Account Number:</td><td>${escapeHtml(BANKING_DETAILS.number)}</td></tr>
-      <tr><td class="label">Account Type:</td><td>${escapeHtml(BANKING_DETAILS.type)}</td></tr>
-      <tr><td class="label">Bank Name:</td><td>${escapeHtml(BANKING_DETAILS.bank)}</td></tr>
-      <tr><td class="label">Branch Code:</td><td>${escapeHtml(BANKING_DETAILS.branchCode)}</td></tr>
+      <tr><td class="label">Account Owner:</td><td>${escapeHtml(bankingDetails.owner)}</td></tr>
+      <tr><td class="label">Account Number:</td><td>${escapeHtml(bankingDetails.number)}</td></tr>
+      <tr><td class="label">Account Type:</td><td>${escapeHtml(bankingDetails.type)}</td></tr>
+      <tr><td class="label">Bank Name:</td><td>${escapeHtml(bankingDetails.bank)}</td></tr>
+      <tr><td class="label">Branch Code:</td><td>${escapeHtml(bankingDetails.branchCode)}</td></tr>
       <tr><td class="label">Reference:</td><td>${invNo}</td></tr>
     </table>
   </div>
@@ -342,15 +343,34 @@ export default function Invoices() {
   const [openActions, setOpenActions] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"booking_desc" | "booking_asc" | "created_desc" | "created_asc">("booking_desc");
   const [exactDate, setExactDate] = useState("");
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({ name: "", addressLines: [], reg: "", vat: "" });
+  const [bankInfo, setBankInfo] = useState<BankingInfo>({ owner: "", number: "", type: "", bank: "", branchCode: "" });
 
   async function load() {
-    const { data } = await supabase.from("invoices")
-      .select("*")
-      .eq("business_id", businessId)
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const [invoiceRes, bizRes] = await Promise.all([
+      supabase.from("invoices").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(200),
+      supabase.from("businesses").select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number, bank_account_owner, bank_account_number, bank_account_type, bank_name, bank_branch_code").eq("id", businessId).maybeSingle(),
+    ]);
 
-    const baseInvoices = (data || []) as InvoiceRecord[];
+    if (bizRes.data) {
+      const b = bizRes.data;
+      const name = b.invoice_company_name || b.business_name || "";
+      setCompanyInfo({
+        name,
+        addressLines: [b.invoice_address_line1, b.invoice_address_line2, b.invoice_address_line3].filter(Boolean) as string[],
+        reg: b.invoice_reg_number || "",
+        vat: b.invoice_vat_number || "",
+      });
+      setBankInfo({
+        owner: b.bank_account_owner || "",
+        number: b.bank_account_number || "",
+        type: b.bank_account_type || "",
+        bank: b.bank_name || "",
+        branchCode: b.bank_branch_code || "",
+      });
+    }
+
+    const baseInvoices = (invoiceRes.data || []) as InvoiceRecord[];
     const bookingIds = [...new Set(baseInvoices.map((inv) => inv.booking_id).filter(Boolean))] as string[];
     let bookingDateMap = new Map<string, string | null>();
 
@@ -426,7 +446,7 @@ export default function Invoices() {
   function handleDownload(inv: InvoiceRecord) {
     setBusyId(inv.id);
     try {
-      const html = buildProFormaHtml(inv);
+      const html = buildProFormaHtml(inv, companyInfo, bankInfo);
       downloadHtmlFile(`proforma-${invoiceNumber(inv)}.html`, html);
     } finally {
       setBusyId(null);
@@ -436,7 +456,7 @@ export default function Invoices() {
   function handlePrint(inv: InvoiceRecord) {
     setBusyId(inv.id);
     try {
-      const html = buildProFormaHtml(inv);
+      const html = buildProFormaHtml(inv, companyInfo, bankInfo);
       const opened = openPrintWindow(html);
       if (!opened) {
         downloadHtmlFile(`proforma-${invoiceNumber(inv)}.html`, html);
@@ -498,6 +518,12 @@ export default function Invoices() {
         <h2 className="text-2xl font-bold">Pro Forma Invoices</h2>
         <p className="text-sm text-gray-500">Download or print the pro forma version sent after successful bookings.</p>
       </div>
+
+      {!loading && !companyInfo.name && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Invoice company details not configured. Go to <strong>Settings &rarr; Invoice &amp; Banking Details</strong> to set your company name, address, and banking info.
+        </div>
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm">
         <span className="font-semibold">Outstanding total:</span>{" "}

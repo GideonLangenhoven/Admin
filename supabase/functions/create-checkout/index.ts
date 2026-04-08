@@ -94,7 +94,7 @@ Deno.serve(async (req: any) => {
     if (type === "BOOKING" && bookingId) {
       var bookingRow = await supabase
         .from("bookings")
-        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, customer_email")
+        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, customer_email, phone")
         .eq("id", bookingId)
         .maybeSingle();
       if (bookingRow.data) {
@@ -172,7 +172,7 @@ Deno.serve(async (req: any) => {
         // If promo covers the entire amount, skip payment
         if (serverCashDue <= 0 && promoId) {
           // Apply promo usage
-          await supabase.rpc("apply_promo_code", { p_promo_id: promoId, p_customer_email: resolvedEmail, p_booking_id: bookingId });
+          await supabase.rpc("apply_promo_code", { p_promo_id: promoId, p_customer_email: resolvedEmail, p_booking_id: bookingId, p_customer_phone: bk.phone || null });
           return new Response(JSON.stringify({ fully_covered: true, promo_applied: appliedPromoCode, discount: promoDiscount }), { headers: buildCors(req?.headers?.get("origin") || "*") });
         }
       }

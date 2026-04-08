@@ -296,12 +296,18 @@ export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?:
   };
 }
 
+export function resolveBookingSiteUrl(business?: TenantBusiness | null): string {
+  var bookingSiteUrl = trimTrailingSlash(business?.booking_site_url);
+  if (bookingSiteUrl) return bookingSiteUrl;
+  if (business?.subdomain) return "https://" + business.subdomain + ".booking.bookingtours.co.za";
+  return "";
+}
+
 export function resolveManageBookingsUrl(business?: TenantBusiness | null): string {
   if (business?.manage_bookings_url) return String(business.manage_bookings_url);
-  var bookingSiteUrl = trimTrailingSlash(business?.booking_site_url);
-  if (bookingSiteUrl) return bookingSiteUrl + "/my-bookings";
-  if (business?.subdomain) return "https://" + business.subdomain + ".booking.bookingtours.co.za/my-bookings";
-  return "https://booking-mu-steel.vercel.app/my-bookings";
+  var siteUrl = resolveBookingSiteUrl(business);
+  if (siteUrl) return siteUrl + "/my-bookings";
+  return "";
 }
 
 // ──────────────────────────────────────────────────────────────────

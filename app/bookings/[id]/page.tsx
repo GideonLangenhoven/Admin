@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
-import { ArrowLeft, User, MapPin, CreditCard, Clock, Warning, CheckCircle, XCircle, ChatCircle, Envelope, Bell, FileText, ShieldCheck, Star, ArrowCounterClockwise, Money } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowCounterClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../../components/BusinessContext";
+import { notify } from "../../lib/app-notify";
 
 /* ── helpers ── */
 function fmtDate(iso: string) {
@@ -62,6 +63,9 @@ interface BookingDetail {
   invoice_id: string | null;
   created_by_admin_name: string | null;
   created_by_admin_email: string | null;
+  promo_code: string | null;
+  discount_amount: number | null;
+  discount_notes: string | null;
   created_at: string;
   tours: { name?: string; duration_minutes?: number; base_price_per_person?: number } | null;
   slots: { start_time?: string; capacity_total?: number; booked?: number; status?: string } | null;
@@ -103,6 +107,13 @@ interface Hold {
   created_at: string;
 }
 
+interface BookingAddOn {
+  id: string;
+  qty: number;
+  unit_price: number;
+  add_ons: { name: string } | null;
+}
+
 /* ── status helpers ── */
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800 border-amber-200",
@@ -133,8 +144,6 @@ interface TimelineEvent {
   time: string;
   label: string;
   detail?: string;
-  icon: typeof CheckCircle;
-  color: string;
 }
 
 // TODO: Accept audit_logs as an additional parameter and merge into the timeline.
@@ -159,8 +168,6 @@ function buildTimeline(
         : "",
       `Status: ${booking.status === "CANCELLED" ? "PENDING" : booking.status}`,
     ].filter(Boolean).join(" | "),
-    icon: FileText,
-    color: "text-blue-600",
   });
 
   // Holds
@@ -169,8 +176,6 @@ function buildTimeline(
       time: h.created_at,
       label: `Slot hold ${h.status === "CONVERTED" ? "converted" : "created"}`,
       detail: `Expires: ${fmtDateTime(h.expires_at)} | Status: ${h.status}`,
-      icon: Clock,
-      color: h.status === "CONVERTED" ? "text-green-600" : "text-amber-600",
     });
   }
 
@@ -183,8 +188,6 @@ function buildTimeline(
           time: log.created_at,
           label: "Payment confirmed (Yoco)",
           detail: `Payment ID: ${p.yoco_payment_id || "—"} | Amount: ${p.amount ? fmtCurrency(Number(p.amount) / 100) : "—"}`,
-          icon: CheckCircle,
-          color: "text-green-600",
         });
         break;
       case "payment_marked_manual":
@@ -192,8 +195,6 @@ function buildTimeline(
           time: log.created_at,
           label: "Marked as paid (Admin)",
           detail: "Payment recorded manually by admin",
-          icon: Money,
-          color: "text-green-600",
         });
         break;
       case "payment_confirmed_but_status_update_failed":
@@ -201,8 +202,6 @@ function buildTimeline(
           time: log.created_at,
           label: "Payment received — status update failed",
           detail: `Error: ${p.error || "Unknown"} | Payment ID: ${p.yoco_payment_id || "—"}`,
-          icon: Warning,
-          color: "text-red-600",
         });
         break;
       default:
@@ -210,27 +209,22 @@ function buildTimeline(
           time: log.created_at,
           label: log.event.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
           detail: Object.keys(p).length > 0 ? JSON.stringify(p) : undefined,
-          icon: FileText,
-          color: "text-gray-500",
         });
     }
   }
 
   // Auto-messages
   for (const am of autoMessages) {
-    const labels: Record<string, { label: string; icon: typeof Envelope; color: string }> = {
-      REMINDER: { label: "Day-before reminder sent (WhatsApp)", icon: Bell, color: "text-blue-600" },
-      INDEMNITY: { label: "Indemnity email sent", icon: ShieldCheck, color: "text-indigo-600" },
-      REVIEW_REQUEST: { label: "Review request sent (WhatsApp)", icon: Star, color: "text-amber-600" },
-      AUTO_CANCEL: { label: "Auto-cancellation notification sent", icon: XCircle, color: "text-red-600" },
+    const labels: Record<string, string> = {
+      REMINDER: "Day-before reminder sent (WhatsApp)",
+      INDEMNITY: "Indemnity email sent",
+      REVIEW_REQUEST: "Review request sent (WhatsApp)",
+      AUTO_CANCEL: "Auto-cancellation notification sent",
     };
-    const info = labels[am.type] || { label: `Auto message: ${am.type}`, icon: ChatCircle, color: "text-gray-500" };
     events.push({
       time: am.created_at,
-      label: info.label,
+      label: labels[am.type] || `Auto message: ${am.type}`,
       detail: am.phone ? `To: ${am.phone}` : undefined,
-      icon: info.icon,
-      color: info.color,
     });
   }
 
@@ -240,8 +234,6 @@ function buildTimeline(
       time: booking.cancelled_at,
       label: "Booking cancelled",
       detail: booking.cancellation_reason || undefined,
-      icon: XCircle,
-      color: "text-red-600",
     });
   }
 
@@ -291,11 +283,16 @@ export default function BookingDetailPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoMessages, setAutoMessages] = useState<AutoMessage[]>([]);
   const [holds, setHolds] = useState<Hold[]>([]);
+  const [bookingAddOns, setBookingAddOns] = useState<BookingAddOn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState({ name: "", phone: "", email: "" });
+  const [codeInput, setCodeInput] = useState("");
+  const [codeApplying, setCodeApplying] = useState(false);
+  const [codeResult, setCodeResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [resendingPayment, setResendingPayment] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !businessId) return;
@@ -303,7 +300,7 @@ export default function BookingDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [bookingRes, invoiceRes, logsRes, amRes, holdsRes] = await Promise.all([
+      const [bookingRes, invoiceRes, logsRes, amRes, holdsRes, addOnsRes] = await Promise.all([
         supabase
           .from("bookings")
           .select("*, tours(name, duration_minutes, base_price_per_person), slots(start_time, capacity_total, booked, status)")
@@ -332,6 +329,10 @@ export default function BookingDetailPage() {
           .select("id, slot_id, qty, status, expires_at, created_at")
           .eq("booking_id", bookingId)
           .order("created_at", { ascending: true }),
+        supabase
+          .from("booking_add_ons")
+          .select("id, qty, unit_price, add_ons(name)")
+          .eq("booking_id", bookingId),
       ]);
 
       if (bookingRes.error || !bookingRes.data) {
@@ -350,6 +351,10 @@ export default function BookingDetailPage() {
       setLogs((logsRes.data as LogEntry[]) || []);
       setAutoMessages((amRes.data as AutoMessage[]) || []);
       setHolds((holdsRes.data as Hold[]) || []);
+      setBookingAddOns(((addOnsRes.data || []) as any[]).map((row: any) => ({
+        ...row,
+        add_ons: Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons,
+      })) as BookingAddOn[]);
       setLoading(false);
     }
     load();
@@ -407,6 +412,169 @@ export default function BookingDetailPage() {
     setSavingCustomer(false);
   }
 
+  async function applyCode() {
+    if (!booking || !codeInput.trim()) return;
+    setCodeApplying(true);
+    setCodeResult(null);
+    const code = codeInput.trim().toUpperCase().replace(/\s/g, "");
+
+    try {
+      // Try voucher first
+      const { data: voucher } = await supabase
+        .from("vouchers")
+        .select("id, code, status, type, value, current_balance, purchase_amount, pax_limit, purchase_value")
+        .eq("code", code)
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      if (voucher) {
+        if (voucher.status !== "ACTIVE") {
+          setCodeResult({ type: "error", message: `Voucher ${code} is ${voucher.status.toLowerCase()}` });
+          setCodeApplying(false);
+          return;
+        }
+        const balance = Number(voucher.current_balance || voucher.value || voucher.purchase_amount || 0);
+        const currentTotal = Number(booking.total_amount || 0);
+        let deduction = 0;
+
+        if (voucher.type === "FREE_TRIP") {
+          const coveredPax = Math.min(voucher.pax_limit || 1, booking.qty);
+          const slotCost = Number(booking.unit_price || 0) * coveredPax;
+          const purchaseVal = Number(voucher.purchase_value || voucher.purchase_amount || balance);
+          deduction = slotCost > purchaseVal ? Math.min(purchaseVal, currentTotal) : Math.min(balance, slotCost, currentTotal);
+        } else {
+          deduction = Math.min(balance, currentTotal);
+        }
+
+        const newTotal = Math.max(0, currentTotal - deduction);
+
+        // Deduct voucher balance atomically
+        const { data: rpcRes } = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: deduction });
+        if (!rpcRes?.success) {
+          // Fallback: mark as redeemed
+          await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_booking_id: booking.id }).eq("id", voucher.id);
+        } else {
+          await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
+        }
+
+        // Update booking
+        const updateFields: Record<string, unknown> = {
+          total_amount: newTotal,
+          voucher_deduction: deduction,
+          discount_type: "VOUCHER",
+        };
+        if (newTotal <= 0) {
+          updateFields.status = "PAID";
+          updateFields.yoco_payment_id = "VOUCHER_ADMIN_" + code;
+        }
+        await supabase.from("bookings").update(updateFields).eq("id", booking.id);
+
+        setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER", status: newTotal <= 0 ? "PAID" : booking.status } as BookingDetail);
+        setCodeResult({ type: "success", message: `Voucher applied: R${deduction} off. ${newTotal <= 0 ? "Booking is now fully paid!" : `New total: R${newTotal}`}` });
+        setCodeInput("");
+        setCodeApplying(false);
+        return;
+      }
+
+      // Try promo code via validate_promo_code RPC
+      const baseTotal = Number(booking.unit_price) * booking.qty;
+      const { data: promoResult } = await supabase.rpc("validate_promo_code", {
+        p_business_id: booking.business_id,
+        p_code: code,
+        p_order_amount: baseTotal,
+        p_customer_email: booking.email || null,
+      });
+
+      if (promoResult?.valid) {
+        let discountAmt = 0;
+        if (promoResult.discount_type === "PERCENT") {
+          discountAmt = Math.round(baseTotal * Number(promoResult.discount_value) / 100 * 100) / 100;
+        } else {
+          discountAmt = Math.min(Number(promoResult.discount_value), baseTotal);
+        }
+        const newTotal = Math.max(0, Math.round((baseTotal - discountAmt) * 100) / 100);
+
+        await supabase.from("bookings").update({
+          total_amount: newTotal,
+          original_total: booking.original_total || baseTotal,
+          promo_code: promoResult.code,
+          discount_amount: discountAmt,
+          discount_type: promoResult.discount_type,
+          discount_percent: promoResult.discount_type === "PERCENT" ? Number(promoResult.discount_value) : null,
+        }).eq("id", booking.id);
+
+        // Record promo usage atomically
+        await supabase.rpc("apply_promo_code", {
+          p_promo_id: promoResult.promo_id,
+          p_customer_email: booking.email || "",
+          p_booking_id: booking.id,
+          p_customer_phone: booking.phone || null,
+        });
+
+        setBooking({
+          ...booking,
+          total_amount: newTotal,
+          original_total: booking.original_total || baseTotal,
+          promo_code: promoResult.code,
+          discount_amount: discountAmt,
+          discount_type: promoResult.discount_type,
+          discount_percent: promoResult.discount_type === "PERCENT" ? Number(promoResult.discount_value) : null,
+        });
+        const discountLabel = promoResult.discount_type === "PERCENT"
+          ? `${promoResult.discount_value}% off`
+          : `R${promoResult.discount_value} off`;
+        setCodeResult({
+          type: "success",
+          message: `Promo applied: ${fmtCurrency(discountAmt)} off (${discountLabel}). New total: ${fmtCurrency(newTotal)}${newTotal <= 0 ? " \u2014 no payment needed!" : ""}`,
+        });
+        setCodeInput("");
+      } else if (promoResult) {
+        setCodeResult({ type: "error", message: promoResult.error || "Invalid promo code" });
+      } else {
+        setCodeResult({ type: "error", message: "Code not found. Check the code and try again." });
+      }
+    } catch (err: any) {
+      setCodeResult({ type: "error", message: err.message || "Failed to apply code" });
+    }
+    setCodeApplying(false);
+  }
+
+  async function resendPaymentLink() {
+    if (!booking) return;
+    setResendingPayment(true);
+    setCodeResult(null);
+    try {
+      const res = await supabase.functions.invoke("create-checkout", {
+        body: {
+          amount: Number(booking.total_amount || 0),
+          booking_id: booking.id,
+          business_id: businessId,
+          type: "BOOKING",
+          customer_name: booking.customer_name || "",
+          customer_email: booking.email || "",
+          qty: booking.qty || 1,
+        },
+      });
+      if (res.error) {
+        const errMsg = "Payment link failed: " + res.error.message;
+        setCodeResult({ type: "error", message: errMsg });
+        notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
+      } else if (res.data?.fully_covered) {
+        setCodeResult({ type: "success", message: "Booking fully covered by promo \u2014 no payment needed" });
+        notify({ title: "Fully covered", message: "Promo covers the full amount. No payment required.", tone: "success" });
+      } else if (res.data?.redirectUrl) {
+        setBooking({ ...booking, yoco_checkout_id: res.data.id });
+        setCodeResult({ type: "success", message: `New payment link sent to customer (${fmtCurrency(Number(booking.total_amount))})` });
+        notify({ title: "Payment link sent", message: "Sent to " + (booking.email || booking.phone), tone: "success" });
+      } else {
+        setCodeResult({ type: "error", message: "Failed to generate payment link" });
+      }
+    } catch (err: any) {
+      setCodeResult({ type: "error", message: err.message || "Failed" });
+    }
+    setResendingPayment(false);
+  }
+
   return (
     <div className="max-w-4xl space-y-6 pb-12">
       {/* Header */}
@@ -422,6 +590,16 @@ export default function BookingDetailPage() {
           <Badge className={STATUS_COLORS[booking.status] || "bg-gray-100 text-gray-600"}>{booking.status}</Badge>
           <Badge className="bg-gray-100 text-gray-600 border-gray-200">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>
+        {isPending && Number(booking.total_amount) > 0 && (
+          <button
+            onClick={resendPaymentLink}
+            disabled={resendingPayment}
+            className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#0f595e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b4347] disabled:opacity-50 transition-colors"
+          >
+            <PaperPlaneTilt size={14} />
+            {resendingPayment ? "Sending..." : "Resend Payment Link"}
+          </button>
+        )}
       </div>
 
       {/* Booking ID + Created */}
@@ -455,8 +633,7 @@ export default function BookingDetailPage() {
             )}
           </div>
           {editingCustomer && isPending && booking.yoco_checkout_id && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
-              <Warning size={16} className="shrink-0 text-amber-600 mt-0.5" />
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
               <p className="text-xs text-amber-800 leading-snug">
                 <span className="font-semibold">Warning:</span> An existing payment link will be invalidated if you save changes. The customer will need a new payment link.
               </p>
@@ -523,9 +700,11 @@ export default function BookingDetailPage() {
                 value={
                   <span className="text-red-600">
                     -{fmtCurrency(discountAmount)}
-                    {booking.discount_type === "PERCENT" && booking.discount_percent
-                      ? ` (${booking.discount_percent}%)`
-                      : booking.discount_type ? ` (${booking.discount_type})` : ""}
+                    {booking.promo_code
+                      ? ` (${booking.promo_code}${booking.discount_type === "PERCENT" && booking.discount_percent ? ` \u2014 ${booking.discount_percent}%` : ""})`
+                      : booking.discount_type === "PERCENT" && booking.discount_percent
+                        ? ` (${booking.discount_percent}%)`
+                        : booking.discount_type ? ` (${booking.discount_type})` : ""}
                   </span>
                 }
               />
@@ -544,7 +723,66 @@ export default function BookingDetailPage() {
               <InfoRow label="Invoice Created" value={fmtDateTime(invoice.created_at)} />
             </>
           )}
+
+          {/* Apply Voucher/Promo Code */}
+          {!isCancelled && (
+            <>
+              <div className="my-3 border-t border-gray-100" />
+              <p className="text-xs font-medium text-gray-500 mb-2">Apply Voucher or Promo Code</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={codeInput}
+                  onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeResult(null); }}
+                  placeholder="Enter code"
+                  maxLength={20}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase text-gray-900 placeholder:text-gray-400 placeholder:normal-case"
+                />
+                <button
+                  onClick={applyCode}
+                  disabled={codeApplying || !codeInput.trim()}
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {codeApplying ? "Applying..." : "Apply"}
+                </button>
+              </div>
+              {codeResult && (
+                <div className={`mt-2 rounded-lg px-3 py-2 text-xs ${codeResult.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                  {codeResult.message}
+                </div>
+              )}
+
+              {/* Resend Payment Link */}
+              {isPending && Number(booking.total_amount) > 0 && (
+                <button
+                  onClick={resendPaymentLink}
+                  disabled={resendingPayment}
+                  className="mt-3 w-full rounded-lg border border-[#0f595e] bg-[#0f595e]/5 px-4 py-2.5 text-xs font-semibold text-[#0f595e] hover:bg-[#0f595e]/10 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                >
+                  <PaperPlaneTilt size={14} />
+                  {resendingPayment ? "Sending..." : `Resend Payment Link (${fmtCurrency(Number(booking.total_amount))})`}
+                </button>
+              )}
+            </>
+          )}
         </Card>
+
+        {bookingAddOns.length > 0 && (
+          <Card title="Add-Ons">
+            {bookingAddOns.map((ao) => (
+              <InfoRow
+                key={ao.id}
+                label={ao.add_ons?.name || "Add-on"}
+                value={`${ao.qty} x ${fmtCurrency(ao.unit_price)} = ${fmtCurrency(ao.qty * ao.unit_price)}`}
+              />
+            ))}
+            <div className="my-2 border-t border-gray-100" />
+            <InfoRow
+              label="Add-Ons Total"
+              value={<span className="font-semibold text-gray-900">{fmtCurrency(bookingAddOns.reduce((sum, ao) => sum + ao.qty * ao.unit_price, 0))}</span>}
+            />
+          </Card>
+        )}
 
         <Card title="Waiver & Intake">
           <InfoRow
@@ -684,12 +922,10 @@ export default function BookingDetailPage() {
 
             <div className="space-y-0">
               {timeline.map((evt, i) => {
-                const Icon = evt.icon;
                 return (
                   <div key={i} className="relative flex gap-3 py-3">
                     {/* Dot */}
-                    <div className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white border border-gray-200 ${evt.color}`}>
-                      <Icon size={12} />
+                    <div className="relative z-10 flex h-3 w-3 shrink-0 mt-1.5 rounded-full bg-gray-400 border border-gray-200">
                     </div>
                     {/* Content */}
                     <div className="flex-1 min-w-0">

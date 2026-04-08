@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Buildings, CheckCircle, Lock, ShieldCheck } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const plans = [
@@ -91,10 +90,7 @@ export default function OperatorsPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center gap-2">
-            <Buildings size={18} className="text-emerald-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Available operators</h2>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900">Available operators</h2>
           <div className="mt-4 space-y-3">
             {(operators.length > 0 ? operators : [{ id: businessId, name: businessName || "Current operator", logoUrl: "" }]).map((operator) => {
               const isActive = operator.id === businessId;
@@ -118,12 +114,10 @@ export default function OperatorsPage() {
                   </div>
                   {isActive ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
-                      <CheckCircle size={14} />
                       Active
                     </span>
                   ) : !canSwitch ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600">
-                      <Lock size={14} />
                       Locked
                     </span>
                   ) : (
@@ -137,10 +131,7 @@ export default function OperatorsPage() {
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-gray-700" />
-              <h2 className="text-lg font-semibold text-gray-900">Isolation checks</h2>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900">Isolation checks</h2>
             <ul className="mt-4 space-y-3 text-sm text-gray-600">
               <li className="rounded-xl bg-gray-50 px-3 py-2">Bookings, invoices, refunds, vouchers, reports, and photos all follow the active operator context.</li>
               <li className="rounded-xl bg-gray-50 px-3 py-2">The current operator name stays visible in the shell so admins can confirm they are working in the correct account.</li>

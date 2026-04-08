@@ -38,12 +38,18 @@ const DEFAULT_FORM: OnboardForm = {
 
 const BOOKING_DOMAIN = "bookingtours.co.za";
 
+async function sha256(msg: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 type BusinessRow = {
   id: string;
   business_name: string;
   subdomain: string | null;
   max_admin_seats: number;
   admin_count?: number;
+  subscription_status: string;
 };
 
 export default function SuperAdminPage() {
@@ -68,19 +74,22 @@ export default function SuperAdminPage() {
   const [savingSeatId, setSavingSeatId] = useState<string | null>(null);
   const [editingSubdomain, setEditingSubdomain] = useState<{ id: string; value: string } | null>(null);
   const [savingSubdomain, setSavingSubdomain] = useState(false);
+  const [togglingStatusId, setTogglingStatusId] = useState<string | null>(null);
   const [expandedBiz, setExpandedBiz] = useState<string | null>(null);
   const [bizDetail, setBizDetail] = useState<Record<string, any> | null>(null);
   const [bizDetailLoading, setBizDetailLoading] = useState(false);
   const [bizDetailSaving, setBizDetailSaving] = useState(false);
   const [bizTours, setBizTours] = useState<any[]>([]);
   const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
+  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean }>>([]);
+  const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
 
   async function loadBusinesses() {
     setLoadingBiz(true);
     // Anon role has SELECT on businesses (RLS allows it)
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, business_name, subdomain, max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+      .select("id, business_name, subdomain, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
       .order("business_name");
     if (error) {
       console.error("LOAD_BIZ_ERR:", error.message);
@@ -140,6 +149,19 @@ export default function SuperAdminPage() {
     setSavingSubdomain(false);
   }
 
+  async function toggleSubscriptionStatus(bizId: string, current: string) {
+    setTogglingStatusId(bizId);
+    var next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+    var { error } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", bizId);
+    if (error) {
+      notify({ title: "Failed", message: error.message, tone: "error" });
+    } else {
+      notify({ title: next === "SUSPENDED" ? "Suspended" : "Reactivated", message: "Subscription status updated to " + next + ".", tone: "success" });
+      setBusinesses((prev) => prev.map((b) => b.id === bizId ? { ...b, subscription_status: next } : b));
+    }
+    setTogglingStatusId(null);
+  }
+
   async function loadBizDetail(bizId: string) {
     if (expandedBiz === bizId) { setExpandedBiz(null); return; }
     setBizDetailLoading(true);
@@ -151,6 +173,10 @@ export default function SuperAdminPage() {
     // Load tours
     const { data: tours } = await supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order");
     setBizTours(tours || []);
+
+    // Load admin users
+    const { data: admins } = await supabase.from("admin_users").select("id, email, name, role, suspended").eq("business_id", bizId).order("role");
+    setBizAdmins(admins || []);
 
     // Parse FAQs
     const faqRaw = data?.faq_json;
@@ -211,6 +237,33 @@ export default function SuperAdminPage() {
     if (error) { notify({ title: "Save failed", message: error.message, tone: "error" }); }
     else { notify({ title: "Saved", message: "Business details updated.", tone: "success" }); }
     setBizDetailSaving(false);
+  }
+
+  async function resetAdminPassword(adminId: string, adminEmail: string) {
+    const newPassword = window.prompt(`Enter new password for ${adminEmail}:`);
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      notify({ title: "Too short", message: "Password must be at least 6 characters.", tone: "error" });
+      return;
+    }
+    setResettingPasswordId(adminId);
+    try {
+      const hashed = await sha256(newPassword);
+      const { error } = await supabase
+        .from("admin_users")
+        .update({
+          password_hash: hashed,
+          must_set_password: false,
+          password_set_at: new Date().toISOString(),
+        })
+        .eq("id", adminId);
+      if (error) throw error;
+      notify({ title: "Password reset", message: `Password updated for ${adminEmail}.`, tone: "success" });
+    } catch (err: any) {
+      notify({ title: "Reset failed", message: err.message || "Could not reset password.", tone: "error" });
+    } finally {
+      setResettingPasswordId(null);
+    }
   }
 
   function updateDetail(key: string, value: any) {
@@ -275,7 +328,7 @@ export default function SuperAdminPage() {
       const admin = res.data.admin;
       if (admin?.id && admin?.email) {
         try {
-          await sendAdminSetupLink({ id: admin.id, email: admin.email, name: admin.name || form.adminName }, "ADMIN_INVITE");
+          await sendAdminSetupLink({ id: admin.id, email: admin.email, name: admin.name || form.adminName }, "ADMIN_INVITE", res.data.business?.id || "");
         } catch (inviteError) {
           console.error("Invite email failed after onboarding:", inviteError);
           notify({
@@ -449,18 +502,33 @@ export default function SuperAdminPage() {
                     <div className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</div>
                     <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5">{b.id}</div>
                   </div>
-                  {/* Right: Seat controls */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
-                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
-                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">−</button>
-                    <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
-                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
-                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">+</button>
-                    <span className={"ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold " +
-                      ((b.admin_count || 0) >= b.max_admin_seats ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
-                      {b.admin_count || 0}/{b.max_admin_seats}
-                    </span>
+                  {/* Right: Status + Seat controls */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {/* Subscription status */}
+                    <button
+                      onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
+                      disabled={togglingStatusId === b.id}
+                      title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
+                      className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold cursor-pointer transition-colors " +
+                        (b.subscription_status === "SUSPENDED"
+                          ? "bg-red-100 text-red-700 hover:bg-red-200"
+                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200")}
+                    >
+                      {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
+                    </button>
+                    {/* Seat controls */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
+                      <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">−</button>
+                      <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
+                      <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">+</button>
+                      <span className={"ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold " +
+                        ((b.admin_count || 0) >= b.max_admin_seats ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                        {b.admin_count || 0}/{b.max_admin_seats}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -682,6 +750,40 @@ export default function SuperAdminPage() {
                                       {t.hidden && <span className="ml-1 text-amber-500">(Hidden)</span>}
                                     </div>
                                   </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </fieldset>
+
+                        {/* ── Admin Users ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                            Admin Users ({bizAdmins.length})
+                          </legend>
+                          {bizAdmins.length === 0 ? (
+                            <p className="text-xs italic text-[var(--ck-text-muted)]">No admin users found for this business.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {bizAdmins.map((admin) => (
+                                <div key={admin.id} className="flex items-center justify-between rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
+                                      {admin.name || admin.email}
+                                      {admin.suspended && <span className="ml-1.5 text-red-500 text-[10px] font-bold">(Suspended)</span>}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--ck-text-muted)]">
+                                      {admin.email} · {admin.role}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => resetAdminPassword(admin.id, admin.email)}
+                                    disabled={resettingPasswordId === admin.id}
+                                    className="shrink-0 ml-3 rounded-lg border px-3 py-1 text-xs font-semibold transition-colors hover:bg-[var(--ck-bg-subtle)] disabled:opacity-50"
+                                    style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}
+                                  >
+                                    {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
+                                  </button>
                                 </div>
                               ))}
                             </div>

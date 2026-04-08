@@ -6,6 +6,7 @@ import { generateSecureToken, sendAdminSetupLink, sha256 } from "../lib/admin-au
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
+import { DatePicker } from "../../components/DatePicker";
 
 function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
     id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
@@ -38,13 +39,26 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
+// Settings sections that MAIN_ADMIN can grant to regular admins
+var SETTINGS_SECTIONS = [
+    { key: "tours", label: "Tours & Activities" },
+    { key: "addons", label: "Booking Add-Ons" },
+    { key: "resources", label: "Shared Resources" },
+    { key: "external", label: "External Booking" },
+    { key: "site", label: "Booking Site Config" },
+    { key: "email", label: "Email Customisation" },
+    { key: "invoice", label: "Invoice Details" },
+    { key: "credentials", label: "Integration Credentials" },
+] as const;
+type SettingsSectionKey = typeof SETTINGS_SECTIONS[number]["key"];
+
 // Default Booking App URLs (separate from Admin Dashboard: https://admin-tawny-delta-92.vercel.app)
-var DEFAULT_BOOKING_URL = "https://booking-mu-steel.vercel.app";
-var DEFAULT_MANAGE_BOOKINGS_URL = "https://booking-mu-steel.vercel.app/my-bookings";
-var DEFAULT_GIFT_VOUCHER_URL = "https://booking-mu-steel.vercel.app/gift-voucher";
-var DEFAULT_BOOKING_SUCCESS_URL = "https://booking-mu-steel.vercel.app/success";
-var DEFAULT_BOOKING_CANCEL_URL = "https://booking-mu-steel.vercel.app/cancelled";
-var DEFAULT_VOUCHER_SUCCESS_URL = "https://booking-mu-steel.vercel.app/voucher-success";
+var DEFAULT_BOOKING_URL = "";
+var DEFAULT_MANAGE_BOOKINGS_URL = "";
+var DEFAULT_GIFT_VOUCHER_URL = "";
+var DEFAULT_BOOKING_SUCCESS_URL = "";
+var DEFAULT_BOOKING_CANCEL_URL = "";
+var DEFAULT_VOUCHER_SUCCESS_URL = "";
 
 var DEFAULT_SITE_SETTINGS = {
     directions: "",
@@ -109,6 +123,17 @@ interface TourResourceLink {
     resources?: ResourceRecord | null;
 }
 
+interface AddOn {
+    id: string;
+    business_id: string;
+    name: string;
+    description: string | null;
+    price: number;
+    image_url: string | null;
+    active: boolean;
+    sort_order: number;
+}
+
 export default function SettingsPage() {
     var { businessId } = useBusinessContext();
     var [admins, setAdmins] = useState<any[]>([]);
@@ -126,6 +151,8 @@ export default function SettingsPage() {
     var [error, setError] = useState("");
     var [adminMessage, setAdminMessage] = useState("");
     var [resendingAdminId, setResendingAdminId] = useState("");
+    var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
+    var [togglingSubscription, setTogglingSubscription] = useState(false);
 
     // Tours state
     var [tours, setTours] = useState<Tour[]>([]);
@@ -157,6 +184,19 @@ export default function SettingsPage() {
     var [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
     var [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
     var [emailColor, setEmailColor] = useState("#1b3b36");
+    var [socialLinks, setSocialLinks] = useState({ facebook: "", instagram: "", tiktok: "", youtube: "", twitter: "", linkedin: "", tripadvisor: "", google_reviews: "" });
+
+    // Operations & AI config (trapped data from onboarding)
+    var [opsConfig, setOpsConfig] = useState({ what_to_bring: "", what_to_wear: "", ai_system_prompt: "", faq_json: {} as Record<string, string> });
+    var [opsSaving, setOpsSaving] = useState(false);
+    var [faqEntries, setFaqEntries] = useState<{ q: string; a: string }[]>([]);
+
+    // Automation tag config
+    var [autoTagConfig, setAutoTagConfig] = useState({
+        vip_bookings: 3, vip_window_days: 90, vip_valid_days: 365, vip_renewal_bookings: 3,
+        lapsed_days: 90, new_booker_enabled: true, completed_tour_enabled: true, voucher_expiry_days: 30,
+    });
+    var [autoTagSaving, setAutoTagSaving] = useState(false);
 
     // Credentials State
     var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean } | null>(null);
@@ -165,6 +205,39 @@ export default function SettingsPage() {
     var [waSaving, setWaSaving] = useState(false);
     var [yocoSaving, setYocoSaving] = useState(false);
     var [credMessage, setCredMessage] = useState({ type: "", text: "" });
+
+    // Add-ons state
+    var [addOns, setAddOns] = useState<AddOn[]>([]);
+    var [editingAddOn, setEditingAddOn] = useState<AddOn | null>(null);
+    var [addOnForm, setAddOnForm] = useState({ name: "", description: "", price: "", image_url: "", sort_order: "0", active: true });
+    var [addOnSaving, setAddOnSaving] = useState(false);
+    var [addOnError, setAddOnError] = useState("");
+    var [addOnDragIdx, setAddOnDragIdx] = useState<number | null>(null);
+
+    // Invoice & Banking state
+    var [invoiceForm, setInvoiceForm] = useState({ company_name: "", address_line1: "", address_line2: "", address_line3: "", reg_number: "", vat_number: "" });
+    var [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
+    var [invoiceSaving, setInvoiceSaving] = useState(false);
+    var [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
+    var [bankOtpStep, setBankOtpStep] = useState<"idle" | "sending" | "sent" | "verifying">("idle");
+    var [bankOtpToken, setBankOtpToken] = useState("");
+    var [bankOtpCode, setBankOtpCode] = useState("");
+    var [bankOtpError, setBankOtpError] = useState("");
+    var [bankVerified, setBankVerified] = useState(false);
+
+    // Marketing test email recipient
+    var [marketingTestEmail, setMarketingTestEmail] = useState("");
+    var [savingTestEmail, setSavingTestEmail] = useState(false);
+
+    // Per-section permissions for the current admin
+    var [myPerms, setMyPerms] = useState<Record<string, boolean>>({});
+    var [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
+    var [savingPerms, setSavingPerms] = useState<string | null>(null);
+
+    function canAccess(section: string): boolean {
+        if (isPrivileged(role)) return true;
+        return myPerms[section] === true;
+    }
 
     useEffect(() => {
         var r = localStorage.getItem("ck_admin_role");
@@ -176,8 +249,10 @@ export default function SettingsPage() {
             fetchSiteSettings();
             fetchPlanUsage();
             fetchCredStatus();
+            fetchAddOns();
         } else {
-            setLoading(false);
+            // Regular admin — load their permissions, then fetch data for granted sections
+            loadMyPermissions();
         }
 
         if (!document.getElementById("dotlottie-script")) {
@@ -189,9 +264,31 @@ export default function SettingsPage() {
         }
     }, [businessId]);
 
+    async function loadMyPermissions() {
+        var adminEmail = localStorage.getItem("ck_admin_email");
+        if (!adminEmail) { setLoading(false); return; }
+        var { data } = await supabase
+            .from("admin_users")
+            .select("settings_permissions")
+            .eq("email", adminEmail)
+            .eq("business_id", businessId)
+            .maybeSingle();
+        var perms = (data?.settings_permissions || {}) as Record<string, boolean>;
+        setMyPerms(perms);
+        var hasAny = Object.values(perms).some(Boolean);
+        if (hasAny) {
+            if (perms.tours) fetchTours();
+            if (perms.addons) fetchAddOns();
+            if (perms.resources) fetchResources();
+            if (perms.site || perms.email || perms.invoice) fetchSiteSettings();
+            if (perms.credentials) fetchCredStatus();
+        }
+        setLoading(false);
+    }
+
     async function fetchAdmins() {
         setLoading(true);
-        var { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at").eq("business_id", businessId).order("created_at");
+        var { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
         if (data) setAdmins(data);
         setLoading(false);
     }
@@ -242,7 +339,7 @@ export default function SettingsPage() {
         }
 
         try {
-            await sendAdminSetupLink(insertedAdmin, "ADMIN_INVITE");
+            await sendAdminSetupLink(insertedAdmin, "ADMIN_INVITE", businessId);
             setAdminMessage("Admin added. A secure password setup email has been sent.");
         } catch (emailErr: any) {
             console.error("Welcome email failed:", emailErr);
@@ -266,7 +363,7 @@ export default function SettingsPage() {
         setError("");
         setAdminMessage("");
         try {
-            await sendAdminSetupLink(admin, "RESET");
+            await sendAdminSetupLink(admin, "RESET", businessId);
             setAdminMessage("A fresh password setup email has been sent to " + admin.email + ".");
             fetchAdmins();
         } catch (resendError: any) {
@@ -476,13 +573,49 @@ export default function SettingsPage() {
 
         if (!await confirmAction({
             title: "Delete tour",
-            message: "Delete \"" + name + "\"? This cannot be undone.",
+            message: "Delete \"" + name + "\"? This will also remove all associated slots, waitlist entries, and combo offers. This cannot be undone.",
             tone: "warning",
             confirmLabel: "Delete tour",
         })) return;
-        await supabase.from("tours").delete().eq("id", id);
+
+        var { error: delErr } = await supabase.from("tours").delete().eq("id", id);
+        if (delErr) {
+            notify({ title: "Delete failed", message: delErr.message, tone: "error" });
+            return;
+        }
+        notify({ title: "Deleted", message: "\"" + name + "\" has been removed.", tone: "success" });
         if (editingTour?.id === id) resetTourForm();
         fetchTours();
+    }
+
+    async function handleSaveAdminPerms(adminId: string, perms: Record<string, boolean>) {
+        setSavingPerms(adminId);
+        var { error: updateErr } = await supabase
+            .from("admin_users")
+            .update({ settings_permissions: perms })
+            .eq("id", adminId);
+        if (updateErr) {
+            notify({ title: "Failed to save permissions", message: updateErr.message, tone: "error" });
+        } else {
+            setAdmins(admins.map(a => a.id === adminId ? { ...a, settings_permissions: perms } : a));
+            notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
+        }
+        setSavingPerms(null);
+    }
+
+    async function handleSaveMarketingTestEmail(email: string) {
+        setSavingTestEmail(true);
+        var { error: updateErr } = await supabase
+            .from("businesses")
+            .update({ marketing_test_email: email || null })
+            .eq("id", businessId);
+        if (updateErr) {
+            notify({ title: "Failed", message: updateErr.message, tone: "error" });
+        } else {
+            setMarketingTestEmail(email);
+            notify({ title: "Saved", message: email ? "Test emails will be sent to " + email : "Marketing test email cleared", tone: "success" });
+        }
+        setSavingTestEmail(false);
     }
 
     async function handleToggleTour(t: Tour) {
@@ -573,7 +706,77 @@ export default function SettingsPage() {
                 photos: data.email_img_photos || "",
             });
             setEmailColor(data.email_color || "#1b3b36");
+            setSocialLinks({
+                facebook: data.social_facebook || "",
+                instagram: data.social_instagram || "",
+                tiktok: data.social_tiktok || "",
+                youtube: data.social_youtube || "",
+                twitter: data.social_twitter || "",
+                linkedin: data.social_linkedin || "",
+                tripadvisor: data.social_tripadvisor || "",
+                google_reviews: data.social_google_reviews || "",
+            });
+            setSubscriptionStatus(data.subscription_status || "ACTIVE");
+            setMarketingTestEmail(data.marketing_test_email || "");
+            setInvoiceForm({
+                company_name: data.invoice_company_name || "",
+                address_line1: data.invoice_address_line1 || "",
+                address_line2: data.invoice_address_line2 || "",
+                address_line3: data.invoice_address_line3 || "",
+                reg_number: data.invoice_reg_number || "",
+                vat_number: data.invoice_vat_number || "",
+            });
+            setBankForm({
+                account_owner: data.bank_account_owner || "",
+                account_number: data.bank_account_number || "",
+                account_type: data.bank_account_type || "",
+                bank_name: data.bank_name || "",
+                branch_code: data.bank_branch_code || "",
+            });
+            // Load operations & AI config
+            setOpsConfig({
+                what_to_bring: data.what_to_bring || "",
+                what_to_wear: data.what_to_wear || "",
+                ai_system_prompt: data.ai_system_prompt || "",
+                faq_json: data.faq_json || {},
+            });
+            var faqObj = data.faq_json || {};
+            setFaqEntries(Object.entries(faqObj).map(([q, a]) => ({ q, a: String(a) })));
+            // Load automation config
+            var ac = data.automation_config || {};
+            setAutoTagConfig({
+                vip_bookings: ac.vip_bookings ?? 3,
+                vip_window_days: ac.vip_window_days ?? 90,
+                vip_valid_days: ac.vip_valid_days ?? 365,
+                vip_renewal_bookings: ac.vip_renewal_bookings ?? 3,
+                lapsed_days: ac.lapsed_days ?? 90,
+                new_booker_enabled: ac.new_booker_enabled ?? true,
+                completed_tour_enabled: ac.completed_tour_enabled ?? true,
+                voucher_expiry_days: ac.voucher_expiry_days ?? 30,
+            });
         }
+    }
+
+    async function toggleSubscription() {
+        var next = subscriptionStatus === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+        var action = next === "SUSPENDED" ? "suspend" : "reactivate";
+        if (!await confirmAction({
+            title: next === "SUSPENDED" ? "Suspend subscription" : "Reactivate subscription",
+            message: next === "SUSPENDED"
+                ? "This will block all admins from accessing the dashboard. Are you sure?"
+                : "This will restore dashboard access for all admins.",
+            tone: next === "SUSPENDED" ? "warning" : "info",
+            confirmLabel: next === "SUSPENDED" ? "Suspend" : "Reactivate",
+        })) return;
+        setTogglingSubscription(true);
+        var { error: err } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", businessId);
+        if (err) {
+            notify({ title: "Failed", message: "Could not " + action + " subscription: " + err.message, tone: "error" });
+        } else {
+            setSubscriptionStatus(next);
+            notify({ title: next === "SUSPENDED" ? "Suspended" : "Reactivated", message: "Subscription is now " + next + ".", tone: "success" });
+        }
+        setTogglingSubscription(false);
     }
 
     function resetResourceForm() {
@@ -782,6 +985,94 @@ export default function SettingsPage() {
         setSiteSaving(false);
     }
 
+    async function handleSaveInvoice(e: React.FormEvent) {
+        e.preventDefault();
+        setInvoiceSaving(true);
+        setInvoiceMessage({ type: "", text: "" });
+
+        var updatePayload: Record<string, string | null> = {
+            invoice_company_name: invoiceForm.company_name || null,
+            invoice_address_line1: invoiceForm.address_line1 || null,
+            invoice_address_line2: invoiceForm.address_line2 || null,
+            invoice_address_line3: invoiceForm.address_line3 || null,
+            invoice_reg_number: invoiceForm.reg_number || null,
+            invoice_vat_number: invoiceForm.vat_number || null,
+        };
+
+        // Banking details require OTP verification
+        var bankChanged = bankForm.account_owner || bankForm.account_number || bankForm.bank_name;
+        if (bankChanged && !bankVerified) {
+            setInvoiceMessage({ type: "error", text: "Banking details require email verification. Click 'Verify via email' first." });
+            setInvoiceSaving(false);
+            return;
+        }
+
+        if (bankVerified) {
+            updatePayload.bank_account_owner = bankForm.account_owner || null;
+            updatePayload.bank_account_number = bankForm.account_number || null;
+            updatePayload.bank_account_type = bankForm.account_type || null;
+            updatePayload.bank_name = bankForm.bank_name || null;
+            updatePayload.bank_branch_code = bankForm.branch_code || null;
+        }
+
+        var { error } = await supabase.from("businesses").update(updatePayload).eq("id", businessId);
+        if (error) {
+            setInvoiceMessage({ type: "error", text: "Error saving: " + error.message });
+        } else {
+            setInvoiceMessage({ type: "success", text: "Invoice & banking details saved!" });
+            setBankVerified(false);
+            setBankOtpStep("idle");
+            setBankOtpCode("");
+            setBankOtpToken("");
+            setTimeout(() => setInvoiceMessage({ type: "", text: "" }), 3000);
+        }
+        setInvoiceSaving(false);
+    }
+
+    async function handleBankOtpSend() {
+        var adminEmail = localStorage.getItem("ck_admin_email") || "";
+        if (!adminEmail) { setBankOtpError("Could not determine your admin email."); return; }
+        setBankOtpStep("sending");
+        setBankOtpError("");
+        try {
+            var { data, error } = await supabase.functions.invoke("send-otp", {
+                body: { action: "send_admin", email: adminEmail, business_id: businessId },
+            });
+            if (error || !data?.success) {
+                setBankOtpError(data?.error || error?.message || "Failed to send code.");
+                setBankOtpStep("idle");
+                return;
+            }
+            setBankOtpToken(data.token);
+            setBankOtpStep("sent");
+        } catch (err: any) {
+            setBankOtpError(err.message || "Failed to send code.");
+            setBankOtpStep("idle");
+        }
+    }
+
+    async function handleBankOtpVerify() {
+        if (!bankOtpCode.trim() || !bankOtpToken) return;
+        setBankOtpStep("verifying");
+        setBankOtpError("");
+        try {
+            var { data, error } = await supabase.functions.invoke("send-otp", {
+                body: { action: "verify", token: bankOtpToken, code: bankOtpCode.trim() },
+            });
+            if (error || !data?.success || !data?.verified) {
+                setBankOtpError(data?.error || error?.message || "Verification failed.");
+                setBankOtpStep("sent");
+                return;
+            }
+            setBankVerified(true);
+            setBankOtpStep("idle");
+            notify({ title: "Verified", message: "You can now save banking details.", tone: "success" });
+        } catch (err: any) {
+            setBankOtpError(err.message || "Verification failed.");
+            setBankOtpStep("sent");
+        }
+    }
+
     async function fetchCredStatus() {
         try {
             var res = await fetch("/api/credentials?business_id=" + businessId);
@@ -833,6 +1124,115 @@ export default function SettingsPage() {
         setYocoSaving(false);
     }
 
+    var [uploadingField, setUploadingField] = useState<string | null>(null);
+
+    async function handleImageUpload(file: File, bucket: string, folder: string, onUrl: (url: string) => void) {
+        var ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        if (!["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(ext)) {
+            notify({ title: "Invalid file", message: "Please upload an image file (jpg, png, webp, gif, svg).", tone: "warning" });
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            notify({ title: "File too large", message: "Image must be under 5 MB.", tone: "warning" });
+            return;
+        }
+        var path = folder + "/" + Date.now() + "." + ext;
+        var { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+        if (error) { notify({ title: "Upload failed", message: error.message, tone: "error" }); return; }
+        var { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+        onUrl(urlData.publicUrl);
+    }
+
+    // ── Add-Ons CRUD ──
+    async function fetchAddOns() {
+        var { data } = await supabase.from("add_ons").select("*").eq("business_id", businessId).order("sort_order", { ascending: true });
+        setAddOns((data || []) as AddOn[]);
+    }
+
+    function resetAddOnForm() {
+        setEditingAddOn(null);
+        setAddOnForm({ name: "", description: "", price: "", image_url: "", sort_order: "0", active: true });
+        setAddOnError("");
+    }
+
+    function startEditAddOn(a: AddOn) {
+        setEditingAddOn(a);
+        setAddOnForm({
+            name: a.name,
+            description: a.description || "",
+            price: String(a.price || ""),
+            image_url: a.image_url || "",
+            sort_order: String(a.sort_order || 0),
+            active: a.active,
+        });
+        setAddOnError("");
+    }
+
+    async function handleSaveAddOn(e: React.FormEvent) {
+        e.preventDefault();
+        if (!addOnForm.name.trim()) return setAddOnError("Name is required");
+        if (!addOnForm.price || Number(addOnForm.price) < 0) return setAddOnError("Price must be 0 or greater");
+
+        setAddOnSaving(true);
+        setAddOnError("");
+
+        var payload = {
+            name: addOnForm.name.trim(),
+            description: addOnForm.description.trim() || null,
+            price: Number(addOnForm.price),
+            image_url: addOnForm.image_url.trim() || null,
+            sort_order: Number(addOnForm.sort_order) || 0,
+            active: addOnForm.active,
+        };
+
+        if (editingAddOn) {
+            var { error: upErr } = await supabase.from("add_ons").update(payload).eq("id", editingAddOn.id);
+            if (upErr) { setAddOnError("Failed: " + upErr.message); setAddOnSaving(false); return; }
+        } else {
+            var { error: inErr } = await supabase.from("add_ons").insert({ ...payload, business_id: businessId });
+            if (inErr) { setAddOnError("Failed: " + inErr.message); setAddOnSaving(false); return; }
+        }
+
+        setAddOnSaving(false);
+        resetAddOnForm();
+        fetchAddOns();
+    }
+
+    async function handleDeleteAddOn(id: string, name: string) {
+        if (!await confirmAction({
+            title: "Delete add-on",
+            message: "Delete \"" + name + "\"? This cannot be undone.",
+            tone: "warning",
+            confirmLabel: "Delete add-on",
+        })) return;
+
+        var { error: delErr } = await supabase.from("add_ons").delete().eq("id", id);
+        if (delErr) {
+            notify({ title: "Delete failed", message: delErr.message, tone: "error" });
+            return;
+        }
+        notify({ title: "Deleted", message: "\"" + name + "\" has been removed.", tone: "success" });
+        if (editingAddOn?.id === id) resetAddOnForm();
+        fetchAddOns();
+    }
+
+    async function handleToggleAddOn(a: AddOn) {
+        await supabase.from("add_ons").update({ active: !a.active }).eq("id", a.id);
+        fetchAddOns();
+    }
+
+    async function handleAddOnDrop(targetIdx: number) {
+        if (addOnDragIdx === null || addOnDragIdx === targetIdx) { setAddOnDragIdx(null); return; }
+        var reordered = [...addOns];
+        var [moved] = reordered.splice(addOnDragIdx, 1);
+        reordered.splice(targetIdx, 0, moved);
+        setAddOns(reordered);
+        setAddOnDragIdx(null);
+        for (var i = 0; i < reordered.length; i++) {
+            await supabase.from("add_ons").update({ sort_order: i }).eq("id", reordered[i].id);
+        }
+    }
+
     async function handleUploadEmailImage(key: string, file: File) {
         setEmailImgUploading(key);
         try {
@@ -866,6 +1266,14 @@ export default function SettingsPage() {
             email_img_admin: emailImgs.admin || null,
             email_img_voucher: emailImgs.voucher || null,
             email_img_photos: emailImgs.photos || null,
+            social_facebook: socialLinks.facebook || null,
+            social_instagram: socialLinks.instagram || null,
+            social_tiktok: socialLinks.tiktok || null,
+            social_youtube: socialLinks.youtube || null,
+            social_twitter: socialLinks.twitter || null,
+            social_linkedin: socialLinks.linkedin || null,
+            social_tripadvisor: socialLinks.tripadvisor || null,
+            social_google_reviews: socialLinks.google_reviews || null,
         }).eq("id", businessId);
         if (error) {
             setEmailImgsMessage({ type: "error", text: "Error saving: " + error.message });
@@ -878,7 +1286,8 @@ export default function SettingsPage() {
 
     if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
 
-    if (!isPrivileged(role)) {
+    var hasAnyPerm = Object.values(myPerms).some(Boolean);
+    if (!isPrivileged(role) && !hasAnyPerm) {
         return (
             <div className="max-w-2xl">
                 <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
@@ -895,7 +1304,7 @@ export default function SettingsPage() {
 
             <div className="space-y-4">
 
-            <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
+            {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex items-center justify-between mb-4">
@@ -908,34 +1317,80 @@ export default function SettingsPage() {
                         <div className="divide-y divide-[var(--ck-border-subtle)]">
                             {admins.map(a => {
                                 var status = adminPasswordStatus(a);
+                                var perms = (a.settings_permissions || {}) as Record<string, boolean>;
+                                var grantedCount = SETTINGS_SECTIONS.filter(s => perms[s.key]).length;
+                                var isExpanded = expandedPermsAdmin === a.id;
                                 return (
-                                    <div key={a.id} className="p-4 flex items-center justify-between">
-                                        <div>
-                                            <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
-                                            <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
-                                            <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">
-                                                {a.role === "MAIN_ADMIN" ? "Main Admin" : "Admin"} • Added {new Date(a.created_at).toLocaleDateString()}
+                                    <div key={a.id}>
+                                        <div className="p-4 flex items-center justify-between">
+                                            <div>
+                                                <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
+                                                <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
+                                                <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">
+                                                    {a.role === "MAIN_ADMIN" ? "Main Admin" : "Admin"} • Added {new Date(a.created_at).toLocaleDateString()}
+                                                </div>
+                                                <div className={"text-xs mt-0.5 " + status.tone}>
+                                                    {status.label} • {status.detail}
+                                                </div>
+                                                {a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
+                                                    <div className="text-xs text-[var(--ck-text-muted)] mt-1">
+                                                        Settings: {grantedCount > 0 ? `${grantedCount} section${grantedCount !== 1 ? "s" : ""} granted` : "No access"}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className={"text-xs mt-0.5 " + status.tone}>
-                                                {status.label} • {status.detail}
+                                            <div className="flex items-center gap-3">
+                                                {a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
+                                                    <button
+                                                        onClick={() => setExpandedPermsAdmin(isExpanded ? null : a.id)}
+                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline"
+                                                    >
+                                                        {isExpanded ? "Close" : "Permissions"}
+                                                    </button>
+                                                )}
+                                                {a.role !== "MAIN_ADMIN" && (
+                                                    <button
+                                                        onClick={() => handleResendSetup(a)}
+                                                        disabled={resendingAdminId === a.id}
+                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50"
+                                                    >
+                                                        {resendingAdminId === a.id ? "Sending..." : ((a.must_set_password || !a.password_set_at) ? "Resend setup link" : "Email reset link")}
+                                                    </button>
+                                                )}
+                                                {a.role !== "MAIN_ADMIN" && (
+                                                    <button onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline">
+                                                        Remove
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            {a.role !== "MAIN_ADMIN" && (
-                                                <button
-                                                    onClick={() => handleResendSetup(a)}
-                                                    disabled={resendingAdminId === a.id}
-                                                    className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50"
-                                                >
-                                                    {resendingAdminId === a.id ? "Sending..." : ((a.must_set_password || !a.password_set_at) ? "Resend setup link" : "Email reset link")}
-                                                </button>
-                                            )}
-                                            {a.role !== "MAIN_ADMIN" && (
-                                                <button onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline">
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
+                                        {/* Expandable permissions panel */}
+                                        {isExpanded && a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
+                                            <div className="px-4 pb-4 pt-1 bg-[var(--ck-bg-subtle)] border-t border-[var(--ck-border-subtle)]">
+                                                <p className="text-xs font-semibold text-[var(--ck-text-strong)] mb-3">Settings page access for {a.name || a.email}</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {SETTINGS_SECTIONS.map(section => (
+                                                        <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={perms[section.key] === true}
+                                                                onChange={() => {
+                                                                    var newPerms = { ...perms, [section.key]: !perms[section.key] };
+                                                                    // Optimistic update
+                                                                    setAdmins(admins.map(x => x.id === a.id ? { ...x, settings_permissions: newPerms } : x));
+                                                                    handleSaveAdminPerms(a.id, newPerms);
+                                                                }}
+                                                                disabled={savingPerms === a.id}
+                                                                className="h-4 w-4 rounded border-gray-300 accent-[var(--ck-accent)]"
+                                                            />
+                                                            <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-[var(--ck-text-muted)] mt-3 leading-relaxed">
+                                                    Banking details and Admin Users management are always restricted to the Main Admin only.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -944,9 +1399,35 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                {/* Add Admin Form */}
-                <div>
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-4">Add New Admin</h2>
+                {/* Add Admin Form + Subscription */}
+                <div className="space-y-6">
+                    {/* Subscription Status */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                        <h2 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">Subscription Status</h2>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold " +
+                                    (subscriptionStatus === "SUSPENDED" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                                    {subscriptionStatus}
+                                </span>
+                                <span className="text-xs text-[var(--ck-text-muted)]">
+                                    {subscriptionStatus === "SUSPENDED" ? "Dashboard access is blocked for all admins" : "Dashboard is accessible"}
+                                </span>
+                            </div>
+                            <button
+                                onClick={toggleSubscription}
+                                disabled={togglingSubscription}
+                                className={"text-xs font-medium px-3 py-1.5 rounded-lg border disabled:opacity-50 " +
+                                    (subscriptionStatus === "SUSPENDED"
+                                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                        : "border-red-300 text-red-700 hover:bg-red-50")}
+                            >
+                                {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
+                            </button>
+                        </div>
+                    </div>
+
+                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Add New Admin</h2>
                     <form onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
                             <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm">
@@ -979,9 +1460,33 @@ export default function SettingsPage() {
                     </form>
                 </div>
                 </div>
-            </CollapsibleSection>
 
-            <CollapsibleSection id="tours" title="Tours & Activities" openSections={openSections} toggle={toggleSection}>
+                {/* Marketing test email recipient */}
+                <div className="mt-6 pt-5 border-t border-[var(--ck-border-subtle)]">
+                    <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Marketing Test Email Recipient</h3>
+                    <p className="text-xs text-[var(--ck-text-muted)] mb-3">Choose which admin receives test marketing emails when previewing templates.</p>
+                    <div className="flex items-end gap-3">
+                        <select
+                            value={marketingTestEmail}
+                            onChange={(e) => handleSaveMarketingTestEmail(e.target.value)}
+                            disabled={savingTestEmail}
+                            className="flex-1 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-3 py-2 text-sm text-[var(--ck-text)] disabled:opacity-50"
+                        >
+                            <option value="">Select an admin...</option>
+                            {admins.map(a => (
+                                <option key={a.id} value={a.email}>{a.name || a.email} ({a.email})</option>
+                            ))}
+                        </select>
+                        {marketingTestEmail && (
+                            <span className="shrink-0 text-xs text-[var(--ck-success)] font-medium px-2 py-2">
+                                Active
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </CollapsibleSection>}
+
+            {canAccess("tours") && <CollapsibleSection id="tours" title="Tours & Activities" openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* Tour List */}
@@ -1064,13 +1569,28 @@ export default function SettingsPage() {
                                     placeholder="Describe this activity..." />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Image URL</label>
-                                <input type="url" value={tourForm.image_url} onChange={e => setTourForm({ ...tourForm, image_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Paste any image URL here..." />
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Paste any direct image link here, or upload your image at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a> if you don't have a link.</p>
-                                {tourForm.image_url && (
-                                    <img src={tourForm.image_url} alt="Preview" className="mt-2 w-full max-w-[160px] aspect-square object-cover rounded-lg border border-[var(--ck-border-subtle)]" />
-                                )}
+                                <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Tour Image</label>
+                                <div className="flex items-center gap-3">
+                                    {tourForm.image_url && (
+                                        <img src={tourForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
+                                    )}
+                                    <div className="flex-1">
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
+                                            {uploadingField === "tour_image" ? "Uploading..." : (tourForm.image_url ? "Change image" : "Upload image")}
+                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                var file = e.target.files?.[0];
+                                                if (!file) return;
+                                                setUploadingField("tour_image");
+                                                await handleImageUpload(file, "email-images", businessId + "/tours", (url) => setTourForm(prev => ({ ...prev, image_url: url })));
+                                                setUploadingField(null);
+                                                e.target.value = "";
+                                            }} />
+                                        </label>
+                                        {tourForm.image_url && (
+                                            <button type="button" onClick={() => setTourForm({ ...tourForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1115,14 +1635,24 @@ export default function SettingsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Date</label>
-                                        <input type="date" value={tourForm.slotStartDate} onChange={e => setTourForm({ ...tourForm, slotStartDate: e.target.value })}
-                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
+                                        <DatePicker
+                                            value={tourForm.slotStartDate}
+                                            onChange={(v) => setTourForm({ ...tourForm, slotStartDate: v })}
+                                            placeholder="Select start"
+                                            disabled={{ before: new Date() }}
+                                            compact
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">End Date</label>
-                                        <input type="date" value={tourForm.slotEndDate} onChange={e => setTourForm({ ...tourForm, slotEndDate: e.target.value })}
-                                            min={tourForm.slotStartDate || undefined}
-                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
+                                        <DatePicker
+                                            value={tourForm.slotEndDate}
+                                            onChange={(v) => setTourForm({ ...tourForm, slotEndDate: v })}
+                                            placeholder="Select end"
+                                            disabled={tourForm.slotStartDate ? { before: new Date(tourForm.slotStartDate + "T00:00:00") } : { before: new Date() }}
+                                            compact
+                                            alignRight
+                                        />
                                     </div>
                                 </div>
                                 <div className="mt-3">
@@ -1188,9 +1718,138 @@ export default function SettingsPage() {
                     </div>
 
                 </div>
-            </CollapsibleSection>
+            </CollapsibleSection>}
 
-            <CollapsibleSection id="resources" title="Shared Resources & Capacity Pools" subtitle="Assets like vans, guides, kayaks that reduce availability across tours" openSections={openSections} toggle={toggleSection}>
+            {canAccess("addons") && <CollapsibleSection id="addons" title="Booking Add-Ons" subtitle="Optional extras customers can add when booking (e.g. photos, equipment rental)" openSections={openSections} toggle={toggleSection}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                    {/* Add-On List */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{addOns.length} add-on{addOns.length !== 1 ? "s" : ""}</span>
+                            <button onClick={resetAddOnForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Add-On</button>
+                        </div>
+                        <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
+                            <div className="divide-y divide-[var(--ck-border-subtle)]">
+                                {addOns.map((a, idx) => (
+                                    <div key={a.id}
+                                        draggable
+                                        onDragStart={() => setAddOnDragIdx(idx)}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={() => handleAddOnDrop(idx)}
+                                        className={"p-4 cursor-pointer transition-colors " + (addOnDragIdx === idx ? "opacity-40 " : "") + (editingAddOn?.id === a.id ? "bg-blue-50" : "hover:bg-[var(--ck-bg)]")}
+                                        onClick={() => startEditAddOn(a)}>
+                                        <div className="flex gap-3">
+                                            <div className="flex items-center shrink-0 cursor-grab active:cursor-grabbing text-[var(--ck-text-muted)] hover:text-[var(--ck-text-strong)]" title="Drag to reorder">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" /><circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" /><circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" /></svg>
+                                            </div>
+                                            {a.image_url && (
+                                                <img src={a.image_url} alt={a.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="font-medium text-sm text-[var(--ck-text-strong)]">{a.name}</span>
+                                                    <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + (a.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                        {a.active ? "Active" : "Inactive"}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-[var(--ck-text-muted)]">
+                                                    R{a.price}/item{a.description ? " \u00b7 " + a.description : ""}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-2">
+                                            <button onClick={(e) => { e.stopPropagation(); handleToggleAddOn(a); }}
+                                                className={"text-xs font-medium hover:underline " + (a.active ? "text-orange-600" : "text-emerald-600")}>
+                                                {a.active ? "Deactivate" : "Activate"}
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteAddOn(a.id, a.name); }}
+                                                className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {addOns.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No add-ons yet. Create your first optional extra.</div>}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Add / Edit Add-On Form */}
+                    <div>
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">
+                            {editingAddOn ? "Edit Add-On" : "Add New Add-On"}
+                        </h3>
+                        <form onSubmit={handleSaveAddOn} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Name</label>
+                                <input type="text" required value={addOnForm.name} onChange={e => setAddOnForm({ ...addOnForm, name: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. GoPro Photos" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Description (optional)</label>
+                                <input type="text" value={addOnForm.description} onChange={e => setAddOnForm({ ...addOnForm, description: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Short description shown to customer" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Image (optional)</label>
+                                <div className="flex items-center gap-3">
+                                    {addOnForm.image_url && (
+                                        <img src={addOnForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
+                                    )}
+                                    <div className="flex-1">
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
+                                            {uploadingField === "addon_image" ? "Uploading..." : (addOnForm.image_url ? "Change image" : "Upload image")}
+                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                var file = e.target.files?.[0];
+                                                if (!file) return;
+                                                setUploadingField("addon_image");
+                                                await handleImageUpload(file, "email-images", businessId + "/addons", (url) => setAddOnForm(prev => ({ ...prev, image_url: url })));
+                                                setUploadingField(null);
+                                                e.target.value = "";
+                                            }} />
+                                        </label>
+                                        {addOnForm.image_url && (
+                                            <button type="button" onClick={() => setAddOnForm({ ...addOnForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price (R)</label>
+                                    <input type="number" required min="0" step="0.01" value={addOnForm.price}
+                                        onChange={e => setAddOnForm({ ...addOnForm, price: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="150" />
+                                </div>
+                                <div className="flex items-end pb-1">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={addOnForm.active} onChange={e => setAddOnForm({ ...addOnForm, active: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                        <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {addOnError && <div className="text-xs text-[var(--ck-danger)] font-medium">{addOnError}</div>}
+
+                            <div className="flex gap-3">
+                                <button type="submit" disabled={addOnSaving}
+                                    className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                                    {addOnSaving ? "Saving..." : editingAddOn ? "Update Add-On" : "Add Add-On"}
+                                </button>
+                                {editingAddOn && (
+                                    <button type="button" onClick={resetAddOnForm}
+                                        className="px-4 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg)]">
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
+            </CollapsibleSection>}
+
+            {canAccess("resources") && <CollapsibleSection id="resources" title="Shared Resources & Capacity Pools" subtitle="Assets like vans, guides, kayaks that reduce availability across tours" openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                         <div className="flex items-center justify-between mb-3">
@@ -1330,15 +1989,15 @@ export default function SettingsPage() {
                         {resourceMessage.text}
                     </div>
                 )}
-            </CollapsibleSection>
+            </CollapsibleSection>}
 
-            {isPrivileged(role) && (
+            {canAccess("external") && (
                 <CollapsibleSection id="external" title="External Booking Integration" subtitle="B2B partner API keys and mappings" openSections={openSections} toggle={toggleSection}>
                     <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
                 </CollapsibleSection>
             )}
 
-            <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="These settings directly affect the public booking page" openSections={openSections} toggle={toggleSection}>
+            {canAccess("site") && <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="These settings directly affect the public booking page" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={handleSaveSiteSettings} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-8">
 
                     {/* Legal & Text Policies */}
@@ -1380,17 +2039,29 @@ export default function SettingsPage() {
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town's Original Since 1994" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo URL <span className="text-[var(--ck-accent)]">— appears next to the business name in the dashboard sidebar</span></label>
-                                <input type="url" value={siteSettings.logo_url} onChange={e => setSiteSettings({ ...siteSettings, logo_url: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="https://your-cdn.com/logo.png" />
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">
-                                    Paste any direct image link here. To get one: right-click your logo on any website → <strong>Copy image address</strong> → paste it above.
-                                    Or upload your logo at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ck-accent)] hover:underline">imgbb.com</a> → after uploading, click the image thumbnail → copy the <strong>Direct link</strong> (ends in .png or .jpg).
-                                    Leave empty to show the default icon.
-                                </p>
-                                {siteSettings.logo_url && (
-                                    <img src={siteSettings.logo_url} alt="Logo preview" className="mt-2 h-10 object-contain rounded border border-[var(--ck-border-subtle)]" />
-                                )}
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo <span className="text-[var(--ck-accent)]">— appears next to the business name in the dashboard sidebar</span></label>
+                                <div className="flex items-center gap-3">
+                                    {siteSettings.logo_url && (
+                                        <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
+                                    )}
+                                    <div>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
+                                            {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
+                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                var file = e.target.files?.[0];
+                                                if (!file) return;
+                                                setUploadingField("logo");
+                                                await handleImageUpload(file, "email-images", businessId + "/branding", (url) => setSiteSettings(prev => ({ ...prev, logo_url: url })));
+                                                setUploadingField(null);
+                                                e.target.value = "";
+                                            }} />
+                                        </label>
+                                        {siteSettings.logo_url && (
+                                            <button type="button" onClick={() => setSiteSettings({ ...siteSettings, logo_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                        )}
+                                    </div>
+                                </div>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Leave empty to show the default icon.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Eyebrow</label>
@@ -1743,9 +2414,9 @@ export default function SettingsPage() {
                     </div>
 
                 </form>
-            </CollapsibleSection>
+            </CollapsibleSection>}
 
-            <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
+            {canAccess("email") && <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={handleSaveEmailImages} className="space-y-6">
                     {/* Email Color Picker */}
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
@@ -1828,6 +2499,37 @@ export default function SettingsPage() {
                             </div>
                         </div>
                     ))}
+                    {/* Social Media Links */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                        <div className="mb-4">
+                            <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Social Media Links</span>
+                            <span className="ml-2 text-xs text-[var(--ck-text-muted)]">Icons appear in email footers only when a link is provided</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {([
+                                { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/yourbusiness" },
+                                { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourbusiness" },
+                                { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@yourbusiness" },
+                                { key: "youtube", label: "YouTube", placeholder: "https://youtube.com/@yourbusiness" },
+                                { key: "twitter", label: "X / Twitter", placeholder: "https://x.com/yourbusiness" },
+                                { key: "linkedin", label: "LinkedIn", placeholder: "https://linkedin.com/company/yourbusiness" },
+                                { key: "tripadvisor", label: "TripAdvisor", placeholder: "https://tripadvisor.com/..." },
+                                { key: "google_reviews", label: "Google Reviews", placeholder: "https://g.page/r/..." },
+                            ] as { key: keyof typeof socialLinks; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
+                                <div key={key}>
+                                    <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">{label}</label>
+                                    <input
+                                        type="url"
+                                        value={socialLinks[key]}
+                                        onChange={e => setSocialLinks({ ...socialLinks, [key]: e.target.value })}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                        placeholder={placeholder}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="flex items-center justify-between pt-2">
                         <div>
                             {emailImgsMessage.text && (
@@ -1838,13 +2540,301 @@ export default function SettingsPage() {
                         </div>
                         <button type="submit" disabled={emailImgsSaving}
                             className="rounded-xl px-8 bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                            {emailImgsSaving ? "Saving..." : "Save Email Images"}
+                            {emailImgsSaving ? "Saving..." : "Save Email Settings"}
                         </button>
                     </div>
                 </form>
-            </CollapsibleSection>
+            </CollapsibleSection>}
 
-            <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
+            {canAccess("site") && <CollapsibleSection id="operations" title="Operations & AI Configuration" subtitle="Meeting info, what to bring/wear, FAQ, and AI chatbot personality" openSections={openSections} toggle={toggleSection}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setOpsSaving(true);
+                    var faqObj: Record<string, string> = {};
+                    for (var entry of faqEntries) { if (entry.q.trim() && entry.a.trim()) faqObj[entry.q.trim()] = entry.a.trim(); }
+                    var { error } = await supabase.from("businesses").update({
+                        what_to_bring: opsConfig.what_to_bring || null,
+                        what_to_wear: opsConfig.what_to_wear || null,
+                        ai_system_prompt: opsConfig.ai_system_prompt || null,
+                        faq_json: faqObj,
+                    }).eq("id", businessId);
+                    setOpsSaving(false);
+                    if (error) { notify({ message: error.message, tone: "error" }); return; }
+                    notify({ message: "Operations & AI settings saved.", tone: "success" });
+                }} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label className="block">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to bring</span>
+                            <textarea value={opsConfig.what_to_bring} onChange={e => setOpsConfig({ ...opsConfig, what_to_bring: e.target.value })}
+                                rows={4} placeholder="e.g. Sunscreen, towel, water bottle, hat..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                        </label>
+                        <label className="block">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to wear</span>
+                            <textarea value={opsConfig.what_to_wear} onChange={e => setOpsConfig({ ...opsConfig, what_to_wear: e.target.value })}
+                                rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                        </label>
+                    </div>
+
+                    <label className="block">
+                        <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">This is the system prompt for your AI chatbot on your booking site and WhatsApp. It tells the AI who it is, your business rules, and how to handle questions.</p>
+                        <textarea value={opsConfig.ai_system_prompt} onChange={e => setOpsConfig({ ...opsConfig, ai_system_prompt: e.target.value })}
+                            rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)] font-mono text-xs" />
+                    </label>
+
+                    {/* FAQ Repeater */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">Frequently Asked Questions</span>
+                            <button type="button" onClick={() => setFaqEntries([...faqEntries, { q: "", a: "" }])}
+                                className="text-xs font-medium px-2 py-1 rounded-lg border border-[var(--ck-border-subtle)] hover:bg-[var(--ck-bg-subtle)]"
+                                style={{ color: "var(--ck-accent)" }}>
+                                + Add FAQ
+                            </button>
+                        </div>
+                        {faqEntries.length === 0 && (
+                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask — these power the AI chatbot.</p>
+                        )}
+                        <div className="space-y-3">
+                            {faqEntries.map((faq, i) => (
+                                <div key={i} className="rounded-lg border border-[var(--ck-border-subtle)] p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-semibold text-[var(--ck-text-muted)]">FAQ {i + 1}</span>
+                                        <button type="button" onClick={() => setFaqEntries(faqEntries.filter((_, j) => j !== i))}
+                                            className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                                    </div>
+                                    <input type="text" value={faq.q} onChange={e => { var next = [...faqEntries]; next[i] = { ...next[i], q: e.target.value }; setFaqEntries(next); }}
+                                        placeholder="Question" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    <textarea value={faq.a} onChange={e => { var next = [...faqEntries]; next[i] = { ...next[i], a: e.target.value }; setFaqEntries(next); }}
+                                        rows={2} placeholder="Answer" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <button type="submit" disabled={opsSaving}
+                            className="rounded-xl px-8 bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                            {opsSaving ? "Saving..." : "Save Operations & AI"}
+                        </button>
+                    </div>
+                </form>
+            </CollapsibleSection>}
+
+            {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAutoTagSaving(true);
+                    var { error } = await supabase.from("businesses").update({ automation_config: autoTagConfig }).eq("id", businessId);
+                    setAutoTagSaving(false);
+                    if (error) { notify({ message: error.message, tone: "error" }); return; }
+                    notify({ message: "Automation tag rules saved.", tone: "success" });
+                }} className="space-y-6">
+                    <p className="text-xs text-[var(--ck-text-muted)]">
+                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations — for example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
+                    </p>
+
+                    {/* VIP Rules */}
+                    <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">VIP Tag</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Assigned when a customer makes a certain number of paid bookings within a time window. Expires after a set period unless they rebook.</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bookings required</span>
+                                <input type="number" min={1} max={50} value={autoTagConfig.vip_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_bookings: parseInt(e.target.value) || 3 })}
+                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Within (days)</span>
+                                <input type="number" min={7} max={365} value={autoTagConfig.vip_window_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_window_days: parseInt(e.target.value) || 90 })}
+                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">VIP valid for (days)</span>
+                                <input type="number" min={30} max={1825} value={autoTagConfig.vip_valid_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_valid_days: parseInt(e.target.value) || 365 })}
+                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Renew after (bookings)</span>
+                                <input type="number" min={1} max={50} value={autoTagConfig.vip_renewal_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_renewal_bookings: parseInt(e.target.value) || 3 })}
+                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                        </div>
+                        <p className="text-[11px] text-[var(--ck-text-muted)]">
+                            Default: 3 bookings within 90 days = VIP for 1 year. Renews if they make 3 more bookings before it expires.
+                        </p>
+                    </div>
+
+                    {/* Lapsed Rules */}
+                    <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Lapsed Customer Tag</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Assigned when a customer hasn't booked in a while. Removed automatically when they book again.</p>
+                        <label className="block max-w-xs">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">Days since last booking</span>
+                            <input type="number" min={14} max={365} value={autoTagConfig.lapsed_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, lapsed_days: parseInt(e.target.value) || 90 })}
+                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                        </label>
+                        <p className="text-[11px] text-[var(--ck-text-muted)]">
+                            Default: 90 days. Tag name: <code className="bg-[var(--ck-bg-subtle)] px-1 rounded">lapsed-{autoTagConfig.lapsed_days}-days</code>
+                        </p>
+                    </div>
+
+                    {/* Other Tags */}
+                    <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Other Auto-Tags</h3>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" checked={autoTagConfig.completed_tour_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, completed_tour_enabled: e.target.checked })}
+                                    className="rounded border-[var(--ck-border-subtle)]" />
+                                <span className="text-sm text-[var(--ck-text)]"><strong>completed-tour</strong> — after a booked tour date has passed</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" checked={autoTagConfig.new_booker_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, new_booker_enabled: e.target.checked })}
+                                    className="rounded border-[var(--ck-border-subtle)]" />
+                                <span className="text-sm text-[var(--ck-text)]"><strong>new-booker</strong> — first-time customers (removed after 2nd booking)</span>
+                            </label>
+                        </div>
+                        <label className="block max-w-xs">
+                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">Voucher expiry warning (days before)</span>
+                            <input type="number" min={7} max={90} value={autoTagConfig.voucher_expiry_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, voucher_expiry_days: parseInt(e.target.value) || 30 })}
+                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                        </label>
+                    </div>
+
+                    <div>
+                        <button type="submit" disabled={autoTagSaving}
+                            className="rounded-xl px-8 bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                            {autoTagSaving ? "Saving..." : "Save Tag Rules"}
+                        </button>
+                    </div>
+                </form>
+            </CollapsibleSection>}
+
+            {canAccess("invoice") && <CollapsibleSection id="invoice" title={isPrivileged(role) ? "Invoice & Banking Details" : "Invoice Details"} subtitle={isPrivileged(role) ? "Company info and banking details shown on pro forma invoices" : "Company information shown on pro forma invoices"} openSections={openSections} toggle={toggleSection}>
+                <form onSubmit={handleSaveInvoice} className="space-y-6">
+                    <div>
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">Company Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Company name (on invoice)</span>
+                                <input type="text" value={invoiceForm.company_name} onChange={e => setInvoiceForm({ ...invoiceForm, company_name: e.target.value })}
+                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Registration number</span>
+                                <input type="text" value={invoiceForm.reg_number} onChange={e => setInvoiceForm({ ...invoiceForm, reg_number: e.target.value })}
+                                    placeholder="e.g. Reg. 2024/123456/07" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">VAT number</span>
+                                <input type="text" value={invoiceForm.vat_number} onChange={e => setInvoiceForm({ ...invoiceForm, vat_number: e.target.value })}
+                                    placeholder="e.g. 4290176926" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 1</span>
+                                <input type="text" value={invoiceForm.address_line1} onChange={e => setInvoiceForm({ ...invoiceForm, address_line1: e.target.value })}
+                                    placeholder="e.g. 179 Beach Road" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 2</span>
+                                <input type="text" value={invoiceForm.address_line2} onChange={e => setInvoiceForm({ ...invoiceForm, address_line2: e.target.value })}
+                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 3</span>
+                                <input type="text" value={invoiceForm.address_line3} onChange={e => setInvoiceForm({ ...invoiceForm, address_line3: e.target.value })}
+                                    placeholder="e.g. 8005" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                        </div>
+                    </div>
+
+                    {isPrivileged(role) && <>
+                    <hr className="border-[var(--ck-border-subtle)]" />
+
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Banking Details</h3>
+                            {bankVerified && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Verified</span>}
+                        </div>
+                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Changes to banking details require email verification for security.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
+                                <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); setBankVerified(false); }}
+                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
+                                <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); setBankVerified(false); }}
+                                    placeholder="e.g. 070631824" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
+                                <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); setBankVerified(false); }}
+                                    placeholder="e.g. Current / Cheque" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bank name</span>
+                                <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); setBankVerified(false); }}
+                                    placeholder="e.g. Standard Bank" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                            <label className="block">
+                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
+                                <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); setBankVerified(false); }}
+                                    placeholder="e.g. 020909" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            </label>
+                        </div>
+
+                        {(bankForm.account_owner || bankForm.account_number || bankForm.bank_name) && !bankVerified && (
+                            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-3">
+                                <p className="text-sm text-amber-800 font-medium">Verify your identity to save banking details</p>
+                                {bankOtpStep === "idle" && (
+                                    <button type="button" onClick={handleBankOtpSend}
+                                        className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                                        Verify via email
+                                    </button>
+                                )}
+                                {bankOtpStep === "sending" && <p className="text-sm text-amber-700">Sending verification code...</p>}
+                                {(bankOtpStep === "sent" || bankOtpStep === "verifying") && (
+                                    <div className="flex items-center gap-2">
+                                        <input type="text" value={bankOtpCode} onChange={e => setBankOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                            placeholder="6-digit code" maxLength={6}
+                                            className="w-32 rounded-lg border border-amber-300 px-3 py-2 text-sm text-center font-mono tracking-widest" />
+                                        <button type="button" onClick={handleBankOtpVerify} disabled={bankOtpCode.length !== 6 || bankOtpStep === "verifying"}
+                                            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                                            {bankOtpStep === "verifying" ? "Verifying..." : "Verify"}
+                                        </button>
+                                        <button type="button" onClick={handleBankOtpSend} className="text-xs text-amber-700 underline hover:text-amber-900">Resend</button>
+                                    </div>
+                                )}
+                                {bankOtpError && <p className="text-xs text-red-600">{bankOtpError}</p>}
+                            </div>
+                        )}
+                    </div>
+                    </>}
+
+                    {!isPrivileged(role) && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mt-2">
+                            <p className="text-sm text-amber-800 font-medium">Banking details can only be edited by the Main Admin.</p>
+                        </div>
+                    )}
+
+                    {invoiceMessage.text && (
+                        <div className={"p-3 rounded-xl text-sm font-medium " + (invoiceMessage.type === "error" ? "bg-red-50 border border-red-200 text-[var(--ck-danger)]" : "bg-emerald-50 border border-emerald-200 text-emerald-700")}>
+                            {invoiceMessage.text}
+                        </div>
+                    )}
+
+                    <button type="submit" disabled={invoiceSaving}
+                        className="rounded-lg bg-[var(--ck-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                        {invoiceSaving ? "Saving..." : "Save invoice details"}
+                    </button>
+                </form>
+            </CollapsibleSection>}
+
+            {canAccess("credentials") && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
@@ -1944,7 +2934,7 @@ export default function SettingsPage() {
                         {credMessage.text}
                     </div>
                 )}
-            </CollapsibleSection>
+            </CollapsibleSection>}
 
             </div>
         </div >

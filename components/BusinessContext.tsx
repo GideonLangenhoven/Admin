@@ -7,6 +7,7 @@ interface BusinessContextValue {
     role: string;
     logoUrl: string;
     timezone: string;
+    subscriptionStatus?: string;
     operators?: Array<{
         id: string;
         name: string;

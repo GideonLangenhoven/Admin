@@ -42,11 +42,19 @@ function isPrivilegedRole(r: string) {
   return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
+var SUSPENDED_ALLOWED = ["/reports", "/invoices", "/refunds", "/settings", "/super-admin"];
+
+function isSuspendedAllowed(path: string) {
+  return SUSPENDED_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
+}
+
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
-  const { businessId, businessName, logoUrl, role, operators, switchOperator } = useBusinessContext();
+  const { businessId, businessName, logoUrl, role, subscriptionStatus, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
+  const isSuspended = subscriptionStatus === "SUSPENDED" && !/super/i.test(role);
+  const routeBlocked = isSuspended && !isSuspendedAllowed(pathname);
 
   useEffect(() => {
     if (displayName && displayName !== "Admin") {
@@ -54,8 +62,19 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     }
   }, [displayName]);
 
-  // Strip privileged-only items for plain ADMIN users
-  const visibleNav = nav.filter((n) => !n.privilegedOnly || isPrivilegedRole(role));
+  // Strip privileged-only items for plain ADMIN users, but show Settings if they have granted permissions
+  const visibleNav = nav.filter((n) => {
+    if (!n.privilegedOnly) return true;
+    if (isPrivilegedRole(role)) return true;
+    // Show Settings for admins who have been granted section permissions
+    if (n.href === "/settings") {
+      try {
+        const perms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
+        return Object.values(perms).some(Boolean);
+      } catch { return false; }
+    }
+    return false;
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem("ck_sidebar_collapsed");
@@ -142,20 +161,23 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             {visibleNav.map((n) => {
               const Icon = iconMap[n.icon] || Circle;
               const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+              const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
               return (
-                <Link key={n.href} href={n.href}
+                <Link key={n.href} href={navBlocked ? pathname : n.href}
                   className={`group flex items-center rounded-xl px-3 py-2 text-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
                       ? "font-medium shadow-sm border"
                       : "font-medium"
-                    }`}
+                    } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
                   style={isActive
                     ? { background: "var(--ck-sidebar-active-bg)", color: "var(--ck-sidebar-active-text)", borderColor: "var(--ck-sidebar-active-border)" }
                     : { color: "var(--ck-sidebar-text)" }
                   }
-                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--ck-sidebar-hover)"; e.currentTarget.style.color = "var(--ck-sidebar-active-text)"; } }}
-                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "var(--ck-sidebar-text)"; } }}
+                  aria-disabled={navBlocked}
+                  tabIndex={navBlocked ? -1 : undefined}
+                  onMouseEnter={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = "var(--ck-sidebar-hover)"; e.currentTarget.style.color = "var(--ck-sidebar-active-text)"; } }}
+                  onMouseLeave={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "var(--ck-sidebar-text)"; } }}
                 >
-                  <span className="flex items-center justify-center" style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
+                  <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
                     {isActive && n.href === "/" ? (
                       <div className="flex items-center justify-center h-[18px] w-[18px] rounded-full" style={{ background: "var(--ck-accent)" }}>
                         <Check size={12} color="white" />
@@ -190,15 +212,34 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             <SignOutButton variant="header" />
           </div>
         </header>
-        <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">{children}</main>
+        {isSuspended && (
+          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "#fef2f2", borderColor: "#fecaca" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-red-600"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
+            <p className="text-xs font-medium text-red-800">Subscription suspended — only Reports, Invoices, Refunds, and Settings are accessible. Contact support to reactivate.</p>
+          </div>
+        )}
+        <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">
+          {routeBlocked ? (
+            <div className="flex items-center justify-center min-h-[50vh]">
+              <div className="text-center max-w-sm">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-red-600"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                </div>
+                <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Feature Unavailable</h2>
+                <p className="text-sm text-[var(--ck-text-muted)]">This section is not accessible while your subscription is suspended. You can still access Reports, Invoices, Refunds, and Settings.</p>
+              </div>
+            </div>
+          ) : children}
+        </main>
 
         <nav className="md:hidden shrink-0 overflow-x-auto border-t py-2 backdrop-blur no-scrollbar" style={{ background: "color-mix(in srgb, var(--ck-surface) 90%, transparent)", borderColor: "var(--ck-border-strong)" }}>
           <div className="flex min-w-max px-2">
           {visibleNav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;
             const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+            const mobileBlocked = isSuspended && !isSuspendedAllowed(n.href);
             return (
-              <Link key={n.href} href={n.href} className="relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] font-medium" style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
+              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] font-medium" + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                 <div className="relative mb-1">
                   <Icon size={20} />
                   {n.href === "/inbox" && <div className="absolute -top-1 -right-2 transform scale-75"><NotificationBadge /></div>}

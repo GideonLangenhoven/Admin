@@ -63,7 +63,10 @@ function text(v: unknown) {
 }
 
 function generateVoucherCode() {
-  return "CK-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var code = "";
+  for (var i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  return code;
 }
 
 export default function Vouchers() {
@@ -232,7 +235,7 @@ export default function Vouchers() {
             </label>
             <label className="text-sm text-gray-600">
               Expiry date
-              <input type="date" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <DatePicker value={form.expires_at} onChange={(v) => setForm({ ...form, expires_at: v })} placeholder="Pick expiry date" compact disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }} />
             </label>
             <label className="text-sm text-gray-600">
               Recipient

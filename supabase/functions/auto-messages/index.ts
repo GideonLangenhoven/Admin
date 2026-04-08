@@ -113,7 +113,6 @@ async function sendRemindersForBusiness(businessId: string) {
           timeStr,
           qtyStr,
           meetingPoint,
-          myBookingsUrl,
         ],
       });
       await logSent(businessId, booking.id, booking.phone, "REMINDER");
@@ -211,7 +210,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
         name: "review_request",
-        params: [firstName, brandName, myBookingsUrl],
+        params: [firstName],
       });
       await logSent(businessId, booking.id, booking.phone, "REVIEW_REQUEST");
       sent++;
@@ -276,10 +275,7 @@ async function sendReEngagementForBusiness(businessId: string) {
     var message = "Hi " + firstName + ", it\u2019s been a while since your last trip with " + brandName + "! \u{1F6F6}\n\nWe\u2019d love to welcome you back on the water. Browse our latest trips and availability:\n" + bookingSiteUrl;
 
     try {
-      await sendWhatsappTextForTenant(tenant, booking.phone, message, {
-        name: "re_engage",
-        params: [firstName, brandName, bookingSiteUrl],
-      });
+      await sendWhatsappTextForTenant(tenant, booking.phone, message);
       await db.from("auto_messages").insert({ business_id: businessId, phone: booking.phone, type: "RE_ENGAGE" });
       sent++;
     } catch (error) {

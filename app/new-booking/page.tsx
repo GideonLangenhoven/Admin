@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { CaretDown, Check, User, Baby, Pulse, Clock, UsersThree } from "@phosphor-icons/react";
+import { CaretDown, Check } from "@phosphor-icons/react";
 
 interface Tour {
   id: string;
@@ -37,6 +37,14 @@ interface AvailabilityPreviewSlot {
   booked: number;
   tour_id: string;
   available_capacity: number;
+}
+
+interface AddOn {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
 }
 
 interface BookingCustomFieldDefinition {
@@ -184,11 +192,10 @@ function CustomSelect({ label, value, options, onChange, placeholder, error }: C
   );
 }
 
-function CustomNumberInput({ label, value, onChange, icon: Icon, error }: { label: string; value: string; onChange: (v: string) => void; icon: any; error?: boolean }) {
+function CustomNumberInput({ label, value, onChange, error }: { label: string; value: string; onChange: (v: string) => void; error?: boolean }) {
   return (
     <div className="w-full">
       <div className="flex items-center gap-1.5">
-        <Icon size={14} className="text-gray-400" />
         <span className="text-sm font-semibold text-[#374151]">{label}</span>
       </div>
       <div className="relative mt-1.5">
@@ -249,6 +256,8 @@ export default function NewBookingPage() {
   const [missingField, setMissingField] = useState<string | null>(null);
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<BookingCustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [availableAddOns, setAvailableAddOns] = useState<AddOn[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
 
   function formatSupabaseError(err: { message?: string; details?: string; hint?: string; code?: string } | null) {
     if (!err) return "Unknown error";
@@ -340,10 +349,22 @@ export default function NewBookingPage() {
     setLoadingAvailabilityPreview(false);
   }
 
+  async function loadAddOns() {
+    if (!businessId) return;
+    const { data } = await supabase
+      .from("add_ons")
+      .select("id, name, description, price, image_url")
+      .eq("business_id", businessId)
+      .eq("active", true)
+      .order("sort_order");
+    setAvailableAddOns((data || []) as AddOn[]);
+  }
+
   useEffect(() => {
     const t = setTimeout(() => {
       loadTours();
       loadBusinessSettings();
+      loadAddOns();
     }, 0);
     return () => clearTimeout(t);
   }, [businessId]);
@@ -372,15 +393,17 @@ export default function NewBookingPage() {
     0
   );
   const baseTotal = qty * unitPrice;
+  const addOnsTotal = useMemo(() => availableAddOns.reduce((sum, ao) => sum + (selectedAddOns[ao.id] || 0) * ao.price, 0), [availableAddOns, selectedAddOns]);
+  const grandTotal = baseTotal + addOnsTotal;
   const discountNum = Math.max(0, Number(discountValue) || 0);
   const promoDiscountCalc = discountType === "promo" && promoResult?.valid
     ? promoResult.discount_type === "PERCENT"
-      ? baseTotal * (Number(promoResult.discount_value) / 100)
-      : Math.min(Number(promoResult.discount_value), baseTotal)
+      ? grandTotal * (Number(promoResult.discount_value) / 100)
+      : Math.min(Number(promoResult.discount_value), grandTotal)
     : 0;
   const totalAmount = discountType === "manual"
     ? Math.max(0, discountNum)
-    : Math.max(0, baseTotal - promoDiscountCalc);
+    : Math.max(0, grandTotal - promoDiscountCalc);
   const availableSlots = slots.filter((s) => {
     const avail = Math.max(Number(s.available_capacity || 0), 0);
     return avail > 0 && (qty <= 0 || avail >= qty);
@@ -509,13 +532,13 @@ export default function NewBookingPage() {
       }
 
       if (discountType === "manual") {
-        insertPayload.original_total = baseTotal;
+        insertPayload.original_total = grandTotal;
         insertPayload.discount_type = "MANUAL";
         insertPayload.discount_notes = discountReason.trim();
       } else if (discountType === "promo" && promoResult?.valid) {
         insertPayload.promo_code = promoResult.code;
         insertPayload.discount_amount = promoDiscountCalc;
-        insertPayload.original_total = baseTotal;
+        insertPayload.original_total = grandTotal;
       }
 
       insertPayload.custom_fields = customFieldDefinitions.reduce<Record<string, string>>((acc, field) => {
@@ -534,6 +557,14 @@ export default function NewBookingPage() {
         setSubmitting(false);
         notify({ title: "Booking creation failed", message: formatSupabaseError(insertError), tone: "error" });
         return;
+      }
+
+      // Save add-on line items (snapshot pricing at booking time)
+      const addOnRows = availableAddOns
+        .filter(ao => (selectedAddOns[ao.id] || 0) > 0)
+        .map(ao => ({ booking_id: bookingId, add_on_id: ao.id, qty: selectedAddOns[ao.id], unit_price: ao.price }));
+      if (addOnRows.length > 0) {
+        await supabase.from("booking_add_ons").insert(addOnRows);
       }
 
       // Record promo usage if applied
@@ -562,7 +593,7 @@ export default function NewBookingPage() {
       try {
         const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
         invoiceNumber = invNumRes.data || ref;
-        const subtotal = baseTotal;
+        const subtotal = grandTotal;
         const discountAmt = Math.max(0, subtotal - totalAmount);
 
         const invPayload: Record<string, unknown> = {
@@ -788,6 +819,7 @@ export default function NewBookingPage() {
       setAdults("0");
       setChildren("0");
       setSelectedSlotId("");
+      setSelectedAddOns({});
       setDiscountType("none");
       setDiscountValue("0");
       setCustomFieldValues(customFieldDefinitions.reduce<Record<string, string>>((acc, field) => {
@@ -816,7 +848,6 @@ export default function NewBookingPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-1">
               <label className="text-sm font-semibold text-[#374151] flex items-center gap-1.5">
-                <Pulse size={14} className="text-gray-400" />
                 To attend <span className="text-red-500">*</span>
               </label>
               <CustomSelect
@@ -832,7 +863,6 @@ export default function NewBookingPage() {
               label="Adults *"
               value={adults}
               onChange={(v) => { setAdults(v); setMissingField(null); }}
-              icon={User}
               error={missingField === "pax"}
             />
 
@@ -840,7 +870,6 @@ export default function NewBookingPage() {
               label="Children"
               value={children}
               onChange={(v) => { setChildren(v); setMissingField(null); }}
-              icon={Baby}
             />
           </div>
 
@@ -1061,7 +1090,6 @@ export default function NewBookingPage() {
 
         <div className="mt-1">
           <label className="text-sm font-semibold text-[#374151] flex items-center gap-1.5 mb-1.5">
-            <Clock size={14} className="text-gray-400" />
             Select slot time <span className="text-red-500">*</span>
           </label>
           <CustomSelect
@@ -1115,6 +1143,55 @@ export default function NewBookingPage() {
           )}
         </div>
       </div>
+
+      {/* Optional Add-Ons */}
+      {availableAddOns.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="mb-4 text-base font-semibold text-gray-700">Optional Add-Ons</h3>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {availableAddOns.map((ao) => {
+              const aoQty = selectedAddOns[ao.id] || 0;
+              return (
+                <div key={ao.id} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                  {ao.image_url && (
+                    <img src={ao.image_url} alt={ao.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{ao.name}</p>
+                    {ao.description && <p className="text-xs text-gray-500 truncate">{ao.description}</p>}
+                    <p className="text-xs font-semibold text-[#0f595e]">{fmtCurrency(ao.price)} each</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddOns(prev => {
+                        const next = { ...prev };
+                        if ((next[ao.id] || 0) > 0) next[ao.id] = (next[ao.id] || 0) - 1;
+                        if (next[ao.id] === 0) delete next[ao.id];
+                        return next;
+                      })}
+                      disabled={aoQty === 0}
+                      className="w-7 h-7 rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                    >-</button>
+                    <span className="w-6 text-center text-sm font-semibold">{aoQty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.id]: (prev[ao.id] || 0) + 1 }))}
+                      className="w-7 h-7 rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50"
+                    >+</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {addOnsTotal > 0 && (
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-[#0f595e]/5 px-4 py-2 text-sm">
+              <span className="text-gray-600">Add-ons subtotal</span>
+              <span className="font-semibold text-[#0f595e]">{fmtCurrency(addOnsTotal)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Discount / Price Override */}
       <div className="rounded-xl border border-gray-200 bg-white p-5">

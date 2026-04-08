@@ -33,7 +33,7 @@ export default function Refunds() {
     var { data: pending } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
       .eq("business_id", businessId)
-      .eq("refund_status", "REQUESTED")
+      .in("refund_status", ["REQUESTED", "ACTION_REQUIRED"])
       .order("cancelled_at", { ascending: false });
     setRefunds(pending || []);
 

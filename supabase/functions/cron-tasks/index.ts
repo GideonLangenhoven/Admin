@@ -211,8 +211,227 @@ async function cleanupAbandonedVouchers() {
   return results;
 }
 
+// ─── AUTO-TAGGING: Sync booking behaviour to marketing contact tags ───
+// Runs daily via cron. Assigns tags that power automations:
+//   completed-tour   — booking slot has passed, status PAID/CONFIRMED
+//   lapsed-90-days   — last booking was 90+ days ago, no recent activity
+//   vip              — 3+ completed paid bookings
+//   new-booker       — exactly 1 paid booking
+//   voucher-expiring — has a voucher expiring within 30 days
+async function autoTagContacts() {
+  const results = { synced: 0, tagged: 0, errors: 0 };
+  const now = new Date();
+
+  // Get all businesses with their automation config
+  const { data: businesses } = await supabase.from("businesses").select("id, automation_config");
+
+  for (const biz of (businesses || [])) {
+    try {
+      // Load configurable thresholds (admin can change these in Settings → Automation Tag Rules)
+      const ac = (biz as any).automation_config || {};
+      const VIP_BOOKINGS = ac.vip_bookings ?? 3;
+      const VIP_WINDOW_DAYS = ac.vip_window_days ?? 90;
+      const VIP_VALID_DAYS = ac.vip_valid_days ?? 365;
+      const VIP_RENEWAL_BOOKINGS = ac.vip_renewal_bookings ?? 3;
+      const LAPSED_DAYS = ac.lapsed_days ?? 90;
+      const NEW_BOOKER_ENABLED = ac.new_booker_enabled ?? true;
+      const COMPLETED_TOUR_ENABLED = ac.completed_tour_enabled ?? true;
+      const VOUCHER_EXPIRY_DAYS = ac.voucher_expiry_days ?? 30;
+
+      // Get all marketing contacts for this business
+      const { data: contacts } = await supabase
+        .from("marketing_contacts")
+        .select("id, email, phone, tags")
+        .eq("business_id", biz.id)
+        .eq("status", "active");
+
+      if (!contacts || contacts.length === 0) continue;
+
+      // Build email→contact lookup
+      const emailMap: Record<string, any> = {};
+      for (const c of contacts) {
+        if (c.email) emailMap[c.email.toLowerCase()] = c;
+      }
+      const emails = Object.keys(emailMap);
+      if (emails.length === 0) continue;
+
+      // Get all paid bookings for these emails
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("id, email, status, slot_id, created_at, slots(start_time)")
+        .eq("business_id", biz.id)
+        .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
+        .in("email", emails);
+
+      // Get vouchers expiring within configured window
+      const voucherCutoff = new Date(now.getTime() + VOUCHER_EXPIRY_DAYS * 86400000).toISOString();
+      const { data: expiringVouchers } = await supabase
+        .from("vouchers")
+        .select("id, buyer_email, recipient_email, expires_at")
+        .eq("business_id", biz.id)
+        .eq("status", "ACTIVE")
+        .lt("expires_at", voucherCutoff)
+        .gt("expires_at", now.toISOString());
+
+      // Build per-contact booking stats
+      const vipWindowStart = new Date(now.getTime() - VIP_WINDOW_DAYS * 86400000);
+      const stats: Record<string, { total: number; recentCount: number; lastBooking: Date | null; hasCompletedTour: boolean }> = {};
+      for (const b of (bookings || [])) {
+        const key = (b.email || "").toLowerCase();
+        if (!stats[key]) stats[key] = { total: 0, recentCount: 0, lastBooking: null, hasCompletedTour: false };
+        stats[key].total += 1;
+        const createdAt = new Date(b.created_at);
+        if (createdAt >= vipWindowStart) stats[key].recentCount += 1;
+        if (!stats[key].lastBooking || createdAt > stats[key].lastBooking!) stats[key].lastBooking = createdAt;
+        const slotTime = (b as any).slots?.start_time;
+        if (slotTime && new Date(slotTime) < now) stats[key].hasCompletedTour = true;
+      }
+
+      // Build expiring voucher set (check both buyer and recipient emails)
+      const voucherEmails = new Set<string>();
+      for (const v of (expiringVouchers || [])) {
+        if (v.buyer_email) voucherEmails.add(v.buyer_email.toLowerCase());
+        if (v.recipient_email) voucherEmails.add(v.recipient_email.toLowerCase());
+      }
+
+      // Apply tags
+      const lapsedCutoff = new Date(now.getTime() - LAPSED_DAYS * 86400000);
+      const lapsedTagName = "lapsed-" + LAPSED_DAYS + "-days";
+
+      for (const email of emails) {
+        const contact = emailMap[email];
+        const s = stats[email];
+        const currentTags: string[] = contact.tags || [];
+        const newTags = new Set(currentTags);
+        let changed = false;
+
+        // completed-tour
+        if (COMPLETED_TOUR_ENABLED && s?.hasCompletedTour && !currentTags.includes("completed-tour")) {
+          newTags.add("completed-tour");
+          changed = true;
+        }
+
+        // lapsed — configurable days, dynamic tag name
+        // Also clean up old lapsed tags with different day counts
+        const oldLapsedTags = currentTags.filter(t => /^lapsed-\d+-days$/.test(t));
+        if (s && s.lastBooking && s.lastBooking < lapsedCutoff) {
+          if (!currentTags.includes(lapsedTagName)) {
+            // Remove any old lapsed tags with different thresholds
+            for (const old of oldLapsedTags) { if (old !== lapsedTagName) { newTags.delete(old); changed = true; } }
+            newTags.add(lapsedTagName);
+            changed = true;
+          }
+        } else {
+          // Remove lapsed tag if they've booked recently
+          for (const old of oldLapsedTags) { newTags.delete(old); changed = true; }
+        }
+
+        // VIP — configurable: N bookings within M days, valid for X days, renews with Y more bookings
+        // Check if contact has enough recent bookings to qualify
+        const qualifiesForVip = s && s.recentCount >= VIP_BOOKINGS;
+        const hasVip = currentTags.includes("vip");
+        const hasVipExpiry = currentTags.find(t => t.startsWith("vip-expires:"));
+        if (qualifiesForVip) {
+          if (!hasVip) {
+            newTags.add("vip");
+            changed = true;
+          }
+          // Set/refresh expiry marker: vip-expires:YYYY-MM-DD
+          const expiryDate = new Date(now.getTime() + VIP_VALID_DAYS * 86400000);
+          const expiryTag = "vip-expires:" + expiryDate.toISOString().split("T")[0];
+          if (hasVipExpiry && hasVipExpiry !== expiryTag) { newTags.delete(hasVipExpiry); }
+          if (!hasVipExpiry || hasVipExpiry !== expiryTag) { newTags.add(expiryTag); changed = true; }
+        } else if (hasVip) {
+          // Check if VIP has expired
+          if (hasVipExpiry) {
+            const expiryStr = hasVipExpiry.split(":")[1];
+            if (expiryStr && new Date(expiryStr) < now) {
+              // Check if they earned renewal (N bookings since VIP was granted)
+              if (!s || s.recentCount < VIP_RENEWAL_BOOKINGS) {
+                newTags.delete("vip");
+                newTags.delete(hasVipExpiry);
+                changed = true;
+              }
+            }
+          }
+        }
+
+        // new-booker — exactly 1 booking
+        if (NEW_BOOKER_ENABLED) {
+          if (s && s.total === 1 && !currentTags.includes("new-booker")) {
+            newTags.add("new-booker");
+            changed = true;
+          }
+          if (s && s.total > 1 && currentTags.includes("new-booker")) {
+            newTags.delete("new-booker");
+            changed = true;
+          }
+        }
+
+        // voucher-expiring
+        if (voucherEmails.has(email) && !currentTags.includes("voucher-expiring")) {
+          newTags.add("voucher-expiring");
+          changed = true;
+        }
+
+        if (changed) {
+          const tagArray = Array.from(newTags);
+          await supabase.from("marketing_contacts").update({ tags: tagArray }).eq("id", contact.id);
+          results.tagged += 1;
+
+          // Trigger automation enrollments for newly added tags
+          const addedTags = tagArray.filter(t => !currentTags.includes(t));
+          for (const tag of addedTags) {
+            // Check for matching tag_added automations
+            const { data: autos } = await supabase
+              .from("marketing_automations")
+              .select("id, trigger_config")
+              .eq("business_id", biz.id)
+              .eq("status", "active")
+              .eq("trigger_type", "tag_added");
+
+            for (const auto of (autos || [])) {
+              if ((auto.trigger_config as any)?.tag !== tag) continue;
+              // Check if already enrolled
+              const { data: existing } = await supabase
+                .from("marketing_automation_enrollments")
+                .select("id")
+                .eq("automation_id", auto.id)
+                .eq("contact_id", contact.id)
+                .maybeSingle();
+
+              if (!existing) {
+                await supabase.from("marketing_automation_enrollments").insert({
+                  automation_id: auto.id,
+                  contact_id: contact.id,
+                  business_id: biz.id,
+                  status: "active",
+                  next_action_at: new Date().toISOString(),
+                });
+                await supabase.rpc("increment_automation_counter", {
+                  p_automation_id: auto.id,
+                  p_column: "enrolled_count",
+                  p_amount: 1,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      results.synced += contacts.length;
+    } catch (err) {
+      console.error("AUTO_TAG_ERR biz=" + biz.id, err);
+      results.errors += 1;
+    }
+  }
+
+  console.log("AUTO_TAG_DONE synced=" + results.synced + " tagged=" + results.tagged + " errors=" + results.errors);
+  return results;
+}
+
 Deno.serve(async (_req) => {
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, errors: [] };
+  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, auto_tags: null, errors: [] };
 
   try {
     const reminderRes = await fetch(SUPABASE_URL + "/functions/v1/auto-messages", {
@@ -247,6 +466,13 @@ Deno.serve(async (_req) => {
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    results.auto_tags = await autoTagContacts();
+  } catch (error) {
+    console.error("AUTO_TAG_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

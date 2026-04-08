@@ -6,13 +6,14 @@ import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
 // Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
 // Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
 var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
+console.log("SEND_EMAIL_INIT supabase=" + (supabase ? "OK" : "NULL") + " url=" + (SUPABASE_URL ? "set" : "MISSING") + " key=" + (SUPABASE_SERVICE_ROLE_KEY ? "set" : "MISSING"));
 
 function getCors(req?: Request) {
   var origins = getAdminAppOrigins();
@@ -89,7 +90,7 @@ function heroImg(key: string, alt: string, bgColor = "#1b3b36") {
 }
 
 var MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005";
-var MANAGE_BOOKING_URL = "https://booking-mu-steel.vercel.app/my-bookings";
+var MANAGE_BOOKING_URL = "";
 
 async function enrichWaiverEmailData(d: Record<string, unknown>) {
   if (!supabase) return d;
@@ -144,7 +145,9 @@ function deriveAccentColor(hex: string): string {
 
 async function loadEmailBranding(d: Record<string, unknown>) {
   var businessId = await resolveBrandingBusinessId(d);
+  console.log("BRANDING_RESOLVE bizId=" + businessId + " supabase=" + (supabase ? "OK" : "NULL") + " d.business_id=" + d.business_id);
   if (!businessId || !supabase) {
+    console.warn("BRANDING_FALLBACK: no businessId or no supabase client");
     var fallbackBrand = String(d.business_name || d.brand_name || "Your Booking");
     return {
       businessId: "",
@@ -152,13 +155,16 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       shortBrandName: fallbackBrand,
       footerLineOne: "Thanks for choosing our team.",
       footerLineTwo: "Reply to this email if you need anything.",
-      manageBookingUrl: String(d.manage_bookings_url || MANAGE_BOOKING_URL),
-      bookingSiteUrl: String(d.booking_site_url || MANAGE_BOOKING_URL.replace("/my-bookings", "")),
-      voucherUrl: String(d.gift_voucher_url || d.booking_site_url || MANAGE_BOOKING_URL.replace("/my-bookings", "/gift-voucher")),
+      manageBookingUrl: String(d.manage_bookings_url || ""),
+      bookingSiteUrl: String(d.booking_site_url || ""),
+      voucherUrl: String(d.gift_voucher_url || d.booking_site_url || ""),
       waiverUrl: String(d.waiver_url || ""),
       directions: String(d.directions || ""),
       fromEmail: FROM_EMAIL,
       replyToEmail: "",
+      emailColor: "#1b3b36",
+      imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
+      socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
     };
   }
 
@@ -166,10 +172,11 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos")
+      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
+    console.log("BRANDING_QUERY_OK data=" + (data ? "found" : "null") + " manage=" + data?.manage_bookings_url + " site=" + data?.booking_site_url + " sub=" + data?.subdomain);
   } catch (brandErr) {
     console.warn("BRANDING_QUERY_ERR (will use fallbacks):", brandErr);
     // Try a simpler query without the email_img columns in case they don't exist yet
@@ -192,9 +199,9 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     shortBrandName: brandName,
     footerLineOne: String(data?.footer_line_one || "Thanks for choosing " + brandName + "."),
     footerLineTwo: String(data?.footer_line_two || "Reply to this email if you need anything."),
-    manageBookingUrl: String(data?.manage_bookings_url || d.manage_bookings_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/my-bookings" : MANAGE_BOOKING_URL)),
-    bookingSiteUrl: String(data?.booking_site_url || d.booking_site_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za" : "https://booking-mu-steel.vercel.app")),
-    voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/gift-voucher" : "https://booking-mu-steel.vercel.app/gift-voucher")),
+    manageBookingUrl: String(data?.manage_bookings_url || d.manage_bookings_url || (data?.booking_site_url ? String(data.booking_site_url).replace(/\/+$/, "") + "/my-bookings" : (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/my-bookings" : ""))),
+    bookingSiteUrl: String(data?.booking_site_url || d.booking_site_url || (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za" : "")),
+    voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || (data?.booking_site_url ? String(data.booking_site_url).replace(/\/+$/, "") + "/gift-voucher" : (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/gift-voucher" : ""))),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
     // Always derive from subdomain: noreply@{slug}.bookingtours.co.za
@@ -214,19 +221,56 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     imgAdmin: String(data?.email_img_admin || ""),
     imgVoucher: String(data?.email_img_voucher || ""),
     imgPhotos: String(data?.email_img_photos || ""),
+    socialFacebook: String(data?.social_facebook || ""),
+    socialInstagram: String(data?.social_instagram || ""),
+    socialTiktok: String(data?.social_tiktok || ""),
+    socialYoutube: String(data?.social_youtube || ""),
+    socialTwitter: String(data?.social_twitter || ""),
+    socialLinkedin: String(data?.social_linkedin || ""),
+    socialTripadvisor: String(data?.social_tripadvisor || ""),
+    socialGoogleReviews: String(data?.social_google_reviews || ""),
   };
+}
+
+function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
+  var icons: string[] = [];
+  var iconStyle = "display: inline-block; margin: 0 6px; text-decoration: none;";
+  var svgStyle = "width: 24px; height: 24px;";
+  // Use accent color derived from brand, fallback to light muted
+  var fill = "#A8C2B8";
+
+  if (branding.socialFacebook) icons.push(`<a href="${branding.socialFacebook}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>`);
+  if (branding.socialInstagram) icons.push(`<a href="${branding.socialInstagram}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>`);
+  if (branding.socialTiktok) icons.push(`<a href="${branding.socialTiktok}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.44v-7.15a8.16 8.16 0 005.58 2.18V11.2a4.85 4.85 0 01-3.59-1.57V6.69h3.59z"/></svg></a>`);
+  if (branding.socialYoutube) icons.push(`<a href="${branding.socialYoutube}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>`);
+  if (branding.socialTwitter) icons.push(`<a href="${branding.socialTwitter}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>`);
+  if (branding.socialLinkedin) icons.push(`<a href="${branding.socialLinkedin}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>`);
+  if (branding.socialTripadvisor) icons.push(`<a href="${branding.socialTripadvisor}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 004.04 10.43 5.976 5.976 0 004.075-1.6L12 19.545l1.922-1.932a5.976 5.976 0 004.075 1.6 5.997 5.997 0 004.04-10.43L24 6.648h-4.35a13.573 13.573 0 00-7.644-2.353zM6.003 17.213a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zm11.994 0a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zM6.003 11.219a2 2 0 100 4 2 2 0 000-4zm11.994 0a2 2 0 100 4 2 2 0 000-4z"/></svg></a>`);
+  if (branding.socialGoogleReviews) icons.push(`<a href="${branding.socialGoogleReviews}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 0C5.372 0 0 5.373 0 12s5.372 12 12 12c6.627 0 12-5.373 12-12S18.627 0 12 0zm.14 19.018c-3.868 0-7-3.14-7-7.018 0-3.878 3.132-7.018 7-7.018 1.89 0 3.47.697 4.682 1.829l-1.974 1.896c-.508-.486-1.394-1.052-2.708-1.052-2.322 0-4.218 1.924-4.218 4.345s1.897 4.345 4.218 4.345c2.703 0 3.718-1.945 3.875-2.951h-3.875v-2.485h6.447c.075.407.134.812.134 1.345 0 4.014-2.686 6.764-6.581 6.764z"/></svg></a>`);
+
+  if (icons.length === 0) return "";
+  return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${icons.join("")}</td></tr></table>`;
 }
 
 function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>) {
   var brandedHtml = html;
+
+  // Safety: NEVER produce empty URLs — Gmail strips href="" making buttons unclickable
+  var fallbackUrl = "https://bookingtours.co.za";
+  var safeManageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : fallbackUrl);
+  var safeBookingUrl = branding.bookingSiteUrl || fallbackUrl;
+  if (safeManageUrl === fallbackUrl) {
+    console.warn("BRANDING_WARN: manageBookingUrl is empty for business=" + branding.businessId + " brandName=" + branding.brandName + " — using fallback");
+  }
+
   var replacements: Array<[string, string]> = [
     ["Cape Kayak Adventures", branding.brandName],
     ["Cape Kayak Adventure", branding.brandName],
     ["Cape Kayak Admin Dashboard", branding.brandName + " Admin Dashboard"],
     ["Cape Kayak Admin", branding.brandName + " Admin"],
     ["Cape Kayak", branding.shortBrandName],
-    ["{{BOOKING_URL}}/my-bookings", branding.manageBookingUrl],
-    ["{{BOOKING_URL}}", branding.bookingSiteUrl],
+    ["{{BOOKING_URL}}/my-bookings", safeManageUrl],
+    ["{{BOOKING_URL}}", safeBookingUrl],
   ];
 
   for (var i = 0; i < replacements.length; i++) {
@@ -236,14 +280,49 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   if (branding.voucherUrl) {
     brandedHtml = brandedHtml.split("book at {{BOOKING_URL}}").join("book at " + branding.voucherUrl);
   }
+  // Always replace hardcoded address with business-specific footer lines
+  brandedHtml = brandedHtml
+    .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            If you have any questions, reply to this email or contact us on WhatsApp.")
+    .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo)
+    .split("Three Anchor Bay, Sea Point, Cape Town<br>Book at {{BOOKING_URL}} or WhatsApp us.")
+    .join(branding.footerLineOne + "<br>" + (branding.bookingSiteUrl ? "Book at " + branding.bookingSiteUrl + " or reply to this email." : branding.footerLineTwo))
+    .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            Thank you for adventuring with us!")
+    .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo)
+    .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            Book at {{BOOKING_URL}} or WhatsApp us.")
+    .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo)
+    .split("Three Anchor Bay, Sea Point, Cape Town")
+    .join(branding.footerLineOne)
+    .split("Cape Kayak Adventures, 180 Beach Rd, Three Anchor Bay")
+    .join(branding.brandName + (branding.directions ? ", " + branding.directions : ""))
+    .split("180 Beach Rd, Three Anchor Bay<br>\n              Cape Town, 8005")
+    .join(branding.directions || branding.footerLineOne)
+    .split("180 Beach Rd, Three Anchor Bay")
+    .join(branding.directions || branding.footerLineOne)
+    .split("179 Beach Road Three Anchor Bay")
+    .join(branding.directions || branding.footerLineOne)
+    .split("Cape Town, 8005")
+    .join("")
+    .split("Cape Town<br>8005")
+    .join("");
+
+  // Replace hardcoded Google Maps URL with business directions or remove it
   if (branding.directions) {
-    brandedHtml = brandedHtml
-      .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            If you have any questions, reply to this email or contact us on WhatsApp.")
-      .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo)
-      .split("Three Anchor Bay, Sea Point, Cape Town<br>Book at {{BOOKING_URL}} or WhatsApp us.")
-      .join(branding.footerLineOne + "<br>Book at " + branding.voucherUrl + " or reply to this email.")
-      .split("Three Anchor Bay, Sea Point, Cape Town<br>\n            Thank you for adventuring with us!")
-      .join(branding.footerLineOne + "<br>\n            " + branding.footerLineTwo);
+    brandedHtml = brandedHtml.split("https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005").join(
+      "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(branding.directions)
+    );
+  }
+
+  // Inject social media icons inside the dark email footer
+  var socialHtml = buildSocialIconsHtml(branding);
+  if (socialHtml) {
+    // Find the footer </td> — it's the last </td> before </body>
+    var bodyClose = brandedHtml.lastIndexOf("</body>");
+    if (bodyClose > -1) {
+      var footerTdClose = brandedHtml.lastIndexOf("</td>", bodyClose);
+      if (footerTdClose > -1) {
+        brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + socialHtml + "\n          " + brandedHtml.slice(footerTdClose);
+      }
+    }
   }
 
   // Resolve hero image markers — show uploaded image or remove the block entirely
@@ -466,7 +545,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 10px 40px 40px; text-align: center;">
             <p style="font-size: 14px; font-family: Georgia, serif; color: #1b3b36; font-style: italic; margin: 0 0 15px 0;">Need to amend your booking?</p>
-            <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Manage Your Booking</a>
+            <a href="${d._manageUrl || "{{BOOKING_URL}}/my-bookings"}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Manage Your Booking</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -533,7 +612,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
         <!-- CTA -->
         <tr>
           <td style="padding: 10px 40px 40px; text-align: center;">
-            <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">View My Booking</a>
+            <a href="${d._manageUrl || "{{BOOKING_URL}}/my-bookings"}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">View My Booking</a>
           </td>
         </tr>
         <!-- Footer -->
@@ -674,45 +753,55 @@ function cancellationHtml(d: Record<string, unknown>) {
                 <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Amount Paid:</td>
                 <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 15px; text-align: right;">R${d.total_amount}</td>
               </tr>` : "";
-  var btnStyle = "display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; padding: 16px 20px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;";
 
-  // Weather cancellations get a prominent self-service block with a single "Manage My Booking" CTA
+  // Use directly-injected URL (set before template runs) with placeholder fallback
+  var manageUrl = String(d._manageUrl || "{{BOOKING_URL}}/my-bookings");
+
+  // Bulletproof table-based button — works in all email clients
+  // NEVER produce empty href — Gmail strips href="" making buttons unclickable
+  function emailBtn(label: string, url: string, bgColor: string) {
+    var safeUrl = url || "https://bookingtours.co.za";
+    return `<table cellpadding="0" cellspacing="0" border="0" style="margin: 4px auto; display: inline-table;"><tr>
+      <td align="center" bgcolor="${bgColor}" style="border-radius: 30px; padding: 0;">
+        <a href="${safeUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 30px; letter-spacing: 0.03em;">${label}</a>
+      </td>
+    </tr></table>`;
+  }
+
+  // Weather cancellations get a prominent self-service block
   var optionsBlock = isWeather
     ? `
-        <!-- Weather self-service notice -->
         <tr>
           <td style="padding: 0 40px 10px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
               <tr>
                 <td style="padding: 24px; text-align: center;">
-                  <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #047857;">Your options</p>
-                  <h3 style="margin: 0 0 10px 0; font-family: Georgia, serif; font-size: 20px; color: #14532d;">Reschedule, get a voucher, or request a refund</h3>
-                  <p style="margin: 0 0 18px 0; font-size: 14px; color: #166534; line-height: 1.6;">Use the link below to manage your booking at any time. You can pick a new date, convert to a gift voucher, or request a full refund &mdash; it only takes a minute.</p>
-                  <a href="{{BOOKING_URL}}/my-bookings" style="display: inline-block; background-color: #166534; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">Manage My Booking</a>
+                  <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #047857;">Your options</p>
+                  <p style="margin: 0 0 16px 0; font-size: 14px; color: #166534; line-height: 1.5;">Pick a new date, convert to a voucher, or request a full refund.</p>
+                  ${emailBtn("Manage My Booking", manageUrl, "#166534")}
                 </td>
               </tr>
             </table>
           </td>
         </tr>
         <tr>
-          <td style="padding: 10px 40px 30px; text-align: center;">
-            <p style="font-size: 13px; color: #888; margin: 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
+          <td style="padding: 8px 40px 28px; text-align: center;">
+            <p style="font-size: 12px; color: #999; margin: 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>
       `
     : `
-        <!-- Options -->
         <tr>
-          <td style="padding: 10px 40px 10px; text-align: center;">
-            <p style="font-size: 17px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 20px 0;">How would you like us to handle your booking?</p>
+          <td style="padding: 10px 40px 8px; text-align: center;">
+            <p style="font-size: 15px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 16px 0;">What would you like to do?</p>
           </td>
         </tr>
         <tr>
-          <td style="padding: 0 40px 40px; text-align: center;">
-            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #1b3b36; color: #ffffff !important;">Reschedule My Trip</a>
-            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #2563eb; color: #ffffff !important;">Convert to Voucher</a>
-            <a href="{{BOOKING_URL}}/my-bookings" style="${btnStyle} background-color: #059669; color: #ffffff !important;">Request a Refund</a>
-            <p style="font-size: 13px; color: #888; margin: 8px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
+          <td style="padding: 0 30px 30px; text-align: center;">
+            ${emailBtn("Reschedule", manageUrl, "#1b3b36")}
+            ${emailBtn("Get a Voucher", manageUrl, "#1b3b36")}
+            ${emailBtn("Request Refund", manageUrl, "#1b3b36")}
+            <p style="font-size: 12px; color: #999; margin: 12px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>
       `;
@@ -1544,7 +1633,7 @@ Deno.serve(async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       var fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: MANAGE_BOOKING_URL, bookingSiteUrl: MANAGE_BOOKING_URL.replace("/my-bookings", ""), voucherUrl: MANAGE_BOOKING_URL.replace("/my-bookings", "/gift-voucher"), waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "" };
+      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {
@@ -1559,7 +1648,27 @@ Deno.serve(async (req: Request) => {
     }
     d.email = recipientEmail;
 
-    console.log("SEND_EMAIL type=" + type + " to=" + (d.email || "?"));
+    console.log("SEND_EMAIL type=" + type + " to=" + (d.email || "?") + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
+
+    // Inject resolved URLs into data so templates can use them directly via ${d._manageUrl}
+    // This avoids relying solely on the {{BOOKING_URL}} placeholder replacement in applyBranding
+    d._manageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : "");
+    d._siteUrl = branding.bookingSiteUrl || "";
+
+    // Last resort: if URL is still empty, try to construct from business_id lookup
+    if (!d._manageUrl && d.business_id && supabase) {
+      try {
+        var bizLookup = await supabase.from("businesses").select("subdomain, manage_bookings_url, booking_site_url").eq("id", String(d.business_id)).maybeSingle();
+        if (bizLookup.data) {
+          d._manageUrl = String(bizLookup.data.manage_bookings_url || (bizLookup.data.booking_site_url ? String(bizLookup.data.booking_site_url).replace(/\/+$/, "") + "/my-bookings" : (bizLookup.data.subdomain ? "https://" + bizLookup.data.subdomain + ".booking.bookingtours.co.za/my-bookings" : "")));
+          d._siteUrl = String(bizLookup.data.booking_site_url || (bizLookup.data.subdomain ? "https://" + bizLookup.data.subdomain + ".booking.bookingtours.co.za" : ""));
+          console.log("BRANDING_LASTRESORT manage=" + d._manageUrl);
+        }
+      } catch (e) { console.warn("BRANDING_LASTRESORT_ERR:", e); }
+    }
+    if (!d._manageUrl) {
+      console.error("BRANDING_EMPTY_URL: no manage URL resolved for type=" + type + " biz=" + branding.businessId);
+    }
 
     var subject = "";
     var html = "";
@@ -1637,6 +1746,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    console.log("BRANDING_URLS type=" + type + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
     var branded = applyBranding(subject, html, branding);
     var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
     if (result?.statusCode && result.statusCode >= 400) {

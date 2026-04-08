@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, MagnifyingGlass, UploadSimple, Trash, X, Tag } from "@phosphor-icons/react";
+import { Plus, MagnifyingGlass, UploadSimple, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
 import * as XLSX from "xlsx";
 
 interface Contact {
@@ -28,7 +28,7 @@ export default function ContactsPage() {
   var [loading, setLoading] = useState(true);
   var [search, setSearch] = useState("");
   var [showAdd, setShowAdd] = useState(false);
-  var [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", tags: "", date_of_birth: "" });
+  var [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
   var [saving, setSaving] = useState(false);
   var [showImport, setShowImport] = useState(false);
   var [importText, setImportText] = useState("");
@@ -47,6 +47,12 @@ export default function ContactsPage() {
   var [showCleanList, setShowCleanList] = useState(false);
   var [staleContacts, setStaleContacts] = useState<Contact[]>([]);
   var [cleaning, setCleaning] = useState(false);
+  var [showDeleteAll, setShowDeleteAll] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState("");
+  var [deletingAll, setDeletingAll] = useState(false);
+  var [editingId, setEditingId] = useState<string | null>(null);
+  var [editForm, setEditForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
+  var [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     if (businessId) load();
@@ -114,14 +120,20 @@ export default function ContactsPage() {
   }
 
   async function addContact() {
-    if (!addForm.email.trim()) return;
+    if (!addForm.email.trim()) { notify({ message: "Email is required.", tone: "warning" }); return; }
+    if (!addForm.first_name.trim()) { notify({ message: "First name is required.", tone: "warning" }); return; }
+    if (!addForm.last_name.trim()) { notify({ message: "Last name is required.", tone: "warning" }); return; }
+    if (!addForm.phone.trim()) { notify({ message: "Phone number is required.", tone: "warning" }); return; }
     setSaving(true);
     var tags = addForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    var normalizedPhone = addForm.phone.trim().replace(/\D/g, "");
+    if (normalizedPhone.startsWith("0")) normalizedPhone = "27" + normalizedPhone.substring(1);
     var { data: inserted, error } = await supabase.from("marketing_contacts").insert({
       business_id: businessId,
       email: addForm.email.trim().toLowerCase(),
-      first_name: addForm.first_name.trim() || null,
-      last_name: addForm.last_name.trim() || null,
+      first_name: addForm.first_name.trim(),
+      last_name: addForm.last_name.trim(),
+      phone: normalizedPhone,
       tags: tags.length > 0 ? tags : [],
       date_of_birth: addForm.date_of_birth || null,
     }).select("id").single();
@@ -138,9 +150,55 @@ export default function ContactsPage() {
       checkAutoEnroll(inserted.id, "contact_added");
     }
     notify({ message: "Contact added.", tone: "success" });
-    setAddForm({ email: "", first_name: "", last_name: "", tags: "", date_of_birth: "" });
+    setAddForm({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
     setShowAdd(false);
     load();
+  }
+
+  function startEdit(c: Contact) {
+    setEditingId(c.id);
+    setEditForm({
+      email: c.email,
+      first_name: c.first_name || "",
+      last_name: c.last_name || "",
+      phone: c.phone || "",
+      tags: (c.tags || []).join(", "),
+      date_of_birth: c.date_of_birth || "",
+    });
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    if (!editForm.email.trim()) { notify({ message: "Email is required.", tone: "warning" }); return; }
+    setEditSaving(true);
+    var tags = editForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    var normalizedPhone = editForm.phone.trim().replace(/\D/g, "");
+    if (normalizedPhone.startsWith("0")) normalizedPhone = "27" + normalizedPhone.substring(1);
+    var { error: updateErr } = await supabase.from("marketing_contacts").update({
+      email: editForm.email.trim().toLowerCase(),
+      first_name: editForm.first_name.trim() || null,
+      last_name: editForm.last_name.trim() || null,
+      phone: normalizedPhone || null,
+      tags: tags.length > 0 ? tags : [],
+      date_of_birth: editForm.date_of_birth || null,
+    }).eq("id", editingId);
+    setEditSaving(false);
+    if (updateErr) {
+      if (updateErr.code === "23505") notify({ message: "This email already exists.", tone: "warning" });
+      else notify({ message: updateErr.message, tone: "error" });
+      return;
+    }
+    setContacts(contacts.map((c) => c.id === editingId ? {
+      ...c,
+      email: editForm.email.trim().toLowerCase(),
+      first_name: editForm.first_name.trim() || null,
+      last_name: editForm.last_name.trim() || null,
+      phone: normalizedPhone || null,
+      tags,
+      date_of_birth: editForm.date_of_birth || null,
+    } : c));
+    notify({ message: "Contact updated.", tone: "success" });
+    setEditingId(null);
   }
 
   // ── DB fields that can be mapped ──
@@ -437,6 +495,20 @@ export default function ContactsPage() {
     notify({ message: "Contact removed.", tone: "success" });
   }
 
+  async function deleteAllContacts() {
+    setDeletingAll(true);
+    var { error } = await supabase.from("marketing_contacts").delete().eq("business_id", businessId);
+    if (error) {
+      notify({ title: "Delete failed", message: error.message, tone: "error" });
+    } else {
+      setContacts([]);
+      notify({ message: "All contacts deleted.", tone: "success" });
+    }
+    setDeletingAll(false);
+    setShowDeleteAll(false);
+    setDeleteConfirmText("");
+  }
+
   async function addTagToContact(contactId: string, tag: string) {
     var contact = contacts.find((c) => c.id === contactId);
     if (!contact || !tag.trim()) return;
@@ -514,8 +586,13 @@ export default function ContactsPage() {
           {activeCount} active · {unsubCount} unsubscribed · {bouncedCount} bounced · {inactiveCount} inactive · {contacts.length} total
         </p>
         <div className="flex gap-2">
+          {contacts.length > 0 && (
+            <button onClick={() => setShowDeleteAll(true)} className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+              <Trash size={14} /> Delete All
+            </button>
+          )}
           <button onClick={() => setShowValidate(true)} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            <Tag size={14} /> Validate & Segment
+            Validate & Segment
           </button>
           <button onClick={previewCleanList} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
             <Trash size={14} /> Clean List
@@ -580,6 +657,7 @@ export default function ContactsPage() {
               <tr style={{ background: "var(--ck-surface)" }}>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Phone</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>DOB</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Tags</th>
                 <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Engagement</th>
@@ -588,24 +666,67 @@ export default function ContactsPage() {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((c) => (
+              {paginated.map((c) => {
+                var isEditing = editingId === c.id;
+                return isEditing ? (
+                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle, var(--ck-bg))" }}>
+                    <td className="px-4 py-2">
+                      <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Email" />
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex gap-1">
+                        <input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                          className="w-1/2 rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="First" />
+                        <input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                          className="w-1/2 rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="Last" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="w-full rounded-lg border px-2 py-1.5 text-xs font-mono" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="Phone" />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                        className="rounded-lg border px-2 py-1.5 text-xs w-[120px]" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                        className="w-full rounded-lg border px-2 py-1.5 text-xs" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="tag1, tag2" />
+                    </td>
+                    <td className="px-4 py-2 text-center text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                      {c.total_received > 0 ? <span>{c.total_received} / {c.total_opens} / {c.total_clicks}</span> : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <button onClick={() => toggleStatus(c)} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer ${
+                        c.status === "active" ? "bg-emerald-100 text-emerald-700" :
+                        c.status === "bounced" ? "bg-red-100 text-red-600" :
+                        c.status === "inactive" ? "bg-amber-100 text-amber-600" :
+                        "bg-gray-100 text-gray-500"
+                      }`}>{c.status}</button>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={saveEdit} disabled={editSaving} className="p-1 rounded-lg hover:bg-emerald-50" style={{ color: "var(--ck-success, #059669)" }} title="Save">
+                          <Check size={16} weight="bold" />
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="p-1 rounded-lg hover:bg-gray-100" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
                 <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
                   <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.email}</td>
                   <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>
                     {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
                   </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="date"
-                      value={c.date_of_birth || ""}
-                      onChange={async (e) => {
-                        var val = e.target.value || null;
-                        await supabase.from("marketing_contacts").update({ date_of_birth: val }).eq("id", c.id);
-                        setContacts(contacts.map((x) => x.id === c.id ? { ...x, date_of_birth: val } : x));
-                      }}
-                      className="rounded-lg border px-2 py-1 text-xs w-[120px]"
-                      style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
-                    />
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    {c.phone || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
+                    {c.date_of_birth || "—"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1 items-center">
@@ -636,7 +757,7 @@ export default function ContactsPage() {
                           style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
                           title="Add tag"
                         >
-                          <Tag size={10} />
+                          +
                         </button>
                       )}
                     </div>
@@ -657,12 +778,18 @@ export default function ContactsPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => deleteContact(c.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
-                      <Trash size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => startEdit(c)} className="p-1 rounded-lg hover:bg-gray-100" style={{ color: "var(--ck-text-muted)" }} title="Edit">
+                        <PencilSimple size={14} />
+                      </button>
+                      <button onClick={() => deleteContact(c.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
+                        <Trash size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -713,14 +840,16 @@ export default function ContactsPage() {
               <button onClick={() => setShowAdd(false)}><X size={18} /></button>
             </div>
             <div className="space-y-3">
-              <input placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="First name" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
+                <input placeholder="First name *" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
                   className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
-                <input placeholder="Last name" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
+                <input placeholder="Last name *" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
                   className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
               </div>
+              <input placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              <input placeholder="Phone number *" value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
               <input placeholder="Tags (comma-separated, e.g. vip, customer)" value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
                 className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
               <div>
@@ -1016,6 +1145,42 @@ export default function ContactsPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {/* Delete All Contacts confirmation */}
+      {showDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900">Delete All Contacts</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              This will permanently delete <strong>{contacts.length}</strong> contacts from your marketing list. This action cannot be undone.
+            </p>
+            <p className="mt-3 text-sm text-gray-600">
+              Type <strong>DELETE</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase"
+            />
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                onClick={() => { setShowDeleteAll(false); setDeleteConfirmText(""); }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteAllContacts}
+                disabled={deleteConfirmText !== "DELETE" || deletingAll}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingAll ? "Deleting..." : "Delete All Contacts"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -288,7 +288,18 @@ Deno.serve(async (req) => {
     // Redirect GET requests to the booking app's waiver page (Supabase Edge Functions
     // force text/plain content-type which prevents HTML rendering in browsers)
     if (req.method === "GET" && bookingId && token) {
-      var redirectUrl = new URL("https://booking-mu-steel.vercel.app/waiver");
+      // Look up the business booking site URL from the booking
+      var waiverBaseUrl = "";
+      try {
+        var { data: wbk } = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
+        if (wbk?.business_id) {
+          var { data: wbiz } = await supabase.from("businesses").select("booking_site_url, subdomain").eq("id", wbk.business_id).maybeSingle();
+          if (wbiz?.booking_site_url) waiverBaseUrl = String(wbiz.booking_site_url).replace(/\/+$/, "");
+          else if (wbiz?.subdomain) waiverBaseUrl = "https://" + wbiz.subdomain + ".booking.bookingtours.co.za";
+        }
+      } catch (_) { /* fallback below */ }
+      if (!waiverBaseUrl) waiverBaseUrl = "https://booking.bookingtours.co.za";
+      var redirectUrl = new URL(waiverBaseUrl + "/waiver");
       redirectUrl.searchParams.set("booking", bookingId);
       redirectUrl.searchParams.set("token", token);
       return Response.redirect(redirectUrl.toString(), 302);

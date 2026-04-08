@@ -682,48 +682,51 @@ export default function Bookings() {
       : "";
     const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
 
-    // WhatsApp notification
-    if (b.phone) {
-      try {
-        await fetch(SU + "/functions/v1/send-whatsapp-text", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: b.phone,
-            message: "📋 *Booking Cancelled*\n\n" +
-              "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", your booking for " + tourName +
-              (startTime ? " on " + startTime : "") + " has been cancelled.\n\n" +
-              "📋 Ref: " + ref + "\n\n" +
-              "You will receive an email with options to reschedule, get a voucher, or request a refund.",
-          }),
-        });
-      } catch (e) { console.error("WA notify err:", e); }
-    }
-
-    // Email notification
-    if (b.email) {
-      try {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            type: "CANCELLATION",
-            data: {
+    // Only notify customers who actually paid — no point emailing unpaid/already-cancelled bookings
+    if (isPaidBooking) {
+      // WhatsApp notification
+      if (b.phone) {
+        try {
+          await fetch(SU + "/functions/v1/send-whatsapp-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+            body: JSON.stringify({
               business_id: businessId,
-              email: b.email,
-              customer_name: b.customer_name,
-              ref,
-              tour_name: tourName,
-              start_time: startTime,
-              reason: "cancelled by operator",
-              total_amount: isPaidBooking ? b.total_amount : null,
+              to: b.phone,
+              message: "📋 *Booking Cancelled*\n\n" +
+                "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", your booking for " + tourName +
+                (startTime ? " on " + startTime : "") + " has been cancelled.\n\n" +
+                "📋 Ref: " + ref + "\n\n" +
+                "You will receive an email with options to reschedule, get a voucher, or request a refund.",
+            }),
+          });
+        } catch (e) { console.error("WA notify err:", e); }
+      }
+
+      // Email notification
+      if (b.email) {
+        try {
+          await supabase.functions.invoke("send-email", {
+            body: {
+              type: "CANCELLATION",
+              data: {
+                business_id: businessId,
+                email: b.email,
+                customer_name: b.customer_name,
+                ref,
+                tour_name: tourName,
+                start_time: startTime,
+                reason: "cancelled by operator",
+                total_amount: b.total_amount,
+              },
             },
-          },
-        });
-      } catch (e) { console.error("Email notify err:", e); }
+          });
+        } catch (e) { console.error("Email notify err:", e); }
+      }
     }
 
     setActionBookingId(null);
-    notify({ title: "Booking cancelled", message: "The booking was cancelled and the customer was notified.", tone: "success" });
+    notify({ title: "Booking cancelled", message: isPaidBooking ? "The booking was cancelled and the customer was notified." : "The booking was cancelled.", tone: "success" });
     loadBookings();
   }
 
@@ -771,49 +774,53 @@ export default function Bookings() {
           ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
           : "";
 
-        if (b.phone) {
-          try {
-            await fetch(SU + "/functions/v1/send-whatsapp-text", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({
-                business_id: businessId,
-                to: b.phone,
-                message: "⛈ *Trip Cancelled — Weather*\n\n" +
-                  "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                  " has been cancelled due to weather conditions.\n\n" +
-                  "📋 Ref: " + ref + "\n\n" +
-                  "Visit your My Bookings page to reschedule, get a voucher, or request a refund:\nhttps://book.capekayak.co.za/my-bookings 🛶",
-              }),
-            });
-          } catch (e) { console.error("WA notify err:", e); }
-        }
-
-        if (b.email) {
-          try {
-            await supabase.functions.invoke("send-email", {
-              body: {
-                type: "CANCELLATION",
-                data: {
+        // Only notify customers who actually paid
+        if (isPaidBooking) {
+          if (b.phone) {
+            try {
+              await fetch(SU + "/functions/v1/send-whatsapp-text", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+                body: JSON.stringify({
                   business_id: businessId,
-                  email: b.email,
-                  customer_name: b.customer_name,
-                  ref,
-                  tour_name: tourName,
-                  start_time: startTime,
-                  reason: "weather conditions",
-                  total_amount: isPaidBooking && refundAmount > 0 ? refundAmount : null,
-                  is_weather: true,
+                  to: b.phone,
+                  message: "⛈ *Trip Cancelled — Weather*\n\n" +
+                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
+                    " has been cancelled due to weather conditions.\n\n" +
+                    "📋 Ref: " + ref + "\n\n" +
+                    "Visit your My Bookings page to reschedule, get a voucher, or request a refund.",
+                }),
+              });
+            } catch (e) { console.error("WA notify err:", e); }
+          }
+
+          if (b.email) {
+            try {
+              await supabase.functions.invoke("send-email", {
+                body: {
+                  type: "CANCELLATION",
+                  data: {
+                    business_id: businessId,
+                    email: b.email,
+                    customer_name: b.customer_name,
+                    ref,
+                    tour_name: tourName,
+                    start_time: startTime,
+                    reason: "weather conditions",
+                    total_amount: refundAmount > 0 ? refundAmount : null,
+                    is_weather: true,
+                  },
                 },
-              },
-            });
-          } catch (e) { console.error("Email notify err:", e); }
+              });
+            } catch (e) { console.error("Email notify err:", e); }
+          }
         }
       }
 
+      const paidCount = affected.filter(b => ["PAID", "CONFIRMED"].includes(b.status)).length;
       notify({
         title: "Weather cancellation complete",
-        message: `${affected.length} booking(s) were cancelled and customers were sent self-service follow-up links.`,
+        message: `${affected.length} booking(s) cancelled.${paidCount > 0 ? ` ${paidCount} paid customer(s) were notified.` : " No paid bookings to notify."}`,
         tone: "success",
       });
       loadBookings();
@@ -1065,7 +1072,7 @@ export default function Bookings() {
 
       // Send the message via admin-reply
       const res = await supabase.functions.invoke("admin-reply", {
-        body: { phone, message: waMessage.trim() },
+        body: { phone, message: waMessage.trim(), business_id: businessId },
       });
 
       if (res.error) {

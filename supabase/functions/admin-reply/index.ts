@@ -35,30 +35,32 @@ Deno.serve(async (req: Request) => {
         const to = body.phone || body.to || body.to_phone;
         const message = body.message;
         const action = body.action;
+        const reqBusinessId = body.business_id || body.businessId || "";
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
         if (action === "return_to_bot") {
-            const { error: rbErr } = await supabase.from("conversations").update({ status: "BOT", current_state: "IDLE", updated_at: new Date().toISOString() }).eq("phone", to);
+            if (!reqBusinessId) return new Response(JSON.stringify({ ok: false, error: "business_id is required" }), { status: 400, headers: getCors(req) });
+            const { error: rbErr } = await supabase.from("conversations").update({ status: "BOT", current_state: "IDLE", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", reqBusinessId);
             if (rbErr) return new Response(JSON.stringify({ ok: false, error: rbErr.message }), { status: 200, headers: getCors(req) });
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
         }
 
         if (!to || !message) {
-            return new Response(JSON.stringify({ 
-                ok: false, 
+            return new Response(JSON.stringify({
+                ok: false,
                 error: `Missing phone (${to}) or message (${message?.length}). Received keys: ${Object.keys(body).join(", ")}`,
                 debug: { body }
             }), { status: 200, headers: getCors(req) });
         }
 
         // Get conversation to ensure correct business ID and state
-        const { data: convo } = await supabase
+        let convoQuery = supabase
             .from("conversations")
             .select("business_id, customer_name")
-            .eq("phone", to)
-            .limit(1)
-            .single();
+            .eq("phone", to);
+        if (reqBusinessId) convoQuery = convoQuery.eq("business_id", reqBusinessId);
+        const { data: convo } = await convoQuery.limit(1).single();
 
         const actualBusinessId = convo?.business_id;
         if (!actualBusinessId) {
@@ -135,7 +137,7 @@ Deno.serve(async (req: Request) => {
                         body: message,
                         sender: "Admin",
                     });
-                    await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to);
+                    await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                     return new Response(JSON.stringify({ ok: true, via_template: true }), { status: 200, headers: getCors(req) });
                 }
                 // Template also failed — let admin know
@@ -166,7 +168,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Ensure conversation status stays as HUMAN so bot doesn't reply to their next message automatically
-        await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to);
+        await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
 
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
 

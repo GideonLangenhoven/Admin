@@ -5,9 +5,7 @@ import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import {
-  Plus, Trash, Play, Pause, Lightning, Envelope, Clock, Gift, Star, UsersThree,
-  ArrowsClockwise, Heart, CalendarDots, Tag, TrendUp, ShoppingCart,
-  Camera, Medal, Sparkle, CaretRight, X, ArrowRight, Info,
+  Plus, Trash, Play, Pause, Sparkle, CaretRight, X, ArrowRight,
 } from "@phosphor-icons/react";
 
 interface Automation {
@@ -43,9 +41,6 @@ interface AutomationTemplate {
   name: string;
   description: string;
   benefit: string;
-  icon: any;
-  iconColor: string;
-  iconBg: string;
   tier: "must-have" | "high-value" | "growth";
   triggerType: string;
   triggerConfig: Record<string, any>;
@@ -60,9 +55,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Welcome Series",
     description: "Greet new subscribers with your brand story, showcase your best tours, and convert them into first-time bookers with a special discount.",
     benefit: "Welcome flows generate R21+ revenue per recipient. Sets the tone for your entire customer relationship.",
-    icon: Sparkle,
-    iconColor: "text-blue-600",
-    iconBg: "bg-blue-50",
+
     tier: "must-have",
     triggerType: "contact_added",
     triggerConfig: {},
@@ -88,9 +81,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Post-Tour Review Request",
     description: "Automatically ask for Google/TripAdvisor reviews while the experience is still fresh. Includes a follow-up nudge for those who didn't respond.",
     benefit: "Guests asked for reviews are 3x more likely to leave one. Reviews are your #1 marketing asset — they directly drive new bookings.",
-    icon: Star,
-    iconColor: "text-yellow-600",
-    iconBg: "bg-yellow-50",
+
     tier: "must-have",
     triggerType: "tag_added",
     triggerConfig: { tag: "completed-tour" },
@@ -115,9 +106,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Win-Back Campaign",
     description: "Re-engage customers who haven't booked in 90+ days with a 3-step escalating sequence: nostalgia, then incentive, then final offer.",
     benefit: "It costs 5x more to acquire a new customer than re-engage an existing one. Win-back emails recover 10-15% of lapsed customers.",
-    icon: ArrowsClockwise,
-    iconColor: "text-indigo-600",
-    iconBg: "bg-indigo-50",
+
     tier: "must-have",
     triggerType: "tag_added",
     triggerConfig: { tag: "lapsed-90-days" },
@@ -144,9 +133,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Birthday Special",
     description: "Delight customers on their birthday with a personalised greeting and exclusive discount voucher. Runs automatically every year.",
     benefit: "Birthday emails generate 342% higher revenue per email than standard promotions, with 45%+ open rates.",
-    icon: Heart,
-    iconColor: "text-pink-600",
-    iconBg: "bg-pink-50",
+
     tier: "high-value",
     triggerType: "date_field",
     triggerConfig: { field: "date_of_birth", days_before: 0 },
@@ -170,9 +157,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Referral Request",
     description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive — they get a voucher, their friend gets a discount.",
     benefit: "Referred customers convert 25-30% better and have 16% higher lifetime value. Delivers new customers at 1/5th the cost of ads.",
-    icon: UsersThree,
-    iconColor: "text-green-600",
-    iconBg: "bg-green-50",
+
     tier: "high-value",
     triggerType: "tag_added",
     triggerConfig: { tag: "left-review" },
@@ -195,9 +180,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Voucher Expiry Reminder",
     description: "Remind voucher holders before their voucher expires with a 3-stage countdown: 30 days, 7 days, and last day. Recovers forgotten revenue.",
     benefit: "Recovers 20-35% of unredeemed vouchers. Each redeemed gift voucher also brings a new customer to your business.",
-    icon: Gift,
-    iconColor: "text-amber-600",
-    iconBg: "bg-amber-50",
+
     tier: "high-value",
     triggerType: "tag_added",
     triggerConfig: { tag: "voucher-expiring-30d" },
@@ -222,9 +205,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "VIP Customer Treatment",
     description: "Give your best customers the VIP treatment with exclusive benefits, early access to new tours, and a generous loyalty discount.",
     benefit: "Top 20% of customers typically generate 80% of revenue. VIP recognition increases rebooking rates by 40-60%.",
-    icon: Medal,
-    iconColor: "text-violet-600",
-    iconBg: "bg-violet-50",
+
     tier: "high-value",
     triggerType: "tag_added",
     triggerConfig: { tag: "vip" },
@@ -248,9 +229,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "New Season Announcement",
     description: "Build excitement for the new season with a 2-part campaign: preview what's coming, then offer early-bird pricing to drive pre-season bookings.",
     benefit: "Pre-season campaigns can generate 20-30% of total season bookings before the season even starts.",
-    icon: CalendarDots,
-    iconColor: "text-teal-600",
-    iconBg: "bg-teal-50",
+
     tier: "growth",
     triggerType: "manual",
     triggerConfig: {},
@@ -275,9 +254,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Booking Anniversary",
     description: "Reach out on the 1-year anniversary of a customer's tour with a 'this time last year' nostalgia email and incentive to rebook.",
     benefit: "High emotional resonance drives 35-45% open rates. Targets a natural decision-making moment at very low cost.",
-    icon: CalendarDots,
-    iconColor: "text-rose-600",
-    iconBg: "bg-rose-50",
+
     tier: "growth",
     triggerType: "tag_added",
     triggerConfig: { tag: "anniversary-1yr" },
@@ -299,9 +276,7 @@ var TEMPLATES: AutomationTemplate[] = [
     name: "Post-Tour Photo Delivery",
     description: "Automatically send trip photos when they're uploaded, with social sharing CTAs to drive organic word-of-mouth marketing.",
     benefit: "Each shared photo album reaches 50-200 people. Free organic marketing that builds social proof and attracts new customers.",
-    icon: Camera,
-    iconColor: "text-cyan-600",
-    iconBg: "bg-cyan-50",
+
     tier: "growth",
     triggerType: "tag_added",
     triggerConfig: { tag: "photos-ready" },
@@ -452,13 +427,12 @@ export default function AutomationsPage() {
   /* ─── TEMPLATE DETAIL MODAL ─── */
   if (selectedTemplate) {
     var t = selectedTemplate;
-    var Icon = t.icon;
     var tier = TIER_INFO[t.tier];
-    var stepIcons: Record<string, { icon: any; label: string; color: string }> = {
-      send_email: { icon: Envelope, label: "Send Email", color: "text-blue-600" },
-      delay: { icon: Clock, label: "Wait", color: "text-orange-600" },
-      condition: { icon: TrendUp, label: "Check", color: "text-purple-600" },
-      generate_voucher: { icon: Gift, label: "Create Voucher", color: "text-emerald-600" },
+    var stepLabels: Record<string, string> = {
+      send_email: "Send Email",
+      delay: "Wait",
+      condition: "Check",
+      generate_voucher: "Create Voucher",
     };
     return (
       <div className="space-y-6">
@@ -476,9 +450,6 @@ export default function AutomationsPage() {
           style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
         >
           <div className="flex items-start gap-4">
-            <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${t.iconBg}`}>
-              <Icon size={24} className={t.iconColor} />
-            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h1 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h1>
@@ -507,10 +478,7 @@ export default function AutomationsPage() {
           className="rounded-xl border p-5"
           style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
         >
-          <div className="flex items-center gap-2 mb-3">
-            <TrendUp size={16} className="text-emerald-600" />
-            <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Why This Works</h2>
-          </div>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Why This Works</h2>
           <p className="text-sm" style={{ color: "var(--ck-text)" }}>{t.benefit}</p>
         </div>
 
@@ -548,7 +516,6 @@ export default function AutomationsPage() {
               className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
               style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}
             >
-              <Lightning size={14} />
               Trigger: {t.triggerType.replace(/_/g, " ")}
               {t.triggerConfig.tag && <span className="opacity-70">({t.triggerConfig.tag})</span>}
               {t.triggerConfig.field && <span className="opacity-70">({t.triggerConfig.field})</span>}
@@ -558,9 +525,7 @@ export default function AutomationsPage() {
           {/* Steps */}
           <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border)" }}>
             {t.steps.map((step, i) => {
-              var si = stepIcons[step.step_type] || stepIcons.send_email;
-              var SIcon = si.icon;
-              var label = si.label;
+              var label = stepLabels[step.step_type] || "Send Email";
               if (step.step_type === "delay") {
                 label = `Wait ${step.config.duration} ${step.config.unit}`;
               } else if (step.step_type === "send_email") {
@@ -581,7 +546,6 @@ export default function AutomationsPage() {
                   >
                     {i + 1}
                   </span>
-                  <SIcon size={14} className={si.color} />
                   <span className="text-xs" style={{ color: "var(--ck-text)" }}>{label}</span>
                 </div>
               );
@@ -663,7 +627,6 @@ export default function AutomationsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {tierTemplates.map((t) => {
-                  var TIcon = t.icon;
                   var tb = triggerBadge[t.triggerType] || triggerBadge.manual;
                   var emailSteps = t.steps.filter((s) => s.step_type === "send_email").length;
                   return (
@@ -674,9 +637,6 @@ export default function AutomationsPage() {
                       style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg ${t.iconBg}`}>
-                          <TIcon size={20} className={t.iconColor} />
-                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
@@ -733,6 +693,33 @@ export default function AutomationsPage() {
   /* ─── MAIN AUTOMATIONS LIST ─── */
   return (
     <div className="space-y-4">
+      {/* Intro banner — shown when there are few automations */}
+      {automations.length > 0 && automations.length <= 5 && (
+        <div
+          className="rounded-xl border p-5"
+          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+        >
+          <div className="flex items-start gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
+                Your automations run 24/7 in the background
+              </h3>
+              <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                Tags are automatically applied to your contacts based on their booking behaviour — like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["completed-tour", "lapsed-90-days", "vip", "new-booker", "voucher-expiring"].map(tag => (
+                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                    {tag}
+                  </span>
+                ))}
+                <span className="text-[10px] py-0.5 px-1" style={{ color: "var(--ck-text-muted)" }}>auto-assigned daily</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
@@ -763,12 +750,11 @@ export default function AutomationsPage() {
             className="rounded-xl border p-8 text-center"
             style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
           >
-            <Lightning size={32} className="mx-auto mb-3 opacity-30" />
             <h2 className="text-base font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
               No automations yet
             </h2>
             <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>
-              Automations send emails automatically based on triggers — saving you time and growing your business on autopilot.
+              Automations send emails automatically when things happen — a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
             </p>
             <button
               onClick={() => setShowGallery(true)}
@@ -786,7 +772,6 @@ export default function AutomationsPage() {
             </h3>
             <div className="grid gap-3 sm:grid-cols-3">
               {TEMPLATES.filter((t) => t.tier === "must-have").map((t) => {
-                var TIcon = t.icon;
                 return (
                   <button
                     key={t.key}
@@ -794,9 +779,6 @@ export default function AutomationsPage() {
                     className="rounded-xl border p-4 text-left transition-all hover:shadow-md"
                     style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
                   >
-                    <div className={`flex items-center justify-center w-9 h-9 rounded-lg mb-3 ${t.iconBg}`}>
-                      <TIcon size={18} className={t.iconColor} />
-                    </div>
                     <h4 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
                       {t.name}
                     </h4>
@@ -814,12 +796,9 @@ export default function AutomationsPage() {
             className="rounded-xl border p-5"
             style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
           >
-            <div className="flex items-center gap-2 mb-3">
-              <Info size={16} style={{ color: "var(--ck-text-muted)" }} />
-              <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>
                 How Automations Work
-              </h3>
-            </div>
+            </h3>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">

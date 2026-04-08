@@ -7,9 +7,8 @@ import { useBusinessContext } from "../components/BusinessContext";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
-    Warning, ArrowUpRight, TrendUp, TrendDown, Plus,
-    List, CalendarX, ClipboardText, CaretLeft, CaretRight,
-    CheckCircle, CloudSun, GearSix, X, Trash, MapPin, ArrowsClockwise
+    Plus, CaretLeft, CaretRight,
+    CheckCircle, GearSix, X, Trash, MapPin, ArrowsClockwise
 } from "@phosphor-icons/react";
 
 /* ── helpers ── */
@@ -266,6 +265,15 @@ export default function Dashboard() {
 
     useEffect(() => { if (businessId) load(); }, [businessId]);
 
+    // Realtime: refresh dashboard when bookings change (refund processed, new booking, etc.)
+    useEffect(() => {
+        if (!businessId) return;
+        const ch = supabase.channel("dash-bookings-" + businessId)
+            .on("postgres_changes" as any, { event: "*", schema: "public", table: "bookings" }, () => load())
+            .subscribe();
+        return () => { supabase.removeChannel(ch); };
+    }, [businessId]);
+
     async function load() {
         setLoading(true);
         const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -295,7 +303,7 @@ export default function Dashboard() {
         const [todayManifest, tomorrowData, refundsData, inboxData, photosData] = await Promise.all([
             fetchManifest(today, tomorrow),
             fetchManifest(tomorrow, dayAfter),
-            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).eq("refund_status", "REQUESTED"),
+            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "ACTION_REQUIRED"]),
             supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
             Promise.all([
                 supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
@@ -377,11 +385,8 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Today Pax */}
                 <Link href="/bookings" className="block p-5 transition-transform hover:-translate-y-1 relative group rounded-2xl shadow-sm" style={{ background: "var(--ck-accent)", color: "#ffffff", border: "1px solid var(--ck-accent)" }}>
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-[15px] font-medium text-white/90">Today's Pax</span>
-                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
-                            <ArrowUpRight size={18} style={{ color: "var(--ck-accent)" }} />
-                        </div>
+                    <div className="mb-4">
+                        <span className="text-[15px] font-medium text-white/90">Today&apos;s Pax</span>
                     </div>
                     <div>
                         <div className="text-[36px] font-bold tracking-tight text-white mb-2 leading-none">
@@ -389,7 +394,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] text-white/90 font-medium">
                             <span className="flex items-center justify-center border border-white/40 rounded px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10">
-                                <TrendUp size={12} className="mr-1" /> {todayBookings}
+                                {todayBookings}
                             </span>
                             <span>trips booked vs {tomorrowPax} tmrw</span>
                         </div>
@@ -398,11 +403,8 @@ export default function Dashboard() {
 
                 {/* Refunds */}
                 <Link href="/refunds" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Pending Refunds</span>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
-                        </div>
                     </div>
                     <div>
                         <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
@@ -410,7 +412,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {refundCount > 0 ? <><TrendDown size={12} className="mr-1" /> {refundCount}</> : "0"} req
+                                {refundCount > 0 ? refundCount : "0"} req
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>awaiting approval</span>
                         </div>
@@ -419,11 +421,8 @@ export default function Dashboard() {
 
                 {/* Inbox */}
                 <Link href="/inbox" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Inbox Action</span>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
-                        </div>
                     </div>
                     <div>
                         <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
@@ -431,7 +430,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {inboxCount > 0 ? <><TrendUp size={12} className="mr-1" /> Waiting</> : "Clear"}
+                                {inboxCount > 0 ? "Waiting" : "Clear"}
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>conversations</span>
                         </div>
@@ -440,11 +439,8 @@ export default function Dashboard() {
 
                 {/* Photos */}
                 <Link href="/photos" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                         <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Photos Out</span>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center border transition-colors group-hover:bg-gray-50" style={{ borderColor: "var(--ck-border-strong)" }}>
-                            <ArrowUpRight size={18} style={{ color: "var(--ck-text-strong)" }} />
-                        </div>
                     </div>
                     <div>
                         <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
@@ -452,7 +448,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
                             <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {photosOutstanding > 0 ? <><TrendUp size={12} className="mr-1" /> Missing</> : "Clear"}
+                                {photosOutstanding > 0 ? "Missing" : "Clear"}
                             </span>
                             <span style={{ color: "var(--ck-text-muted)" }}>photo uploads</span>
                         </div>
@@ -465,9 +461,6 @@ export default function Dashboard() {
                 <div className="ui-surface flex flex-col">
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--ck-success-soft)" }}>
-                                <List size={16} style={{ color: "var(--ck-success)" }} />
-                            </div>
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>
@@ -499,7 +492,6 @@ export default function Dashboard() {
                     <div className="flex-1 overflow-x-auto">
                         {slotGroups.length === 0 ? (
                             <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <CalendarX size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
                                 <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
                                     {manifestDate === "TODAY" ? "No bookings today." : "No bookings tomorrow."}
                                 </p>
@@ -570,9 +562,6 @@ export default function Dashboard() {
                 <div className="ui-surface flex flex-col">
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "var(--ck-accent-soft)" }}>
-                                <ClipboardText size={16} style={{ color: "var(--ck-accent)" }} />
-                            </div>
                             <div>
                                 <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
                                 <p className="text-[12px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
@@ -618,7 +607,6 @@ export default function Dashboard() {
                     <div className="flex-1 overflow-x-auto">
                         {!activeSlot ? (
                             <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <CalendarX size={32} className="mb-2" style={{ color: "var(--ck-border-strong)" }} />
                                 <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>No bookings today.</p>
                             </div>
                         ) : (
@@ -694,9 +682,6 @@ export default function Dashboard() {
                 <div className="ui-surface flex flex-col">
                     <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center p-1.5" style={{ background: "var(--ck-accent-soft)" }}>
-                                <CloudSun size={16} style={{ color: "var(--ck-accent)" }} />
-                            </div>
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
                         </div>
                         <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium border rounded-full transition-colors hover:bg-gray-50 bg-white" style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}>

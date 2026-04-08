@@ -40,7 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function Reports() {
-  const { businessId, timezone } = useBusinessContext();
+  const { businessId, businessName, timezone } = useBusinessContext();
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -198,6 +198,33 @@ export default function Reports() {
     return <span className="text-blue-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
+  const reportGenDate = new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: activeTimezone });
+  const csvPrefix = businessName.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+
+  function buildCSV(title: string, headers: string[], rows: any[][]) {
+    const meta = [
+      [title],
+      ["Company", businessName],
+      ["Period", startDate + " to " + endDate],
+      ["Generated", reportGenDate],
+      [],
+    ];
+    const csv = [...meta, headers, ...rows]
+      .map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    return "\uFEFF" + csv;
+  }
+
+  function triggerDownload(content: string, filename: string) {
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function downloadCSV() {
     if (activeTab === "attendance") {
       const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
@@ -213,16 +240,7 @@ export default function Reports() {
         b.checked_in_at ? fmtDateTime(b.checked_in_at, activeTimezone) : "",
         b.status || ""
       ]);
-      const csv = [headers, ...rows]
-        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `attendance-${startDate}-to-${endDate}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(buildCSV("Attendance Report", headers, rows), `${csvPrefix}-attendance-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -238,16 +256,7 @@ export default function Reports() {
         Number(b.total_amount || 0).toFixed(2),
         b.status || ""
       ]);
-      const csv = [headers, ...rows]
-        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `financials-${startDate}-to-${endDate}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(buildCSV("Financial Report", headers, rows), `${csvPrefix}-financials-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -273,16 +282,7 @@ export default function Reports() {
         Number(d.revenue).toFixed(2),
         Number(d.count > 0 ? d.revenue / d.count : 0).toFixed(2)
       ]);
-      const csv = [headers, ...rows]
-        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `marketing-${startDate}-to-${endDate}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(buildCSV("Marketing Report", headers, rows), `${csvPrefix}-marketing-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -302,16 +302,7 @@ export default function Reports() {
         b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "",
         b.status || "",
       ]);
-      const csv = [headers, ...rows]
-        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `waivers-${startDate}-to-${endDate}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(buildCSV("Waiver Report", headers, rows), `${csvPrefix}-waivers-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -341,16 +332,7 @@ export default function Reports() {
       b.yoco_payment_id || "",
       b.waiver_status === "SIGNED" ? "SIGNED" : "PENDING",
     ]);
-    const csv = [headers, ...rows]
-      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bookings-${startDate}-to-${endDate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownload(buildCSV("Bookings Report", headers, rows), `${csvPrefix}-bookings-${startDate}-to-${endDate}.csv`);
   }
 
   async function downloadPDF() {
@@ -358,7 +340,6 @@ export default function Reports() {
     const { default: autoTable } = await import("jspdf-autotable");
 
     const doc = new jsPDF("landscape");
-    doc.setFontSize(14);
 
     let title = "";
     let headers: string[] = [];
@@ -444,25 +425,35 @@ export default function Reports() {
       ]);
     }
 
-    doc.text(title, 14, 15);
+    // Company header
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(businessName, 14, 14);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(title, 14, 22);
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Generated: " + reportGenDate, 14, 28);
+    doc.setTextColor(0, 0, 0);
 
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 20,
+      startY: 32,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [4, 120, 87] }, // Emerald-600
+      headStyles: { fillColor: [4, 120, 87] },
     });
 
-    doc.save(`${activeTab}-${startDate}-to-${endDate}.pdf`);
+    doc.save(`${csvPrefix}-${activeTab}-${startDate}-to-${endDate}.pdf`);
   }
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Reports</h2>
-          <p className="text-sm text-gray-500">All bookings — filter by tour date or booking date, download as CSV or PDF.</p>
+          <h2 className="text-2xl font-bold">{businessName} Reports</h2>
+          <p className="text-sm text-gray-500">Filter by tour date or booking date, download as CSV or PDF.</p>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <button

@@ -299,8 +299,8 @@ async function getOrCreateReferral(tenant: TenantContext, phone: any, name: any)
   var r = await supabase.from("referrals").insert({ business_id: tenant.business.id, referrer_phone: phone, referrer_name: name, referral_code: code, discount_percent: 5 }).select().single();
   return r.data;
 }
-async function validateReferralCode(code: any, phone: any) {
-  var r = await supabase.from("referrals").select().eq("referral_code", code.toUpperCase()).eq("status", "ACTIVE").single();
+async function validateReferralCode(tenant: TenantContext, code: any, phone: any) {
+  var r = await supabase.from("referrals").select().eq("referral_code", code.toUpperCase()).eq("business_id", tenant.business.id).eq("status", "ACTIVE").single();
   if (!r.data) return null;
   if (r.data.referrer_phone === phone) return null;
   if (r.data.uses >= r.data.max_uses) return null;

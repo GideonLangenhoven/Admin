@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Warning, ArrowsClockwise } from "@phosphor-icons/react";
+import { ArrowsClockwise } from "@phosphor-icons/react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -231,8 +231,7 @@ export default function Weather() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-start gap-3">
-            <Warning className="mt-0.5 text-amber-500" size={18} />
+          <div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Upcoming slots at risk</h3>
               <p className="mt-1 text-sm text-gray-500">{slots.length} upcoming booked slot(s) in the next {DAYS} days can be cancelled from this page if conditions turn unsafe.</p>

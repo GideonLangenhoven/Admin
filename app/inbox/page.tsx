@@ -233,7 +233,7 @@ function InboxContent() {
 
     try {
       const res = await supabase.functions.invoke("admin-reply", {
-        body: { phone: target.phone, message: msg },
+        body: { phone: target.phone, message: msg, business_id: businessId },
       });
       if (res.error) {
         notify({ title: "Reply failed", message: res.error.message, tone: "error" });
@@ -283,7 +283,7 @@ function InboxContent() {
     if (!phone) return;
     try {
       const res = await supabase.functions.invoke("admin-reply", {
-        body: { action: "return_to_bot", phone: phone, message: "RETURN" },
+        body: { action: "return_to_bot", phone: phone, message: "RETURN", business_id: businessId },
       });
       if (res.error) {
         notify({ title: "Return to bot failed", message: res.error.message, tone: "error" });

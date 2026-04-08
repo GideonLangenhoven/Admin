@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { notify } from "../../../lib/app-notify";
 import { useBusinessContext } from "../../../../components/BusinessContext";
-import { ArrowLeft, Plus, Trash, Envelope, Clock, GitBranch, Gift, Tag, CaretUp, CaretDown, MagnifyingGlass, Play, Pause, Lightning } from "@phosphor-icons/react";
+import { ArrowLeft, Plus, Trash, CaretUp, CaretDown, MagnifyingGlass, Play, Pause } from "@phosphor-icons/react";
 
 interface Step {
   id?: string;
@@ -35,12 +35,12 @@ interface Contact {
   last_name: string | null;
 }
 
-var stepTypeInfo: Record<string, { label: string; icon: any; color: string }> = {
-  send_email: { label: "Send Email", icon: Envelope, color: "text-blue-600" },
-  delay: { label: "Delay", icon: Clock, color: "text-orange-600" },
-  condition: { label: "Condition", icon: GitBranch, color: "text-purple-600" },
-  generate_voucher: { label: "Generate Voucher", icon: Gift, color: "text-emerald-600" },
-  generate_promo: { label: "Generate Promo", icon: Tag, color: "text-indigo-600" },
+var stepTypeInfo: Record<string, { label: string }> = {
+  send_email: { label: "Send Email" },
+  delay: { label: "Delay" },
+  condition: { label: "Condition" },
+  generate_voucher: { label: "Generate Voucher" },
+  generate_promo: { label: "Generate Promo" },
 };
 
 export default function AutomationBuilderPage() {
@@ -452,7 +452,6 @@ export default function AutomationBuilderPage() {
             className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium"
             style={{ borderColor: "var(--ck-accent)", background: "var(--ck-surface)", color: "var(--ck-accent)" }}
           >
-            <Lightning size={16} />
             Trigger: {automation.trigger_type.replace(/_/g, " ")}
           </div>
         </div>
@@ -463,7 +462,6 @@ export default function AutomationBuilderPage() {
         {/* Steps */}
         {steps.map((step, idx) => {
           var info = stepTypeInfo[step.step_type] || stepTypeInfo.send_email;
-          var Icon = info.icon;
           return (
             <div key={step.id ?? `step-${idx}`}>
               {/* Connecting line */}
@@ -483,7 +481,6 @@ export default function AutomationBuilderPage() {
                     >
                       {idx + 1}
                     </span>
-                    <Icon size={16} className={info.color} />
                     <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>
                       {info.label}
                     </span>
@@ -845,11 +842,11 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
   }, [open]);
 
   var types = [
-    { type: "send_email", label: "Send Email", icon: Envelope, color: "text-blue-600" },
-    { type: "delay", label: "Delay", icon: Clock, color: "text-orange-600" },
-    { type: "condition", label: "Condition", icon: GitBranch, color: "text-purple-600" },
-    { type: "generate_voucher", label: "Generate Voucher", icon: Gift, color: "text-emerald-600" },
-    { type: "generate_promo", label: "Generate Promo", icon: Tag, color: "text-indigo-600" },
+    { type: "send_email", label: "Send Email" },
+    { type: "delay", label: "Delay" },
+    { type: "condition", label: "Condition" },
+    { type: "generate_voucher", label: "Generate Voucher" },
+    { type: "generate_promo", label: "Generate Promo" },
   ];
 
   return (
@@ -869,7 +866,6 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
           style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
         >
           {types.map((t) => {
-            var Icon = t.icon;
             return (
               <button
                 key={t.type}
@@ -877,7 +873,6 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
                 className="flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm text-left hover:opacity-80"
                 style={{ color: "var(--ck-text)" }}
               >
-                <Icon size={14} className={t.color} />
                 {t.label}
               </button>
             );

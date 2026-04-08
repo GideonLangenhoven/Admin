@@ -64,3 +64,13 @@ node_modules_old/
 .vscode/settings.json
 .idea/
 Thumbs.db
+
+# Claude and test artifacts
+.claude-flow/
+.claude/
+playwright-report/
+test-results/
+auto-research/
+my-video/
+video/
+video1/

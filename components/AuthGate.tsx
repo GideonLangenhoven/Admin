@@ -36,6 +36,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   var [timezone, setTimezone] = useState("UTC");
   var [role, setRole] = useState("");
   var [operators, setOperators] = useState<OperatorOption[]>([]);
+  var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
   var [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     var baseQuery = supabase
       .from("businesses")
-      .select("id, name, business_name, logo_url, timezone")
+      .select("id, name, business_name, logo_url, timezone, subscription_status")
       .order("business_name", { ascending: true });
 
     var businessesRes = isMultiOperator
@@ -80,6 +81,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       name: biz.business_name || biz.name || "Operator",
       logoUrl: biz.logo_url || "",
       timezone: biz.timezone || "UTC",
+      subscriptionStatus: (biz as any).subscription_status || "ACTIVE",
     }));
 
     var activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
@@ -90,6 +92,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       logoUrl: activeOperator?.logoUrl || "",
       timezone: activeOperator?.timezone || "UTC",
       operators: operatorOptions,
+      subscriptionStatus: activeOperator?.subscriptionStatus || "ACTIVE",
     };
   }
 
@@ -105,7 +108,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     var { data } = await supabase
       .from("admin_users")
-      .select("role, business_id, name")
+      .select("role, business_id, name, settings_permissions")
       .eq("email", savedEmail)
       .maybeSingle();
 
@@ -117,10 +120,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setLogoUrl(context.logoUrl);
       setTimezone(context.timezone);
       setOperators(context.operators);
+      setSubscriptionStatus(context.subscriptionStatus);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
       localStorage.setItem("ck_admin_timezone", context.timezone);
       localStorage.setItem("ck_admin_name", data.name || "");
+      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
     } else if (data) {
       // Admin exists but no business_id — legacy admin, still allow access
@@ -129,6 +134,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators([]);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_name", data.name || "");
+      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
     } else {
       clearSession();
@@ -145,6 +151,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("ck_admin_timezone");
     localStorage.removeItem("ck_operator_override_business_id");
     localStorage.removeItem("ck_admin_name");
+    localStorage.removeItem("ck_admin_settings_perms");
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
@@ -152,6 +159,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setTimezone("UTC");
     setRole("");
     setOperators([]);
+    setSubscriptionStatus("ACTIVE");
   }
 
   async function login() {
@@ -167,13 +175,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setNotice("");
     var { data: user } = await supabase
       .from("admin_users")
-      .select("id, role, email, business_id, name, password_hash, must_set_password")
+      .select("id, role, email, business_id, name, password_hash, must_set_password, settings_permissions")
       .eq("email", email.trim().toLowerCase())
       .maybeSingle();
 
     if (user && (user.must_set_password || !user.password_hash)) {
       try {
-        await sendAdminSetupLink({ id: user.id, email: user.email, name: user.name }, "FIRST_LOGIN");
+        await sendAdminSetupLink({ id: user.id, email: user.email, name: user.name }, "FIRST_LOGIN", user.business_id || "");
         setNotice("This admin account still needs a password. A secure setup link has been emailed.");
       } catch (setupError) {
         console.error("Failed to send admin setup link:", setupError);
@@ -195,6 +203,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_email", email.trim().toLowerCase());
       localStorage.setItem("ck_admin_time", String(Date.now()));
       localStorage.setItem("ck_admin_name", user.name || "");
+      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(user.settings_permissions || {}));
 
       setRole(user.role);
       setNotice("");
@@ -208,6 +217,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setLogoUrl(context.logoUrl);
         setTimezone(context.timezone);
         setOperators(context.operators);
+        setSubscriptionStatus(context.subscriptionStatus);
       }
 
       setAuthed(true);
@@ -235,7 +245,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!admin) return;
 
     try {
-      await sendAdminSetupLink(admin, "RESET");
+      await sendAdminSetupLink(admin, "RESET", "");
     } catch { }
 
     setResetSent(true);
@@ -327,7 +337,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, operators, switchOperator }}>
+    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, operators, switchOperator }}>
       {children}
     </BusinessProvider>
   );

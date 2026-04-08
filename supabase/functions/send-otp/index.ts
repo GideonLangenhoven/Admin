@@ -97,7 +97,7 @@ function otpEmailHtml(code: string): string {
     <div style="text-align:center;margin:24px 0">
       <span style="display:inline-block;font-family:'Courier New',monospace;font-size:36px;font-weight:700;letter-spacing:8px;color:#1b3b36;background:#f0f5f4;padding:16px 28px;border-radius:10px;border:2px dashed #1b3b36">${code}</span>
     </div>
-    <p style="margin:0 0 4px;color:#666;font-size:13px">This code expires in 5 minutes.</p>
+    <p style="margin:0 0 4px;color:#666;font-size:13px">This code expires in 15 minutes.</p>
     <p style="margin:0;color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
   </td></tr>
   <tr><td style="padding:16px 32px;background:#f9fafb;text-align:center;border-top:1px solid #eee">
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
     var body = await req.json();
     var action = String(body.action || "send");
 
-    /* ── SEND OTP ── */
+    /* ── SEND OTP (customer login) ── */
     if (action === "send") {
       var email = String(body.email || "").trim().toLowerCase();
       var phoneTail = String(body.phone_tail || "").replace(/\D/g, "").slice(-9);
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       // Generate 6-digit code
       var codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
       var code = String(codeNum);
-      var expiresTs = Date.now() + 5 * 60 * 1000; // 5 min TTL
+      var expiresTs = Date.now() + 15 * 60 * 1000; // 15 min TTL
 
       // Create signed token
       var token = await createToken(email, phoneTail, code, expiresTs);
@@ -176,6 +176,57 @@ Deno.serve(async (req) => {
       return respond(200, { success: true, token });
     }
 
+    /* ── SEND ADMIN OTP (settings verification) ── */
+    if (action === "send_admin") {
+      var email = String(body.email || "").trim().toLowerCase();
+      var businessId = String(body.business_id || "");
+
+      if (!email || !businessId) {
+        return respond(400, { success: false, error: "Email and business_id are required." });
+      }
+
+      if (!checkRateLimit("admin:" + email)) {
+        return respond(429, { success: false, error: "Too many requests. Please wait a few minutes." });
+      }
+
+      // Verify the email belongs to an admin of this business
+      var { data: admin } = await supabase
+        .from("admin_users")
+        .select("id, role")
+        .eq("business_id", businessId)
+        .eq("email", email)
+        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+        .maybeSingle();
+
+      if (!admin) {
+        return respond(403, { success: false, error: "Not authorised." });
+      }
+
+      var codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
+      var code = String(codeNum);
+      var expiresTs = Date.now() + 15 * 60 * 1000;
+      var token = await createToken(email, "admin", code, expiresTs);
+
+      var res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: [email],
+          subject: "Verify settings change",
+          html: otpEmailHtml(code),
+        }),
+      });
+
+      if (!res.ok) {
+        var errData = await res.json();
+        console.error("RESEND_ADMIN_OTP_ERR", res.status, JSON.stringify(errData));
+        return respond(500, { success: false, error: "Failed to send verification email." });
+      }
+
+      return respond(200, { success: true, token });
+    }
+
     /* ── VERIFY OTP ── */
     if (action === "verify") {
       var token = String(body.token || "");
@@ -187,7 +238,7 @@ Deno.serve(async (req) => {
 
       var result = await verifyToken(token, userCode);
       if (!result.valid) {
-        return respond(400, { success: false, error: result.error });
+        return respond(200, { success: false, verified: false, error: result.error });
       }
 
       return respond(200, { success: true, verified: true });

@@ -1060,7 +1060,7 @@ Deno.serve(async (req: any) => {
     var metaPromoEmail = payload?.metadata?.customer_email || booking.customer_email || "";
     if (metaPromoId) {
       try {
-        await supabase.rpc("apply_promo_code", { p_promo_id: metaPromoId, p_customer_email: metaPromoEmail, p_booking_id: booking.id });
+        await supabase.rpc("apply_promo_code", { p_promo_id: metaPromoId, p_customer_email: metaPromoEmail, p_booking_id: booking.id, p_customer_phone: booking.phone || null });
         console.log("PROMO_USAGE_RECORDED: promo=" + metaPromoId + " booking=" + booking.id);
       } catch (promoErr) { console.error("PROMO_APPLY_ERR:", promoErr); }
     }

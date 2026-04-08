@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     } else {
       _requestTimezone = "UTC";
     }
-    var toursQuery = db.from("tours").select("*").eq("active", true).order("base_price_per_person");
+    var toursQuery = db.from("tours").select("*").eq("active", true).order("sort_order", { ascending: true });
     if (requestedBusinessId) toursQuery = toursQuery.eq("business_id", requestedBusinessId);
     var { data: allT } = await toursQuery;
     var tours = (allT || []).filter(function (t) { return !t.hidden; });
@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
       var em2 = lo.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
       if (em2) {
         // L16: Only show bookings with actionable statuses (exclude CANCELLED, HELD, PENDING)
-        var { data: bks } = await db.from("bookings").select("id, business_id, customer_name, email, phone, qty, total_amount, unit_price, status, refund_status, slot_id, tour_id, slots(start_time), tours(name)").eq("email", em2[0].toLowerCase()).in("status", ["PAID", "CONFIRMED", "COMPLETED"]).order("created_at", { ascending: false }).limit(5);
+        var { data: bks } = await db.from("bookings").select("id, business_id, customer_name, email, phone, qty, total_amount, unit_price, status, refund_status, slot_id, tour_id, slots(start_time), tours(name)").eq("email", em2[0].toLowerCase()).eq("business_id", requestedBusinessId).in("status", ["PAID", "CONFIRMED", "COMPLETED"]).order("created_at", { ascending: false }).limit(5);
         var activeBks = bks || [];
         if (activeBks.length > 0) {
           reply = "Found your bookings:\n\n";

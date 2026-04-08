@@ -12,8 +12,9 @@ export function resolveWaiverLink(business: Pick<TenantBusiness, "waiver_url"> &
   if (!bookingId || !waiverToken) return "";
   var customUrl = String(business?.waiver_url || "").trim();
   if (customUrl) return appendQuery(customUrl, { booking: bookingId, token: waiverToken });
-  // Use the booking site URL if available, otherwise fall back to a default
-  var bookingSiteUrl = String(business?.booking_site_url || "https://booking-mu-steel.vercel.app").replace(/\/+$/, "");
+  // Use the booking site URL if available
+  var bookingSiteUrl = String(business?.booking_site_url || "").replace(/\/+$/, "");
+  if (!bookingSiteUrl) return "";
   return appendQuery(bookingSiteUrl + "/waiver", {
     booking: bookingId,
     token: waiverToken,

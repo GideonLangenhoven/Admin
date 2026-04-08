@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, CalendarBlank, Flask, Tag } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
 import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
 
@@ -121,13 +121,61 @@ export default function TemplatesPage() {
   }
 
   async function sendTestEmail(t: Template) {
-    var { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
-      notify({ message: "Could not determine your email address.", tone: "error" });
+    // Resolve test recipient: designated marketing test email > current admin's email
+    var testEmail = "";
+    var testName = "Admin";
+
+    // Check if business has a designated marketing test email
+    var { data: biz } = await supabase
+      .from("businesses")
+      .select("marketing_test_email")
+      .eq("id", businessId)
+      .maybeSingle();
+    if (biz?.marketing_test_email) {
+      testEmail = biz.marketing_test_email;
+      // Look up the admin name for that email
+      var { data: adminRow } = await supabase
+        .from("admin_users")
+        .select("name")
+        .eq("email", testEmail)
+        .eq("business_id", businessId)
+        .maybeSingle();
+      testName = adminRow?.name || "Admin";
+    }
+
+    // Fallback to current admin's email from session or DB
+    if (!testEmail) {
+      testEmail = localStorage.getItem("ck_admin_email") || "";
+      testName = localStorage.getItem("ck_admin_name") || "Admin";
+    }
+
+    // If still no email, look up the first admin for this business
+    if (!testEmail) {
+      var { data: fallbackAdmin } = await supabase
+        .from("admin_users")
+        .select("email, name")
+        .eq("business_id", businessId)
+        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+        .order("created_at")
+        .limit(1)
+        .maybeSingle();
+      if (fallbackAdmin?.email) {
+        testEmail = fallbackAdmin.email;
+        testName = fallbackAdmin.name || "Admin";
+        // Persist for next time
+        localStorage.setItem("ck_admin_email", testEmail);
+        if (fallbackAdmin.name) localStorage.setItem("ck_admin_name", fallbackAdmin.name);
+      }
+    }
+
+    if (!testEmail) {
+      notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
       return;
     }
-    notify({ message: "Sending test email...", tone: "info" });
-    // Create a one-off campaign + single queue entry for the admin's email
+
+    notify({ message: `Sending test email to ${testEmail}...`, tone: "info" });
+
+    // Create a one-off campaign + single queue entry
     var { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
       business_id: businessId,
       template_id: t.id,
@@ -141,31 +189,41 @@ export default function TemplatesPage() {
       notify({ message: campErr?.message || "Failed to create test campaign", tone: "error" });
       return;
     }
-    // Ensure the admin exists as a contact (upsert, then fetch separately)
+
+    // Ensure the recipient exists as a contact
     await supabase.from("marketing_contacts")
       .upsert({
         business_id: businessId,
-        email: user.email,
-        first_name: user.user_metadata?.first_name || "Admin",
+        email: testEmail,
+        first_name: testName.split(" ")[0] || "Admin",
         source: "test",
       }, { onConflict: "business_id,email" });
     var { data: contact } = await supabase.from("marketing_contacts")
       .select("id")
       .eq("business_id", businessId)
-      .eq("email", user.email)
+      .eq("email", testEmail)
       .single();
     if (!contact) {
       notify({ message: "Failed to resolve contact for test.", tone: "error" });
       return;
     }
+
     await supabase.from("marketing_queue").insert({
       business_id: businessId,
       campaign_id: campaign.id,
       contact_id: contact.id,
-      email: user.email,
-      first_name: user.user_metadata?.first_name || "Admin",
+      email: testEmail,
+      first_name: testName.split(" ")[0] || "Admin",
     });
-    notify({ message: `Test email queued to ${user.email}. It will arrive within a minute.`, tone: "success" });
+
+    // Trigger dispatch immediately so the test email sends now (don't wait for cron)
+    try {
+      await supabase.functions.invoke("marketing-dispatch");
+    } catch (dispatchErr) {
+      console.warn("marketing-dispatch invoke failed, email will send on next cron cycle:", dispatchErr);
+    }
+
+    notify({ message: `Test email sent to ${testEmail}.`, tone: "success" });
   }
 
   async function sendCampaign() {
@@ -410,7 +468,7 @@ export default function TemplatesPage() {
               {/* Audience filter */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
-                  <Tag size={12} className="inline mr-1" />Audience
+                  Audience
                 </label>
                 <div className="flex gap-2 mb-2">
                   <button
@@ -481,7 +539,7 @@ export default function TemplatesPage() {
               {/* Schedule */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
-                  <CalendarBlank size={12} className="inline mr-1" />Schedule (optional)
+                  Schedule (optional)
                 </label>
                 <input
                   type="datetime-local"

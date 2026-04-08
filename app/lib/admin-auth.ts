@@ -35,6 +35,7 @@ function setupUrl(email: string, token: string) {
 export async function sendAdminSetupLink(
   admin: Pick<AdminAccountRow, "id" | "email" | "name">,
   reason = "ADMIN_INVITE",
+  businessId?: string,
 ) {
   var rawToken = generateSecureToken(24);
   var tokenHash = await sha256(rawToken);
@@ -62,9 +63,10 @@ export async function sendAdminSetupLink(
       data: {
         email: admin.email,
         name: admin.name || "",
-        setup_url: setupUrl(admin.email, rawToken),
+        change_password_url: setupUrl(admin.email, rawToken),
         expires_at: expiresAt,
         reason,
+        ...(businessId ? { business_id: businessId } : {}),
       },
     },
   });
@@ -108,7 +110,23 @@ export async function validateAdminSetupToken(email: string, token: string) {
 
 export async function completeAdminPasswordSetup(email: string, token: string, newPassword: string) {
   var admin = await validateAdminSetupToken(email, token);
-  if (!admin) throw new Error("This password setup link is invalid or has expired.");
+
+  if (!admin) {
+    // Token may have already been consumed by a prior submit — check if password was recently set
+    var { data: recentlySet } = await supabase
+      .from("admin_users")
+      .select("id, email, name, password_set_at")
+      .eq("email", email.trim().toLowerCase())
+      .maybeSingle();
+    if (recentlySet?.password_set_at) {
+      var setAgo = Date.now() - new Date(recentlySet.password_set_at).getTime();
+      if (setAgo < 5 * 60 * 1000) {
+        // Password was set within the last 5 minutes — treat as success (likely double-submit)
+        return recentlySet as Pick<AdminAccountRow, "id" | "email" | "name">;
+      }
+    }
+    throw new Error("This password setup link is invalid or has expired.");
+  }
 
   var passwordHash = await sha256(newPassword);
   var { error } = await supabase

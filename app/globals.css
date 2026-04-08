@@ -23,8 +23,8 @@ html.light {
   /* Subtle teal-tinted background */
   --ck-surface: #ffffff;
   --ck-surface-elevated: #ffffff;
-  --ck-border-subtle: #f3f4f6;
-  --ck-border-strong: #e5e7eb;
+  --ck-border-subtle: #e2e5e9;
+  --ck-border-strong: #d1d5db;
 
   --ck-text-strong: #111827;
   --ck-text: #374151;
@@ -200,6 +200,56 @@ body {
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+}
+
+/* ── Sidebar icon: disappear → line-redraw → fill back on hover ── */
+.sidebar-icon svg path,
+.sidebar-icon svg circle,
+.sidebar-icon svg rect,
+.sidebar-icon svg line,
+.sidebar-icon svg polyline {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 500;
+  stroke-dashoffset: 0;
+  stroke-width: 0;
+}
+
+.group:hover .sidebar-icon svg path,
+.group:hover .sidebar-icon svg circle,
+.group:hover .sidebar-icon svg rect,
+.group:hover .sidebar-icon svg line,
+.group:hover .sidebar-icon svg polyline {
+  animation: icon-linedraw 0.7s ease-in-out forwards;
+}
+
+@keyframes icon-linedraw {
+  0% {
+    fill: currentColor !important;
+    stroke-width: 0;
+    stroke-dashoffset: 0;
+  }
+  12% {
+    fill: transparent !important;
+    stroke-width: 0;
+  }
+  16% {
+    fill: transparent !important;
+    stroke-width: 14;
+    stroke-dashoffset: 500;
+  }
+  62% {
+    fill: transparent !important;
+    stroke-width: 14;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    fill: currentColor !important;
+    stroke-width: 0;
+    stroke-dashoffset: 0;
   }
 }
 
