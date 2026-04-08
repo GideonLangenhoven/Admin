@@ -19,10 +19,10 @@ type ConfirmState = AppConfirmPayload & {
 };
 
 const TONE_STYLES: Record<AppNoticeTone, { card: string; icon: string; Icon: typeof Info }> = {
-  info: { card: "border-sky-200 bg-sky-50 text-sky-900", icon: "text-sky-600", Icon: Info },
-  success: { card: "border-emerald-200 bg-emerald-50 text-emerald-900", icon: "text-emerald-600", Icon: CheckCircle },
-  warning: { card: "border-amber-200 bg-amber-50 text-amber-900", icon: "text-amber-600", Icon: Warning },
-  error: { card: "border-red-200 bg-red-50 text-red-900", icon: "text-red-600", Icon: Warning },
+  info: { card: "border-sky-500 bg-sky-600 text-white shadow-xl ring-1 ring-sky-300/50", icon: "text-white", Icon: Info },
+  success: { card: "border-emerald-500 bg-emerald-600 text-white shadow-xl ring-1 ring-emerald-300/50", icon: "text-white", Icon: CheckCircle },
+  warning: { card: "border-amber-500 bg-amber-600 text-white shadow-xl ring-1 ring-amber-300/50", icon: "text-white", Icon: Warning },
+  error: { card: "border-red-500 bg-red-600 text-white shadow-xl ring-1 ring-red-300/50", icon: "text-white", Icon: Warning },
 };
 
 export default function AppNotifications() {
