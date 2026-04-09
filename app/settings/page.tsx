@@ -33,6 +33,7 @@ function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false
 const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
 const ExternalBookingSettings = dynamic(() => import("../../components/ExternalBookingSettings"), { ssr: false });
 import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
+import InlineSlotManager from "../../components/InlineSlotManager";
 
 // SUPER_ADMIN has every right that MAIN_ADMIN has, plus cross-tenant access.
 function isPrivileged(r: string | null) {
@@ -1628,10 +1629,7 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">
                                     {editingTour ? "Generate Slots" : "Auto-generate Slots (optional)"}
                                 </label>
-                                {editingTour && (
-                                    <a href={`/slots?tour=${editingTour.id}`} className="text-xs text-emerald-600 font-medium mb-2 block hover:underline cursor-pointer">{tourSlotCounts[editingTour.id] ?? 0} upcoming open slots →</a>
-                                )}
-                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Creates one slot per selected day in the date range. Edit individual slots on the Slots page.</p>
+                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Creates one slot per selected day in the date range.</p>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Date</label>
@@ -1715,6 +1713,10 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         </form>
+                        
+                        {editingTour && (
+                            <InlineSlotManager tourId={editingTour.id} businessId={businessId} />
+                        )}
                     </div>
 
                 </div>
