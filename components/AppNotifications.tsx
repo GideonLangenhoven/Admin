@@ -18,11 +18,11 @@ type ConfirmState = AppConfirmPayload & {
   resolve: (value: boolean) => void;
 };
 
-const TONE_STYLES: Record<AppNoticeTone, { card: string; icon: string; Icon: typeof Info }> = {
-  info: { card: "border-sky-500 bg-sky-600 text-white shadow-xl ring-1 ring-sky-300/50", icon: "text-white", Icon: Info },
-  success: { card: "border-emerald-500 bg-emerald-600 text-white shadow-xl ring-1 ring-emerald-300/50", icon: "text-white", Icon: CheckCircle },
-  warning: { card: "border-amber-500 bg-amber-600 text-white shadow-xl ring-1 ring-amber-300/50", icon: "text-white", Icon: Warning },
-  error: { card: "border-red-500 bg-red-600 text-white shadow-xl ring-1 ring-red-300/50", icon: "text-white", Icon: Warning },
+const TONE_STYLES: Record<AppNoticeTone, { bg: string; text: string; Icon: typeof Info }> = {
+  info: { bg: "#0ea5e9", text: "#ffffff", Icon: Info },
+  success: { bg: "#10b981", text: "#ffffff", Icon: CheckCircle },
+  warning: { bg: "#f59e0b", text: "#ffffff", Icon: Warning },
+  error: { bg: "#ef4444", text: "#ffffff", Icon: Warning },
 };
 
 export default function AppNotifications() {
@@ -105,9 +105,9 @@ export default function AppNotifications() {
           const style = TONE_STYLES[tone];
           const Icon = style.Icon;
           return (
-            <div key={notice.id} className={`pointer-events-auto rounded-2xl border p-4 shadow-lg backdrop-blur ${style.card}`}>
+            <div key={notice.id} className="pointer-events-auto rounded-2xl border p-4 font-medium shadow-2xl" style={{ backgroundColor: style.bg, color: style.text, borderColor: "rgba(255,255,255,0.2)" }}>
               <div className="flex items-start gap-3">
-                <Icon className={`mt-0.5 shrink-0 ${style.icon}`} size={18} />
+                <Icon className="mt-0.5 shrink-0 text-white" size={20} weight="bold" />
                 <div className="min-w-0 flex-1">
                   {notice.title && <p className="text-sm font-semibold">{notice.title}</p>}
                   <p className="text-sm leading-6">{notice.message}</p>
@@ -123,9 +123,9 @@ export default function AppNotifications() {
 
       {confirmState && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[101] flex justify-center px-4">
-          <div className={`pointer-events-auto w-full max-w-2xl rounded-3xl border p-5 shadow-2xl ${TONE_STYLES[confirmState.tone || "warning"].card}`}>
+          <div className="pointer-events-auto w-full max-w-2xl rounded-3xl border p-5 font-medium shadow-2xl" style={{ backgroundColor: TONE_STYLES[confirmState.tone || "warning"].bg, color: TONE_STYLES[confirmState.tone || "warning"].text, borderColor: "rgba(255,255,255,0.2)" }}>
             <div className="flex items-start gap-3">
-              <Warning className={`mt-0.5 shrink-0 ${TONE_STYLES[confirmState.tone || "warning"].icon}`} size={20} />
+              <Warning className="mt-0.5 shrink-0 text-white" size={24} weight="bold" />
               <div className="min-w-0 flex-1">
                 <p className="text-base font-semibold">{confirmState.title || "Please confirm"}</p>
                 <p className="mt-1 text-sm leading-6">{confirmState.message}</p>
