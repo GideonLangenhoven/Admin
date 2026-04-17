@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   DARK TEMPLATE — Cinematic Neon Dark Mode
+   Fonts: Space Grotesk + Inter
+   Palette: Near-black + Cyan/Purple/Pink neon
+   ============================================= */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --bg: {{color_bg}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
+
+  --dark-primary: #09090b;
+  --dark-card: #141417;
+  --dark-alt: #1c1c21;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --pink: #ec4899;
+  --white: #ffffff;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--dark-primary);
+  background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.15;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.3s ease;
+}
+
+img, video {
+  display: block;
+  max-width: 100%;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* -------------------------------------------
+   GRADIENT TEXT UTILITY
+   ------------------------------------------- */
+.grad-text {
+  background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.grad-text-alt {
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 60%, var(--pink) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* -------------------------------------------
+   GLASS MORPHISM
+   ------------------------------------------- */
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.glow-hover {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 24px rgba(6,182,212,0.2);
+  border-color: rgba(6,182,212,0.3);
+}
+
+/* -------------------------------------------
+   FLOATING GRADIENT BLOBS
+   ------------------------------------------- */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.blob-1 {
+  width: 600px;
+  height: 600px;
+  top: -100px;
+  left: -200px;
+  background: radial-gradient(circle, rgba(6,182,212,0.08), transparent 70%);
+  animation: blob-drift-1 20s ease-in-out infinite;
+}
+
+.blob-2 {
+  width: 500px;
+  height: 500px;
+  top: 40%;
+  right: -150px;
+  background: radial-gradient(circle, rgba(168,85,247,0.06), transparent 70%);
+  animation: blob-drift-2 25s ease-in-out infinite;
+}
+
+.blob-3 {
+  width: 450px;
+  height: 450px;
+  bottom: 10%;
+  left: -100px;
+  background: radial-gradient(circle, rgba(236,72,153,0.05), transparent 70%);
+  animation: blob-drift-3 30s ease-in-out infinite;
+}
+
+@keyframes blob-drift-1 {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -20px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes blob-drift-2 {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(-25px, 15px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes blob-drift-3 {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(20px, -30px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* -------------------------------------------
+   FADE-UP ANIMATION
+   ------------------------------------------- */
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.d1 { transition-delay: 0.1s; }
+.d2 { transition-delay: 0.2s; }
+.d3 { transition-delay: 0.3s; }
+.d4 { transition-delay: 0.4s; }
+.d5 { transition-delay: 0.5s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .blob { animation: none; }
+  .scroll-line span { animation: none; }
+}
+
+/* -------------------------------------------
+   SECTION LABEL
+   ------------------------------------------- */
+.section-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(6,182,212,0.4);
+  margin-bottom: 16px;
+}
+
+/* -------------------------------------------
+   CTA BUTTON STYLES
+   ------------------------------------------- */
+.btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 28px;
+  border-radius: 10px;
+  background: var(--cta);
+  color: var(--white);
+  box-shadow: 0 0 30px rgba(6,182,212,0.3);
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-cta:hover {
+  box-shadow: 0 0 40px rgba(6,182,212,0.45);
+  transform: translateY(-1px);
+}
+
+.btn-glass {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 12px 28px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-glass:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--white);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* -------------------------------------------
+   1. TOP BAR
+   ------------------------------------------- */
+.top-bar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent 0%, var(--cyan) 30%, var(--purple) 70%, transparent 100%) 1;
+  position: relative;
+  z-index: 100;
+}
+
+.top-bar a {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+  transition: color 0.3s ease;
+}
+
+.top-bar a:hover {
+  color: var(--white);
+}
+
+/* -------------------------------------------
+   2. HEADER (sticky, glass)
+   ------------------------------------------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  background: rgba(9,9,11,0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: backdrop-filter 0.3s ease;
+}
+
+.site-header.scrolled {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(9,9,11,0.92);
+}
+
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-logo img {
+  height: 36px;
+  width: auto;
+}
+
+.header-logo-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.header-nav a {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+  transition: color 0.3s ease;
+}
+
+.header-nav a:hover {
+  color: var(--white);
+}
+
+.header-cta {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: var(--cta);
+  color: var(--white);
+  box-shadow: 0 0 20px rgba(6,182,212,0.25);
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.header-cta:hover {
+  box-shadow: 0 0 32px rgba(6,182,212,0.4);
+  transform: translateY(-1px);
+}
+
+/* -------------------------------------------
+   3. HERO (100vh, dramatic)
+   ------------------------------------------- */
+.hero {
+  position: relative;
+  height: 100vh;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(9,9,11,0.4) 0%, rgba(9,9,11,0.85) 100%);
+  z-index: 2;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  max-width: 720px;
+  padding: 0 24px;
+}
+
+.hero-eyebrow {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-shadow: 0 0 24px rgba(6,182,212,0.5);
+  margin-bottom: 20px;
+}
+
+.hero-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  line-height: 1.1;
+}
+
+.hero-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.6);
+  max-width: 520px;
+  margin: 0 auto 36px;
+  line-height: 1.7;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 48px;
+  background: rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.scroll-line span {
+  position: absolute;
+  top: -8px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+  animation: scroll-dot 2s ease-in-out infinite;
+}
+
+@keyframes scroll-dot {
+  0% { top: -8px; opacity: 0; }
+  30% { opacity: 1; }
+  100% { top: 48px; opacity: 0; }
+}
+
+/* -------------------------------------------
+   TEXT+MEDIA SECTION LAYOUT
+   ------------------------------------------- */
+.text-media {
+  padding: 120px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.text-media .container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.text-media.reversed .container {
+  direction: rtl;
+}
+
+.text-media.reversed .container > * {
+  direction: ltr;
+}
+
+.text-media .tm-text h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 40px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 20px;
+}
+
+.text-media .tm-text p {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.text-media .tm-text .text-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cyan);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  transition: all 0.3s ease;
+}
+
+.text-media .tm-text .text-link:hover {
+  text-shadow: 0 0 16px rgba(6,182,212,0.4);
+}
+
+.text-media .tm-media img,
+.text-media .tm-media video {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: all 0.4s ease;
+}
+
+.text-media .tm-media img:hover,
+.text-media .tm-media video:hover {
+  box-shadow: 0 0 32px rgba(6,182,212,0.15);
+  border-color: rgba(6,182,212,0.25);
+}
+
+.bg-card {
+  background: var(--dark-card);
+}
+
+/* -------------------------------------------
+   7. TOURS (glass cards, 3-col grid)
+   ------------------------------------------- */
+.tours-section {
+  background: var(--dark-card);
+  padding: 120px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.section-header h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 42px;
+  font-weight: 600;
+}
+
+.tours-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.tour-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.tour-card:hover {
+  box-shadow: 0 0 24px rgba(6,182,212,0.18);
+  border-color: rgba(6,182,212,0.3);
+}
+
+.tour-card-image {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  filter: brightness(0.85);
+  transition: filter 0.4s ease;
+}
+
+.tour-card:hover .tour-card-image {
+  filter: brightness(1);
+}
+
+.tour-card-body {
+  padding: 24px;
+}
+
+.tour-card-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.tour-card-meta {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 12px;
+  display: flex;
+  gap: 16px;
+}
+
+.tour-card-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.tour-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-card-price {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+.tour-card-book {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cyan);
+  transition: all 0.3s ease;
+}
+
+.tour-card-book:hover {
+  text-shadow: 0 0 12px rgba(6,182,212,0.4);
+}
+
+/* -------------------------------------------
+   8. INFO CARDS
+   ------------------------------------------- */
+.info-section {
+  padding: 120px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.info-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 36px;
+  transition: all 0.4s ease;
+}
+
+.info-card:hover {
+  box-shadow: 0 0 24px rgba(6,182,212,0.18);
+  border-color: rgba(6,182,212,0.3);
+}
+
+.info-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(6,182,212,0.1);
+  border: 1px solid rgba(6,182,212,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.info-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--cyan);
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.info-card h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 12px;
+}
+
+.info-card p {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.7;
+}
+
+/* -------------------------------------------
+   9. HERO BANNER
+   ------------------------------------------- */
+.hero-banner {
+  position: relative;
+  padding: 140px 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.hero-banner video,
+.hero-banner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.hero-banner .banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(9,9,11,0.7);
+  z-index: 2;
+}
+
+.hero-banner .banner-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.hero-banner h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 52px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.hero-banner p {
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+/* -------------------------------------------
+   10. STATS
+   ------------------------------------------- */
+.stats-section {
+  background: var(--dark-card);
+  padding: 80px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 0 48px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+.stat-item:last-child {
+  border-right: none;
+}
+
+.stat-number {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.35);
+}
+
+/* -------------------------------------------
+   11. TESTIMONIALS
+   ------------------------------------------- */
+.testimonials-section {
+  padding: 100px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.testimonial-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.4s ease;
+}
+
+.testimonial-card:hover {
+  box-shadow: 0 0 20px rgba(6,182,212,0.15);
+  border-color: rgba(6,182,212,0.25);
+}
+
+.testimonial-stars {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.testimonial-stars svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--cyan);
+}
+
+.testimonial-quote {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.testimonial-author {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.8);
+}
+
+/* -------------------------------------------
+   13. HERO SPLIT
+   ------------------------------------------- */
+.hero-split {
+  position: relative;
+  padding: 160px 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.hero-split .split-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.hero-split .split-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(9,9,11,0.92) 0%, rgba(9,9,11,0.5) 100%);
+  z-index: 2;
+}
+
+.hero-split .split-content {
+  position: relative;
+  z-index: 3;
+  max-width: 560px;
+  padding: 0 24px;
+}
+
+.hero-split h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.hero-split p {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.7;
+  margin-bottom: 28px;
+}
+
+/* -------------------------------------------
+   14. DOUBLE CARDS
+   ------------------------------------------- */
+.double-cards {
+  padding: 100px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.double-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.double-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 16/10;
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: all 0.4s ease;
+}
+
+.double-card:hover {
+  box-shadow: 0 0 28px rgba(6,182,212,0.2);
+  border-color: rgba(6,182,212,0.3);
+}
+
+.double-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.double-card:hover img {
+  transform: scale(1.03);
+}
+
+.double-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(9,9,11,0.85) 0%, rgba(9,9,11,0.1) 60%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 32px;
+}
+
+.double-card-overlay h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.double-card-overlay p {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* -------------------------------------------
+   16. CATEGORY GRID
+   ------------------------------------------- */
+.category-section {
+  padding: 100px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.category-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 3/4;
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: all 0.4s ease;
+}
+
+.category-card:hover {
+  box-shadow: 0 0 24px rgba(6,182,212,0.2);
+  border-color: rgba(6,182,212,0.3);
+}
+
+.category-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.7);
+  transition: all 0.5s ease;
+}
+
+.category-card:hover img {
+  filter: brightness(0.9);
+  transform: scale(1.04);
+}
+
+.category-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(9,9,11,0.9) 0%, transparent 60%);
+  display: flex;
+  align-items: flex-end;
+  padding: 28px;
+}
+
+.category-card-overlay span {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+/* -------------------------------------------
+   17. FOOTER
+   ------------------------------------------- */
+.site-footer {
+  background: var(--dark-primary);
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent 0%, var(--cyan) 30%, var(--purple) 70%, transparent 100%) 1;
+  padding: 80px 0 0;
+  position: relative;
+  z-index: 1;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 48px;
+  margin-bottom: 48px;
+}
+
+.footer-brand p {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.7;
+  margin: 16px 0 24px;
+}
+
+.footer-email-input {
+  display: flex;
+  gap: 0;
+}
+
+.footer-email-input input {
+  flex: 1;
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: var(--white);
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.footer-email-input input::placeholder {
+  color: rgba(255,255,255,0.25);
+}
+
+.footer-email-input input:focus {
+  border-color: rgba(6,182,212,0.3);
+}
+
+.footer-email-input button {
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--cta);
+  color: var(--white);
+  border: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.footer-email-input button:hover {
+  opacity: 0.85;
+}
+
+.footer-col h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 20px;
+}
+
+.footer-col ul {
+  list-style: none;
+}
+
+.footer-col ul li {
+  margin-bottom: 12px;
+}
+
+.footer-col ul li a {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  transition: color 0.3s ease;
+}
+
+.footer-col ul li a:hover {
+  color: var(--white);
+}
+
+.footer-social {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.footer-social a svg {
+  width: 20px;
+  height: 20px;
+  fill: rgba(255,255,255,0.4);
+  transition: all 0.3s ease;
+}
+
+.footer-social a:hover svg {
+  fill: var(--cyan);
+  filter: drop-shadow(0 0 8px rgba(6,182,212,0.4));
+}
+
+.footer-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.15) 30%, rgba(168,85,247,0.15) 70%, transparent 100%);
+  margin-bottom: 28px;
+}
+
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.footer-bottom span {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+}
+
+/* -------------------------------------------
+   FLOATING BOOKING BUBBLE
+   ------------------------------------------- */
+.floating-bubble {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(6,182,212,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 98;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.floating-bubble:hover {
+  box-shadow: 0 0 28px rgba(6,182,212,0.4);
+  border-color: var(--cyan);
+  transform: scale(1.08);
+}
+
+.floating-bubble svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--white);
+  fill: none;
+  stroke-width: 1.5;
+}
+
+/* -------------------------------------------
+   MOBILE NAV TOGGLE
+   ------------------------------------------- */
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: rgba(255,255,255,0.6);
+  margin: 4px 0;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+/* -------------------------------------------
+   RESPONSIVE — 1200px
+   ------------------------------------------- */
+@media (max-width: 1200px) {
+  .hero-title { font-size: 52px; }
+  .tours-grid { grid-template-columns: repeat(2, 1fr); }
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 36px; }
+}
+
+/* -------------------------------------------
+   RESPONSIVE — 768px
+   ------------------------------------------- */
+@media (max-width: 768px) {
+  .header-nav { display: none; }
+  .nav-toggle { display: block; }
+
+  .header-nav.active {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 68px;
+    left: 0;
+    right: 0;
+    background: rgba(9,9,11,0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 24px;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .hero-title { font-size: 40px; }
+  .hero-subtitle { font-size: 16px; }
+
+  .text-media .container {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .text-media.reversed .container {
+    direction: ltr;
+  }
+
+  .tours-grid { grid-template-columns: 1fr; }
+  .info-grid { grid-template-columns: 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  .double-grid { grid-template-columns: 1fr; }
+
+  .stats-row {
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+
+  .stat-item {
+    border-right: none;
+    padding: 0 24px;
+    flex: 0 0 50%;
+  }
+
+  .hero-banner h2 { font-size: 36px; }
+  .hero-split h2 { font-size: 32px; }
+  .hero-split .split-overlay {
+    background: rgba(9,9,11,0.8);
+  }
+
+  .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+  .footer-bottom { flex-direction: column; text-align: center; }
+}
+
+/* -------------------------------------------
+   RESPONSIVE — 480px
+   ------------------------------------------- */
+@media (max-width: 480px) {
+  .hero-title { font-size: 32px; }
+  .hero-buttons { flex-direction: column; align-items: center; }
+  .stat-number { font-size: 36px; }
+  .section-header h2 { font-size: 32px; }
+  .text-media .tm-text h2 { font-size: 30px; }
+  .hero-banner h2 { font-size: 28px; }
+  .hero-split h2 { font-size: 28px; }
+  .category-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- FLOATING GRADIENT BLOBS -->
+<div class="blob blob-1" aria-hidden="true"></div>
+<div class="blob blob-2" aria-hidden="true"></div>
+<div class="blob blob-3" aria-hidden="true"></div>
+
+<!-- =========================================
+     1. TOP BAR
+     ========================================= -->
+<div class="top-bar">
+  <a href="{{booking_url}}">{{hero_eyebrow}} &middot; Book Now &rarr;</a>
+</div>
+
+<!-- =========================================
+     2. HEADER
+     ========================================= -->
+<header class="site-header" id="header">
+  <div class="header-inner">
+    <a href="#" class="header-logo" aria-label="{{business_name}} home">
+      {{#if logo_url}}
+        <img src="{{logo_url}}" alt="{{business_name}} logo">
+      {{else}}
+        <span class="header-logo-text">{{business_name}}</span>
+      {{/if}}
+    </a>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.header-nav').classList.toggle('active')">
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="header-nav">
+      <a href="#about">Experiences</a>
+      <a href="#tours">Tours</a>
+      <a href="#info">Info</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a href="{{booking_url}}" class="header-cta">Book Now</a>
+  </div>
+</header>
+
+<!-- =========================================
+     3. HERO
+     ========================================= -->
+<section class="hero" id="hero">
+  <video class="hero-video" autoplay muted loop playsinline poster="/landing-pages/images/stock-adventure-poster.jpg">
+    <source src="/landing-pages/videos/stock-adventure.mp4" type="video/mp4">
+  </video>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow fade-up">{{hero_eyebrow}}</p>
+    <h1 class="hero-title fade-up d1">{{hero_title}}</h1>
+    <p class="hero-subtitle fade-up d2">{{hero_subtitle}}</p>
+    <div class="hero-buttons fade-up d3">
+      <a href="{{booking_url}}" class="btn-cta">Book Now &rarr;</a>
+      <a href="#about" class="btn-glass">Explore &darr;</a>
+    </div>
+  </div>
+  <div class="scroll-indicator" aria-hidden="true">
+    <div class="scroll-line"><span></span></div>
+  </div>
+</section>
+
+<!-- =========================================
+     4. TEXT+MEDIA — Experiences (media RIGHT)
+     ========================================= -->
+<section class="text-media" id="about">
+  <div class="container">
+    <div class="tm-text">
+      <p class="section-label fade-up">EXPERIENCES</p>
+      <h2 class="fade-up d1">Adventures After Dark</h2>
+      <p class="fade-up d2">Step beyond the ordinary and into a world where adrenaline meets the unknown.
+        Our curated experiences are designed for those who crave the extraordinary, blending
+        the beauty of nature with heart-racing thrills that will leave you breathless.</p>
+      <p class="fade-up d3">Whether you are a seasoned adventurer or a curious newcomer, every session is
+        guided by experts who know these waters and trails like the back of their hand.
+        Safety first, memories forever.</p>
+      <a href="#tours" class="text-link fade-up d4">View All &rarr;</a>
+    </div>
+    <div class="tm-media fade-up d2">
+      <img src="/landing-pages/images/act-zipline.jpg" alt="Adventure experience — zipline over canyon" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     5. TEXT+MEDIA — Booking (media LEFT)
+     ========================================= -->
+<section class="text-media reversed bg-card">
+  <div class="container">
+    <div class="tm-text">
+      <p class="section-label fade-up">BOOKING</p>
+      <h2 class="grad-text fade-up d1">Instant Reservations</h2>
+      <p class="fade-up d2">Our streamlined booking system lets you secure your spot in seconds.
+        Pick your experience, choose your date, and confirm instantly with real-time
+        availability. No phone calls, no waiting.</p>
+      <p class="fade-up d3">With flexible cancellation policies and automated reminders, we make sure
+        you are always prepared for the adventure ahead. Your confirmation arrives the
+        moment you book.</p>
+      <a href="{{booking_url}}" class="text-link fade-up d4">Reserve Now &rarr;</a>
+    </div>
+    <div class="tm-media fade-up d2">
+      <video autoplay muted loop playsinline poster="/landing-pages/images/stock-ocean-poster.jpg">
+        <source src="/landing-pages/videos/stock-ocean.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     6. TEXT+MEDIA — Analytics (media RIGHT)
+     ========================================= -->
+<section class="text-media">
+  <div class="container">
+    <div class="tm-text">
+      <p class="section-label fade-up">INSIGHTS</p>
+      <h2 class="fade-up d1">Data In The Dark</h2>
+      <p class="fade-up d2">We harness weather patterns, tide charts, and local conditions to ensure
+        every outing is timed to perfection. Our data-driven approach means you get
+        the best possible conditions every time you join us.</p>
+      <p class="fade-up d3">Real-time dashboards track wind speed, swell height, and visibility
+        so our guides can make informed decisions on the fly. When conditions shift,
+        we adapt — that is the power of intelligent adventure.</p>
+      <a href="#info" class="text-link fade-up d4">Learn More &rarr;</a>
+    </div>
+    <div class="tm-media fade-up d2">
+      <img src="/landing-pages/images/nature-stars.jpg" alt="Night sky with stars over ocean" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     7. TOURS — Glass Cards, 3-col Grid
+     ========================================= -->
+<section class="tours-section" id="tours">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-label fade-up">OUR EXPERIENCES</p>
+      <h2 class="grad-text fade-up d1">Choose Your Path</h2>
+    </div>
+    {{#each tours}}
+    <div class="tours-grid">
+      <!-- Tour cards generated by each loop -->
+    </div>
+    {{/each}}
+    <div class="tours-grid">
+      {{#each tours}}
+      <div class="tour-card fade-up">
+        {{#if image_url}}
+          <img class="tour-card-image" src="{{image_url}}" alt="{{name}}" loading="lazy">
+        {{else}}
+          <img class="tour-card-image" src="/landing-pages/images/act-kayaking.jpg" alt="{{name}}" loading="lazy">
+        {{/if}}
+        <div class="tour-card-body">
+          <h3 class="tour-card-name">{{name}}</h3>
+          <div class="tour-card-meta">
+            <span>{{duration_minutes}} min</span>
+            <span>Up to {{default_capacity}} guests</span>
+          </div>
+          <p class="tour-card-desc">{{description}}</p>
+          <div class="tour-card-footer">
+            <span class="tour-card-price">{{../currency}} {{base_price_per_person}}</span>
+            <a href="{{../booking_url}}" class="tour-card-book">Book &rarr;</a>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     8. INFO — Glass Cards with Neon Accents
+     ========================================= -->
+<section class="info-section" id="info">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-label fade-up">ESSENTIAL INFO</p>
+      <h2 class="grad-text fade-up d1">Plan Your Visit</h2>
+    </div>
+    <div class="info-grid">
+      <!-- Meeting Point -->
+      <div class="info-card fade-up">
+        <div class="info-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="9" r="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>Meeting Point</h3>
+        <p>{{directions}}</p>
+      </div>
+      <!-- What To Bring -->
+      <div class="info-card fade-up d1">
+        <div class="info-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>What To Bring</h3>
+        <p>{{what_to_bring}}</p>
+      </div>
+      <!-- What To Wear -->
+      <div class="info-card fade-up d2">
+        <div class="info-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>What To Wear</h3>
+        <p>{{what_to_wear}}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     9. HERO BANNER — "Into The Night"
+     ========================================= -->
+<section class="hero-banner">
+  <video autoplay muted loop playsinline poster="/landing-pages/images/stock-paddle-poster.jpg">
+    <source src="/landing-pages/videos/stock-paddle.mp4" type="video/mp4">
+  </video>
+  <div class="banner-overlay"></div>
+  <div class="banner-content">
+    <h2 class="grad-text fade-up">Into The Night</h2>
+    <p class="fade-up d1">There is something magnetic about the water after sundown. The sounds sharpen,
+      the stars emerge, and every paddle stroke feels like a conversation with the ocean.
+      This is where memories are forged.</p>
+    <a href="{{booking_url}}" class="btn-cta fade-up d2">Book Your Night Session &rarr;</a>
+  </div>
+</section>
+
+<!-- =========================================
+     10. STATS — Gradient Numbers
+     ========================================= -->
+<section class="stats-section">
+  <div class="container">
+    <div class="stats-row">
+      <div class="stat-item fade-up">
+        <div class="stat-number">15+</div>
+        <div class="stat-label">Experiences</div>
+      </div>
+      <div class="stat-item fade-up d1">
+        <div class="stat-number">4.5K+</div>
+        <div class="stat-label">Guests</div>
+      </div>
+      <div class="stat-item fade-up d2">
+        <div class="stat-number">5.0</div>
+        <div class="stat-label">Rating</div>
+      </div>
+      <div class="stat-item fade-up d3">
+        <div class="stat-number">98%</div>
+        <div class="stat-label">Return</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     11. TESTIMONIALS — Glass Cards, 2x3 Grid
+     ========================================= -->
+<section class="testimonials-section">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-label fade-up">GUEST STORIES</p>
+      <h2 class="grad-text fade-up d1">Words In The Dark</h2>
+    </div>
+    <div class="testimonials-grid">
+      <!-- Testimonial 1 -->
+      <div class="testimonial-card fade-up">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"An absolutely unforgettable night on the water. The guides were incredible and the bioluminescence was like something from another planet. Cannot recommend enough."</p>
+        <span class="testimonial-author">Sarah M.</span>
+      </div>
+      <!-- Testimonial 2 -->
+      <div class="testimonial-card fade-up d1">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"We booked as a team-building event and it exceeded all expectations. The night paddle under the stars was the highlight of our quarter. Already planning the next one."</p>
+        <span class="testimonial-author">James T.</span>
+      </div>
+      <!-- Testimonial 3 -->
+      <div class="testimonial-card fade-up d2">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"The attention to safety made us feel completely at ease, even on the water at night. Our guide was knowledgeable, funny, and clearly passionate about what they do."</p>
+        <span class="testimonial-author">Lisa K.</span>
+      </div>
+      <!-- Testimonial 4 -->
+      <div class="testimonial-card fade-up d3">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"I have done adventure tours all over the world and this one stands out. The combination of natural beauty and professional operation is hard to find. Truly world-class."</p>
+        <span class="testimonial-author">David R.</span>
+      </div>
+      <!-- Testimonial 5 -->
+      <div class="testimonial-card fade-up d4">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"Brought my kids for a sunset session and it was magical. The guides made sure everyone was comfortable and having a blast. We are now regulars — every school holiday!"</p>
+        <span class="testimonial-author">Michelle V.</span>
+      </div>
+      <!-- Testimonial 6 -->
+      <div class="testimonial-card fade-up d5">
+        <div class="testimonial-stars">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testimonial-quote">"The online booking was seamless and the communication before the trip was excellent. Everything was well-organized from start to finish. Five stars, no question."</p>
+        <span class="testimonial-author">Tom W.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     12. TEXT+MEDIA — Retention (media LEFT)
+     ========================================= -->
+<section class="text-media reversed bg-card">
+  <div class="container">
+    <div class="tm-text">
+      <p class="section-label fade-up">LOYALTY</p>
+      <h2 class="fade-up d1">They Always Come Back</h2>
+      <p class="fade-up d2">There is a reason our return rate sits at 98%. It is not just the thrill — it is the
+        personal touch, the feeling that every trip is crafted just for you. Our repeat guests
+        become part of our family, and we treat them like it.</p>
+      <p class="fade-up d3">From exclusive returning-guest discounts to early access on new experiences,
+        we reward loyalty in ways that matter. Once you have been out with us, you will
+        understand why people keep coming back.</p>
+      <a href="{{booking_url}}" class="text-link fade-up d4">Join The Community &rarr;</a>
+    </div>
+    <div class="tm-media fade-up d2">
+      <img src="/landing-pages/images/nature-ocean.jpg" alt="Ocean at dusk with moody lighting" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     13. HERO SPLIT — "Smart Pricing"
+     ========================================= -->
+<section class="hero-split">
+  <img class="split-bg" src="/landing-pages/images/nature-canyon.jpg" alt="Canyon landscape" loading="lazy">
+  <div class="split-overlay"></div>
+  <div class="container">
+    <div class="split-content fade-up">
+      <p class="section-label">PRICING</p>
+      <h2 class="grad-text">Smart Pricing, No Surprises</h2>
+      <p>Our transparent pricing means you always know exactly what you are paying for.
+        Dynamic rates adjust to demand so you get the best value when you book early.
+        Group discounts, combo packages, and seasonal specials give you even more
+        reasons to get on the water.</p>
+      <a href="{{booking_url}}" class="btn-cta">See Prices &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     14. DOUBLE CARDS — Waivers + Combos
+     ========================================= -->
+<section class="double-cards">
+  <div class="container">
+    <div class="double-grid">
+      <div class="double-card glow-hover fade-up">
+        <img src="/landing-pages/images/act-surfing.jpg" alt="Surfing adventure" loading="lazy">
+        <div class="double-card-overlay">
+          <h3>Seamless Check-In</h3>
+          <p>Digital waivers and contactless registration get you from arrival to adventure in minutes, not queues.</p>
+        </div>
+      </div>
+      <div class="double-card glow-hover fade-up d1">
+        <img src="/landing-pages/images/act-snorkeling.jpg" alt="Snorkeling experience" loading="lazy">
+        <div class="double-card-overlay">
+          <h3>Bundle &amp; Save</h3>
+          <p>Combine multiple experiences into a single combo package and unlock exclusive multi-activity discounts.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     15. HERO SPLIT — "Communication"
+     ========================================= -->
+<section class="hero-banner">
+  <video autoplay muted loop playsinline poster="/landing-pages/images/stock-surfing-poster.jpg">
+    <source src="/landing-pages/videos/stock-surfing.mp4" type="video/mp4">
+  </video>
+  <div class="banner-overlay"></div>
+  <div class="banner-content">
+    <h2 class="grad-text fade-up">Every Channel, Connected</h2>
+    <p class="fade-up d1">Whether you prefer WhatsApp, email, or live chat, we meet you where you are.
+      Instant confirmations, real-time updates, and human support when you need it.
+      Communication should be effortless — and with us, it is.</p>
+    <a href="{{booking_url}}" class="btn-cta fade-up d2">Get In Touch &rarr;</a>
+  </div>
+</section>
+
+<!-- =========================================
+     16. CATEGORY GRID — 4 Glass Cards
+     ========================================= -->
+<section class="category-section">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-label fade-up">EXPLORE</p>
+      <h2 class="grad-text fade-up d1">Discover More</h2>
+    </div>
+    <div class="category-grid">
+      <a href="#tours" class="category-card glow-hover fade-up">
+        <img src="/landing-pages/images/cat-adventure1.jpg" alt="Experiences" loading="lazy">
+        <div class="category-card-overlay">
+          <span>Experiences</span>
+        </div>
+      </a>
+      <a href="{{booking_url}}" class="category-card glow-hover fade-up d1">
+        <img src="/landing-pages/images/cat-adventure2.jpg" alt="Booking" loading="lazy">
+        <div class="category-card-overlay">
+          <span>Booking</span>
+        </div>
+      </a>
+      <a href="#about" class="category-card glow-hover fade-up d2">
+        <img src="/landing-pages/images/cat-adventure3.jpg" alt="About" loading="lazy">
+        <div class="category-card-overlay">
+          <span>About</span>
+        </div>
+      </a>
+      <a href="#contact" class="category-card glow-hover fade-up d3">
+        <img src="/landing-pages/images/cat-adventure4.jpg" alt="Contact" loading="lazy">
+        <div class="category-card-overlay">
+          <span>Contact</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================
+     17. FOOTER — Dark with Gradient Top Border
+     ========================================= -->
+<footer class="site-footer" id="contact">
+  <div class="container">
+    <div class="footer-grid">
+      <!-- Column 1: Brand -->
+      <div class="footer-brand">
+        {{#if logo_url}}
+          <img src="{{logo_url}}" alt="{{business_name}}" style="height:32px; margin-bottom:8px;">
+        {{else}}
+          <span class="header-logo-text">{{business_name}}</span>
+        {{/if}}
+        <p>{{hero_subtitle}}</p>
+        <div class="footer-email-input">
+          <input type="email" placeholder="Your email address" aria-label="Email address">
+          <button type="button">Subscribe</button>
+        </div>
+      </div>
+      <!-- Column 2: Tours -->
+      <div class="footer-col">
+        <h4>Tours</h4>
+        <ul>
+          {{#each tours}}
+          <li><a href="{{../booking_url}}">{{name}}</a></li>
+          {{/each}}
+        </ul>
+      </div>
+      <!-- Column 3: Info -->
+      <div class="footer-col">
+        <h4>Info</h4>
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#info">Essential Info</a></li>
+          <li><a href="#tours">Experiences</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <!-- Column 4: Connect -->
+      <div class="footer-col">
+        <h4>Connect</h4>
+        <div class="footer-social">
+          <!-- Facebook -->
+          <a href="#" aria-label="Facebook">
+            <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          </a>
+          <!-- Instagram -->
+          <a href="#" aria-label="Instagram">
+            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          </a>
+          <!-- X / Twitter -->
+          <a href="#" aria-label="X">
+            <svg viewBox="0 0 24 24"><path d="M4 4l11.733 16h4.267l-11.733-16zM4 20l6.768-6.768M20 4l-6.768 6.768"/></svg>
+          </a>
+          <!-- TikTok -->
+          <a href="#" aria-label="TikTok">
+            <svg viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-divider"></div>
+    <div class="footer-bottom">
+      <span>{{footer_line_one}}</span>
+      <span>{{footer_line_two}}</span>
+      <span>&copy; {{year}} &middot; Powered by BookingTours</span>
+    </div>
+  </div>
+</footer>
+
+<!-- =========================================
+     FLOATING BOOKING BUBBLE
+     ========================================= -->
+<a href="{{booking_url}}" class="floating-bubble" aria-label="Book now">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="22,6 12,13 2,6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</a>
+
+<!-- =========================================
+     JAVASCRIPT
+     ========================================= -->
+<script>
+(function() {
+  'use strict';
+
+  /* -----------------------------------------------
+     IntersectionObserver for .fade-up
+     ----------------------------------------------- */
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.fade-up').forEach(function(el) {
+      observer.observe(el);
+    });
+  } else {
+    /* Fallback: show all elements immediately */
+    document.querySelectorAll('.fade-up').forEach(function(el) {
+      el.classList.add('visible');
+    });
+  }
+
+  /* -----------------------------------------------
+     Header blur on scroll
+     ----------------------------------------------- */
+  var header = document.getElementById('header');
+  if (header) {
+    var lastScroll = 0;
+    window.addEventListener('scroll', function() {
+      var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      if (scrollY > 60) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+      lastScroll = scrollY;
+    }, { passive: true });
+  }
+
+  /* -----------------------------------------------
+     Smooth scroll for anchor links
+     ----------------------------------------------- */
+  document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+    anchor.addEventListener('click', function(e) {
+      var targetId = this.getAttribute('href');
+      if (targetId === '#') return;
+      var target = document.querySelector(targetId);
+      if (target) {
+        e.preventDefault();
+        var headerOffset = 80;
+        var elementPosition = target.getBoundingClientRect().top;
+        var offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+        /* Close mobile nav if open */
+        var nav = document.querySelector('.header-nav');
+        if (nav) nav.classList.remove('active');
+      }
+    });
+  });
+
+  /* -----------------------------------------------
+     Parallax blobs on scroll
+     ----------------------------------------------- */
+  var blobs = document.querySelectorAll('.blob');
+  if (blobs.length > 0 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.addEventListener('scroll', function() {
+      var scrollY = window.pageYOffset;
+      blobs.forEach(function(blob, i) {
+        var speed = 0.02 + (i * 0.01);
+        var yOffset = scrollY * speed;
+        blob.style.transform = 'translateY(' + (-yOffset) + 'px)';
+      });
+    }, { passive: true });
+  }
+
+})();
+</script>
+</body>
+</html>

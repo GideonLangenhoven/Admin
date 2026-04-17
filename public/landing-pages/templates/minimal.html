@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{business_name}} — {{tagline}}</title>
+  <meta name="description" content="{{hero_subtitle}}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================================
+       MINIMAL — Pure restraint. Black, white, one accent.
+       Apple-inspired. Typography-driven. Zero decoration.
+       ========================================================= */
+
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --main: {{color_main}};
+      --secondary: {{color_secondary}};
+      --cta: {{color_cta}};
+      --bg: {{color_bg}};
+      --nav: {{color_nav}};
+      --hover: {{color_hover}};
+      --black: #000000;
+      --white: #ffffff;
+      --border: #e5e5e5;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      color: var(--black);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    img, video {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* =========================================================
+       Section 1 — TOP BORDER
+       ========================================================= */
+
+    .top-border {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--border);
+      z-index: 1001;
+    }
+
+    /* =========================================================
+       Section 2 — HEADER (sticky, invisible until scroll)
+       ========================================================= */
+
+    .site-header {
+      position: fixed;
+      top: 1px;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 1000;
+      background: transparent;
+      border-bottom: 1px solid transparent;
+      transition: background 0.4s ease, border-color 0.4s ease;
+    }
+
+    .site-header.scrolled {
+      background: var(--white);
+      border-bottom-color: var(--border);
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-logo img {
+      height: 28px;
+      width: auto;
+      display: block;
+    }
+
+    .header-logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--black);
+      letter-spacing: -0.01em;
+    }
+
+    .site-header:not(.scrolled) .header-logo-text {
+      color: var(--white);
+    }
+
+    .site-header:not(.scrolled) .header-logo img {
+      filter: brightness(0) invert(1);
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .header-nav a {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+      transition: color 0.3s ease;
+    }
+
+    .header-nav a:hover {
+      color: var(--black);
+    }
+
+    .site-header:not(.scrolled) .header-nav a {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .site-header:not(.scrolled) .header-nav a:hover {
+      color: var(--white);
+    }
+
+    .header-nav .nav-book {
+      font-weight: 600;
+      color: var(--black);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .site-header:not(.scrolled) .header-nav .nav-book {
+      color: var(--white);
+    }
+
+    /* =========================================================
+       Section 3 — HERO (100vh, video bg, minimal text)
+       ========================================================= */
+
+    .hero {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      min-height: 600px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .hero-video-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .hero-video-wrap video,
+    .hero-video-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.25);
+      z-index: 1;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 0 24px;
+      max-width: 800px;
+    }
+
+    .hero-title {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(3rem, 7vw, 6rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    .hero-divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.4);
+      margin: 24px auto;
+    }
+
+    .hero-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 17px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.75);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .hero-cta {
+      display: inline-block;
+      margin-top: 32px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--white);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+      padding-bottom: 2px;
+      transition: border-color 0.3s ease;
+    }
+
+    .hero-cta:hover {
+      border-color: var(--white);
+    }
+
+    /* Scroll indicator line */
+    .scroll-indicator {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      width: 1px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .scroll-indicator .dot {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--white);
+      animation: scrollDot 2s ease-in-out infinite;
+    }
+
+    @keyframes scrollDot {
+      0% { top: 0; opacity: 1; }
+      80% { top: 44px; opacity: 0.5; }
+      100% { top: 44px; opacity: 0; }
+    }
+
+    /* =========================================================
+       SHARED — Section layout helpers
+       ========================================================= */
+
+    .section-pad {
+      padding: 140px 0;
+    }
+
+    .section-border {
+      border-top: 1px solid var(--border);
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .section-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.3);
+      margin-bottom: 16px;
+    }
+
+    .section-h2 {
+      font-family: 'Inter', sans-serif;
+      font-size: 38px;
+      font-weight: 700;
+      color: var(--black);
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .section-line {
+      width: 30px;
+      height: 1px;
+      background: rgba(0, 0, 0, 0.15);
+      margin: 20px 0;
+    }
+
+    .section-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.55);
+      line-height: 1.8;
+      max-width: 480px;
+    }
+
+    .section-text + .section-text {
+      margin-top: 16px;
+    }
+
+    .section-cta {
+      display: inline-block;
+      margin-top: 28px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--black);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.3s ease;
+    }
+
+    .section-cta:hover {
+      color: var(--cta);
+    }
+
+    /* =========================================================
+       TEXT+MEDIA — Two-column layout
+       ========================================================= */
+
+    .text-media {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .text-media--reverse {
+      flex-direction: row-reverse;
+    }
+
+    .text-media__media {
+      flex: 0 0 50%;
+      max-width: 50%;
+    }
+
+    .text-media__media img,
+    .text-media__media video {
+      width: 100%;
+      aspect-ratio: 4 / 5;
+      object-fit: cover;
+      display: block;
+      /* NO rounded corners — sharp edges */
+    }
+
+    .text-media__content {
+      flex: 1;
+      padding-left: 80px;
+    }
+
+    .text-media--reverse .text-media__content {
+      padding-left: 0;
+      padding-right: 80px;
+    }
+
+    /* =========================================================
+       Section 7 — TOURS (clean list)
+       ========================================================= */
+
+    .tours-header {
+      margin-bottom: 40px;
+    }
+
+    .tours-header .section-h2 {
+      font-size: 32px;
+    }
+
+    .tours-header .section-line {
+      margin-top: 16px;
+      margin-bottom: 0;
+    }
+
+    .tour-row {
+      display: flex;
+      align-items: center;
+      padding: 40px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tour-row__image {
+      flex: 0 0 200px;
+      width: 200px;
+    }
+
+    .tour-row__image img {
+      width: 100%;
+      aspect-ratio: 3 / 2;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tour-row__placeholder {
+      width: 100%;
+      aspect-ratio: 3 / 2;
+      background: #f5f5f5;
+    }
+
+    .tour-row__info {
+      flex: 1;
+      padding-left: 32px;
+    }
+
+    .tour-row__name {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--black);
+      line-height: 1.3;
+    }
+
+    .tour-row__meta {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.4);
+      margin-top: 6px;
+    }
+
+    .tour-row__desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.55);
+      line-height: 1.7;
+      margin-top: 10px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .tour-row__price-col {
+      flex: 0 0 140px;
+      text-align: right;
+    }
+
+    .tour-row__price {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .tour-row__per {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.4);
+      margin-top: 2px;
+    }
+
+    .tour-row__book {
+      display: inline-block;
+      margin-top: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--cta);
+      transition: opacity 0.3s ease;
+    }
+
+    .tour-row__book:hover {
+      opacity: 0.7;
+    }
+
+    /* =========================================================
+       Section 8 — INFO (three text blocks)
+       ========================================================= */
+
+    .info-grid {
+      display: flex;
+      gap: 0;
+    }
+
+    .info-grid__col {
+      flex: 1;
+      padding: 0 40px;
+      border-left: 1px solid var(--border);
+    }
+
+    .info-grid__col:first-child {
+      padding-left: 0;
+      border-left: none;
+    }
+
+    .info-grid__col:last-child {
+      padding-right: 0;
+    }
+
+    .info-grid__title {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--black);
+      margin-bottom: 12px;
+    }
+
+    .info-grid__text {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.55);
+      line-height: 1.7;
+    }
+
+    /* =========================================================
+       Section 9 & 14 — FULL-BLEED IMAGE BREAK
+       ========================================================= */
+
+    .image-break {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .image-break img {
+      width: 100%;
+      aspect-ratio: 21 / 9;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* =========================================================
+       Section 10 — HERO BANNER
+       ========================================================= */
+
+    .hero-banner {
+      position: relative;
+      width: 100%;
+      min-height: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .hero-banner__video-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .hero-banner__video-wrap video,
+    .hero-banner__video-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-banner__overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.2);
+      z-index: 1;
+    }
+
+    .hero-banner__content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 100px 24px;
+    }
+
+    .hero-banner__title {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .hero-banner__divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.4);
+      margin: 24px auto;
+    }
+
+    .hero-banner__cta {
+      display: inline-block;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--white);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: opacity 0.3s ease;
+    }
+
+    .hero-banner__cta:hover {
+      opacity: 0.8;
+    }
+
+    /* =========================================================
+       Section 11 — STATS
+       ========================================================= */
+
+    .stats-section {
+      padding: 100px 0;
+    }
+
+    .stats-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .stats-row__item {
+      flex: 1;
+      text-align: center;
+      padding: 0 20px;
+      border-left: 1px solid var(--border);
+    }
+
+    .stats-row__item:first-child {
+      border-left: none;
+    }
+
+    .stats-row__number {
+      font-family: 'Inter', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--black);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .stats-row__label {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 10px;
+    }
+
+    /* =========================================================
+       Section 12 — TESTIMONIALS (single large quote)
+       ========================================================= */
+
+    .testimonial-section {
+      padding: 120px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .testimonial-inner {
+      max-width: 700px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .testimonial-quote-mark {
+      font-family: 'Inter', sans-serif;
+      font-size: 72px;
+      font-weight: 400;
+      color: rgba(0, 0, 0, 0.1);
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    .testimonial-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 24px;
+      font-weight: 300;
+      font-style: italic;
+      color: rgba(0, 0, 0, 0.7);
+      line-height: 1.6;
+    }
+
+    .testimonial-line {
+      width: 20px;
+      height: 1px;
+      background: rgba(0, 0, 0, 0.15);
+      margin: 28px auto;
+    }
+
+    .testimonial-author {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--black);
+    }
+
+    /* =========================================================
+       Section 17 — FOOTER (ultra-minimal)
+       ========================================================= */
+
+    .site-footer {
+      background: var(--black);
+      color: var(--white);
+      padding: 60px 0;
+    }
+
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .footer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 32px;
+    }
+
+    .footer-brand {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.5);
+      transition: color 0.3s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-divider {
+      width: 100%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .footer-bottom {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding-top: 24px;
+    }
+
+    .footer-legal {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.4);
+      line-height: 1.6;
+    }
+
+    .footer-copyright {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: right;
+    }
+
+    /* =========================================================
+       ANIMATIONS
+       ========================================================= */
+
+    .fade-in {
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+    }
+
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+    }
+
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .d1 { transition-delay: 0.1s; }
+    .d2 { transition-delay: 0.2s; }
+    .d3 { transition-delay: 0.3s; }
+    .d4 { transition-delay: 0.4s; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in,
+      .fade-up {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+
+      .scroll-indicator .dot {
+        animation: none;
+      }
+    }
+
+    /* =========================================================
+       RESPONSIVE — 1120px
+       ========================================================= */
+
+    @media (max-width: 1120px) {
+      .text-media__content {
+        padding-left: 48px;
+      }
+
+      .text-media--reverse .text-media__content {
+        padding-left: 0;
+        padding-right: 48px;
+      }
+    }
+
+    /* =========================================================
+       RESPONSIVE — 768px
+       ========================================================= */
+
+    @media (max-width: 768px) {
+      .section-pad {
+        padding: 80px 0;
+      }
+
+      .section-h2 {
+        font-size: 30px;
+      }
+
+      .header-nav a:not(.nav-book) {
+        display: none;
+      }
+
+      .text-media {
+        flex-direction: column;
+      }
+
+      .text-media--reverse {
+        flex-direction: column;
+      }
+
+      .text-media__media {
+        flex: none;
+        max-width: 100%;
+        width: 100%;
+      }
+
+      .text-media__content {
+        padding-left: 0;
+        padding-top: 40px;
+      }
+
+      .text-media--reverse .text-media__content {
+        padding-right: 0;
+        padding-top: 40px;
+      }
+
+      .tour-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .tour-row__image {
+        flex: none;
+        width: 100%;
+      }
+
+      .tour-row__info {
+        padding-left: 0;
+        padding-top: 20px;
+      }
+
+      .tour-row__price-col {
+        flex: none;
+        text-align: left;
+        padding-top: 16px;
+      }
+
+      .info-grid {
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      .info-grid__col {
+        padding: 0;
+        border-left: none;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 32px;
+      }
+
+      .info-grid__col:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .stats-row {
+        flex-wrap: wrap;
+      }
+
+      .stats-row__item {
+        flex: 0 0 50%;
+        padding: 20px;
+        border-left: none;
+      }
+
+      .stats-row__number {
+        font-size: 40px;
+      }
+
+      .footer-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+      }
+
+      .footer-bottom {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .footer-copyright {
+        text-align: left;
+      }
+
+      .hero-banner {
+        min-height: 400px;
+      }
+    }
+
+    /* =========================================================
+       RESPONSIVE — 480px
+       ========================================================= */
+
+    @media (max-width: 480px) {
+      .section-pad {
+        padding: 60px 0;
+      }
+
+      .section-h2 {
+        font-size: 26px;
+      }
+
+      .section-text {
+        font-size: 15px;
+      }
+
+      .hero-subtitle {
+        font-size: 15px;
+      }
+
+      .stats-section {
+        padding: 60px 0;
+      }
+
+      .stats-row__item {
+        flex: 0 0 50%;
+      }
+
+      .stats-row__number {
+        font-size: 32px;
+      }
+
+      .testimonial-text {
+        font-size: 19px;
+      }
+
+      .testimonial-section {
+        padding: 80px 0;
+      }
+
+      .tour-row__name {
+        font-size: 19px;
+      }
+
+      .tour-row__price {
+        font-size: 18px;
+      }
+
+      .footer-links {
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .image-break img {
+        aspect-ratio: 16 / 9;
+      }
+    }
+  </style>
+</head>
+<body>
+
+
+<!-- ================================================================
+     Section 1 — TOP BORDER
+     ================================================================ -->
+<div class="top-border" aria-hidden="true"></div>
+
+
+<!-- ================================================================
+     Section 2 — HEADER (sticky, invisible until scroll)
+     ================================================================ -->
+<header class="site-header" id="site-header">
+  <div class="header-inner">
+    <a href="#" class="header-logo" aria-label="{{business_name}} home">
+      {{#if logo_url}}
+      <img src="{{logo_url}}" alt="{{business_name}}" />
+      {{else}}
+      <span class="header-logo-text">{{business_name}}</span>
+      {{/if}}
+    </a>
+    <nav class="header-nav" aria-label="Main navigation">
+      <a href="#tours">Tours</a>
+      <a href="#about">About</a>
+      <a href="#info">Info</a>
+      <a href="{{booking_url}}" class="nav-book">Book</a>
+    </nav>
+  </div>
+</header>
+
+
+<!-- ================================================================
+     Section 3 — HERO (100vh, video background, minimal text)
+     ================================================================ -->
+<section class="hero" id="top">
+  <div class="hero-video-wrap">
+    {{#if hero_image}}
+    <video autoplay muted loop playsinline poster="{{hero_image}}">
+      <source src="/landing-pages/videos/stock-nature.mp4" type="video/mp4" />
+    </video>
+    {{else}}
+    <video autoplay muted loop playsinline poster="/landing-pages/images/stock-nature-poster.jpg">
+      <source src="/landing-pages/videos/stock-nature.mp4" type="video/mp4" />
+    </video>
+    {{/if}}
+  </div>
+  <div class="hero-overlay" aria-hidden="true"></div>
+  <div class="hero-content">
+    {{#if hero_eyebrow}}
+    <p class="fade-up" style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">{{hero_eyebrow}}</p>
+    {{/if}}
+    <h1 class="hero-title fade-up d1">{{hero_title}}</h1>
+    <div class="hero-divider fade-up d2" aria-hidden="true"></div>
+    <p class="hero-subtitle fade-up d3">{{hero_subtitle}}</p>
+    <a href="#tours" class="hero-cta fade-up d4">Explore</a>
+  </div>
+  <div class="scroll-indicator" aria-hidden="true">
+    <span class="dot"></span>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 4 — TEXT+MEDIA: "The Experience" (image LEFT)
+     ================================================================ -->
+<section class="section-pad" id="about">
+  <div class="container">
+    <div class="text-media">
+      <div class="text-media__media fade-up">
+        <img src="/landing-pages/images/act-hiking.jpg" alt="Outdoor experience in nature" loading="lazy" />
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">01</p>
+        <h2 class="section-h2 fade-up d1">Experiences Worth Having</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          Every adventure we curate is designed to take you beyond the ordinary.
+          {{#if tagline}}{{tagline}}{{else}}From the first moment to the last,
+          you will feel the difference that careful attention to detail makes.{{/if}}
+        </p>
+        <p class="section-text fade-up d3">
+          We believe the best experiences happen when preparation meets spontaneity.
+          Our guides know the terrain, the tides, and the perfect moments that
+          turn a good trip into an unforgettable one.
+        </p>
+        <a href="#tours" class="section-cta fade-up d4">View experiences &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 5 — TEXT+MEDIA: "Booking" (image RIGHT)
+     ================================================================ -->
+<section class="section-pad section-border">
+  <div class="container">
+    <div class="text-media text-media--reverse">
+      <div class="text-media__media fade-up">
+        <video autoplay muted loop playsinline poster="/landing-pages/images/stock-biking-poster.jpg">
+          <source src="/landing-pages/videos/stock-biking.mp4" type="video/mp4" />
+        </video>
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">02</p>
+        <h2 class="section-h2 fade-up d1">Book In Moments</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          No back-and-forth emails. No waiting for confirmation. Select your
+          preferred date and time, choose your group size, and you are booked
+          in under two minutes.
+        </p>
+        <p class="section-text fade-up d3">
+          Instant confirmation arrives in your inbox with everything you need
+          to know — meeting point, what to bring, and a direct line to your
+          guide. Simple.
+        </p>
+        <a href="{{booking_url}}" class="section-cta fade-up d4">Start booking &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 6 — TEXT+MEDIA: "Insights" (image LEFT)
+     ================================================================ -->
+<section class="section-pad section-border">
+  <div class="container">
+    <div class="text-media">
+      <div class="text-media__media fade-up">
+        <img src="/landing-pages/images/nature-lake.jpg" alt="Serene lake view" loading="lazy" />
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">03</p>
+        <h2 class="section-h2 fade-up d1">Understand Your Business</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          Real-time analytics give you a clear picture of bookings, revenue,
+          and capacity. Know which tours perform best, which time slots fill
+          fastest, and where opportunities lie.
+        </p>
+        <p class="section-text fade-up d3">
+          Data should be effortless. Dashboards update as bookings come in,
+          so you spend less time in spreadsheets and more time doing what
+          matters.
+        </p>
+        <a href="{{booking_url}}" class="section-cta fade-up d4">Learn more &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 7 — TOURS (clean list, not grid)
+     ================================================================ -->
+<section class="section-pad section-border" id="tours">
+  <div class="container">
+    <div class="tours-header fade-up">
+      <h2 class="section-h2">Tours</h2>
+      <div class="section-line" aria-hidden="true"></div>
+    </div>
+
+    {{#each tours}}
+    <div class="tour-row fade-up">
+      <div class="tour-row__image">
+        {{#if image_url}}
+        <img src="{{image_url}}" alt="{{name}}" loading="lazy" />
+        {{else}}
+        <div class="tour-row__placeholder" aria-hidden="true"></div>
+        {{/if}}
+      </div>
+      <div class="tour-row__info">
+        <h3 class="tour-row__name">{{name}}</h3>
+        <p class="tour-row__meta">{{duration_minutes}} min &middot; Up to {{default_capacity}} guests</p>
+        <p class="tour-row__desc">{{description}}</p>
+      </div>
+      <div class="tour-row__price-col">
+        <p class="tour-row__price">{{../currency}}{{base_price_per_person}}</p>
+        <p class="tour-row__per">per person</p>
+        <a href="{{../booking_url}}" class="tour-row__book">Book &rarr;</a>
+      </div>
+    </div>
+    {{/each}}
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 8 — INFO (three text blocks, no cards)
+     ================================================================ -->
+<section class="section-pad section-border" id="info">
+  <div class="container">
+    <h2 class="section-h2 fade-up" style="margin-bottom:48px;">Plan Your Visit</h2>
+    <div class="info-grid fade-up d1">
+      <div class="info-grid__col">
+        <h3 class="info-grid__title">Meeting Point</h3>
+        <p class="info-grid__text">{{directions}}</p>
+      </div>
+      <div class="info-grid__col">
+        <h3 class="info-grid__title">What To Bring</h3>
+        <p class="info-grid__text">{{what_to_bring}}</p>
+      </div>
+      <div class="info-grid__col">
+        <h3 class="info-grid__title">What To Wear</h3>
+        <p class="info-grid__text">{{what_to_wear}}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 9 — FULL-BLEED IMAGE BREAK
+     ================================================================ -->
+<div class="image-break">
+  <img src="/landing-pages/images/nature-stars.jpg" alt="Night sky over the landscape" loading="lazy" />
+</div>
+
+
+<!-- ================================================================
+     Section 10 — HERO BANNER: "Begin"
+     ================================================================ -->
+<section class="hero-banner">
+  <div class="hero-banner__video-wrap">
+    <video autoplay muted loop playsinline poster="/landing-pages/images/stock-zipline-poster.jpg">
+      <source src="/landing-pages/videos/stock-zipline.mp4" type="video/mp4" />
+    </video>
+  </div>
+  <div class="hero-banner__overlay" aria-hidden="true"></div>
+  <div class="hero-banner__content">
+    <h2 class="hero-banner__title fade-up">Your Next Adventure</h2>
+    <div class="hero-banner__divider fade-up d1" aria-hidden="true"></div>
+    <a href="{{booking_url}}" class="hero-banner__cta fade-up d2">Book now &rarr;</a>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 11 — STATS (plain large numbers)
+     ================================================================ -->
+<section class="stats-section">
+  <div class="container">
+    <div class="stats-row">
+      <div class="stats-row__item fade-up">
+        <p class="stats-row__number">15+</p>
+        <p class="stats-row__label">Experiences</p>
+      </div>
+      <div class="stats-row__item fade-up d1">
+        <p class="stats-row__number">4.5K+</p>
+        <p class="stats-row__label">Guests</p>
+      </div>
+      <div class="stats-row__item fade-up d2">
+        <p class="stats-row__number">5.0</p>
+        <p class="stats-row__label">Rating</p>
+      </div>
+      <div class="stats-row__item fade-up d3">
+        <p class="stats-row__number">98%</p>
+        <p class="stats-row__label">Return</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 12 — TESTIMONIALS (single large quote)
+     ================================================================ -->
+<section class="testimonial-section">
+  <div class="testimonial-inner">
+    <p class="testimonial-quote-mark fade-up" aria-hidden="true">&ldquo;</p>
+    <blockquote class="testimonial-text fade-up d1">
+      An experience that stays with you long after you have dried off and
+      gone home. The attention to detail, the warmth of the guides, and the
+      sheer beauty of the route made this the highlight of our entire trip.
+    </blockquote>
+    <div class="testimonial-line fade-up d2" aria-hidden="true"></div>
+    <p class="testimonial-author fade-up d3">Sarah M., Cape Town</p>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 13 — TEXT+MEDIA: "Return" (image LEFT)
+     ================================================================ -->
+<section class="section-pad section-border">
+  <div class="container">
+    <div class="text-media">
+      <div class="text-media__media fade-up">
+        <img src="/landing-pages/images/nature-sunrise.jpg" alt="Sunrise over the water" loading="lazy" />
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">04</p>
+        <h2 class="section-h2 fade-up d1">Guests Who Return</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          Most of our guests have been here before. That says everything
+          about the quality of what we offer. We do not chase novelty — we
+          refine what works until it is exceptional.
+        </p>
+        <p class="section-text fade-up d3">
+          Return visitors often bring friends, family, or colleagues. Word
+          of mouth remains our strongest channel because the experience
+          speaks for itself.
+        </p>
+        <a href="{{booking_url}}" class="section-cta fade-up d4">Book again &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 14 — FULL-BLEED IMAGE BREAK #2
+     ================================================================ -->
+<div class="image-break">
+  <img src="/landing-pages/images/act-paragliding.jpg" alt="Paragliding over the coastline" loading="lazy" />
+</div>
+
+
+<!-- ================================================================
+     Section 15 — TEXT+MEDIA: "Pricing" (image RIGHT)
+     ================================================================ -->
+<section class="section-pad section-border">
+  <div class="container">
+    <div class="text-media text-media--reverse">
+      <div class="text-media__media fade-up">
+        <img src="/landing-pages/images/act-climbing.jpg" alt="Rock climbing adventure" loading="lazy" />
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">05</p>
+        <h2 class="section-h2 fade-up d1">Smart Pricing</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          Dynamic pricing that adapts to demand, season, and group size. You
+          set the rules — the system handles the rest. Peak periods earn what
+          they are worth. Quiet days attract new guests with the right price.
+        </p>
+        <p class="section-text fade-up d3">
+          Transparent pricing builds trust. Every guest sees exactly what
+          they are paying for before they commit. No hidden fees. No
+          surprises.
+        </p>
+        <a href="{{booking_url}}" class="section-cta fade-up d4">See pricing &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 16 — TEXT+MEDIA: "Communication" (image LEFT)
+     ================================================================ -->
+<section class="section-pad section-border">
+  <div class="container">
+    <div class="text-media">
+      <div class="text-media__media fade-up">
+        <video autoplay muted loop playsinline poster="/landing-pages/images/stock-road-poster.jpg">
+          <source src="/landing-pages/videos/stock-road.mp4" type="video/mp4" />
+        </video>
+      </div>
+      <div class="text-media__content">
+        <p class="section-label fade-up">06</p>
+        <h2 class="section-h2 fade-up d1">Every Message, One Place</h2>
+        <div class="section-line fade-up d2" aria-hidden="true"></div>
+        <p class="section-text fade-up d3">
+          WhatsApp, email, web chat — all conversations arrive in a single
+          inbox. No more switching between apps. Reply from one place and
+          never miss a booking enquiry again.
+        </p>
+        <p class="section-text fade-up d3">
+          Automated confirmations, reminders, and follow-ups keep your guests
+          informed without lifting a finger. When you do need to respond,
+          everything you need is right there.
+        </p>
+        <a href="{{booking_url}}" class="section-cta fade-up d4">Get started &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================================================================
+     Section 17 — FOOTER (ultra-minimal)
+     ================================================================ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <span class="footer-brand">{{business_name}}</span>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="#tours">Tours</a>
+        <a href="#about">About</a>
+        <a href="#info">Info</a>
+        <a href="{{booking_url}}">Book</a>
+        {{#each tours}}
+        <a href="{{../booking_url}}">{{name}}</a>
+        {{/each}}
+      </nav>
+    </div>
+    <div class="footer-divider" aria-hidden="true"></div>
+    <div class="footer-bottom">
+      <div class="footer-legal">
+        <p>{{footer_line_one}}</p>
+        {{#if footer_line_two}}
+        <p style="margin-top:4px;">{{footer_line_two}}</p>
+        {{/if}}
+      </div>
+      <p class="footer-copyright">&copy; {{year}} &middot; Powered by BookingTours</p>
+    </div>
+  </div>
+</footer>
+
+
+<!-- ================================================================
+     JAVASCRIPT — IntersectionObserver, header scroll, smooth anchors
+     ================================================================ -->
+<script>
+  (function () {
+    'use strict';
+
+    /* ----------------------------------------------------------
+       IntersectionObserver — fade-up / fade-in animations
+       ---------------------------------------------------------- */
+    var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (!prefersReducedMotion && 'IntersectionObserver' in window) {
+      var fadeElements = document.querySelectorAll('.fade-up, .fade-in');
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, {
+        threshold: 0.2,
+        rootMargin: '0px 0px -40px 0px'
+      });
+
+      fadeElements.forEach(function (el) {
+        observer.observe(el);
+      });
+    } else {
+      /* Immediately show all elements if reduced motion or no IO */
+      document.querySelectorAll('.fade-up, .fade-in').forEach(function (el) {
+        el.classList.add('visible');
+      });
+    }
+
+    /* ----------------------------------------------------------
+       Header scroll state — add border on scroll
+       ---------------------------------------------------------- */
+    var header = document.getElementById('site-header');
+    var scrollThreshold = 80;
+
+    function updateHeader() {
+      if (window.scrollY > scrollThreshold) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    }
+
+    window.addEventListener('scroll', updateHeader, { passive: true });
+    updateHeader();
+
+    /* ----------------------------------------------------------
+       Smooth scroll for anchor links
+       ---------------------------------------------------------- */
+    document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        var targetId = this.getAttribute('href');
+        if (targetId === '#') return;
+
+        var target = document.querySelector(targetId);
+        if (target) {
+          e.preventDefault();
+          var offsetTop = target.getBoundingClientRect().top + window.pageYOffset - 80;
+          window.scrollTo({
+            top: offsetTop,
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+
+    /* ----------------------------------------------------------
+       Pause hero videos when not visible (performance)
+       ---------------------------------------------------------- */
+    if ('IntersectionObserver' in window) {
+      var videos = document.querySelectorAll('video[autoplay]');
+      var videoObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.play().catch(function () { /* ignore autoplay block */ });
+          } else {
+            entry.target.pause();
+          }
+        });
+      }, {
+        threshold: 0.1
+      });
+
+      videos.forEach(function (video) {
+        videoObserver.observe(video);
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>
