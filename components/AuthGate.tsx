@@ -101,7 +101,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     var savedTime = localStorage.getItem("ck_admin_time");
 
     if (!savedEmail || !savedTime || Date.now() - Number(savedTime) > SESSION_TIMEOUT) {
-      clearSession();
+      await clearSession();
+      setChecking(false);
+      return;
+    }
+
+    // Confirm we still have a Supabase Auth session (set during login or auto-restored from storage).
+    var { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      await clearSession();
       setChecking(false);
       return;
     }
@@ -137,12 +145,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
     } else {
-      clearSession();
+      await clearSession();
     }
     setChecking(false);
   }
 
-  function clearSession() {
+  async function clearSession() {
+    try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
     localStorage.removeItem("ck_admin_email");
@@ -173,43 +182,81 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError("");
     setNotice("");
-    var { data: user } = await supabase
-      .from("admin_users")
-      .select("id, role, email, business_id, name, password_hash, must_set_password, settings_permissions")
-      .eq("email", email.trim().toLowerCase())
-      .maybeSingle();
 
-    if (user && (user.must_set_password || !user.password_hash)) {
-      try {
-        await sendAdminSetupLink({ id: user.id, email: user.email, name: user.name }, "FIRST_LOGIN", user.business_id || "");
-        setNotice("This admin account still needs a password. A secure setup link has been emailed.");
-      } catch (setupError) {
-        console.error("Failed to send admin setup link:", setupError);
-        setError("This account still needs a password, but the setup email could not be sent.");
+    try {
+      var normalizedEmail = email.trim().toLowerCase();
+      var res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password: pass }),
+      });
+      var data: any = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Special: account exists but needs password setup
+        if (data?.code === "MUST_SET_PASSWORD" && data?.admin_id) {
+          try {
+            await sendAdminSetupLink(
+              { id: data.admin_id, email: normalizedEmail, name: data.name },
+              "FIRST_LOGIN",
+              data.business_id || "",
+            );
+            setNotice("This admin account still needs a password. A secure setup link has been emailed.");
+          } catch (setupError) {
+            console.error("Failed to send admin setup link:", setupError);
+            setError("This account still needs a password, but the setup email could not be sent.");
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Failed credentials — increment counter
+        var failCount = Number(localStorage.getItem("ck_fail_count") || "0") + 1;
+        localStorage.setItem("ck_fail_count", String(failCount));
+
+        if (failCount >= MAX_ATTEMPTS) {
+          localStorage.setItem("ck_lock_until", String(Date.now() + LOCKOUT_DURATION));
+          setLocked(true);
+          sendResetEmail(normalizedEmail);
+        } else {
+          setError(data?.error || "Incorrect email or password. " + (MAX_ATTEMPTS - failCount) + " attempt(s) remaining.");
+        }
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    var hash = await sha256(pass);
+      var session = data?.session;
+      var adminInfo = data?.admin;
+      if (!session?.access_token || !adminInfo) {
+        setError("Login response was malformed");
+        setLoading(false);
+        return;
+      }
 
-    setLoading(false);
+      // Set Supabase Auth session — every subsequent supabase-js call now goes as the authenticated user.
+      var setRes = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      if (setRes.error) {
+        setError("Failed to start session: " + setRes.error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (user && user.password_hash === hash) {
       localStorage.removeItem("ck_fail_count");
       localStorage.removeItem("ck_lock_until");
       localStorage.setItem("ck_admin_auth", "true");
-      localStorage.setItem("ck_admin_role", user.role);
-      localStorage.setItem("ck_admin_email", email.trim().toLowerCase());
+      localStorage.setItem("ck_admin_role", adminInfo.role);
+      localStorage.setItem("ck_admin_email", adminInfo.email);
       localStorage.setItem("ck_admin_time", String(Date.now()));
-      localStorage.setItem("ck_admin_name", user.name || "");
-      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(user.settings_permissions || {}));
+      localStorage.setItem("ck_admin_name", adminInfo.name || "");
+      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
 
-      setRole(user.role);
-      setNotice("");
+      setRole(adminInfo.role);
 
-      if (user.business_id) {
-        var context = await loadBusinessContext(user.role, user.business_id);
+      if (adminInfo.business_id) {
+        var context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
         localStorage.setItem("ck_admin_business_id", context.businessId);
         localStorage.setItem("ck_admin_timezone", context.timezone);
         setBusinessId(context.businessId);
@@ -221,17 +268,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       setAuthed(true);
-    } else {
-      var failCount = Number(localStorage.getItem("ck_fail_count") || "0") + 1;
-      localStorage.setItem("ck_fail_count", String(failCount));
-
-      if (failCount >= MAX_ATTEMPTS) {
-        localStorage.setItem("ck_lock_until", String(Date.now() + LOCKOUT_DURATION));
-        setLocked(true);
-        sendResetEmail(email.trim().toLowerCase());
-      } else {
-        setError("Incorrect email or password. " + (MAX_ATTEMPTS - failCount) + " attempt(s) remaining.");
-      }
+    } catch (err: any) {
+      console.error("LOGIN_ERR", err);
+      setError(err?.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 

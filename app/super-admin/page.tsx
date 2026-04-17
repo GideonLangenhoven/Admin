@@ -135,18 +135,47 @@ export default function SuperAdminPage() {
     setSavingSubdomain(true);
     var slug = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
     if (!slug) { notify({ title: "Invalid", message: "Subdomain must contain at least one letter or number.", tone: "error" }); setSavingSubdomain(false); return; }
+    var base = `https://${slug}.${BOOKING_DOMAIN}`;
     var { error } = await supabase.from("businesses").update({
       subdomain: slug,
-      booking_site_url: `https://${slug}.${BOOKING_DOMAIN}`,
+      booking_site_url: base,
+      manage_bookings_url: base + "/my-bookings",
+      booking_success_url: base + "/success",
+      booking_cancel_url: base + "/cancelled",
+      gift_voucher_url: base + "/voucher",
+      voucher_success_url: base + "/voucher-success",
+      waiver_url: base + "/waiver",
     }).eq("id", businessId);
     if (error) {
       notify({ title: "Failed", message: error.code === "23505" ? "This subdomain is already taken." : error.message, tone: "error" });
     } else {
-      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN}`, tone: "success" });
+      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN} — all 6 booking URLs regenerated`, tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === businessId ? { ...b, subdomain: slug } : b));
+      // Refresh expanded detail if this is the open one
+      if (expandedBiz === businessId) await loadBizDetail(businessId);
     }
     setEditingSubdomain(null);
     setSavingSubdomain(false);
+  }
+
+  async function regenerateDerivedUrls(businessId: string, subdomain: string | null) {
+    if (!subdomain) { notify({ title: "No subdomain", message: "Set a subdomain first.", tone: "error" }); return; }
+    var base = `https://${subdomain}.${BOOKING_DOMAIN}`;
+    var { error } = await supabase.from("businesses").update({
+      booking_site_url: base,
+      manage_bookings_url: base + "/my-bookings",
+      booking_success_url: base + "/success",
+      booking_cancel_url: base + "/cancelled",
+      gift_voucher_url: base + "/voucher",
+      voucher_success_url: base + "/voucher-success",
+      waiver_url: base + "/waiver",
+    }).eq("id", businessId);
+    if (error) {
+      notify({ title: "Regenerate failed", message: error.message, tone: "error" });
+    } else {
+      notify({ title: "URLs regenerated", message: "All 6 booking-site URLs reset to match the subdomain.", tone: "success" });
+      if (expandedBiz === businessId) await loadBizDetail(businessId);
+    }
   }
 
   async function toggleSubscriptionStatus(bizId: string, current: string) {
@@ -210,6 +239,7 @@ export default function SuperAdminPage() {
       hero_eyebrow: bizDetail.hero_eyebrow,
       hero_title: bizDetail.hero_title,
       hero_subtitle: bizDetail.hero_subtitle,
+      hero_image: bizDetail.hero_image || null,
       chatbot_avatar: bizDetail.chatbot_avatar,
       color_main: bizDetail.color_main,
       color_secondary: bizDetail.color_secondary,
@@ -232,6 +262,30 @@ export default function SuperAdminPage() {
       footer_line_one: bizDetail.footer_line_one,
       footer_line_two: bizDetail.footer_line_two,
       booking_custom_fields: bizDetail.booking_custom_fields,
+      // ── booking-site URLs (explicit override of the derive-from-subdomain defaults) ──
+      booking_site_url: bizDetail.booking_site_url || null,
+      manage_bookings_url: bizDetail.manage_bookings_url || null,
+      booking_success_url: bizDetail.booking_success_url || null,
+      booking_cancel_url: bizDetail.booking_cancel_url || null,
+      gift_voucher_url: bizDetail.gift_voucher_url || null,
+      voucher_success_url: bizDetail.voucher_success_url || null,
+      waiver_url: bizDetail.waiver_url || null,
+      // ── social links (used in email footers and booking-site footer) ──
+      social_facebook: bizDetail.social_facebook || null,
+      social_instagram: bizDetail.social_instagram || null,
+      social_tiktok: bizDetail.social_tiktok || null,
+      social_youtube: bizDetail.social_youtube || null,
+      social_twitter: bizDetail.social_twitter || null,
+      social_linkedin: bizDetail.social_linkedin || null,
+      social_tripadvisor: bizDetail.social_tripadvisor || null,
+      social_google_reviews: bizDetail.social_google_reviews || null,
+      // ── terminology for booking-site copy ──
+      activity_noun: bizDetail.activity_noun || null,
+      activity_verb_past: bizDetail.activity_verb_past || null,
+      location_phrase: bizDetail.location_phrase || null,
+      // ── marketing ──
+      marketing_test_email: bizDetail.marketing_test_email || null,
+      weather_relevance: bizDetail.weather_relevance ?? true,
     }).eq("id", expandedBiz);
 
     if (error) { notify({ title: "Save failed", message: error.message, tone: "error" }); }
@@ -677,6 +731,96 @@ export default function SuperAdminPage() {
                                   className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
                               </label>
                             ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Booking Site URLs ── */}
+                        <fieldset>
+                          <div className="flex items-center justify-between mb-2">
+                            <legend className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--ck-text-muted)" }}>Booking Site URLs</legend>
+                            <button type="button" onClick={() => regenerateDerivedUrls(b.id, bizDetail.subdomain || b.subdomain)}
+                              className="text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
+                              ⟲ Regenerate from subdomain
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2">
+                            {[
+                              ["booking_site_url", "Booking site (customer entry)"],
+                              ["manage_bookings_url", "Manage bookings (customer self-service)"],
+                              ["booking_success_url", "Payment success redirect"],
+                              ["booking_cancel_url", "Payment cancel redirect"],
+                              ["gift_voucher_url", "Gift voucher purchase"],
+                              ["voucher_success_url", "Voucher purchase success"],
+                              ["waiver_url", "Waiver signing page"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input type="url" value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs font-mono" placeholder="https://…" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Social Links ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Social Links (email footers + site footer)</legend>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              ["social_facebook", "Facebook"],
+                              ["social_instagram", "Instagram"],
+                              ["social_tiktok", "TikTok"],
+                              ["social_youtube", "YouTube"],
+                              ["social_twitter", "Twitter / X"],
+                              ["social_linkedin", "LinkedIn"],
+                              ["social_tripadvisor", "TripAdvisor"],
+                              ["social_google_reviews", "Google Reviews"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input type="url" value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="https://…" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Terminology / Messaging ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Terminology & Messaging</legend>
+                          <div className="grid grid-cols-3 gap-3">
+                            {[
+                              ["activity_noun", "Activity noun (e.g. 'tour', 'dive', 'flight')"],
+                              ["activity_verb_past", "Activity verb — past (e.g. 'kayaked')"],
+                              ["location_phrase", "Location phrase (e.g. 'in Cape Town')"],
+                            ].map(([key, label]) => (
+                              <label key={key} className="text-xs text-[var(--ck-text-muted)]">
+                                {label}
+                                <input value={bizDetail[key] || ""} onChange={(e) => updateDetail(key, e.target.value)}
+                                  className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" />
+                              </label>
+                            ))}
+                          </div>
+                        </fieldset>
+
+                        {/* ── Hero Image + Marketing test recipient + Weather relevance ── */}
+                        <fieldset>
+                          <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Hero / Marketing / Weather</legend>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="text-xs text-[var(--ck-text-muted)]">
+                              Hero background image URL
+                              <input type="url" value={bizDetail.hero_image || ""} onChange={(e) => updateDetail("hero_image", e.target.value)}
+                                className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="https://…" />
+                            </label>
+                            <label className="text-xs text-[var(--ck-text-muted)]">
+                              Marketing test recipient (where test campaign sends go)
+                              <input type="email" value={bizDetail.marketing_test_email || ""} onChange={(e) => updateDetail("marketing_test_email", e.target.value)}
+                                className="mt-0.5 w-full ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="test@operator.example" />
+                            </label>
+                            <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]">
+                              <input type="checkbox" checked={bizDetail.weather_relevance !== false} onChange={(e) => updateDetail("weather_relevance", e.target.checked)} />
+                              Weather-sensitive operation (enables weather-cancel logic)
+                            </label>
                           </div>
                         </fieldset>
 

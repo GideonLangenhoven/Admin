@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -19,7 +19,7 @@ type SlotGroup = { date: string; label: string; slots: any[] };
 
 export default function PhotosPage() {
   var { businessId } = useBusinessContext();
-  var [bookingSiteUrl, setBookingSiteUrl] = useState("https://book.capekayak.co.za");
+  var [bookingSiteUrl, setBookingSiteUrl] = useState("");
   var [slots, setSlots] = useState<SlotGroup[]>([]);
   var [selectedSlot, setSelectedSlot] = useState<any>(null);
   var [urls, setUrls] = useState<string[]>([""]);
@@ -29,11 +29,121 @@ export default function PhotosPage() {
   var [bulkInput, setBulkInput] = useState("");
   var [sendProgress, setSendProgress] = useState(0);
 
-  useEffect(() => { loadSlots(); loadHistory(); loadBusinessLinks(); }, [businessId]);
+  // Google Drive upload state
+  var [gdriveConnected, setGdriveConnected] = useState(false);
+  var [gdriveEmail, setGdriveEmail] = useState("");
+  var [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  var [uploading, setUploading] = useState(false);
+  var [uploadProgress, setUploadProgress] = useState(0);
+  var [uploadedFolderUrl, setUploadedFolderUrl] = useState("");
+  var [dragOver, setDragOver] = useState(false);
+  var fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { loadSlots(); loadHistory(); loadBusinessLinks(); checkGdrive(); }, [businessId]);
+
+  async function checkGdrive() {
+    try {
+      var { data } = await supabase.functions.invoke("google-drive", {
+        body: { action: "status", business_id: businessId },
+      });
+      if (data && !data.error) {
+        setGdriveConnected(data.connected);
+        setGdriveEmail(data.email || "");
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    var files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    var files = Array.from(e.target.files || []);
+    if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
+    e.target.value = "";
+  }
+
+  function removeFile(i: number) { setUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }
+
+  async function uploadToDrive() {
+    if (!selectedSlot || uploadFiles.length === 0) return;
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadedFolderUrl("");
+
+    try {
+      // Create a trip subfolder
+      var tourName = (selectedSlot as any).tours?.name || "Trip";
+      var tripDate = fmtDate(selectedSlot.start_time);
+      var folderName = tripDate + " — " + tourName;
+
+      var { data: folderData, error: folderErr } = await supabase.functions.invoke("google-drive", {
+        body: { action: "create_folder", business_id: businessId, folder_name: folderName },
+      });
+      if (folderErr || folderData?.error) {
+        notify({ title: "Upload failed", message: folderData?.error || folderErr?.message || "Could not create Drive folder.", tone: "error" });
+        setUploading(false);
+        return;
+      }
+
+      var folderId = folderData.folder_id;
+      var folderUrl = folderData.folder_url;
+
+      // Get a fresh access token for direct browser-to-Google uploads
+      var { data: tokenData, error: tokenErr } = await supabase.functions.invoke("google-drive", {
+        body: { action: "token", business_id: businessId },
+      });
+      if (tokenErr || tokenData?.error) {
+        notify({ title: "Upload failed", message: tokenData?.error || "Could not get access token. Reconnect Google Drive in Settings.", tone: "error" });
+        setUploading(false);
+        return;
+      }
+
+      var accessToken = tokenData.access_token;
+
+      // Upload each file directly to Google Drive
+      for (var i = 0; i < uploadFiles.length; i++) {
+        var file = uploadFiles[i];
+        var metadata = JSON.stringify({ name: file.name, parents: [folderId] });
+        var form = new FormData();
+        form.append("metadata", new Blob([metadata], { type: "application/json" }));
+        form.append("file", file);
+
+        var res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + accessToken },
+          body: form,
+        });
+
+        if (!res.ok) {
+          var errBody = await res.text();
+          console.error("Drive upload failed for", file.name, errBody);
+        }
+
+        setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
+      }
+
+      setUploadedFolderUrl(folderUrl);
+      setUrls([folderUrl]);
+
+      // Log to trip_photos
+      await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: folderUrl, business_id: businessId });
+
+      notify({ title: "Upload complete", message: uploadFiles.length + " file" + (uploadFiles.length === 1 ? "" : "s") + " uploaded to Google Drive.", tone: "success" });
+      setUploadFiles([]);
+      loadHistory();
+    } catch (e: any) {
+      notify({ title: "Upload failed", message: e.message || "Unknown error", tone: "error" });
+    }
+    setUploading(false);
+  }
 
   async function loadBusinessLinks() {
     var { data } = await supabase.from("businesses").select("booking_site_url").eq("id", businessId).maybeSingle();
-    setBookingSiteUrl(data?.booking_site_url || "https://book.capekayak.co.za");
+    setBookingSiteUrl(data?.booking_site_url || "");
   }
 
   async function loadSlots() {
@@ -202,31 +312,110 @@ export default function PhotosPage() {
           )}
         </div>
 
-        {/* Right: Photo URLs + Send */}
+        {/* Right: Upload / Photo URLs + Send */}
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">Photo URLs</h2>
-            <p className="text-xs text-gray-400 mb-3">Upload photos to Google Drive, Dropbox, or any host and paste the share links here.</p>
-            <div className="mb-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bulk import</p>
-                <button type="button" onClick={importBulkUrls} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                  Import links
-                </button>
+          {/* Google Drive Upload */}
+          {gdriveConnected && (
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold">Upload to Google Drive</h2>
+                <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">{gdriveEmail}</span>
               </div>
-              <textarea
-                value={bulkInput}
-                onChange={(e) => setBulkInput(e.target.value)}
-                placeholder="Paste one image URL per line"
-                rows={3}
-                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
+
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleFileDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={"rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors " +
+                  (dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50 hover:border-gray-400")}
+              >
+                <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+                <p className="text-sm font-medium text-gray-600">
+                  {dragOver ? "Drop files here" : "Drag & drop photos or click to browse"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Images and videos accepted</p>
+              </div>
+
+              {/* Selected files */}
+              {uploadFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected</span>
+                    <span>{(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-auto">
+                    {uploadFiles.map((f, i) => (
+                      <div key={f.name + i} className="relative group">
+                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full object-cover rounded-lg border border-gray-200" />
+                        <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          ✕
+                        </button>
+                        <p className="text-[10px] text-gray-400 truncate mt-0.5">{f.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={uploadToDrive} disabled={uploading || !selectedSlot}
+                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                    {uploading ? "Uploading..." : !selectedSlot ? "Select a trip first" : "Upload to Google Drive"}
+                  </button>
+                </div>
+              )}
+
+              {/* Upload progress */}
+              {uploading && (
+                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+                  <div className="flex items-center justify-between text-xs font-semibold text-blue-700">
+                    <span>Uploading to Drive</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-blue-100">
+                    <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: uploadProgress + "%" }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Folder link result */}
+              {uploadedFolderUrl && (
+                <div className="mt-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50">
+                  <p className="text-xs font-semibold text-emerald-800 mb-1">Photos uploaded successfully</p>
+                  <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline break-all">{uploadedFolderUrl}</a>
+                  <p className="text-xs text-emerald-600 mt-2">Click &quot;Send Photos&quot; below to share this link with customers.</p>
+                </div>
+              )}
             </div>
+          )}
+
+          {/* Manual URL paste (always available) */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <h2 className="font-semibold mb-3">{gdriveConnected ? "Photo Link" : "Photo URLs"}</h2>
+            {!gdriveConnected && (
+              <>
+                <p className="text-xs text-gray-400 mb-3">Paste share links from Google Drive, Dropbox, or any host. Connect Google Drive in Settings for direct uploads.</p>
+                <div className="mb-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bulk import</p>
+                    <button type="button" onClick={importBulkUrls} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                      Import links
+                    </button>
+                  </div>
+                  <textarea
+                    value={bulkInput}
+                    onChange={(e) => setBulkInput(e.target.value)}
+                    placeholder="Paste one image URL per line"
+                    rows={3}
+                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               {urls.map((u, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <input type="text" value={u} onChange={e => updateUrl(i, e.target.value)}
-                    placeholder="https://drive.google.com/file/..."
+                    placeholder="https://drive.google.com/drive/folders/..."
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
                   {urls.length > 1 && (
                     <button onClick={() => removeUrl(i)} className="shrink-0 px-2 py-2 text-sm text-gray-400 hover:text-red-500">✕</button>
@@ -234,30 +423,9 @@ export default function PhotosPage() {
                 </div>
               ))}
             </div>
-            <button onClick={addUrl} className="mt-2 text-sm text-blue-600 font-medium hover:text-blue-800">+ Add another photo</button>
-
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Preview gallery</span>
-                <span>{validUrls.length} photo{validUrls.length === 1 ? "" : "s"} ready</span>
-              </div>
-              {validUrls.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-                  No photos added yet. Paste links to build the gallery preview.
-                </div>
-              ) : (
-                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {validUrls.map((url, index) => (
-                    <div key={url + index} className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-                      <img src={url} alt={`Trip photo ${index + 1}`} loading="lazy" className="h-28 w-full object-cover" />
-                      <div className="p-2">
-                        <p className="truncate text-[11px] text-gray-500">{url}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {!gdriveConnected && (
+              <button onClick={addUrl} className="mt-2 text-sm text-blue-600 font-medium hover:text-blue-800">+ Add another link</button>
+            )}
           </div>
 
           <button onClick={sendPhotos} disabled={sending || !selectedSlot || urls.every(u => !u.trim())}

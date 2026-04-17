@@ -58,7 +58,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   useEffect(() => {
     if (displayName && displayName !== "Admin") {
-      document.title = displayName + " Admin";
+      document.title = displayName + " — BookingTours Admin";
+    } else {
+      document.title = "BookingTours Admin";
     }
   }, [displayName]);
 
@@ -95,7 +97,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className={`hidden shrink-0 flex-col border-r bg-[var(--ck-sidebar)] transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`} style={{ borderColor: "var(--ck-sidebar-border)" }}>
+      <aside className={`hidden shrink-0 flex-col bg-white transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`} style={{ boxShadow: "1px 0 20px rgba(0,0,0,0.02)" }}>
         <div className="p-6 pb-2">
           <div className={`mb-8 flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
             <Link href="/" className={`flex items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2"}`}>
@@ -164,12 +166,12 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
               return (
                 <Link key={n.href} href={navBlocked ? pathname : n.href}
-                  className={`group flex items-center rounded-xl px-3 py-2 text-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
-                      ? "font-medium shadow-sm border"
+                  className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
+                      ? "ui-nav-active font-semibold"
                       : "font-medium"
                     } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
                   style={isActive
-                    ? { background: "var(--ck-sidebar-active-bg)", color: "var(--ck-sidebar-active-text)", borderColor: "var(--ck-sidebar-active-border)" }
+                    ? undefined
                     : { color: "var(--ck-sidebar-text)" }
                   }
                   aria-disabled={navBlocked}
@@ -179,11 +181,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                 >
                   <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
                     {isActive && n.href === "/" ? (
-                      <div className="flex items-center justify-center h-[18px] w-[18px] rounded-full" style={{ background: "var(--ck-accent)" }}>
-                        <Check size={12} color="white" />
-                      </div>
+                      <Icon size={20} weight="fill" className="text-emerald-500" />
                     ) : (
-                      <Icon size={18} />
+                      <Icon size={20} weight={isActive ? "fill" : "regular"} className={isActive ? "text-emerald-500" : ""} />
                     )}
                   </span>
                   {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
@@ -198,6 +198,24 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         <div className={`mt-auto border-t p-4 flex ${collapsed ? "flex-col gap-3" : "items-center justify-between"}`} style={{ borderColor: "var(--ck-sidebar-border)" }}>
           <SignOutButton />
           <ThemeToggle />
+        </div>
+        {/* Platform provenance — subtle, stays in hairline footer */}
+        <div
+          className={`border-t px-4 py-2.5 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}
+          style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
+          title="Powered by BookingTours"
+        >
+          <span className="grid grid-cols-2 gap-[2px] h-3 w-3 shrink-0" aria-hidden="true">
+            <span className="rounded-tl-full" style={{ background: "var(--ck-accent)" }} />
+            <span className="rounded-tr-full" style={{ background: "var(--ck-accent)" }} />
+            <span className="rounded-bl-full" style={{ background: "var(--ck-accent)" }} />
+            <span className="rounded-br-full opacity-50" style={{ background: "var(--ck-accent)" }} />
+          </span>
+          {!collapsed && (
+            <span className="text-[10px] font-medium uppercase" style={{ letterSpacing: "0.08em" }}>
+              Powered by BookingTours
+            </span>
+          )}
         </div>
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--ck-bg)" }}>

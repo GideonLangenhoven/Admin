@@ -19,8 +19,8 @@
 :root,
 html.light {
   color-scheme: light;
-  --ck-bg: #eff4f4;
-  /* Subtle teal-tinted background */
+  --ck-bg: #f8fafc;
+  /* Subtle gray background, Donezo style */
   --ck-surface: #ffffff;
   --ck-surface-elevated: #ffffff;
   --ck-border-subtle: #e2e5e9;
@@ -51,10 +51,15 @@ html.light {
   --ck-sidebar-active-border: #f3f4f6;
   --ck-sidebar-active-text: #111827;
 
+  --ck-radius-sm: 6px;
   --ck-radius-md: 10px;
-  --ck-radius-lg: 16px;
-  --ck-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --ck-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.025);
+  --ck-radius-lg: 14px;
+  --ck-radius-xl: 20px;
+  /* Modern, restrained shadow stack — inspired by Linear / Vercel.
+     Interior shadows use hairline borders instead of heavy drop-shadows. */
+  --ck-shadow-sm: 0 1px 0 0 rgba(17, 24, 39, 0.03), 0 1px 2px -1px rgba(17, 24, 39, 0.04);
+  --ck-shadow-md: 0 1px 0 0 rgba(17, 24, 39, 0.03), 0 4px 12px -2px rgba(17, 24, 39, 0.04), 0 2px 4px -1px rgba(17, 24, 39, 0.03);
+  --ck-shadow-lg: 0 12px 32px -8px rgba(17, 24, 39, 0.10), 0 4px 12px -4px rgba(17, 24, 39, 0.05);
   --ck-ease: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Primary button text: white on dark bg in light mode */
@@ -93,8 +98,9 @@ html.dark {
   --ck-sidebar-active-border: #383838;
   --ck-sidebar-active-text: #f0f0f0;
 
-  --ck-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
-  --ck-shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --ck-shadow-sm: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.30);
+  --ck-shadow-md: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 4px 12px -2px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.25);
+  --ck-shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
 
   /* Primary button text: dark on light bg in dark mode */
   --ck-btn-primary-text: #161616;
@@ -110,11 +116,21 @@ body {
   background: var(--ck-bg);
   color: var(--ck-text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Inter OpenType features: alternate 6/9, straight lowercase l, tabular numerals,
+     contextual alternates. Used by Linear, Vercel, GitHub Next. */
+  font-feature-settings: "cv11", "ss01", "ss03", "cv02", "calt";
+}
+
+/* Default numeric rendering: proportional for prose, but opt-in tabular via utility */
+.tabular-nums, .ui-stat, th, td, .font-mono {
+  font-variant-numeric: tabular-nums;
 }
 
 @layer base {
   * {
-    border-color: var(--ck-border-strong);
+    border-color: var(--ck-border-subtle);
   }
 
   a,
@@ -142,31 +158,51 @@ body {
 
 @layer components {
   .ui-surface {
-    @apply rounded-2xl border;
+    @apply rounded-xl border;
     background: var(--ck-surface);
-    border-color: var(--ck-border-strong);
+    border-color: var(--ck-border-subtle);
     box-shadow: none;
   }
 
   .ui-surface-elevated {
-    @apply rounded-2xl border;
+    @apply rounded-xl border;
     background: var(--ck-surface-elevated);
-    border-color: var(--ck-border-strong);
+    border-color: var(--ck-border-subtle);
     box-shadow: var(--ck-shadow-sm);
   }
 
+  /* Interactive surface — subtle hover lift, used for stat tiles and clickable cards */
+  .ui-surface-hoverable {
+    @apply rounded-xl border;
+    background: var(--ck-surface);
+    border-color: var(--ck-border-subtle);
+    box-shadow: var(--ck-shadow-sm);
+    transition: box-shadow 180ms var(--ck-ease),
+                transform 180ms var(--ck-ease),
+                border-color 180ms var(--ck-ease);
+  }
+
+  .ui-surface-hoverable:hover {
+    border-color: var(--ck-border-strong);
+    box-shadow: var(--ck-shadow-md);
+    transform: translateY(-1px);
+  }
+
   .ui-section-title {
-    @apply text-xs font-semibold tracking-[0.05rem] uppercase;
+    @apply text-[11px] font-semibold uppercase;
+    letter-spacing: 0.08em;
     color: var(--ck-text-muted);
   }
 
   .ui-title-lg {
-    @apply text-2xl md:text-3xl font-semibold tracking-tight;
+    @apply text-2xl md:text-3xl font-semibold;
+    letter-spacing: -0.02em;
     color: var(--ck-text-strong);
   }
 
   .ui-title-md {
     @apply text-sm md:text-base font-semibold;
+    letter-spacing: -0.01em;
     color: var(--ck-text-strong);
   }
 
@@ -174,24 +210,60 @@ body {
     color: var(--ck-text-muted);
   }
 
+  .ui-stat {
+    @apply font-semibold;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ck-text-strong);
+  }
+
   .ui-control {
-    @apply border rounded-xl px-3 py-2 text-sm;
+    @apply border rounded-lg px-3 py-2 text-sm;
     background: var(--ck-surface);
     border-color: var(--ck-border-strong);
     color: var(--ck-text-strong);
   }
 
-  .ui-control:hover {
-    border-color: var(--ck-border-subtle);
+  .ui-control:hover:not(:focus-visible) {
+    border-color: color-mix(in srgb, var(--ck-border-strong) 70%, var(--ck-text) 30%);
   }
 
   .ui-control:focus-visible {
     border-color: var(--ck-accent);
-    box-shadow: 0 0 0 2px var(--ck-accent-soft);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ck-accent) 18%, transparent);
+    outline: none;
   }
 
   .ui-pill {
     @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  /* Keyboard-hint chip. Used near actions that have hotkeys. */
+  .ui-kbd {
+    @apply inline-flex items-center rounded-md border px-1.5 text-[10px] font-semibold;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace;
+    line-height: 1.1rem;
+    height: 1.1rem;
+    color: var(--ck-text-muted);
+    border-color: var(--ck-border-subtle);
+    background: var(--ck-surface);
+  }
+
+  /* Signature active-nav bar — gives the sidebar its "branded" feel */
+  .ui-nav-active {
+    position: relative;
+    background: var(--ck-sidebar-active-bg);
+    color: var(--ck-sidebar-active-text);
+  }
+  .ui-nav-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--ck-accent);
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -200,6 +272,10 @@ body {
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .bg-donezo-gradient {
+    background: linear-gradient(135deg, #10422c 0%, #176e44 100%);
   }
 }
 

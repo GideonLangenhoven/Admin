@@ -32,114 +32,58 @@ function setupUrl(email: string, token: string) {
   return `${window.location.origin}/change-password?mode=setup&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
 }
 
+// All three functions below now go through /api/admin/setup-link (server-side, service-role).
+// Direct anon-key access to admin_users is closed once the permissive RLS fallback is dropped.
+
+async function setupLinkApi(action: "send" | "validate" | "complete", body: Record<string, any>) {
+  var res = await fetch("/api/admin/setup-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...body }),
+  });
+  var data: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Setup-link request failed");
+  return data;
+}
+
 export async function sendAdminSetupLink(
   admin: Pick<AdminAccountRow, "id" | "email" | "name">,
   reason = "ADMIN_INVITE",
   businessId?: string,
 ) {
-  var rawToken = generateSecureToken(24);
-  var tokenHash = await sha256(rawToken);
-  var now = new Date();
-  var expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
-
-  var shouldForceSetup = reason !== "RESET";
-  var updatePayload: Record<string, string | boolean | null> = {
-    setup_token_hash: tokenHash,
-    setup_token_expires_at: expiresAt,
-    invite_sent_at: now.toISOString(),
-  };
-  if (shouldForceSetup) updatePayload.must_set_password = true;
-
-  var { error: updateError } = await supabase
-    .from("admin_users")
-    .update(updatePayload)
-    .eq("id", admin.id);
-
-  if (updateError) throw updateError;
-
-  var { error: emailError } = await supabase.functions.invoke("send-email", {
-    body: {
-      type: "ADMIN_WELCOME",
-      data: {
-        email: admin.email,
-        name: admin.name || "",
-        change_password_url: setupUrl(admin.email, rawToken),
-        expires_at: expiresAt,
-        reason,
-        ...(businessId ? { business_id: businessId } : {}),
-      },
-    },
+  var data = await setupLinkApi("send", {
+    admin_id: admin.id,
+    reason,
+    business_id: businessId || null,
   });
-
-  if (emailError) {
-    // Try to extract the human-readable reason from the edge-function response body.
-    // FunctionsHttpError carries a `context` property that is the raw Response object.
-    var humanMsg = "";
-    try {
-      var ctx: any = (emailError as any).context;
-      if (ctx && typeof ctx.json === "function") {
-        var body = await ctx.json();
-        humanMsg =
-          body?.providerResponse?.sandboxNote ||
-          body?.error ||
-          "";
-      }
-    } catch (_) {
-      // ignore JSON parse failures
-    }
-    throw new Error(humanMsg || emailError.message);
-  }
-
-  return { expiresAt };
+  return { expiresAt: data.expires_at as string };
 }
 
 export async function validateAdminSetupToken(email: string, token: string) {
-  var tokenHash = await sha256(token);
-  var { data, error } = await supabase
-    .from("admin_users")
-    .select("id, email, name, setup_token_expires_at")
-    .eq("email", email.trim().toLowerCase())
-    .eq("setup_token_hash", tokenHash)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) return null;
-  if (!data.setup_token_expires_at || new Date(data.setup_token_expires_at).getTime() < Date.now()) return null;
-  return data as Pick<AdminAccountRow, "id" | "email" | "name">;
+  try {
+    var data = await setupLinkApi("validate", {
+      email: email.trim().toLowerCase(),
+      token,
+    });
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+    } as Pick<AdminAccountRow, "id" | "email" | "name">;
+  } catch {
+    return null;
+  }
 }
 
 export async function completeAdminPasswordSetup(email: string, token: string, newPassword: string) {
-  var admin = await validateAdminSetupToken(email, token);
-
-  if (!admin) {
-    // Token may have already been consumed by a prior submit — check if password was recently set
-    var { data: recentlySet } = await supabase
-      .from("admin_users")
-      .select("id, email, name, password_set_at")
-      .eq("email", email.trim().toLowerCase())
-      .maybeSingle();
-    if (recentlySet?.password_set_at) {
-      var setAgo = Date.now() - new Date(recentlySet.password_set_at).getTime();
-      if (setAgo < 5 * 60 * 1000) {
-        // Password was set within the last 5 minutes — treat as success (likely double-submit)
-        return recentlySet as Pick<AdminAccountRow, "id" | "email" | "name">;
-      }
-    }
-    throw new Error("This password setup link is invalid or has expired.");
-  }
-
-  var passwordHash = await sha256(newPassword);
-  var { error } = await supabase
-    .from("admin_users")
-    .update({
-      password_hash: passwordHash,
-      password_set_at: new Date().toISOString(),
-      must_set_password: false,
-      setup_token_hash: null,
-      setup_token_expires_at: null,
-    })
-    .eq("id", admin.id);
-
-  if (error) throw error;
-  return admin;
+  var data = await setupLinkApi("complete", {
+    email: email.trim().toLowerCase(),
+    token,
+    password: newPassword,
+  });
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+  } as Pick<AdminAccountRow, "id" | "email" | "name">;
 }
