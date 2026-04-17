@@ -964,6 +964,9 @@ export default function SuperAdminPage() {
    Landing Page Manager
    ══════════════════════════════════════════════════════════════ */
 
+// Keep this list in sync with the .html files under public/landing-pages/templates/.
+// The super-admin UI fetches /landing-pages/templates/<id>.html — if the file is
+// missing the preview 404s. Template ids shown here are the ones currently on disk.
 const TEMPLATES = [
   { id: "adventure", name: "Adventure", desc: "Cinematic fullscreen hero, scroll-reveal animations, glassmorphism nav", preview: "A" },
   { id: "modern", name: "Modern", desc: "Bold split-hero layout, stat counters, sharp geometric design", preview: "M" },
@@ -974,11 +977,6 @@ const TEMPLATES = [
   { id: "dark", name: "Dark", desc: "Full dark mode, neon glow accents, cinematic moody feel", preview: "D" },
   { id: "retro", name: "Retro", desc: "Vintage serif fonts, warm film tones, nostalgic charm", preview: "R" },
   { id: "tropical", name: "Tropical", desc: "Lush greens, vibrant gradients, paradise island energy", preview: "T" },
-  { id: "bold", name: "Bold", desc: "Oversized typography, editorial magazine style, high contrast", preview: "B" },
-  { id: "zen", name: "Zen", desc: "Japanese-inspired minimalism, extreme calm, soft neutrals", preview: "Z" },
-  { id: "vibrant", name: "Vibrant", desc: "Colorful gradients, glassmorphism cards, energetic youth feel", preview: "V" },
-  { id: "nordic", name: "Nordic", desc: "Scandinavian clean lines, muted blues, geometric accents", preview: "N" },
-  { id: "heritage", name: "Heritage", desc: "South African warmth, terracotta tones, cultural patterns", preview: "H" },
 ];
 
 function LandingPageManager({ businesses }: { businesses: any[] }) {
