@@ -407,6 +407,102 @@ export async function sendWhatsappTemplate(
 // If the customer is outside the 24-hour window (error 131047 / 131026) and
 // a templateFallback is provided, the template is sent instead so the message
 // still reaches the customer.
+/**
+ * Try to send a free-form WhatsApp message. Unlike sendWhatsappTextForTenant,
+ * this does NOT auto-fallback to a template — it reports whether the 24-hour
+ * customer-initiated-conversation window is closed, so callers can implement
+ * "send reopener template + queue full message" patterns (e.g. cancellations).
+ */
+export async function sendWhatsappFreeformOrSignal(
+  tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials },
+  to: string,
+  message: string,
+): Promise<{ ok: boolean; windowClosed: boolean; error: string; messageId?: string }> {
+  if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
+    return { ok: false, windowClosed: false, error: "WhatsApp not configured for this business" };
+  }
+  var normalizedTo = String(to || "").replace(/\D/g, "");
+  if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
+  try {
+    var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", to: normalizedTo, type: "text", text: { body: message } }),
+    });
+    var data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      var errCode = data?.error?.code;
+      var windowClosed = errCode === 131047 || errCode === 131026;
+      return { ok: false, windowClosed: windowClosed, error: String(data?.error?.message || data?.message || "send failed") };
+    }
+    var messageId = data?.messages?.[0]?.id || undefined;
+    return { ok: true, windowClosed: false, error: "", messageId };
+  } catch (e: any) {
+    return { ok: false, windowClosed: false, error: String(e?.message || e) };
+  }
+}
+
+/**
+ * Two-step cancellation / urgent-update WhatsApp flow.
+ *
+ * If the 24-hour customer service window is OPEN → sends `full_message` directly as free-form text.
+ * If the window is CLOSED → sends a pre-approved reopener template (default name:
+ *   `booking_update_reopener`, override via WA_REOPENER_TEMPLATE_NAME env var; parameters are
+ *   [customer_first_name, brand_name]) AND queues the full message in `outbox` with
+ *   status='WAITING_WINDOW'. The message is sent the moment the customer replies (see the
+ *   drain block in wa-webhook — keyed on phone + business_id).
+ *
+ * Intended for time-sensitive cancellation/reschedule notifications where we want the customer
+ * to see the FULL details with a working manage-bookings link, not just a generic template.
+ *
+ * Returns { sent: 'direct' | 'template', queued: boolean }.
+ */
+export async function sendWhatsappWithWindowReopen(
+  supabase: any,
+  tenant: TenantContext,
+  params: {
+    to: string;
+    booking_id?: string | null;
+    full_message: string;
+    customer_first_name: string;
+  },
+): Promise<{ sent: "direct" | "template"; queued: boolean }> {
+  var res = await sendWhatsappFreeformOrSignal(tenant, params.to, params.full_message);
+  if (res.ok) {
+    return { sent: "direct", queued: false };
+  }
+  if (!res.windowClosed) {
+    // Not a window-closed error — rethrow so caller can log/alert.
+    throw new Error("WhatsApp send failed: " + res.error);
+  }
+
+  // Window closed → send reopener template + queue full message for later drain.
+  var reopenerTemplateName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+  var brandName = getBusinessDisplayName(tenant.business);
+  var firstName = params.customer_first_name || "there";
+  try {
+    await sendWhatsappTemplate(tenant, params.to, reopenerTemplateName, [firstName, brandName]);
+  } catch (templateErr: any) {
+    // Template not approved / rejected / missing variables — fall back to the original
+    // sendWhatsappTextForTenant path so caller still attempts something. Rethrow so caller
+    // can log; cancellation emails are independent and will still go out.
+    throw new Error("Reopener template send failed (" + reopenerTemplateName + "): " + (templateErr?.message || templateErr));
+  }
+
+  var normalizedTo = String(params.to || "").replace(/\D/g, "");
+  if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
+  await supabase.from("outbox").insert({
+    business_id: tenant.business.id,
+    booking_id: params.booking_id || null,
+    phone: normalizedTo,
+    message_type: "CANCEL_FOLLOWUP",
+    message_body: params.full_message,
+    scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
+    status: "WAITING_WINDOW",
+  });
+  return { sent: "template", queued: true };
+}
+
 export async function sendWhatsappTextForTenant(
   tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials },
   to: string,

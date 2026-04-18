@@ -3,6 +3,7 @@ import {
   createServiceClient,
   resolveBusinessSiteUrls,
   resolveTenantByWhatsappPayload,
+  sendWhatsappFreeformOrSignal,
   type TenantContext,
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
@@ -10,11 +11,50 @@ import { resolveWaiverLink } from "../_shared/waiver.ts";
 var VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+var WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") || "";
 var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 var supabase = createServiceClient();
 var GK = Deno.env.get("GEMINI_API_KEY") || "";
+
+// ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) return new Uint8Array(0);
+  var out = new Uint8Array(hex.length / 2);
+  for (var i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+async function verifyMetaSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
+  if (!WA_APP_SECRET) {
+    console.error("WA_APP_SECRET not configured — rejecting webhook for safety");
+    return false;
+  }
+  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+  var providedHex = signatureHeader.substring(7);
+  var providedBytes = hexToBytes(providedHex);
+  if (providedBytes.length !== 32) return false;
+  try {
+    var keyData = new TextEncoder().encode(WA_APP_SECRET);
+    var key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    var sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+    var computed = new Uint8Array(sigBuf);
+    return timingSafeEqual(computed, providedBytes);
+  } catch (e) {
+    console.error("HMAC verify failed:", e);
+    return false;
+  }
+}
 
 function withQuery(base: string, params: Record<string, string>) {
   var url = new URL(base);
@@ -448,9 +488,9 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 
     var weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
     if (concerns.length > 0) {
-      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, it does look like a challenging paddle \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
+      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, conditions may be challenging \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
     } else {
-      weatherMsg = weatherDayLabel.charAt(0).toUpperCase() + weatherDayLabel.slice(1) + "\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for paddling. We\u2019ll still confirm on the morning of your trip about an hour before launch. Keep your phone nearby \u{1F4F1}";
+      weatherMsg = weatherDayLabel.charAt(0).toUpperCase() + weatherDayLabel.slice(1) + "\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for your trip. We\u2019ll still confirm on the morning of your trip about an hour before. Keep your phone nearby \u{1F4F1}";
     }
   } catch (e) {
     console.error("Weather API err:", e);
@@ -630,6 +670,41 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     } catch (e: any) {
       await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
     }
+
+    // ── Drain any queued cancellation follow-ups ────────────────────────────
+    // When weather-cancel (or any cancel flow using sendWhatsappWithWindowReopen)
+    // couldn't send a free-form message because the 24h window was closed, it
+    // queued the full message in outbox with status='WAITING_WINDOW' and sent a
+    // reopener template. The customer just replied → window is now open → send
+    // the queued messages right away using this tenant's own WA credentials.
+    try {
+      var { data: queuedMsgs } = await supabase
+        .from("outbox")
+        .select("id, message_body")
+        .eq("status", "WAITING_WINDOW")
+        .eq("business_id", tenant.business.id)
+        .eq("phone", phone);
+      for (var qm of (queuedMsgs || [])) {
+        try {
+          var drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
+          if (drainRes.ok) {
+            await supabase.from("outbox").update({
+              status: "SENT",
+              sent_at: new Date().toISOString(),
+              attempts: 1,
+            }).eq("id", (qm as any).id);
+          } else {
+            // Window somehow still closed (shouldn't happen after a real inbound) — retry later.
+            await supabase.from("outbox").update({ attempts: 1 }).eq("id", (qm as any).id);
+          }
+        } catch (drainErr: any) {
+          console.error("CANCEL_FOLLOWUP_SEND_ERR", drainErr?.message || drainErr);
+        }
+      }
+    } catch (drainQueryErr: any) {
+      console.error("CANCEL_FOLLOWUP_DRAIN_QUERY_ERR", drainQueryErr?.message || drainQueryErr);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     var input = (text || "").trim().toLowerCase();
     var rawText = (text || "").trim();
     var rid = "";
@@ -844,7 +919,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             var tr = tours[ti];
             trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + tr.duration_minutes + " min" });
           }
-          await sendText(tenant, phone, "Awesome, let\u2019s get you on the water! \u{1F30A}\n\nWhich tour catches your eye?");
+          await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
           await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: trows }]);
           await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: {} });
         }
@@ -1285,7 +1360,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               });
             }
           } catch (e) { console.log("cancel refund email err"); }
-          await sendText(tenant, phone, crRefundMsg + "\n\nWe\u2019d love to have you back on the water soon! \u{1F6F6}");
+          var crLoc = (tenant.business as any).location_phrase;
+          await sendText(tenant, phone, crRefundMsg + "\n\n" + (crLoc ? "We\u2019d love to have you back " + crLoc + " soon!" : "We\u2019d love to have you back soon!"));
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         }
       }
@@ -1320,7 +1396,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         var refAmt = sd.total;
         await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
-        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\nWe\u2019d love to have you back on the water soon! \u{1F6F6}");
+        var frLoc = (tenant.business as any).location_phrase;
+        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else {
         await sendText(tenant, phone, "No worries, your booking remains cancelled and untouched. You can manage it again from the My Bookings menu.");
@@ -1922,9 +1999,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           "\u{1F465} " + sd.qty + " people\n" +
           "\u{1F39F} Paid with voucher *" + sd.voucher_code + "*\n\n" +
           (waiverLink ? "\u{1F4DD} Waiver: " + waiverLink + "\n\n" : "") +
-          "\u{1F4CD} *Meeting Point:* Check your confirmation details from " + businessName(tenant) + " for arrival instructions.\n\n" +
-          "\u{1F392} *Bring:* Sunscreen, hat, towel, water bottle\n\n" +
-          "See you soon! \u{1F30A}"
+          "\u{1F4CD} *Meeting Point:* " + (tenant.business.directions || "Check your confirmation details from " + businessName(tenant) + " for arrival instructions.") + "\n\n" +
+          ((tenant.business as any).what_to_bring ? "\u{1F392} *Bring:* " + (tenant.business as any).what_to_bring + "\n\n" : "") +
+          ((tenant.business as any).location_phrase ? "See you " + (tenant.business as any).location_phrase + "!" : "See you soon!")
         );
         // Send confirmation email
         try {
@@ -2749,7 +2826,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (newSlotR.data) await supabase.from("slots").update({ booked: newSlotR.data.booked + sd.qty }).eq("id", ctSlotId);
       var newTotal2 = sd.qty * Number(sd.new_price);
       await supabase.from("bookings").update({ tour_id: sd.new_tour_id, slot_id: ctSlotId, unit_price: sd.new_price, total_amount: newTotal2 }).eq("id", sd.booking_id);
-      await sendText(tenant, phone, "All done! \u2705 Switched to *" + sd.new_tour_name + "* on " + (newSlotR.data ? fmtTime(tenant, newSlotR.data.start_time) : "TBC") + ".\n\nSee you on the water! \u{1F30A}");
+      var tsLoc = (tenant.business as any).location_phrase;
+      await sendText(tenant, phone, "All done! \u2705 Switched to *" + sd.new_tour_name + "* on " + (newSlotR.data ? fmtTime(tenant, newSlotR.data.start_time) : "TBC") + ".\n\n" + (tsLoc ? "See you " + tsLoc + "!" : "See you soon!"));
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
 
@@ -2884,10 +2962,41 @@ Deno.serve(async (req: any) => {
   }
   if (req.method === "POST") {
     try {
-      var body = await req.json();
+      // ── 1. Read raw body for signature verification ──
+      var rawBody = await req.text();
+      var signature = req.headers.get("x-hub-signature-256");
+      var verified = await verifyMetaSignature(rawBody, signature);
+      if (!verified) {
+        console.warn("WA webhook rejected — invalid or missing signature");
+        return new Response("Invalid signature", { status: 401 });
+      }
+
+      var body = JSON.parse(rawBody);
       var tenant = await resolveTenantByWhatsappPayload(supabase, body);
       var message = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0];
       if (!message) return new Response("OK", { status: 200 });
+
+      // ── 2. Idempotency: dedup via processed_wa_messages (id TEXT PK) ──
+      var msgId = message.id || "";
+      if (msgId) {
+        try {
+          var dedupRes = await supabase
+            .from("processed_wa_messages")
+            .insert({ id: msgId });
+          if (dedupRes.error) {
+            // Unique violation = already processed → ack and skip
+            if (String(dedupRes.error.code) === "23505" || /duplicate key|unique constraint/i.test(String(dedupRes.error.message || ""))) {
+              console.log("WA dedup skip — already processed message id:" + msgId);
+              return new Response("OK", { status: 200 });
+            }
+            // Non-uniqueness errors (e.g. table missing) → log and continue, do not block
+            console.error("WA dedup non-fatal error:", dedupRes.error);
+          }
+        } catch (dedupErr) {
+          console.error("WA dedup exception (continuing):", dedupErr);
+        }
+      }
+
       var ph = message.from; var mt = message.type; var txt = ""; var inter = null;
       if (mt === "text") txt = (message.text && message.text.body) || "";
       else if (mt === "interactive") { inter = message.interactive; txt = (inter.button_reply && inter.button_reply.title) || (inter.list_reply && inter.list_reply.title) || ""; }

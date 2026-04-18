@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappTextForTenant, resolveManageBookingsUrl, getAdminAppOrigins, isAllowedOrigin, formatTenantDateTime } from "../_shared/tenant.ts";
+import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappWithWindowReopen, resolveManageBookingsUrl, getAdminAppOrigins, isAllowedOrigin, formatTenantDateTime } from "../_shared/tenant.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -39,7 +39,10 @@ Deno.serve(async (req: any) => {
       .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
 
     var affected = bookings || [];
+    var nowIso = new Date().toISOString();
 
+    // ── Phase 1: Cancel all bookings and compute per-slot capacity deltas ──
+    var slotDeltas: Record<string, { booked: number; held: number }> = {};
     for (var i = 0; i < affected.length; i++) {
       var b = affected[i] as any;
       var isPaid = ["PAID", "CONFIRMED"].includes(b.status);
@@ -49,7 +52,7 @@ Deno.serve(async (req: any) => {
       await supabase.from("bookings").update({
         status: "CANCELLED",
         cancellation_reason: "Weather cancellation: " + cancelReason,
-        cancelled_at: new Date().toISOString(),
+        cancelled_at: nowIso,
         ...(isPaid && refundAmount > 0 ? {
           refund_status: "ACTION_REQUIRED",
           refund_amount: refundAmount,
@@ -57,18 +60,32 @@ Deno.serve(async (req: any) => {
         } : {}),
       }).eq("id", b.id);
 
-      // Release slot capacity
-      var { data: slotCancelData } = await supabase.from("slots").select("booked, held").eq("id", b.slot_id).maybeSingle();
-      if (slotCancelData) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotCancelData.booked || 0) - b.qty),
-          held: Math.max(0, (slotCancelData.held || 0) - (b.status === "HELD" ? b.qty : 0)),
-        }).eq("id", b.slot_id);
-      }
+      // Accumulate capacity deltas per slot (avoids read-then-write race)
+      if (!slotDeltas[b.slot_id]) slotDeltas[b.slot_id] = { booked: 0, held: 0 };
+      slotDeltas[b.slot_id].booked += Number(b.qty || 0);
+      if (b.status === "HELD") slotDeltas[b.slot_id].held += Number(b.qty || 0);
 
       // Cancel any active holds
       await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
+    }
 
+    // ── Phase 2: Release slot capacity in one atomic update per slot ──
+    for (var slotId of Object.keys(slotDeltas)) {
+      var delta = slotDeltas[slotId];
+      var { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", slotId).maybeSingle();
+      if (slotData) {
+        await supabase.from("slots").update({
+          booked: Math.max(0, (slotData.booked || 0) - delta.booked),
+          held: Math.max(0, (slotData.held || 0) - delta.held),
+        }).eq("id", slotId);
+      }
+    }
+
+    // ── Phase 3: Send notifications (after all DB state is consistent) ──
+    for (var i = 0; i < affected.length; i++) {
+      var b = affected[i] as any;
+      var isPaid = ["PAID", "CONFIRMED"].includes(b.status);
+      var refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
       var ref = b.id.substring(0, 8).toUpperCase();
       var tourName = b.tours?.name || "Tour";
       var startTime = b.slots?.start_time
@@ -86,22 +103,20 @@ Deno.serve(async (req: any) => {
               "Ref: " + ref + "\n\n" +
               "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
               manageBookingUrl + "\n\n" +
-              "We hope to see you on the water soon \u2014 " + brandName
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName
             : "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
               "No payment was taken, so no action is needed on your side.\n\n" +
-              "We hope to see you on the water soon \u2014 " + brandName;
-          await sendWhatsappTextForTenant(tenant, b.phone, waMessage, {
-            name: "weather_cancellation",
-            params: [
-              b.customer_name?.split(" ")[0] || "there",
-              tourName,
-              startTime,
-              ref,
-              manageBookingUrl,
-            ],
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName;
+          // Two-step flow: if 24h window is closed, send reopener template and queue
+          // the full cancellation message for drain on next customer reply.
+          await sendWhatsappWithWindowReopen(supabase, tenant, {
+            to: b.phone,
+            booking_id: b.id,
+            full_message: waMessage,
+            customer_first_name: firstName,
           });
         } catch (e) { console.error("WA weather-cancel err:", e); }
       }
