@@ -646,87 +646,45 @@ export default function Bookings() {
       }
     }
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        status: "CANCELLED",
-        cancellation_reason: "Cancelled by admin",
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq("id", b.id);
-
-    if (error) {
+    // Delegate to the cancel-booking edge function — centralises atomic
+    // state updates (status, holds, slot counters, refund_status), the
+    // two-step WhatsApp flow (reopener template + queued full message when
+    // the 24h service window is closed), email notification, and audit logging.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
       setActionBookingId(null);
-      notify({ title: "Cancel failed", message: error.message, tone: "error" });
+      notify({ title: "Session expired", message: "Please sign in again and try again.", tone: "error" });
+      return;
+    }
+    try {
+      const res = await fetch(SU + "/functions/v1/cancel-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + session.access_token,
+        },
+        body: JSON.stringify({ booking_id: b.id, reason: "Cancelled by admin" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) {
+        notify({ title: "Cancel failed", message: (data as any)?.error || res.statusText || "Unknown error", tone: "error" });
+        setActionBookingId(null);
+        return;
+      }
+      notify({
+        title: "Booking cancelled",
+        message: (data as any)?.refund_action_required
+          ? `Customer notified. Refund of R${Number((data as any).refund_amount || 0).toFixed(2)} pending their choice.`
+          : "Customer notified.",
+        tone: "success",
+      });
+    } catch (err: any) {
+      notify({ title: "Cancel failed", message: err?.message || "Network error", tone: "error" });
+      setActionBookingId(null);
       return;
     }
 
-    // Release slot capacity
-    if (b.slot_id) {
-      const slotData = await supabase.from("slots").select("booked, held").eq("id", b.slot_id).single();
-      if (slotData.data) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, slotData.data.booked - (b.qty || 1)),
-          held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? (b.qty || 1) : 0)),
-        }).eq("id", b.slot_id);
-      }
-    }
-
-    // Cancel active holds
-    await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-
-    const ref = b.id.substring(0, 8).toUpperCase();
-    const tourName = (b as any).tours?.name || (b as any).tour_name || "Tour";
-    const startTime = (b as any).slots?.start_time
-      ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
-      : "";
-    const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
-
-    // Only notify customers who actually paid — no point emailing unpaid/already-cancelled bookings
-    if (isPaidBooking) {
-      // WhatsApp notification
-      if (b.phone) {
-        try {
-          await fetch(SU + "/functions/v1/send-whatsapp-text", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-            body: JSON.stringify({
-              business_id: businessId,
-              to: b.phone,
-              message: "📋 *Booking Cancelled*\n\n" +
-                "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", your booking for " + tourName +
-                (startTime ? " on " + startTime : "") + " has been cancelled.\n\n" +
-                "📋 Ref: " + ref + "\n\n" +
-                "You will receive an email with options to reschedule, get a voucher, or request a refund.",
-            }),
-          });
-        } catch (e) { console.error("WA notify err:", e); }
-      }
-
-      // Email notification
-      if (b.email) {
-        try {
-          await supabase.functions.invoke("send-email", {
-            body: {
-              type: "CANCELLATION",
-              data: {
-                business_id: businessId,
-                email: b.email,
-                customer_name: b.customer_name,
-                ref,
-                tour_name: tourName,
-                start_time: startTime,
-                reason: "cancelled by operator",
-                total_amount: b.total_amount,
-              },
-            },
-          });
-        } catch (e) { console.error("Email notify err:", e); }
-      }
-    }
-
     setActionBookingId(null);
-    notify({ title: "Booking cancelled", message: isPaidBooking ? "The booking was cancelled and the customer was notified." : "The booking was cancelled.", tone: "success" });
     loadBookings();
   }
 
@@ -745,82 +703,17 @@ export default function Bookings() {
 
     setCancellingWeatherId(slotId);
     try {
-      await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slotId);
-
-      const affected = activeBks;
-      for (const b of affected) {
-        const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
-        const refundAmount = isPaidBooking ? Number(b.total_amount || 0) : 0;
-
-        await supabase.from("bookings").update({
-          status: "CANCELLED",
-          cancellation_reason: "Weather cancellation",
-          cancelled_at: new Date().toISOString(),
-        }).eq("id", b.id);
-
-        const slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
-        if (slotData.data) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, slotData.data.booked - b.qty),
-            held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
-          }).eq("id", slotId);
-        }
-
-        await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-
-        const ref = b.id.substring(0, 8).toUpperCase();
-        const tourName = (b as any).tours?.name || "Tour";
-        const startTime = (b as any).slots?.start_time
-          ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
-          : "";
-
-        // Only notify customers who actually paid
-        if (isPaidBooking) {
-          if (b.phone) {
-            try {
-              await fetch(SU + "/functions/v1/send-whatsapp-text", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-                body: JSON.stringify({
-                  business_id: businessId,
-                  to: b.phone,
-                  message: "⛈ *Trip Cancelled — Weather*\n\n" +
-                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                    " has been cancelled due to weather conditions.\n\n" +
-                    "📋 Ref: " + ref + "\n\n" +
-                    "Visit your My Bookings page to reschedule, get a voucher, or request a refund.",
-                }),
-              });
-            } catch (e) { console.error("WA notify err:", e); }
-          }
-
-          if (b.email) {
-            try {
-              await supabase.functions.invoke("send-email", {
-                body: {
-                  type: "CANCELLATION",
-                  data: {
-                    business_id: businessId,
-                    email: b.email,
-                    customer_name: b.customer_name,
-                    ref,
-                    tour_name: tourName,
-                    start_time: startTime,
-                    reason: "weather conditions",
-                    total_amount: refundAmount > 0 ? refundAmount : null,
-                    is_weather: true,
-                  },
-                },
-              });
-            } catch (e) { console.error("Email notify err:", e); }
-          }
-        }
-      }
-
-      const paidCount = affected.filter(b => ["PAID", "CONFIRMED"].includes(b.status)).length;
+      // Delegate to weather-cancel edge function — atomic per-slot capacity, customer notifications,
+      // and self-service compensation links. Replaces the previous N+1 read-then-write loop.
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: { slot_ids: [slotId], business_id: businessId, reason: "weather conditions" },
+      });
+      if (error) throw error;
+      const cancelled = (data as any)?.bookings_cancelled ?? activeBks.length;
+      const paidCount = activeBks.filter(b => ["PAID", "CONFIRMED"].includes(b.status)).length;
       notify({
         title: "Weather cancellation complete",
-        message: `${affected.length} booking(s) cancelled.${paidCount > 0 ? ` ${paidCount} paid customer(s) were notified.` : " No paid bookings to notify."}`,
+        message: `${cancelled} booking(s) cancelled.${paidCount > 0 ? ` ${paidCount} paid customer(s) were notified.` : " No paid bookings to notify."}`,
         tone: "success",
       });
       loadBookings();
