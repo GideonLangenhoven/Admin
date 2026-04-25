@@ -5,7 +5,7 @@ import {
   cleanupStores,
   getClientIp,
   rateLimit,
-} from "./app/lib/rate-limit";
+} from "@/app/lib/rate-limit";
 
 /**
  * Per-IP rate limiting at the platform edge (Next.js 16 proxy.ts).
