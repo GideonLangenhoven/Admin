@@ -43,23 +43,47 @@ async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
   return "";
 }
 
-async function verifyWebhookSignature(req: Request, rawBody: string, businessId: string) {
+// Verify the Yoco webhook signature. Throws on any failure.
+//
+// Hardening (post-MVP audit): we used to "skip and warn" when businessId
+// could not be resolved or the tenant had no webhook_secret. That left a
+// path for an attacker to send a forged payment.succeeded event for any
+// known checkoutId and have it processed, since the resolver still finds
+// the booking row by checkoutId and proceeds to mark it PAID.
+//
+// New rule: any payment.succeeded webhook MUST verify against a configured
+// per-tenant secret. Other event types (payment.failed, etc.) follow the
+// same rule for parity. If verification cannot be performed, reject.
+async function verifyWebhookSignature(
+  req: Request,
+  rawBody: string,
+  businessId: string,
+  eventType: string,
+) {
   if (!businessId) {
-    console.warn("YOCO_WEBHOOK_VERIFY: no businessId resolved — skipping verification");
-    return;
+    throw new Error(
+      "YOCO_WEBHOOK_VERIFY: cannot resolve business for this webhook — rejecting (event=" + eventType + ")",
+    );
   }
 
   var tenant: any;
   try {
     tenant = await getTenantByBusinessId(supabase, businessId);
   } catch (credErr) {
-    console.warn("YOCO_WEBHOOK_VERIFY: could not load credentials for business " + businessId + " — skipping verification:", credErr);
-    return;
+    throw new Error(
+      "YOCO_WEBHOOK_VERIFY: failed to load credentials for business " +
+        businessId +
+        ": " +
+        (credErr instanceof Error ? credErr.message : String(credErr)),
+    );
   }
 
   if (!tenant.credentials.yocoWebhookSecret) {
-    console.warn("YOCO_WEBHOOK_VERIFY: no webhook secret configured for business " + businessId + " — skipping verification (set it in Settings → Integration Credentials)");
-    return;
+    throw new Error(
+      "YOCO_WEBHOOK_VERIFY: no webhook secret configured for business " +
+        businessId +
+        " — rejecting until secret is set in Settings → Integration Credentials",
+    );
   }
 
   var webhook = new Webhook(tenant.credentials.yocoWebhookSecret);
@@ -293,9 +317,24 @@ Deno.serve(async (req: any) => {
     if (!checkoutId && !metaBookingId) { console.log("No checkoutId or booking_id in payload"); return new Response("OK", { status: 200 }); }
     var businessId = await resolveWebhookBusinessId(checkoutId, payload);
     try {
-      await verifyWebhookSignature(req, rawBody, businessId);
+      await verifyWebhookSignature(req, rawBody, businessId, type);
     } catch (verifyError) {
       console.error("YOCO_WEBHOOK_VERIFY_ERROR:", verifyError);
+      // Best-effort log so operators can see this in the logs table.
+      // We intentionally do not include rawBody (could contain PII).
+      try {
+        await supabase.from("logs").insert({
+          business_id: businessId || null,
+          event: "yoco_webhook_signature_failed",
+          payload: {
+            event_type: type,
+            checkout_id: checkoutId || null,
+            booking_id: metaBookingId || null,
+            yoco_payment_id: yocoPaymentId || null,
+            reason: verifyError instanceof Error ? verifyError.message : String(verifyError),
+          },
+        });
+      } catch (_logErr) { /* swallow — we already failed open above */ }
       return new Response("Unauthorized", { status: 401 });
     }
 
