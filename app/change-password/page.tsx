@@ -10,9 +10,6 @@ import {
   validateAdminSetupToken,
 } from "../lib/admin-auth";
 
-var MAX_ATTEMPTS = 5;
-var LOCKOUT_DURATION = 30 * 60 * 1000;
-
 function ChangePasswordForm() {
   var searchParams = useSearchParams();
   var mode = searchParams.get("mode");
@@ -27,7 +24,6 @@ function ChangePasswordForm() {
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
   var [success, setSuccess] = useState(false);
-  var [locked, setLocked] = useState(false);
   var [resetSent, setResetSent] = useState(false);
   var [tokenChecking, setTokenChecking] = useState(setupMode);
   var [tokenValid, setTokenValid] = useState(false);
@@ -71,17 +67,6 @@ function ChangePasswordForm() {
     validate();
   }, [setupEmailParam, setupMode, token]);
 
-  function isLocked() {
-    if (typeof window === "undefined") return false;
-    var lockUntil = Number(localStorage.getItem("ck_cp_lock_until") || "0");
-    if (lockUntil > Date.now()) return true;
-    if (lockUntil > 0) {
-      localStorage.removeItem("ck_cp_lock_until");
-      localStorage.removeItem("ck_cp_fail_count");
-    }
-    return false;
-  }
-
   async function requestResetLink(targetEmail: string) {
     var normalizedEmail = targetEmail.trim().toLowerCase();
     if (!normalizedEmail) {
@@ -124,11 +109,6 @@ function ChangePasswordForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (isLocked()) {
-      setLocked(true);
-      return;
-    }
 
     if (setupMode) {
       if (!newPass || !confirmPass) {
@@ -174,21 +154,6 @@ function ChangePasswordForm() {
 
     if (!user) {
       setLoading(false);
-
-      if (typeof window !== "undefined") {
-        var failCount = Number(localStorage.getItem("ck_cp_fail_count") || "0") + 1;
-        localStorage.setItem("ck_cp_fail_count", String(failCount));
-
-        if (failCount >= MAX_ATTEMPTS) {
-          localStorage.setItem("ck_cp_lock_until", String(Date.now() + LOCKOUT_DURATION));
-          setLocked(true);
-          await requestResetLink(email.trim().toLowerCase());
-          return;
-        }
-
-        return setError("Incorrect email or current password. " + (MAX_ATTEMPTS - failCount) + " attempt(s) remaining.");
-      }
-
       return setError("Incorrect email or current password.");
     }
 
@@ -210,12 +175,6 @@ function ChangePasswordForm() {
       return setError("Failed to update password: " + updateErr.message);
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("ck_cp_fail_count");
-      localStorage.removeItem("ck_cp_lock_until");
-      localStorage.removeItem("ck_fail_count");
-      localStorage.removeItem("ck_lock_until");
-    }
     setSuccess(true);
   }
 
@@ -242,25 +201,6 @@ function ChangePasswordForm() {
     );
   }
 
-  if (locked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-5">
-            <p className="mb-2 text-sm font-semibold text-red-700">Too Many Attempts</p>
-            <p className="text-xs leading-relaxed text-red-600">
-              Your account has been locked for 30 minutes due to too many incorrect password attempts.
-              {resetSent
-                ? " A secure password setup email has been sent."
-                : " If this is your account, a secure password setup email will be sent."}
-            </p>
-          </div>
-          <a href="/" className="text-xs text-[var(--ck-text-muted)] hover:underline">Back to sign in</a>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
       <div className="ui-surface-elevated w-full max-w-sm p-8">
@@ -282,7 +222,7 @@ function ChangePasswordForm() {
             {error && <p className="text-xs font-medium text-[var(--ck-danger)]">{error}</p>}
             <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-4">
               <p className="text-sm font-medium text-[var(--ck-text-strong)]">Need a fresh password link?</p>
-              <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Enter your admin email and we will send a new secure setup link.</p>
+              <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Enter your admin email and we will send a new password reset link.</p>
               <input
                 type="email"
                 value={resetEmail}
@@ -297,9 +237,9 @@ function ChangePasswordForm() {
                 disabled={loading}
                 className="mt-3 w-full rounded-xl bg-[var(--ck-text-strong)] py-3 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50"
               >
-                {loading ? "Sending..." : "Email New Setup Link"}
+                {loading ? "Sending..." : "Email New Reset Link"}
               </button>
-              {resetSent && <p className="mt-3 text-xs text-emerald-700">A new secure password setup link has been sent.</p>}
+              {resetSent && <p className="mt-3 text-xs text-emerald-700">A password reset link has been sent.</p>}
             </div>
             <p className="text-center text-xs text-[var(--ck-text-muted)]">
               <a href="/" className="hover:underline">Back to sign in</a>
@@ -385,7 +325,7 @@ function ChangePasswordForm() {
                 >
                   {loading ? "Sending..." : "Email Reset Link"}
                 </button>
-                {resetSent && <p className="mt-3 text-xs text-emerald-700">A secure password setup link has been sent.</p>}
+                {resetSent && <p className="mt-3 text-xs text-emerald-700">A password reset link has been sent.</p>}
               </div>
             )}
 

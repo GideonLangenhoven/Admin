@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getAdminAppOrigins } from "../_shared/tenant.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -14,6 +15,12 @@ function getCors(req?: any) {
 
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
+
+  try {
+    await requireAuth(req);
+  } catch (authErr: any) {
+    return new Response(JSON.stringify({ error: authErr.message }), { status: 401, headers: getCors(req) });
+  }
 
   try {
     var body = await req.json();

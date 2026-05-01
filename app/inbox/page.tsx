@@ -181,11 +181,13 @@ function InboxContent() {
   }, [reply]);
 
   async function loadConvos() {
+    // Cap at 200 — anything beyond is paginated history (loaded via the History tab)
     const { data } = await supabase.from("conversations")
       .select("id, phone, customer_name, email, status, current_state, updated_at")
       .eq("business_id", businessId)
       .in("status", ["HUMAN", "AGENT_PENDING"])
-      .order("updated_at", { ascending: false });
+      .order("updated_at", { ascending: false })
+      .limit(200);
     setConvos(data || []);
     setLoading(false);
   }

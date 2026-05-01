@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
 
 function serviceClient() {
     var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -10,6 +11,7 @@ function serviceClient() {
 // GET /api/partner-tours?business_id=xxx&partner_id=yyy
 // Returns active tours for the partner business, after verifying an active partnership exists.
 export async function GET(req: NextRequest) {
+    if (!isComboEnabledServer()) return comboDisabledResponse();
     var businessId = req.nextUrl.searchParams.get("business_id");
     var partnerId = req.nextUrl.searchParams.get("partner_id");
 
