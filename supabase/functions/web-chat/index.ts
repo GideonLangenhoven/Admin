@@ -62,6 +62,46 @@ function fmtTime(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?
 function dateKey(iso) { var d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: _requestTimezone }).format(d); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function normP(p) { if (!p) return ""; var c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c; }
+function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any): string | null {
+  if (faq) {
+    if (Array.isArray(faq)) {
+      for (var f of faq) {
+        var qw = String(f.question || f.q || "").toLowerCase();
+        if (qw && lo.split(/\s+/).some(function (w) { return w.length > 3 && qw.includes(w); })) {
+          return String(f.answer || f.a || "");
+        }
+      }
+    } else if (typeof faq === "object") {
+      for (var key of Object.keys(faq)) {
+        if (key && lo.split(/\s+/).some(function (w) { return w.length > 3 && key.toLowerCase().includes(w); })) {
+          return String(faq[key] || "");
+        }
+      }
+    }
+  }
+  if (lo.includes("tour") || lo.includes("offer") || lo.includes("activit") || lo.includes("experience") || lo.includes("do you do") || lo.includes("what do you")) {
+    return "Here's what we offer:\n" + tsText + "\n\nWould you like to book one?";
+  }
+  if (lo.includes("price") || lo.includes("cost") || lo.includes("how much") || lo.includes("rate") || lo.includes("fee")) {
+    return "Here are our current rates:\n" + tsText + "\n\nWould you like to book?";
+  }
+  if (lo.includes("bring") || lo.includes("wear") || lo.includes("need to have") || lo.includes("pack")) {
+    var wtb = String(business?.what_to_bring || "").trim();
+    if (wtb) return wtb;
+    return "We recommend sunscreen, a towel, and clothes that can get wet. Would you like to book a tour?";
+  }
+  if (lo.includes("meet") || lo.includes("where") || lo.includes("location") || lo.includes("direction") || lo.includes("address") || lo.includes("find you")) {
+    var dir = String(business?.directions || "").trim();
+    if (dir) return dir;
+  }
+  if (lo.includes("time") || lo.includes("when") || lo.includes("start") || lo.includes("schedule")) {
+    return "Our tours run at various times throughout the day. Here's what's available:\n" + tsText + "\n\nWould you like to pick a date to see specific times?";
+  }
+  if (lo.includes("refund") || lo.includes("cancel") || lo.includes("policy")) {
+    return "For cancellations and refunds, please reach out to us directly so we can help with your specific booking. Would you like to look up your booking?";
+  }
+  return null;
+}
 async function gemChat(hist, msg, toursList, businessId) {
   var tenant = businessId ? await getTenantByBusinessId(db, businessId).catch(function () { return null; }) : null;
   var brandName = getBusinessDisplayName(tenant?.business);
@@ -77,12 +117,8 @@ async function gemChat(hist, msg, toursList, businessId) {
     if (!GK) {
       console.warn("WEBCHAT_NO_GEMINI_KEY — falling back to FAQ search");
       var lo = String(msg).toLowerCase();
-      if (faq && Array.isArray(faq)) {
-        for (var f of faq) { var qw = String(f.question || f.q || "").toLowerCase(); if (qw && lo.split(/\s+/).some(function (w) { return w.length > 3 && qw.includes(w); })) return String(f.answer || f.a || ""); }
-      }
-      if (lo.includes("tour") || lo.includes("offer") || lo.includes("do you") || lo.includes("what") || lo.includes("activity") || lo.includes("experience")) {
-        return "We offer the following:\n" + tsText + "\n\nWould you like to book one?";
-      }
+      var faqHit = tryFaqOrToursReply(lo, faq, tsText, tenant?.business);
+      if (faqHit) return faqHit;
       return null;
     }
     var c = []; for (var h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] });
@@ -98,11 +134,24 @@ async function gemChat(hist, msg, toursList, businessId) {
       var raw = d.candidates[0].content.parts[0].text;
       var out = gateOutbound(String(raw));
       if (out.leakDetected) console.warn("WEBCHAT_GEM_LEAK:" + out.matches.join(","));
+      var gemLo = String(out.reply || "").toLowerCase();
+      var isDeflection = gemLo.includes("not sure") || gemLo.includes("don't have") || gemLo.includes("i can't help") || gemLo.includes("connect you with") || gemLo.includes("i don't know");
+      if (isDeflection) {
+        var fb3 = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+        if (fb3) return fb3;
+      }
       return out.reply;
     }
     console.warn("WEBCHAT_GEMINI_EMPTY_RESPONSE");
+    var fb = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+    if (fb) return fb;
     return null;
-  } catch (e) { console.error("WEBCHAT_GEMINI_ERR:" + String(e)); return null; }
+  } catch (e) {
+    console.error("WEBCHAT_GEMINI_ERR:" + String(e));
+    var fb2 = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+    if (fb2) return fb2;
+    return null;
+  }
 }
 async function getSlots(tourId, now) {
   var in30 = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
