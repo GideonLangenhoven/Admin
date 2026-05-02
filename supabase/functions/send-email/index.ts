@@ -1263,6 +1263,66 @@ function adminWelcomeHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function adminResetPasswordHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Password Reset</h1>
+          </td>
+        </tr>
+        ${heroImg("IMG_ADMIN", "Cape Kayak")}
+        <tr>
+          <td style="padding: 40px 40px 10px; text-align: center;">
+            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Reset your admin password</h2>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">We received a request to reset your admin dashboard password. Click the button below to set a new password.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px;">
+              <tr>
+                <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Email:</td>
+                <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 15px; text-align: right;">${d.email}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 40px 15px; text-align: center;">
+            <a href="${d.change_password_url}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Reset Your Password</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 30px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px;">
+              <tr>
+                <td style="padding: 16px; text-align: center;">
+                  <p style="margin: 0; font-size: 13px; color: #78350F; line-height: 1.5;">This reset link expires in 48 hours. If you didn't request this, you can safely ignore this email.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+            <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
+            If you have any questions, contact the main admin.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 var VAT_RATE = 0.15;
 var FROM_COMPANY = {
   name: "Cape Kayak Adventures",
@@ -1718,8 +1778,13 @@ Deno.serve(async (req: Request) => {
         html = broadcastHtml(d);
         break;
       case "ADMIN_WELCOME":
-        subject = "Cape Kayak Admin - You've Been Added";
-        html = adminWelcomeHtml(d);
+        if (d.reason === "RESET") {
+          subject = "Reset Your Admin Password";
+          html = adminResetPasswordHtml(d);
+        } else {
+          subject = "Cape Kayak Admin - You've Been Added";
+          html = adminWelcomeHtml(d);
+        }
         break;
       case "TRIP_PHOTOS":
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
