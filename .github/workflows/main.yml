@@ -1,0 +1,26 @@
+# .github/workflows/security-drift-check.yml
+name: Security drift check
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC
+  workflow_dispatch:        # also run manually from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Check security drift
+        env:
+        
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npm run check-security-drift
