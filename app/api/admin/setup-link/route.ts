@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     };
     if (shouldForceSetup) updatePayload.must_set_password = true;
 
-    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", adminId);
+    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", user.id);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
     const origin = req.nextUrl.origin || req.headers.get("origin") || "";
