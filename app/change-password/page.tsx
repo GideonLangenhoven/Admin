@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import {
   completeAdminPasswordSetup,
-  sendAdminSetupLink,
   sha256,
   validateAdminSetupToken,
 } from "../lib/admin-auth";
@@ -77,30 +76,21 @@ function ChangePasswordForm() {
     setLoading(true);
     setError("");
 
-    var { data: admin, error: adminError } = await supabase
-      .from("admin_users")
-      .select("id, email, name")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
-
-    if (adminError) {
-      setLoading(false);
-      setError("Failed to request a password link: " + adminError.message);
-      return;
-    }
-
-    if (!admin) {
-      setLoading(false);
-      setError("No admin account exists for that email.");
-      return;
-    }
-
     try {
-      await sendAdminSetupLink(admin, "RESET");
-      setResetSent(true);
+      var res = await fetch("/api/admin/setup-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send", email: normalizedEmail, reason: "RESET" }),
+      });
+      var data: any = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || "Failed to send the reset link.");
+      } else {
+        setResetSent(true);
+      }
     } catch (resetError) {
-      console.error("Failed to send password setup link:", resetError);
-      setError("Failed to send the password setup email.");
+      console.error("Failed to send password reset link:", resetError);
+      setError("Failed to send the password reset email.");
     }
 
     setLoading(false);
