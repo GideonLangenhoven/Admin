@@ -30,3 +30,9 @@ verify_jwt = false
 
 [functions.paysafe-webhook]
 verify_jwt = false
+
+[functions.auto-messages]
+verify_jwt = false
+
+[functions.cron-tasks]
+verify_jwt = false

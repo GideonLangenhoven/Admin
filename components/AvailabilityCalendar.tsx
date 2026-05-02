@@ -2,7 +2,12 @@
 import React, { useEffect, useState, createContext, useContext, useCallback, useMemo } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { format, parse, isValid, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { addMonths } from "date-fns/addMonths";
+import { endOfMonth } from "date-fns/endOfMonth";
+import { format } from "date-fns/format";
+import { isValid } from "date-fns/isValid";
+import { parse } from "date-fns/parse";
+import { startOfMonth } from "date-fns/startOfMonth";
 import { listAvailableSlots } from "../app/lib/slot-availability";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
 

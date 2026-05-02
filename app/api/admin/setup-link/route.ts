@@ -43,16 +43,19 @@ export async function POST(req: NextRequest) {
 
   // -------- send: generate token, store hash, email setup link --------
   if (action === "send") {
-    const adminId = String(body.admin_id || "");
+    const adminId = body.admin_id ? String(body.admin_id) : "";
+    const adminEmail = body.email ? String(body.email).trim().toLowerCase() : "";
     const reason = String(body.reason || "ADMIN_INVITE");
     const businessId = body.business_id ? String(body.business_id) : null;
-    if (!adminId) return NextResponse.json({ error: "admin_id is required" }, { status: 400 });
+    if (!adminId && !adminEmail) return NextResponse.json({ error: "admin_id or email is required" }, { status: 400 });
 
-    const { data: user, error: lookupErr } = await admin
-      .from("admin_users")
-      .select("id, email, name")
-      .eq("id", adminId)
-      .maybeSingle();
+    let lookupQuery = admin.from("admin_users").select("id, email, name");
+    if (adminId) {
+      lookupQuery = lookupQuery.eq("id", adminId);
+    } else {
+      lookupQuery = lookupQuery.eq("email", adminEmail);
+    }
+    const { data: user, error: lookupErr } = await lookupQuery.maybeSingle();
     if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 });
     if (!user) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
 
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
     };
     if (shouldForceSetup) updatePayload.must_set_password = true;
 
-    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", adminId);
+    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", user.id);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
     const origin = req.nextUrl.origin || req.headers.get("origin") || "";

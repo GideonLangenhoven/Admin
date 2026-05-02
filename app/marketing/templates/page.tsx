@@ -121,109 +121,97 @@ export default function TemplatesPage() {
   }
 
   async function sendTestEmail(t: Template) {
-    // Resolve test recipient: designated marketing test email > current admin's email
-    var testEmail = "";
-    var testName = "Admin";
-
-    // Check if business has a designated marketing test email
-    var { data: biz } = await supabase
-      .from("businesses")
-      .select("marketing_test_email")
-      .eq("id", businessId)
-      .maybeSingle();
-    if (biz?.marketing_test_email) {
-      testEmail = biz.marketing_test_email;
-      // Look up the admin name for that email
-      var { data: adminRow } = await supabase
-        .from("admin_users")
-        .select("name")
-        .eq("email", testEmail)
-        .eq("business_id", businessId)
-        .maybeSingle();
-      testName = adminRow?.name || "Admin";
-    }
-
-    // Fallback to current admin's email from session or DB
-    if (!testEmail) {
-      testEmail = localStorage.getItem("ck_admin_email") || "";
-      testName = localStorage.getItem("ck_admin_name") || "Admin";
-    }
-
-    // If still no email, look up the first admin for this business
-    if (!testEmail) {
-      var { data: fallbackAdmin } = await supabase
-        .from("admin_users")
-        .select("email, name")
-        .eq("business_id", businessId)
-        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
-        .order("created_at")
-        .limit(1)
-        .maybeSingle();
-      if (fallbackAdmin?.email) {
-        testEmail = fallbackAdmin.email;
-        testName = fallbackAdmin.name || "Admin";
-        // Persist for next time
-        localStorage.setItem("ck_admin_email", testEmail);
-        if (fallbackAdmin.name) localStorage.setItem("ck_admin_name", fallbackAdmin.name);
-      }
-    }
-
-    if (!testEmail) {
-      notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
-      return;
-    }
-
-    notify({ message: `Sending test email to ${testEmail}...`, tone: "info" });
-
-    // Create a one-off campaign + single queue entry
-    var { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
-      business_id: businessId,
-      template_id: t.id,
-      name: "[TEST] " + t.name,
-      subject_line: "[TEST] " + t.subject_line,
-      status: "sending",
-      total_recipients: 1,
-      started_at: new Date().toISOString(),
-    }).select("id").single();
-    if (campErr || !campaign) {
-      notify({ message: campErr?.message || "Failed to create test campaign", tone: "error" });
-      return;
-    }
-
-    // Ensure the recipient exists as a contact
-    await supabase.from("marketing_contacts")
-      .upsert({
-        business_id: businessId,
-        email: testEmail,
-        first_name: testName.split(" ")[0] || "Admin",
-        source: "test",
-      }, { onConflict: "business_id,email" });
-    var { data: contact } = await supabase.from("marketing_contacts")
-      .select("id")
-      .eq("business_id", businessId)
-      .eq("email", testEmail)
-      .single();
-    if (!contact) {
-      notify({ message: "Failed to resolve contact for test.", tone: "error" });
-      return;
-    }
-
-    await supabase.from("marketing_queue").insert({
-      business_id: businessId,
-      campaign_id: campaign.id,
-      contact_id: contact.id,
-      email: testEmail,
-      first_name: testName.split(" ")[0] || "Admin",
-    });
-
-    // Trigger dispatch immediately so the test email sends now (don't wait for cron)
     try {
-      await supabase.functions.invoke("marketing-dispatch");
-    } catch (dispatchErr) {
-      console.warn("marketing-dispatch invoke failed, email will send on next cron cycle:", dispatchErr);
-    }
+      // Resolve test recipient: designated marketing test email > current admin's email
+      var testEmail = "";
+      var testName = "Admin";
 
-    notify({ message: `Test email sent to ${testEmail}.`, tone: "success" });
+      // Check if business has a designated marketing test email
+      var { data: biz, error: bizErr } = await supabase
+        .from("businesses")
+        .select("marketing_test_email")
+        .eq("id", businessId)
+        .maybeSingle();
+      if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
+      if (biz?.marketing_test_email) {
+        testEmail = biz.marketing_test_email;
+        var { data: adminRow } = await supabase
+          .from("admin_users")
+          .select("name")
+          .eq("email", testEmail)
+          .eq("business_id", businessId)
+          .maybeSingle();
+        testName = adminRow?.name || "Admin";
+      }
+
+      // Fallback to current admin's email from session or DB
+      if (!testEmail) {
+        testEmail = localStorage.getItem("ck_admin_email") || "";
+        testName = localStorage.getItem("ck_admin_name") || "Admin";
+      }
+
+      // If still no email, look up the first admin for this business
+      if (!testEmail) {
+        var { data: fallbackAdmin } = await supabase
+          .from("admin_users")
+          .select("email, name")
+          .eq("business_id", businessId)
+          .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+          .order("created_at")
+          .limit(1)
+          .maybeSingle();
+        if (fallbackAdmin?.email) {
+          testEmail = fallbackAdmin.email;
+          testName = fallbackAdmin.name || "Admin";
+          localStorage.setItem("ck_admin_email", testEmail);
+          if (fallbackAdmin.name) localStorage.setItem("ck_admin_name", fallbackAdmin.name);
+        }
+      }
+
+      if (!testEmail) {
+        notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
+        return;
+      }
+
+      console.log("[MARKETING_TEST] Sending to:", testEmail, "template:", t.name, "businessId:", businessId);
+      notify({ message: `Sending test email to ${testEmail}...`, tone: "info" });
+
+      var { data: sendResult, error: sendErr } = await supabase.functions.invoke("send-email", {
+        body: {
+          type: "MARKETING_TEST",
+          data: {
+            business_id: businessId,
+            email: testEmail,
+            first_name: testName.split(" ")[0] || "Admin",
+            subject_line: "[TEST] " + t.subject_line,
+            html_content: t.html_content || "<p>No content</p>",
+          },
+        },
+      });
+
+      console.log("[MARKETING_TEST] Response:", { sendResult, sendErr: sendErr?.message });
+
+      if (sendErr) {
+        // supabase.functions.invoke wraps non-2xx as FunctionsHttpError — read the body
+        var errDetail = sendErr.message || "Unknown error";
+        try {
+          var errBody = typeof sendResult === "object" ? sendResult : null;
+          if (errBody?.error) errDetail = errBody.error;
+        } catch { /* ignore */ }
+        notify({ message: "Test email failed: " + errDetail, tone: "error" });
+        return;
+      }
+
+      if (sendResult?.error) {
+        notify({ message: "Test email failed: " + sendResult.error, tone: "error" });
+        return;
+      }
+
+      notify({ message: `Test email sent to ${testEmail}.`, tone: "success" });
+    } catch (err: unknown) {
+      console.error("[MARKETING_TEST] Unexpected error:", err);
+      notify({ message: "Test email failed: " + (err instanceof Error ? err.message : String(err)), tone: "error" });
+    }
   }
 
   async function sendCampaign() {

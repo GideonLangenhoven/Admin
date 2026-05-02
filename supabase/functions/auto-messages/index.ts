@@ -72,7 +72,10 @@ async function sendRemindersForBusiness(businessId: string) {
   var timezone = tenant.business.timezone || "UTC";
   var tomorrowKey = addDaysToToday(timezone, 1);
   var brandName = getBusinessDisplayName(tenant.business);
-  var meetingPoint = tenant.business.directions || brandName;
+  var meetingPoint = tenant.business.directions || "";
+  var whatToBring = (tenant.business as any).what_to_bring || "";
+  var activityVerbPast = (tenant.business as any).activity_verb_past || "joining us";
+  var locationPhrase = (tenant.business as any).location_phrase || "";
 
   var { data: bookings } = await db.from("bookings")
     .select("id, business_id, customer_name, phone, qty, tours(name), slots(start_time)")
@@ -99,9 +102,8 @@ async function sendRemindersForBusiness(businessId: string) {
       tourNameR + "\n" +
       timeStr + "\n" +
       qtyStr + " guest" + (Number(booking.qty || 0) === 1 ? "" : "s") + "\n\n" +
-      "\u{1F4CD} Meeting point: " + meetingPoint + "\n" +
-      "Please arrive 15 minutes early.\n\n" +
-      "\u{1F392} Bring: Sunscreen, hat, towel, water bottle\n\n" +
+      (meetingPoint ? "\u{1F4CD} Meeting point: " + meetingPoint + "\n" + "Please arrive 15 minutes early.\n\n" : "") +
+      (whatToBring ? "\u{1F392} Bring: " + whatToBring + "\n\n" : "") +
       "Need to make changes? " + myBookingsUrl;
 
     try {
@@ -204,7 +206,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
     var message =
       "Hi " + firstName + ", thanks for joining " + brandName + " today! \u{1F30A}\n\n" +
-      "We\u2019d love a quick review if you have a moment \u2014 it really helps other adventurers find us and means the world to our small team.\n\n" +
+      "We\u2019d love a quick review if you have a moment \u2014 it really helps others find us and means the world to our small team.\n\n" +
       "Your trip photos and booking details: " + myBookingsUrl;
 
     try {
@@ -272,7 +274,8 @@ async function sendReEngagementForBusiness(businessId: string) {
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
     var bookingSiteUrl = tenant.business.booking_site_url || resolveManageBookingsUrl(tenant.business).replace("/my-bookings", "");
-    var message = "Hi " + firstName + ", it\u2019s been a while since your last trip with " + brandName + "! \u{1F6F6}\n\nWe\u2019d love to welcome you back on the water. Browse our latest trips and availability:\n" + bookingSiteUrl;
+    var reLocationPhrase = (tenant.business as any).location_phrase;
+    var message = "Hi " + firstName + ", it\u2019s been a while since your last trip with " + brandName + "!\n\nWe\u2019d love to welcome you back" + (reLocationPhrase ? " " + reLocationPhrase : "") + ". Browse our latest trips and availability:\n" + bookingSiteUrl;
 
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message);

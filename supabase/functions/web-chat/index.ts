@@ -1,6 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin } from "../_shared/tenant.ts";
+import {
+  gateInbound,
+  gateOutbound,
+  hardenSystemPrompt,
+  KB_REFUSAL_REPLY,
+} from "../_shared/bot-guards.ts";
 var GK = Deno.env.get("GEMINI_API_KEY");
 var SU = Deno.env.get("SUPABASE_URL");
 var SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -55,23 +61,97 @@ function fmtDate(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?
 function fmtTime(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
 function dateKey(iso) { var d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: _requestTimezone }).format(d); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
-function normP(p) { if (!p) return ""; var c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); return c; }
+function normP(p) { if (!p) return ""; var c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c; }
+function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any): string | null {
+  if (faq) {
+    if (Array.isArray(faq)) {
+      for (var f of faq) {
+        var qw = String(f.question || f.q || "").toLowerCase();
+        if (qw && lo.split(/\s+/).some(function (w) { return w.length > 3 && qw.includes(w); })) {
+          return String(f.answer || f.a || "");
+        }
+      }
+    } else if (typeof faq === "object") {
+      for (var key of Object.keys(faq)) {
+        if (key && lo.split(/\s+/).some(function (w) { return w.length > 3 && key.toLowerCase().includes(w); })) {
+          return String(faq[key] || "");
+        }
+      }
+    }
+  }
+  if (lo.includes("tour") || lo.includes("offer") || lo.includes("activit") || lo.includes("experience") || lo.includes("do you do") || lo.includes("what do you")) {
+    return "Here's what we offer:\n" + tsText + "\n\nWould you like to book one?";
+  }
+  if (lo.includes("price") || lo.includes("cost") || lo.includes("how much") || lo.includes("rate") || lo.includes("fee")) {
+    return "Here are our current rates:\n" + tsText + "\n\nWould you like to book?";
+  }
+  if (lo.includes("bring") || lo.includes("wear") || lo.includes("need to have") || lo.includes("pack")) {
+    var wtb = String(business?.what_to_bring || "").trim();
+    if (wtb) return wtb;
+    return "We recommend sunscreen, a towel, and clothes that can get wet. Would you like to book a tour?";
+  }
+  if (lo.includes("meet") || lo.includes("where") || lo.includes("location") || lo.includes("direction") || lo.includes("address") || lo.includes("find you")) {
+    var dir = String(business?.directions || "").trim();
+    if (dir) return dir;
+  }
+  if (lo.includes("time") || lo.includes("when") || lo.includes("start") || lo.includes("schedule")) {
+    return "Our tours run at various times throughout the day. Here's what's available:\n" + tsText + "\n\nWould you like to pick a date to see specific times?";
+  }
+  if (lo.includes("refund") || lo.includes("cancel") || lo.includes("policy")) {
+    return "For cancellations and refunds, please reach out to us directly so we can help with your specific booking. Would you like to look up your booking?";
+  }
+  return null;
+}
 async function gemChat(hist, msg, toursList, businessId) {
+  var tenant = businessId ? await getTenantByBusinessId(db, businessId).catch(function () { return null; }) : null;
+  var brandName = getBusinessDisplayName(tenant?.business);
+  var tsText = (toursList || []).map(function (t) { return "- " + t.name + ": R" + t.base_price_per_person + "/pp, " + t.duration_minutes + " min"; }).join("\n");
+  var faq = tenant?.business?.faq_json;
   try {
+    // Pre-LLM injection check.
+    var gate = gateInbound(String(msg || ""));
+    if (!gate.safe) {
+      console.log("WEBCHAT_GEM_GATED:" + gate.reason);
+      return gate.reply || KB_REFUSAL_REPLY;
+    }
+    if (!GK) {
+      console.warn("WEBCHAT_NO_GEMINI_KEY — falling back to FAQ search");
+      var lo = String(msg).toLowerCase();
+      var faqHit = tryFaqOrToursReply(lo, faq, tsText, tenant?.business);
+      if (faqHit) return faqHit;
+      return null;
+    }
     var c = []; for (var h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] });
-    c.push({ role: "user", parts: [{ text: msg }] });
-    var tsText = (toursList || []).map(function (t) { return "- " + t.name + ": R" + t.base_price_per_person + "/pp"; }).join("\n");
-    var tenant = businessId ? await getTenantByBusinessId(db, businessId).catch(function () { return null; }) : null;
-    var brandName = getBusinessDisplayName(tenant?.business);
-    var sysText = (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human. Never invent availability, pricing, or policy details."))
+    c.push({ role: "user", parts: [{ text: gate.cleaned || msg }] });
+    var sysBase = (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human. Never invent availability, pricing, or policy details."))
       + "\n\nCurrent available tours:\n" + tsText
-      + (tenant?.business?.faq_json ? "\n\nFAQ:\n" + JSON.stringify(tenant.business.faq_json) : "")
+      + (faq ? "\n\nFAQ:\n" + JSON.stringify(faq) : "")
       + (tenant?.business?.terminology ? "\n\nTerminology:\n" + JSON.stringify(tenant.business.terminology) : "");
+    var sysText = hardenSystemPrompt(sysBase);
     var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(8000), body: JSON.stringify({ system_instruction: { parts: [{ text: sysText }] }, contents: c, generationConfig: { temperature: 0.7, maxOutputTokens: 150 } }) });
     var d = await r.json();
-    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]) return d.candidates[0].content.parts[0].text;
+    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]) {
+      var raw = d.candidates[0].content.parts[0].text;
+      var out = gateOutbound(String(raw));
+      if (out.leakDetected) console.warn("WEBCHAT_GEM_LEAK:" + out.matches.join(","));
+      var gemLo = String(out.reply || "").toLowerCase();
+      var isDeflection = gemLo.includes("not sure") || gemLo.includes("don't have") || gemLo.includes("i can't help") || gemLo.includes("connect you with") || gemLo.includes("i don't know");
+      if (isDeflection) {
+        var fb3 = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+        if (fb3) return fb3;
+      }
+      return out.reply;
+    }
+    console.warn("WEBCHAT_GEMINI_EMPTY_RESPONSE");
+    var fb = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+    if (fb) return fb;
     return null;
-  } catch (e) { return null; }
+  } catch (e) {
+    console.error("WEBCHAT_GEMINI_ERR:" + String(e));
+    var fb2 = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
+    if (fb2) return fb2;
+    return null;
+  }
 }
 async function getSlots(tourId, now) {
   var in30 = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -99,20 +179,45 @@ Deno.serve(async (req) => {
     var requestOrigin = req?.headers?.get("origin") || "";
     // L10: Reset timezone at start of each request
     _requestTimezone = "UTC";
-    if (requestedBusinessId) {
-      var requestTenant = await getTenantByBusinessId(db, requestedBusinessId).catch(function () { return null; });
-      _requestTimezone = requestTenant?.business?.timezone || "UTC";
-      if (requestTenant && requestOrigin) {
-        var allowedOrigins = getBusinessAllowedOrigins(requestTenant.business);
-        if (!isAllowedOrigin(requestOrigin, allowedOrigins)) {
-          return new Response(JSON.stringify({ reply: "Origin not allowed for this business.", state: { step: "IDLE" } }), { status: 403, headers: gCors(requestOrigin) });
+
+    // SECURITY: business_id is REQUIRED to prevent cross-tenant data leaks.
+    // Previously, if the frontend omitted business_id (e.g. on the initial chat call before
+    // a tour was picked), the tours query ran unfiltered and returned tours from EVERY business.
+    // We now resolve the business from the Origin's subdomain as a fallback, and refuse
+    // the request if it still can't be determined.
+    if (!requestedBusinessId && requestOrigin) {
+      try {
+        var hostname = new URL(requestOrigin).hostname;
+        var bookingMatch = hostname.match(/^([^.]+)\.booking\.bookingtours\.co\.za$/i);
+        var subdomain = bookingMatch ? bookingMatch[1].toLowerCase() : "";
+        if (subdomain) {
+          var { data: bizBySub } = await db
+            .from("businesses")
+            .select("id")
+            .eq("subdomain", subdomain)
+            .maybeSingle();
+          if (bizBySub?.id) requestedBusinessId = bizBySub.id;
         }
-      }
-    } else {
-      _requestTimezone = "UTC";
+      } catch (_e) { /* fall through to 400 below */ }
     }
-    var toursQuery = db.from("tours").select("*").eq("active", true).order("sort_order", { ascending: true });
-    if (requestedBusinessId) toursQuery = toursQuery.eq("business_id", requestedBusinessId);
+    if (!requestedBusinessId) {
+      return new Response(
+        JSON.stringify({ reply: "Missing business context. Please open this chat from a booking site.", state: { step: "IDLE" } }),
+        { status: 400, headers: gCors(requestOrigin) }
+      );
+    }
+
+    var requestTenant = await getTenantByBusinessId(db, requestedBusinessId).catch(function () { return null; });
+    _requestTimezone = requestTenant?.business?.timezone || "UTC";
+    if (requestTenant && requestOrigin) {
+      var allowedOrigins = getBusinessAllowedOrigins(requestTenant.business);
+      if (!isAllowedOrigin(requestOrigin, allowedOrigins)) {
+        return new Response(JSON.stringify({ reply: "Origin not allowed for this business.", state: { step: "IDLE" } }), { status: 403, headers: gCors(requestOrigin) });
+      }
+    }
+
+    // SECURITY: tours query is now ALWAYS scoped to the requesting business.
+    var toursQuery = db.from("tours").select("*").eq("business_id", requestedBusinessId).eq("active", true).neq("hidden", true).order("sort_order", { ascending: true });
     var { data: allT } = await toursQuery;
     var tours = (allT || []).filter(function (t) { return !t.hidden; });
     var lo = msg.toLowerCase().trim(); var step = state.step || "IDLE";
@@ -153,7 +258,7 @@ Deno.serve(async (req) => {
     if (step === "IDLE" && isBtnClick) {
       if (btnVal === "book" || btnVal === "btn:book") {
         ns = { step: "PICK_TOUR" };
-        reply = pick(["Which tour are you keen on?", "Let's get you on the water! Which tour?"]);
+        reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
         buttons = tours.map(function (t4) { return { label: t4.name + " \u2014 R" + t4.base_price_per_person, value: t4.id }; });
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
@@ -200,11 +305,11 @@ Deno.serve(async (req) => {
           } else { reply = "No " + mt.name + " slots in the next month 😔 Want to try the other tour?"; buttons = tours.filter(function (t2) { return t2.id !== mt.id; }).map(function (t3) { return { label: t3.name + " — R" + t3.base_price_per_person, value: t3.id }; }); ns.step = "PICK_TOUR"; }
         } else {
           ns = { step: "PICK_TOUR" };
-          reply = pick(["Which tour are you keen on?", "Let's get you on the water! Which tour?"]);
+          reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
           buttons = tours.map(function (t4) { return { label: t4.name + " — R" + t4.base_price_per_person, value: t4.id }; });
         }
       }
-      else { var gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); reply = gem || "Hey! Want to book an experience or got a question?"; }
+      else { var gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I can help you book a tour or answer questions about our experiences!"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }]; } }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== PICK_TOUR =====
@@ -467,25 +572,13 @@ Deno.serve(async (req) => {
         var { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "GROUP_5PCT" : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", custom_fields: ns.custom_fields || {} }).select().single();
         if (!bk) { reply = "Something went wrong — try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {
-          // L20: Set total_captured for voucher bookings (full amount captured via voucher)
-          await db.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_CHAT", total_captured: ft }).eq("id", bk.id);
-          if (ns.vid) {
-            // Atomic deduction via RPC — prevents double-spend race condition
-            var chatDeductionAmount = Number(ns.vded || ns.baseTotal || ns.tprice * ns.qty || 0);
-            var chatRpcRes = await db.rpc("deduct_voucher_balance", { p_voucher_id: ns.vid, p_amount: chatDeductionAmount });
-            if (chatRpcRes.data?.success) {
-              await db.from("vouchers").update({ redeemed_booking_id: bk.id }).eq("id", ns.vid);
-            } else {
-              // Fallback if RPC fails
-              await db.from("vouchers").update({ status: "REDEEMED", redeemed_at: now.toISOString(), redeemed_booking_id: bk.id }).eq("id", ns.vid);
-            }
-          }
-          // H1: Use atomic RPC for capacity check even for voucher bookings, then convert hold to booking
+          // H1 (MVP fix): capacity check MUST run BEFORE voucher deduction.
+          // Otherwise a sold-out slot would still drain the voucher balance.
           var voucherHoldRes = await db.rpc("create_hold_with_capacity_check", {
             p_booking_id: bk.id,
             p_slot_id: ns.slotId,
             p_qty: ns.qty,
-            p_expires_at: new Date(now.getTime() + 2 * 60 * 1000).toISOString(), // Short 2-min expiry
+            p_expires_at: new Date(now.getTime() + 2 * 60 * 1000).toISOString(),
           });
           if (voucherHoldRes.error || !voucherHoldRes.data?.success) {
             await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", bk.id);
@@ -493,15 +586,26 @@ Deno.serve(async (req) => {
             ns = { step: "IDLE" };
             return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
           }
+          // Capacity reserved — now mark PAID + drain voucher
+          await db.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_CHAT", total_captured: ft }).eq("id", bk.id);
+          if (ns.vid) {
+            var chatDeductionAmount = Number(ns.vded || ns.baseTotal || ns.tprice * ns.qty || 0);
+            var chatRpcRes = await db.rpc("deduct_voucher_balance", { p_voucher_id: ns.vid, p_amount: chatDeductionAmount });
+            if (chatRpcRes.data?.success) {
+              await db.from("vouchers").update({ redeemed_booking_id: bk.id }).eq("id", ns.vid);
+            } else {
+              await db.from("vouchers").update({ status: "REDEEMED", redeemed_at: now.toISOString(), redeemed_booking_id: bk.id }).eq("id", ns.vid);
+            }
+          }
           var waiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
           // Send booking confirmation email for voucher bookings
           var vRef = bk.id.substring(0, 8).toUpperCase();
           try { await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: bk.id, business_id: businessId, email: ns.email, customer_name: ns.name, ref: vRef, tour_name: ns.tname, start_time: fmtS(ns.slotTime), qty: ns.qty, total_amount: "FREE (voucher)" } }) }); } catch (e) { console.log("webchat voucher confirm email err"); }
           // Send WhatsApp confirmation if phone provided
           // L1: Use dynamic meeting point instead of hardcoded address
-          if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n\n\u{1F392} *Bring:* Sunscreen, hat, towel, water bottle\n\nSee you on the water! \u{1F30A}" }) }); } catch (e) { console.log("webchat voucher wa err"); } }
-          // L1: Use dynamic meeting point
-          reply = "🎉 You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n📍 " + meetingPointText + " — arrive 15 min early. See you on the water! 🛶"; ns = { step: "IDLE" };
+          var wcLoc = (tenant?.business as any)?.location_phrase; var wcWtb = (tenant?.business as any)?.what_to_bring;
+          if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
+          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!"); ns = { step: "IDLE" };
         } else {
           // Atomic capacity check + hold creation to prevent overbooking
           var holdRes = await db.rpc("create_hold_with_capacity_check", {
@@ -694,7 +798,8 @@ Deno.serve(async (req) => {
       });
       if (rbErr || rbData?.error) { reply = "Something went wrong changing your booking. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      reply = "\u2705 Rescheduled to " + fmt(rsSlot.start_time) + "!\n\nSee you on the water! \u{1F30A}";
+      var rsLoc = (tenant?.business as any)?.location_phrase;
+      reply = "\u2705 Rescheduled to " + fmt(rsSlot.start_time) + "!\n\n" + (rsLoc ? "See you " + rsLoc + "!" : "See you soon!");
       if (rbData?.diff > 0) {
         reply = "\u2705 Timeslot updated!\n\nAs this was more expensive, you have a balance of R" + rbData.diff + ". Please pay using the link below:";
         pay = rbData.payment_url;
@@ -775,7 +880,8 @@ Deno.serve(async (req) => {
       });
       if (rbErr2 || rbData2?.error) { reply = "Something went wrong changing your tour. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      reply = "\u2705 Switched to *" + ns.new_tour_name + "* on " + fmt(ctsSl.start_time) + "!\n\nSee you on the water! \u{1F30A}";
+      var ctsLoc = (tenant?.business as any)?.location_phrase;
+      reply = "\u2705 Switched to *" + ns.new_tour_name + "* on " + fmt(ctsSl.start_time) + "!\n\n" + (ctsLoc ? "See you " + ctsLoc + "!" : "See you soon!");
       if (rbData2?.diff > 0) {
         reply = "\u2705 Tour switched!\n\nAs this tour is more expensive, you have a balance of R" + rbData2.diff + ". Please pay using the link below:";
         pay = rbData2.payment_url;

@@ -382,75 +382,102 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Dashboard Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pt-2">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h2>
+                    <p className="text-sm text-gray-500 mt-1">Plan, prioritize, and accomplish your bookings with ease.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Link href="/new-booking" className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 bg-donezo-gradient shadow-sm">
+                        <Plus size={16} weight="bold" /> Add Booking
+                    </Link>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Today Pax */}
-                <Link href="/bookings" className="block p-5 transition-transform hover:-translate-y-1 relative group rounded-2xl shadow-sm" style={{ background: "var(--ck-accent)", color: "#ffffff", border: "1px solid var(--ck-accent)" }}>
-                    <div className="mb-4">
-                        <span className="text-[15px] font-medium text-white/90">Today&apos;s Pax</span>
+                <Link href="/bookings" className="block p-6 transition-all hover:-translate-y-1 relative group rounded-[24px] shadow-sm bg-donezo-gradient text-white">
+                    <div className="flex justify-between items-start mb-6">
+                        <span className="text-[16px] font-medium text-white/90">Today's Pax</span>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:scale-110">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
+                        </div>
                     </div>
                     <div>
-                        <div className="text-[36px] font-bold tracking-tight text-white mb-2 leading-none">
+                        <div className="text-[46px] font-bold tracking-tight text-white mb-4 leading-none">
                             {todayPax}
                         </div>
-                        <div className="flex items-center gap-2 mt-4 text-[13px] text-white/90 font-medium">
-                            <span className="flex items-center justify-center border border-white/40 rounded px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10">
-                                {todayBookings}
+                        <div className="flex items-center gap-2 text-[13px] text-white/90 font-medium">
+                            <span className="flex items-center gap-1 border border-white/30 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10">
+                                {todayBookings} trips
                             </span>
-                            <span>trips booked vs {tomorrowPax} tmrw</span>
+                            <span>booked vs {tomorrowPax} tmrw</span>
                         </div>
                     </div>
                 </Link>
 
                 {/* Refunds */}
-                <Link href="/refunds" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="mb-4">
-                        <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Pending Refunds</span>
+                <Link href="/refunds" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-start mb-6">
+                        <span className="text-[16px] font-medium text-gray-900">Pending Refunds</span>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
+                        </div>
                     </div>
                     <div>
-                        <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
-                            R {refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900">
+                            {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
                         </div>
-                        <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
-                            <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                                {refundCount > 0 ? refundCount : "0"} req
+                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
+                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 256 256"><path d="M213.66,165.66a8,8,0,0,1-11.32,0L128,91.31,53.66,165.66a8,8,0,0,1-11.32-11.32l80-80a8,8,0,0,1,11.32,0l80,80A8,8,0,0,1,213.66,165.66Z"></path></svg>
+                                {refundCount}
                             </span>
-                            <span style={{ color: "var(--ck-text-muted)" }}>awaiting approval</span>
+                            <span>awaiting approval</span>
                         </div>
                     </div>
                 </Link>
 
                 {/* Inbox */}
-                <Link href="/inbox" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="mb-4">
-                        <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Inbox Action</span>
+                <Link href="/inbox" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-start mb-6">
+                        <span className="text-[16px] font-medium text-gray-900">Inbox Action</span>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
+                        </div>
                     </div>
                     <div>
-                        <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
-                            {inboxCount} msgs
+                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900 flex items-baseline gap-1">
+                            {inboxCount} <span className="text-[20px] text-gray-400 font-medium">msgs</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
-                            <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
+                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
                                 {inboxCount > 0 ? "Waiting" : "Clear"}
                             </span>
-                            <span style={{ color: "var(--ck-text-muted)" }}>conversations</span>
+                            <span>conversations</span>
                         </div>
                     </div>
                 </Link>
 
                 {/* Photos */}
-                <Link href="/photos" className="block ui-surface p-5 transition-transform hover:-translate-y-1 group rounded-2xl border" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                    <div className="mb-4">
-                        <span className="text-[15px] font-medium" style={{ color: "var(--ck-text-strong)" }}>Photos Out</span>
+                <Link href="/photos" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-start mb-6">
+                        <span className="text-[16px] font-medium text-gray-900">Photos Out</span>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
+                        </div>
                     </div>
                     <div>
-                        <div className="text-[36px] font-bold tracking-tight mb-2 leading-none" style={{ color: "var(--ck-text-strong)" }}>
-                            {photosOutstanding} trips
+                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900 flex items-baseline gap-1">
+                            {photosOutstanding} <span className="text-[20px] text-gray-400 font-medium">trips</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-4 text-[13px] font-medium" style={{ color: "var(--ck-success)" }}>
-                            <span className="flex items-center justify-center border rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--ck-success-soft)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
+                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 256 256"><path d="M213.66,165.66a8,8,0,0,1-11.32,0L128,91.31,53.66,165.66a8,8,0,0,1-11.32-11.32l80-80a8,8,0,0,1,11.32,0l80,80A8,8,0,0,1,213.66,165.66Z"></path></svg>
                                 {photosOutstanding > 0 ? "Missing" : "Clear"}
                             </span>
-                            <span style={{ color: "var(--ck-text-muted)" }}>photo uploads</span>
+                            <span>photo uploads</span>
                         </div>
                     </div>
                 </Link>
@@ -458,8 +485,8 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* ── Today's Manifest (pax per slot) ── */}
-                <div className="ui-surface flex flex-col">
-                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <div>
                                 <div className="flex items-center gap-2">
@@ -532,7 +559,7 @@ export default function Dashboard() {
                                                     <div className="font-bold text-[16px]" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax}</div>
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
-                                                    <span className={`inline-block rounded-full px-2.5 py-1 text-[12px] font-bold ${slot.checkedIn === slot.totalPax && slot.totalPax > 0 ? "bg-emerald-100 text-emerald-700" : "text-amber-700"}`} style={slot.checkedIn === slot.totalPax && slot.totalPax > 0 ? {} : { background: "var(--ck-surface-elevated)", color: "var(--ck-text-muted)" }}>
+                                                    <span className={`inline-block rounded-full px-2.5 py-1 text-[12px] font-bold ${slot.checkedIn === slot.totalPax && slot.totalPax > 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                                                         {slot.checkedIn}/{slot.totalPax}
                                                     </span>
                                                 </td>
@@ -559,8 +586,8 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Roll Call ── */}
-                <div className="ui-surface flex flex-col">
-                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <div>
                                 <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
@@ -593,8 +620,7 @@ export default function Dashboard() {
                                 {manualSlotNav && (
                                     <button
                                         onClick={() => setManualSlotNav(false)}
-                                        className="ml-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors"
-                                        style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}
+                                        className="ml-1 px-3 py-1.5 rounded-full text-[11px] font-bold text-white transition-all hover:opacity-90 shadow-sm bg-donezo-gradient"
                                         title="Resume auto-advance"
                                     >
                                         Auto
@@ -649,10 +675,10 @@ export default function Dashboard() {
                                                     <div className="font-bold text-[14px]" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</div>
                                                 </td>
                                                 <td className="px-4 py-3.5 text-right">
-                                                    <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-medium ${
-                                                        b.checked_in ? "bg-emerald-100 text-emerald-700"
-                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "bg-blue-100 text-blue-700"
-                                                        : "bg-amber-100 text-amber-700"
+                                                    <span className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                                        b.checked_in ? "bg-emerald-50 text-emerald-700"
+                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "bg-blue-50 text-blue-700"
+                                                        : "bg-amber-50 text-amber-700"
                                                     }`}>
                                                         {b.checked_in ? "Present" : b.status}
                                                     </span>
@@ -679,13 +705,13 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 gap-6">
                 {/* ── Weather Block ── */}
-                <div className="ui-surface flex flex-col">
-                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
                         </div>
-                        <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium border rounded-full transition-colors hover:bg-gray-50 bg-white" style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}>
-                            Manage Locations <GearSix size={14} />
+                        <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-bold rounded-full transition-all text-white shadow-sm hover:opacity-90 bg-donezo-gradient">
+                            Manage Locations <GearSix size={14} weight="bold" />
                         </button>
                     </div>
 
