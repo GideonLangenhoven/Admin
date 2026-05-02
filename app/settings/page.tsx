@@ -205,6 +205,9 @@ export default function SettingsPage() {
     var [yocoForm, setYocoForm] = useState({ secretKey: "", webhookSecret: "" });
     var [waSaving, setWaSaving] = useState(false);
     var [yocoSaving, setYocoSaving] = useState(false);
+    var [gdriveConnected, setGdriveConnected] = useState(false);
+    var [gdriveEmail, setGdriveEmail] = useState("");
+    var [gdriveLoading, setGdriveLoading] = useState(false);
     var [credMessage, setCredMessage] = useState({ type: "", text: "" });
 
     // Add-ons state
@@ -282,7 +285,7 @@ export default function SettingsPage() {
             if (perms.addons) fetchAddOns();
             if (perms.resources) fetchResources();
             if (perms.site || perms.email || perms.invoice) fetchSiteSettings();
-            if (perms.credentials) fetchCredStatus();
+            if (perms.credentials) { fetchCredStatus(); checkGdriveStatus(); }
         }
         setLoading(false);
     }
@@ -1123,6 +1126,61 @@ export default function SettingsPage() {
             setCredMessage({ type: "error", text: String(err?.message || "Failed to save Yoco credentials.") });
         }
         setYocoSaving(false);
+    }
+
+    async function checkGdriveStatus() {
+        try {
+            var { data } = await supabase.functions.invoke("google-drive", {
+                body: { action: "status", business_id: businessId },
+            });
+            if (data && !data.error) {
+                setGdriveConnected(data.connected);
+                setGdriveEmail(data.email || "");
+            }
+        } catch (_) { /* ignore */ }
+    }
+
+    async function handleConnectGdrive() {
+        setGdriveLoading(true);
+        try {
+            var { data, error } = await supabase.functions.invoke("google-drive", {
+                body: {
+                    action: "auth_url",
+                    business_id: businessId,
+                    redirect_uri: window.location.origin + "/google-callback",
+                    return_to: "/settings",
+                },
+            });
+            if (error || data?.error) {
+                notify({ title: "Google Drive", message: data?.error || error?.message || "Failed to start connection.", tone: "error" });
+            } else if (data?.url) {
+                window.location.href = data.url;
+            }
+        } catch (err: any) {
+            notify({ title: "Google Drive", message: err.message || "Connection failed.", tone: "error" });
+        }
+        setGdriveLoading(false);
+    }
+
+    async function handleDisconnectGdrive() {
+        var ok = await confirmAction("Disconnect Google Drive? Photo uploads will stop working until you reconnect.");
+        if (!ok) return;
+        setGdriveLoading(true);
+        try {
+            var { data, error } = await supabase.functions.invoke("google-drive", {
+                body: { action: "disconnect", business_id: businessId },
+            });
+            if (error || data?.error) {
+                notify({ title: "Google Drive", message: data?.error || error?.message || "Disconnect failed.", tone: "error" });
+            } else {
+                setGdriveConnected(false);
+                setGdriveEmail("");
+                notify({ title: "Google Drive", message: "Disconnected successfully. Token revoked at Google.", tone: "success" });
+            }
+        } catch (err: any) {
+            notify({ title: "Google Drive", message: err.message || "Disconnect failed.", tone: "error" });
+        }
+        setGdriveLoading(false);
     }
 
     var [uploadingField, setUploadingField] = useState<string | null>(null);
@@ -2928,6 +2986,47 @@ export default function SettingsPage() {
                             {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
                         </button>
                     </form>
+
+                    {/* Google Drive */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#4285F4]"><path d="M7.71 3.5L1.15 15l3.43 5.94h6.87L7.71 3.5z" fill="#0066DA"/><path d="M16.29 3.5H7.71l3.74 17.44h6.87l3.43-5.94L16.29 3.5z" fill="#00AC47"/><path d="M1.15 15l3.43 5.94h14.84l3.43-5.94H1.15z" fill="#EA4335"/><path d="M7.71 3.5l3.74 6.48L16.29 3.5H7.71z" fill="#00832D"/><path d="M11.45 9.98L7.71 3.5 1.15 15h7.48l2.82-5.02z" fill="#2684FC"/><path d="M11.45 9.98L16.29 3.5l5.56 11.5h-7.48l-2.92-5.02z" fill="#FFBA00"/></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Drive (Photos)</h3>
+                            </div>
+                            <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (gdriveConnected ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                {gdriveConnected ? "Connected" : "Not connected"}
+                            </span>
+                        </div>
+                        {gdriveConnected ? (
+                            <>
+                                <p className="text-sm text-[var(--ck-text-muted)]">
+                                    Connected as <span className="font-medium text-[var(--ck-text-strong)]">{gdriveEmail}</span>
+                                </p>
+                                <p className="text-xs text-[var(--ck-text-muted)]">Trip photo uploads go to your Google Drive. Disconnect to revoke access.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleDisconnectGdrive}
+                                    disabled={gdriveLoading}
+                                    className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-40 transition-opacity"
+                                >
+                                    {gdriveLoading ? "Disconnecting..." : "Disconnect Google Drive"}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-[var(--ck-text-muted)]">Connect Google Drive to upload trip photos directly from the Photos page.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleConnectGdrive}
+                                    disabled={gdriveLoading}
+                                    className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
+                                >
+                                    {gdriveLoading ? "Connecting..." : "Connect Google Drive"}
+                                </button>
+                            </>
+                        )}
+                    </div>
 
                 </div>
 
