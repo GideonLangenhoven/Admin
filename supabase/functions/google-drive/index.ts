@@ -5,6 +5,7 @@ var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
 var GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 var GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
+var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 
 var supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -111,12 +112,21 @@ async function shareFolder(accessToken: string, folderId: string) {
 }
 
 async function getBusinessDrive(businessId: string) {
-  var { data } = await supabase
-    .from("businesses")
-    .select("google_drive_refresh_token, google_drive_folder_id, google_drive_email")
-    .eq("id", businessId)
-    .maybeSingle();
-  return data;
+  if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
+    throw new Error("Missing or too-short SETTINGS_ENCRYPTION_KEY (must be 32+ chars)");
+  }
+  var { data, error } = await supabase.rpc("get_gdrive_credentials", {
+    p_business_id: businessId,
+    p_key: SETTINGS_ENCRYPTION_KEY,
+  });
+  if (error) throw new Error("Credential lookup failed: " + error.message);
+  var row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    google_drive_refresh_token: row.refresh_token || null,
+    google_drive_folder_id: row.folder_id || null,
+    google_drive_email: row.email || null,
+  };
 }
 
 // ── Main handler ──
@@ -150,6 +160,10 @@ Deno.serve(async (req: any) => {
       if (!code) return fail(req, "code required");
       if (!redirectUri) return fail(req, "redirect_uri required");
 
+      if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
+        return fail(req, "Encryption key not configured. Contact support.", 503);
+      }
+
       var tokens = await exchangeCode(code, redirectUri);
       if (tokens.error) {
         console.error("GOOGLE_TOKEN_ERR:", tokens);
@@ -158,19 +172,19 @@ Deno.serve(async (req: any) => {
 
       var email = await getUserEmail(tokens.access_token);
 
-      // Create a root "Trip Photos" folder in the user's Drive
       var rootFolder = await createFolder(tokens.access_token, "Trip Photos");
       if (rootFolder.error) {
         console.error("GOOGLE_FOLDER_ERR:", rootFolder);
         return fail(req, "Failed to create Drive folder: " + (rootFolder.error.message || rootFolder.error));
       }
 
-      // Store credentials
-      var { error: dbErr } = await supabase.from("businesses").update({
-        google_drive_refresh_token: tokens.refresh_token,
-        google_drive_folder_id: rootFolder.id,
-        google_drive_email: email,
-      }).eq("id", businessId);
+      var { error: dbErr } = await supabase.rpc("set_gdrive_credentials", {
+        p_business_id: businessId,
+        p_key: SETTINGS_ENCRYPTION_KEY,
+        p_refresh_token: tokens.refresh_token,
+        p_folder_id: rootFolder.id,
+        p_email: email,
+      });
 
       if (dbErr) {
         console.error("GOOGLE_DB_ERR:", dbErr);
@@ -216,19 +230,22 @@ Deno.serve(async (req: any) => {
       return ok(req, { folder_id: folder.id, folder_url: shareUrl });
     }
 
-    // ── Check connection status ──
+    // ── Check connection status (no decrypt needed — just check bytea IS NOT NULL) ──
     if (action === "status") {
-      var biz = await getBusinessDrive(businessId);
+      var { data: statusData } = await supabase
+        .from("businesses")
+        .select("google_drive_refresh_token_encrypted, google_drive_folder_id, google_drive_email")
+        .eq("id", businessId)
+        .maybeSingle();
       return ok(req, {
-        connected: !!biz?.google_drive_refresh_token,
-        email: biz?.google_drive_email || null,
-        folder_id: biz?.google_drive_folder_id || null,
+        connected: statusData?.google_drive_refresh_token_encrypted != null,
+        email: statusData?.google_drive_email || null,
+        folder_id: statusData?.google_drive_folder_id || null,
       });
     }
 
     // ── Disconnect ──
     if (action === "disconnect") {
-      // Revoke the token if possible
       var biz = await getBusinessDrive(businessId);
       if (biz?.google_drive_refresh_token) {
         try {
@@ -237,7 +254,7 @@ Deno.serve(async (req: any) => {
       }
 
       await supabase.from("businesses").update({
-        google_drive_refresh_token: null,
+        google_drive_refresh_token_encrypted: null,
         google_drive_folder_id: null,
         google_drive_email: null,
       }).eq("id", businessId);
