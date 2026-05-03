@@ -149,7 +149,7 @@ _This section is a running log of failures, learnings, and anti-patterns discove
 
 ### Build & Deploy
 - Duplicate/backup files moved to `.backups/` folder (components and supabase functions with " 2" suffix). Don't delete without checking.
-- `pnpm-lock.yaml` and `pnpm-workspace.yaml` exist alongside `package-lock.json` — project uses npm, not pnpm.
+- **Package manager: npm only.** pnpm artifacts were removed (Prompt 29). `packageManager` is pinned in package.json. Don't reintroduce pnpm-lock.yaml — Vercel defaults to npm.
 - Test/utility scripts live in `scripts/` (test-bookings.js, test-db.js, apply_migration.js, etc.)
 
 ### Marketing Dispatch
