@@ -1,3 +1,5 @@
+// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+// Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
@@ -58,8 +60,9 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
+  var auth;
   try {
-    await requireAuth(req);
+    auth = await requireAuth(req);
   } catch (authErr: any) {
     return new Response(JSON.stringify({ error: authErr.message }), { status: 401, headers: getCors(req) });
   }
@@ -74,6 +77,11 @@ Deno.serve(async (req: Request) => {
     var bookingRes = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).maybeSingle();
     var booking = bookingRes.data;
     if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
+
+    // Tenant guard: admin can only mark-paid bookings from their own business
+    if (!auth.isServiceRole && auth.businessId && booking.business_id !== auth.businessId) {
+      return new Response(JSON.stringify({ error: "You can only mark bookings for your own business as paid" }), { status: 403, headers: getCors(req) });
+    }
 
     var tenant = await getTenantByBusinessId(supabase, booking.business_id);
     var brandName = getBusinessDisplayName(tenant.business);

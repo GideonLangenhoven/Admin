@@ -1,3 +1,5 @@
+// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+// Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getTenantByBusinessId, getAdminAppOrigins } from "../_shared/tenant.ts";

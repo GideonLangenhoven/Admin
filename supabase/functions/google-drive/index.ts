@@ -1,3 +1,5 @@
+// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+// Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -144,6 +146,17 @@ Deno.serve(async (req: any) => {
     var businessId = String(body.business_id || "");
 
     if (!businessId) return fail(req, "business_id required");
+
+    // Tenant guard: verify caller is an admin of the requested business
+    var jwt = req.headers.get("authorization")?.replace("Bearer ", "") || "";
+    if (jwt && jwt !== SERVICE_ROLE_KEY) {
+      var { data: { user: gUser }, error: gAuthErr } = await supabase.auth.getUser(jwt);
+      if (gAuthErr || !gUser) return fail(req, "Unauthorized", 401);
+      var { data: gAdmin } = await supabase.from("admin_users").select("id").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
+      if (!gAdmin) return fail(req, "You are not an admin of this business", 403);
+    } else if (!jwt) {
+      return fail(req, "Authorization required", 401);
+    }
 
     // ── Generate OAuth URL ──
     if (action === "auth_url") {
