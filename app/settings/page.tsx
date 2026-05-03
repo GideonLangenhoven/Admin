@@ -211,6 +211,8 @@ export default function SettingsPage() {
     var [gdriveConnected, setGdriveConnected] = useState(false);
     var [gdriveEmail, setGdriveEmail] = useState("");
     var [gdriveLoading, setGdriveLoading] = useState(false);
+    var [googlePlaceId, setGooglePlaceId] = useState("");
+    var [googlePlaceSaving, setGooglePlaceSaving] = useState(false);
     var [credMessage, setCredMessage] = useState({ type: "", text: "" });
 
     // Add-ons state
@@ -707,6 +709,7 @@ export default function SettingsPage() {
                 voucher: data.email_img_voucher || "",
                 photos: data.email_img_photos || "",
             });
+            setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
             setSocialLinks({
                 facebook: data.social_facebook || "",
@@ -3080,6 +3083,44 @@ export default function SettingsPage() {
                                 </button>
                             </>
                         )}
+                    </div>
+
+                    {/* Google Reviews */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-amber-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Reviews</h3>
+                            </div>
+                            {googlePlaceId && (
+                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">✓ Configured</span>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Google Place ID</label>
+                            <input
+                                type="text"
+                                value={googlePlaceId}
+                                onChange={e => setGooglePlaceId(e.target.value)}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder="ChIJ..."
+                                autoComplete="off"
+                            />
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Find your Place ID at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>. Reviews sync daily at 03:17 UTC.</p>
+                        </div>
+                        <button
+                            type="button"
+                            disabled={googlePlaceSaving}
+                            onClick={async () => {
+                                setGooglePlaceSaving(true);
+                                var { error } = await supabase.from("businesses").update({ google_place_id: googlePlaceId.trim() || null }).eq("id", businessId);
+                                setCredMessage(error ? { type: "error", text: "Failed to save Place ID." } : { type: "success", text: "Google Place ID saved." });
+                                setGooglePlaceSaving(false);
+                            }}
+                            className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
+                        >
+                            {googlePlaceSaving ? "Saving..." : "Save Google Place ID"}
+                        </button>
                     </div>
 
                 </div>

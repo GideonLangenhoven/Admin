@@ -30,6 +30,7 @@ const nav = [
   { href: "/customers", label: "Customers", icon: "Users" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
+  { href: "/reviews", label: "Reviews", icon: "Star" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   { href: "/super-admin", label: "Super Admin", icon: "Shield", privilegedOnly: true },
