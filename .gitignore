@@ -65,6 +65,9 @@ node_modules_old/
 .idea/
 Thumbs.db
 
+# Sentry
+.sentryclirc
+
 # Claude and test artifacts
 .claude-flow/
 .claude/
