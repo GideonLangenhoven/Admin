@@ -62,7 +62,7 @@ The term "real-time sync" is ambiguous. Investigation reveals:
 
 **What this means for AH8:** If "real-time sync" means "Tab A sees changes made in Tab B without manual refresh," this only works on the inbox page. On the bookings page, Tab A would need to refresh to see Tab B's cancellation. The test must define which behaviour is expected. **I recommend testing the realistic scenario: both tabs function independently (no crashes, no stale-state corruption), and changes made in one tab are visible in the other after navigating away and back or refreshing.**
 
-**AH13 recategorised to Degraded Mode (from Validation).** Draft creation is a best-effort side effect (`saveDraft()` at `~/Desktop/booking/app/book/page.tsx:165-183`), not a validation gate. The system silently catches errors. This is a graceful-degradation behaviour test.
+**AH13 recategorised to Degraded Mode (from Validation).** Draft creation is a best-effort side effect (`saveDraft()` at `~/dev/booking/app/book/page.tsx:165-183`), not a validation gate. The system silently catches errors. This is a graceful-degradation behaviour test.
 
 **AH18 has a secondary Concurrency category** because the combination of AH18 + AH14 (combo booking where one slot has limited capacity under concurrent load) is a derived test in Phase 4.
 
@@ -86,7 +86,7 @@ The term "real-time sync" is ambiguous. Investigation reveals:
 **Required:** Normal UI access + database access to create test data.
 
 **Available:** All validation logic is in:
-- Booking site UI (`~/Desktop/booking/app/book/page.tsx`)
+- Booking site UI (`~/dev/booking/app/book/page.tsx`)
 - Database RPCs (`validate_promo_code`, `create_hold_with_capacity_check`, `deduct_voucher_balance`)
 - Edge functions (`create-paysafe-checkout`)
 
@@ -868,7 +868,7 @@ curl -s -X POST "${SB_URL}/functions/v1/process-refund" \
 2. Observe whether the full slot appears in the calendar/slot picker
 
 **Expected result:**
-- **UI path:** The full slot does NOT appear in the available slots list. The booking site query filters by `capacity_total - booked - held > 0` (`~/Desktop/booking/app/book/page.tsx:86`).
+- **UI path:** The full slot does NOT appear in the available slots list. The booking site query filters by `capacity_total - booked - held > 0` (`~/dev/booking/app/book/page.tsx:86`).
 - If a slot somehow appears (e.g., another booking completes between page load and slot selection), the `create_hold_with_capacity_check` RPC returns:
   ```json
   {"success": false, "error": "Sorry, those spots were just taken! Please try another time slot.", "available": 0}
@@ -902,7 +902,7 @@ curl -s -X POST "${SB_URL}/functions/v1/process-refund" \
 - **Pass:** Full slot not visible in UI. Direct RPC returns `success: false`. Zero new persistent records.
 - **Fail:** Slot visible in UI, or booking/hold created for a full slot.
 
-**If failed:** Check the slot listing query in `~/Desktop/booking/app/book/page.tsx:84-86` and the `create_hold_with_capacity_check` function in `supabase/migrations/20260319110000_atomic_hold_creation.sql`.
+**If failed:** Check the slot listing query in `~/dev/booking/app/book/page.tsx:84-86` and the `create_hold_with_capacity_check` function in `supabase/migrations/20260319110000_atomic_hold_creation.sql`.
 
 ---
 
@@ -927,7 +927,7 @@ curl -s -X POST "${SB_URL}/functions/v1/process-refund" \
 3. Click Apply
 
 **Expected result:**
-- Error message displayed: **"Expired"** (exact text from `~/Desktop/booking/app/book/page.tsx:154`)
+- Error message displayed: **"Expired"** (exact text from `~/dev/booking/app/book/page.tsx:154`)
 - Voucher NOT added to the applied vouchers list
 - No balance deduction
 - No change to the voucher record
@@ -950,7 +950,7 @@ curl -s -X POST "${SB_URL}/functions/v1/process-refund" \
 - **Pass:** "Expired" error shown. Voucher balance unchanged. Not added to cart.
 - **Fail:** Voucher accepted despite being expired, or error message differs.
 
-**If failed:** Check the expiry comparison in `~/Desktop/booking/app/book/page.tsx:154`. Verify the timezone handling.
+**If failed:** Check the expiry comparison in `~/dev/booking/app/book/page.tsx:154`. Verify the timezone handling.
 
 ---
 
@@ -1023,7 +1023,7 @@ None beyond normal access.
 
 **Expected result:**
 - **Past slot:** NOT visible in slot listing. Filtered by `start_time > NOW()` at the database level.
-- **30-minute slot:** NOT visible. Filtered by `start_time > NOW() + 60 minutes` cutoff (`~/Desktop/booking/app/book/page.tsx:78-82`).
+- **30-minute slot:** NOT visible. Filtered by `start_time > NOW() + 60 minutes` cutoff (`~/dev/booking/app/book/page.tsx:78-82`).
 - No mechanism to submit a booking for either slot through the UI.
 
 **Verification steps:**
@@ -1043,7 +1043,7 @@ None beyond normal access.
 - **Pass:** Neither slot visible in the booking UI. If testing direct API: note whether backend validation exists as a finding.
 - **Fail:** Past or imminent slot appears in the UI and can be booked.
 
-**If failed:** Check `~/Desktop/booking/app/book/page.tsx:78-86` for the cutoff filter and `list_available_slots` RPC in `supabase/migrations/20260321180000_filter_past_timeslots.sql:43`.
+**If failed:** Check `~/dev/booking/app/book/page.tsx:78-86` for the cutoff filter and `list_available_slots` RPC in `supabase/migrations/20260321180000_filter_past_timeslots.sql:43`.
 
 ---
 
@@ -1285,7 +1285,7 @@ curl -s -X POST "${SB_URL}/functions/v1/create-paysafe-checkout" \
 
 **Common failure modes:**
 - The add-on is removed from the total display but still saved to `booking_add_ons` with qty 0 (which the CHECK constraint would reject, but the error might be unhandled)
-- The filter `(selectedAddOns[ao.id] || 0) > 0` at `~/Desktop/booking/app/book/page.tsx:564` uses a truthy check that treats 0 as falsy — this is correct in JS but worth verifying
+- The filter `(selectedAddOns[ao.id] || 0) > 0` at `~/dev/booking/app/book/page.tsx:564` uses a truthy check that treats 0 as falsy — this is correct in JS but worth verifying
 
 **Pass / fail criteria:**
 - **Pass:** No add-on in order total. No `booking_add_ons` row. No DB error.
@@ -1325,10 +1325,10 @@ None — clean start.
 - No holds table entry exists
 - No confirmation email is sent
 - No WhatsApp message is sent
-- The draft creation failing silently is acceptable (best-effort: `/* draft save is best-effort */` at `~/Desktop/booking/app/book/page.tsx:182`)
+- The draft creation failing silently is acceptable (best-effort: `/* draft save is best-effort */` at `~/dev/booking/app/book/page.tsx:182`)
 
 **How to confirm the dependency (draft mechanism) is present:**
-The `saveDraft()` function is triggered by `onBlur` on the email field (`~/Desktop/booking/app/book/page.tsx:592`).
+The `saveDraft()` function is triggered by `onBlur` on the email field (`~/dev/booking/app/book/page.tsx:592`).
 
 **Verification steps:**
 1. ```sql

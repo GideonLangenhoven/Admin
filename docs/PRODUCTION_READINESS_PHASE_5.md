@@ -97,7 +97,7 @@ Sorted within tier by fix effort ascending.
 
 | ID | Title | Affects | Fix | Effort |
 |---|---|---|---|---|
-| **P3-1** | 35 dead `page 2.tsx` / `page 3.tsx` files in `~/Desktop/booking/app/` | — | `find … -name '* 2.tsx' -delete` after confirming nothing imports | 15 min |
+| **P3-1** | 35 dead `page 2.tsx` / `page 3.tsx` files in `~/dev/booking/app/` | — | `find … -name '* 2.tsx' -delete` after confirming nothing imports | 15 min |
 | **P3-2** | Realtime auto-reconnect has no missed-event backfill | J4 | On reconnect, re-fetch initial state | 4 h |
 | **P3-3** | No RUM agent (no Vercel Speed Insights, no GA4, no Sentry) | — | Install Vercel Speed Insights on all 3 Vercel projects | 1 h |
 | **P3-4** | Lighthouse + Playwright tooling not set up for automated perf checks | — | `npm i -D lighthouse playwright` + GitHub Actions workflow | 2 h |

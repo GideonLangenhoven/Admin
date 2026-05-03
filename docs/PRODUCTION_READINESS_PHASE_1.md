@@ -47,7 +47,7 @@ Your prompt described capekayak as *"the Cape Kayak Adventures instance (the ori
 
 **Reality:** this project is the **multi-tenant admin dashboard** ("BookingTours Admin Dashboard" per `app/layout.tsx:13`). It has no customer booking UI. Its routes are `/bookings`, `/slots`, `/refunds`, `/marketing`, `/super-admin`, etc.
 
-The Cape Kayak customer-facing site (`book.capekayak.co.za`) is served by the **generic booking app** at `~/Desktop/booking`, which matches that hostname against `businesses.booking_site_url` on page load (see `booking/app/components/ThemeProvider.tsx:89–137`) and renders Cape Kayak's branding/tours/slots based on the matched row.
+The Cape Kayak customer-facing site (`book.capekayak.co.za`) is served by the **generic booking app** at `~/dev/booking`, which matches that hostname against `businesses.booking_site_url` on page load (see `booking/app/components/ThemeProvider.tsx:89–137`) and renders Cape Kayak's branding/tours/slots based on the matched row.
 
 **Implication:** there is no "Cape Kayak codebase" to maintain separately. Cape Kayak is a row in `businesses` and a custom domain pointed at the `booking` Vercel project. Every other operator works the same way. This is *good news* — a single booking codebase to test.
 
@@ -131,7 +131,7 @@ Also notable: the `landing-pages/` **folder inside the admin repo** (different f
                   book.capekayak.co.za  ◄─────────┐    │
                   *.{operator-domains}            │    │
                   Vercel · Next.js                │    │
-                  repo: ~/Desktop/booking         │    │
+                  repo: ~/dev/booking         │    │
                   Vercel project: booking         │    │
                   Multi-tenant: ThemeProvider     │    │
                    resolves tenant by             │    │
@@ -175,7 +175,7 @@ Key facts the diagram encodes:
 | Notable files | `components/AuthGate.tsx` (session + role gating), `components/AppShell.tsx` (nav), `components/BusinessContext.tsx`, `supabase/functions/_shared/tenant.ts` |
 | Smells | (a) SHA-256 without salt for admin auth; (b) permissive fallback RLS policies `FOR ALL USING (true)` from migration `20260316143000`; (c) audit-log timeline is a TODO on `/bookings/[id]`; (d) marketing content (`case-study/cape-kayak`, `compare/*`) lives in the admin deployment — unusual; (e) duplicate `case-study/cape-kayak 2/` folder; (f) setup-link error handling in `admin-auth.ts:74–91` swallows failures |
 
-### 4.2 Customer booking site · `~/Desktop/booking`
+### 4.2 Customer booking site · `~/dev/booking`
 
 | Field | Value |
 |---|---|
@@ -202,7 +202,7 @@ Key facts the diagram encodes:
 | Tables written | `businesses`, `admin_users`, `policies`, `tours`, `slots` (auto-generated from schedule), `subscriptions`, `landing_page_orders` |
 | Key file | `app/api/onboarding/route.ts` — does all the writes |
 | External calls | Resend (email), Supabase with **service-role key** |
-| Smells | (a) **service-role key in `.env.example`** — one misconfigured deployment = admin DB access from a public endpoint; (b) package.json name collides with `~/Desktop/booking`; (c) credential encryption for WhatsApp/Yoco happens server-side in the route (review the key custody model in Phase 4); (d) auto-slot-generation to `slots` happens in one big transaction — behaviour at scale (operator enters 50 tours × 180 days of slots = 9000 rows) untested |
+| Smells | (a) **service-role key in `.env.example`** — one misconfigured deployment = admin DB access from a public endpoint; (b) package.json name collides with `~/dev/booking`; (c) credential encryption for WhatsApp/Yoco happens server-side in the route (review the key custody model in Phase 4); (d) auto-slot-generation to `slots` happens in one big transaction — behaviour at scale (operator enters 50 tours × 180 days of slots = 9000 rows) untested |
 
 ### 4.4 Marketing landing · `~/Desktop/landingpage`
 
@@ -452,8 +452,8 @@ Once this is signed off, Phase 2 begins with the 5 cross-app journeys in your or
   - Implication: since admin does not use Supabase Auth, every admin UI request arrives at Postgres as role `anon` with `auth.uid() = NULL`. Any RLS policy of the form `business_id IN (SELECT ... WHERE id = auth.uid())` evaluates to false for admin requests. Therefore **the permissive fallback policies `FOR ALL USING (true)` from the `FIX_*_permissive.sql` and `*_rls_anon.sql` migrations are load-bearing**. This is confirmed by the pattern of repair migrations in `supabase/migrations/` — the team has had to add permissive policies repeatedly to unblock the admin UI, which is exactly what this architecture forces.
   - **Net security posture:** the admin app's tenant isolation is **application-code-only** — `business_id` filters in every query string. Anyone who obtains the browser-visible `NEXT_PUBLIC_SUPABASE_ANON_KEY` can call the Supabase REST API directly and read every tenant's data. This makes Journey 5 (multi-operator isolation test) a near-certain fail as currently configured. **Flagging as the top P0 candidate for Phase 5.**
 - Q7 (Cape Kayak tenant resolution — env lock or runtime match?): **Env lock in dev, needs Vercel UI confirmation for prod.**
-  - `~/Desktop/booking/.env.local` has `NEXT_PUBLIC_BUSINESS_ID=<redacted>` set. Good.
-  - `~/Desktop/booking/.env.production.local` also exists — production uses Vercel's env-var UI, which I cannot read. If the prod env var is unset, the app falls back to runtime hostname matching, which means a DNS misconfig on a new operator could accidentally map to Cape Kayak's tenant.
+  - `~/dev/booking/.env.local` has `NEXT_PUBLIC_BUSINESS_ID=<redacted>` set. Good.
+  - `~/dev/booking/.env.production.local` also exists — production uses Vercel's env-var UI, which I cannot read. If the prod env var is unset, the app falls back to runtime hostname matching, which means a DNS misconfig on a new operator could accidentally map to Cape Kayak's tenant.
   - **Action for user:** verify in Vercel that `NEXT_PUBLIC_BUSINESS_ID` is set on every production deployment of the `booking` project that is attached to a single-operator domain like `book.capekayak.co.za`.
 - Q11 (Onboarding service-role key only server-side?): **Yes, correctly scoped.**
   - Service-role key is read only in `app/api/onboarding/route.ts` (server-side Next.js API route). Never shipped to the browser.
