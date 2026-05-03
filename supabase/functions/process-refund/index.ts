@@ -122,6 +122,15 @@ Deno.serve(async (req: any) => {
       payload: { amount: refundAmount, partial: isPartial, yoco_refund: yocoData },
     });
 
+    await supabase.from("audit_logs").insert({
+      business_id: booking.business_id,
+      action_type: "REFUND_INITIATED",
+      target_entity: "bookings",
+      target_id: booking.id,
+      metadata: { amount: refundAmount, partial: isPartial, payment_method: "yoco" },
+      source: "edge",
+    }).catch((e: any) => console.error("AUDIT_ERR:", e));
+
     var ref = booking.id.substring(0, 8).toUpperCase();
     var tourName = booking.tours?.name || "Booking";
     if (booking.phone) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes } from "crypto";
 import { getCallerAdmin, isPrivilegedRole } from "../../../lib/api-auth";
+import { audit, callerContext } from "../../../lib/audit";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -118,6 +119,14 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ error: humanMsg || (emailErr as any).message || "Email failed" }, { status: 500 });
     }
+
+    await audit({
+      ...callerContext(req, caller),
+      action: reason === "RESET" ? "ADMIN_RESET_REQUESTED" : "ADMIN_INVITE",
+      entity_type: "admin_users",
+      entity_id: user.id,
+      metadata: { target_email: user.email, reason },
+    });
 
     return NextResponse.json({ ok: true, expires_at: expiresAt });
   }
@@ -244,6 +253,14 @@ export async function POST(req: NextRequest) {
     } else {
       await admin.auth.admin.updateUserById(authUserId, { password: newPassword, email_confirm: true });
     }
+
+    await audit({
+      business_id: null,
+      actor_email: email,
+      action: "ADMIN_PASSWORD_CHANGED",
+      entity_type: "admin_users",
+      entity_id: user.id,
+    });
 
     return NextResponse.json({ ok: true, id: user.id, email: user.email, name: user.name });
   }

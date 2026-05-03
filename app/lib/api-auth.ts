@@ -4,6 +4,7 @@ export type CallerAdmin = {
   id: string;
   role: string;
   business_id: string;
+  email: string;
 };
 
 export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> {
@@ -24,12 +25,12 @@ export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> 
 
   var { data: adminRow } = await admin
     .from("admin_users")
-    .select("id, role, business_id, suspended")
+    .select("id, role, business_id, email, suspended")
     .eq("user_id", data.user.id)
     .maybeSingle();
 
   if (!adminRow || adminRow.suspended) return null;
-  return { id: adminRow.id, role: adminRow.role, business_id: adminRow.business_id };
+  return { id: adminRow.id, role: adminRow.role, business_id: adminRow.business_id, email: adminRow.email || data.user.email || "" };
 }
 
 export function isPrivilegedRole(role: string): boolean {

@@ -68,6 +68,44 @@ This means they can only be called via the service role key — which is only av
 
 Operational RPCs (`deduct_voucher_balance`, `create_hold_with_capacity_check`, `confirm_payment_atomic`, etc.) operate on row-level data and don't modify admin/role/tenant structures. Not an escalation surface.
 
+## Audit Log (Prompt 17)
+
+Every meaningful admin action writes a row to `audit_logs`. Two layers:
+
+### Application-level (`app/lib/audit.ts`)
+Best-effort inserts via service role. Used from Next.js API routes:
+
+| Handler | Actions logged |
+|---|---|
+| `/api/admin/login` | ADMIN_LOGIN, ADMIN_LOGIN_FAIL |
+| `/api/credentials` | CREDENTIALS_UPDATED |
+| `/api/admin/setup-link` | ADMIN_INVITE, ADMIN_RESET_REQUESTED, ADMIN_PASSWORD_CHANGED |
+
+### Edge-function-level (direct insert)
+Edge functions insert directly into `audit_logs` with `source: "edge"`:
+
+| Function | Action logged |
+|---|---|
+| `cancel-booking` | BOOKING_CANCELLED |
+| `process-refund` | REFUND_INITIATED |
+| `super-admin-onboard` | TENANT_ONBOARDED |
+
+### Database triggers (safety net)
+Fire AFTER INSERT/UPDATE/DELETE, `source: "trigger"`. Sensitive columns stripped from snapshots:
+
+| Table | Columns stripped |
+|---|---|
+| `admin_users` | password_hash, setup_token_hash |
+| `businesses` | 14 encrypted credential columns |
+
+### RLS on audit_logs
+- `audit_logs_select_own_business` — MAIN_ADMIN sees own tenant
+- `audit_logs_select_super_admin` — SUPER_ADMIN sees all
+- `audit_logs_service_insert` — writes via service role only
+
+### Audit Log UI
+`/audit-log` page — privilegedOnly nav item (MAIN_ADMIN+). Filters by action type and actor email. Shows 200 most recent events.
+
 ## Known Limitations
 
 - Client-side admin creation (`handleAddAdmin` in settings) hardcodes `role: "ADMIN"`, but a malicious admin with browser dev tools could modify the Supabase client insert to use `role: "MAIN_ADMIN"`. This depends on RLS INSERT policies on admin_users — should be verified.

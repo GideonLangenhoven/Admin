@@ -198,6 +198,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    await supabase.from("audit_logs").insert({
+      business_id: business.id,
+      actor_id: requester.id,
+      actor_role: "SUPER_ADMIN",
+      actor_email: requesterEmail,
+      action_type: "TENANT_ONBOARDED",
+      target_entity: "businesses",
+      target_id: business.id,
+      metadata: { business_name: businessName, admin_email: adminEmail },
+      source: "edge",
+    }).catch((e: any) => console.error("AUDIT_ERR:", e));
+
     return respond(200, {
       success: true,
       business,

@@ -214,7 +214,7 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    // Audit log
+    // Audit log (operational)
     await supabase.from("logs").insert({
       business_id: booking.business_id,
       booking_id: booking_id,
@@ -228,6 +228,18 @@ Deno.serve(async (req: any) => {
         refund_amount_action_required: isPaid ? refundAmount : 0,
       },
     }).catch(function (e: any) { console.error("LOG_ERR:", e); });
+
+    // Admin audit trail
+    await supabase.from("audit_logs").insert({
+      business_id: booking.business_id,
+      actor_id: session.user_id,
+      actor_role: session.role,
+      action_type: "BOOKING_CANCELLED",
+      target_entity: "bookings",
+      target_id: booking_id,
+      metadata: { reason: cancelReason, was_paid: isPaid, refund_amount: isPaid ? refundAmount : 0 },
+      source: "edge",
+    }).catch(function (e: any) { console.error("AUDIT_ERR:", e); });
 
     return new Response(JSON.stringify({
       ok: true,

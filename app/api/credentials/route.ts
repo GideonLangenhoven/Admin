@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
+import { audit, callerContext } from "../../lib/audit";
 
 function serviceClient() {
     var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -102,5 +103,6 @@ export async function POST(req: NextRequest) {
     } else {
         return NextResponse.json({ error: "Invalid section value." }, { status: 400 });
     }
+    await audit({ ...callerContext(req, caller), action: "CREDENTIALS_UPDATED", entity_type: "businesses", entity_id: business_id, metadata: { section } });
     return NextResponse.json({ ok: true });
 }

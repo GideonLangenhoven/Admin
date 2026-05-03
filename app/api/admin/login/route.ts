@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+import { audit } from "../../../lib/audit";
 
 // Legacy SHA-256 hash check — matches what the browser admin-auth.ts produces.
 // Used only to verify pre-migration passwords; new passwords are stored by Supabase Auth (bcrypt internally).
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
   // After this passes, we lazy-migrate the user into Supabase Auth (which uses bcrypt internally).
   const incomingHash = sha256(password);
   if (user.password_hash !== incomingHash) {
+    await audit({ business_id: user.business_id, actor_email: email, action: "ADMIN_LOGIN_FAIL", metadata: { reason: "bad_password" }, ip_address: req.headers.get("x-forwarded-for"), user_agent: req.headers.get("user-agent") });
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
@@ -135,6 +137,8 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  await audit({ business_id: user.business_id, actor_id: user.id, actor_role: user.role, actor_email: email, action: "ADMIN_LOGIN", ip_address: req.headers.get("x-forwarded-for"), user_agent: req.headers.get("user-agent") });
 
   return NextResponse.json({
     session: {
