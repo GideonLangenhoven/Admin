@@ -223,11 +223,6 @@ export default function SettingsPage() {
     var [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
     var [invoiceSaving, setInvoiceSaving] = useState(false);
     var [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
-    var [bankOtpStep, setBankOtpStep] = useState<"idle" | "sending" | "sent" | "verifying">("idle");
-    var [bankOtpToken, setBankOtpToken] = useState("");
-    var [bankOtpCode, setBankOtpCode] = useState("");
-    var [bankOtpError, setBankOtpError] = useState("");
-    var [bankVerified, setBankVerified] = useState(false);
 
     // Marketing test email recipient
     var [marketingTestEmail, setMarketingTestEmail] = useState("");
@@ -730,12 +725,19 @@ export default function SettingsPage() {
                 reg_number: data.invoice_reg_number || "",
                 vat_number: data.invoice_vat_number || "",
             });
-            setBankForm({
-                account_owner: data.bank_account_owner || "",
-                account_number: data.bank_account_number || "",
-                account_type: data.bank_account_type || "",
-                bank_name: data.bank_name || "",
-                branch_code: data.bank_branch_code || "",
+            // Bank details fetched separately via encrypted edge function
+            supabase.functions.invoke("bank-details", {
+                body: { action: "get", business_id: businessId },
+            }).then(({ data: bankData }) => {
+                if (bankData) {
+                    setBankForm({
+                        account_owner: bankData.account_owner || "",
+                        account_number: bankData.account_number || "",
+                        account_type: bankData.account_type || "",
+                        bank_name: bankData.bank_name || "",
+                        branch_code: bankData.branch_code || "",
+                    });
+                }
             });
             // Load operations & AI config
             setOpsConfig({
@@ -1003,79 +1005,35 @@ export default function SettingsPage() {
             invoice_vat_number: invoiceForm.vat_number || null,
         };
 
-        // Banking details require OTP verification
-        var bankChanged = bankForm.account_owner || bankForm.account_number || bankForm.bank_name;
-        if (bankChanged && !bankVerified) {
-            setInvoiceMessage({ type: "error", text: "Banking details require email verification. Click 'Verify via email' first." });
+        var { error: invErr } = await supabase.from("businesses").update(updatePayload).eq("id", businessId);
+        if (invErr) {
+            setInvoiceMessage({ type: "error", text: "Error saving invoice: " + invErr.message });
             setInvoiceSaving(false);
             return;
         }
 
-        if (bankVerified) {
-            updatePayload.bank_account_owner = bankForm.account_owner || null;
-            updatePayload.bank_account_number = bankForm.account_number || null;
-            updatePayload.bank_account_type = bankForm.account_type || null;
-            updatePayload.bank_name = bankForm.bank_name || null;
-            updatePayload.bank_branch_code = bankForm.branch_code || null;
+        var { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
+            body: {
+                action: "set",
+                business_id: businessId,
+                account_owner: bankForm.account_owner || null,
+                account_number: bankForm.account_number || null,
+                account_type: bankForm.account_type || null,
+                bank_name: bankForm.bank_name || null,
+                branch_code: bankForm.branch_code || null,
+            },
+        });
+        if (bankErr || !bankData?.success) {
+            setInvoiceMessage({ type: "error", text: "Bank details failed: " + (bankErr?.message || bankData?.error || "Unknown error") });
+            setInvoiceSaving(false);
+            return;
         }
 
-        var { error } = await supabase.from("businesses").update(updatePayload).eq("id", businessId);
-        if (error) {
-            setInvoiceMessage({ type: "error", text: "Error saving: " + error.message });
-        } else {
-            setInvoiceMessage({ type: "success", text: "Invoice & banking details saved!" });
-            setBankVerified(false);
-            setBankOtpStep("idle");
-            setBankOtpCode("");
-            setBankOtpToken("");
-            setTimeout(() => setInvoiceMessage({ type: "", text: "" }), 3000);
-        }
+        setInvoiceMessage({ type: "success", text: "Invoice & banking details saved!" });
+        setTimeout(() => setInvoiceMessage({ type: "", text: "" }), 3000);
         setInvoiceSaving(false);
     }
 
-    async function handleBankOtpSend() {
-        var adminEmail = localStorage.getItem("ck_admin_email") || "";
-        if (!adminEmail) { setBankOtpError("Could not determine your admin email."); return; }
-        setBankOtpStep("sending");
-        setBankOtpError("");
-        try {
-            var { data, error } = await supabase.functions.invoke("send-otp", {
-                body: { action: "send_admin", email: adminEmail, business_id: businessId },
-            });
-            if (error || !data?.success) {
-                setBankOtpError(data?.error || error?.message || "Failed to send code.");
-                setBankOtpStep("idle");
-                return;
-            }
-            setBankOtpToken(data.token);
-            setBankOtpStep("sent");
-        } catch (err: any) {
-            setBankOtpError(err.message || "Failed to send code.");
-            setBankOtpStep("idle");
-        }
-    }
-
-    async function handleBankOtpVerify() {
-        if (!bankOtpCode.trim() || !bankOtpToken) return;
-        setBankOtpStep("verifying");
-        setBankOtpError("");
-        try {
-            var { data, error } = await supabase.functions.invoke("send-otp", {
-                body: { action: "verify", token: bankOtpToken, code: bankOtpCode.trim() },
-            });
-            if (error || !data?.success || !data?.verified) {
-                setBankOtpError(data?.error || error?.message || "Verification failed.");
-                setBankOtpStep("sent");
-                return;
-            }
-            setBankVerified(true);
-            setBankOtpStep("idle");
-            notify({ title: "Verified", message: "You can now save banking details.", tone: "success" });
-        } catch (err: any) {
-            setBankOtpError(err.message || "Verification failed.");
-            setBankOtpStep("sent");
-        }
-    }
 
     async function fetchCredStatus() {
         try {
@@ -2816,62 +2774,36 @@ export default function SettingsPage() {
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Banking Details</h3>
-                            {bankVerified && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Verified</span>}
                         </div>
-                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Changes to banking details require email verification for security.</p>
+                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Banking details are encrypted at rest.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
-                                <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); setBankVerified(false); }}
+                                <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); }}
                                     placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
-                                <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); setBankVerified(false); }}
+                                <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); }}
                                     placeholder="e.g. 070631824" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
-                                <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); setBankVerified(false); }}
+                                <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); }}
                                     placeholder="e.g. Current / Cheque" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bank name</span>
-                                <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); setBankVerified(false); }}
+                                <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); }}
                                     placeholder="e.g. Standard Bank" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
-                                <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); setBankVerified(false); }}
+                                <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); }}
                                     placeholder="e.g. 020909" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                             </label>
                         </div>
 
-                        {(bankForm.account_owner || bankForm.account_number || bankForm.bank_name) && !bankVerified && (
-                            <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-3">
-                                <p className="text-sm text-amber-800 font-medium">Verify your identity to save banking details</p>
-                                {bankOtpStep === "idle" && (
-                                    <button type="button" onClick={handleBankOtpSend}
-                                        className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
-                                        Verify via email
-                                    </button>
-                                )}
-                                {bankOtpStep === "sending" && <p className="text-sm text-amber-700">Sending verification code...</p>}
-                                {(bankOtpStep === "sent" || bankOtpStep === "verifying") && (
-                                    <div className="flex items-center gap-2">
-                                        <input type="text" value={bankOtpCode} onChange={e => setBankOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                            placeholder="6-digit code" maxLength={6}
-                                            className="w-32 rounded-lg border border-amber-300 px-3 py-2 text-sm text-center font-mono tracking-widest" />
-                                        <button type="button" onClick={handleBankOtpVerify} disabled={bankOtpCode.length !== 6 || bankOtpStep === "verifying"}
-                                            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
-                                            {bankOtpStep === "verifying" ? "Verifying..." : "Verify"}
-                                        </button>
-                                        <button type="button" onClick={handleBankOtpSend} className="text-xs text-amber-700 underline hover:text-amber-900">Resend</button>
-                                    </div>
-                                )}
-                                {bankOtpError && <p className="text-xs text-red-600">{bankOtpError}</p>}
-                            </div>
-                        )}
                     </div>
                     </>}
 

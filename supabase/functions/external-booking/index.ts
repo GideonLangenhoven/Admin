@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 const SIGNATURE_WINDOW_SECONDS = 300;
 
 const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -223,7 +224,31 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
     .maybeSingle();
 
   if (error) throw error;
-  return (data as CredentialRecord | null) || null;
+  if (!data) return null;
+
+  const credential = data as CredentialRecord;
+
+  if (SETTINGS_ENCRYPTION_KEY) {
+    const { data: rpcData } = await db.rpc("get_external_booking_credentials", {
+      p_credential_id: credential.id,
+      p_key: SETTINGS_ENCRYPTION_KEY,
+    });
+    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    if (row?.hmac_secret) {
+      credential.hmac_secret = row.hmac_secret;
+      return credential;
+    }
+
+    if (credential.hmac_secret) {
+      db.rpc("set_external_booking_credentials", {
+        p_credential_id: credential.id,
+        p_key: SETTINGS_ENCRYPTION_KEY,
+        p_hmac_secret: credential.hmac_secret,
+      }).catch((err: unknown) => console.error("AUTO_MIGRATE_HMAC_ERR:", err));
+    }
+  }
+
+  return credential;
 }
 
 async function verifyAuth(req: Request, source: string, rawBody: string): Promise<VerifyAuthSuccess | VerifyAuthFailure> {
@@ -536,6 +561,68 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = sanitizeBody(parsedBody);
+    const rawAction = String(body.action || "").trim();
+
+    // ── Admin: encrypt and store hmac_secret (JWT-authenticated) ──
+    if (rawAction === "admin_set_hmac") {
+      const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (!jwt) return respond(401, { success: false, code: "UNAUTHORIZED", message: "Auth token required" });
+      const { data: { user }, error: authErr } = await db.auth.getUser(jwt);
+      if (authErr || !user) return respond(401, { success: false, code: "UNAUTHORIZED", message: "Invalid auth token" });
+
+      const credentialId = String(body.credential_id || "");
+      if (!credentialId) return respond(400, { success: false, code: "MISSING_CREDENTIAL_ID", message: "credential_id required" });
+      if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
+
+      const { data: adminRows } = await db.from("admin_users").select("business_id, role").eq("user_id", user.id);
+      if (!adminRows?.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an admin user" });
+
+      const { data: cred } = await db.from("external_booking_credentials").select("business_id").eq("id", credentialId).maybeSingle();
+      if (!cred) return respond(404, { success: false, code: "NOT_FOUND", message: "Credential not found" });
+
+      const isSuperAdmin = adminRows.some((r: { role: string | null }) => (r.role || "").toUpperCase().startsWith("SUPER"));
+      if (!isSuperAdmin && !adminRows.some((r: { business_id: string }) => r.business_id === cred.business_id)) {
+        return respond(403, { success: false, code: "FORBIDDEN", message: "No access to this business" });
+      }
+
+      const hmacSecret = body.hmac_secret === null || body.hmac_secret === undefined ? null : String(body.hmac_secret);
+      const { error: rpcErr } = await db.rpc("set_external_booking_credentials", {
+        p_credential_id: credentialId,
+        p_key: SETTINGS_ENCRYPTION_KEY,
+        p_hmac_secret: hmacSecret,
+      });
+      if (rpcErr) {
+        console.error("ADMIN_SET_HMAC_ERR:", rpcErr);
+        return respond(500, { success: false, code: "SET_FAILED", message: rpcErr.message });
+      }
+      return respond(200, { success: true });
+    }
+
+    // ── Internal: backfill plaintext → encrypted (service_role only) ──
+    if (rawAction === "backfill_hmac") {
+      if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
+
+      const { data: rows } = await db
+        .from("external_booking_credentials")
+        .select("id, hmac_secret")
+        .not("hmac_secret", "is", null);
+
+      let migrated = 0;
+      for (const row of (rows || [])) {
+        const { data: check } = await db.from("external_booking_credentials").select("hmac_secret_encrypted").eq("id", row.id).maybeSingle();
+        if (check?.hmac_secret_encrypted) continue;
+
+        const { error: setErr } = await db.rpc("set_external_booking_credentials", {
+          p_credential_id: row.id,
+          p_key: SETTINGS_ENCRYPTION_KEY,
+          p_hmac_secret: row.hmac_secret,
+        });
+        if (!setErr) migrated++;
+        else console.error("BACKFILL_HMAC_ERR:", row.id, setErr);
+      }
+      return respond(200, { success: true, migrated });
+    }
+
     source = normalizeSource(req, body);
     action = normalizeAction(body.action, body);
     eventId = eventIdFromRequest(req, body, requestId);

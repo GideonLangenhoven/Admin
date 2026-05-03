@@ -57,6 +57,7 @@ type CredentialRow = {
   source: string;
   api_key_last4: string | null;
   hmac_secret: string | null;
+  hmac_secret_encrypted: string | null;
   active: boolean;
   created_at: string;
 };
@@ -143,7 +144,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     setLoadingCredentials(true);
     const { data, error } = await supabase
       .from("external_booking_credentials")
-      .select("id, source, api_key_last4, hmac_secret, active, created_at")
+      .select("id, source, api_key_last4, hmac_secret, hmac_secret_encrypted, active, created_at")
       .eq("business_id", businessId)
       .order("source", { ascending: true });
 
@@ -253,31 +254,48 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
       payload.api_key_last4 = apiKey!.slice(-4);
     }
 
-    if (!credentialForm.hmacEnabled) {
-      payload.hmac_secret = null;
-    } else if (hmacSecret) {
-      payload.hmac_secret = hmacSecret;
-    }
+    let credentialId = editingCredentialId;
+    let saveError: string | null = null;
 
-    const query = editingCredentialId
-      ? supabase.from("external_booking_credentials").update(payload).eq("id", editingCredentialId)
-      : supabase.from("external_booking_credentials").insert(payload);
-
-    const { error } = await query;
-    if (error) {
-      setCredentialMessage({ type: "error", text: error.message });
+    if (editingCredentialId) {
+      const { error } = await supabase.from("external_booking_credentials").update(payload).eq("id", editingCredentialId);
+      if (error) saveError = error.message;
     } else {
-      setCredentialMessage({ type: "success", text: editingCredentialId ? "Credential updated." : "Credential created." });
-      if (apiKey || hmacSecret) {
-        setGeneratedSecrets({
-          source: credentialForm.source.trim().toUpperCase(),
-          apiKey: apiKey || "",
-          hmacSecret: credentialForm.hmacEnabled ? (hmacSecret || null) : null,
-        });
-      }
-      await loadCredentials();
-      resetCredentialForm();
+      const { data: inserted, error } = await supabase
+        .from("external_booking_credentials")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) saveError = error.message;
+      else credentialId = inserted?.id || null;
     }
+
+    if (saveError) {
+      setCredentialMessage({ type: "error", text: saveError });
+      setSavingCredential(false);
+      return;
+    }
+
+    if (credentialId) {
+      const hmacValue = !credentialForm.hmacEnabled ? null : (hmacSecret || undefined);
+      if (hmacValue !== undefined) {
+        const { error: fnErr } = await supabase.functions.invoke("external-booking", {
+          body: { action: "admin_set_hmac", credential_id: credentialId, hmac_secret: hmacValue },
+        });
+        if (fnErr) console.error("Failed to encrypt HMAC secret:", fnErr);
+      }
+    }
+
+    setCredentialMessage({ type: "success", text: editingCredentialId ? "Credential updated." : "Credential created." });
+    if (apiKey || hmacSecret) {
+      setGeneratedSecrets({
+        source: credentialForm.source.trim().toUpperCase(),
+        apiKey: apiKey || "",
+        hmacSecret: credentialForm.hmacEnabled ? (hmacSecret || null) : null,
+      });
+    }
+    await loadCredentials();
+    resetCredentialForm();
 
     setSavingCredential(false);
   }
@@ -300,7 +318,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     setCredentialForm({
       source: row.source,
       active: row.active,
-      hmacEnabled: Boolean(row.hmac_secret),
+      hmacEnabled: Boolean(row.hmac_secret_encrypted || row.hmac_secret),
       rotateApiKey: false,
       rotateHmacSecret: false,
     });
@@ -400,7 +418,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
                           </div>
                           <div className="mt-2 space-y-1 text-xs text-[var(--ck-text-muted)]">
                             <div>API key: {row.api_key_last4 ? `••••${row.api_key_last4}` : "Not set"}</div>
-                            <div>HMAC: {row.hmac_secret ? "Enabled" : "Disabled"}</div>
+                            <div>HMAC: {(row.hmac_secret_encrypted || row.hmac_secret) ? "Enabled" : "Disabled"}</div>
                             <div>Created: {new Date(row.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>

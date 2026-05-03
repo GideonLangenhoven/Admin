@@ -158,7 +158,7 @@ _This section is a running log of failures, learnings, and anti-patterns discove
 - **Rule:** Any edge function called by pg_cron via `net.http_post` MUST have `verify_jwt = false` in config.toml.
 - Also added a guard: if `RESEND_API_KEY` is not set, dispatch returns 503 instead of crashing.
 
-### Security (Audited 2026-04-01)
+### Security (Audited 2026-05-02)
 - **Dependencies:** 0 vulnerabilities (npm audit clean)
 - **RLS:** All tables have Row Level Security enabled (bulk migration `20260304150000_enable_rls_all.sql` + per-table)
 - **Secrets:** No hardcoded API keys in source. Credentials handled via encrypted DB columns + .env files
@@ -166,3 +166,6 @@ _This section is a running log of failures, learnings, and anti-patterns discove
 - **.gitignore:** Covers .env*, *.pem, *.key, credentials.json, service-account.json
 - **Payment data:** Credit card data never touches our server — Paysafe/Yoco handle PCI compliance
 - Edge function JWT verification is disabled on: yoco-webhook, wa-webhook, web-chat, external-booking, process-refund (intentional — these need public access)
+- **Security baseline:** `supabase/security-baseline.json` — checked-in snapshot of all grants, RLS status, and policies. Any migration that changes grants, RLS, or policies MUST update this file in the same commit.
+- **Drift detection:** `npm run check-security-drift` — compares production against baseline, exits non-zero on drift. Requires `DATABASE_URL` env var. Run weekly and before releases.
+- **Workflow rule:** No production schema changes via the Supabase Dashboard SQL Editor. All DDL and GRANT/REVOKE changes must go through timestamped migration files.

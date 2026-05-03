@@ -347,9 +347,10 @@ export default function Invoices() {
   const [bankInfo, setBankInfo] = useState<BankingInfo>({ owner: "", number: "", type: "", bank: "", branchCode: "" });
 
   async function load() {
-    const [invoiceRes, bizRes] = await Promise.all([
+    const [invoiceRes, bizRes, bankRes] = await Promise.all([
       supabase.from("invoices").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(200),
-      supabase.from("businesses").select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number, bank_account_owner, bank_account_number, bank_account_type, bank_name, bank_branch_code").eq("id", businessId).maybeSingle(),
+      supabase.from("businesses").select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number").eq("id", businessId).maybeSingle(),
+      supabase.functions.invoke("bank-details", { body: { action: "get", business_id: businessId } }),
     ]);
 
     if (bizRes.data) {
@@ -361,12 +362,14 @@ export default function Invoices() {
         reg: b.invoice_reg_number || "",
         vat: b.invoice_vat_number || "",
       });
+    }
+    if (bankRes.data) {
       setBankInfo({
-        owner: b.bank_account_owner || "",
-        number: b.bank_account_number || "",
-        type: b.bank_account_type || "",
-        bank: b.bank_name || "",
-        branchCode: b.bank_branch_code || "",
+        owner: bankRes.data.account_owner || "",
+        number: bankRes.data.account_number || "",
+        type: bankRes.data.account_type || "",
+        bank: bankRes.data.bank_name || "",
+        branchCode: bankRes.data.branch_code || "",
       });
     }
 
