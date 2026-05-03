@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     var supabase = serviceClient();
     var { data, error } = await supabase
         .from("businesses")
-        .select("wa_token_encrypted, wa_phone_id_encrypted, yoco_secret_key_encrypted, yoco_webhook_secret_encrypted")
+        .select("wa_token_encrypted, wa_phone_id_encrypted, yoco_secret_key_encrypted, yoco_webhook_secret_encrypted, yoco_test_mode, yoco_test_secret_key_encrypted, yoco_test_webhook_secret_encrypted")
         .eq("id", businessId)
         .maybeSingle();
     if (error) {
@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
         wa: !!data.wa_token_encrypted && !!data.wa_phone_id_encrypted,
         yoco: !!data.yoco_secret_key_encrypted && !!data.yoco_webhook_secret_encrypted,
+        yoco_test_mode: data.yoco_test_mode === true,
+        yoco_test: !!data.yoco_test_secret_key_encrypted && !!data.yoco_test_webhook_secret_encrypted,
     });
 }
 
@@ -42,9 +44,9 @@ export async function POST(req: NextRequest) {
     }
     var body: any;
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
-    var { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret } = body;
+    var { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
-    if (!section) return NextResponse.json({ error: "section is required ('wa' or 'yoco')" }, { status: 400 });
+    if (!section) return NextResponse.json({ error: "section is required ('wa', 'yoco', or 'yoco_test')" }, { status: 400 });
     var supabase = serviceClient();
     if (section === "wa") {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {
@@ -62,6 +64,20 @@ export async function POST(req: NextRequest) {
             p_business_id: business_id, p_key: encryptionKey, p_yoco_secret_key: yoco_secret_key.trim(), p_yoco_webhook_secret: yoco_webhook_secret.trim(),
         });
         if (yocoErr) return NextResponse.json({ error: "Failed to save Yoco credentials: " + yocoErr.message }, { status: 500 });
+    } else if (section === "yoco_test") {
+        if (!yoco_test_secret_key?.trim() || !yoco_test_webhook_secret?.trim()) {
+            return NextResponse.json({ error: "Both Yoco Test Secret Key and Test Webhook Signing Secret are required." }, { status: 400 });
+        }
+        var { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
+            p_business_id: business_id, p_key: encryptionKey, p_yoco_test_secret_key: yoco_test_secret_key.trim(), p_yoco_test_webhook_secret: yoco_test_webhook_secret.trim(),
+        });
+        if (testErr) return NextResponse.json({ error: "Failed to save Yoco test credentials: " + testErr.message }, { status: 500 });
+    } else if (section === "yoco_test_mode") {
+        var { error: modeErr } = await supabase
+            .from("businesses")
+            .update({ yoco_test_mode: yoco_test_mode === true })
+            .eq("id", business_id);
+        if (modeErr) return NextResponse.json({ error: "Failed to update test mode: " + modeErr.message }, { status: 500 });
     } else {
         return NextResponse.json({ error: "Invalid section value." }, { status: 400 });
     }

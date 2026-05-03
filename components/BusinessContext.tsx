@@ -8,6 +8,7 @@ interface BusinessContextValue {
     logoUrl: string;
     timezone: string;
     subscriptionStatus?: string;
+    yocoTestMode?: boolean;
     operators?: Array<{
         id: string;
         name: string;

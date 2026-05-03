@@ -36,6 +36,11 @@ export type TenantCredentials = {
   waPhoneId: string;
   yocoSecretKey: string;
   yocoWebhookSecret: string;
+  yocoTestMode: boolean;
+  yocoTestSecretKey: string;
+  yocoTestWebhookSecret: string;
+  activeYocoSecretKey: string;
+  activeYocoWebhookSecret: string;
 };
 
 export type TenantContext = {
@@ -105,11 +110,21 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     throw new Error("No credential record found for business " + businessId);
   }
 
+  var testMode = row.yoco_test_mode === true;
+  var liveKey = String(row.yoco_secret_key || "");
+  var liveWebhook = String(row.yoco_webhook_secret || "");
+  var testKey = String(row.yoco_test_secret_key || "");
+  var testWebhook = String(row.yoco_test_webhook_secret || "");
   return {
     waToken: String(row.wa_token || ""),
     waPhoneId: String(row.wa_phone_id || ""),
-    yocoSecretKey: String(row.yoco_secret_key || ""),
-    yocoWebhookSecret: String(row.yoco_webhook_secret || ""),
+    yocoSecretKey: liveKey,
+    yocoWebhookSecret: liveWebhook,
+    yocoTestMode: testMode,
+    yocoTestSecretKey: testKey,
+    yocoTestWebhookSecret: testWebhook,
+    activeYocoSecretKey: testMode && testKey ? testKey : liveKey,
+    activeYocoWebhookSecret: testMode && testWebhook ? testWebhook : liveWebhook,
   };
 }
 

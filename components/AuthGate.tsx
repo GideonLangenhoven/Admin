@@ -16,6 +16,8 @@ interface OperatorOption {
   name: string;
   logoUrl: string;
   timezone: string;
+  subscriptionStatus: string;
+  yocoTestMode: boolean;
 }
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
@@ -37,6 +39,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   var [role, setRole] = useState("");
   var [operators, setOperators] = useState<OperatorOption[]>([]);
   var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
+  var [yocoTestMode, setYocoTestMode] = useState(false);
   var [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -61,7 +64,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     var baseQuery = supabase
       .from("businesses")
-      .select("id, name, business_name, logo_url, timezone, subscription_status")
+      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode")
       .order("business_name", { ascending: true });
 
     var businessesRes = isMultiOperator
@@ -82,6 +85,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       logoUrl: biz.logo_url || "",
       timezone: biz.timezone || "UTC",
       subscriptionStatus: (biz as any).subscription_status || "ACTIVE",
+      yocoTestMode: (biz as any).yoco_test_mode === true,
     }));
 
     var activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
@@ -93,6 +97,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       timezone: activeOperator?.timezone || "UTC",
       operators: operatorOptions,
       subscriptionStatus: activeOperator?.subscriptionStatus || "ACTIVE",
+      yocoTestMode: activeOperator?.yocoTestMode || false,
     };
   }
 
@@ -129,6 +134,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setTimezone(context.timezone);
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
+      setYocoTestMode(context.yocoTestMode || false);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
       localStorage.setItem("ck_admin_timezone", context.timezone);
@@ -169,6 +175,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setRole("");
     setOperators([]);
     setSubscriptionStatus("ACTIVE");
+    setYocoTestMode(false);
   }
 
   async function login() {
@@ -265,6 +272,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setTimezone(context.timezone);
         setOperators(context.operators);
         setSubscriptionStatus(context.subscriptionStatus);
+        setYocoTestMode(context.yocoTestMode || false);
       }
 
       setAuthed(true);
@@ -302,6 +310,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setBusinessName(nextOperator.name);
     setLogoUrl(nextOperator.logoUrl || "");
     setTimezone(nextOperator.timezone || "UTC");
+    setSubscriptionStatus(nextOperator.subscriptionStatus || "ACTIVE");
+    setYocoTestMode(nextOperator.yocoTestMode || false);
     localStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
   }
 
@@ -378,7 +388,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, operators, switchOperator }}>
+    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, operators, switchOperator }}>
       {children}
     </BusinessProvider>
   );

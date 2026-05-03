@@ -79,7 +79,7 @@ async function verifyWebhookSignature(
     );
   }
 
-  if (!tenant.credentials.yocoWebhookSecret) {
+  if (!tenant.credentials.activeYocoWebhookSecret) {
     throw new Error(
       "YOCO_WEBHOOK_VERIFY: no webhook secret configured for business " +
         businessId +
@@ -87,7 +87,7 @@ async function verifyWebhookSignature(
     );
   }
 
-  var webhook = new Webhook(tenant.credentials.yocoWebhookSecret);
+  var webhook = new Webhook(tenant.credentials.activeYocoWebhookSecret);
   await webhook.verify(rawBody, {
     "webhook-id": req.headers.get("webhook-id") || "",
     "webhook-timestamp": req.headers.get("webhook-timestamp") || "",

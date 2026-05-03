@@ -200,11 +200,14 @@ export default function SettingsPage() {
     var [autoTagSaving, setAutoTagSaving] = useState(false);
 
     // Credentials State
-    var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean } | null>(null);
+    var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean; yoco_test_mode: boolean; yoco_test: boolean } | null>(null);
     var [waForm, setWaForm] = useState({ token: "", phoneId: "" });
     var [yocoForm, setYocoForm] = useState({ secretKey: "", webhookSecret: "" });
+    var [yocoTestForm, setYocoTestForm] = useState({ secretKey: "", webhookSecret: "" });
     var [waSaving, setWaSaving] = useState(false);
     var [yocoSaving, setYocoSaving] = useState(false);
+    var [yocoTestSaving, setYocoTestSaving] = useState(false);
+    var [testModeToggling, setTestModeToggling] = useState(false);
     var [gdriveConnected, setGdriveConnected] = useState(false);
     var [gdriveEmail, setGdriveEmail] = useState("");
     var [gdriveLoading, setGdriveLoading] = useState(false);
@@ -1084,6 +1087,48 @@ export default function SettingsPage() {
             setCredMessage({ type: "error", text: String(err?.message || "Failed to save Yoco credentials.") });
         }
         setYocoSaving(false);
+    }
+
+    async function handleToggleTestMode() {
+        setTestModeToggling(true);
+        setCredMessage({ type: "", text: "" });
+        var newMode = !(credStatus?.yoco_test_mode);
+        try {
+            var res = await fetch("/api/credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ business_id: businessId, section: "yoco_test_mode", yoco_test_mode: newMode }),
+            });
+            var d = await res.json();
+            if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
+            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled — sandbox keys will be used for payments." : "Yoco TEST MODE disabled — live keys are active." });
+            fetchCredStatus();
+            window.location.reload();
+        } catch (err: any) {
+            setCredMessage({ type: "error", text: String(err?.message || "Failed to toggle test mode.") });
+        }
+        setTestModeToggling(false);
+    }
+
+    async function handleSaveYocoTest(e: React.FormEvent) {
+        e.preventDefault();
+        setYocoTestSaving(true);
+        setCredMessage({ type: "", text: "" });
+        try {
+            var res = await fetch("/api/credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ business_id: businessId, section: "yoco_test", yoco_test_secret_key: yocoTestForm.secretKey, yoco_test_webhook_secret: yocoTestForm.webhookSecret }),
+            });
+            var d = await res.json();
+            if (!res.ok || d.error) throw new Error(d.error || "Save failed");
+            setCredMessage({ type: "success", text: "Yoco test credentials saved and encrypted successfully." });
+            setYocoTestForm({ secretKey: "", webhookSecret: "" });
+            fetchCredStatus();
+        } catch (err: any) {
+            setCredMessage({ type: "error", text: String(err?.message || "Failed to save Yoco test credentials.") });
+        }
+        setYocoTestSaving(false);
     }
 
     async function checkGdriveStatus() {
@@ -2916,6 +2961,82 @@ export default function SettingsPage() {
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
+                        </button>
+                    </form>
+
+                    {/* Yoco Test Mode */}
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Mode</h3>
+                            </div>
+                            {credStatus !== null && (
+                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test_mode ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600")}>
+                                    {credStatus.yoco_test_mode ? "TEST MODE ON" : "Live mode"}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs text-[var(--ck-text-muted)] leading-relaxed">
+                            When enabled, all Yoco payments will use sandbox (test) keys. No real charges will be processed. Use this to test the payment flow with Yoco test cards.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleToggleTestMode}
+                            disabled={testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
+                            className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
+                                ? "border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                                : "bg-orange-500 text-white hover:bg-orange-600")}
+                        >
+                            {testModeToggling ? "Updating..." : credStatus?.yoco_test_mode ? "Disable Test Mode" : "Enable Test Mode"}
+                        </button>
+                        {!credStatus?.yoco_test && !credStatus?.yoco_test_mode && (
+                            <p className="text-xs text-amber-600">Save test credentials below before enabling test mode.</p>
+                        )}
+                    </div>
+
+                    {/* Yoco Test Credentials */}
+                    <form onSubmit={handleSaveYocoTest} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
+                            <div className="flex items-center gap-2">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-400"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
+                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Credentials</h3>
+                            </div>
+                            {credStatus !== null && (
+                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                    {credStatus.yoco_test ? "Configured" : "Not set"}
+                                </span>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Secret Key</label>
+                            <input
+                                type="password"
+                                value={yocoTestForm.secretKey}
+                                onChange={e => setYocoTestForm({ ...yocoTestForm, secretKey: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "sk_test_..."}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Webhook Signing Secret</label>
+                            <input
+                                type="password"
+                                value={yocoTestForm.webhookSecret}
+                                onChange={e => setYocoTestForm({ ...yocoTestForm, webhookSecret: e.target.value })}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "whsec_test_..."}
+                                autoComplete="new-password"
+                            />
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Test environment → Webhooks.</p>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim()}
+                            className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
+                        >
+                            {yocoTestSaving ? "Encrypting & saving..." : "Save Yoco Test Credentials"}
                         </button>
                     </form>
 

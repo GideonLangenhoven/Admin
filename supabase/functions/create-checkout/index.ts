@@ -233,16 +233,19 @@ Deno.serve(async (req: any) => {
 
     console.log("CREATING CHECKOUT: amount=" + amount + " type=" + type);
 
-    if (!tenant.credentials.yocoSecretKey) {
+    if (!tenant.credentials.activeYocoSecretKey) {
       return new Response(
         JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "No Yoco secret key configured for this business." }),
         { status: 503, headers: corsHeaders },
       );
     }
 
+    var isTestMode = tenant.credentials.yocoTestMode === true;
+    console.log("CREATING CHECKOUT: test_mode=" + isTestMode);
+
     var yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
       method: "POST",
-      headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+      headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: Math.round(Number(amount) * 100),
         currency: tenant.business.currency || "ZAR",
