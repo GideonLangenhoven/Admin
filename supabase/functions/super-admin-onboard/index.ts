@@ -56,12 +56,15 @@ Deno.serve(async (req) => {
 
     const { data: requester, error: requesterError } = await supabase
       .from("admin_users")
-      .select("id, role, password_hash")
+      .select("id, role, password_hash, suspended")
       .eq("email", requesterEmail)
       .maybeSingle();
     if (requesterError) throw requesterError;
     if (!requester || !/super/i.test(String(requester.role || ""))) {
       return respond(403, { success: false, error: "Only super admins can create new tenants" });
+    }
+    if (requester.suspended) {
+      return respond(403, { success: false, error: "Account is suspended" });
     }
     const requesterHash = await sha256Hex(requesterPassword);
     if (!requester.password_hash || requester.password_hash !== requesterHash) {

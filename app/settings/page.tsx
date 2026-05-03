@@ -2,7 +2,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
-import { generateSecureToken, sendAdminSetupLink, sha256 } from "../lib/admin-auth";
+import { generateSecureToken, sendAdminSetupLink, sha256, getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
@@ -1040,7 +1040,8 @@ export default function SettingsPage() {
 
     async function fetchCredStatus() {
         try {
-            var res = await fetch("/api/credentials?business_id=" + businessId);
+            var headers = await getAuthHeaders();
+            var res = await fetch("/api/credentials?business_id=" + businessId, { headers });
             if (res.ok) setCredStatus(await res.json());
         } catch (e) {
             console.error("Failed to load credential status:", e);
@@ -1054,7 +1055,7 @@ export default function SettingsPage() {
         try {
             var res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "wa", wa_token: waForm.token, wa_phone_id: waForm.phoneId }),
             });
             var d = await res.json();
@@ -1075,7 +1076,7 @@ export default function SettingsPage() {
         try {
             var res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco", yoco_secret_key: yocoForm.secretKey, yoco_webhook_secret: yocoForm.webhookSecret }),
             });
             var d = await res.json();
@@ -1096,7 +1097,7 @@ export default function SettingsPage() {
         try {
             var res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test_mode", yoco_test_mode: newMode }),
             });
             var d = await res.json();
@@ -1117,7 +1118,7 @@ export default function SettingsPage() {
         try {
             var res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test", yoco_test_secret_key: yocoTestForm.secretKey, yoco_test_webhook_secret: yocoTestForm.webhookSecret }),
             });
             var d = await res.json();

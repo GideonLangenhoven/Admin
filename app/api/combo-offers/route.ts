@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
+import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,8 +12,16 @@ function serviceClient() {
 // GET /api/combo-offers?business_id=xxx
 export async function GET(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
+
+  var caller = await getCallerAdmin(req);
+  if (!caller) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+
   var businessId = req.nextUrl.searchParams.get("business_id");
   if (!businessId) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
+
+  if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
+    return NextResponse.json({ error: "You can only view combo offers for your own business" }, { status: 403 });
+  }
 
   var supabase = serviceClient();
 
@@ -47,11 +56,21 @@ export async function GET(req: NextRequest) {
 // body.action: "create" | "update" | "deactivate" | "activate"
 export async function POST(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
+
+  var caller = await getCallerAdmin(req);
+  if (!caller || !isPrivilegedRole(caller.role)) {
+    return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+  }
+
   var body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   var { business_id, action } = body;
   if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
+
+  if (caller.role !== "SUPER_ADMIN" && caller.business_id !== business_id) {
+    return NextResponse.json({ error: "You can only manage combo offers for your own business" }, { status: 403 });
+  }
 
   var supabase = serviceClient();
 

@@ -2,6 +2,13 @@
 
 import { supabase } from "./supabase";
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  var { data: { session } } = await supabase.auth.getSession();
+  var headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (session?.access_token) headers["Authorization"] = "Bearer " + session.access_token;
+  return headers;
+}
+
 export interface AdminAccountRow {
   id: string;
   email: string;
@@ -36,9 +43,10 @@ function setupUrl(email: string, token: string) {
 // Direct anon-key access to admin_users is closed once the permissive RLS fallback is dropped.
 
 async function setupLinkApi(action: "send" | "validate" | "complete", body: Record<string, any>) {
+  var headers = action === "send" ? await getAuthHeaders() : { "Content-Type": "application/json" };
   var res = await fetch("/api/admin/setup-link", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ action, ...body }),
   });
   var data: any = await res.json().catch(() => ({}));
