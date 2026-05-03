@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
     var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,10 +13,20 @@ function serviceClient() {
 }
 
 export async function GET(req: NextRequest) {
+    var caller = await getCallerAdmin(req);
+    if (!caller || !isPrivilegedRole(caller.role)) {
+        return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+    }
+
     var businessId = req.nextUrl.searchParams.get("business_id");
     if (!businessId) {
         return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
     }
+
+    if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
+        return NextResponse.json({ error: "You can only view credentials for your own business" }, { status: 403 });
+    }
+
     var supabase = serviceClient();
     var { data, error } = await supabase
         .from("businesses")
@@ -36,6 +47,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    var caller = await getCallerAdmin(req);
+    if (!caller || !isPrivilegedRole(caller.role)) {
+        return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+    }
+
     var encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
     if (!encryptionKey || encryptionKey.length < 32) {
         return NextResponse.json({
@@ -47,6 +63,11 @@ export async function POST(req: NextRequest) {
     var { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
     if (!section) return NextResponse.json({ error: "section is required ('wa', 'yoco', or 'yoco_test')" }, { status: 400 });
+
+    if (caller.role !== "SUPER_ADMIN" && caller.business_id !== business_id) {
+        return NextResponse.json({ error: "You can only update credentials for your own business" }, { status: 403 });
+    }
+
     var supabase = serviceClient();
     if (section === "wa") {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {

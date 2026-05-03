@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
+import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,10 +13,20 @@ function serviceClient() {
 // Returns a settlement summary: how much each operator collected and owes for combo bookings.
 export async function GET(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
+
+  var caller = await getCallerAdmin(req);
+  if (!caller || !isPrivilegedRole(caller.role)) {
+    return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+  }
+
   var businessId = req.nextUrl.searchParams.get("business_id");
   var period = req.nextUrl.searchParams.get("period"); // format: YYYY-MM-DD..YYYY-MM-DD
 
   if (!businessId) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
+
+  if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
+    return NextResponse.json({ error: "You can only view settlements for your own business" }, { status: 403 });
+  }
 
   var supabase = serviceClient();
 
@@ -103,6 +114,12 @@ export async function GET(req: NextRequest) {
 // Mark combo bookings as settled
 export async function POST(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
+
+  var caller = await getCallerAdmin(req);
+  if (!caller || !isPrivilegedRole(caller.role)) {
+    return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+  }
+
   var body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 

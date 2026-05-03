@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -18,8 +19,15 @@ const TOKEN_RATE_WINDOW_MS = 60 * 60 * 1000;
 
 // GET /api/partnerships?business_id=xxx
 export async function GET(req: NextRequest) {
+  var caller = await getCallerAdmin(req);
+  if (!caller) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+
   var businessId = req.nextUrl.searchParams.get("business_id");
   if (!businessId) return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
+
+  if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
+    return NextResponse.json({ error: "You can only view partnerships for your own business" }, { status: 403 });
+  }
 
   var supabase = serviceClient();
   var { data, error } = await supabase
@@ -51,6 +59,17 @@ export async function POST(req: NextRequest) {
 
   var { business_id, action } = body;
   var supabase = serviceClient();
+
+  // accept_token is token-gated (no session required — email link flow)
+  if (action !== "accept_token") {
+    var caller = await getCallerAdmin(req);
+    if (!caller || !isPrivilegedRole(caller.role)) {
+      return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+    }
+    if (business_id && caller.role !== "SUPER_ADMIN" && caller.business_id !== business_id) {
+      return NextResponse.json({ error: "You can only manage partnerships for your own business" }, { status: 403 });
+    }
+  }
 
   // --- INVITE ---
   if (action === "invite") {
