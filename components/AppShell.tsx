@@ -15,6 +15,7 @@ import {
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
   ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
+  UsersThree,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
@@ -22,7 +23,7 @@ const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
   MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
-  ArrowLeftRight: ArrowsLeftRight, Check, Circle,
+  ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree,
 };
 
 interface NavItem {

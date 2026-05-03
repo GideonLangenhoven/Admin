@@ -75,6 +75,23 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
     }
 
+    // Upsert customer profile (best-effort — never fail the confirmation)
+    try {
+      var { data: customerId } = await supabase.rpc("upsert_customer", {
+        p_business_id: booking.business_id,
+        p_email: booking.email,
+        p_name: booking.customer_name || null,
+        p_phone: booking.phone || null,
+        p_marketing_consent: booking.marketing_opt_in || false,
+      });
+      if (customerId) {
+        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
+        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
+      }
+    } catch (custErr) {
+      console.error("CUSTOMER_UPSERT_ERR:", custErr);
+    }
+
     var tenant = await getTenantByBusinessId(supabase, booking.business_id);
     var ref = booking.id.substring(0, 8).toUpperCase();
     var slotTime = booking.slots?.start_time
