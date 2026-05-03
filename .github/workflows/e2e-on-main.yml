@@ -1,0 +1,43 @@
+name: E2E on main
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: e2e-main
+  cancel-in-progress: false
+
+jobs:
+  happy-path:
+    name: Customer happy-path (Yoco test mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - name: Run happy-path
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          ADMIN_URL: ${{ secrets.ADMIN_URL }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: npm run test:e2e:happy
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-happy-path-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
