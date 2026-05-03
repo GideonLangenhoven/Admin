@@ -27,6 +27,9 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@phosphor-icons/react@^2.1.10",
+        "npm:@playwright/test@^1.59.1",
+        "npm:@sentry/nextjs@^10.51.0",
         "npm:@supabase/supabase-js@^2.95.3",
         "npm:@types/node@20",
         "npm:@types/react-dom@19",
@@ -34,16 +37,22 @@
         "npm:autoprefixer@^10.4.24",
         "npm:babel-plugin-react-compiler@1.0.0",
         "npm:date-fns@^4.1.0",
-        "npm:eslint-config-next@16.1.6",
+        "npm:eslint-config-next@^16.2.2",
         "npm:eslint@9",
+        "npm:jspdf-autotable@^5.0.7",
+        "npm:jspdf@^4.2.0",
         "npm:lucide-react@0.575",
-        "npm:next@16.1.6",
+        "npm:next@^16.2.2",
+        "npm:pg@^8.20.0",
         "npm:postcss@^8.5.6",
         "npm:react-day-picker@^9.13.2",
-        "npm:react-dom@19.2.3",
-        "npm:react@19.2.3",
+        "npm:react-dom@^19.2.4",
+        "npm:react@^19.2.4",
+        "npm:recharts@^3.8.1",
         "npm:tailwindcss@^3.4.19",
-        "npm:typescript@5"
+        "npm:typescript@5",
+        "npm:vitest@^2.1.9",
+        "npm:xlsx@~0.18.5"
       ]
     }
   }
