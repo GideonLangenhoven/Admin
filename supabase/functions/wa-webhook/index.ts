@@ -353,7 +353,7 @@ async function getLastCompletedBooking(tenant: TenantContext, phone: any) {
   return r.data;
 }
 
-var REVIEW_URL = "https://g.page/r/CWabH9a6u5DbEB0/review";
+// REVIEW_URL removed — use tenant.business.social_google_reviews (Prompt 23)
 
 // ===== SMART AVAILABILITY =====
 function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end: Date, label: string } | null {
@@ -1360,7 +1360,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               });
             }
           } catch (e) { console.log("cancel refund email err"); }
-          var crLoc = (tenant.business as any).location_phrase;
+          var crLoc = tenant.business.location_phrase;
           await sendText(tenant, phone, crRefundMsg + "\n\n" + (crLoc ? "We\u2019d love to have you back " + crLoc + " soon!" : "We\u2019d love to have you back soon!"));
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         }
@@ -1396,7 +1396,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         var refAmt = sd.total;
         await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
-        var frLoc = (tenant.business as any).location_phrase;
+        var frLoc = tenant.business.location_phrase;
         await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else {
@@ -2001,7 +2001,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           (waiverLink ? "\u{1F4DD} Waiver: " + waiverLink + "\n\n" : "") +
           "\u{1F4CD} *Meeting Point:* " + (tenant.business.directions || "Check your confirmation details from " + businessName(tenant) + " for arrival instructions.") + "\n\n" +
           ((tenant.business as any).what_to_bring ? "\u{1F392} *Bring:* " + (tenant.business as any).what_to_bring + "\n\n" : "") +
-          ((tenant.business as any).location_phrase ? "See you " + (tenant.business as any).location_phrase + "!" : "See you soon!")
+          (tenant.business.location_phrase ? "See you " + tenant.business.location_phrase + "!" : "See you soon!")
         );
         // Send confirmation email
         try {
@@ -2826,7 +2826,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (newSlotR.data) await supabase.from("slots").update({ booked: newSlotR.data.booked + sd.qty }).eq("id", ctSlotId);
       var newTotal2 = sd.qty * Number(sd.new_price);
       await supabase.from("bookings").update({ tour_id: sd.new_tour_id, slot_id: ctSlotId, unit_price: sd.new_price, total_amount: newTotal2 }).eq("id", sd.booking_id);
-      var tsLoc = (tenant.business as any).location_phrase;
+      var tsLoc = tenant.business.location_phrase;
       await sendText(tenant, phone, "All done! \u2705 Switched to *" + sd.new_tour_name + "* on " + (newSlotR.data ? fmtTime(tenant, newSlotR.data.start_time) : "TBC") + ".\n\n" + (tsLoc ? "See you " + tsLoc + "!" : "See you soon!"));
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }

@@ -22,6 +22,13 @@ export type TenantBusiness = {
   directions?: string | null;
   footer_line_one?: string | null;
   footer_line_two?: string | null;
+  meeting_point_address?: string | null;
+  arrival_instructions?: string | null;
+  business_address?: string | null;
+  social_google_reviews?: string | null;
+  what_to_bring?: string | null;
+  activity_verb_past?: string | null;
+  location_phrase?: string | null;
 };
 
 export type TenantCredentials = {
@@ -131,6 +138,13 @@ export async function getBusinessConfig(supabase: any, businessId: string): Prom
       "directions",
       "footer_line_one",
       "footer_line_two",
+      "meeting_point_address",
+      "arrival_instructions",
+      "business_address",
+      "social_google_reviews",
+      "what_to_bring",
+      "activity_verb_past",
+      "location_phrase",
     ].join(","))
     .eq("id", businessId)
     .maybeSingle();
@@ -188,6 +202,13 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
       "directions",
       "footer_line_one",
       "footer_line_two",
+      "meeting_point_address",
+      "arrival_instructions",
+      "business_address",
+      "social_google_reviews",
+      "what_to_bring",
+      "activity_verb_past",
+      "location_phrase",
     ].join(","))
     .order("created_at", { ascending: true });
 

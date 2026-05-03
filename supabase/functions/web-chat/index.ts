@@ -88,7 +88,7 @@ function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any)
   if (lo.includes("bring") || lo.includes("wear") || lo.includes("need to have") || lo.includes("pack")) {
     var wtb = String(business?.what_to_bring || "").trim();
     if (wtb) return wtb;
-    return "We recommend sunscreen, a towel, and clothes that can get wet. Would you like to book a tour?";
+    return "Comfortable clothes, sun protection, water. Would you like to book a tour?";
   }
   if (lo.includes("meet") || lo.includes("where") || lo.includes("location") || lo.includes("direction") || lo.includes("address") || lo.includes("find you")) {
     var dir = String(business?.directions || "").trim();
@@ -603,7 +603,7 @@ Deno.serve(async (req) => {
           try { await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: bk.id, business_id: businessId, email: ns.email, customer_name: ns.name, ref: vRef, tour_name: ns.tname, start_time: fmtS(ns.slotTime), qty: ns.qty, total_amount: "FREE (voucher)" } }) }); } catch (e) { console.log("webchat voucher confirm email err"); }
           // Send WhatsApp confirmation if phone provided
           // L1: Use dynamic meeting point instead of hardcoded address
-          var wcLoc = (tenant?.business as any)?.location_phrase; var wcWtb = (tenant?.business as any)?.what_to_bring;
+          var wcLoc = tenant?.business?.location_phrase; var wcWtb = tenant?.business?.what_to_bring;
           if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
           reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!"); ns = { step: "IDLE" };
         } else {
@@ -798,7 +798,7 @@ Deno.serve(async (req) => {
       });
       if (rbErr || rbData?.error) { reply = "Something went wrong changing your booking. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      var rsLoc = (tenant?.business as any)?.location_phrase;
+      var rsLoc = tenant?.business?.location_phrase;
       reply = "\u2705 Rescheduled to " + fmt(rsSlot.start_time) + "!\n\n" + (rsLoc ? "See you " + rsLoc + "!" : "See you soon!");
       if (rbData?.diff > 0) {
         reply = "\u2705 Timeslot updated!\n\nAs this was more expensive, you have a balance of R" + rbData.diff + ". Please pay using the link below:";
@@ -880,7 +880,7 @@ Deno.serve(async (req) => {
       });
       if (rbErr2 || rbData2?.error) { reply = "Something went wrong changing your tour. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      var ctsLoc = (tenant?.business as any)?.location_phrase;
+      var ctsLoc = tenant?.business?.location_phrase;
       reply = "\u2705 Switched to *" + ns.new_tour_name + "* on " + fmt(ctsSl.start_time) + "!\n\n" + (ctsLoc ? "See you " + ctsLoc + "!" : "See you soon!");
       if (rbData2?.diff > 0) {
         reply = "\u2705 Tour switched!\n\nAs this tour is more expensive, you have a balance of R" + rbData2.diff + ". Please pay using the link below:";
@@ -914,7 +914,7 @@ Deno.serve(async (req) => {
       if (isBtnClick) gPicked = tours.find(function (t) { return t.id === btnVal; });
       else { for (var gt of tours) { if ((lo.includes("sea") || lo.includes("morning") || lo.includes("kayak")) && gt.name.includes("Sea")) gPicked = gt; if ((lo.includes("sunset") || lo.includes("evening")) && gt.name.includes("Sunset")) gPicked = gt; } }
       if (gPicked) { ns = { step: "GIFT_RECIPIENT", gtid: gPicked.id, gtname: gPicked.name, gtprice: gPicked.base_price_per_person, gbid: gPicked.business_id }; reply = "" + gPicked.name + " voucher (R" + gPicked.base_price_per_person + ") \u2014 great choice! Who is it for? (Their name)"; }
-      else { reply = "Which tour? Sea Kayak or Sunset Paddle?"; buttons = tours.map(function (gt2) { return { label: gt2.name + " \u2014 R" + gt2.base_price_per_person, value: gt2.id }; }); }
+      else { reply = "Which tour? " + tours.map(function(t) { return t.name; }).join(" or ") + "?"; buttons = tours.map(function (gt2) { return { label: gt2.name + " \u2014 R" + gt2.base_price_per_person, value: gt2.id }; }); }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     if (step === "GIFT_RECIPIENT") {

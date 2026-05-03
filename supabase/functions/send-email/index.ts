@@ -7,6 +7,7 @@ import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 // Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
 // Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
 var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
@@ -89,7 +90,6 @@ function heroImg(key: string, alt: string, bgColor = "#1b3b36") {
   return `<!--HERO_IMG:${key}:${bgColor}:${alt}-->`;
 }
 
-var MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005";
 var MANAGE_BOOKING_URL = "";
 
 async function enrichWaiverEmailData(d: Record<string, unknown>) {
@@ -165,6 +165,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       emailColor: "#1b3b36",
       imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
       socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
+      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "",
     };
   }
 
@@ -172,7 +173,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     var res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews")
+      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -229,7 +230,74 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     socialLinkedin: String(data?.social_linkedin || ""),
     socialTripadvisor: String(data?.social_tripadvisor || ""),
     socialGoogleReviews: String(data?.social_google_reviews || ""),
+    meetingPointAddress: String(data?.meeting_point_address || ""),
+    arrivalInstructions: String(data?.arrival_instructions || ""),
+    businessAddress: String(data?.business_address || ""),
+    whatToBring: String(data?.what_to_bring || ""),
+    activityVerbPast: String(data?.activity_verb_past || ""),
   };
+}
+
+type InvoiceContext = {
+  companyName: string;
+  addressLines: string[];
+  reg: string;
+  vat: string;
+  bank: {
+    account_owner: string | null;
+    account_number: string | null;
+    account_type: string | null;
+    bank_name: string | null;
+    branch_code: string | null;
+  };
+};
+
+async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
+  var empty: InvoiceContext = {
+    companyName: "",
+    addressLines: [],
+    reg: "",
+    vat: "",
+    bank: { account_owner: null, account_number: null, account_type: null, bank_name: null, branch_code: null },
+  };
+  if (!businessId || !supabase) return empty;
+
+  var { data: biz } = await supabase
+    .from("businesses")
+    .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number")
+    .eq("id", businessId)
+    .maybeSingle();
+
+  var companyName = String(biz?.invoice_company_name || biz?.business_name || "");
+  var addressLines = [biz?.invoice_address_line1, biz?.invoice_address_line2, biz?.invoice_address_line3].filter(Boolean) as string[];
+  var reg = String(biz?.invoice_reg_number || "");
+  var vat = String(biz?.invoice_vat_number || "");
+
+  var bank = empty.bank;
+  if (SETTINGS_ENCRYPTION_KEY) {
+    try {
+      var { data: bankRows } = await supabase.rpc("get_business_bank_details", {
+        p_business_id: businessId,
+        p_key: SETTINGS_ENCRYPTION_KEY,
+      });
+      var row = Array.isArray(bankRows) ? bankRows[0] : bankRows;
+      if (row) {
+        bank = {
+          account_owner: row.account_owner || null,
+          account_number: row.account_number || null,
+          account_type: row.account_type || null,
+          bank_name: row.bank_name || null,
+          branch_code: row.branch_code || null,
+        };
+      }
+    } catch (bankErr) {
+      console.error("INVOICE_BANK_DETAILS_ERR:", bankErr);
+    }
+  } else {
+    console.warn("INVOICE_CONTEXT: SETTINGS_ENCRYPTION_KEY not set, skipping bank details");
+  }
+
+  return { companyName, addressLines, reg, vat, bank };
 }
 
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
@@ -304,6 +372,25 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     .join("")
     .split("Cape Town<br>8005")
     .join("");
+
+  // Replace arrival instructions + what-to-bring (Prompt 23)
+  if (branding.arrivalInstructions || branding.whatToBring) {
+    brandedHtml = brandedHtml
+      .split("Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.")
+      .join((branding.arrivalInstructions || "Please arrive 15 minutes before launch.") + (branding.whatToBring ? "<br>" + branding.whatToBring : ""));
+  }
+
+  // Replace Google Reviews URL (Prompt 23)
+  if (branding.socialGoogleReviews) {
+    brandedHtml = brandedHtml
+      .split("https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ")
+      .join(branding.socialGoogleReviews);
+  }
+
+  // Replace activity verb (Prompt 23)
+  brandedHtml = brandedHtml
+    .split("Thank you for paddling with")
+    .join("Thank you for " + (branding.activityVerbPast || "adventuring") + " with");
 
   // Replace hardcoded Google Maps URL with business directions or remove it
   if (branding.directions) {
@@ -534,7 +621,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
               180 Beach Rd, Three Anchor Bay<br>
               Cape Town, 8005
             </p>
-            <a href="${MAPS_URL}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>
+            <a href="https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>
             <p style="font-size: 14px; color: #555; line-height: 1.5; margin: 15px 0 0 0;">
               Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.
             </p>
@@ -1324,25 +1411,12 @@ function adminResetPasswordHtml(d: Record<string, unknown>) {
 }
 
 var VAT_RATE = 0.15;
-var FROM_COMPANY = {
-  name: "Cape Kayak Adventures",
-  addressLines: ["179 Beach Road Three Anchor Bay", "Cape Town", "8005"],
-  reg: "Reg. 1995/051404/23",
-  vat: "4290176926",
-};
-var BANKING_DETAILS = {
-  owner: "Coastal Kayak Trails CC",
-  number: "070631824",
-  type: "Current / Cheque",
-  bank: "Standard Bank",
-  branchCode: "020909",
-};
 
 function escHtml(raw: string) {
   return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> {
+async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContext): Promise<Uint8Array> {
   var doc = await PDFDocument.create();
   var page = doc.addPage([595.28, 841.89]); // A4
   var font = await doc.embedFont(StandardFonts.Helvetica);
@@ -1375,10 +1449,11 @@ async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> 
   function m(n: number) { return "R" + n.toFixed(2); }
 
   // ── Header ──
-  page.drawText(FROM_COMPANY.name, { x: margin, y, font: fontBold, size: 18, color: black });
+  page.drawText(invCtx.companyName || "Tax Invoice", { x: margin, y, font: fontBold, size: 18, color: black });
   page.drawText("TAX INVOICE", { x: W - margin - fontBold.widthOfTextAtSize("TAX INVOICE", 22), y, font: fontBold, size: 22, color: grey });
   y -= 16;
-  page.drawText(FROM_COMPANY.reg + "  VAT: " + FROM_COMPANY.vat, { x: margin, y, font, size: 8, color: grey });
+  var regLine = [invCtx.reg ? invCtx.reg : "", invCtx.vat ? "VAT: " + invCtx.vat : ""].filter(Boolean).join("  ");
+  if (regLine) page.drawText(regLine, { x: margin, y, font, size: 8, color: grey });
   y -= 30;
 
   // ── Horizontal line ──
@@ -1389,7 +1464,7 @@ async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> 
   page.drawText("From:", { x: margin, y, font: fontBold, size: 10, color: black });
   page.drawText("To:", { x: margin + usable * 0.5, y, font: fontBold, size: 10, color: black });
   y -= 14;
-  var fromLines = [FROM_COMPANY.name, ...FROM_COMPANY.addressLines];
+  var fromLines = [invCtx.companyName, ...invCtx.addressLines].filter(Boolean);
   for (var fl of fromLines) {
     page.drawText(fl, { x: margin, y, font, size: 9, color: black });
     y -= 12;
@@ -1471,156 +1546,27 @@ async function buildInvoicePdf(d: Record<string, unknown>): Promise<Uint8Array> 
   page.drawText("R0.00", { x: totalsValX, y, font: fontBold, size: 10, color: black });
   y -= 35;
 
-  // ── Banking Details ──
-  page.drawText("Banking Details", { x: margin, y, font: fontBold, size: 12, color: black });
-  y -= 18;
-  var bankRows = [
-    ["Account Owner:", BANKING_DETAILS.owner],
-    ["Account Number:", BANKING_DETAILS.number],
-    ["Account Type:", BANKING_DETAILS.type],
-    ["Bank Name:", BANKING_DETAILS.bank],
-    ["Branch Code:", BANKING_DETAILS.branchCode],
-    ["Reference:", invNo],
-  ];
-  for (var br of bankRows) {
-    page.drawText(br[0], { x: margin, y, font: fontBold, size: 9, color: black });
-    page.drawText(br[1], { x: margin + 110, y, font, size: 9, color: black });
-    y -= 13;
+  // ── Banking Details (only if business has bank details populated) ──
+  var hasBank = invCtx.bank.account_number || invCtx.bank.account_owner;
+  if (hasBank) {
+    page.drawText("Banking Details", { x: margin, y, font: fontBold, size: 12, color: black });
+    y -= 18;
+    var bankRows = [
+      ["Account Owner:", invCtx.bank.account_owner || ""],
+      ["Account Number:", invCtx.bank.account_number || ""],
+      ["Account Type:", invCtx.bank.account_type || ""],
+      ["Bank Name:", invCtx.bank.bank_name || ""],
+      ["Branch Code:", invCtx.bank.branch_code || ""],
+      ["Reference:", invNo],
+    ].filter(row => row[1]);
+    for (var br of bankRows) {
+      page.drawText(br[0], { x: margin, y, font: fontBold, size: 9, color: black });
+      page.drawText(br[1], { x: margin + 110, y, font, size: 9, color: black });
+      y -= 13;
+    }
   }
 
   return await doc.save();
-}
-
-function proFormaHtml(d: Record<string, unknown>) {
-  var invNo = escHtml(String(d.invoice_number || ""));
-  var ref = escHtml(String(d.payment_reference || invNo).substring(0, 8).toUpperCase());
-  var toName = escHtml(String(d.customer_name || "Customer"));
-  var toEmail = escHtml(String(d.customer_email || ""));
-  var tourName = escHtml(String(d.tour_name || "Kayak Booking"));
-  var tourDate = escHtml(String(d.tour_date || d.invoice_date || "-"));
-  var service = tourName + "(" + tourDate + ")";
-  var qty = Number(d.qty) || 1;
-  var totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
-  var total = parseFloat(totalStr) || 0;
-  var subtotal = total / (1 + VAT_RATE);
-  var vat = total - subtotal;
-  var invDate = escHtml(String(d.invoice_date || "-"));
-
-  var phoneSection = d.phone ? escHtml(String(d.phone)) + "\\n" : "";
-
-  function m(n: number) { return n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, ''); }
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tax Invoice ${invNo}</title>
-  <style>
-    @page { size: A4; margin: 10mm; }
-    body { margin: 0; background: #eeeeee; font-family: Arial, Helvetica, sans-serif; color: #111; }
-    .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 12mm; box-sizing: border-box; }
-    .row { display: flex; justify-content: space-between; gap: 10mm; margin-bottom: 5mm; }
-    .company-name { font-family: 'Arial Black', sans-serif; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; margin-top: -5px; }
-    .company-name span { font-weight: 300; }
-    .title { font-family: 'Arial Black', sans-serif; font-size: 32px; font-weight: 900; color: #b3b3b3; margin: 0; text-transform: uppercase; }
-    .muted { font-size: 10px; color: #111; margin-top: 5mm; }
-    table { width: 100%; border-collapse: collapse; }
-    td, th { border: 1px solid #222; padding: 6px 7px; vertical-align: top; font-size: 12px; }
-    th { background: #d8d8d8; text-align: left; font-weight: 700; color: #111; }
-    .num { text-align: right; font-family: "Courier New", monospace; }
-    .spacer { height: 10mm; }
-    .bank-title { font-size: 16px; font-weight: 700; margin-top: 8mm; margin-bottom: 3mm; }
-    .bank td { border: none; padding: 2px 2px; font-size: 12px; }
-    .bank .label { font-weight: 700; width: 38mm; }
-    .to-line { white-space: pre-line; }
-    @media print { body { background: #fff; } .page { margin: 0; box-shadow: none; } }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <div class="row">
-      <div>
-        <div style="width: 200px; text-align: center; margin-bottom: 5px;">
-          <svg width="80" height="30" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0,30 Q25,10 50,20 T100,10 L100,20 Q75,30 50,20 T0,30 Z" fill="#28a2d4" />
-            <path d="M0,40 Q25,20 50,30 T100,20 L100,30 Q75,40 50,30 T0,40 Z" fill="#1b85b8" />
-          </svg>
-        </div>
-        <div class="company-name">${escHtml((FROM_COMPANY.name || "CAPE KAYAK").replace(" Adventures", "").replace(" ADVENTURES", ""))} <span>ADVENTURES</span></div>
-        <div class="muted">${escHtml(FROM_COMPANY.reg)} VAT: ${escHtml(FROM_COMPANY.vat)}</div>
-      </div>
-      <div style="text-align: right;">
-        <h1 class="title">TAX INVOICE</h1>
-      </div>
-    </div>
-    <div class="spacer"></div>
-    <div class="row">
-      <table style="width: 50%;">
-        <tr><th style="background:#d8d8d8; text-align:center;">From:</th><th style="background:#d8d8d8; text-align:center;">To:</th></tr>
-        <tr>
-          <td class="to-line">${escHtml(FROM_COMPANY.name)}\n${escHtml(FROM_COMPANY.addressLines.join("\n"))}</td>
-          <td class="to-line">${toName}\n${phoneSection}${toEmail}</td>
-        </tr>
-      </table>
-      <table style="width: 45%;">
-        <tr><th style="background:#d8d8d8; width: 40%">Invoice #:</th><td class="num">${invNo}</td></tr>
-        <tr><th style="background:#d8d8d8;">Booking #:</th><td class="num">${ref}</td></tr>
-        <tr><th style="background:#d8d8d8;">Date:</th><td class="num">${invDate}</td></tr>
-        <tr><th style="background:#d8d8d8;">Amount Due:</th><td class="num">R0.00</td></tr>
-      </table>
-    </div>
-    <div class="spacer"></div>
-    <table>
-      <tr>
-        <th style="background:#d8d8d8; text-align:center; width:40%">Service</th>
-        <th style="background:#d8d8d8; text-align:center; width:15%">Adults (Qty)</th>
-        <th style="background:#d8d8d8; text-align:center; width:15%">Children (Qty)</th>
-        <th style="background:#d8d8d8; text-align:center; width:15%">Guides (Qty)</th>
-        <th style="background:#d8d8d8; text-align:center; width:15%">Total Cost (ZAR)</th>
-      </tr>
-      <tr>
-        <td style="vertical-align:top;">${service}</td>
-        <td style="text-align:center; vertical-align:top;">${qty}</td>
-        <td style="text-align:center; vertical-align:top;">0</td>
-        <td style="text-align:center; vertical-align:top;">0</td>
-        <td class="num" style="text-align:right; vertical-align:top;">${m(total)}</td>
-      </tr>
-      <tr>
-        <td rowspan="5" colspan="1" style="border:1px solid #222; border-top:none; border-bottom:1px solid #222;"></td>
-        <td style="text-align:center; font-weight:bold;">Sub-total</td>
-        <td colspan="2" style="text-align:right; font-weight:bold;">(Excl VAT)</td>
-        <td class="num" style="text-align:right;">${m(subtotal)}</td>
-      </tr>
-      <tr>
-        <td colspan="3" style="text-align:right; font-weight:bold;">VAT - ${(VAT_RATE * 100).toFixed(1)}%</td>
-        <td class="num" style="text-align:right;">${m(vat)}</td>
-      </tr>
-      <tr>
-        <td colspan="3" style="text-align:right; font-weight:bold;">Total:</td>
-        <td class="num" style="text-align:right; font-weight:bold;">${m(total)}</td>
-      </tr>
-      <tr>
-        <td colspan="3" style="text-align:right; font-weight:bold;">Amount Paid:</td>
-        <td class="num" style="text-align:right;">${m(total)}</td>
-      </tr>
-      <tr>
-        <td colspan="3" style="background:#b3b3b3; text-align:right; font-weight:bold;">Balance Due:</td>
-        <td class="num" style="background:#b3b3b3; text-align:right; font-weight:bold;">R0.00</td>
-      </tr>
-    </table>
-    <div class="bank-title">Banking Details</div>
-    <table class="bank">
-      <tr><td class="label">Account Owner:</td><td>${escHtml(BANKING_DETAILS.owner)}</td></tr>
-      <tr><td class="label">Account Number:</td><td>${escHtml(BANKING_DETAILS.number)}</td></tr>
-      <tr><td class="label">Account Type:</td><td>${escHtml(BANKING_DETAILS.type)}</td></tr>
-      <tr><td class="label">Bank Name:</td><td>${escHtml(BANKING_DETAILS.bank)}</td></tr>
-      <tr><td class="label">Branch Code:</td><td>${escHtml(BANKING_DETAILS.branchCode)}</td></tr>
-      <tr><td class="label">Reference:</td><td>${invNo}</td></tr>
-    </table>
-  </div>
-</body>
-</html>`;
 }
 
 function toBase64(str: string): string {
@@ -1800,7 +1746,8 @@ Deno.serve(async (req: Request) => {
       try {
         if (d.invoice_number) {
           var invNum = String(d.invoice_number);
-          var pdfBytes = await buildInvoicePdf(d);
+          var invCtx = await getInvoiceContext(branding.businessId);
+          var pdfBytes = await buildInvoicePdf(d, invCtx);
           var pdfB64 = "";
           for (var pi = 0; pi < pdfBytes.length; pi++) pdfB64 += String.fromCharCode(pdfBytes[pi]);
           pdfB64 = btoa(pdfB64);
