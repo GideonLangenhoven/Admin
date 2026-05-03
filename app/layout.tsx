@@ -27,6 +27,7 @@ const nav = [
   { href: "/photos", label: "Photos", icon: "Camera" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
+  { href: "/customers", label: "Customers", icon: "Users" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
