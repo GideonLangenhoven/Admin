@@ -58,9 +58,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   useEffect(() => {
     if (displayName && displayName !== "Admin") {
-      document.title = displayName + " — BookingTours Admin";
+      document.title = displayName + " · Admin";
     } else {
-      document.title = "BookingTours Admin";
+      document.title = "Admin";
     }
   }, [displayName]);
 
@@ -91,7 +91,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     });
   }
 
-  if (isMarketingPath(pathname) && !(pathname === "/operators" && businessId)) {
+  if (pathname === "/change-password" || (isMarketingPath(pathname) && !(pathname === "/operators" && businessId))) {
     return <main className="min-h-screen">{children}</main>;
   }
 

@@ -9,8 +9,8 @@ import ThemeProvider from "../components/ThemeProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "BookingTours Admin",
-  description: "BookingTours Admin Dashboard — Built for adventure operators",
+  title: "Admin",
+  description: "Admin Dashboard — Built for adventure operators",
   icons: { icon: "/favicon.ico" },
 };
 
