@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.cron-tasks]
 verify_jwt = false
+
+[functions.fetch-google-reviews]
+verify_jwt = false

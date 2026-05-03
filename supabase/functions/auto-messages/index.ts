@@ -189,7 +189,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
   var sixHoursAgo = now - 6 * 60 * 60 * 1000;
 
   var { data: bookings } = await db.from("bookings")
-    .select("id, business_id, customer_name, phone, tours(name, duration_minutes), slots(start_time)")
+    .select("id, business_id, tour_id, customer_name, phone, tours(name, duration_minutes), slots(start_time)")
     .eq("business_id", businessId)
     .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
     .not("phone", "is", null);
@@ -206,11 +206,27 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     await db.from("bookings").update({ status: "COMPLETED" }).eq("id", booking.id).in("status", ["PAID", "CONFIRMED"]);
 
     var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
-    var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+    var customerName = String(booking.customer_name || "").trim() || null;
+
+    // Create a PENDING review row with a unique submission token
+    var submissionToken = crypto.randomUUID();
+    var tourId = booking.tour_id || null;
+    await db.from("reviews").insert({
+      business_id: businessId,
+      tour_id: tourId,
+      booking_id: booking.id,
+      source: "NATIVE",
+      status: "PENDING",
+      submission_token: submissionToken,
+      reviewer_name: customerName,
+    });
+
+    var bookingSiteUrl = tenant.business.booking_site_url || resolveManageBookingsUrl(tenant.business).replace("/my-bookings", "");
+    var reviewUrl = bookingSiteUrl + "/review/" + submissionToken;
     var message =
       "Hi " + firstName + ", thanks for joining " + brandName + " today! \u{1F30A}\n\n" +
       "We\u2019d love a quick review if you have a moment \u2014 it really helps others find us and means the world to our small team.\n\n" +
-      "Your trip photos and booking details: " + myBookingsUrl;
+      "\u{2B50} Leave a review: " + reviewUrl;
 
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
