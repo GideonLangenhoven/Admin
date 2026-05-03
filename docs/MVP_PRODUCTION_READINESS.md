@@ -171,7 +171,7 @@ Bot contract enforcement:
    is intentional for MVP (we don't want to retry stale bot replies).
    A future worker can drain `FAILED` rows after operator review.
 4. **Webchat widget 320px responsiveness** lives in
-   `~/Desktop/booking`, not in this repo. Verify there before launch.
+   `~/dev/booking`, not in this repo. Verify there before launch.
 5. **Media fallback for document/image** still goes through the
    existing payment-issue routing (intentional — customers do send
    payment screenshots). If an attacker sends a malicious image the

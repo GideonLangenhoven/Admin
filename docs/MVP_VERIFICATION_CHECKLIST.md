@@ -206,7 +206,7 @@ adversarial extensions.
 | W2   | Load widget at viewport 375px | Same | |
 
 > Widget code lives in the customer-facing booking site repo, not in
-> this admin repo. Verify in `~/Desktop/booking`.
+> this admin repo. Verify in `~/dev/booking`.
 
 ## Sign-off
 

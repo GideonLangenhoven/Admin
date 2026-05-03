@@ -73,7 +73,7 @@ There are **two code paths** for weather cancellation:
 |--------|--------|
 | **WhatsApp message** | Includes `manageBookingUrl` — resolved from `business.manage_bookings_url` or derived from subdomain (e.g., `https://capekayak.booking.bookingtours.co.za/my-bookings`) |
 | **Email** | Contains a green "Manage My Booking" button linking to the same URL |
-| **Self-service UI** | Lives in the **separate booking site** (`~/Desktop/booking`), NOT this admin app. The My Bookings page lets customers choose reschedule / voucher / refund. |
+| **Self-service UI** | Lives in the **separate booking site** (`~/dev/booking`), NOT this admin app. The My Bookings page lets customers choose reschedule / voucher / refund. |
 | **Authentication** | Customer authenticates via OTP or booking lookup — no bearer token in the link itself |
 | **Implementation status** | The links are generated and sent. The actual self-service reschedule/voucher/refund UI is in the booking site — **verify it exists and works by clicking the link manually.** |
 

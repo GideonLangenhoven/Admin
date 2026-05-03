@@ -1,7 +1,7 @@
 # RLS Lockdown Regression — Customer Site Fix Plan
 
 **Date:** 2026-04-20
-**Scope:** `~/Desktop/booking` (customer-facing booking site) across all tenants
+**Scope:** `~/dev/booking` (customer-facing booking site) across all tenants
 **Severity:** P0 — customer purchases silently broken across the platform
 **Supabase project:** `ukdsrndqhsatjkmxijuj` (cape-kayak-bookings)
 
