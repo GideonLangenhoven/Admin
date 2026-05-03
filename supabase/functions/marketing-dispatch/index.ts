@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
+import { withSentry } from "../_shared/sentry.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
@@ -9,7 +10,7 @@ const MAX_RETRIES = 3;
 
 const supabase = createServiceClient();
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
   try {
     if (!RESEND_API_KEY) {
       console.error("MARKETING_DISPATCH: RESEND_API_KEY not configured — skipping");
@@ -286,7 +287,7 @@ Deno.serve(async (_req: Request) => {
     console.error("MARKETING_DISPATCH_ERROR:", err);
     return jsonRes({ error: err.message || "Internal error" }, 500);
   }
-});
+}));
 
 function jsonRes(body: Record<string, unknown>, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

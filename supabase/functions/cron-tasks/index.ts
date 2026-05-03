@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { withSentry } from "../_shared/sentry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -430,7 +431,7 @@ async function autoTagContacts() {
   return results;
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(withSentry("cron-tasks", async (_req) => {
   const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, auto_tags: null, errors: [] };
 
   try {
@@ -477,4 +478,4 @@ Deno.serve(async (_req) => {
   }
 
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
-});
+}));

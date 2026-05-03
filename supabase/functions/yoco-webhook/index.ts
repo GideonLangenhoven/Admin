@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Webhook } from "npm:standardwebhooks";
 import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
+import { withSentry } from "../_shared/sentry.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -302,7 +303,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   });
 }
 
-Deno.serve(async (req: any) => {
+Deno.serve(withSentry("yoco-webhook", async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
   try {
     var rawBody = await req.text();
@@ -1125,4 +1126,4 @@ Deno.serve(async (req: any) => {
     console.log("PAYMENT CONFIRMED booking:" + booking.id);
     return new Response("OK", { status: 200 });
   } catch (err) { console.error("YOCO_WEBHOOK_ERROR:", err); return new Response("OK", { status: 200 }); }
-});
+}));

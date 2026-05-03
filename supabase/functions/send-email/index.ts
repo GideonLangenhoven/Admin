@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
@@ -1613,7 +1614,7 @@ function broadcastHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withSentry("send-email", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
@@ -1769,4 +1770,4 @@ Deno.serve(async (req: Request) => {
     console.error("SEND_EMAIL_ERR:", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: getCors(req) });
   }
-});
+}));

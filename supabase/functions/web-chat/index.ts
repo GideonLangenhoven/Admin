@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withSentry } from "../_shared/sentry.ts";
 import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin } from "../_shared/tenant.ts";
 import {
   gateInbound,
@@ -170,8 +171,12 @@ async function getSlots(tourId, now) {
     .filter(function (s) { return Number(s.available_capacity || 0) > 0; })
     .map(function (s) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0 }; });
 }
-Deno.serve(async (req) => {
+Deno.serve(withSentry("web-chat", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
+  var url = new URL(req.url);
+  if (url.searchParams.get("__sentry_test") === "1") {
+    throw new Error("Sentry test error from web-chat (intentional)");
+  }
   try {
     var body = await req.json(); var hist = body.messages || []; var msg = body.message || ""; var state = body.state || { step: "IDLE" };
     var now = new Date(); var ns = { ...state }; var pay = null; var reply = ""; var buttons = null; var calendar = null;
@@ -971,4 +976,4 @@ Deno.serve(async (req) => {
     ns = { step: "IDLE" };
     return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
   } catch (err) { console.error("ERR:", err); return new Response(JSON.stringify({ reply: "Ah sorry, try that again?", state: { step: "IDLE" } }), { status: 500, headers: gCors(req) }); }
-});
+}));

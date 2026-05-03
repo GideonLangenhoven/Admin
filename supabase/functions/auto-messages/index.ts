@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { withSentry } from "../_shared/sentry.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -386,7 +387,7 @@ async function autoExpireBookingsForBusiness(businessId: string) {
   return cancelled;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentry("auto-messages", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getHeaders(req.headers.get("origin")) });
 
   try {
@@ -418,4 +419,4 @@ Deno.serve(async (req) => {
     console.error("AUTO_MESSAGES_ERR", error);
     return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }), { status: 500, headers: getHeaders(req.headers.get("origin")) });
   }
-});
+}));

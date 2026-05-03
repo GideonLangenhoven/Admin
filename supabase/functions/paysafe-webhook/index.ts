@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { withSentry } from "../_shared/sentry.ts";
 
 var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -310,7 +311,7 @@ async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
   }).catch(function (e: any) { console.error("LOG_ERR:", e); });
 }
 
-Deno.serve(async (req: any) => {
+Deno.serve(withSentry("paysafe-webhook", async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
 
   try {
@@ -348,4 +349,4 @@ Deno.serve(async (req: any) => {
     // Always return 200 to webhooks to prevent retries on server errors
     return new Response("OK", { status: 200 });
   }
-});
+}));
