@@ -1,3 +1,5 @@
+// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+// Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -39,10 +41,12 @@ Deno.serve(async (req: any) => {
     var photoUrl = body.photo_url;
     var caption = body.caption || "Here are your photos from today's adventure!";
 
+    var businessId = body.business_id;
     if (!slotId || !photoUrl) return new Response("Need slot_id and photo_url", { status: 400, headers: CORS_HEADERS });
+    if (!businessId) return new Response(JSON.stringify({ error: "business_id required" }), { status: 400, headers: CORS_HEADERS });
 
     var bookings = await supabase.from("bookings").select("phone, customer_name, email")
-      .eq("slot_id", slotId).in("status", ["PAID", "COMPLETED"]);
+      .eq("slot_id", slotId).eq("business_id", businessId).in("status", ["PAID", "COMPLETED"]);
 
     var customers = bookings.data || [];
     var sent = 0;

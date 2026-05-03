@@ -1,3 +1,5 @@
+// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+// Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getAdminAppOrigins } from "../_shared/tenant.ts";
 import { requireAuth } from "../_shared/auth.ts";
@@ -16,8 +18,9 @@ function getCors(req?: any) {
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
+  var auth;
   try {
-    await requireAuth(req);
+    auth = await requireAuth(req);
   } catch (authErr: any) {
     return new Response(JSON.stringify({ error: authErr.message }), { status: 401, headers: getCors(req) });
   }
@@ -32,6 +35,16 @@ Deno.serve(async (req: any) => {
 
     if (booking_ids.length > 100) {
       return new Response(JSON.stringify({ error: "Maximum 100 bookings per batch" }), { status: 400, headers: getCors(req) });
+    }
+
+    // Tenant guard: verify all bookings belong to the authenticated admin's business
+    if (!auth.isServiceRole && auth.businessId) {
+      var { data: owned } = await supabase.from("bookings").select("id").in("id", booking_ids).eq("business_id", auth.businessId);
+      var ownedIds = new Set((owned || []).map((b: any) => b.id));
+      var foreign = booking_ids.filter((id: string) => !ownedIds.has(id));
+      if (foreign.length > 0) {
+        return new Response(JSON.stringify({ error: "Some booking IDs do not belong to your business", foreign_ids: foreign }), { status: 403, headers: getCors(req) });
+      }
     }
 
     // Create a batch record so the frontend can track progress
