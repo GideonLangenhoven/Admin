@@ -11,7 +11,7 @@ import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import {
-  ArrowsLeftRight, Check, Circle, Star, GlobeSimple,
+  ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
   ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
@@ -23,7 +23,7 @@ const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
   MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
-  ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree, Star, Globe: GlobeSimple,
+  ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree, Star, Globe: GlobeSimple, Warning: WarningCircle,
 };
 
 interface NavItem {

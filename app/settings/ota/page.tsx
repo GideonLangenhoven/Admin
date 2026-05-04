@@ -18,7 +18,9 @@ type Mapping = {
 type Tour = { id: string; name: string };
 
 type Status = {
+  channel: string;
   configured: boolean;
+  secret_configured: boolean;
   webhook_configured: boolean;
   enabled: boolean;
   test_mode: boolean;
@@ -27,12 +29,39 @@ type Status = {
   last_sync_error: string | null;
 };
 
+type ChannelConfig = {
+  key: string;
+  label: string;
+  webhookFunction: string;
+  primaryCredLabel: string;
+  secondaryCredLabel: string | null;
+  webhookSecretLabel: string;
+  syncNote: string;
+};
+
+var CHANNELS: ChannelConfig[] = [
+  {
+    key: "VIATOR", label: "Viator", webhookFunction: "viator-webhook",
+    primaryCredLabel: "API Key (exp-api-key)", secondaryCredLabel: null,
+    webhookSecretLabel: "Webhook Secret (for signature verification)",
+    syncNote: "Availability syncs to Viator every hour at :07. Next 90 days of OPEN slots are pushed.",
+  },
+  {
+    key: "GETYOURGUIDE", label: "GetYourGuide", webhookFunction: "getyourguide-webhook",
+    primaryCredLabel: "Client ID", secondaryCredLabel: "Client Secret",
+    webhookSecretLabel: "Webhook Secret (for signature verification)",
+    syncNote: "Availability syncs to GetYourGuide every hour at :12. Next 90 days of OPEN slots are pushed.",
+  },
+];
+
 export default function OtaSettingsPage() {
   var { businessId } = useBusinessContext();
-  var [status, setStatus] = useState<Status | null>(null);
+  var [activeTab, setActiveTab] = useState("VIATOR");
+  var [statuses, setStatuses] = useState<Record<string, Status>>({});
   var [mappings, setMappings] = useState<Mapping[]>([]);
   var [tours, setTours] = useState<Tour[]>([]);
   var [apiKey, setApiKey] = useState("");
+  var [apiSecret, setApiSecret] = useState("");
   var [webhookSecret, setWebhookSecret] = useState("");
   var [testMode, setTestMode] = useState(true);
   var [saving, setSaving] = useState(false);
@@ -41,20 +70,41 @@ export default function OtaSettingsPage() {
   var [addSaving, setAddSaving] = useState(false);
 
   useEffect(() => {
-    if (businessId) refresh();
+    if (businessId) refreshAll();
   }, [businessId]);
 
-  async function refresh() {
-    var [statusRes, mappingsRes, toursRes] = await Promise.all([
-      fetch("/api/ota?business_id=" + businessId).then(r => r.json()),
-      supabase.from("ota_product_mappings").select("*").eq("business_id", businessId).eq("channel", "VIATOR").order("created_at"),
+  useEffect(() => {
+    if (businessId) refreshChannel(activeTab);
+  }, [activeTab]);
+
+  async function refreshAll() {
+    var [toursRes] = await Promise.all([
       supabase.from("tours").select("id, name").eq("business_id", businessId).order("name"),
     ]);
-    setStatus(statusRes);
-    setMappings((mappingsRes.data as Mapping[]) || []);
     setTours((toursRes.data as Tour[]) || []);
-    if (statusRes.test_mode !== undefined) setTestMode(statusRes.test_mode);
+    for (var ch of CHANNELS) {
+      await refreshChannel(ch.key);
+    }
   }
+
+  async function refreshChannel(channel: string) {
+    var [statusRes, mappingsRes] = await Promise.all([
+      fetch("/api/ota?business_id=" + businessId + "&channel=" + channel).then(r => r.json()),
+      supabase.from("ota_product_mappings").select("*").eq("business_id", businessId).eq("channel", channel).order("created_at"),
+    ]);
+    setStatuses(prev => ({ ...prev, [channel]: statusRes }));
+    if (channel === activeTab) {
+      setMappings((mappingsRes.data as Mapping[]) || []);
+      if (statusRes.test_mode !== undefined) setTestMode(statusRes.test_mode);
+    }
+    setMsg("");
+    setApiKey("");
+    setApiSecret("");
+    setWebhookSecret("");
+  }
+
+  var ch = CHANNELS.find(c => c.key === activeTab)!;
+  var status = statuses[activeTab] || null;
 
   async function saveCredentials() {
     setSaving(true);
@@ -62,10 +112,13 @@ export default function OtaSettingsPage() {
     var res = await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ business_id: businessId, action: "save_credentials", api_key: apiKey, webhook_secret: webhookSecret, test_mode: testMode }),
+      body: JSON.stringify({
+        business_id: businessId, action: "save_credentials", channel: activeTab,
+        api_key: apiKey, api_secret: apiSecret || null, webhook_secret: webhookSecret, test_mode: testMode,
+      }),
     });
     var data = await res.json();
-    if (data.ok) { setMsg("Credentials saved"); setApiKey(""); setWebhookSecret(""); refresh(); }
+    if (data.ok) { setMsg("Credentials saved"); setApiKey(""); setApiSecret(""); setWebhookSecret(""); refreshChannel(activeTab); }
     else setMsg(data.error || "Save failed");
     setSaving(false);
   }
@@ -75,9 +128,9 @@ export default function OtaSettingsPage() {
     await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ business_id: businessId, action: "toggle_enabled", enabled: newVal }),
+      body: JSON.stringify({ business_id: businessId, action: "toggle_enabled", channel: activeTab, enabled: newVal }),
     });
-    refresh();
+    refreshChannel(activeTab);
   }
 
   async function toggleTestMode() {
@@ -85,10 +138,10 @@ export default function OtaSettingsPage() {
     await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ business_id: businessId, action: "toggle_test_mode", test_mode: newVal }),
+      body: JSON.stringify({ business_id: businessId, action: "toggle_test_mode", channel: activeTab, test_mode: newVal }),
     });
     setTestMode(newVal);
-    refresh();
+    refreshChannel(activeTab);
   }
 
   async function addMapping() {
@@ -96,7 +149,7 @@ export default function OtaSettingsPage() {
     setAddSaving(true);
     await supabase.from("ota_product_mappings").insert({
       business_id: businessId,
-      channel: "VIATOR",
+      channel: activeTab,
       tour_id: addForm.tour_id,
       external_product_code: addForm.external_product_code.trim(),
       external_option_code: addForm.external_option_code.trim() || null,
@@ -105,45 +158,69 @@ export default function OtaSettingsPage() {
     });
     setAddForm({ tour_id: "", external_product_code: "", external_option_code: "", default_markup_pct: "0", notes: "" });
     setAddSaving(false);
-    refresh();
+    refreshChannel(activeTab);
   }
 
   async function toggleMapping(id: string, enabled: boolean) {
     await supabase.from("ota_product_mappings").update({ enabled, updated_at: new Date().toISOString() }).eq("id", id);
-    refresh();
+    refreshChannel(activeTab);
   }
 
   async function deleteMapping(id: string) {
     if (!confirm("Remove this mapping?")) return;
     await supabase.from("ota_product_mappings").delete().eq("id", id);
-    refresh();
+    refreshChannel(activeTab);
   }
 
   var tourMap: Record<string, string> = {};
   tours.forEach(t => { tourMap[t.id] = t.name; });
 
   var webhookUrl = typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") + "/functions/v1/viator-webhook?b=" + businessId
+    ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") + "/functions/v1/" + ch.webhookFunction + "?b=" + businessId
     : "";
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Globe size={28} weight="duotone" className="text-[color:var(--accent)]" />
-        <h1 className="text-2xl font-bold text-[color:var(--text)]">Viator Integration</h1>
+        <h1 className="text-2xl font-bold text-[color:var(--text)]">OTA Integrations</h1>
       </div>
 
-      {/* ─── Credentials ─── */}
+      {/* Channel Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-[color:var(--border)]">
+        {CHANNELS.map(c => {
+          var s = statuses[c.key];
+          return (
+            <button key={c.key} onClick={() => setActiveTab(c.key)}
+              className={"px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px " +
+                (activeTab === c.key
+                  ? "border-[color:var(--accent)] text-[color:var(--accent)]"
+                  : "border-transparent text-[color:var(--textMuted)] hover:text-[color:var(--text)]")}>
+              {c.label}
+              {s?.enabled && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-emerald-500" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Credentials */}
       <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-        <h2 className="font-semibold text-[color:var(--text)] mb-4">API Credentials</h2>
+        <h2 className="font-semibold text-[color:var(--text)] mb-4">{ch.label} Credentials</h2>
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">Viator API Key (exp-api-key)</label>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={status?.configured ? "••••••• (saved)" : "Paste your Viator API key"}
+            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.primaryCredLabel}</label>
+            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={status?.configured ? "••••••• (saved)" : "Paste your " + ch.primaryCredLabel}
               className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
           </div>
+          {ch.secondaryCredLabel && (
+            <div>
+              <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.secondaryCredLabel}</label>
+              <input type="password" value={apiSecret} onChange={e => setApiSecret(e.target.value)} placeholder={status?.secret_configured ? "••••••• (saved)" : "Paste your " + ch.secondaryCredLabel}
+                className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
+            </div>
+          )}
           <div>
-            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">Webhook Secret (for signature verification)</label>
+            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.webhookSecretLabel}</label>
             <input type="password" value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={status?.webhook_configured ? "••••••• (saved)" : "Paste webhook secret"}
               className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
           </div>
@@ -169,16 +246,16 @@ export default function OtaSettingsPage() {
         </div>
       </section>
 
-      {/* ─── Webhook URL ─── */}
+      {/* Webhook URL */}
       {status?.configured && (
         <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
           <h2 className="font-semibold text-[color:var(--text)] mb-2">Webhook URL</h2>
-          <p className="text-xs text-[color:var(--textMuted)] mb-2">Paste this into your Viator Partner Portal webhook settings:</p>
+          <p className="text-xs text-[color:var(--textMuted)] mb-2">Paste this into your {ch.label} partner portal webhook settings:</p>
           <code className="block text-xs bg-[color:var(--surface2)] rounded-lg p-3 break-all text-[color:var(--text)] select-all">{webhookUrl}</code>
         </section>
       )}
 
-      {/* ─── Sync Status ─── */}
+      {/* Sync Status */}
       {status?.configured && (
         <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
           <h2 className="font-semibold text-[color:var(--text)] mb-3">Availability Sync</h2>
@@ -193,13 +270,13 @@ export default function OtaSettingsPage() {
             {status.last_sync_at && <span className="text-xs text-[color:var(--textMuted)]">{new Date(status.last_sync_at).toLocaleString()}</span>}
           </div>
           {status.last_sync_error && <p className="text-xs text-red-500 mt-1">{status.last_sync_error}</p>}
-          <p className="text-xs text-[color:var(--textMuted)] mt-2">Availability syncs to Viator every hour at :07. Next 90 days of OPEN slots are pushed.</p>
+          <p className="text-xs text-[color:var(--textMuted)] mt-2">{ch.syncNote}</p>
         </section>
       )}
 
-      {/* ─── Product Mappings ─── */}
+      {/* Product Mappings */}
       <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-        <h2 className="font-semibold text-[color:var(--text)] mb-4">Tour ↔ Viator Product Mappings</h2>
+        <h2 className="font-semibold text-[color:var(--text)] mb-4">Tour ↔ {ch.label} Product Mappings</h2>
 
         {mappings.length > 0 && (
           <div className="space-y-2 mb-4">
@@ -234,13 +311,13 @@ export default function OtaSettingsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Viator Product Code</label>
-              <input value={addForm.external_product_code} onChange={e => setAddForm({ ...addForm, external_product_code: e.target.value })} placeholder="e.g. 12345P3"
+              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">{ch.label} Product Code</label>
+              <input value={addForm.external_product_code} onChange={e => setAddForm({ ...addForm, external_product_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. 12345P3" : "e.g. 98765"}
                 className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
             </div>
             <div>
               <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Option Code (optional)</label>
-              <input value={addForm.external_option_code} onChange={e => setAddForm({ ...addForm, external_option_code: e.target.value })} placeholder="e.g. TG1"
+              <input value={addForm.external_option_code} onChange={e => setAddForm({ ...addForm, external_option_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. TG1" : "e.g. 12345"}
                 className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
             </div>
             <div>
@@ -261,12 +338,17 @@ export default function OtaSettingsPage() {
         </div>
       </section>
 
-      {/* ─── Status badges ─── */}
+      {/* Status badges */}
       {status && (
         <div className="flex flex-wrap gap-2 text-xs">
           <span className={"px-2 py-1 rounded-full border " + (status.configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
-            API Key: {status.configured ? "configured" : "not set"}
+            {ch.primaryCredLabel.split(" ")[0]}: {status.configured ? "configured" : "not set"}
           </span>
+          {ch.secondaryCredLabel && (
+            <span className={"px-2 py-1 rounded-full border " + (status.secret_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
+              {ch.secondaryCredLabel.split(" ")[0]}: {status.secret_configured ? "configured" : "not set"}
+            </span>
+          )}
           <span className={"px-2 py-1 rounded-full border " + (status.webhook_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
             Webhook: {status.webhook_configured ? "configured" : "not set"}
           </span>

@@ -33,6 +33,7 @@ const nav = [
   { href: "/reviews", label: "Reviews", icon: "Star" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
   { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
+  { href: "/ota-drift", label: "OTA Drift", icon: "Warning", privilegedOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   { href: "/super-admin", label: "Super Admin", icon: "Shield", privilegedOnly: true },
 ];

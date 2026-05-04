@@ -45,3 +45,12 @@ verify_jwt = false
 
 [functions.viator-availability-sync]
 verify_jwt = false
+
+[functions.getyourguide-webhook]
+verify_jwt = false
+
+[functions.getyourguide-availability-sync]
+verify_jwt = false
+
+[functions.ota-reconcile]
+verify_jwt = false
