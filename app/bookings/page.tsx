@@ -5,7 +5,8 @@ import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap } from "@phosphor-icons/react";
+import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
+import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -191,6 +192,92 @@ export default function Bookings() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [quickResendingId, setQuickResendingId] = useState<string | null>(null);
 
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  type BulkAction = "cancel" | "refund" | "markpaid" | "checkin";
+  type ProgressEvent = { id: string; name: string; status: "pending" | "ok" | "error"; error?: string };
+  const [bulkProgress, setBulkProgress] = useState<ProgressEvent[] | null>(null);
+  const [bulkActionInFlight, setBulkActionInFlight] = useState<BulkAction | null>(null);
+
+  function toggleSelect(id: string) {
+    setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+  function selectAllVisible(ids: string[]) {
+    setSelected(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; });
+  }
+  function clearSelection() { setSelected(new Set()); }
+
+  const bookingsById = useMemo(() => {
+    var map: Record<string, Booking> = {};
+    for (var b of bookings) map[b.id] = b;
+    return map;
+  }, [bookings]);
+
+  async function runBulk(action: BulkAction) {
+    var ids = Array.from(selected);
+    if (ids.length === 0) return;
+
+    var confirmText: Record<BulkAction, string> = {
+      cancel: "Cancel " + ids.length + " booking(s)? Each customer will be notified and refund calculated per the cancellation policy.",
+      refund: "Refund " + ids.length + " booking(s)? Each will be processed via Yoco or marked as manual refund.",
+      markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
+      checkin: "Check in " + ids.length + " guest(s)?",
+    };
+    if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" })) return;
+
+    var reason = "operator-cancel";
+    var weather = false;
+    if (action === "cancel") {
+      weather = confirm("Is this a weather cancel? (Weather cancels override the policy and refund 100%.)");
+      var prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
+      reason = prompted || "operator-cancel";
+    }
+
+    setBulkActionInFlight(action);
+    var init: ProgressEvent[] = ids.map(id => ({ id, name: bookingsById[id]?.customer_name || id.slice(0, 8), status: "pending" as const }));
+    setBulkProgress(init);
+
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var result: ActionResult;
+      switch (action) {
+        case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
+        case "refund":   result = await refundBookingAction(id); break;
+        case "markpaid": result = await markPaidAction(id); break;
+        case "checkin":  result = await checkInAction(id); break;
+      }
+      setBulkProgress(prev =>
+        prev?.map(e => e.id === id ? { ...e, status: result.ok ? "ok" : "error", error: result.error } : e) ?? null,
+      );
+      if (i < ids.length - 1) await new Promise(r => setTimeout(r, 120));
+    }
+
+    setBulkActionInFlight(null);
+
+    // Log bulk summary
+    try {
+      var final = init.map(e => {
+        var match = bulkProgress?.find(p => p.id === e.id);
+        return match || e;
+      });
+      await supabase.from("logs").insert({
+        business_id: businessId,
+        event: "bulk_action_" + action,
+        payload: {
+          bulk: true,
+          action,
+          booking_ids: ids,
+          succeeded: ids.filter((_, idx) => init[idx]?.status !== "error"),
+          total: ids.length,
+          reason: action === "cancel" ? reason : undefined,
+          weather: action === "cancel" ? weather : undefined,
+        },
+      });
+    } catch { /* audit log failure should not block */ }
+
+    await loadBookings();
+  }
+
   async function loadBookings() {
     if (!businessId) return;
     console.log("[BOOKINGS] loadBookings started", { businessId, rangeStart: rangeStart.toISOString(), rangeEnd: rangeEnd.toISOString() });
@@ -299,6 +386,26 @@ export default function Bookings() {
     const allowed = STATUS_FILTER_MAP[statusFilter] || [];
     return bookings.filter((b) => allowed.includes(b.status));
   }, [bookings, statusFilter]);
+
+  const allVisibleIds = useMemo(() => filteredBookings.map(b => b.id), [filteredBookings]);
+
+  const selectionAllPaid = useMemo(() => {
+    if (selected.size === 0) return false;
+    return Array.from(selected).every(id => bookingsById[id] && isPaid(bookingsById[id].status));
+  }, [selected, bookingsById]);
+
+  const selectionAllUnpaid = useMemo(() => {
+    if (selected.size === 0) return false;
+    return Array.from(selected).every(id => {
+      var b = bookingsById[id];
+      return b && ["PENDING", "PENDING PAYMENT", "HELD"].includes(b.status);
+    });
+  }, [selected, bookingsById]);
+
+  const selectionNoneCancelled = useMemo(() => {
+    if (selected.size === 0) return false;
+    return Array.from(selected).every(id => bookingsById[id]?.status !== "CANCELLED");
+  }, [selected, bookingsById]);
 
   const dayGroups: DayGroup[] = useMemo(() => {
     const dayMap = new Map<string, Map<string, Booking[]>>();
@@ -1211,6 +1318,37 @@ export default function Bookings() {
           {statusFilter !== "ALL" ? "No " + statusFilter.toLowerCase() + " bookings in this date range." : "No bookings in this date range."}
         </div>
       ) : (
+        <>
+        {selected.size > 0 && (
+          <div className="sticky top-0 z-20 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3 shadow-sm">
+            <span className="text-sm font-semibold text-blue-900">{selected.size} selected</span>
+            <div className="flex-1" />
+            {selectionAllPaid && (
+              <button onClick={() => runBulk("checkin")} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors">
+                Check in
+              </button>
+            )}
+            {selectionAllUnpaid && (
+              <button onClick={() => runBulk("markpaid")} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors">
+                Mark paid (EFT)
+              </button>
+            )}
+            {selectionNoneCancelled && (
+              <button onClick={() => runBulk("cancel")} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors">
+                Cancel
+              </button>
+            )}
+            {selectionAllPaid && (
+              <button onClick={() => runBulk("refund")} className="px-3 py-1.5 rounded-lg bg-red-700 text-white text-xs font-semibold hover:bg-red-800 transition-colors">
+                Refund
+              </button>
+            )}
+            <button onClick={clearSelection} className="px-3 py-1.5 text-xs text-blue-700 underline hover:text-blue-900">
+              Clear
+            </button>
+          </div>
+        )}
+
         <div className="space-y-6 pb-48">
           {dayGroups.map((day) => {
             const slotKeys = day.slots.map((_, i) => `${day.sortKey}-${i}`);
@@ -1234,6 +1372,13 @@ export default function Bookings() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="w-8 p-1.5 lg:p-3 text-center">
+                          <input type="checkbox"
+                            checked={allVisibleIds.length > 0 && allVisibleIds.every(id => selected.has(id))}
+                            onChange={(e) => e.target.checked ? selectAllVisible(allVisibleIds) : clearSelection()}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            aria-label="Select all visible bookings" />
+                        </th>
                         <th className="w-24 lg:w-36 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Time</th>
                         <th className="w-10 lg:w-16 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Pax</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Details</th>
@@ -1272,11 +1417,14 @@ export default function Bookings() {
                             cancellingWeatherId={cancellingWeatherId}
                             quickResendingId={quickResendingId}
                             onQuickResend={quickResendPaymentLink}
+                            selected={selected}
+                            onToggleSelect={toggleSelect}
                           />
                         );
                       })}
 
                       <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold text-gray-700">
+                        <td className="p-3"></td>
                         <td className="p-3 text-xs text-gray-500">Totals:</td>
                         <td className="p-3">{day.totalPax}</td>
                         <td className="hidden p-3 md:table-cell"></td>
@@ -1292,6 +1440,47 @@ export default function Bookings() {
               </div>
             );
           })}
+        </div>
+        </>
+      )}
+
+      {/* Bulk progress dialog */}
+      {bulkProgress && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h2 className="font-bold text-lg text-gray-900">
+              {bulkActionInFlight ? "Running " + bulkActionInFlight + "..." : "Done"}
+            </h2>
+            <div className="mt-3 space-y-1.5 max-h-80 overflow-auto">
+              {bulkProgress.map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  {p.status === "ok" && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" weight="fill" />}
+                  {p.status === "error" && <XCircle className="w-4 h-4 text-red-600 shrink-0" weight="fill" />}
+                  {p.status === "pending" && <Spinner className="w-4 h-4 text-gray-400 shrink-0 animate-spin" />}
+                  <span className="font-medium text-gray-800 truncate">{p.name}</span>
+                  <span className="font-mono text-[10px] text-gray-400">{p.id.slice(0, 8)}</span>
+                  {p.error && <span className="text-[11px] text-red-700 truncate ml-auto">— {p.error}</span>}
+                </div>
+              ))}
+            </div>
+            {!bulkActionInFlight && (() => {
+              var ok = bulkProgress.filter(p => p.status === "ok").length;
+              var err = bulkProgress.filter(p => p.status === "error").length;
+              return (
+                <p className="mt-3 text-xs text-gray-600">
+                  {ok} succeeded · {err} failed
+                </p>
+              );
+            })()}
+            <div className="mt-4 flex gap-2 justify-end">
+              {!bulkActionInFlight && (
+                <button onClick={() => { setBulkProgress(null); clearSelection(); }}
+                  className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors">
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1534,6 +1723,8 @@ function SlotRows({
   cancellingWeatherId,
   quickResendingId,
   onQuickResend,
+  selected,
+  onToggleSelect,
 }: {
   slot: SlotGroup;
   services: string;
@@ -1555,6 +1746,8 @@ function SlotRows({
   cancellingWeatherId: string | null;
   quickResendingId: string | null;
   onQuickResend: (b: Booking) => void;
+  selected: Set<string>;
+  onToggleSelect: (id: string) => void;
 }) {
   const [openActions, setOpenActions] = useState<string | null>(null);
   useEffect(() => {
@@ -1567,6 +1760,7 @@ function SlotRows({
   return (
     <>
       <tr className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-blue-50/40" onClick={onToggle}>
+        <td className="w-8 p-1.5 lg:p-3 text-center" onClick={e => e.stopPropagation()}></td>
         <td className="p-1.5 lg:p-3 font-medium text-blue-700 text-[12px] lg:text-sm">
           <span className="mr-0.5 inline-block w-3 text-gray-400 transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>
             ›
@@ -1603,7 +1797,12 @@ function SlotRows({
           const hasPaymentLink = Boolean(b.yoco_checkout_id);
           const actionsOpen = openActions === b.id;
           return (
-            <tr key={b.id} className="border-t border-gray-100 bg-gray-50/60 text-[11px] lg:text-xs text-gray-600">
+            <tr key={b.id} className={"border-t border-gray-100 text-[11px] lg:text-xs text-gray-600 " + (selected.has(b.id) ? "bg-blue-50/80" : "bg-gray-50/60")}>
+              <td className="w-8 p-1.5 lg:p-3 text-center align-top" onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  aria-label={"Select " + b.customer_name} />
+              </td>
               <td className="p-1.5 lg:p-3 pl-2 lg:pl-10 text-gray-400" colSpan={1}>
                 <div className="flex flex-col gap-0.5">
                   <button
