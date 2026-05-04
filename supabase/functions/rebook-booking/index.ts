@@ -513,16 +513,27 @@ async function handleCancelRefund(req: any, booking: any) {
 
   // If paid via split tender (voucher + Yoco), pro-rata the refund
   if (isSplitTenderPayment(booking)) {
-    return await handleCancelRefundSplitTender(req, booking, totalAmount);
+    return await handleCancelRefundSplitTender(req, booking, totalAmount, policyPercent);
   }
+
+  // Calculate refund percent from policy tiers
+  var policyPercent = 95;
+  var tourStart = booking.slots?.start_time;
+  if (tourStart && booking.business_id) {
+    var { data: pctData } = await supabase.rpc("calculate_refund_percent", {
+      p_business_id: booking.business_id,
+      p_tour_start: tourStart,
+    });
+    if (typeof pctData === "number") policyPercent = pctData;
+  }
+  var policyFraction = policyPercent / 100;
 
   // If paid via manual method (cash/EFT), skip Yoco and flag for manual refund
   if (isManualPayment(booking)) {
-    var manualRefundAmount = totalAmount * 0.95;
     var totalCaptured = Number(booking.total_captured || totalAmount);
     var totalRefunded = Number(booking.total_refunded || 0);
     var refundableAmount = totalCaptured - totalRefunded;
-    manualRefundAmount = refundableAmount * 0.95;
+    var manualRefundAmount = refundableAmount * policyFraction;
 
     await supabase.from("bookings").update({
       status: "CANCELLED",
@@ -548,7 +559,7 @@ async function handleCancelRefund(req: any, booking: any) {
       business_id: booking.business_id,
       booking_id: booking.id,
       event: "booking_cancelled_manual_refund",
-      payload: { refund_amount: manualRefundAmount, total_amount: totalAmount, payment_method: booking.payment_method },
+      payload: { refund_amount: manualRefundAmount, total_amount: totalAmount, payment_method: booking.payment_method, policy_percent: policyPercent },
     });
 
     return ok(req, { ok: true, action: "CANCEL_REFUND", refund_status: "MANUAL_EFT_REQUIRED", refund_amount: manualRefundAmount, message: "Booking cancelled. Admin must process refund manually (payment was " + booking.payment_method + ")." });
@@ -557,7 +568,7 @@ async function handleCancelRefund(req: any, booking: any) {
   var totalCaptured = Number(booking.total_captured || totalAmount);
   var totalRefunded = Number(booking.total_refunded || 0);
   var refundableAmount = totalCaptured - totalRefunded;
-  var refundAmount = refundableAmount * 0.95;
+  var refundAmount = refundableAmount * policyFraction;
 
   await supabase.from("bookings").update({
     status: "CANCELLED",
@@ -585,7 +596,7 @@ async function handleCancelRefund(req: any, booking: any) {
     business_id: booking.business_id,
     booking_id: booking.id,
     event: "booking_cancelled_refund",
-    payload: { refund_amount: refundAmount, total_amount: totalAmount },
+    payload: { refund_amount: refundAmount, total_amount: totalAmount, policy_percent: policyPercent },
   });
 
   // Send cancellation notifications
@@ -632,7 +643,7 @@ async function handleCancelRefund(req: any, booking: any) {
     } catch (e) { console.error("REBOOK_CANCEL_EMAIL_ERR:", e); }
   }
 
-  return ok(req, { ok: true, action: "CANCEL_REFUND", refund_amount: refundAmount });
+  return ok(req, { ok: true, action: "CANCEL_REFUND", refund_amount: refundAmount, policy_percent: policyPercent });
 }
 
 // ───── CANCEL_REFUND for voucher-paid bookings (issue voucher, no 5% penalty) ─────
@@ -731,9 +742,9 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
 
 // ───── CANCEL_REFUND for split-tender bookings (voucher + Yoco) ─────
 // Pro-rata: restore voucher portion fully, deduct 5% cancellation fee from cash (Yoco) portion only
-async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount: number) {
+async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount: number, policyPercent: number) {
   var split = getSplitTenderAmounts(booking);
-  var cancellationFee = totalAmount * 0.05; // 5% of TOTAL booking
+  var cancellationFee = totalAmount * ((100 - policyPercent) / 100);
   var yocoRefundAmount = Math.max(0, split.cashPortion - cancellationFee);
   var totalRefunded = Number(booking.total_refunded || 0);
 
@@ -795,6 +806,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
       voucher_code: vcode,
       voucher_id: voucherId,
       voucher_restored: split.voucherPortion,
+      policy_percent: policyPercent,
     },
   });
 
