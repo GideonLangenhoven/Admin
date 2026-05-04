@@ -243,6 +243,55 @@ async function sendReviewRequestsForBusiness(businessId: string) {
   return sent;
 }
 
+async function sendReviewRemindersForBusiness(businessId: string) {
+  var tenant = await getTenantByBusinessId(db, businessId);
+  var brandName = getBusinessDisplayName(tenant.business);
+  var now = new Date();
+  var sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  var fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  var { data: reviews } = await db.from("reviews")
+    .select("id, booking_id, submission_token, reviewer_name, bookings(phone, customer_name)")
+    .eq("business_id", businessId)
+    .eq("status", "PENDING")
+    .eq("source", "NATIVE")
+    .is("reminder_sent_at", null)
+    .not("submission_token", "is", null)
+    .lt("created_at", sevenDaysAgo)
+    .gt("created_at", fourteenDaysAgo);
+
+  var sent = 0;
+  for (var i = 0; i < (reviews || []).length; i++) {
+    var review: any = reviews?.[i];
+    var phone = review?.bookings?.phone;
+    if (!phone || !review.submission_token) continue;
+
+    var firstName = String(review?.bookings?.customer_name || review?.reviewer_name || "").split(" ")[0] || "there";
+    var bookingSiteUrl = tenant.business.booking_site_url || resolveManageBookingsUrl(tenant.business).replace("/my-bookings", "");
+    var reviewUrl = bookingSiteUrl + "/review/" + review.submission_token;
+
+    var message =
+      "Hi " + firstName + ", just a gentle reminder \u2014 we\u2019d love to hear how your " + brandName + " experience was! \u{1F30A}\n\n" +
+      "It only takes a minute and really helps us out.\n\n" +
+      "\u{2B50} Leave a review: " + reviewUrl;
+
+    // Mark sent BEFORE attempting send (one-shot: no retry storms)
+    await db.from("reviews").update({ reminder_sent_at: now.toISOString() }).eq("id", review.id);
+
+    try {
+      await sendWhatsappTextForTenant(tenant, phone, message, {
+        name: "review_reminder",
+        params: [firstName],
+      });
+      sent++;
+    } catch (error) {
+      console.error("REVIEW_REMINDER_ERR", businessId, review.id, error);
+    }
+  }
+
+  return sent;
+}
+
 async function sendReEngagementForBusiness(businessId: string) {
   var tenant = await getTenantByBusinessId(db, businessId);
   var brandName = getBusinessDisplayName(tenant.business);
@@ -416,6 +465,7 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       reminders: 0,
       indemnity: 0,
       reviews: 0,
+      review_reminders: 0,
       re_engage: 0,
       auto_expire: 0,
       human_timeout: 0,
@@ -427,6 +477,7 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       if (action === "all" || action === "reminders") results.reminders += await sendRemindersForBusiness(businessId);
       if (action === "all" || action === "indemnity") results.indemnity += await sendIndemnityEmailsForBusiness(businessId);
       if (action === "all" || action === "reviews") results.reviews += await sendReviewRequestsForBusiness(businessId);
+      if (action === "all" || action === "review_reminders") results.review_reminders += await sendReviewRemindersForBusiness(businessId);
       if (action === "all" || action === "re_engage") results.re_engage += await sendReEngagementForBusiness(businessId);
       if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
       if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
