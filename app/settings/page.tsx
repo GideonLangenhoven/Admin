@@ -177,6 +177,10 @@ export default function SettingsPage() {
     var [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
     var [siteSaving, setSiteSaving] = useState(false);
     var [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
+    var [refundTiers, setRefundTiers] = useState<Array<{ hours_before: number; refund_percent: number }>>([]);
+    var [refundPolicyText, setRefundPolicyText] = useState("");
+    var [refundSaving, setRefundSaving] = useState(false);
+    var [refundMessage, setRefundMessage] = useState({ type: "", text: "" });
     var [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
 
     // Email Header Images State
@@ -697,6 +701,8 @@ export default function SettingsPage() {
                 footer_line_two: data.footer_line_two || DEFAULT_SITE_SETTINGS.footer_line_two,
             });
             setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
+            setRefundTiers(Array.isArray(data.refund_policy_tiers) ? data.refund_policy_tiers : []);
+            setRefundPolicyText(data.refund_policy_text || "");
             setEmailImgs({
                 payment: data.email_img_payment || "",
                 confirm: data.email_img_confirm || "",
@@ -995,6 +1001,30 @@ export default function SettingsPage() {
             setTimeout(() => setSiteMessage({ type: "", text: "" }), 3000);
         }
         setSiteSaving(false);
+    }
+
+    async function handleSaveRefundPolicy() {
+        setRefundSaving(true);
+        setRefundMessage({ type: "", text: "" });
+        var sorted = [...refundTiers].sort((a, b) => b.hours_before - a.hours_before);
+        var valid = sorted.every(t => t.hours_before >= 0 && t.refund_percent >= 0 && t.refund_percent <= 100);
+        if (!valid) {
+            setRefundMessage({ type: "error", text: "Hours must be ≥ 0 and percent must be 0–100." });
+            setRefundSaving(false);
+            return;
+        }
+        var { error } = await supabase.from("businesses").update({
+            refund_policy_tiers: sorted,
+            refund_policy_text: refundPolicyText.trim(),
+        }).eq("id", businessId);
+        if (error) {
+            setRefundMessage({ type: "error", text: error.message });
+        } else {
+            setRefundTiers(sorted);
+            setRefundMessage({ type: "success", text: "Cancellation policy saved!" });
+            setTimeout(() => setRefundMessage({ type: "", text: "" }), 3000);
+        }
+        setRefundSaving(false);
     }
 
     async function handleSaveInvoice(e: React.FormEvent) {
@@ -2481,6 +2511,53 @@ export default function SettingsPage() {
                     </div>
 
                 </form>
+
+                {/* Cancellation Policy — separate from the main site settings form */}
+                <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-5 mt-6">
+                    <div>
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Cancellation Policy</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)]">
+                            Each tier: how many hours <strong>before</strong> the tour the customer cancels → what % they get refunded. The highest-hours tier they still qualify for wins. Weather cancellations by the operator always get a full refund.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        {refundTiers.map((t, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <input type="number" value={t.hours_before} min={0} onChange={e => setRefundTiers(prev => {
+                                    var next = [...prev]; next[i] = { ...next[i], hours_before: Number(e.target.value) }; return next;
+                                })} className="ui-control w-20 px-2 py-1.5 text-sm rounded-lg outline-none text-center" />
+                                <span className="text-xs text-[var(--ck-text-muted)]">hours before →</span>
+                                <input type="number" value={t.refund_percent} min={0} max={100} onChange={e => setRefundTiers(prev => {
+                                    var next = [...prev]; next[i] = { ...next[i], refund_percent: Number(e.target.value) }; return next;
+                                })} className="ui-control w-20 px-2 py-1.5 text-sm rounded-lg outline-none text-center" />
+                                <span className="text-xs text-[var(--ck-text-muted)]">% refund</span>
+                                <button type="button" onClick={() => setRefundTiers(prev => prev.filter((_, j) => j !== i))}
+                                    className="text-xs text-[var(--ck-danger)] hover:underline ml-1">Remove</button>
+                            </div>
+                        ))}
+                        <button type="button" onClick={() => setRefundTiers(prev => [...prev, { hours_before: 0, refund_percent: 0 }])}
+                            className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ Add tier</button>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Plain-language summary (shown to customers)</label>
+                        <textarea value={refundPolicyText} onChange={e => setRefundPolicyText(e.target.value)} rows={3}
+                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none resize-y" />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button type="button" onClick={handleSaveRefundPolicy} disabled={refundSaving}
+                            className="rounded-xl px-6 bg-[var(--ck-text-strong)] py-2 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                            {refundSaving ? "Saving..." : "Save Cancellation Policy"}
+                        </button>
+                        {refundMessage.text && (
+                            <span className={"text-sm font-medium " + (refundMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-[var(--ck-success)]")}>
+                                {refundMessage.text}
+                            </span>
+                        )}
+                    </div>
+                </div>
             </CollapsibleSection>}
 
             {canAccess("email") && <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
