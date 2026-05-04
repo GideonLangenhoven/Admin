@@ -31,7 +31,7 @@ async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret
   return mismatch === 0;
 }
 
-Deno.serve(withSentry("viator-webhook", async (req) => {
+Deno.serve(withSentry("getyourguide-webhook", async (req) => {
   var origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
@@ -40,20 +40,18 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
   var event: any;
   try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
 
-  // Business ID from query param (?b=<uuid>) — set when registering webhook URL with Viator
   var url = new URL(req.url);
   var businessId = url.searchParams.get("b");
   if (!businessId) return respond(400, { error: "Missing business_id (?b= param)" }, origin);
 
-  // Look up integration
   var { data: integration } = await db
     .from("ota_integrations")
     .select("id, enabled, test_mode, webhook_secret_encrypted")
     .eq("business_id", businessId)
-    .eq("channel", "VIATOR")
+    .eq("channel", "GETYOURGUIDE")
     .maybeSingle();
 
-  if (!integration) return respond(401, { error: "No Viator integration for this business" }, origin);
+  if (!integration) return respond(401, { error: "No GYG integration for this business" }, origin);
   if (!integration.enabled) return respond(200, { ok: true, skipped: "integration disabled" }, origin);
 
   // HMAC signature verification
@@ -61,27 +59,27 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
     var { data: creds } = await db.rpc("get_ota_credentials", {
       p_business_id: businessId,
       p_key: SETTINGS_ENCRYPTION_KEY,
-      p_channel: "VIATOR",
+      p_channel: "GETYOURGUIDE",
     });
     var credRow = Array.isArray(creds) ? creds[0] : creds;
     var webhookSecret = credRow?.webhook_secret || "";
     if (webhookSecret) {
-      var sigHeader = req.headers.get("x-viator-signature") || req.headers.get("viator-signature") || "";
+      var sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
       var sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
       if (!sigValid) {
-        console.error("VIATOR_WEBHOOK_SIG_INVALID business=" + businessId);
+        console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
         return respond(401, { error: "Invalid signature" }, origin);
       }
     }
   }
 
-  var externalRef = String(event?.bookingRef || event?.bookingReference || event?.data?.bookingRef || event?.id || "");
-  var eventType = String(event?.type || event?.notificationType || event?.data?.type || "BOOKING_CONFIRMED").toUpperCase();
-  console.log("VIATOR_WEBHOOK event=" + eventType + " ref=" + externalRef + " biz=" + businessId);
+  var eventType = String(event?.event_type || event?.type || event?.data?.type || "booking.confirmed").toUpperCase();
+  var d = event?.data || event;
+  var externalRef = String(d?.booking_reference || d?.booking_id || event?.booking_reference || event?.id || "");
+  console.log("GYG_WEBHOOK event=" + eventType + " ref=" + externalRef + " biz=" + businessId);
 
-  // Idempotency — key includes event type so create + cancel on same ref are distinct
   if (externalRef) {
-    var idemInsert = await db.from("idempotency_keys").insert({ key: "viator:" + eventType + ":" + externalRef }).select("id").maybeSingle();
+    var idemInsert = await db.from("idempotency_keys").insert({ key: "gyg:" + eventType + ":" + externalRef }).select("id").maybeSingle();
     if (idemInsert.error && idemInsert.error.code === "23505") {
       return respond(200, { ok: true, replay: true }, origin);
     }
@@ -91,62 +89,57 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
     return await handleCancelled(businessId, event, externalRef, origin);
   }
   if (eventType.includes("AMEND") || eventType.includes("MODIF") || eventType.includes("UPDATE")) {
-    return await handleBookingAmended(businessId, event, externalRef, origin);
+    return await handleAmended(businessId, event, externalRef, origin);
   }
   if (eventType.includes("CONFIRM") || eventType.includes("CREAT") || eventType.includes("BOOKING")) {
     return await handleBookingCreated(businessId, event, externalRef, origin);
   }
 
-  // Unknown event type — ack to prevent retries
   return respond(200, { ok: true, ignored: eventType }, origin);
 }));
 
 async function handleBookingCreated(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  // Extract fields — Viator's webhook payload structure
-  // Top-level or nested under event.data depending on webhook version
   var d = event?.data || event;
-  var productCode = String(d?.productCode || d?.product?.productCode || "");
-  var optionCode = d?.productOptionCode || d?.product?.productOptionCode || null;
-  var startDateTime = d?.travelDate || d?.startDate || d?.startDateTime || d?.activity?.startDate;
-  var pax = d?.travelerCount || d?.paxMix?.reduce((s: number, p: any) => s + (p?.numberOfTravelers || 0), 0) || d?.numTravelers || 1;
+  var productCode = String(d?.product_id || d?.product?.id || "");
+  var optionCode = d?.option_id || d?.option?.id || null;
+  var startDateTime = d?.datetime || d?.start_datetime || d?.date || d?.activity?.datetime;
+  var participants = d?.participants || d?.travelers || [];
+  var pax = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity || p?.numberOfTravelers) || 0), 0) || d?.traveler_count || 1;
   var qty = Number(pax);
-  var grossAmount = Number(d?.totalPrice?.amount || d?.price?.total?.amount || d?.totalRetailPrice || 0);
-  var netAmount = Number(d?.totalNetPrice?.amount || d?.netRate?.amount || d?.supplierPrice || grossAmount);
+  var grossAmount = Number(d?.price?.retail?.amount || d?.retail_price?.amount || d?.total_retail_price || 0);
+  var netAmount = Number(d?.price?.net?.amount || d?.net_price?.amount || d?.total_net_price || grossAmount);
 
-  // Traveler info
-  var leadTraveler = d?.leadTraveler || d?.booker || {};
-  var customerName = String(leadTraveler?.name || ((leadTraveler?.firstName || "") + " " + (leadTraveler?.lastName || "")).trim() || d?.customerName || "Viator Guest");
-  var customerEmail = String(leadTraveler?.email || d?.email || "");
-  var customerPhone = String(leadTraveler?.phone || d?.phone || "");
+  var traveler = d?.traveler || d?.lead_traveler || d?.booker || {};
+  var customerName = String(traveler?.name || ((traveler?.first_name || "") + " " + (traveler?.last_name || "")).trim() || d?.customer_name || "GYG Guest");
+  var customerEmail = String(traveler?.email || d?.email || "");
+  var customerPhone = String(traveler?.phone || d?.phone_number || "");
 
   if (!productCode) {
-    console.error("VIATOR_WEBHOOK: no productCode in payload business=" + businessId);
-    return respond(200, { ok: false, reason: "no productCode" }, origin);
+    console.error("GYG_WEBHOOK: no product_id in payload business=" + businessId);
+    return respond(200, { ok: false, reason: "no product_id" }, origin);
   }
 
-  // Resolve tour from mapping
   var { data: mapping } = await db.from("ota_product_mappings")
     .select("tour_id, default_markup_pct")
     .eq("business_id", businessId)
-    .eq("channel", "VIATOR")
+    .eq("channel", "GETYOURGUIDE")
     .eq("external_product_code", productCode)
     .eq("enabled", true)
     .maybeSingle();
 
   if (!mapping?.tour_id) {
-    console.error("VIATOR_WEBHOOK: no mapping for product=" + productCode + " biz=" + businessId);
+    console.error("GYG_WEBHOOK: no mapping for product=" + productCode + " biz=" + businessId);
     await db.from("logs").insert({
       business_id: businessId,
-      event: "viator_unmapped_product",
+      event: "gyg_unmapped_product",
       payload: { productCode, optionCode, externalRef, event_type: "BOOKING_CONFIRMED" },
     });
-    return respond(200, { ok: false, reason: "no mapping for productCode", productCode }, origin);
+    return respond(200, { ok: false, reason: "no mapping for product_id", productCode }, origin);
   }
 
-  // Find matching slot (±30 min tolerance)
   var slotStart = new Date(startDateTime);
   if (isNaN(slotStart.getTime())) {
-    console.error("VIATOR_WEBHOOK: invalid startDateTime=" + startDateTime);
+    console.error("GYG_WEBHOOK: invalid startDateTime=" + startDateTime);
     return respond(200, { ok: false, reason: "invalid startDateTime" }, origin);
   }
 
@@ -161,10 +154,10 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     .maybeSingle();
 
   if (!slot) {
-    console.error("VIATOR_WEBHOOK: no slot found for product=" + productCode + " start=" + startDateTime + " biz=" + businessId);
+    console.error("GYG_WEBHOOK: no slot found for product=" + productCode + " start=" + startDateTime + " biz=" + businessId);
     await db.from("logs").insert({
       business_id: businessId,
-      event: "viator_no_slot",
+      event: "gyg_no_slot",
       payload: { productCode, startDateTime, externalRef, tour_id: mapping.tour_id },
     });
     return respond(200, { ok: false, reason: "no matching slot" }, origin);
@@ -172,15 +165,14 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
 
   var available = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
   if (available < qty) {
-    console.warn("VIATOR_WEBHOOK: oversold — slot=" + slot.id + " available=" + available + " requested=" + qty);
+    console.warn("GYG_WEBHOOK: oversold — slot=" + slot.id + " available=" + available + " requested=" + qty);
     await db.from("logs").insert({
       business_id: businessId,
-      event: "viator_oversold",
+      event: "gyg_oversold",
       payload: { slot_id: slot.id, available, qty, externalRef },
     });
   }
 
-  // Upsert customer
   var customerId: string | null = null;
   if (customerEmail) {
     var { data: cid } = await db.rpc("upsert_customer", {
@@ -193,7 +185,6 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     customerId = cid as string;
   }
 
-  // Create booking — status PAID since Viator collects payment
   var { data: booking, error: insertErr } = await db.from("bookings").insert({
     business_id: businessId,
     tour_id: mapping.tour_id,
@@ -206,8 +197,8 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     unit_price: netAmount / Math.max(1, qty),
     total_amount: netAmount,
     status: "PAID",
-    source: "OTA_VIATOR",
-    ota_channel: "VIATOR",
+    source: "OTA_GETYOURGUIDE",
+    ota_channel: "GETYOURGUIDE",
     ota_external_booking_id: externalRef || null,
     ota_net_amount: netAmount,
     ota_gross_amount: grossAmount,
@@ -215,43 +206,42 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
   }).select("id").single();
 
   if (insertErr) {
-    console.error("VIATOR_WEBHOOK: booking insert failed code=" + insertErr.code + " msg=" + insertErr.message);
+    console.error("GYG_WEBHOOK: booking insert failed code=" + insertErr.code + " msg=" + insertErr.message);
     return respond(500, { ok: false, error: "DB insert failed: " + insertErr.message, code: insertErr.code }, origin);
   }
 
-  // Increment slot booked count
   await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
 
-  // Audit log
   await db.from("logs").insert({
     business_id: businessId,
     booking_id: booking.id,
-    event: "viator_booking_created",
+    event: "gyg_booking_created",
     payload: { external_ref: externalRef, productCode, qty, net: netAmount, gross: grossAmount },
   });
 
-  console.log("VIATOR_WEBHOOK: booking created id=" + booking.id + " ref=" + externalRef + " qty=" + qty);
+  console.log("GYG_WEBHOOK: booking created id=" + booking.id + " ref=" + externalRef + " qty=" + qty);
   return respond(200, { ok: true, booking_id: booking.id }, origin);
 }
 
-async function handleBookingAmended(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  var ref = externalRef || String(event?.data?.bookingRef || event?.bookingReference || "");
+async function handleAmended(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
+  var ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
   if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
 
   var { data: existing } = await db.from("bookings")
     .select("id, slot_id, qty, tour_id, status")
     .eq("business_id", businessId)
     .eq("ota_external_booking_id", ref)
-    .eq("ota_channel", "VIATOR")
+    .eq("ota_channel", "GETYOURGUIDE")
     .maybeSingle();
 
   if (!existing) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
   if (existing.status === "CANCELLED") return respond(200, { ok: false, reason: "booking already cancelled" }, origin);
 
   var d = event?.data || event;
-  var newQty = d?.travelerCount || d?.paxMix?.reduce((s: number, p: any) => s + (p?.numberOfTravelers || 0), 0) || d?.numTravelers || existing.qty;
-  var newGross = Number(d?.totalPrice?.amount || d?.price?.total?.amount || d?.totalRetailPrice || 0);
-  var newNet = Number(d?.totalNetPrice?.amount || d?.netRate?.amount || d?.supplierPrice || newGross);
+  var participants = d?.participants || d?.travelers || [];
+  var newQty = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity) || 0), 0) || d?.traveler_count || existing.qty;
+  var newGross = Number(d?.price?.retail?.amount || d?.retail_price?.amount || 0);
+  var newNet = Number(d?.price?.net?.amount || d?.net_price?.amount || newGross);
   var qtyDiff = Number(newQty) - (existing.qty || 0);
 
   await db.from("bookings").update({
@@ -273,23 +263,23 @@ async function handleBookingAmended(businessId: string, event: any, externalRef:
   await db.from("logs").insert({
     business_id: businessId,
     booking_id: existing.id,
-    event: "viator_booking_amended",
+    event: "gyg_booking_amended",
     payload: { external_ref: ref, old_qty: existing.qty, new_qty: newQty, qty_diff: qtyDiff, net: newNet, gross: newGross },
   });
 
-  console.log("VIATOR_WEBHOOK: booking amended id=" + existing.id + " ref=" + ref + " qtyDiff=" + qtyDiff);
+  console.log("GYG_WEBHOOK: booking amended id=" + existing.id + " ref=" + ref + " qtyDiff=" + qtyDiff);
   return respond(200, { ok: true, amended: existing.id }, origin);
 }
 
 async function handleCancelled(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  var ref = externalRef || String(event?.data?.bookingRef || event?.bookingReference || "");
+  var ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
   if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
 
   var { data: bk } = await db.from("bookings")
     .select("id, slot_id, qty, status")
     .eq("business_id", businessId)
     .eq("ota_external_booking_id", ref)
-    .eq("ota_channel", "VIATOR")
+    .eq("ota_channel", "GETYOURGUIDE")
     .maybeSingle();
 
   if (!bk) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
@@ -297,11 +287,10 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
 
   await db.from("bookings").update({
     status: "CANCELLED",
-    cancellation_reason: "Cancelled via Viator",
+    cancellation_reason: "Cancelled via GetYourGuide",
     cancelled_at: new Date().toISOString(),
   }).eq("id", bk.id);
 
-  // Release slot capacity
   if (bk.slot_id) {
     var { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
     if (sl) await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) - (bk.qty || 0)) }).eq("id", bk.slot_id);
@@ -310,10 +299,10 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
   await db.from("logs").insert({
     business_id: businessId,
     booking_id: bk.id,
-    event: "viator_booking_cancelled",
+    event: "gyg_booking_cancelled",
     payload: { external_ref: ref },
   });
 
-  console.log("VIATOR_WEBHOOK: booking cancelled id=" + bk.id + " ref=" + ref);
+  console.log("GYG_WEBHOOK: booking cancelled id=" + bk.id + " ref=" + ref);
   return respond(200, { ok: true, cancelled: bk.id }, origin);
 }
