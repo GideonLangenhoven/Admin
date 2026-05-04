@@ -39,3 +39,9 @@ verify_jwt = false
 
 [functions.fetch-google-reviews]
 verify_jwt = false
+
+[functions.viator-webhook]
+verify_jwt = false
+
+[functions.viator-availability-sync]
+verify_jwt = false
