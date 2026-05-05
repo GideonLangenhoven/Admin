@@ -35,3 +35,18 @@ export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> 
 export function isPrivilegedRole(role: string): boolean {
   return role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
 }
+
+export async function requireActiveSubscription(businessId: string): Promise<{ active: boolean; status: string }> {
+  const { createClient } = await import("@supabase/supabase-js");
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const db = createClient(url, key, { auth: { persistSession: false } });
+
+  const { data } = await db.from("subscriptions")
+    .select("status")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const status = data?.status ?? "ACTIVE";
+  return { active: status === "ACTIVE" || status === "TRIAL", status };
+}
