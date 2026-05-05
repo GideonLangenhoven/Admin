@@ -35,6 +35,7 @@ const nav = [
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },
   { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
   { href: "/ota-drift", label: "OTA Drift", icon: "Warning", privilegedOnly: true },
+  { href: "/super-admin/data-requests", label: "Data Requests", icon: "Shield", privilegedOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   { href: "/super-admin", label: "Super Admin", icon: "Shield", privilegedOnly: true },
 ];
