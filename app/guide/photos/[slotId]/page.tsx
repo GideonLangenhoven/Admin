@@ -99,15 +99,12 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
         <>
           <h2 className="mt-6 text-sm font-semibold text-[color:var(--text)]">Uploaded ({photos.length})</h2>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            {photos.map(p => {
-              const url = p.gdrive_view_url || p.photo_url;
-              return (
-                <a key={p.id} href={url} target="_blank" rel="noreferrer"
+            {photos.map(p => (
+                <a key={p.id} href={p.gdrive_view_url || p.photo_url} target="_blank" rel="noreferrer"
                   className="block aspect-square rounded-lg bg-[color:var(--surface2)] overflow-hidden border border-[color:var(--border)]">
-                  <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img src={p.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                 </a>
-              );
-            })}
+            ))}
           </div>
         </>
       )}

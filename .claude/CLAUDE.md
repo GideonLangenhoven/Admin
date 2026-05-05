@@ -7,7 +7,7 @@ Multi-tenant Next.js 16 admin dashboard for the BookingTours platform — a comp
 **Pricing:** R1,500/month + R750/additional admin user. Clients can pause for off-season (no charge).
 
 ## Related Apps
-- **Booking Site:** `~/Desktop/booking` — customer-facing booking pages (multi-tenant via subdomain)
+- **Booking Site:** `~/dev/booking` — customer-facing booking pages (multi-tenant via subdomain)
 - **Onboarding App:** `~/Desktop/ActvityHub/Onboarding` — client self-service setup form
 - **Landing Pages:** `landing-pages/` folder — 4 templates (adventure, luxury, safari, modern) + generator
 
@@ -151,6 +151,12 @@ _This section is a running log of failures, learnings, and anti-patterns discove
 - Duplicate/backup files moved to `.backups/` folder (components and supabase functions with " 2" suffix). Don't delete without checking.
 - **Package manager: npm only.** pnpm artifacts were removed (Prompt 29). `packageManager` is pinned in package.json. Don't reintroduce pnpm-lock.yaml — Vercel defaults to npm.
 - Test/utility scripts live in `scripts/` (test-bookings.js, test-db.js, apply_migration.js, etc.)
+
+### Booking-site repo location
+The customer-facing booking site is at `~/dev/booking` (NOT under `~/Desktop`).
+The Desktop iCloud-synced copy was deleted in Prompt 31 because iCloud sync
+repeatedly corrupted git refs and produced ` 2.tsx` duplicate files.
+Don't restore it — it'll just rot again.
 
 ### Marketing Dispatch
 - Campaigns were stuck at "scheduled"/"sending" because `marketing-dispatch` was missing from `config.toml`, defaulting to `verify_jwt = true`. The cron job sends a `Bearer <service_role_key>` which is NOT a JWT — so the function rejected every call with 401.

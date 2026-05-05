@@ -49,11 +49,13 @@ export async function POST(req: NextRequest) {
   let photoUrl = photoUrls[0] || "";
 
   const { data: biz } = await db.from("businesses")
-    .select("gdrive_photos_folder_url")
+    .select("gdrive_photos_folder_url, google_drive_folder_id")
     .eq("id", caller.business_id)
     .maybeSingle();
 
-  if (biz?.gdrive_photos_folder_url) photoUrl = biz.gdrive_photos_folder_url;
+  const folderUrl = biz?.gdrive_photos_folder_url ||
+    (biz?.google_drive_folder_id ? "https://drive.google.com/drive/folders/" + biz.google_drive_folder_id : "");
+  if (folderUrl) photoUrl = folderUrl;
 
   if (!photoUrl) return NextResponse.json({ error: "No photos uploaded for this slot" }, { status: 400 });
 
