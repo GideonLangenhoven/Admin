@@ -11,8 +11,8 @@ import {
 } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 function cors() {
   return {
@@ -29,15 +29,15 @@ Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors() });
 
   try {
-    var supabase = createServiceClient();
-    var body = await req.json();
-    var bookingId = String(body.booking_id || "");
+    const supabase = createServiceClient();
+    const body = await req.json();
+    const bookingId = String(body.booking_id || "");
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: cors() });
     }
 
-    var br = await supabase
+    const br = await supabase
       .from("bookings")
       .select("*, slots(start_time), tours(name)")
       .eq("id", bookingId)
@@ -47,13 +47,13 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: cors() });
     }
 
-    var booking = br.data;
+    const booking = br.data;
     if (booking.status !== "PAID" && booking.status !== "COMPLETED") {
       return new Response(JSON.stringify({ ok: false, reason: "Booking not paid yet" }), { status: 200, headers: cors() });
     }
 
     // Idempotency: check if confirmation was already sent for this booking.
-    var { data: existingClaim } = await supabase
+    const { data: existingClaim } = await supabase
       .from("logs")
       .select("id")
       .eq("booking_id", bookingId)
@@ -65,7 +65,7 @@ Deno.serve(async (req: any) => {
     }
 
     // Claim the send by inserting the log entry first
-    var { data: claimData } = await supabase
+    const { data: claimData } = await supabase
       .from("logs")
       .insert({ booking_id: bookingId, business_id: booking.business_id, event: "booking_confirmation_notifications_sent", payload: { claimed_at: new Date().toISOString() } })
       .select("id")
@@ -77,7 +77,7 @@ Deno.serve(async (req: any) => {
 
     // Upsert customer profile (best-effort — never fail the confirmation)
     try {
-      var { data: customerId } = await supabase.rpc("upsert_customer", {
+      const { data: customerId } = await supabase.rpc("upsert_customer", {
         p_business_id: booking.business_id,
         p_email: booking.email,
         p_name: booking.customer_name || null,
@@ -92,40 +92,40 @@ Deno.serve(async (req: any) => {
       console.error("CUSTOMER_UPSERT_ERR:", custErr);
     }
 
-    var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-    var ref = booking.id.substring(0, 8).toUpperCase();
-    var slotTime = booking.slots?.start_time
+    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const ref = booking.id.substring(0, 8).toUpperCase();
+    const slotTime = booking.slots?.start_time
       ? formatTenantDateTime(tenant.business, booking.slots.start_time)
       : "See email";
-    var tourName = booking.tours?.name || "Booking";
-    var brandName = getBusinessDisplayName(tenant.business);
-    var waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
-    var currency = tenant.business.currency || "ZAR";
+    const tourName = booking.tours?.name || "Booking";
+    const brandName = getBusinessDisplayName(tenant.business);
+    const waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
+    const currency = tenant.business.currency || "ZAR";
 
     // Last-minute booking: if trip is within 24 hours, always include waiver link
-    var isLastMinute = false;
+    let isLastMinute = false;
     if (booking.slots?.start_time) {
-      var hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
+      const hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
       isLastMinute = hoursUntilTrip < 24 && hoursUntilTrip > 0;
     }
 
-    var invR = await supabase
+    const invR = await supabase
       .from("invoices")
       .select("invoice_number, payment_reference")
       .eq("booking_id", bookingId)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
-    var invoice = invR.data;
+    const invoice = invR.data;
 
-    var waSent = false;
-    var emailSent = false;
-    var waError = "";
-    var emailError = "";
+    let waSent = false;
+    let emailSent = false;
+    let waError = "";
+    let emailError = "";
 
     if (booking.phone) {
       try {
-        var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+        const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
         await sendWhatsappTextForTenant(
           tenant,
           booking.phone,
@@ -154,7 +154,7 @@ Deno.serve(async (req: any) => {
 
     if (booking.email) {
       try {
-        var { data: emailData, error: emailInvokeErr } = await supabase.functions.invoke("send-email", {
+        const { data: emailData, error: emailInvokeErr } = await supabase.functions.invoke("send-email", {
           body: {
             type: "BOOKING_CONFIRM",
             data: {

@@ -39,7 +39,7 @@ type ChannelConfig = {
   syncNote: string;
 };
 
-var CHANNELS: ChannelConfig[] = [
+const CHANNELS: ChannelConfig[] = [
   {
     key: "VIATOR", label: "Viator", webhookFunction: "viator-webhook",
     primaryCredLabel: "API Key (exp-api-key)", secondaryCredLabel: null,
@@ -55,19 +55,19 @@ var CHANNELS: ChannelConfig[] = [
 ];
 
 export default function OtaSettingsPage() {
-  var { businessId } = useBusinessContext();
-  var [activeTab, setActiveTab] = useState("VIATOR");
-  var [statuses, setStatuses] = useState<Record<string, Status>>({});
-  var [mappings, setMappings] = useState<Mapping[]>([]);
-  var [tours, setTours] = useState<Tour[]>([]);
-  var [apiKey, setApiKey] = useState("");
-  var [apiSecret, setApiSecret] = useState("");
-  var [webhookSecret, setWebhookSecret] = useState("");
-  var [testMode, setTestMode] = useState(true);
-  var [saving, setSaving] = useState(false);
-  var [msg, setMsg] = useState("");
-  var [addForm, setAddForm] = useState({ tour_id: "", external_product_code: "", external_option_code: "", default_markup_pct: "0", notes: "" });
-  var [addSaving, setAddSaving] = useState(false);
+  const { businessId } = useBusinessContext();
+  const [activeTab, setActiveTab] = useState("VIATOR");
+  const [statuses, setStatuses] = useState<Record<string, Status>>({});
+  const [mappings, setMappings] = useState<Mapping[]>([]);
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [testMode, setTestMode] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [addForm, setAddForm] = useState({ tour_id: "", external_product_code: "", external_option_code: "", default_markup_pct: "0", notes: "" });
+  const [addSaving, setAddSaving] = useState(false);
 
   useEffect(() => {
     if (businessId) refreshAll();
@@ -78,17 +78,17 @@ export default function OtaSettingsPage() {
   }, [activeTab]);
 
   async function refreshAll() {
-    var [toursRes] = await Promise.all([
+    const [toursRes] = await Promise.all([
       supabase.from("tours").select("id, name").eq("business_id", businessId).order("name"),
     ]);
     setTours((toursRes.data as Tour[]) || []);
-    for (var ch of CHANNELS) {
+    for (const ch of CHANNELS) {
       await refreshChannel(ch.key);
     }
   }
 
   async function refreshChannel(channel: string) {
-    var [statusRes, mappingsRes] = await Promise.all([
+    const [statusRes, mappingsRes] = await Promise.all([
       fetch("/api/ota?business_id=" + businessId + "&channel=" + channel).then(r => r.json()),
       supabase.from("ota_product_mappings").select("*").eq("business_id", businessId).eq("channel", channel).order("created_at"),
     ]);
@@ -103,13 +103,13 @@ export default function OtaSettingsPage() {
     setWebhookSecret("");
   }
 
-  var ch = CHANNELS.find(c => c.key === activeTab)!;
-  var status = statuses[activeTab] || null;
+  const ch = CHANNELS.find(c => c.key === activeTab)!;
+  const status = statuses[activeTab] || null;
 
   async function saveCredentials() {
     setSaving(true);
     setMsg("");
-    var res = await fetch("/api/ota", {
+    const res = await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -117,14 +117,14 @@ export default function OtaSettingsPage() {
         api_key: apiKey, api_secret: apiSecret || null, webhook_secret: webhookSecret, test_mode: testMode,
       }),
     });
-    var data = await res.json();
+    const data = await res.json();
     if (data.ok) { setMsg("Credentials saved"); setApiKey(""); setApiSecret(""); setWebhookSecret(""); refreshChannel(activeTab); }
     else setMsg(data.error || "Save failed");
     setSaving(false);
   }
 
   async function toggleEnabled() {
-    var newVal = !status?.enabled;
+    const newVal = !status?.enabled;
     await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,7 +134,7 @@ export default function OtaSettingsPage() {
   }
 
   async function toggleTestMode() {
-    var newVal = !status?.test_mode;
+    const newVal = !status?.test_mode;
     await fetch("/api/ota", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -172,10 +172,10 @@ export default function OtaSettingsPage() {
     refreshChannel(activeTab);
   }
 
-  var tourMap: Record<string, string> = {};
+  const tourMap: Record<string, string> = {};
   tours.forEach(t => { tourMap[t.id] = t.name; });
 
-  var webhookUrl = typeof window !== "undefined"
+  const webhookUrl = typeof window !== "undefined"
     ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") + "/functions/v1/" + ch.webhookFunction + "?b=" + businessId
     : "";
 
@@ -189,7 +189,7 @@ export default function OtaSettingsPage() {
       {/* Channel Tabs */}
       <div className="flex gap-1 mb-6 border-b border-[color:var(--border)]">
         {CHANNELS.map(c => {
-          var s = statuses[c.key];
+          const s = statuses[c.key];
           return (
             <button key={c.key} onClick={() => setActiveTab(c.key)}
               className={"px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px " +

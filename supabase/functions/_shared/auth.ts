@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-var SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
 
 export type AuthResult = {
   userId: string;
@@ -16,8 +16,8 @@ export type AuthResult = {
  * supports all JWT algorithms — immune to the HS256/ES256 gateway issue.
  */
 export async function requireAuth(req: Request): Promise<AuthResult> {
-  var authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  var token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 
   if (!token) {
     throw new Error("Missing authorization header");
@@ -27,14 +27,14 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
     return { userId: "service_role", businessId: "", role: "service_role", isServiceRole: true };
   }
 
-  var supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  var { data, error } = await supabase.auth.getUser(token);
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data, error } = await supabase.auth.getUser(token);
 
   if (error || !data?.user) {
     throw new Error("Invalid or expired token");
   }
 
-  var { data: admin } = await supabase
+  const { data: admin } = await supabase
     .from("admin_users")
     .select("business_id, role, suspended")
     .eq("user_id", data.user.id)

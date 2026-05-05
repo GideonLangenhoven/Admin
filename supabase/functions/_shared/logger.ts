@@ -28,11 +28,11 @@ export interface Logger {
 }
 
 export function createLogger(functionName: string, supabase?: any): Logger {
-  var correlationId = crypto.randomUUID().substring(0, 8);
-  var entries: Array<{ level: LogLevel; message: string; ctx: LogContext; ts: string }> = [];
+  const correlationId = crypto.randomUUID().substring(0, 8);
+  const entries: Array<{ level: LogLevel; message: string; ctx: LogContext; ts: string }> = [];
 
   function log(level: LogLevel, message: string, ctx: LogContext = {}) {
-    var entry = {
+    const entry = {
       ts: new Date().toISOString(),
       fn: functionName,
       cid: correlationId,
@@ -51,7 +51,7 @@ export function createLogger(functionName: string, supabase?: any): Logger {
   async function flush(durationMs?: number) {
     if (!supabase) return;
     // Persist warn/error entries to the database for monitoring
-    var toInsert = entries
+    const toInsert = entries
       .filter((e) => e.level === "warn" || e.level === "error")
       .map((e) => ({
         function_name: functionName,

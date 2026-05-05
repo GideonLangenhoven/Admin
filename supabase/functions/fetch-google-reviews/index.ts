@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry, captureException } from "../_shared/sentry.ts";
 
-var db = createServiceClient();
-var GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") || "";
+const db = createServiceClient();
+const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") || "";
 
 Deno.serve(withSentry("fetch-google-reviews", async (_req: Request) => {
   if (!GOOGLE_PLACES_API_KEY) {
@@ -13,15 +13,15 @@ Deno.serve(withSentry("fetch-google-reviews", async (_req: Request) => {
     });
   }
 
-  var { data: businesses } = await db.from("businesses")
+  const { data: businesses } = await db.from("businesses")
     .select("id, google_place_id")
     .not("google_place_id", "is", null);
 
-  var totalUpserted = 0;
+  let totalUpserted = 0;
 
-  for (var biz of businesses || []) {
+  for (const biz of businesses || []) {
     try {
-      var res = await fetch(
+      const res = await fetch(
         "https://places.googleapis.com/v1/places/" + biz.google_place_id,
         {
           headers: {
@@ -36,14 +36,14 @@ Deno.serve(withSentry("fetch-google-reviews", async (_req: Request) => {
         continue;
       }
 
-      var body = await res.json();
-      var reviews = body.reviews || [];
+      const body = await res.json();
+      const reviews = body.reviews || [];
 
-      for (var review of reviews) {
-        var googleReviewId = review.name;
+      for (const review of reviews) {
+        const googleReviewId = review.name;
         if (!googleReviewId) continue;
 
-        var { error } = await db.from("reviews").upsert(
+        const { error } = await db.from("reviews").upsert(
           {
             business_id: biz.id,
             source: "GOOGLE",

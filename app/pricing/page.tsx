@@ -6,35 +6,35 @@ import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 export default function PeakPricingPage() {
-  var { businessId } = useBusinessContext();
-  var [tours, setTours] = useState<any[]>([]);
-  var [peakRanges, setPeakRanges] = useState<any[]>([]);
-  var [peakPeriods, setPeakPeriods] = useState<any[]>([]);
-  var [startDate, setStartDate] = useState("");
-  var [endDate, setEndDate] = useState("");
-  var [peakPrices, setPeakPrices] = useState<Record<string, string>>({});
-  var [basePrices, setBasePrices] = useState<Record<string, string>>({});
-  var [priority, setPriority] = useState("0");
-  var [periodLabel, setPeriodLabel] = useState("");
-  var [saving, setSaving] = useState(false);
-  var [loading, setLoading] = useState(true);
-  var [result, setResult] = useState("");
-  var [overlapWarning, setOverlapWarning] = useState("");
+  const { businessId } = useBusinessContext();
+  const [tours, setTours] = useState<any[]>([]);
+  const [peakRanges, setPeakRanges] = useState<any[]>([]);
+  const [peakPeriods, setPeakPeriods] = useState<any[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [peakPrices, setPeakPrices] = useState<Record<string, string>>({});
+  const [basePrices, setBasePrices] = useState<Record<string, string>>({});
+  const [priority, setPriority] = useState("0");
+  const [periodLabel, setPeriodLabel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState("");
+  const [overlapWarning, setOverlapWarning] = useState("");
 
   useEffect(() => { load(); }, [businessId]);
 
   // Check for overlapping peak periods whenever dates change
   useEffect(() => {
     if (!startDate || !endDate || peakPeriods.length === 0) { setOverlapWarning(""); return; }
-    var s = new Date(startDate);
-    var e = new Date(endDate);
-    var overlaps = peakPeriods.filter((p: any) => {
-      var ps = new Date(p.start_date);
-      var pe = new Date(p.end_date);
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const overlaps = peakPeriods.filter((p: any) => {
+      const ps = new Date(p.start_date);
+      const pe = new Date(p.end_date);
       return s <= pe && e >= ps; // date ranges overlap
     });
     if (overlaps.length > 0) {
-      var labels = overlaps.map((o: any) => (o.label || "Unnamed") + " (" + o.start_date + " to " + o.end_date + ", priority " + o.priority + ")").join("; ");
+      const labels = overlaps.map((o: any) => (o.label || "Unnamed") + " (" + o.start_date + " to " + o.end_date + ", priority " + o.priority + ")").join("; ");
       setOverlapWarning("Overlapping periods: " + labels + ". The highest priority rule will take precedence for overlapping dates.");
     } else {
       setOverlapWarning("");
@@ -42,25 +42,25 @@ export default function PeakPricingPage() {
   }, [startDate, endDate, peakPeriods]);
 
   async function load() {
-    var { data: t } = await supabase.from("tours").select("id, name, base_price_per_person, peak_price_per_person").eq("business_id", businessId).eq("active", true).order("sort_order");
+    const { data: t } = await supabase.from("tours").select("id, name, base_price_per_person, peak_price_per_person").eq("business_id", businessId).eq("active", true).order("sort_order");
     setTours((t || []).filter((x: any) => !x.name.includes("Private")));
 
     // Load peak periods from new table
-    var { data: periods } = await supabase.from("peak_periods")
+    const { data: periods } = await supabase.from("peak_periods")
       .select("id, label, start_date, end_date, priority, created_at, peak_period_prices(tour_id, price_per_person)")
       .eq("business_id", businessId)
       .order("start_date", { ascending: true });
     setPeakPeriods(periods || []);
 
     // Also get existing peak slots grouped by date range (legacy view)
-    var { data: peakSlots } = await supabase.from("slots").select("id, start_time, tour_id, is_peak, price_per_person_override")
+    const { data: peakSlots } = await supabase.from("slots").select("id, start_time, tour_id, is_peak, price_per_person_override")
       .eq("business_id", businessId).eq("is_peak", true).order("start_time", { ascending: true }).limit(500);
 
     // Group into date ranges
-    var ranges: any[] = [];
-    var current: any = null;
-    for (var s of (peakSlots || [])) {
-      var d = new Date(s.start_time).toISOString().split("T")[0];
+    const ranges: any[] = [];
+    let current: any = null;
+    for (const s of (peakSlots || [])) {
+      const d = new Date(s.start_time).toISOString().split("T")[0];
       if (!current || d !== current.endDate) {
         if (current && new Date(d).getTime() - new Date(current.endDate).getTime() <= 86400000) {
           current.endDate = d;
@@ -84,14 +84,14 @@ export default function PeakPricingPage() {
     setSaving(true);
     setResult("");
 
-    var start = new Date(startDate);
-    var end = new Date(endDate);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     end.setDate(end.getDate() + 1); // inclusive
 
-    var priorityVal = Number(priority) || 0;
+    const priorityVal = Number(priority) || 0;
 
     // Save peak period record
-    var { data: period, error: periodErr } = await supabase.from("peak_periods").insert({
+    const { data: period, error: periodErr } = await supabase.from("peak_periods").insert({
       business_id: businessId,
       label: periodLabel.trim() || (startDate + " to " + endDate),
       start_date: startDate,
@@ -106,9 +106,9 @@ export default function PeakPricingPage() {
     }
 
     // Save per-tour prices for this period
-    var periodPriceRows: any[] = [];
-    for (var tour of tours) {
-      var price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
+    const periodPriceRows: any[] = [];
+    for (const tour of tours) {
+      const price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
       periodPriceRows.push({ peak_period_id: period.id, tour_id: tour.id, price_per_person: price });
     }
     if (periodPriceRows.length > 0) {
@@ -117,36 +117,36 @@ export default function PeakPricingPage() {
 
     // For each slot in range, determine the winning peak period (highest priority)
     // and apply its price
-    var updated = 0;
-    for (var tour of tours) {
-      var price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
+    let updated = 0;
+    for (const tour of tours) {
+      const price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
 
       // Also save peak price on tour
       await supabase.from("tours").update({ peak_price_per_person: price }).eq("id", tour.id);
 
-      var { data: slots } = await supabase.from("slots").select("id, start_time, is_manually_overridden")
+      const { data: slots } = await supabase.from("slots").select("id, start_time, is_manually_overridden")
         .eq("business_id", businessId)
         .eq("tour_id", tour.id)
         .gte("start_time", start.toISOString())
         .lt("start_time", end.toISOString());
 
-      for (var s of (slots || [])) {
+      for (const s of (slots || [])) {
         // Skip manually overridden slots
         if (s.is_manually_overridden) continue;
 
         // Skip slots that have CONFIRMED or PAID bookings (grandfathering)
-        var { count } = await supabase.from("bookings")
+        const { count } = await supabase.from("bookings")
           .select("id", { count: "exact", head: true })
           .eq("slot_id", s.id)
           .in("status", ["CONFIRMED", "PAID"]);
         if ((count || 0) > 0) continue;
 
         // Determine which peak period has the highest priority for this slot's date
-        var slotDate = new Date(s.start_time).toISOString().split("T")[0];
-        var winningPrice = price; // default to current period's price
+        const slotDate = new Date(s.start_time).toISOString().split("T")[0];
+        let winningPrice = price; // default to current period's price
 
         // Check all peak periods that cover this date
-        var applicablePeriods = peakPeriods.filter((p: any) => slotDate >= p.start_date && slotDate <= p.end_date);
+        const applicablePeriods = peakPeriods.filter((p: any) => slotDate >= p.start_date && slotDate <= p.end_date);
         // Include the period we just created
         applicablePeriods.push({ ...period, peak_period_prices: periodPriceRows.map(r => ({ tour_id: r.tour_id, price_per_person: r.price_per_person })) });
 
@@ -154,8 +154,8 @@ export default function PeakPricingPage() {
         applicablePeriods.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
 
         if (applicablePeriods.length > 0) {
-          var winner = applicablePeriods[0];
-          var tourPrice = (winner.peak_period_prices || []).find((pp: any) => pp.tour_id === tour.id);
+          const winner = applicablePeriods[0];
+          const tourPrice = (winner.peak_period_prices || []).find((pp: any) => pp.tour_id === tour.id);
           if (tourPrice) {
             winningPrice = Number(tourPrice.price_per_person);
           }
@@ -176,9 +176,9 @@ export default function PeakPricingPage() {
   async function saveTourPricing() {
     setSaving(true);
     setResult("");
-    for (var tour of tours) {
-      var nextBase = basePrices[tour.id] !== undefined ? Number(basePrices[tour.id] || 0) : Number(tour.base_price_per_person || 0);
-      var nextPeak = peakPrices[tour.id] !== undefined ? Number(peakPrices[tour.id] || 0) : Number(tour.peak_price_per_person || tour.base_price_per_person || 0);
+    for (const tour of tours) {
+      const nextBase = basePrices[tour.id] !== undefined ? Number(basePrices[tour.id] || 0) : Number(tour.base_price_per_person || 0);
+      const nextPeak = peakPrices[tour.id] !== undefined ? Number(peakPrices[tour.id] || 0) : Number(tour.peak_price_per_person || tour.base_price_per_person || 0);
       await supabase.from("tours").update({
         base_price_per_person: nextBase,
         peak_price_per_person: nextPeak,
@@ -196,17 +196,17 @@ export default function PeakPricingPage() {
       tone: "warning",
       confirmLabel: "Remove range",
     })) return;
-    var start = new Date(startD);
-    var end = new Date(endD);
+    const start = new Date(startD);
+    const end = new Date(endD);
     end.setDate(end.getDate() + 1);
 
-    var { data: slots } = await supabase.from("slots").select("id, is_manually_overridden")
+    const { data: slots } = await supabase.from("slots").select("id, is_manually_overridden")
       .eq("business_id", businessId)
       .eq("is_peak", true)
       .gte("start_time", start.toISOString())
       .lt("start_time", end.toISOString());
 
-    for (var s of (slots || [])) {
+    for (const s of (slots || [])) {
       // Skip manually overridden slots
       if (s.is_manually_overridden) continue;
       await supabase.from("slots").update({ is_peak: false, price_per_person_override: null }).eq("id", s.id);
@@ -226,17 +226,17 @@ export default function PeakPricingPage() {
       tone: "warning",
       confirmLabel: "Remove range",
     })) return;
-    var start = new Date(startD);
-    var end = new Date(endD);
+    const start = new Date(startD);
+    const end = new Date(endD);
     end.setDate(end.getDate() + 1);
 
-    var { data: slots } = await supabase.from("slots").select("id, is_manually_overridden")
+    const { data: slots } = await supabase.from("slots").select("id, is_manually_overridden")
       .eq("business_id", businessId)
       .eq("is_peak", true)
       .gte("start_time", start.toISOString())
       .lt("start_time", end.toISOString());
 
-    for (var s of (slots || [])) {
+    for (const s of (slots || [])) {
       if (s.is_manually_overridden) continue;
       await supabase.from("slots").update({ is_peak: false, price_per_person_override: null }).eq("id", s.id);
     }
@@ -276,8 +276,8 @@ export default function PeakPricingPage() {
             </thead>
             <tbody>
               {tours.map((tour) => {
-                var base = basePrices[tour.id] !== undefined ? basePrices[tour.id] : String(tour.base_price_per_person || "");
-                var peak = peakPrices[tour.id] !== undefined ? peakPrices[tour.id] : String(tour.peak_price_per_person || tour.base_price_per_person || "");
+                const base = basePrices[tour.id] !== undefined ? basePrices[tour.id] : String(tour.base_price_per_person || "");
+                const peak = peakPrices[tour.id] !== undefined ? peakPrices[tour.id] : String(tour.peak_price_per_person || tour.base_price_per_person || "");
                 return (
                   <tr key={tour.id} className="border-t border-gray-100">
                     <td className="p-3 font-medium text-gray-900">{tour.name}</td>
@@ -380,7 +380,7 @@ export default function PeakPricingPage() {
                   {(p.peak_period_prices || []).length > 0 && (
                     <p className="text-xs text-gray-400 mt-0.5">
                       {(p.peak_period_prices || []).map((pp: any) => {
-                        var tour = tours.find(t => t.id === pp.tour_id);
+                        const tour = tours.find(t => t.id === pp.tour_id);
                         return tour ? tour.name + ": R" + pp.price_per_person : null;
                       }).filter(Boolean).join(" | ")}
                     </p>

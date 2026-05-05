@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer } from "../../../lib/feature-flags";
 
 function serviceClient() {
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(url, key);
 }
 
@@ -17,15 +17,15 @@ export async function GET(req: NextRequest) {
       { status: 503, headers: { "Content-Type": "text/html" } }
     );
   }
-  var token = req.nextUrl.searchParams.get("token");
+  const token = req.nextUrl.searchParams.get("token");
   if (!token) {
     return new Response(htmlPage("Invalid Link", "No invite token provided."), { status: 400, headers: { "Content-Type": "text/html" } });
   }
 
-  var supabase = serviceClient();
+  const supabase = serviceClient();
 
   // Find and activate the partnership
-  var { data: partnership, error } = await supabase
+  const { data: partnership, error } = await supabase
     .from("business_partnerships")
     .select("*, business_a:businesses!business_partnerships_business_a_id_fkey(business_name, name), business_b:businesses!business_partnerships_business_b_id_fkey(business_name, name)")
     .eq("invite_token", token)
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (partnership.status === "ACTIVE") {
-    var partnerName = partnership.business_a?.business_name || partnership.business_b?.business_name || "your partner";
+    const partnerName = partnership.business_a?.business_name || partnership.business_b?.business_name || "your partner";
     return new Response(htmlPage("Already Accepted", "This partnership with " + partnerName + " is already active. You can close this page."), { status: 200, headers: { "Content-Type": "text/html" } });
   }
 
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Accept the partnership
-  var { error: updateErr } = await supabase
+  const { error: updateErr } = await supabase
     .from("business_partnerships")
     .update({ status: "ACTIVE", accepted_at: new Date().toISOString() })
     .eq("id", partnership.id)
@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
     return new Response(htmlPage("Error", "Something went wrong accepting the partnership. Please try again or contact support."), { status: 500, headers: { "Content-Type": "text/html" } });
   }
 
-  var bizA = partnership.business_a?.business_name || partnership.business_a?.name || "Business A";
-  var bizB = partnership.business_b?.business_name || partnership.business_b?.name || "Business B";
+  const bizA = partnership.business_a?.business_name || partnership.business_a?.name || "Business A";
+  const bizB = partnership.business_b?.business_name || partnership.business_b?.name || "Business B";
 
   return new Response(
     htmlPage("Partnership Accepted!", "The partnership between <strong>" + bizA + "</strong> and <strong>" + bizB + "</strong> is now active. You can now create combo offers together from your admin dashboard."),

@@ -13,7 +13,7 @@ export async function assertAdminTestModeOn(
 
   await page.waitForSelector("main", { timeout: 15_000 });
 
-  var banner = page.getByText(/TEST MODE/i).first();
+  const banner = page.getByText(/TEST MODE/i).first();
   await expect(
     banner,
     "ABORT: Admin must show TEST MODE banner before E2E tests can run. " +

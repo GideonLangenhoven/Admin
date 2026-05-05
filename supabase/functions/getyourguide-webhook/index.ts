@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
-var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
-var db = createServiceClient();
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+const db = createServiceClient();
 
 function headers(origin?: string | null) {
   return {
@@ -19,32 +19,32 @@ function respond(status: number, body: any, origin?: string | null) {
 
 async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
   if (!secret || !signatureHeader) return false;
-  var key = new TextEncoder().encode(secret);
-  var data = new TextEncoder().encode(rawBody);
-  var cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  var sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
-  var expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-  var receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
+  const key = new TextEncoder().encode(secret);
+  const data = new TextEncoder().encode(rawBody);
+  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
+  const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
   if (receivedHex.length !== expectedHex.length) return false;
-  var mismatch = 0;
-  for (var i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  const mismatch = 0;
+  for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
 
 Deno.serve(withSentry("getyourguide-webhook", async (req) => {
-  var origin = req.headers.get("origin");
+  const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
 
-  var rawBody = await req.text();
-  var event: any;
+  const rawBody = await req.text();
+  const event: any;
   try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
 
-  var url = new URL(req.url);
-  var businessId = url.searchParams.get("b");
+  const url = new URL(req.url);
+  const businessId = url.searchParams.get("b");
   if (!businessId) return respond(400, { error: "Missing business_id (?b= param)" }, origin);
 
-  var { data: integration } = await db
+  const { data: integration } = await db
     .from("ota_integrations")
     .select("id, enabled, test_mode, webhook_secret_encrypted")
     .eq("business_id", businessId)
@@ -56,16 +56,16 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
 
   // HMAC signature verification
   if (integration.webhook_secret_encrypted && SETTINGS_ENCRYPTION_KEY) {
-    var { data: creds } = await db.rpc("get_ota_credentials", {
+    const { data: creds } = await db.rpc("get_ota_credentials", {
       p_business_id: businessId,
       p_key: SETTINGS_ENCRYPTION_KEY,
       p_channel: "GETYOURGUIDE",
     });
-    var credRow = Array.isArray(creds) ? creds[0] : creds;
-    var webhookSecret = credRow?.webhook_secret || "";
+    const credRow = Array.isArray(creds) ? creds[0] : creds;
+    const webhookSecret = credRow?.webhook_secret || "";
     if (webhookSecret) {
-      var sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
-      var sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
+      const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
+      const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
       if (!sigValid) {
         console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
         return respond(401, { error: "Invalid signature" }, origin);
@@ -73,13 +73,13 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
     }
   }
 
-  var eventType = String(event?.event_type || event?.type || event?.data?.type || "booking.confirmed").toUpperCase();
-  var d = event?.data || event;
-  var externalRef = String(d?.booking_reference || d?.booking_id || event?.booking_reference || event?.id || "");
+  const eventType = String(event?.event_type || event?.type || event?.data?.type || "booking.confirmed").toUpperCase();
+  const d = event?.data || event;
+  const externalRef = String(d?.booking_reference || d?.booking_id || event?.booking_reference || event?.id || "");
   console.log("GYG_WEBHOOK event=" + eventType + " ref=" + externalRef + " biz=" + businessId);
 
   if (externalRef) {
-    var idemInsert = await db.from("idempotency_keys").insert({ key: "gyg:" + eventType + ":" + externalRef }).select("id").maybeSingle();
+    const idemInsert = await db.from("idempotency_keys").insert({ key: "gyg:" + eventType + ":" + externalRef }).select("id").maybeSingle();
     if (idemInsert.error && idemInsert.error.code === "23505") {
       return respond(200, { ok: true, replay: true }, origin);
     }
@@ -99,27 +99,27 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
 }));
 
 async function handleBookingCreated(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  var d = event?.data || event;
-  var productCode = String(d?.product_id || d?.product?.id || "");
-  var optionCode = d?.option_id || d?.option?.id || null;
-  var startDateTime = d?.datetime || d?.start_datetime || d?.date || d?.activity?.datetime;
-  var participants = d?.participants || d?.travelers || [];
-  var pax = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity || p?.numberOfTravelers) || 0), 0) || d?.traveler_count || 1;
-  var qty = Number(pax);
-  var grossAmount = Number(d?.price?.retail?.amount || d?.retail_price?.amount || d?.total_retail_price || 0);
-  var netAmount = Number(d?.price?.net?.amount || d?.net_price?.amount || d?.total_net_price || grossAmount);
+  const d = event?.data || event;
+  const productCode = String(d?.product_id || d?.product?.id || "");
+  const optionCode = d?.option_id || d?.option?.id || null;
+  const startDateTime = d?.datetime || d?.start_datetime || d?.date || d?.activity?.datetime;
+  const participants = d?.participants || d?.travelers || [];
+  const pax = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity || p?.numberOfTravelers) || 0), 0) || d?.traveler_count || 1;
+  const qty = Number(pax);
+  const grossAmount = Number(d?.price?.retail?.amount || d?.retail_price?.amount || d?.total_retail_price || 0);
+  const netAmount = Number(d?.price?.net?.amount || d?.net_price?.amount || d?.total_net_price || grossAmount);
 
-  var traveler = d?.traveler || d?.lead_traveler || d?.booker || {};
-  var customerName = String(traveler?.name || ((traveler?.first_name || "") + " " + (traveler?.last_name || "")).trim() || d?.customer_name || "GYG Guest");
-  var customerEmail = String(traveler?.email || d?.email || "");
-  var customerPhone = String(traveler?.phone || d?.phone_number || "");
+  const traveler = d?.traveler || d?.lead_traveler || d?.booker || {};
+  const customerName = String(traveler?.name || ((traveler?.first_name || "") + " " + (traveler?.last_name || "")).trim() || d?.customer_name || "GYG Guest");
+  const customerEmail = String(traveler?.email || d?.email || "");
+  const customerPhone = String(traveler?.phone || d?.phone_number || "");
 
   if (!productCode) {
     console.error("GYG_WEBHOOK: no product_id in payload business=" + businessId);
     return respond(200, { ok: false, reason: "no product_id" }, origin);
   }
 
-  var { data: mapping } = await db.from("ota_product_mappings")
+  const { data: mapping } = await db.from("ota_product_mappings")
     .select("tour_id, default_markup_pct")
     .eq("business_id", businessId)
     .eq("channel", "GETYOURGUIDE")
@@ -137,13 +137,13 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     return respond(200, { ok: false, reason: "no mapping for product_id", productCode }, origin);
   }
 
-  var slotStart = new Date(startDateTime);
+  const slotStart = new Date(startDateTime);
   if (isNaN(slotStart.getTime())) {
     console.error("GYG_WEBHOOK: invalid startDateTime=" + startDateTime);
     return respond(200, { ok: false, reason: "invalid startDateTime" }, origin);
   }
 
-  var { data: slot } = await db.from("slots")
+  const { data: slot } = await db.from("slots")
     .select("id, capacity_total, booked, held, tour_id")
     .eq("business_id", businessId)
     .eq("tour_id", mapping.tour_id)
@@ -163,7 +163,7 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     return respond(200, { ok: false, reason: "no matching slot" }, origin);
   }
 
-  var available = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
+  const available = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
   if (available < qty) {
     console.warn("GYG_WEBHOOK: oversold — slot=" + slot.id + " available=" + available + " requested=" + qty);
     await db.from("logs").insert({
@@ -173,9 +173,9 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     });
   }
 
-  var customerId: string | null = null;
+  let customerId: string | null = null;
   if (customerEmail) {
-    var { data: cid } = await db.rpc("upsert_customer", {
+    const { data: cid } = await db.rpc("upsert_customer", {
       p_business_id: businessId,
       p_email: customerEmail,
       p_name: customerName || null,
@@ -185,7 +185,7 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     customerId = cid as string;
   }
 
-  var { data: booking, error: insertErr } = await db.from("bookings").insert({
+  const { data: booking, error: insertErr } = await db.from("bookings").insert({
     business_id: businessId,
     tour_id: mapping.tour_id,
     slot_id: slot.id,
@@ -224,10 +224,10 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
 }
 
 async function handleAmended(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  var ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
+  const ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
   if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
 
-  var { data: existing } = await db.from("bookings")
+  const { data: existing } = await db.from("bookings")
     .select("id, slot_id, qty, tour_id, status")
     .eq("business_id", businessId)
     .eq("ota_external_booking_id", ref)
@@ -237,12 +237,12 @@ async function handleAmended(businessId: string, event: any, externalRef: string
   if (!existing) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
   if (existing.status === "CANCELLED") return respond(200, { ok: false, reason: "booking already cancelled" }, origin);
 
-  var d = event?.data || event;
-  var participants = d?.participants || d?.travelers || [];
-  var newQty = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity) || 0), 0) || d?.traveler_count || existing.qty;
-  var newGross = Number(d?.price?.retail?.amount || d?.retail_price?.amount || 0);
-  var newNet = Number(d?.price?.net?.amount || d?.net_price?.amount || newGross);
-  var qtyDiff = Number(newQty) - (existing.qty || 0);
+  const d = event?.data || event;
+  const participants = d?.participants || d?.travelers || [];
+  const newQty = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity) || 0), 0) || d?.traveler_count || existing.qty;
+  const newGross = Number(d?.price?.retail?.amount || d?.retail_price?.amount || 0);
+  const newNet = Number(d?.price?.net?.amount || d?.net_price?.amount || newGross);
+  const qtyDiff = Number(newQty) - (existing.qty || 0);
 
   await db.from("bookings").update({
     qty: newQty,
@@ -254,7 +254,7 @@ async function handleAmended(businessId: string, event: any, externalRef: string
   }).eq("id", existing.id);
 
   if (qtyDiff !== 0 && existing.slot_id) {
-    var { data: sl } = await db.from("slots").select("booked").eq("id", existing.slot_id).single();
+    const { data: sl } = await db.from("slots").select("booked").eq("id", existing.slot_id).single();
     if (sl) {
       await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) + qtyDiff) }).eq("id", existing.slot_id);
     }
@@ -272,10 +272,10 @@ async function handleAmended(businessId: string, event: any, externalRef: string
 }
 
 async function handleCancelled(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
-  var ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
+  const ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
   if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
 
-  var { data: bk } = await db.from("bookings")
+  const { data: bk } = await db.from("bookings")
     .select("id, slot_id, qty, status")
     .eq("business_id", businessId)
     .eq("ota_external_booking_id", ref)
@@ -292,7 +292,7 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
   }).eq("id", bk.id);
 
   if (bk.slot_id) {
-    var { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
+    const { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
     if (sl) await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) - (bk.qty || 0)) }).eq("id", bk.slot_id);
   }
 

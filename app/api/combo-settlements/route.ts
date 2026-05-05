@@ -4,8 +4,8 @@ import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-f
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(url, key);
 }
 
@@ -14,13 +14,13 @@ function serviceClient() {
 export async function GET(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
 
-  var caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req);
   if (!caller || !isPrivilegedRole(caller.role)) {
     return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
   }
 
-  var businessId = req.nextUrl.searchParams.get("business_id");
-  var period = req.nextUrl.searchParams.get("period"); // format: YYYY-MM-DD..YYYY-MM-DD
+  const businessId = req.nextUrl.searchParams.get("business_id");
+  const period = req.nextUrl.searchParams.get("period"); // format: YYYY-MM-DD..YYYY-MM-DD
 
   if (!businessId) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
 
@@ -28,13 +28,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "You can only view settlements for your own business" }, { status: 403 });
   }
 
-  var supabase = serviceClient();
+  const supabase = serviceClient();
 
   // Default period: last 7 days
-  var endDate = new Date();
-  var startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+  let endDate = new Date();
+  let startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
   if (period) {
-    var parts = period.split("..");
+    const parts = period.split("..");
     if (parts.length === 2) {
       startDate = new Date(parts[0] + "T00:00:00+02:00");
       endDate = new Date(parts[1] + "T23:59:59+02:00");
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch all PAID combo bookings in the period where this business is involved
-  var { data: combos, error } = await supabase
+  const { data: combos, error } = await supabase
     .from("combo_bookings")
     .select("id, combo_total, split_a_amount, split_b_amount, payment_status, settled, created_at, combo_offers(name, business_a_id, business_b_id, business_a:businesses!combo_offers_business_a_id_fkey(business_name), business_b:businesses!combo_offers_business_b_id_fkey(business_name))")
     .in("payment_status", ["PAID", "VOUCHER_ISSUED"])
@@ -52,18 +52,18 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Filter to combos involving this business
-  var relevant = (combos || []).filter((c: any) => {
-    var offer = c.combo_offers;
+  const relevant = (combos || []).filter((c: any) => {
+    const offer = c.combo_offers;
     return offer?.business_a_id === businessId || offer?.business_b_id === businessId;
   });
 
   // Calculate settlement per partnership
-  var settlements: Record<string, any> = {};
-  for (var combo of relevant as any[]) {
-    var offer = combo.combo_offers;
-    var isA = offer.business_a_id === businessId;
-    var partnerId = isA ? offer.business_b_id : offer.business_a_id;
-    var partnerName = isA ? offer.business_b?.business_name : offer.business_a?.business_name;
+  const settlements: Record<string, any> = {};
+  for (const combo of relevant as any[]) {
+    const offer = combo.combo_offers;
+    const isA = offer.business_a_id === businessId;
+    const partnerId = isA ? offer.business_b_id : offer.business_a_id;
+    const partnerName = isA ? offer.business_b?.business_name : offer.business_a?.business_name;
 
     if (!settlements[partnerId]) {
       settlements[partnerId] = {
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    var s = settlements[partnerId];
+    const s = settlements[partnerId];
     s.total_combos++;
     if (!combo.settled) s.unsettled_count++;
 
@@ -115,21 +115,21 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!isComboEnabledServer()) return comboDisabledResponse();
 
-  var caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req);
   if (!caller || !isPrivilegedRole(caller.role)) {
     return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
   }
 
-  var body: any;
+  let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  var { combo_booking_ids, notes, settled_by } = body;
+  const { combo_booking_ids, notes, settled_by } = body;
   if (!Array.isArray(combo_booking_ids) || combo_booking_ids.length === 0) {
     return NextResponse.json({ error: "combo_booking_ids array is required" }, { status: 400 });
   }
 
-  var supabase = serviceClient();
-  var { error } = await supabase
+  const supabase = serviceClient();
+  const { error } = await supabase
     .from("combo_bookings")
     .update({
       settled: true,

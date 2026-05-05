@@ -19,14 +19,14 @@ type Review = {
     tours?: { name: string } | null;
 };
 
-var STATUSES = ["PENDING", "APPROVED", "HIDDEN", "SPAM"] as const;
+const STATUSES = ["PENDING", "APPROVED", "HIDDEN", "SPAM"] as const;
 
 export default function ReviewsPage() {
-    var { businessId } = useBusinessContext();
-    var [reviews, setReviews] = useState<Review[]>([]);
-    var [loading, setLoading] = useState(true);
-    var [filter, setFilter] = useState<string>("PENDING");
-    var [updating, setUpdating] = useState<string | null>(null);
+    const { businessId } = useBusinessContext();
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<string>("PENDING");
+    const [updating, setUpdating] = useState<string | null>(null);
 
     useEffect(() => {
         if (!businessId) return;
@@ -35,21 +35,21 @@ export default function ReviewsPage() {
 
     async function loadReviews() {
         setLoading(true);
-        var q = supabase.from("reviews")
+        let q = supabase.from("reviews")
             .select("*, tours(name)")
             .eq("business_id", businessId)
             .eq("status", filter)
             .order("created_at", { ascending: false })
             .limit(100);
         if (filter === "PENDING") q = q.not("submitted_at", "is", null);
-        var { data } = await q;
+        const { data } = await q;
         setReviews((data || []) as Review[]);
         setLoading(false);
     }
 
     async function updateStatus(id: string, status: string) {
         setUpdating(id);
-        var { error } = await supabase.from("reviews").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+        const { error } = await supabase.from("reviews").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
         if (error) {
             notify({ message: "Failed to update: " + error.message, tone: "error" });
         } else {

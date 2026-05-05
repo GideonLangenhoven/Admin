@@ -3,8 +3,8 @@
 import { supabase } from "./supabase";
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  var { data: { session } } = await supabase.auth.getSession();
-  var headers: Record<string, string> = { "Content-Type": "application/json" };
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.access_token) headers["Authorization"] = "Bearer " + session.access_token;
   return headers;
 }
@@ -24,12 +24,12 @@ export interface AdminAccountRow {
 }
 
 export async function sha256(str: string) {
-  var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function generateSecureToken(bytes = 24) {
-  var arr = new Uint8Array(bytes);
+  const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
   return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -43,13 +43,13 @@ function setupUrl(email: string, token: string) {
 // Direct anon-key access to admin_users is closed once the permissive RLS fallback is dropped.
 
 async function setupLinkApi(action: "send" | "validate" | "complete", body: Record<string, any>) {
-  var headers = action === "send" ? await getAuthHeaders() : { "Content-Type": "application/json" };
-  var res = await fetch("/api/admin/setup-link", {
+  const headers = action === "send" ? await getAuthHeaders() : { "Content-Type": "application/json" };
+  const res = await fetch("/api/admin/setup-link", {
     method: "POST",
     headers,
     body: JSON.stringify({ action, ...body }),
   });
-  var data: any = await res.json().catch(() => ({}));
+  const data: any = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Setup-link request failed");
   return data;
 }
@@ -59,7 +59,7 @@ export async function sendAdminSetupLink(
   reason = "ADMIN_INVITE",
   businessId?: string,
 ) {
-  var data = await setupLinkApi("send", {
+  const data = await setupLinkApi("send", {
     admin_id: admin.id,
     reason,
     business_id: businessId || null,
@@ -69,7 +69,7 @@ export async function sendAdminSetupLink(
 
 export async function validateAdminSetupToken(email: string, token: string) {
   try {
-    var data = await setupLinkApi("validate", {
+    const data = await setupLinkApi("validate", {
       email: email.trim().toLowerCase(),
       token,
     });
@@ -84,7 +84,7 @@ export async function validateAdminSetupToken(email: string, token: string) {
 }
 
 export async function completeAdminPasswordSetup(email: string, token: string, newPassword: string) {
-  var data = await setupLinkApi("complete", {
+  const data = await setupLinkApi("complete", {
     email: email.trim().toLowerCase(),
     token,
     password: newPassword,

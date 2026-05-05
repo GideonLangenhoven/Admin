@@ -21,10 +21,10 @@ import { SOCIAL_PLATFORMS } from "./social-icons";
 
 /* ── Shared styling helpers ── */
 
-var inputCls = "rounded-lg border px-2 py-1.5 text-xs";
-var inputStyle = { borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" };
-var labelCls = "text-[10px] font-semibold uppercase tracking-wider";
-var labelStyle = { color: "var(--ck-text-muted)" };
+const inputCls = "rounded-lg border px-2 py-1.5 text-xs";
+const inputStyle = { borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" };
+const labelCls = "text-[10px] font-semibold uppercase tracking-wider";
+const labelStyle = { color: "var(--ck-text-muted)" };
 
 function Label({ children }: { children: string }) {
   return <span className={labelCls} style={labelStyle}>{children}</span>;
@@ -75,7 +75,7 @@ export function BlockEditor({
 
 /* ── Individual editors ── */
 
-var EMAIL_FONTS = [
+const EMAIL_FONTS = [
   { label: "Default", value: "" },
   { label: "Arial", value: "Arial, Helvetica, sans-serif" },
   { label: "Georgia", value: "Georgia, serif" },
@@ -88,7 +88,7 @@ var EMAIL_FONTS = [
   { label: "Lucida Sans", value: "'Lucida Sans Unicode', 'Lucida Grande', sans-serif" },
 ];
 
-var FONT_WEIGHTS = [
+const FONT_WEIGHTS = [
   { label: "Light", value: "300" },
   { label: "Normal", value: "400" },
   { label: "Medium", value: "500" },
@@ -97,12 +97,12 @@ var FONT_WEIGHTS = [
   { label: "Extra Bold", value: "800" },
 ];
 
-var FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
+const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
 
 function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Partial<TextBlock>) => void }) {
-  var editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   // Track whether the user is actively editing so we don't clobber the DOM
-  var editingRef = useRef(false);
+  const editingRef = useRef(false);
 
   function execCmd(cmd: string) {
     // Re-focus the editor before executing (toolbar clicks steal focus)
@@ -126,15 +126,15 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
   }
 
   // Only set innerHTML from props when NOT actively editing (initial load / block switch)
-  var lastSetRef = useRef(block.content);
+  const lastSetRef = useRef(block.content);
   if (editorRef.current && !editingRef.current && block.content !== lastSetRef.current) {
     editorRef.current.innerHTML = block.content;
     lastSetRef.current = block.content;
   }
 
-  var btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-bg-subtle)] transition-colors";
-  var btnActive = "bg-[var(--ck-bg-subtle)]";
-  var selectCls = "rounded border px-1.5 py-1 text-[11px] outline-none";
+  const btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-bg-subtle)] transition-colors";
+  const btnActive = "bg-[var(--ck-bg-subtle)]";
+  const selectCls = "rounded border px-1.5 py-1 text-[11px] outline-none";
 
   return (
     <div>
@@ -332,10 +332,10 @@ function HeaderEditor({ block, onUpdate }: { block: HeaderBlock; onUpdate: (u: P
 }
 
 function SocialEditor({ block, onUpdate }: { block: SocialBlock; onUpdate: (u: Partial<SocialBlock>) => void }) {
-  var [expanded, setExpanded] = useState<string[]>(Object.keys(block.platforms));
+  const [expanded, setExpanded] = useState<string[]>(Object.keys(block.platforms));
 
   function togglePlatform(key: string) {
-    var next = { ...block.platforms };
+    const next = { ...block.platforms };
     if (key in next) {
       delete next[key];
       setExpanded(expanded.filter((k) => k !== key));
@@ -421,28 +421,28 @@ function QuoteEditor({ block, onUpdate, onUpload }: { block: QuoteBlock; onUpdat
 }
 
 function ColumnsEditor({ block, onUpdate }: { block: ColumnsBlock; onUpdate: (u: Partial<ColumnsBlock>) => void }) {
-  var ALLOWED_TYPES = ["text", "image", "button"] as const;
+  const ALLOWED_TYPES = ["text", "image", "button"] as const;
 
   function addSubBlock(colIdx: number, type: Block["type"]) {
-    var cols = block.columns.map((c) => [...c]);
+    const cols = block.columns.map((c) => [...c]);
     cols[colIdx].push(createBlock(type));
     onUpdate({ columns: cols });
   }
 
   function removeSubBlock(colIdx: number, blockIdx: number) {
-    var cols = block.columns.map((c) => [...c]);
+    const cols = block.columns.map((c) => [...c]);
     cols[colIdx].splice(blockIdx, 1);
     onUpdate({ columns: cols });
   }
 
   function updateSubBlock(colIdx: number, blockIdx: number, updates: Partial<Block>) {
-    var cols = block.columns.map((c) => [...c]);
+    const cols = block.columns.map((c) => [...c]);
     cols[colIdx][blockIdx] = { ...cols[colIdx][blockIdx], ...updates } as Block;
     onUpdate({ columns: cols });
   }
 
   function setColumnCount(n: 2 | 3) {
-    var cols = [...block.columns.map((c) => [...c])];
+    const cols = [...block.columns.map((c) => [...c])];
     while (cols.length < n) cols.push([]);
     while (cols.length > n) cols.pop();
     onUpdate({ columnCount: n, columns: cols });
@@ -538,7 +538,7 @@ function FooterEditor({ block, onUpdate }: { block: FooterBlock; onUpdate: (u: P
   }
 
   function toggleSocial(key: string) {
-    var next = { ...block.socials };
+    const next = { ...block.socials };
     if (key in next) {
       delete next[key];
     } else {

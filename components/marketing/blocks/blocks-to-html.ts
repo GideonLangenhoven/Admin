@@ -38,16 +38,16 @@ function blockToHtml(b: Block): string {
       return `<div style="height:${b.height}px;line-height:${b.height}px;font-size:1px;">&nbsp;</div>`;
 
     case "header": {
-      var sizes: Record<string, string> = { h1: "28px", h2: "22px", h3: "18px" };
-      var weights: Record<string, string> = { h1: "700", h2: "600", h3: "600" };
+      const sizes: Record<string, string> = { h1: "28px", h2: "22px", h3: "18px" };
+      const weights: Record<string, string> = { h1: "700", h2: "600", h3: "600" };
       return `<${b.level} style="margin:0;padding:8px 0;font-size:${sizes[b.level]};font-weight:${weights[b.level]};color:${escapeAttr(b.color || "#111827")};">${escapeAttr(b.text)}</${b.level}>`;
     }
 
     case "social": {
-      var links = Object.entries(b.platforms)
+      const links = Object.entries(b.platforms)
         .filter(([, url]) => url.trim())
         .map(([key, url]) => {
-          var platform = SOCIAL_PLATFORMS[key];
+          const platform = SOCIAL_PLATFORMS[key];
           if (!platform) return "";
           return `<a href="${escapeAttr(url)}" target="_blank" style="display:inline-block;margin:0 5px;text-decoration:none;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="36" height="36" style="display:block;border-radius:8px;" /></a>`;
         })
@@ -57,7 +57,7 @@ function blockToHtml(b: Block): string {
     }
 
     case "video": {
-      var thumb = b.thumbnailUrl || autoThumbnail(b.url);
+      const thumb = b.thumbnailUrl || autoThumbnail(b.url);
       return `<div style="padding:8px 0;text-align:center;">
 <a href="${escapeAttr(b.url)}" style="display:inline-block;position:relative;text-decoration:none;">
 <img src="${escapeAttr(thumb)}" alt="Video" style="max-width:100%;height:auto;border-radius:8px;display:block;" />
@@ -69,10 +69,10 @@ function blockToHtml(b: Block): string {
     }
 
     case "quote": {
-      var photoHtml = b.photoUrl
+      const photoHtml = b.photoUrl
         ? `<img src="${escapeAttr(b.photoUrl)}" alt="" style="width:40px;height:40px;border-radius:50%;margin-right:10px;vertical-align:middle;" />`
         : "";
-      var attrHtml = b.attribution
+      const attrHtml = b.attribution
         ? `<div style="margin-top:8px;font-size:13px;color:#6b7280;">${photoHtml}${escapeAttr(b.attribution)}</div>`
         : "";
       return `<div style="padding:12px 0;">
@@ -84,8 +84,8 @@ ${attrHtml}
     }
 
     case "columns": {
-      var colWidth = b.columnCount === 2 ? "50%" : "33.3333%";
-      var tds = b.columns
+      const colWidth = b.columnCount === 2 ? "50%" : "33.3333%";
+      const tds = b.columns
         .map(
           (col) =>
             `<td class="col-cell" style="width:${colWidth};vertical-align:top;padding:0 8px;">${col.map(blockToHtml).join("")}</td>`
@@ -98,11 +98,11 @@ ${attrHtml}
       if (!b.targetDate) {
         return `<div style="padding:16px 0;text-align:center;font-size:15px;color:#6b7280;">${escapeAttr(b.label || "Countdown")}: set a target date</div>`;
       }
-      var target = new Date(b.targetDate);
-      var now = new Date();
-      var diffMs = target.getTime() - now.getTime();
-      var days = Math.max(0, Math.floor(diffMs / 86400000));
-      var hours = Math.max(0, Math.floor((diffMs % 86400000) / 3600000));
+      const target = new Date(b.targetDate);
+      const now = new Date();
+      const diffMs = target.getTime() - now.getTime();
+      const days = Math.max(0, Math.floor(diffMs / 86400000));
+      const hours = Math.max(0, Math.floor((diffMs % 86400000) / 3600000));
       return `<div style="padding:16px 0;text-align:center;">
 <div style="font-size:13px;color:#6b7280;margin-bottom:6px;">${escapeAttr(b.label)}</div>
 <div style="font-size:28px;font-weight:700;color:#111827;">${days}d ${hours}h</div>
@@ -110,7 +110,7 @@ ${attrHtml}
     }
 
     case "tourcard": {
-      var imgHtml = b.imageUrl
+      const imgHtml = b.imageUrl
         ? `<img src="${escapeAttr(b.imageUrl)}" alt="${escapeAttr(b.title)}" style="width:100%;height:auto;border-radius:8px 8px 0 0;display:block;" />`
         : `<div style="height:160px;background:#e5e7eb;border-radius:8px 8px 0 0;"></div>`;
       return `<div style="padding:8px 0;">
@@ -126,10 +126,10 @@ ${attrHtml}
     }
 
     case "footer": {
-      var socialRow = Object.entries(b.socials || {})
+      const socialRow = Object.entries(b.socials || {})
         .filter(([, url]) => url.trim())
         .map(([key, url]) => {
-          var platform = SOCIAL_PLATFORMS[key];
+          const platform = SOCIAL_PLATFORMS[key];
           if (!platform) return "";
           return `<a href="${escapeAttr(url)}" target="_blank" style="display:inline-block;margin:0 4px;"><img src="${escapeAttr(platform.icon)}" alt="${escapeAttr(platform.label)}" width="28" height="28" style="display:block;border-radius:6px;" /></a>`;
         })
@@ -153,7 +153,7 @@ ${socialRow ? `<div style="margin-top:8px;">${socialRow}</div>` : ""}
 function autoThumbnail(url: string): string {
   if (!url) return "";
   // YouTube
-  var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
   if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
   // Vimeo — can't reliably get thumb without API, use placeholder
   return "";
@@ -161,7 +161,7 @@ function autoThumbnail(url: string): string {
 
 /* ── Head styles (responsive columns) ── */
 
-var HEAD_STYLES = `<style>
+const HEAD_STYLES = `<style>
 @media (max-width: 480px) {
   .col-cell { display:block!important; width:100%!important; padding:0 0 8px 0!important; }
 }
@@ -170,7 +170,7 @@ var HEAD_STYLES = `<style>
 /* ── Full document compiler ── */
 
 export function blocksToHtml(blocks: Block[]): string {
-  var inner = blocks.map(blockToHtml).join("\n");
+  const inner = blocks.map(blockToHtml).join("\n");
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${HEAD_STYLES}</head>

@@ -11,12 +11,12 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createServiceClient();
 
 function getCors(req?: any) {
-  var origin = (req && req.headers) ? req.headers.get("origin") || "" : "";
+  const origin = (req && req.headers) ? req.headers.get("origin") || "" : "";
   // Allow any origin — this is a customer-facing function invoked from booking sites
   return {
     "Access-Control-Allow-Origin": origin || "*",
@@ -27,17 +27,17 @@ function getCors(req?: any) {
 }
 
 function genVoucherCode() {
-  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  var code = "";
-  for (var i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const code = "";
+  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
 }
 
 // Insert a voucher with retry on unique constraint violation (code collision)
 async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
-  for (var attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) payload.code = genVoucherCode();
-    var { data, error } = await supabase.from("vouchers").insert(payload).select().single();
+    const { data, error } = await supabase.from("vouchers").insert(payload).select().single();
     if (!error) return { data, error: null };
     // Postgres unique_violation error code
     if (error.code === "23505" && attempt < maxRetries - 1) continue;
@@ -56,34 +56,34 @@ function fail(req: any, msg: string, status: number) {
 
 // ───── RESCHEDULE ─────
 async function handleReschedule(req: any, booking: any, body: any) {
-  var newSlotId = body.new_slot_id;
+  const newSlotId = body.new_slot_id;
   if (!newSlotId) return fail(req, "new_slot_id required for RESCHEDULE", 400);
 
-  var slotRes = await supabase
+  const slotRes = await supabase
     .from("slots")
     .select("id, tour_id, start_time, capacity_total, booked, held, price_per_person_override")
     .eq("id", newSlotId)
     .single();
   if (slotRes.error || !slotRes.data) return fail(req, "New slot not found", 404);
-  var newSlot = slotRes.data;
+  const newSlot = slotRes.data;
 
   // Enforce same-activity rescheduling: new slot must be for the same tour
   if (newSlot.tour_id !== booking.tour_id) {
     return fail(req, "Cannot reschedule to a different activity", 400);
   }
 
-  var available = newSlot.capacity_total - (newSlot.booked || 0) - (newSlot.held || 0);
+  const available = newSlot.capacity_total - (newSlot.booked || 0) - (newSlot.held || 0);
   if (available < booking.qty) return fail(req, "Not enough capacity on new slot (" + available + " available, need " + booking.qty + ")", 400);
 
   // Calculate price diff
-  var oldUnitPrice = Number(booking.unit_price || 0);
-  var newTourRes = await supabase.from("tours").select("base_price_per_person").eq("id", newSlot.tour_id).single();
-  var newBasePrice = (newTourRes.data && newTourRes.data.base_price_per_person) ? Number(newTourRes.data.base_price_per_person) : oldUnitPrice;
-  var newUnitPrice = (newSlot.price_per_person_override != null) ? Number(newSlot.price_per_person_override) : newBasePrice;
-  var newTotalAmount = newUnitPrice * booking.qty;
-  var diff = newTotalAmount - Number(booking.total_amount || 0);
+  const oldUnitPrice = Number(booking.unit_price || 0);
+  const newTourRes = await supabase.from("tours").select("base_price_per_person").eq("id", newSlot.tour_id).single();
+  const newBasePrice = (newTourRes.data && newTourRes.data.base_price_per_person) ? Number(newTourRes.data.base_price_per_person) : oldUnitPrice;
+  const newUnitPrice = (newSlot.price_per_person_override != null) ? Number(newSlot.price_per_person_override) : newBasePrice;
+  const newTotalAmount = newUnitPrice * booking.qty;
+  const diff = newTotalAmount - Number(booking.total_amount || 0);
 
-  var result: any = { ok: true, action: "RESCHEDULE", diff: diff };
+  const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
 
   if (diff > 0) {
     // ── UPGRADE: customer owes more ──
@@ -92,8 +92,8 @@ async function handleReschedule(req: any, booking: any, body: any) {
     // The actual swap happens only when payment is confirmed (yoco-webhook).
 
     // 1. Create a 15-minute hold on the new slot
-    var holdExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    var holdRes = await supabase.from("holds").insert({
+    const holdExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const holdRes = await supabase.from("holds").insert({
       booking_id: booking.id,
       slot_id: newSlotId,
       expires_at: holdExpiry,
@@ -113,13 +113,13 @@ async function handleReschedule(req: any, booking: any, body: any) {
     }
 
     // 2. Increment held count on new slot
-    var heldSlotRes = await supabase.from("slots").select("held").eq("id", newSlotId).single();
+    const heldSlotRes = await supabase.from("slots").select("held").eq("id", newSlotId).single();
     if (heldSlotRes.data) {
       await supabase.from("slots").update({ held: (heldSlotRes.data.held || 0) + booking.qty }).eq("id", newSlotId);
     }
 
     // 3. Create pending_reschedule record
-    var pendingRes = await supabase.from("pending_reschedules").insert({
+    const pendingRes = await supabase.from("pending_reschedules").insert({
       booking_id: booking.id,
       business_id: booking.business_id,
       old_slot_id: booking.slot_id,
@@ -143,7 +143,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
     }
 
     // 4. Create checkout with reschedule metadata
-    var checkoutRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+    const checkoutRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
       body: JSON.stringify({
@@ -154,7 +154,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
         pending_reschedule_id: pendingRes.data.id,
       }),
     });
-    var checkoutData = await checkoutRes.json();
+    const checkoutData = await checkoutRes.json();
     if (checkoutData && checkoutData.redirectUrl) {
       result.payment_url = checkoutData.redirectUrl;
     }
@@ -181,7 +181,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
     // ── SAME PRICE OR DOWNGRADE: immediate swap ──
 
     // Decrement old slot booked count
-    var oldSlotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+    const oldSlotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (oldSlotRes.data) {
       await supabase.from("slots").update({ booked: Math.max(0, oldSlotRes.data.booked - booking.qty) }).eq("id", booking.slot_id);
     }
@@ -190,7 +190,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
     await supabase.from("slots").update({ booked: (newSlot.booked || 0) + booking.qty }).eq("id", newSlotId);
 
     // Update booking
-    var updateData: any = {
+    const updateData: any = {
       slot_id: newSlotId,
       tour_id: newSlot.tour_id,
       unit_price: newUnitPrice,
@@ -218,7 +218,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
       }
       // If paid via manual method, flag for manual refund
       if (isManualPayment(booking)) {
-        var manualDiffRefund = Math.abs(diff) * 0.95;
+        const manualDiffRefund = Math.abs(diff) * 0.95;
         await supabase.from("bookings").update({
           refund_status: "MANUAL_EFT_REQUIRED",
           refund_amount: manualDiffRefund,
@@ -227,10 +227,10 @@ async function handleReschedule(req: any, booking: any, body: any) {
         result.refund_amount = manualDiffRefund;
         result.refund_status = "MANUAL_EFT_REQUIRED";
       } else {
-        var rescheduleTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
-        var rescheduleTotalRefunded = Number(booking.total_refunded || 0);
-        var rescheduleRefundable = rescheduleTotalCaptured - rescheduleTotalRefunded;
-        var refundAmount = Math.min(Math.abs(diff) * 0.95, rescheduleRefundable);
+        const rescheduleTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
+        const rescheduleTotalRefunded = Number(booking.total_refunded || 0);
+        const rescheduleRefundable = rescheduleTotalCaptured - rescheduleTotalRefunded;
+        const refundAmount = Math.min(Math.abs(diff) * 0.95, rescheduleRefundable);
         await supabase.from("bookings").update({
           refund_status: "REQUESTED",
           refund_amount: refundAmount,
@@ -239,9 +239,9 @@ async function handleReschedule(req: any, booking: any, body: any) {
         result.refund_amount = refundAmount;
       }
     } else if (diff < 0 && body.excess_action === "VOUCHER") {
-      var voucherAmount = Math.abs(diff);
-      var vcode = genVoucherCode();
-      var vResult = await insertVoucherWithRetry({
+      const voucherAmount = Math.abs(diff);
+      const vcode = genVoucherCode();
+      const vResult = await insertVoucherWithRetry({
         business_id: booking.business_id,
         code: vcode,
         status: "ACTIVE",
@@ -265,17 +265,17 @@ async function handleReschedule(req: any, booking: any, body: any) {
 
 // ───── ADD_GUESTS ─────
 async function handleAddGuests(req: any, booking: any, body: any) {
-  var newQty = Number(body.new_qty || 0);
+  const newQty = Number(body.new_qty || 0);
   if (newQty <= booking.qty) return fail(req, "new_qty must be greater than current qty (" + booking.qty + ")", 400);
 
-  var additionalGuests = newQty - booking.qty;
-  var unitPrice = Number(booking.unit_price || 0);
-  var additionalCost = additionalGuests * unitPrice;
-  var newTotal = Number(booking.total_amount || 0) + additionalCost;
+  const additionalGuests = newQty - booking.qty;
+  const unitPrice = Number(booking.unit_price || 0);
+  const additionalCost = additionalGuests * unitPrice;
+  const newTotal = Number(booking.total_amount || 0) + additionalCost;
 
   // Atomic capacity check + hold for the additional guests
-  var holdExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  var holdResult = await supabase.rpc("create_hold_with_capacity_check", {
+  const holdExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const holdResult = await supabase.rpc("create_hold_with_capacity_check", {
     p_booking_id: booking.id,
     p_slot_id: booking.slot_id,
     p_qty: additionalGuests,
@@ -286,7 +286,7 @@ async function handleAddGuests(req: any, booking: any, body: any) {
     return fail(req, holdResult.data?.error || "Not enough spots available", 400);
   }
 
-  var holdId = holdResult.data.hold_id;
+  const holdId = holdResult.data.hold_id;
 
   await supabase.from("logs").insert({
     business_id: booking.business_id,
@@ -295,10 +295,10 @@ async function handleAddGuests(req: any, booking: any, body: any) {
     payload: { old_qty: booking.qty, new_qty: newQty, additional_cost: additionalCost, hold_id: holdId },
   });
 
-  var result: any = { ok: true, action: "ADD_GUESTS", diff: additionalCost, hold_id: holdId };
+  const result: any = { ok: true, action: "ADD_GUESTS", diff: additionalCost, hold_id: holdId };
 
   // Create checkout for additional amount — pass hold_id so yoco-webhook can convert it
-  var checkoutRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+  const checkoutRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
     body: JSON.stringify({
@@ -310,7 +310,7 @@ async function handleAddGuests(req: any, booking: any, body: any) {
       new_qty: newQty,
     }),
   });
-  var checkoutData = await checkoutRes.json();
+  const checkoutData = await checkoutRes.json();
   if (checkoutData && checkoutData.redirectUrl) {
     result.payment_url = checkoutData.redirectUrl;
   }
@@ -320,25 +320,25 @@ async function handleAddGuests(req: any, booking: any, body: any) {
 
 // ───── REMOVE_GUESTS ─────
 async function handleRemoveGuests(req: any, booking: any, body: any) {
-  var newQty = Number(body.new_qty || 0);
+  const newQty = Number(body.new_qty || 0);
   if (newQty < 1) return fail(req, "new_qty must be at least 1", 400);
   if (newQty >= booking.qty) return fail(req, "new_qty must be less than current qty (" + booking.qty + ")", 400);
 
   // Block guest removal within 24 hours of departure (prevents cancellation loophole)
   if (booking.slots?.start_time) {
-    var hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
+    const hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
     if (hoursUntilTrip < 24 && hoursUntilTrip > 0) {
       return fail(req, "Guest changes are not allowed within 24 hours of departure", 400);
     }
   }
 
-  var removedGuests = booking.qty - newQty;
+  const removedGuests = booking.qty - newQty;
   // Use pro-rata discount math: divide total_amount by current guest count
   // to find the true discounted per-person price (not the base unit_price)
-  var totalAmountPaid = Number(booking.total_amount || 0);
-  var discountedUnitPrice = booking.qty > 0 ? totalAmountPaid / booking.qty : Number(booking.unit_price || 0);
-  var excessAmount = removedGuests * discountedUnitPrice;
-  var newTotal = totalAmountPaid - excessAmount;
+  const totalAmountPaid = Number(booking.total_amount || 0);
+  const discountedUnitPrice = booking.qty > 0 ? totalAmountPaid / booking.qty : Number(booking.unit_price || 0);
+  const excessAmount = removedGuests * discountedUnitPrice;
+  const newTotal = totalAmountPaid - excessAmount;
 
   await supabase.from("bookings").update({
     qty: newQty,
@@ -346,7 +346,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   }).eq("id", booking.id);
 
   // Decrement slot booked count
-  var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+  const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
   if (slotRes.data) {
     await supabase.from("slots").update({
       booked: Math.max(0, (slotRes.data.booked || 0) - removedGuests),
@@ -360,13 +360,13 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
     payload: { old_qty: booking.qty, new_qty: newQty, excess_amount: excessAmount, excess_action: body.excess_action },
   });
 
-  var result: any = { ok: true, action: "REMOVE_GUESTS" };
+  const result: any = { ok: true, action: "REMOVE_GUESTS" };
 
   if (body.excess_action === "REFUND") {
     // If paid via voucher, issue voucher at full value (no 5% penalty) instead of Yoco refund
     if (isVoucherPayment(booking)) {
-      var vcode = genVoucherCode();
-      var vResult = await insertVoucherWithRetry({
+      const vcode = genVoucherCode();
+      const vResult = await insertVoucherWithRetry({
         business_id: booking.business_id,
         code: vcode,
         status: "ACTIVE",
@@ -381,7 +381,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       result.voucher_code = vResult.data.code;
       result.payment_method = booking.payment_method;
     } else if (isManualPayment(booking)) {
-      var manualRefund = excessAmount * 0.95;
+      const manualRefund = excessAmount * 0.95;
       await supabase.from("bookings").update({
         refund_status: "MANUAL_EFT_REQUIRED",
         refund_amount: manualRefund,
@@ -390,10 +390,10 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       result.refund_amount = manualRefund;
       result.refund_status = "MANUAL_EFT_REQUIRED";
     } else {
-      var guestTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
-      var guestTotalRefunded = Number(booking.total_refunded || 0);
-      var guestRefundable = guestTotalCaptured - guestTotalRefunded;
-      var refundAmount = Math.min(excessAmount * 0.95, guestRefundable);
+      const guestTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
+      const guestTotalRefunded = Number(booking.total_refunded || 0);
+      const guestRefundable = guestTotalCaptured - guestTotalRefunded;
+      const refundAmount = Math.min(excessAmount * 0.95, guestRefundable);
       await supabase.from("bookings").update({
         refund_status: "REQUESTED",
         refund_amount: refundAmount,
@@ -402,8 +402,8 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       result.refund_amount = refundAmount;
     }
   } else if (body.excess_action === "VOUCHER") {
-    var vcode = genVoucherCode();
-    var vResult = await insertVoucherWithRetry({
+    const vcode = genVoucherCode();
+    const vResult = await insertVoucherWithRetry({
       business_id: booking.business_id,
       code: vcode,
       status: "ACTIVE",
@@ -425,7 +425,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
 
 // ───── UPDATE_CONTACT ─────
 async function handleUpdateContact(req: any, booking: any, body: any) {
-  var updateData: any = {};
+  const updateData: any = {};
   if (body.contact_name) updateData.customer_name = body.contact_name;
   if (body.contact_email) updateData.email = body.contact_email;
   if (body.contact_phone) updateData.phone = normalizePhone(body.contact_phone);
@@ -446,10 +446,10 @@ async function handleUpdateContact(req: any, booking: any, body: any) {
 
 // ───── SPECIAL_REQUEST ─────
 async function handleSpecialRequest(req: any, booking: any, body: any) {
-  var specialRequests = body.special_requests || "";
+  const specialRequests = body.special_requests || "";
   if (!specialRequests) return fail(req, "special_requests required", 400);
 
-  var existingFields = booking.custom_fields || {};
+  let existingFields = booking.custom_fields || {};
   if (typeof existingFields !== "object" || Array.isArray(existingFields)) {
     existingFields = {};
   }
@@ -469,30 +469,30 @@ async function handleSpecialRequest(req: any, booking: any, body: any) {
 
 // ───── Helper: check if booking was paid via voucher ─────
 function isVoucherPayment(booking: any): boolean {
-  var pm = (booking.payment_method || "").toUpperCase();
+  const pm = (booking.payment_method || "").toUpperCase();
   return pm === "VOUCHER" || pm === "GIFT_VOUCHER";
 }
 
 // ───── Helper: check if booking was paid via manual method (cash/EFT) ─────
 function isManualPayment(booking: any): boolean {
-  var pm = (booking.payment_method || "").toUpperCase();
+  const pm = (booking.payment_method || "").toUpperCase();
   return pm === "MANUAL" || pm === "CASH" || pm === "EFT";
 }
 
 // ───── Helper: check if booking was paid via split tender (voucher + cash/Yoco) ─────
 function isSplitTenderPayment(booking: any): boolean {
-  var pm = (booking.payment_method || "").toUpperCase();
+  const pm = (booking.payment_method || "").toUpperCase();
   return pm === "SPLIT" || pm === "SPLIT_TENDER" || pm === "VOUCHER_PARTIAL";
 }
 
 // ───── Helper: derive voucher and cash portions from a booking ─────
 function getSplitTenderAmounts(booking: any): { voucherPortion: number; cashPortion: number } {
-  var voucherPortion = Number(booking.voucher_amount_paid || 0);
-  var cashPortion = Number(booking.cash_amount_paid || 0);
+  let voucherPortion = Number(booking.voucher_amount_paid || 0);
+  let cashPortion = Number(booking.cash_amount_paid || 0);
   // If split amounts are not explicitly stored, try to derive from total
   if (voucherPortion === 0 && cashPortion === 0) {
-    var totalAmount = Number(booking.total_amount || 0);
-    var totalCaptured = Number(booking.total_captured || 0);
+    const totalAmount = Number(booking.total_amount || 0);
+    const totalCaptured = Number(booking.total_captured || 0);
     // total_captured represents Yoco portion; the rest was voucher
     if (totalCaptured > 0 && totalCaptured < totalAmount) {
       cashPortion = totalCaptured;
@@ -504,7 +504,7 @@ function getSplitTenderAmounts(booking: any): { voucherPortion: number; cashPort
 
 // ───── CANCEL_REFUND ─────
 async function handleCancelRefund(req: any, booking: any) {
-  var totalAmount = Number(booking.total_amount || 0);
+  const totalAmount = Number(booking.total_amount || 0);
 
   // If paid via voucher only, issue a voucher at full value (no 5% penalty) instead of Yoco refund
   if (isVoucherPayment(booking)) {
@@ -517,23 +517,23 @@ async function handleCancelRefund(req: any, booking: any) {
   }
 
   // Calculate refund percent from policy tiers
-  var policyPercent = 95;
-  var tourStart = booking.slots?.start_time;
+  const policyPercent = 95;
+  const tourStart = booking.slots?.start_time;
   if (tourStart && booking.business_id) {
-    var { data: pctData } = await supabase.rpc("calculate_refund_percent", {
+    const { data: pctData } = await supabase.rpc("calculate_refund_percent", {
       p_business_id: booking.business_id,
       p_tour_start: tourStart,
     });
     if (typeof pctData === "number") policyPercent = pctData;
   }
-  var policyFraction = policyPercent / 100;
+  const policyFraction = policyPercent / 100;
 
   // If paid via manual method (cash/EFT), skip Yoco and flag for manual refund
   if (isManualPayment(booking)) {
-    var totalCaptured = Number(booking.total_captured || totalAmount);
-    var totalRefunded = Number(booking.total_refunded || 0);
-    var refundableAmount = totalCaptured - totalRefunded;
-    var manualRefundAmount = refundableAmount * policyFraction;
+    const totalCaptured = Number(booking.total_captured || totalAmount);
+    const totalRefunded = Number(booking.total_refunded || 0);
+    const refundableAmount = totalCaptured - totalRefunded;
+    const manualRefundAmount = refundableAmount * policyFraction;
 
     await supabase.from("bookings").update({
       status: "CANCELLED",
@@ -545,7 +545,7 @@ async function handleCancelRefund(req: any, booking: any) {
     }).eq("id", booking.id);
 
     if (booking.slot_id) {
-      var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+      const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
       if (slotRes.data) {
         await supabase.from("slots").update({
           booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
@@ -565,10 +565,10 @@ async function handleCancelRefund(req: any, booking: any) {
     return ok(req, { ok: true, action: "CANCEL_REFUND", refund_status: "MANUAL_EFT_REQUIRED", refund_amount: manualRefundAmount, message: "Booking cancelled. Admin must process refund manually (payment was " + booking.payment_method + ")." });
   }
 
-  var totalCaptured = Number(booking.total_captured || totalAmount);
-  var totalRefunded = Number(booking.total_refunded || 0);
-  var refundableAmount = totalCaptured - totalRefunded;
-  var refundAmount = refundableAmount * policyFraction;
+  const totalCaptured = Number(booking.total_captured || totalAmount);
+  const totalRefunded = Number(booking.total_refunded || 0);
+  const refundableAmount = totalCaptured - totalRefunded;
+  const refundAmount = refundableAmount * policyFraction;
 
   await supabase.from("bookings").update({
     status: "CANCELLED",
@@ -581,7 +581,7 @@ async function handleCancelRefund(req: any, booking: any) {
 
   // Release slot capacity
   if (booking.slot_id) {
-    var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+    const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
       await supabase.from("slots").update({
         booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
@@ -600,11 +600,11 @@ async function handleCancelRefund(req: any, booking: any) {
   });
 
   // Send cancellation notifications
-  var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var currency = tenant.business.currency || "ZAR";
+  const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const currency = tenant.business.currency || "ZAR";
 
   if (booking.phone) {
     try {
@@ -648,9 +648,9 @@ async function handleCancelRefund(req: any, booking: any) {
 
 // ───── CANCEL_REFUND for voucher-paid bookings (issue voucher, no 5% penalty) ─────
 async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: number) {
-  var vcode = genVoucherCode();
+  const vcode = genVoucherCode();
 
-  var vr = await insertVoucherWithRetry({
+  const vr = await insertVoucherWithRetry({
     business_id: booking.business_id,
     code: vcode,
     status: "ACTIVE",
@@ -662,7 +662,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
   });
   if (vr.error) return fail(req, "Voucher creation failed: " + vr.error.message, 500);
 
-  var voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
+  const voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
 
   await supabase.from("bookings").update({
     status: "CANCELLED",
@@ -673,7 +673,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
 
   // Release slot capacity
   if (booking.slot_id) {
-    var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+    const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
       await supabase.from("slots").update({
         booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
@@ -692,11 +692,11 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
   });
 
   // Send voucher notification
-  var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var currency = tenant.business.currency || "ZAR";
+  const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const currency = tenant.business.currency || "ZAR";
 
   if (booking.phone) {
     try {
@@ -743,19 +743,19 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
 // ───── CANCEL_REFUND for split-tender bookings (voucher + Yoco) ─────
 // Pro-rata: restore voucher portion fully, deduct 5% cancellation fee from cash (Yoco) portion only
 async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount: number, policyPercent: number) {
-  var split = getSplitTenderAmounts(booking);
-  var cancellationFee = totalAmount * ((100 - policyPercent) / 100);
-  var yocoRefundAmount = Math.max(0, split.cashPortion - cancellationFee);
-  var totalRefunded = Number(booking.total_refunded || 0);
+  const split = getSplitTenderAmounts(booking);
+  const cancellationFee = totalAmount * ((100 - policyPercent) / 100);
+  let yocoRefundAmount = Math.max(0, split.cashPortion - cancellationFee);
+  const totalRefunded = Number(booking.total_refunded || 0);
 
   // Cap Yoco refund at actual Yoco capture amount
-  var totalCaptured = Number(booking.total_captured || split.cashPortion);
-  var yocoRefundable = totalCaptured - totalRefunded;
+  const totalCaptured = Number(booking.total_captured || split.cashPortion);
+  const yocoRefundable = totalCaptured - totalRefunded;
   yocoRefundAmount = Math.min(yocoRefundAmount, yocoRefundable);
 
   // 1. Restore voucher portion fully (create new voucher)
-  var vcode = genVoucherCode();
-  var vr = await insertVoucherWithRetry({
+  const vcode = genVoucherCode();
+  const vr = await insertVoucherWithRetry({
     business_id: booking.business_id,
     code: vcode,
     status: "ACTIVE",
@@ -767,7 +767,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   });
   if (vr.error) return fail(req, "Voucher creation failed: " + vr.error.message, 500);
 
-  var voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
+  const voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
 
   // 2. Update booking status
   await supabase.from("bookings").update({
@@ -782,7 +782,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
 
   // 3. Release slot capacity
   if (booking.slot_id) {
-    var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+    const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
       await supabase.from("slots").update({
         booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
@@ -811,11 +811,11 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   });
 
   // 5. Send notifications
-  var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var currency = tenant.business.currency || "ZAR";
+  const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const currency = tenant.business.currency || "ZAR";
 
   if (booking.phone) {
     try {
@@ -869,10 +869,10 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
 
 // ───── CANCEL_VOUCHER ─────
 async function handleCancelVoucher(req: any, booking: any) {
-  var totalAmount = Number(booking.total_amount || 0);
-  var vcode = genVoucherCode();
+  const totalAmount = Number(booking.total_amount || 0);
+  const vcode = genVoucherCode();
 
-  var vr = await insertVoucherWithRetry({
+  const vr = await insertVoucherWithRetry({
     business_id: booking.business_id,
     code: vcode,
     status: "ACTIVE",
@@ -884,7 +884,7 @@ async function handleCancelVoucher(req: any, booking: any) {
   });
   if (vr.error) return fail(req, "Voucher creation failed: " + vr.error.message, 500);
 
-  var voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
+  const voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
 
   await supabase.from("bookings").update({
     status: "CANCELLED",
@@ -895,7 +895,7 @@ async function handleCancelVoucher(req: any, booking: any) {
 
   // Release slot capacity
   if (booking.slot_id) {
-    var slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+    const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
       await supabase.from("slots").update({
         booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
@@ -914,11 +914,11 @@ async function handleCancelVoucher(req: any, booking: any) {
   });
 
   // Send voucher notification
-  var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var currency = tenant.business.currency || "ZAR";
+  const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const currency = tenant.business.currency || "ZAR";
 
   if (booking.phone) {
     try {
@@ -964,11 +964,11 @@ async function handleCancelVoucher(req: any, booking: any) {
 // ───── Notification helper ─────
 async function sendRebookNotification(booking: any, event: string, message: string) {
   try {
-    var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-    var ref = booking.id.substring(0, 8).toUpperCase();
-    var tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
-    var brandName = getBusinessDisplayName(tenant.business);
-    var slotTime = (booking.slots && booking.slots.start_time)
+    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const ref = booking.id.substring(0, 8).toUpperCase();
+    const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+    const brandName = getBusinessDisplayName(tenant.business);
+    const slotTime = (booking.slots && booking.slots.start_time)
       ? formatTenantDateTime(tenant.business, booking.slots.start_time)
       : "";
 
@@ -1016,26 +1016,26 @@ Deno.serve(async function (req: any) {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
-    var body = await req.json();
-    var bookingId = String(body.booking_id || "");
-    var action = String(body.action || "");
+    const body = await req.json();
+    const bookingId = String(body.booking_id || "");
+    const action = String(body.action || "");
 
     if (!bookingId) return fail(req, "booking_id required", 400);
     if (!action) return fail(req, "action required", 400);
 
-    var validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "CANCEL_REFUND", "CANCEL_VOUCHER"];
+    const validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "CANCEL_REFUND", "CANCEL_VOUCHER"];
     if (validActions.indexOf(action) === -1) {
       return fail(req, "Invalid action. Must be one of: " + validActions.join(", "), 400);
     }
 
-    var br = await supabase
+    const br = await supabase
       .from("bookings")
       .select("*, slots(start_time, capacity_total, booked, held, price_per_person_override), tours(name, base_price_per_person)")
       .eq("id", bookingId)
       .single();
 
     if (br.error || !br.data) return fail(req, "Booking not found", 404);
-    var booking = br.data;
+    const booking = br.data;
 
     // For modification actions, booking must be in a modifiable state
     if (action !== "UPDATE_CONTACT" && action !== "SPECIAL_REQUEST") {

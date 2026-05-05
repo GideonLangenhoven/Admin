@@ -14,7 +14,7 @@ import { BlockEditor } from "./blocks/block-editors";
 
 /* ── Toolbar block definitions ── */
 
-var BLOCK_DEFS: { type: Block["type"]; label: string; icon: React.ReactNode }[] = [
+const BLOCK_DEFS: { type: Block["type"]; label: string; icon: React.ReactNode }[] = [
   { type: "text", label: "Text", icon: <TextT size={12} /> },
   { type: "image", label: "Image", icon: <ImageIcon size={12} /> },
   { type: "button", label: "Button", icon: <CursorClick size={12} /> },
@@ -42,19 +42,19 @@ interface EmailBuilderProps {
 }
 
 export default function EmailBuilder({ businessId, initialName, initialSubject, initialCategory, initialBlocks, onSave }: EmailBuilderProps) {
-  var [blocks, setBlocks] = useState<Block[]>(() => {
+  const [blocks, setBlocks] = useState<Block[]>(() => {
     if (initialBlocks && initialBlocks.length > 0) return initialBlocks as Block[];
     return [{ type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>Write your email content here...</p>" }];
   });
-  var [name, setName] = useState(initialName || "");
-  var [subject, setSubject] = useState(initialSubject || "");
-  var [category, setCategory] = useState(initialCategory || "general");
-  var [preview, setPreview] = useState(false);
-  var [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
-  var [dragIndex, setDragIndex] = useState<number | null>(null);
-  var [uploading, setUploading] = useState<string | null>(null);
-  var fileRef = useRef<HTMLInputElement>(null);
-  var uploadBlockId = useRef<string>("");
+  const [name, setName] = useState(initialName || "");
+  const [subject, setSubject] = useState(initialSubject || "");
+  const [category, setCategory] = useState(initialCategory || "general");
+  const [preview, setPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadBlockId = useRef<string>("");
 
   function addBlock(type: Block["type"]) {
     setBlocks([...blocks, createBlock(type)]);
@@ -69,23 +69,23 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
   }
 
   function moveBlock(index: number, dir: -1 | 1) {
-    var target = index + dir;
+    const target = index + dir;
     if (target < 0 || target >= blocks.length) return;
-    var arr = [...blocks];
+    const arr = [...blocks];
     [arr[index], arr[target]] = [arr[target], arr[index]];
     setBlocks(arr);
   }
 
   // Drag and drop — track by block ID to prevent index drift during rapid drags
-  var dragBlockIdRef = useRef<string | null>(null);
+  const dragBlockIdRef = useRef<string | null>(null);
   function handleDragStart(index: number) { setDragIndex(index); dragBlockIdRef.current = blocks[index]?.id || null; }
   function handleDragOver(e: React.DragEvent, index: number) {
     e.preventDefault();
     if (dragBlockIdRef.current === null) return;
-    var currentIdx = blocks.findIndex(b => b.id === dragBlockIdRef.current);
+    const currentIdx = blocks.findIndex(b => b.id === dragBlockIdRef.current);
     if (currentIdx === -1 || currentIdx === index) return;
-    var arr = [...blocks];
-    var [moved] = arr.splice(currentIdx, 1);
+    const arr = [...blocks];
+    const [moved] = arr.splice(currentIdx, 1);
     arr.splice(index, 0, moved);
     setBlocks(arr);
     setDragIndex(index);
@@ -94,25 +94,25 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
 
   // Image upload to Supabase storage
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    var file = e.target.files?.[0];
+    const file = e.target.files?.[0];
     if (!file) return;
-    var blockId = uploadBlockId.current;
+    const blockId = uploadBlockId.current;
     setUploading(blockId);
 
-    var ext = file.name.split(".").pop() || "png";
-    var path = `${businessId}/${Date.now()}.${ext}`;
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${businessId}/${Date.now()}.${ext}`;
 
-    var { error } = await supabase.storage.from("marketing-assets").upload(path, file, { cacheControl: "3600", upsert: false });
+    const { error } = await supabase.storage.from("marketing-assets").upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) {
       notify({ message: "Upload failed: " + error.message, tone: "error" });
       setUploading(null);
       return;
     }
 
-    var { data: urlData } = supabase.storage.from("marketing-assets").getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from("marketing-assets").getPublicUrl(path);
 
     // Determine which field to update based on block type
-    var block = blocks.find((b) => b.id === blockId);
+    const block = blocks.find((b) => b.id === blockId);
     if (block?.type === "tourcard") {
       updateBlock(blockId, { imageUrl: urlData.publicUrl } as any);
     } else if (block?.type === "quote") {
@@ -131,11 +131,11 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
 
   function handleSave() {
     if (!name.trim()) { notify({ message: "Template name is required.", tone: "warning" }); return; }
-    var html = blocksToHtml(blocks);
+    const html = blocksToHtml(blocks);
     onSave(name.trim(), subject.trim(), category, blocks, html);
   }
 
-  var previewHtml = blocksToHtml(blocks);
+  const previewHtml = blocksToHtml(blocks);
 
   return (
     <div className="space-y-4">

@@ -10,28 +10,28 @@ import {
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 
-var VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") || "";
-var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
-var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
-var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
-var supabase = createServiceClient();
-var GK = Deno.env.get("GEMINI_API_KEY") || "";
+const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") || "";
+const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
+const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
+const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
+const supabase = createServiceClient();
+const GK = Deno.env.get("GEMINI_API_KEY") || "";
 
 // ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
-  var diff = 0;
-  for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  const diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
 }
 
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) return new Uint8Array(0);
-  var out = new Uint8Array(hex.length / 2);
-  for (var i = 0; i < out.length; i++) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
     out[i] = parseInt(hex.substr(i * 2, 2), 16);
   }
   return out;
@@ -43,14 +43,14 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
     return false;
   }
   if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
-  var providedHex = signatureHeader.substring(7);
-  var providedBytes = hexToBytes(providedHex);
+  const providedHex = signatureHeader.substring(7);
+  const providedBytes = hexToBytes(providedHex);
   if (providedBytes.length !== 32) return false;
   try {
-    var keyData = new TextEncoder().encode(WA_APP_SECRET);
-    var key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    var sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
-    var computed = new Uint8Array(sigBuf);
+    const keyData = new TextEncoder().encode(WA_APP_SECRET);
+    const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+    const computed = new Uint8Array(sigBuf);
     return timingSafeEqual(computed, providedBytes);
   } catch (e) {
     console.error("HMAC verify failed:", e);
@@ -59,8 +59,8 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
 }
 
 function withQuery(base: string, params: Record<string, string>) {
-  var url = new URL(base);
-  for (var [key, value] of Object.entries(params)) {
+  const url = new URL(base);
+  for (const [key, value] of Object.entries(params)) {
     if (value) url.searchParams.set(key, value);
   }
   return url.toString();
@@ -87,7 +87,7 @@ function formatTimeOnly(tenant: TenantContext, iso: any, options: Intl.DateTimeF
 }
 
 function getTimeZoneOffsetMs(date: Date, timeZone: string) {
-  var formatter = new Intl.DateTimeFormat("en-CA", {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timeZone,
     year: "numeric",
     month: "2-digit",
@@ -97,12 +97,12 @@ function getTimeZoneOffsetMs(date: Date, timeZone: string) {
     second: "2-digit",
     hourCycle: "h23",
   });
-  var parts = formatter.formatToParts(date);
-  var values: Record<string, string> = {};
-  for (var i = 0; i < parts.length; i++) {
+  const parts = formatter.formatToParts(date);
+  const values: Record<string, string> = {};
+  for (let i = 0; i < parts.length; i++) {
     if (parts[i].type !== "literal") values[parts[i].type] = parts[i].value;
   }
-  var utcTs = Date.UTC(
+  const utcTs = Date.UTC(
     Number(values.year),
     Number(values.month) - 1,
     Number(values.day),
@@ -114,9 +114,9 @@ function getTimeZoneOffsetMs(date: Date, timeZone: string) {
 }
 
 function zonedDateTimeToUtcIso(tenant: TenantContext, dateKey: string, hour: number, minute: number = 0) {
-  var [year, month, day] = dateKey.split("-").map(Number);
-  var guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
-  var offset = getTimeZoneOffsetMs(guess, tenantTimeZone(tenant));
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const offset = getTimeZoneOffsetMs(guess, tenantTimeZone(tenant));
   return new Date(guess.getTime() - offset).toISOString();
 }
 
@@ -143,7 +143,7 @@ function serializeTerminology(terminology: any) {
 }
 
 function getFaqAnswer(tenant: TenantContext, key: string) {
-  var faqJson = tenant.business.faq_json || {};
+  const faqJson = tenant.business.faq_json || {};
   if (faqJson && typeof faqJson === "object" && !Array.isArray(faqJson) && typeof faqJson[key] === "string") {
     return faqJson[key];
   }
@@ -151,15 +151,15 @@ function getFaqAnswer(tenant: TenantContext, key: string) {
 }
 
 function buildGeminiInstruction(tenant: TenantContext, extraContext?: string) {
-  var sections = [
+  const sections = [
     String(tenant.business.ai_system_prompt || "").trim(),
     "Use the tenant FAQ and terminology below. Keep replies short, factual, and never invent availability, pricing, or policies.",
   ];
 
-  var terminologyText = serializeTerminology(tenant.business.terminology);
+  const terminologyText = serializeTerminology(tenant.business.terminology);
   if (terminologyText) sections.push("Terminology: " + terminologyText);
 
-  var faqText = serializeFaqForPrompt(tenant.business.faq_json);
+  const faqText = serializeFaqForPrompt(tenant.business.faq_json);
   if (faqText) sections.push("FAQ:\n" + faqText);
 
   if (extraContext) sections.push("Live context:\n" + extraContext);
@@ -176,19 +176,19 @@ async function getBusinessSiteUrls(tenant: TenantContext) {
 }
 
 async function sendWA(tenant: TenantContext, to: any, body: any) {
-  var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, ...body }),
   });
-  var data = await res.json();
+  const data = await res.json();
   console.log("WA:" + JSON.stringify(data));
 
   // If we get an error about outside the 24 hour window (code 131047 or similar), 
   // we fallback to sending a generic template message to wake the user up.
   if (!res.ok && data.error && (data.error.code === 131047 || (data.error.message && data.error.message.includes("24")))) {
     console.log("Outside 24h window, sending template fallback...");
-    var templateRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+    const templateRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
       method: "POST",
       headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -219,7 +219,7 @@ async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200
 async function gemFallback(tenant: TenantContext, msg: string, extraContext?: string): Promise<string | null> {
   if (!GK) return null;
   try {
-    var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
       method: "POST", headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
@@ -228,15 +228,15 @@ async function gemFallback(tenant: TenantContext, msg: string, extraContext?: st
         generationConfig: { temperature: 0.7, maxOutputTokens: 150 }
       })
     });
-    var d = await r.json();
+    const d = await r.json();
     if (d.candidates?.[0]?.content?.parts?.[0]) return d.candidates[0].content.parts[0].text;
     return null;
   } catch (e) { return null; }
 }
 async function getConvo(tenant: TenantContext, phone: any) {
-  var r = await supabase.from("conversations").select().eq("business_id", tenant.business.id).eq("phone", phone).single();
+  const r = await supabase.from("conversations").select().eq("business_id", tenant.business.id).eq("phone", phone).single();
   if (r.data) return r.data;
-  var r2 = await supabase.from("conversations").insert({ business_id: tenant.business.id, phone: phone, status: "BOT", current_state: "IDLE", state_data: {} }).select().single();
+  const r2 = await supabase.from("conversations").insert({ business_id: tenant.business.id, phone: phone, status: "BOT", current_state: "IDLE", state_data: {} }).select().single();
   return r2.data;
 }
 async function setConvo(id: any, u: any) { await supabase.from("conversations").update({ ...u, updated_at: new Date().toISOString() }).eq("id", id); }
@@ -245,14 +245,14 @@ function fmtTime(tenant: TenantContext, iso: any) { return formatDateTime(tenant
 
 async function getSlotPrice(slot: any) {
   if (slot.price_per_person_override) return Number(slot.price_per_person_override);
-  var t = await supabase.from("tours").select("base_price_per_person").eq("id", slot.tour_id).single();
+  const t = await supabase.from("tours").select("base_price_per_person").eq("id", slot.tour_id).single();
   return Number(t.data?.base_price_per_person || 600);
 }
 async function getAvailSlotsForTour(tenant: TenantContext, tourId: any, days: number = 14) {
-  var later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  const later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   // M5: Add 60-min cutoff — don't show slots starting within the next hour
-  var cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  var r = await supabase.rpc("list_available_slots", {
+  const cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const r = await supabase.rpc("list_available_slots", {
     p_business_id: tenant.business.id,
     p_range_start: cutoff,
     p_range_end: later,
@@ -263,10 +263,10 @@ async function getAvailSlotsForTour(tenant: TenantContext, tourId: any, days: nu
     .map(function (s: any) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0, tours: { name: s.tour_name } }; });
 }
 async function getAvailSlots(tenant: TenantContext, days: number = 14) {
-  var later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  const later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   // M5: Add 60-min cutoff — don't show slots starting within the next hour
-  var cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  var r = await supabase.rpc("list_available_slots", {
+  const cutoff = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const r = await supabase.rpc("list_available_slots", {
     p_business_id: tenant.business.id,
     p_range_start: cutoff,
     p_range_end: later,
@@ -277,17 +277,17 @@ async function getAvailSlots(tenant: TenantContext, days: number = 14) {
     .map(function (s: any) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0, tours: { name: s.tour_name } }; });
 }
 async function getActiveTours(tenant: TenantContext) {
-  var r = await supabase.from("tours").select("id, name, description, base_price_per_person, duration_minutes, hidden")
+  const r = await supabase.from("tours").select("id, name, description, base_price_per_person, duration_minutes, hidden")
     .eq("business_id", tenant.business.id).eq("active", true).order("sort_order", { ascending: true });
   return (r.data || []).filter(function (t: any) { return !t.name.includes("Private") && !t.hidden; });
 }
 async function getBookingCustomFields(tenant: TenantContext) {
-  var r = await supabase.from("businesses").select("booking_custom_fields").eq("id", tenant.business.id).maybeSingle();
+  const r = await supabase.from("businesses").select("booking_custom_fields").eq("id", tenant.business.id).maybeSingle();
   return Array.isArray(r.data?.booking_custom_fields) ? r.data.booking_custom_fields.filter(function (f: any) { return f && f.key && f.label; }) : [];
 }
 function nextCustomField(defs: any[], values: Record<string, unknown>) {
-  for (var i = 0; i < (defs || []).length; i++) {
-    var field = defs[i];
+  for (let i = 0; i < (defs || []).length; i++) {
+    const field = defs[i];
     if (!field) continue;
     if (!String(values?.[field.key] || "").trim()) return field;
   }
@@ -298,25 +298,25 @@ function promptForCustomField(field: any) {
   return field.label + (field.required ? " *" : "") + (field.placeholder ? "\n" + field.placeholder : "");
 }
 async function getLoyaltyCount(tenant: TenantContext, phone: any) {
-  try { var r = await supabase.rpc("check_loyalty", { p_phone: phone, p_business_id: tenant.business.id }); return r.data || 0; } catch (e) { return 0; }
+  try { const r = await supabase.rpc("check_loyalty", { p_phone: phone, p_business_id: tenant.business.id }); return r.data || 0; } catch (e) { return 0; }
 }
 async function calcDiscount(tenant: TenantContext, qty: any, phone: any) {
-  var pol = await supabase.from("policies").select().eq("business_id", tenant.business.id).single();
-  var p = pol.data; var discount = { type: "", percent: 0 };
-  var lc = await getLoyaltyCount(tenant, phone);
+  const pol = await supabase.from("policies").select().eq("business_id", tenant.business.id).single();
+  const p = pol.data; const discount = { type: "", percent: 0 };
+  const lc = await getLoyaltyCount(tenant, phone);
   if (p && lc >= (p.loyalty_bookings_threshold || 2)) discount = { type: "LOYALTY", percent: p.loyalty_discount_percent || 10 };
-  if (p && qty >= (p.group_discount_min_qty || 6)) { var gp = p.group_discount_percent || 5; if (gp > discount.percent) discount = { type: "GROUP", percent: gp }; }
+  if (p && qty >= (p.group_discount_min_qty || 6)) { const gp = p.group_discount_percent || 5; if (gp > discount.percent) discount = { type: "GROUP", percent: gp }; }
   return discount;
 }
 function genVoucherCode() {
-  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; var code = "";
-  for (var i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const code = "";
+  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
 }
 async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
-  for (var attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) payload.code = genVoucherCode();
-    var { data, error } = await supabase.from("vouchers").insert(payload).select().single();
+    const { data, error } = await supabase.from("vouchers").insert(payload).select().single();
     if (!error) return { data, error: null };
     if (error.code === "23505" && attempt < maxRetries - 1) continue;
     return { data: null, error };
@@ -324,25 +324,25 @@ async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
   return { data: null, error: { message: "Failed to generate unique voucher code after " + maxRetries + " attempts" } };
 }
 async function hasActiveBookings(tenant: TenantContext, phone: any) {
-  var r = await supabase.from("bookings").select("id").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"]).limit(1);
+  const r = await supabase.from("bookings").select("id").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"]).limit(1);
   return (r.data || []).length > 0;
 }
 
 // ===== REFERRAL SYSTEM =====
 function genReferralCode(name: any) {
-  var clean = ((name || "REF") + "").split(" ")[0].toUpperCase().substring(0, 4);
-  var rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const clean = ((name || "REF") + "").split(" ")[0].toUpperCase().substring(0, 4);
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
   return clean + rand;
 }
 async function getOrCreateReferral(tenant: TenantContext, phone: any, name: any) {
-  var existing = await supabase.from("referrals").select().eq("referrer_phone", phone).eq("business_id", tenant.business.id).eq("status", "ACTIVE").single();
+  const existing = await supabase.from("referrals").select().eq("referrer_phone", phone).eq("business_id", tenant.business.id).eq("status", "ACTIVE").single();
   if (existing.data) return existing.data;
-  var code = genReferralCode(name);
-  var r = await supabase.from("referrals").insert({ business_id: tenant.business.id, referrer_phone: phone, referrer_name: name, referral_code: code, discount_percent: 5 }).select().single();
+  const code = genReferralCode(name);
+  const r = await supabase.from("referrals").insert({ business_id: tenant.business.id, referrer_phone: phone, referrer_name: name, referral_code: code, discount_percent: 5 }).select().single();
   return r.data;
 }
 async function validateReferralCode(tenant: TenantContext, code: any, phone: any) {
-  var r = await supabase.from("referrals").select().eq("referral_code", code.toUpperCase()).eq("business_id", tenant.business.id).eq("status", "ACTIVE").single();
+  const r = await supabase.from("referrals").select().eq("referral_code", code.toUpperCase()).eq("business_id", tenant.business.id).eq("status", "ACTIVE").single();
   if (!r.data) return null;
   if (r.data.referrer_phone === phone) return null;
   if (r.data.uses >= r.data.max_uses) return null;
@@ -351,7 +351,7 @@ async function validateReferralCode(tenant: TenantContext, code: any, phone: any
 
 // ===== REPEAT BOOKING =====
 async function getLastCompletedBooking(tenant: TenantContext, phone: any) {
-  var r = await supabase.from("bookings").select("*, tours(id, name, base_price_per_person)").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["COMPLETED", "PAID"]).order("created_at", { ascending: false }).limit(1).single();
+  const r = await supabase.from("bookings").select("*, tours(id, name, base_price_per_person)").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["COMPLETED", "PAID"]).order("created_at", { ascending: false }).limit(1).single();
   return r.data;
 }
 
@@ -359,38 +359,38 @@ async function getLastCompletedBooking(tenant: TenantContext, phone: any) {
 
 // ===== SMART AVAILABILITY =====
 function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end: Date, label: string } | null {
-  var i = input.toLowerCase();
-  var now = new Date();
-  var tzNow = new Date(now.toLocaleString("en-US", { timeZone: tenantTimeZone(tenant) }));
-  var today = new Date(tzNow.getFullYear(), tzNow.getMonth(), tzNow.getDate());
-  var targetDate: Date | null = null;
-  var label = "";
+  const i = input.toLowerCase();
+  const now = new Date();
+  const tzNow = new Date(now.toLocaleString("en-US", { timeZone: tenantTimeZone(tenant) }));
+  const today = new Date(tzNow.getFullYear(), tzNow.getMonth(), tzNow.getDate());
+  let targetDate: Date | null = null;
+  let label = "";
   if (i.includes("tomorrow") || i.includes("tmrw")) { targetDate = new Date(today); targetDate.setDate(targetDate.getDate() + 1); label = "tomorrow"; }
   else if (i.includes("today") || i.includes("this afternoon") || i.includes("this morning")) { targetDate = new Date(today); label = "today"; }
   else {
-    var days: string[] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    for (var d = 0; d < days.length; d++) {
+    const days: string[] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    for (let d = 0; d < days.length; d++) {
       if (i.includes(days[d]) || i.includes(days[d].substring(0, 3))) {
-        var currentDay = today.getDay(); var diff = d - currentDay; if (diff <= 0) diff += 7;
+        const currentDay = today.getDay(); const diff = d - currentDay; if (diff <= 0) diff += 7;
         targetDate = new Date(today); targetDate.setDate(targetDate.getDate() + diff);
         label = days[d].charAt(0).toUpperCase() + days[d].slice(1); break;
       }
     }
   }
   if (i.includes("weekend")) {
-    var sat = new Date(today); var daysToSat = 6 - sat.getDay(); if (daysToSat <= 0) daysToSat += 7;
+    const sat = new Date(today); const daysToSat = 6 - sat.getDay(); if (daysToSat <= 0) daysToSat += 7;
     sat.setDate(sat.getDate() + daysToSat);
-    var mon = new Date(sat); mon.setDate(mon.getDate() + 2);
+    const mon = new Date(sat); mon.setDate(mon.getDate() + 2);
     return { start: sat, end: mon, label: "this weekend" };
   }
   if (i.includes("next week")) {
-    var nextMon = new Date(today); var toMon = (8 - nextMon.getDay()) % 7 || 7;
+    const nextMon = new Date(today); const toMon = (8 - nextMon.getDay()) % 7 || 7;
     nextMon.setDate(nextMon.getDate() + toMon);
-    var nextSun = new Date(nextMon); nextSun.setDate(nextSun.getDate() + 7);
+    const nextSun = new Date(nextMon); nextSun.setDate(nextSun.getDate() + 7);
     return { start: nextMon, end: nextSun, label: "next week" };
   }
   if (!targetDate) {
-    var dm = i.match(/(\d{1,2})\s*(st|nd|rd|th)/);
+    const dm = i.match(/(\d{1,2})\s*(st|nd|rd|th)/);
     if (dm) {
       targetDate = new Date(today); targetDate.setDate(parseInt(dm[1]));
       if (targetDate < today) targetDate.setMonth(targetDate.getMonth() + 1);
@@ -398,97 +398,97 @@ function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end:
     }
   }
   if (!targetDate) return null;
-  var start = new Date(targetDate); var end = new Date(targetDate); end.setDate(end.getDate() + 1);
+  const start = new Date(targetDate); const end = new Date(targetDate); end.setDate(end.getDate() + 1);
   if (i.includes("morning") || i.includes("early")) { start.setHours(5, 0, 0, 0); end = new Date(targetDate); end.setHours(12, 0, 0, 0); label += " morning"; }
   else if (i.includes("afternoon")) { start.setHours(12, 0, 0, 0); end = new Date(targetDate); end.setHours(17, 0, 0, 0); label += " afternoon"; }
   else if (i.includes("evening") || i.includes("sunset")) { start.setHours(16, 0, 0, 0); end = new Date(targetDate); end.setHours(21, 0, 0, 0); label += " evening"; }
-  var tm = i.match(/(\d{1,2})\s*(am|pm)/);
+  const tm = i.match(/(\d{1,2})\s*(am|pm)/);
   if (tm) {
-    var hr = parseInt(tm[1]); if (tm[2] === "pm" && hr < 12) hr += 12; if (tm[2] === "am" && hr === 12) hr = 0;
+    const hr = parseInt(tm[1]); if (tm[2] === "pm" && hr < 12) hr += 12; if (tm[2] === "am" && hr === 12) hr = 0;
     start.setHours(hr, 0, 0, 0); end = new Date(targetDate); end.setHours(hr + 2, 0, 0, 0);
   }
   return { start: start, end: end, label: label };
 }
 async function checkWeatherConcern(tenant: TenantContext, phone: string, input: string): Promise<boolean> {
-  var i = input.toLowerCase();
-  var isWeatherQ = (i.includes("trip") || i.includes("tour") || i.includes("paddle")) && (i.includes("still on") || i.includes("go ahead") || i.includes("happening") || i.includes("confirmed"));
-  var isWeatherCheck = i.includes("weather") && (i.includes("tomorrow") || i.includes("today") || i.includes("look"));
+  const i = input.toLowerCase();
+  const isWeatherQ = (i.includes("trip") || i.includes("tour") || i.includes("paddle")) && (i.includes("still on") || i.includes("go ahead") || i.includes("happening") || i.includes("confirmed"));
+  const isWeatherCheck = i.includes("weather") && (i.includes("tomorrow") || i.includes("today") || i.includes("look"));
   if (!isWeatherQ && !isWeatherCheck) return false;
 
   // Check if they have a booking
-  var wBkr = await supabase.from("bookings").select("id, slots(start_time), tours(name)")
+  const wBkr = await supabase.from("bookings").select("id, slots(start_time), tours(name)")
     .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
     .order("created_at", { ascending: false }).limit(1).single();
-  var bkInfo = "";
-  var bkTime = "";
+  let bkInfo = "";
+  let bkTime = "";
   if (wBkr.data) {
-    var wSlot = (wBkr.data as any).slots;
-    var wTour = (wBkr.data as any).tours;
+    const wSlot = (wBkr.data as any).slots;
+    const wTour = (wBkr.data as any).tours;
     if (wSlot) {
       bkInfo = "Your *" + (wTour?.name || "tour") + "* is on " + fmtTime(tenant, wSlot.start_time) + ".\n\n";
       bkTime = wSlot.start_time;
     }
   }
 
-  var defaultWeatherSpot = { lat: -33.908, lon: 18.398 };
-  var configuredWeatherSpot = Array.isArray(tenant.business.weather_widget_locations) && tenant.business.weather_widget_locations.length > 0
+  const defaultWeatherSpot = { lat: -33.908, lon: 18.398 };
+  const configuredWeatherSpot = Array.isArray(tenant.business.weather_widget_locations) && tenant.business.weather_widget_locations.length > 0
     ? tenant.business.weather_widget_locations[0]
     : defaultWeatherSpot;
-  var weatherLat = Number(configuredWeatherSpot?.lat ?? defaultWeatherSpot.lat);
-  var weatherLon = Number(configuredWeatherSpot?.lon ?? defaultWeatherSpot.lon);
+  const weatherLat = Number(configuredWeatherSpot?.lat ?? defaultWeatherSpot.lat);
+  const weatherLon = Number(configuredWeatherSpot?.lon ?? defaultWeatherSpot.lon);
 
   // Fetch live weather from Open-Meteo for the tenant's configured weather spot.
-  var weatherMsg = "";
+  let weatherMsg = "";
   try {
     // L12: Calculate the day index based on the booking's slot start_time relative to today
-    var weatherDayIndex = 1; // default to tomorrow
+    let weatherDayIndex = 1; // default to tomorrow
     if (bkTime) {
-      var bkDate = new Date(bkTime);
-      var todayStart = new Date();
+      const bkDate = new Date(bkTime);
+      const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       weatherDayIndex = Math.max(0, Math.floor((bkDate.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000)));
     }
-    var forecastDays = Math.max(weatherDayIndex + 1, 2);
-    var targetDate = new Date();
+    const forecastDays = Math.max(weatherDayIndex + 1, 2);
+    const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + weatherDayIndex);
-    var dateStr = targetDate.toISOString().split("T")[0];
-    var wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
-    var mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
-    var [wRes, mRes] = await Promise.all([fetch(wUrl), fetch(mUrl)]);
-    var wData = await wRes.json();
-    var mData = await mRes.json();
+    const dateStr = targetDate.toISOString().split("T")[0];
+    const wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
+    const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
+    const [wRes, mRes] = await Promise.all([fetch(wUrl), fetch(mUrl)]);
+    const wData = await wRes.json();
+    const mData = await mRes.json();
 
     // L12: Use the correct day index for the booking day
-    var maxWind = wData?.daily?.wind_speed_10m_max?.[weatherDayIndex] || 0;
-    var windDir = wData?.daily?.wind_direction_10m_dominant?.[weatherDayIndex] || 0;
-    var swell = mData?.daily?.wave_height_max?.[weatherDayIndex] || 0;
-    var weatherCode = wData?.daily?.weather_code?.[weatherDayIndex] || 0;
+    const maxWind = wData?.daily?.wind_speed_10m_max?.[weatherDayIndex] || 0;
+    const windDir = wData?.daily?.wind_direction_10m_dominant?.[weatherDayIndex] || 0;
+    const swell = mData?.daily?.wave_height_max?.[weatherDayIndex] || 0;
+    const weatherCode = wData?.daily?.weather_code?.[weatherDayIndex] || 0;
 
     // Check visibility at tour hours (7-9am = indices 7-9) on the booking day
-    var minVis = 99999;
-    var hourlyVis = wData?.hourly?.visibility || [];
-    var hourlyTimes = wData?.hourly?.time || [];
-    for (var hi = 0; hi < hourlyTimes.length; hi++) {
+    const minVis = 99999;
+    const hourlyVis = wData?.hourly?.visibility || [];
+    const hourlyTimes = wData?.hourly?.time || [];
+    for (let hi = 0; hi < hourlyTimes.length; hi++) {
       if (hourlyTimes[hi].startsWith(dateStr) && hi % 24 >= 6 && hi % 24 <= 10) {
         if (hourlyVis[hi] < minVis) minVis = hourlyVis[hi];
       }
     }
-    var foggy = minVis < 1000; // less than 1km visibility
+    const foggy = minVis < 1000; // less than 1km visibility
 
     // Wind direction name
-    var dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-    var dirName = dirs[Math.round(windDir / 22.5) % 16];
-    var isSE = dirName.includes("SE");
-    var windLimit = isSE ? 25 : 20;
-    var windBad = maxWind > windLimit;
-    var swellBad = swell > 2.6;
+    const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+    const dirName = dirs[Math.round(windDir / 22.5) % 16];
+    const isSE = dirName.includes("SE");
+    const windLimit = isSE ? 25 : 20;
+    const windBad = maxWind > windLimit;
+    const swellBad = swell > 2.6;
 
-    var concerns: string[] = [];
+    const concerns: string[] = [];
     if (swellBad) concerns.push("swell is " + swell.toFixed(1) + "m (above 2.6m)");
     if (windBad) concerns.push("wind gusts up to " + Math.round(maxWind) + "km/h " + dirName + (isSE ? " (limit 25km/h for SE)" : " (limit 20km/h)"));
     if (foggy) concerns.push("low visibility/fog expected");
 
-    var weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
+    const weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
     if (concerns.length > 0) {
       weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, conditions may be challenging \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
     } else {
@@ -505,22 +505,22 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 }
 
 function detectAvailQuery(input: string): boolean {
-  var i = input.toLowerCase();
-  var hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
-  var hasIntent = i.includes("available") || i.includes("space") || i.includes("slot") || i.includes("open") || i.includes("spot") || i.includes("can i") || i.includes("do you have") || i.includes("any tour") || i.includes("what time") || i.includes("book for") || i.includes("free") || i.includes("which") || i.includes("what");
+  const i = input.toLowerCase();
+  const hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
+  const hasIntent = i.includes("available") || i.includes("space") || i.includes("slot") || i.includes("open") || i.includes("spot") || i.includes("can i") || i.includes("do you have") || i.includes("any tour") || i.includes("what time") || i.includes("book for") || i.includes("free") || i.includes("which") || i.includes("what");
   return hasTime && hasIntent;
 }
 async function handleSmartAvail(tenant: TenantContext, phone: string, input: string): Promise<boolean> {
-  var timeRef = parseTimeRef(tenant, input);
+  const timeRef = parseTimeRef(tenant, input);
   if (!timeRef) return false;
 
   // No hard slot limits; pull all within the boundaries user asked for
-  var r = await supabase.from("slots").select("id, start_time, capacity_total, booked, held, tour_id, tours(name, base_price_per_person)")
+  const r = await supabase.from("slots").select("id, start_time, capacity_total, booked, held, tour_id, tours(name, base_price_per_person)")
     .eq("business_id", tenant.business.id).eq("status", "OPEN")
     .gte("start_time", timeRef.start.toISOString())
     .lt("start_time", timeRef.end.toISOString())
     .order("start_time", { ascending: true });
-  var slots = (r.data || []).filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) > 0; });
+  const slots = (r.data || []).filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) > 0; });
   if (slots.length === 0) {
     await sendText(tenant, phone, "I checked and unfortunately there aren't any slots generated or available for " + timeRef.label + ". \u{1F614}\n\nWe usually publish slots a month or two in advance. Let me know if you want to look at another date!");
     await sendButtons(tenant, phone, "Options:", [{ id: "AVAIL", title: "\u{1F4C5} Look at other dates" }, { id: "BOOK", title: "\u{1F6F6} Book Now" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -528,11 +528,11 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
   }
 
   // Slice to a readable amount for WhatsApp UX, but tell them to hit book if they want more
-  var displaySlots = slots.slice(0, 8);
-  var msg = "Here\u2019s what\u2019s available for *" + timeRef.label + "*:\n\n";
-  for (var si = 0; si < displaySlots.length; si++) {
-    var s = displaySlots[si]; var tour = (s as any).tours;
-    var avail = s.capacity_total - s.booked - (s.held || 0);
+  const displaySlots = slots.slice(0, 8);
+  let msg = "Here\u2019s what\u2019s available for *" + timeRef.label + "*:\n\n";
+  for (let si = 0; si < displaySlots.length; si++) {
+    const s = displaySlots[si]; const tour = (s as any).tours;
+    const avail = s.capacity_total - s.booked - (s.held || 0);
     msg += "\u{1F6F6} *" + (tour?.name || "Tour") + "*\n";
     msg += "   " + fmtTime(tenant, s.start_time) + " \u2014 " + avail + " spots \u2014 R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
   }
@@ -547,7 +547,7 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
 }
 
 function matchFAQ(input: any) {
-  var i = input.toLowerCase();
+  const i = input.toLowerCase();
   // Meeting point
   if (i.includes("where") && (i.includes("meet") || i.includes("go") || i.includes("find") || i.includes("located"))) return "meeting_point";
   if (i.includes("meeting point") || i.includes("location") || i.includes("address") || i.includes("directions") || i.includes("get there")) return "meeting_point";
@@ -613,7 +613,7 @@ function matchFAQ(input: any) {
 // Detect intent from natural language
 // Detect intent using Gemini for natural language understanding
 async function detectIntent(tenant: TenantContext, input: string, phone: string): Promise<string | null> {
-  var i = input.toLowerCase();
+  const i = input.toLowerCase();
 
   // Fast path for exact keywords to save API calls
   if (i === "book" || i === "reserve") return "BOOK";
@@ -625,7 +625,7 @@ async function detectIntent(tenant: TenantContext, input: string, phone: string)
   if (!GK) return null; // Fallback if no API key
 
   try {
-    var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
       method: "POST", headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout(5000),
       body: JSON.stringify({
@@ -646,9 +646,9 @@ Reply ONLY with the keyword, nothing else.`}]
         generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
       })
     });
-    var d = await r.json();
+    const d = await r.json();
     if (d.candidates?.[0]?.content?.parts?.[0]) {
-      var intent = d.candidates[0].content.parts[0].text.trim().toUpperCase();
+      const intent = d.candidates[0].content.parts[0].text.trim().toUpperCase();
       if (["BOOK", "AVAIL", "MY_BOOKINGS", "VOUCHER", "HUMAN", "THANKS"].includes(intent)) {
         return intent;
       }
@@ -661,13 +661,13 @@ Reply ONLY with the keyword, nothing else.`}]
 
 async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any) {
   try {
-    var convo = await getConvo(tenant, phone);
+    const convo = await getConvo(tenant, phone);
     if (!convo) return;
     // Log incoming message before HUMAN check
-    var _rt = (text || "").trim();
-    var _ri = (msgType === "interactive" && interactive) ? ((interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "") : "";
+    const _rt = (text || "").trim();
+    const _ri = (msgType === "interactive" && interactive) ? ((interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "") : "";
     try {
-      var cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone });
+      const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone });
       if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
     } catch (e: any) {
       await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
@@ -680,15 +680,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // reopener template. The customer just replied → window is now open → send
     // the queued messages right away using this tenant's own WA credentials.
     try {
-      var { data: queuedMsgs } = await supabase
+      const { data: queuedMsgs } = await supabase
         .from("outbox")
         .select("id, message_body")
         .eq("status", "WAITING_WINDOW")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone);
-      for (var qm of (queuedMsgs || [])) {
+      for (const qm of (queuedMsgs || [])) {
         try {
-          var drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
+          const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
           if (drainRes.ok) {
             await supabase.from("outbox").update({
               status: "SENT",
@@ -707,15 +707,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       console.error("CANCEL_FOLLOWUP_DRAIN_QUERY_ERR", drainQueryErr?.message || drainQueryErr);
     }
     // ─────────────────────────────────────────────────────────────────────────
-    var input = (text || "").trim().toLowerCase();
-    var rawText = (text || "").trim();
-    var rid = "";
+    const input = (text || "").trim().toLowerCase();
+    const rawText = (text || "").trim();
+    let rid = "";
     if (msgType === "interactive" && interactive) {
       rid = (interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "";
     }
 
     // Marketing opt-out stop words — always processed regardless of conversation state
-    var STOP_WORDS = ["stop", "unsubscribe", "opt out"];
+    const STOP_WORDS = ["stop", "unsubscribe", "opt out"];
     if (STOP_WORDS.includes(input)) {
       // Set marketing_opt_in = false on all bookings for this phone number
       await supabase.from("bookings")
@@ -729,7 +729,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     // Allow "menu"/"start"/"restart" to escape HUMAN mode so the user can always get the bot back
-    var isResetKeyword = (input === "menu" || input === "start" || input === "restart" || input === "back" || input === "home" || input === "main menu" || input === "start over");
+    const isResetKeyword = (input === "menu" || input === "start" || input === "restart" || input === "back" || input === "home" || input === "main menu" || input === "start over");
     if (convo.status === "HUMAN") {
       if (isResetKeyword) {
         await setConvo(convo.id, { status: "BOT", current_state: "IDLE", state_data: {} });
@@ -738,8 +738,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
 
-    var state = convo.current_state || "IDLE";
-    var sd = convo.state_data || {};
+    let state = convo.current_state || "IDLE";
+    let sd = convo.state_data || {};
     console.log("S:" + state + " I:" + input + " R:" + rid);
 
     // Global reset
@@ -756,8 +756,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // Weather cancellation response intercept
     if ((input === "1" || input === "2" || input === "3" || input === "1️⃣" || input === "2️⃣" || input === "3️⃣" || input.includes("refund") || input.includes("voucher") || input.includes("reschedule")) && (state === "IDLE" || state === "MENU")) {
-      var yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      var cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status")
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone)
         .eq("status", "CANCELLED")
@@ -765,7 +765,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         .order("cancelled_at", { ascending: false }).limit(1).single();
 
       if (cb.data && cb.data.cancellation_reason && cb.data.cancellation_reason.includes("Weather")) {
-        var choiceDesc = "";
+        const choiceDesc = "";
         if (input.includes("1") || input.includes("reschedule")) choiceDesc = "RESCHEDULE";
         else if (input.includes("2") || input.includes("voucher")) choiceDesc = "VOUCHER";
         else if (input.includes("3") || input.includes("refund")) choiceDesc = "REFUND";
@@ -786,7 +786,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     // POP / Payment Issue Intercept
-    var isPaymentIssue = false;
+    const isPaymentIssue = false;
     if (msgType === "document" || msgType === "image") isPaymentIssue = true;
     if (input.includes("proof") || input.includes("pop") || input.includes("receipt") || input.includes("paid it") || input.includes("just paid")) isPaymentIssue = true;
     if (input.includes("payment") && (input.includes("fail") || input.includes("error") || input.includes("won't") || input.includes("issue"))) isPaymentIssue = true;
@@ -806,11 +806,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // When we send a photo-ready notification via template, we ask customers to reply "YES".
     // This handler detects that reply and sends them the actual photo URLs.
     // L7: Only trigger photo sending if last conversation involved photo-related keywords
-    var _lastMsgs = await supabase.from("chat_messages").select("body").eq("business_id", tenant.business.id).eq("phone", phone).order("created_at", { ascending: false }).limit(5);
-    var _recentPhotoContext = (_lastMsgs.data || []).some(function (m: any) { var mb = (m.body || "").toLowerCase(); return mb.includes("photo") || mb.includes("picture") || mb.includes("pics") || mb.includes("trip photos"); });
+    const _lastMsgs = await supabase.from("chat_messages").select("body").eq("business_id", tenant.business.id).eq("phone", phone).order("created_at", { ascending: false }).limit(5);
+    const _recentPhotoContext = (_lastMsgs.data || []).some(function (m: any) { const mb = (m.body || "").toLowerCase(); return mb.includes("photo") || mb.includes("picture") || mb.includes("pics") || mb.includes("trip photos"); });
     if ((input === "yes" || input === "yes!" || input === "yeah" || input === "yep") && (state === "IDLE" || state === "MENU") && _recentPhotoContext) {
       // Check if this customer has a recent booking with trip photos
-      var recentBk = await supabase.from("bookings")
+      const recentBk = await supabase.from("bookings")
         .select("id, slot_id")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone)
@@ -819,13 +819,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         .limit(1)
         .maybeSingle();
       if (recentBk.data?.slot_id) {
-        var photos = await supabase.from("trip_photos")
+        const photos = await supabase.from("trip_photos")
           .select("photo_url")
           .eq("slot_id", recentBk.data.slot_id)
           .eq("business_id", tenant.business.id)
           .order("uploaded_at", { ascending: false });
         if (photos.data && photos.data.length > 0) {
-          var photoUrls = photos.data.map(function (p: any) { return p.photo_url; });
+          const photoUrls = photos.data.map(function (p: any) { return p.photo_url; });
           await typingDelay();
           await sendText(tenant, phone, "Here are your trip photos! 📸\n\n" + photoUrls.join("\n") + "\n\nShare this link with your group and enjoy the memories! 🛶");
           return;
@@ -838,14 +838,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     if (state === "IDLE" || state === "MENU") {
       // Check smart availability first
       if (!rid && detectAvailQuery(input)) {
-        var handled = await handleSmartAvail(tenant, phone, input);
+        const handled = await handleSmartAvail(tenant, phone, input);
         if (handled) { await setConvo(convo.id, { current_state: "MENU" }); return; }
       }
 
       // Check FAQ
-      var faqKey = matchFAQ(input);
+      const faqKey = matchFAQ(input);
       if (faqKey && !rid) {
-        var faqAnswer = getFaqAnswer(tenant, faqKey);
+        const faqAnswer = getFaqAnswer(tenant, faqKey);
         if (!faqAnswer) {
           await sendText(tenant, phone, "I’m not sure about that yet. Let me connect you to our team.");
           await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
@@ -864,7 +864,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // Check intent (skip if rid already set from button click)
-      var intent = rid ? null : await detectIntent(tenant, input, phone);
+      const intent = rid ? null : await detectIntent(tenant, input, phone);
       if (intent === "THANKS" && !rid) {
         await sendText(tenant, phone, "You\u2019re welcome! \u{1F60A} Feel free to ask anything else or type *menu* to see your options.");
         await setConvo(convo.id, { current_state: "MENU" });
@@ -875,9 +875,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== IDLE =====
     if (state === "IDLE") {
-      var lc = await getLoyaltyCount(tenant, phone);
-      var hasBookings = await hasActiveBookings(tenant, phone);
-      var welcome = "";
+      const lc = await getLoyaltyCount(tenant, phone);
+      const hasBookings = await hasActiveBookings(tenant, phone);
+      let welcome = "";
 
       if (lc >= 2) {
         welcome = "Hey, welcome back! \u{1F44B} Great to see you again. What can I do for you?";
@@ -906,19 +906,19 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== MENU =====
     else if (state === "MENU") {
-      var c = rid || input;
+      const c = rid || input;
 
       // BOOK
       if (c === "BOOK" || c.includes("book")) {
-        var tours = await getActiveTours(tenant);
+        const tours = await getActiveTours(tenant);
         if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment \u2014 check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         if (tours.length === 1) {
           await sendText(tenant, phone, "How many people will be joining? (1\u201330)");
           await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tours[0].id } });
         } else {
-          var trows: any[] = [];
-          for (var ti = 0; ti < tours.length; ti++) {
-            var tr = tours[ti];
+          const trows: any[] = [];
+          for (let ti = 0; ti < tours.length; ti++) {
+            const tr = tours[ti];
             trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + tr.duration_minutes + " min" });
           }
           await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
@@ -929,28 +929,28 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // AVAILABILITY
       else if (c === "AVAIL" || c.includes("avail")) {
-        var tours2 = await getActiveTours(tenant);
+        const tours2 = await getActiveTours(tenant);
         if (tours2.length <= 1) {
-          var slots = await getAvailSlots(tenant, 8);
+          const slots = await getAvailSlots(tenant, 8);
           if (slots.length === 0) { await sendText(tenant, phone, "Nothing open right now, but check back soon \u2014 we add new slots regularly!"); await setConvo(convo.id, { current_state: "IDLE" }); }
           else {
-            var msg = "Here\u2019s what\u2019s coming up:\n\n";
-            for (var ai = 0; ai < slots.length; ai++) {
-              var as2 = slots[ai]; var aav = as2.capacity_total - as2.booked - (as2.held || 0); var apr = await getSlotPrice(as2);
+            let msg = "Here\u2019s what\u2019s coming up:\n\n";
+            for (let ai = 0; ai < slots.length; ai++) {
+              const as2 = slots[ai]; const aav = as2.capacity_total - as2.booked - (as2.held || 0); const apr = await getSlotPrice(as2);
               msg += "\u2022 " + fmtTime(tenant, as2.start_time) + " \u2014 " + aav + " spots \u2014 R" + apr + "/pp\n";
             }
             await sendButtons(tenant, phone, msg, [{ id: "BOOK", title: "\u{1F6F6} Book Now" }, { id: "IDLE", title: "\u2B05 Back" }]);
           }
         } else {
-          var availMsg = "Here\u2019s what\u2019s available:\n\n";
-          for (var ati = 0; ati < tours2.length; ati++) {
-            var at2 = tours2[ati];
-            var atSlots = await getAvailSlotsForTour(tenant, at2.id, 3);
+          let availMsg = "Here\u2019s what\u2019s available:\n\n";
+          for (let ati = 0; ati < tours2.length; ati++) {
+            const at2 = tours2[ati];
+            const atSlots = await getAvailSlotsForTour(tenant, at2.id, 3);
             availMsg += "*" + at2.name + "* (R" + at2.base_price_per_person + "/pp)\n";
             if (atSlots.length === 0) { availMsg += "  Fully booked for now\n\n"; }
             else {
-              for (var asi = 0; asi < atSlots.length; asi++) {
-                var ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + " \u2014 " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
+              for (let asi = 0; asi < atSlots.length; asi++) {
+                const ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + " \u2014 " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
               }
               availMsg += "\n";
             }
@@ -961,19 +961,19 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // MY BOOKINGS / RESCHEDULE / CANCEL
       else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel")) {
-        var bkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, slots(start_time), tours(name)")
+        const bkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED", "CANCELLED"])
           .order("created_at", { ascending: false }).limit(5);
-        var bookings = bkr.data || [];
+        const bookings = bkr.data || [];
         if (bookings.length === 0) {
           await sendText(tenant, phone, "You don\u2019t have any active bookings at the moment.");
           await sendButtons(tenant, phone, "Want to book your next adventure?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Main Menu" }]);
           await setConvo(convo.id, { current_state: "MENU" });
         } else {
-          var bmsg = "Here are your bookings:\n\n"; var brows: any[] = [];
-          for (var bi = 0; bi < bookings.length; bi++) {
-            var b = bookings[bi]; var bslot = (b as any).slots; var btour = (b as any).tours;
-            var bref = b.id.substring(0, 8).toUpperCase(); var btime = bslot ? fmtTime(tenant, bslot.start_time) : "TBC";
+          let bmsg = "Here are your bookings:\n\n"; const brows: any[] = [];
+          for (let bi = 0; bi < bookings.length; bi++) {
+            const b = bookings[bi]; const bslot = (b as any).slots; const btour = (b as any).tours;
+            const bref = b.id.substring(0, 8).toUpperCase(); const btime = bslot ? fmtTime(tenant, bslot.start_time) : "TBC";
             bmsg += (bi + 1) + ". *" + bref + "* \u2014 " + (btour?.name || "Tour") + "\n   " + btime + " \u2022 " + b.qty + " pax \u2022 R" + b.total_amount + " \u2022 " + b.status + "\n\n";
             brows.push({ id: "BK_" + b.id, title: bref + " - " + b.status, description: (btour?.name || "Tour").substring(0, 20) + " " + (btime || "").substring(0, 15) });
           }
@@ -1034,10 +1034,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // BUY GIFT VOUCHER
       else if (c === "BUY_VOUCHER" || c.includes("buy") && c.includes("voucher")) {
-        var tours = await getActiveTours(tenant);
-        var trows = [];
-        for (var ti = 0; ti < tours.length; ti++) {
-          var tr = tours[ti];
+        const tours = await getActiveTours(tenant);
+        const trows = [];
+        for (let ti = 0; ti < tours.length; ti++) {
+          const tr = tours[ti];
           trows.push({ id: "GV_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + " voucher" });
         }
         await sendText(tenant, phone, "\u{1F381} *Buy a Gift Voucher*\n\nGreat idea! Pick which tour the voucher is for:");
@@ -1054,8 +1054,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // HUMAN
       // REFERRAL
       else if (c === "REFERRAL" || (c.includes("refer") && !c.includes("refund"))) {
-        var cname = convo.customer_name || "Friend";
-        var ref = await getOrCreateReferral(tenant, phone, cname);
+        const cname = convo.customer_name || "Friend";
+        const ref = await getOrCreateReferral(tenant, phone, cname);
         if (ref) {
           await sendText(tenant, phone, "\u{1F91D} *Share the adventure!*\n\nHere\u2019s your personal referral code:\n\n\u{1F3AF} Code: *" + ref.referral_code + "*\n\n\u2022 Your friend gets *5% off* their first booking\n\u2022 You get *5% off* your next booking\n\nJust tell them to mention your code when booking!\n\nShare this message:\n_Hey! Use my code *" + ref.referral_code + "* to get 5% off a booking with " + businessName(tenant) + "._");
           await sendButtons(tenant, phone, "Anything else?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -1066,9 +1066,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // REPEAT BOOKING
       else if (c === "BOOK_AGAIN") {
-        var lastBk = await getLastCompletedBooking(tenant, phone);
+        const lastBk = await getLastCompletedBooking(tenant, phone);
         if (lastBk) {
-          var lbTour = lastBk.tours;
+          const lbTour = lastBk.tours;
           await sendText(tenant, phone, "\u{1F6F6} Let\u2019s book you on *" + (lbTour ? lbTour.name : "a tour") + "* again!\n\nHow many people this time?");
           await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: lbTour ? lbTour.id : lastBk.tour_id } });
         } else {
@@ -1092,7 +1092,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // FALLBACK — try to be helpful
       else {
         await typingDelay();
-        var gemReply = await gemFallback(tenant, input || rawText);
+        const gemReply = await gemFallback(tenant, input || rawText);
         if (gemReply) {
           await sendText(tenant, phone, gemReply);
           await sendButtons(tenant, phone, "Anything else?", [
@@ -1112,30 +1112,30 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK TOUR =====
     else if (state === "PICK_TOUR") {
-      var tourId = rid ? rid.replace("TOUR_", "") : "";
+      const tourId = rid ? rid.replace("TOUR_", "") : "";
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list above."); return; }
-      var tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
+      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-      var t = tourInfo.data;
+      const t = tourInfo.data;
       await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + t.duration_minutes + " minutes\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
       await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tourId } });
     }
 
     // ===== MY BOOKINGS LIST =====
     else if (state === "MY_BOOKINGS_LIST") {
-      var bookingId = rid ? rid.replace("BK_", "") : "";
+      const bookingId = rid ? rid.replace("BK_", "") : "";
       if (!bookingId) { await sendText(tenant, phone, "Please select a booking from the list."); return; }
-      var bkd = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", bookingId).single();
+      const bkd = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", bookingId).single();
       if (!bkd.data) { await sendText(tenant, phone, "Can\u2019t find that booking."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-      var bk = bkd.data; var bkref = bk.id.substring(0, 8).toUpperCase();
-      var bkslot = (bk as any).slots; var bktour = (bk as any).tours;
-      var bkhrs = bkslot ? (new Date(bkslot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-      var bkUnitPrice = Number(bk.unit_price || (bk.qty > 0 ? bk.total_amount / bk.qty : 0));
-      var detail = "*Booking " + bkref + "*\n\n\u{1F6F6} " + (bktour?.name || "Tour") + "\n\u{1F4C5} " + (bkslot ? fmtTime(tenant, bkslot.start_time) : "TBC") + "\n\u{1F465} " + bk.qty + " people\n\u{1F4B0} R" + bk.total_amount + "\n\u{1F4CC} " + bk.status;
+      const bk = bkd.data; const bkref = bk.id.substring(0, 8).toUpperCase();
+      const bkslot = (bk as any).slots; const bktour = (bk as any).tours;
+      const bkhrs = bkslot ? (new Date(bkslot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
+      const bkUnitPrice = Number(bk.unit_price || (bk.qty > 0 ? bk.total_amount / bk.qty : 0));
+      let detail = "*Booking " + bkref + "*\n\n\u{1F6F6} " + (bktour?.name || "Tour") + "\n\u{1F4C5} " + (bkslot ? fmtTime(tenant, bkslot.start_time) : "TBC") + "\n\u{1F465} " + bk.qty + " people\n\u{1F4B0} R" + bk.total_amount + "\n\u{1F4CC} " + bk.status;
       // Show special request if exists
       if (bk.custom_fields && bk.custom_fields.special_requests) detail += "\n\u{1F4DD} Request: " + bk.custom_fields.special_requests;
       detail += "\n\nWhat would you like to do?";
-      var actRows: any[] = [];
+      let actRows: any[] = [];
       if (bk.status === "CANCELLED") {
         if (bk.cancellation_reason && bk.cancellation_reason.includes("Weather")) {
           if (bk.refund_status === "REQUESTED" || bk.refund_status === "PROCESSED") {
@@ -1199,12 +1199,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== BOOKING ACTIONS =====
     else if (state === "BOOKING_ACTIONS") {
-      var action = rid || "";
+      const action = rid || "";
 
       // ── CANCEL ──
       if (action.startsWith("ACT_CANCEL_")) {
         if (sd.hours_before >= 24) {
-          var rAmt = Math.round(Number(sd.total) * 0.95 * 100) / 100;
+          const rAmt = Math.round(Number(sd.total) * 0.95 * 100) / 100;
           await sendText(tenant, phone, "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + sd.total + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + rAmt + " (5% processing fee) \u2022 5-7 business days");
           await sendButtons(tenant, phone, "Choose an option:", [
             { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
@@ -1221,7 +1221,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // ── RESCHEDULE ──
       else if (action.startsWith("ACT_RESCH_")) {
         if (!sd.is_weather && sd.hours_before < 24) { await sendText(tenant, phone, "Sorry, rescheduling is only available more than 24 hours before your tour."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-        var cbk2 = await supabase.from("bookings").select("reschedule_count").eq("id", sd.booking_id).single();
+        const cbk2 = await supabase.from("bookings").select("reschedule_count").eq("id", sd.booking_id).single();
         if (cbk2.data && cbk2.data.reschedule_count >= 2) { await sendText(tenant, phone, "You\u2019ve already rescheduled twice. Let me connect you to our team for help."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await typingDelay();
         await sendText(tenant, phone, "No problem! \ud83d\udcc5 Simply type the new date you want to reschedule to (e.g., 'Tomorrow' or '1 September')");
@@ -1230,7 +1230,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // ── EDIT GUESTS ──
       else if (action.startsWith("ACT_GUESTS_")) {
-        var canRemove = sd.hours_before >= 24;
+        const canRemove = sd.hours_before >= 24;
         if (canRemove) {
           await sendText(tenant, phone, "You currently have *" + sd.qty + " people* on this booking (R" + sd.unit_price + "/pp).\n\nType the *new total number* of guests:");
         } else {
@@ -1270,7 +1270,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // ── CONTACT TEAM ──
       else if (action.startsWith("ACT_TEAM_")) {
-        var teamHrs = Math.round(sd.hours_before);
+        const teamHrs = Math.round(sd.hours_before);
         await supabase.from("chat_messages").insert({
           business_id: tenant.business.id, phone: phone, direction: "IN",
           body: "[REQUEST] Customer wants to modify booking " + sd.booking_id.substring(0, 8).toUpperCase() + " (Trip in " + teamHrs + "h). " + convo.customer_name,
@@ -1286,17 +1286,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== CANCEL CHOICE (refund or voucher) =====
     else if (state === "CANCEL_CHOICE") {
       if (rid === "CANCEL_VOUCHER" || input === "voucher") {
-        var cvcode = genVoucherCode();
-        var cvTotal = Number(sd.total);
-        var cvr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: cvcode, status: "ACTIVE", type: "CREDIT", value: cvTotal, current_balance: cvTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+        const cvcode = genVoucherCode();
+        const cvTotal = Number(sd.total);
+        const cvr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: cvcode, status: "ACTIVE", type: "CREDIT", value: cvTotal, current_balance: cvTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (cvr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + cvcode, converted_to_voucher_id: cvr.data.id }).eq("id", sd.booking_id);
-        if (sd.slot_id) { var svr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr2.data) await supabase.from("slots").update({ booked: Math.max(0, svr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) { const svr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr2.data) await supabase.from("slots").update({ booked: Math.max(0, svr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
         await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
         await logE(tenant, "booking_cancelled_voucher", { booking_id: sd.booking_id, code: cvcode, amount: cvTotal }, sd.booking_id);
         // Email voucher
         try {
-          var cvEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
+          const cvEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
           if (cvEmail.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -1308,36 +1308,36 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else if (rid === "CANCEL_REFUND" || input === "refund") {
-        var crTotal = Number(sd.total);
+        const crTotal = Number(sd.total);
         // C4: Check if booking was paid by voucher — issue a new voucher instead of requesting Yoco refund
-        var crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_deduction").eq("id", sd.booking_id).single();
-        var crIsVoucherPaid = crBkCheck.data && (
+        const crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_deduction").eq("id", sd.booking_id).single();
+        const crIsVoucherPaid = crBkCheck.data && (
           (crBkCheck.data.yoco_payment_id && String(crBkCheck.data.yoco_payment_id).startsWith("VOUCHER_")) ||
           crBkCheck.data.payment_method === "VOUCHER" ||
           crBkCheck.data.payment_method === "GIFT_VOUCHER"
         );
         if (crIsVoucherPaid) {
           // Voucher-paid booking: create a new voucher for the full amount instead of Yoco refund
-          var crVCode = genVoucherCode();
-          var crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+          const crVCode = genVoucherCode();
+          const crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
           if (crVResult.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
           await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
-          if (sd.slot_id) { var slrV = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slrV.data) await supabase.from("slots").update({ booked: Math.max(0, slrV.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          if (sd.slot_id) { const slrV = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slrV.data) await supabase.from("slots").update({ booked: Math.max(0, slrV.data.booked - sd.qty) }).eq("id", sd.slot_id); }
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_voucher_refund", { booking_id: sd.booking_id, code: crVCode, amount: crTotal }, sd.booking_id);
           await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         } else {
           // M7: Split-tender refund math — check if booking has voucher_deduction > 0
-          var crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
-          var crRefund: number;
-          var crRefundMsg: string;
+          const crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
+          let crRefund: number;
+          let crRefundMsg: string;
           if (crVoucherDeduction > 0) {
             // Restore full voucher amount
-            var crSplitVCode = genVoucherCode();
-            var crSplitVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crSplitVCode, status: "ACTIVE", type: "CREDIT", value: crVoucherDeduction, current_balance: crVoucherDeduction, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+            const crSplitVCode = genVoucherCode();
+            const crSplitVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crSplitVCode, status: "ACTIVE", type: "CREDIT", value: crVoucherDeduction, current_balance: crVoucherDeduction, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
             // Calculate 5% fee on total, subtract from cash portion only
-            var crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
+            const crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
             crRefund = Math.round(crCashPaid * 0.95 * 100) / 100;
             crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
             if (crSplitVResult.data) {
@@ -1349,12 +1349,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           }
           await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: "95% refund via WhatsApp" }).eq("id", sd.booking_id);
           // TODO: Replace with atomic increment RPC for slot decrement
-          if (sd.slot_id) { var slr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr2.data) await supabase.from("slots").update({ booked: Math.max(0, slr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          if (sd.slot_id) { const slr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr2.data) await supabase.from("slots").update({ booked: Math.max(0, slr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_refund", { booking_id: sd.booking_id, amount: crRefund }, sd.booking_id);
           // Email cancellation
           try {
-            var crEmail = await supabase.from("bookings").select("email, customer_name, tours(name), slots(start_time)").eq("id", sd.booking_id).single();
+            const crEmail = await supabase.from("bookings").select("email, customer_name, tours(name), slots(start_time)").eq("id", sd.booking_id).single();
             if (crEmail.data?.email) {
               await fetch(SUPABASE_URL + "/functions/v1/send-email", {
                 method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -1362,7 +1362,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               });
             }
           } catch (e) { console.log("cancel refund email err"); }
-          var crLoc = tenant.business.location_phrase;
+          const crLoc = tenant.business.location_phrase;
           await sendText(tenant, phone, crRefundMsg + "\n\n" + (crLoc ? "We\u2019d love to have you back " + crLoc + " soon!" : "We\u2019d love to have you back soon!"));
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         }
@@ -1374,12 +1374,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "CONFIRM_CANCEL_ACTION") {
       if (rid === "CONFIRM_CANCEL_NOREFUND" || rid === "CONFIRM_CANCEL" || input === "yes") {
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled (no refund)" }).eq("id", sd.booking_id);
-        if (sd.slot_id) { var slr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr.data) await supabase.from("slots").update({ booked: Math.max(0, slr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) { const slr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr.data) await supabase.from("slots").update({ booked: Math.max(0, slr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
         await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
         await logE(tenant, "booking_cancelled_no_refund", { booking_id: sd.booking_id }, sd.booking_id);
         // Email
         try {
-          var cbkData = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", sd.booking_id).single();
+          const cbkData = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", sd.booking_id).single();
           if (cbkData.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -1395,10 +1395,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== CONFIRM WX REFUND =====
     else if (state === "CONFIRM_WX_REFUND_ACTION") {
       if (rid === "CONFIRM_WX_REFUND" || input === "yes") {
-        var refAmt = sd.total;
+        const refAmt = sd.total;
         await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
-        var frLoc = tenant.business.location_phrase;
+        const frLoc = tenant.business.location_phrase;
         await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else {
@@ -1410,16 +1410,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== CONFIRM VOUCHER (weather bookings) =====
     else if (state === "CONFIRM_VOUCHER_CONVERT") {
       if (rid === "CONFIRM_VOUCHER" || input === "yes") {
-        var vcode = genVoucherCode();
-        var vTotal = Number(sd.total);
-        var vr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: vcode, status: "ACTIVE", type: "CREDIT", value: vTotal, current_balance: vTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+        const vcode = genVoucherCode();
+        const vTotal = Number(sd.total);
+        const vr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: vcode, status: "ACTIVE", type: "CREDIT", value: vTotal, current_balance: vTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (vr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + vcode, converted_to_voucher_id: vr.data.id }).eq("id", sd.booking_id);
-        if (sd.slot_id) { var svr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr.data) await supabase.from("slots").update({ booked: Math.max(0, svr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) { const svr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr.data) await supabase.from("slots").update({ booked: Math.max(0, svr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
         await logE(tenant, "voucher_from_booking", { booking_id: sd.booking_id, code: vcode, amount: vTotal }, sd.booking_id);
         // Email voucher
         try {
-          var vEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
+          const vEmail = await supabase.from("bookings").select("email, customer_name").eq("id", sd.booking_id).single();
           if (vEmail.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -1434,17 +1434,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== EDIT GUESTS — ask for new number =====
     else if (state === "EDIT_GUESTS_QTY") {
-      var newQty = parseInt(input);
+      const newQty = parseInt(input);
       if (isNaN(newQty) || newQty < 1 || newQty > 30) { await sendText(tenant, phone, "Please type a number between 1 and 30."); return; }
       if (newQty === sd.qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed. \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
 
       if (newQty > sd.qty) {
         // Adding guests — use atomic capacity check via RPC (H2: don't update slot before payment)
-        var addCount = newQty - sd.qty;
-        var addCost = addCount * Number(sd.unit_price);
+        const addCount = newQty - sd.qty;
+        const addCost = addCount * Number(sd.unit_price);
         await sendText(tenant, phone, "Adding " + addCount + " guest" + (addCount !== 1 ? "s" : "") + "...");
         // H2: Create hold via atomic RPC instead of directly updating slots.booked
-        var addHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+        const addHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
           p_booking_id: sd.booking_id,
           p_slot_id: sd.slot_id,
           p_qty: addCount,
@@ -1454,18 +1454,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await sendText(tenant, phone, addHoldRes.data?.error || "Sorry, not enough spots left for " + addCount + " more. Try a smaller number.");
           return;
         }
-        var addNewTotal = newQty * Number(sd.unit_price);
+        const addNewTotal = newQty * Number(sd.unit_price);
         // M8: Invalidate waiver on guest addition
         await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
         await logE(tenant, "guests_added_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: newQty, additional_cost: addCost }, sd.booking_id);
         // Create checkout for extra payment — booking qty/total updated by webhook on payment success
         try {
-          var coRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+          const coRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
             method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
             body: JSON.stringify({ amount: addCost, booking_id: sd.booking_id, business_id: tenant.business.id, type: "BOOKING",
               metadata: { hold_id: addHoldRes.data.hold_id, add_qty: addCount, new_qty: newQty, new_total: addNewTotal } }),
           });
-          var coData = await coRes.json();
+          const coData = await coRes.json();
           if (coData?.redirectUrl) {
             await sendText(tenant, phone, "\u{1F465} *" + addCount + " extra guest" + (addCount !== 1 ? "s" : "") + " reserved!*\n\nNew total will be: " + newQty + " people (R" + addNewTotal + ")\n\nPlease pay the extra *R" + addCost + "* to confirm:\n" + coData.redirectUrl + "\n\n\u23F0 Spots held for 15 minutes.");
           } else {
@@ -1483,8 +1483,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       else {
         // Removing guests
         if (!sd.can_remove) { await sendText(tenant, phone, "Removing guests is only available more than 24 hours before the trip. You can add more guests, or contact our team for help."); return; }
-        var rmCount = sd.qty - newQty;
-        var rmAmount = rmCount * (Number(sd.total) / Number(sd.qty));
+        const rmCount = sd.qty - newQty;
+        const rmAmount = rmCount * (Number(sd.total) / Number(sd.qty));
         await sendText(tenant, phone, "Removing " + rmCount + " guest" + (rmCount !== 1 ? "s" : "") + " frees up *R" + rmAmount + "*.\n\nHow would you like your credit?");
         await sendButtons(tenant, phone, "Choose an option:", [
           { id: "GUEST_VOUCHER", title: "\u{1F39F} Voucher (R" + rmAmount + ")" },
@@ -1498,24 +1498,24 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== EDIT GUESTS — refund or voucher for removed guests =====
     else if (state === "EDIT_GUESTS_EXCESS") {
       if (rid === "GUEST_VOUCHER" || input === "voucher") {
-        var gvNewTotal = sd.new_qty * Number(sd.unit_price);
+        const gvNewTotal = sd.new_qty * Number(sd.unit_price);
         await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: gvNewTotal }).eq("id", sd.booking_id);
         // Release slot capacity
-        var gvSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        const gvSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
         if (gvSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (gvSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
         // Create voucher
-        var gvCode = genVoucherCode();
-        var gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
+        const gvCode = genVoucherCode();
+        const gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (gvResult.data) gvCode = gvResult.data.code;
         await logE(tenant, "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode, amount: sd.rm_amount }, sd.booking_id);
         await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + gvCode + "*\n\u{1F4B0} Value: *R" + sd.rm_amount + "*\n\u{1F4C5} Valid for 3 years");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else if (rid === "GUEST_REFUND" || input === "refund") {
-        var grNewTotal = sd.new_qty * Number(sd.unit_price);
-        var grRefund = Math.round(sd.rm_amount * 0.95 * 100) / 100;
+        const grNewTotal = sd.new_qty * Number(sd.unit_price);
+        const grRefund = Math.round(sd.rm_amount * 0.95 * 100) / 100;
         await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund (95%)" }).eq("id", sd.booking_id);
-        var grSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        const grSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
         if (grSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (grSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
         await logE(tenant, "guests_removed_refund_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, refund: grRefund }, sd.booking_id);
         await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted (5% processing fee). Expect it within 5\u20137 business days.");
@@ -1527,8 +1527,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== SPECIAL REQUEST INPUT =====
     else if (state === "SPECIAL_REQUEST_INPUT") {
       if (!rawText || rawText.length < 2) { await sendText(tenant, phone, "Please type your special request (e.g., 'birthday celebration' or 'vegetarian')."); return; }
-      var srFields = await supabase.from("bookings").select("custom_fields").eq("id", sd.booking_id).single();
-      var srExisting = (srFields.data?.custom_fields && typeof srFields.data.custom_fields === "object") ? srFields.data.custom_fields : {};
+      const srFields = await supabase.from("bookings").select("custom_fields").eq("id", sd.booking_id).single();
+      const srExisting = (srFields.data?.custom_fields && typeof srFields.data.custom_fields === "object") ? srFields.data.custom_fields : {};
       srExisting.special_requests = rawText.substring(0, 500);
       await supabase.from("bookings").update({ custom_fields: srExisting }).eq("id", sd.booking_id);
       await logE(tenant, "special_request_wa", { booking_id: sd.booking_id, request: rawText.substring(0, 500) }, sd.booking_id);
@@ -1538,7 +1538,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== UPDATE CONTACT — pick field =====
     else if (state === "UPDATE_CONTACT_FIELD") {
-      var contactField = rid || "";
+      const contactField = rid || "";
       if (contactField === "CONTACT_NAME") {
         await sendText(tenant, phone, "Type the *new name* for this booking:");
         await setConvo(convo.id, { current_state: "UPDATE_CONTACT_VALUE", state_data: { ...sd, contact_field: "customer_name" } });
@@ -1557,25 +1557,25 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== UPDATE CONTACT — set new value =====
     else if (state === "UPDATE_CONTACT_VALUE") {
       if (!rawText || rawText.length < 2) { await sendText(tenant, phone, "Please type a valid value."); return; }
-      var ucField = sd.contact_field;
-      var ucValue = rawText.trim();
+      const ucField = sd.contact_field;
+      const ucValue = rawText.trim();
       // Validation
       if (ucField === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ucValue)) { await sendText(tenant, phone, "That doesn\u2019t look like a valid email. Please try again:"); return; }
       if (ucField === "phone") { ucValue = ucValue.replace(/\D/g, ""); if (ucValue.length < 9) { await sendText(tenant, phone, "Phone number seems too short. Please include country code (e.g. 27812345678):"); return; } }
-      var ucUpdate: any = {};
+      const ucUpdate: any = {};
       ucUpdate[ucField] = ucValue;
       await supabase.from("bookings").update(ucUpdate).eq("id", sd.booking_id);
       await logE(tenant, "contact_updated_wa", { booking_id: sd.booking_id, field: ucField, new_value: ucValue }, sd.booking_id);
-      var fieldLabel = ucField === "customer_name" ? "Name" : ucField === "email" ? "Email" : "Phone";
+      const fieldLabel = ucField === "customer_name" ? "Name" : ucField === "email" ? "Email" : "Phone";
       await sendText(tenant, phone, "\u2705 *" + fieldLabel + " updated!*\n\nNew " + fieldLabel.toLowerCase() + ": *" + ucValue + "*\n\nType *menu* for more options.");
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
 
     // ===== FAQ LIST =====
     else if (state === "FAQ_LIST") {
-      var faqMap: any = { FAQ_MEET: "meeting_point", FAQ_BRING: "what_to_bring", FAQ_CANCEL: "cancellation", FAQ_DURATION: "duration", FAQ_SAFE: "safety", FAQ_WEATHER: "weather", FAQ_PRICE: "pricing", FAQ_AGE: "age", FAQ_PARKING: "parking", FAQ_EXPECT: "what_to_expect" };
-      var key = faqMap[rid];
-      var keyAnswer = key ? getFaqAnswer(tenant, key) : null;
+      const faqMap: any = { FAQ_MEET: "meeting_point", FAQ_BRING: "what_to_bring", FAQ_CANCEL: "cancellation", FAQ_DURATION: "duration", FAQ_SAFE: "safety", FAQ_WEATHER: "weather", FAQ_PRICE: "pricing", FAQ_AGE: "age", FAQ_PARKING: "parking", FAQ_EXPECT: "what_to_expect" };
+      const key = faqMap[rid];
+      const keyAnswer = key ? getFaqAnswer(tenant, key) : null;
       if (key && keyAnswer) {
         await sendText(tenant, phone, keyAnswer);
         await sendText(tenant, phone, "Anything else? Just ask, or:");
@@ -1583,8 +1583,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "MENU" });
       } else {
         // Try natural language match even in FAQ state
-        var fk = matchFAQ(input);
-        var fkAnswer = fk ? getFaqAnswer(tenant, fk) : null;
+        const fk = matchFAQ(input);
+        const fkAnswer = fk ? getFaqAnswer(tenant, fk) : null;
         if (fk && fkAnswer) {
           await sendText(tenant, phone, fkAnswer);
           await sendButtons(tenant, phone, "Anything else?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "FAQ_LIST", title: "\u2753 More Questions" }, { id: "IDLE", title: "\u2B05 Main Menu" }]);
@@ -1598,12 +1598,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK QTY =====
     else if (state === "ASK_QTY") {
-      var qty = parseInt(input);
+      const qty = parseInt(input);
       if (isNaN(qty) || qty < 1 || qty > 30) { await sendText(tenant, phone, "Just need a number between 1 and 30 \u{1F60A}"); return; }
 
       // Check if there are ANY valid slots left in general (just to catch waitlist cases)
-      var tourSlots = sd.tour_id ? await getAvailSlotsForTour(tenant, sd.tour_id, 60) : await getAvailSlots(tenant, 60);
-      var fitting = tourSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= qty; });
+      const tourSlots = sd.tour_id ? await getAvailSlotsForTour(tenant, sd.tour_id, 60) : await getAvailSlots(tenant, 60);
+      const fitting = tourSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= qty; });
 
       if (fitting.length === 0) {
         await sendText(tenant, phone, "Ah, we are fully booked for " + qty + " people right now. Want me to add you to the waitlist? I\u2019ll message you as soon as a spot opens up!");
@@ -1614,27 +1614,27 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
-      var previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      const previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
       try {
-        var previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
+        const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
           .lte("start_time", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
           .order("start_time", { ascending: true });
-        var pvSlots = previewSlots.data || [];
+        const pvSlots = previewSlots.data || [];
         // Group by date
-        var pvDays: any = {};
-        for (var pvi = 0; pvi < pvSlots.length; pvi++) {
-          var pvs = pvSlots[pvi];
-          var pvDate = formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" });
+        const pvDays: any = {};
+        for (let pvi = 0; pvi < pvSlots.length; pvi++) {
+          const pvs = pvSlots[pvi];
+          const pvDate = formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" });
           if (!pvDays[pvDate]) pvDays[pvDate] = { open: 0, closed: 0, full: 0 };
           if (pvs.status !== "OPEN") { pvDays[pvDate].closed++; }
           else if (pvs.capacity_total - pvs.booked - (pvs.held || 0) < qty) { pvDays[pvDate].full++; }
           else { pvDays[pvDate].open++; }
         }
-        var pvKeys = Object.keys(pvDays);
-        var pvShown = 0;
-        for (var pvk = 0; pvk < pvKeys.length && pvShown < 5; pvk++) {
-          var pvd = pvDays[pvKeys[pvk]];
+        const pvKeys = Object.keys(pvDays);
+        let pvShown = 0;
+        for (let pvk = 0; pvk < pvKeys.length && pvShown < 5; pvk++) {
+          const pvd = pvDays[pvKeys[pvk]];
           if (pvd.open > 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
           else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 \u274C Closed (weather)\n"; }
           else { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 Fully booked\n"; }
@@ -1649,13 +1649,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK DATE (new step) =====
     else if (state === "PICK_DATE") {
-      var pickedDate = "";
+      const pickedDate = "";
 
       // Attempt Natural Language Date Parsing if they typed it instead of clicking
       if (rawText) {
         if (GK) {
           try {
-            var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
+            const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
               method: "POST", headers: { "Content-Type": "application/json" },
               signal: AbortSignal.timeout(5000),
               body: JSON.stringify({
@@ -1664,9 +1664,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
                 generationConfig: { temperature: 0.1, maxOutputTokens: 15 }
               })
             });
-            var d = await r.json();
+            const d = await r.json();
             if (d.candidates?.[0]?.content?.parts?.[0]) {
-              var extracted = d.candidates[0].content.parts[0].text.trim();
+              const extracted = d.candidates[0].content.parts[0].text.trim();
               if (extracted !== "INVALID" && extracted.match(/^\d{4}-\d{2}-\d{2}$/)) pickedDate = extracted;
             }
           } catch (e) { }
@@ -1679,10 +1679,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // Convert the picked local date into a UTC range using the tenant timezone.
-      var startIso = zonedDateTimeToUtcIso(tenant, pickedDate, 0, 0);
-      var endIso = zonedDateTimeToUtcIso(tenant, pickedDate, 24, 0);
+      const startIso = zonedDateTimeToUtcIso(tenant, pickedDate, 0, 0);
+      const endIso = zonedDateTimeToUtcIso(tenant, pickedDate, 24, 0);
 
-      var slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
+      const slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
         .eq("business_id", tenant.business.id)
         .gte("start_time", startIso)
         .lt("start_time", endIso)
@@ -1690,23 +1690,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Don't filter by tour_id — show ALL activities for the date so user can see all options
 
-      var { data: dbSlots } = await slotQ;
+      const { data: dbSlots } = await slotQ;
 
-      var pdFormatted = formatDateOnly(tenant, zonedDateTimeToUtcIso(tenant, pickedDate, 12, 0), { weekday: "long", day: "numeric", month: "short" });
+      const pdFormatted = formatDateOnly(tenant, zonedDateTimeToUtcIso(tenant, pickedDate, 12, 0), { weekday: "long", day: "numeric", month: "short" });
 
       if (!dbSlots || dbSlots.length === 0) {
         await sendText(tenant, phone, "We don\u2019t have any trips scheduled for " + pdFormatted + " yet. Try a date in the next 2 weeks! \u{1F4C5}");
         return;
       }
 
-      var openSlots = [];
-      var allClosed = true;
-      var hasOpenButFull = false;
+      const openSlots = [];
+      let allClosed = true;
+      let hasOpenButFull = false;
 
-      for (var ts of dbSlots) {
+      for (const ts of dbSlots) {
         if (ts.status === "OPEN") {
           allClosed = false;
-          var t_avail = ts.capacity_total - ts.booked - (ts.held || 0);
+          const t_avail = ts.capacity_total - ts.booked - (ts.held || 0);
           if (t_avail >= sd.qty) {
             openSlots.push(ts);
           } else {
@@ -1730,16 +1730,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // Multiple or 1 slot — show time picker via numbered text menu (cap at 10)
-      var maxDisplay = 10;
-      var timeTxt = pdFormatted + " \u2014 pick a time (reply with a number):\n\n";
-      var slotMap: any = {};
-      var displayCount = Math.min(openSlots.length, maxDisplay);
-      for (var ti = 0; ti < displayCount; ti++) {
-        var os = openSlots[ti];
-        var oavl = os.capacity_total - os.booked - (os.held || 0);
-        var opri = os.price_per_person_override || os.tours?.base_price_per_person || 600;
-        var otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
-        var tName = os.tours?.name ? os.tours.name + " \u2022 " : "";
+      const maxDisplay = 10;
+      let timeTxt = pdFormatted + " \u2014 pick a time (reply with a number):\n\n";
+      const slotMap: any = {};
+      const displayCount = Math.min(openSlots.length, maxDisplay);
+      for (let ti = 0; ti < displayCount; ti++) {
+        const os = openSlots[ti];
+        const oavl = os.capacity_total - os.booked - (os.held || 0);
+        const opri = os.price_per_person_override || os.tours?.base_price_per_person || 600;
+        const otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
+        const tName = os.tours?.name ? os.tours.name + " \u2022 " : "";
         timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, R" + opri + "/pp)\n";
         slotMap[ti + 1] = os.id;
       }
@@ -1754,26 +1754,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK SLOT =====
     else if (state === "PICK_SLOT") {
-      var slotId = "";
-      var num = parseInt(input.replace(/[^\d]/g, ""));
+      let slotId = "";
+      const num = parseInt(input.replace(/[^\d]/g, ""));
       if (!isNaN(num) && sd.slot_map && sd.slot_map[num]) {
         slotId = sd.slot_map[num];
       }
       if (!slotId) { await sendText(tenant, phone, "Please reply with a valid number from the list."); return; }
-      var sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
-      var slot = sr2.data;
+      const sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
+      const slot = sr2.data;
       if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date \u2014 type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date \u2014 type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       // M5: 60-min cutoff check at slot selection
-      var slotStartMs = new Date(slot.start_time).getTime();
+      const slotStartMs = new Date(slot.start_time).getTime();
       if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time or another date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
-      var slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
-      var slotAvail = Number(slotAvailRes.data || 0);
+      const slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
+      const slotAvail = Number(slotAvailRes.data || 0);
       if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
 
       if (sd.is_reschedule) {
         await sendText(tenant, phone, "Processing your change... \u23F3");
-        var { data: rbData, error: rbErr } = await supabase.functions.invoke("rebook-booking", {
+        const { data: rbData, error: rbErr } = await supabase.functions.invoke("rebook-booking", {
           body: {
             booking_id: sd.booking_id,
             new_slot_id: slotId,
@@ -1789,24 +1789,24 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      var price = await getSlotPrice(slot);
-      var baseTotal = price * sd.qty;
-      var disc = await calcDiscount(tenant, sd.qty, phone);
-      var finalTotal = baseTotal; var discountMsg = "";
+      const price = await getSlotPrice(slot);
+      const baseTotal = price * sd.qty;
+      const disc = await calcDiscount(tenant, sd.qty, phone);
+      let finalTotal = baseTotal; const discountMsg = "";
       if (disc.percent > 0) {
-        var saving = Math.round(baseTotal * disc.percent / 100); finalTotal = baseTotal - saving;
+        const saving = Math.round(baseTotal * disc.percent / 100); finalTotal = baseTotal - saving;
         if (disc.type === "GROUP") discountMsg = "\n\u{1F389} *5% group discount applied!* You save R" + saving;
         if (disc.type === "LOYALTY") discountMsg = "\n\u{1F31F} *10% loyalty discount!* You save R" + saving;
       }
       // Check if voucher booking — subtract voucher value from total
       // Supports FREE_TRIP pax limit (only covers pax_limit guests) and peak arbitrage
-      var voucherDeduction = 0;
+      let voucherDeduction = 0;
       if (sd.voucher_id) {
-        var voucherValue = Number(sd.voucher_value || 0);
+        const voucherValue = Number(sd.voucher_value || 0);
         if (sd.voucher_type === "FREE_TRIP") {
-          var coveredPax = Math.min(sd.voucher_pax_limit || 1, sd.qty);
-          var slotCost = price * coveredPax;
-          var purchaseVal = Number(sd.voucher_purchase_value || voucherValue);
+          const coveredPax = Math.min(sd.voucher_pax_limit || 1, sd.qty);
+          const slotCost = price * coveredPax;
+          const purchaseVal = Number(sd.voucher_purchase_value || voucherValue);
           // Peak arbitrage: if slot price > purchase_value, treat as credit for purchase_value
           if (slotCost > purchaseVal) {
             voucherDeduction = Math.min(purchaseVal, finalTotal);
@@ -1823,14 +1823,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           discountMsg = "\n\u{1F39F} *Voucher applied \u2014 R" + voucherDeduction + " off!*";
         }
       }
-      var tourName2 = await supabase.from("tours").select("name").eq("id", slot.tour_id).single();
-      var summary = "Here\u2019s your booking summary:\n\n\u{1F6F6} *" + (tourName2.data?.name || "Tour") + "*\n\u{1F4C5} " + fmtTime(tenant, slot.start_time) + "\n\u{1F465} " + sd.qty + " " + (sd.qty === 1 ? "person" : "people") + "\n\u{1F4B0} R" + price + " \u00D7 " + sd.qty + " = R" + baseTotal;
+      const tourName2 = await supabase.from("tours").select("name").eq("id", slot.tour_id).single();
+      let summary = "Here\u2019s your booking summary:\n\n\u{1F6F6} *" + (tourName2.data?.name || "Tour") + "*\n\u{1F4C5} " + fmtTime(tenant, slot.start_time) + "\n\u{1F465} " + sd.qty + " " + (sd.qty === 1 ? "person" : "people") + "\n\u{1F4B0} R" + price + " \u00D7 " + sd.qty + " = R" + baseTotal;
       if (sd.voucher_id && finalTotal === 0) summary += discountMsg + "\n*Total: FREE*";
       else if (sd.voucher_id && finalTotal > 0) summary += discountMsg + "\n*Remaining: R" + finalTotal + "*";
       else if (disc.percent > 0) summary += discountMsg + "\n*Total: R" + finalTotal + "*";
       else summary += "\n*Total: R" + finalTotal + "*";
       summary += "\n\nLook good?";
-      var confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay R" + finalTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
+      const confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay R" + finalTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (finalTotal > 0) confirmBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, summary, confirmBtns);
       await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, slot_id: slotId, tour_id: slot.tour_id, unit_price: price, base_total: baseTotal, total: finalTotal, discount_type: disc.type, discount_percent: disc.percent, voucher_deduction: voucherDeduction || 0 } });
@@ -1853,30 +1853,30 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK DETAILS (also handles ASK_NAME_EMAIL) =====
     else if (state === "ASK_DETAILS" || state === "ASK_NAME_EMAIL") {
-      var dParts = rawText.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
+      const dParts = rawText.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
       // Restore any partial data saved from a previous message in this state
-      var dName = sd.partial_name || "";
-      var dEmail = sd.partial_email || "";
-      for (var dp of dParts) {
-        var dc = dp.replace(/^(name|email)[:\-\s]*/i, "").trim();
+      const dName = sd.partial_name || "";
+      const dEmail = sd.partial_email || "";
+      for (const dp of dParts) {
+        const dc = dp.replace(/^(name|email)[:\-\s]*/i, "").trim();
         if (!dc) continue;
         // Use regex to extract just the email address, handles trailing text like "john@email.com but ..."
-        var emailMatch = dc.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+        const emailMatch = dc.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
         if (emailMatch && !dEmail) { dEmail = emailMatch[0].toLowerCase(); }
         else if (!emailMatch && dc.match(/[a-zA-Z]/) && !dName) { dName = dc; }
       }
 
       if (!dName || !dEmail) {
-        var dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address");
+        const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address");
         // Save whatever was valid so the next message doesn't start from scratch
         await setConvo(convo.id, { state_data: { ...sd, partial_name: dName || sd.partial_name || "", partial_email: dEmail || sd.partial_email || "" } });
-        var missMsg = dMiss.length === 1
+        const missMsg = dMiss.length === 1
           ? "Got it! I just need your " + dMiss[0] + " now:"
           : "I still need your " + dMiss.join(" and ") + ".\n\nPlease send them together, e.g.:\n*John Smith, john@email.com*";
         await sendText(tenant, phone, missMsg);
         return;
       }
-      var customDefs = await getBookingCustomFields(tenant);
+      const customDefs = await getBookingCustomFields(tenant);
       if (customDefs.length > 0) {
         await setConvo(convo.id, { current_state: "ASK_CUSTOM_FIELDS", state_data: { ...sd, customer_name: dName, email: dEmail, custom_field_defs: customDefs, custom_fields: {}, partial_name: undefined, partial_email: undefined } });
         await typingDelay();
@@ -1889,9 +1889,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     else if (state === "ASK_CUSTOM_FIELDS") {
-      var defs = Array.isArray(sd.custom_field_defs) ? sd.custom_field_defs : [];
-      var values = { ...(sd.custom_fields || {}) };
-      var currentField = nextCustomField(defs, values);
+      const defs = Array.isArray(sd.custom_field_defs) ? sd.custom_field_defs : [];
+      const values = { ...(sd.custom_fields || {}) };
+      const currentField = nextCustomField(defs, values);
       if (!currentField) {
         await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: { ...sd, custom_fields: values } });
         await typingDelay();
@@ -1899,14 +1899,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      var fieldValue = rawText.trim();
+      const fieldValue = rawText.trim();
       if (!fieldValue && currentField.required) {
         await sendText(tenant, phone, "I still need this before I can lock in the booking:\n\n" + promptForCustomField(currentField));
         return;
       }
 
       values[currentField.key] = fieldValue;
-      var upcomingField = nextCustomField(defs, values);
+      const upcomingField = nextCustomField(defs, values);
       if (upcomingField) {
         await setConvo(convo.id, { state_data: { ...sd, custom_fields: values } });
         await sendText(tenant, phone, "Got it.\n\n" + promptForCustomField(upcomingField));
@@ -1922,14 +1922,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== FINALIZE BOOKING =====
     else if (state === "FINALIZE_BOOKING") {
       // M5: Final 60-min cutoff check before creating the booking
-      var finalSlotCheck = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
+      const finalSlotCheck = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
       if (finalSlotCheck.data && new Date(finalSlotCheck.data.start_time).getTime() - Date.now() < 60 * 60 * 1000) {
         await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. This slot is no longer available. Please type *menu* to start a new booking.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         return;
       }
-      var email = sd.email;
-      var br2 = await supabase.from("bookings").insert({
+      const email = sd.email;
+      const br2 = await supabase.from("bookings").insert({
         business_id: tenant.business.id, tour_id: sd.tour_id, slot_id: sd.slot_id,
         customer_name: sd.customer_name, phone: phone, email: email,
         qty: sd.qty, unit_price: sd.unit_price, total_amount: sd.total,
@@ -1938,26 +1938,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         marketing_opt_in: null, total_captured: 0, total_refunded: 0,
       }).select().single();
       if (br2.error || !br2.data) { console.error("Err:", JSON.stringify(br2.error)); await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
-      var booking = br2.data;
+      const booking = br2.data;
 
       // VOUCHER BOOKING — skip payment
       if (sd.voucher_id && sd.total <= 0) {
         await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + sd.voucher_code }).eq("id", booking.id);
         // Deduct voucher balances — sequential drain using atomic RPC (prevents double-spend)
-        var allVIds = sd.voucher_ids || [sd.voucher_id];
-        var waRemainingCost = Number(sd.voucher_deduction || sd.original_total || sd.base_total || 0);
-        for (var vi = 0; vi < allVIds.length; vi++) {
+        const allVIds = sd.voucher_ids || [sd.voucher_id];
+        let waRemainingCost = Number(sd.voucher_deduction || sd.original_total || sd.base_total || 0);
+        for (let vi = 0; vi < allVIds.length; vi++) {
           if (!allVIds[vi] || waRemainingCost <= 0) continue;
           // Atomic deduction via RPC — drains Voucher A to R0 first, then Voucher B
-          var waRpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: allVIds[vi], p_amount: waRemainingCost });
+          const waRpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: allVIds[vi], p_amount: waRemainingCost });
           if (waRpcRes.data?.success) {
-            var waDeducted = Number(waRpcRes.data.deducted);
-            var waNewBal = Number(waRpcRes.data.remaining);
+            const waDeducted = Number(waRpcRes.data.deducted);
+            const waNewBal = Number(waRpcRes.data.remaining);
             waRemainingCost -= waDeducted;
             await supabase.from("vouchers").update({ redeemed_booking_id: booking.id, redeemed_by_phone: phone }).eq("id", allVIds[vi]);
             if (waNewBal > 0) {
               // Notify about remaining balance via WhatsApp
-              var waVCode = await supabase.from("vouchers").select("code").eq("id", allVIds[vi]).single();
+              const waVCode = await supabase.from("vouchers").select("code").eq("id", allVIds[vi]).single();
               try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + (waVCode.data?.code || allVIds[vi]) + "* has *R" + waNewBal + "* remaining. Use it on your next booking!"); } catch (e) { }
             }
           } else {
@@ -1966,7 +1966,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           }
         }
         // H1: Atomic slot update for voucher bookings via RPC
-        var vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+        const vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
           p_booking_id: booking.id,
           p_slot_id: sd.slot_id,
           p_qty: sd.qty,
@@ -1978,15 +1978,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
-        var vref = booking.id.substring(0, 8).toUpperCase();
-        var vslot = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
-        var vtour = await supabase.from("tours").select("name").eq("id", sd.tour_id).single();
-        var waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
+        const vref = booking.id.substring(0, 8).toUpperCase();
+        const vslot = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
+        const vtour = await supabase.from("tours").select("name").eq("id", sd.tour_id).single();
+        const waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
         await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: sd.voucher_code }, booking.id);
         // Upsell second trip
-        var otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== sd.tour_id; });
+        const otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== sd.tour_id; });
         if (otherTours2.length > 0) {
-          var upsellTour = otherTours2[0];
+          const upsellTour = otherTours2[0];
           setTimeout(async function () {
             try {
               await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip? Book both and enjoy even more of Cape Town\u2019s coastline!\n\nJust type *book* to add another tour.");
@@ -2018,7 +2018,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // PAID BOOKING — atomic capacity check + hold creation to prevent overbooking
-      var holdRes = await supabase.rpc("create_hold_with_capacity_check", {
+      const holdRes = await supabase.rpc("create_hold_with_capacity_check", {
         p_booking_id: booking.id,
         p_slot_id: sd.slot_id,
         p_qty: sd.qty,
@@ -2028,8 +2028,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
-      var bookingSiteUrls = await getBusinessSiteUrls(tenant);
-      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(sd.total * 100)); var yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+      const bookingSiteUrls = await getBusinessSiteUrls(tenant);
+      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(sd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
         method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: Math.round(sd.total * 100), currency: tenant.business.currency || "ZAR",
@@ -2039,14 +2039,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           metadata: { booking_id: booking.id, customer_name: sd.customer_name, qty: String(sd.qty) },
         }),
       });
-      var yocoData = await yocoRes.json();
+      const yocoData = await yocoRes.json();
       console.log("YOCO:" + JSON.stringify(yocoData));
-      var payUrl = "";
+      let payUrl = "";
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
         await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", booking.id);
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable \u2014 type *speak to us* for help"; }
-      var ref = booking.id.substring(0, 8).toUpperCase();
+      const ref = booking.id.substring(0, 8).toUpperCase();
       await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + sd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
@@ -2056,7 +2056,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "AWAITING_PAYMENT") {
       // L9: Check if hold has expired
       if (sd.booking_id) {
-        var awHold = await supabase.from("holds").select("status, expires_at").eq("booking_id", sd.booking_id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const awHold = await supabase.from("holds").select("status, expires_at").eq("booking_id", sd.booking_id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (awHold.data && new Date(awHold.data.expires_at) < new Date()) {
           await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries \u2014 type *book* to start a new booking and grab fresh spots!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
@@ -2064,7 +2064,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
         if (!awHold.data) {
           // No active hold found — check if booking is still HELD
-          var awBk = await supabase.from("bookings").select("status").eq("id", sd.booking_id).single();
+          const awBk = await supabase.from("bookings").select("status").eq("id", sd.booking_id).single();
           if (awBk.data && awBk.data.status !== "HELD" && awBk.data.status !== "PAID") {
             await sendText(tenant, phone, "Your booking hold has expired. Type *book* to start a new booking!");
             await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
@@ -2080,11 +2080,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== GIFT VOUCHER PURCHASE =====
     else if (state === "GV_PICK_TOUR") {
-      var tourId = rid ? rid.replace("GV_", "") : "";
+      const tourId = rid ? rid.replace("GV_", "") : "";
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list."); return; }
-      var tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
+      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Can't find that tour. Let's try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-      var t = tourInfo.data;
+      const t = tourInfo.data;
       await sendText(tenant, phone, "\u{1F381} *" + t.name + " Gift Voucher*\nValue: R" + t.base_price_per_person + "\n\nWho is this voucher for? Type their name (e.g. Sarah):");
       await setConvo(convo.id, { current_state: "GV_RECIPIENT_NAME", state_data: { tour_id: tourId, tour_name: t.name, value: t.base_price_per_person } });
     }
@@ -2096,7 +2096,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     else if (state === "GV_MESSAGE") {
-      var giftMsg = (input === "skip" || input === "no") ? "" : rawText;
+      const giftMsg = (input === "skip" || input === "no") ? "" : rawText;
       await sendText(tenant, phone, "Almost done! I just need your details.\n\nWhat's your full name?");
       await setConvo(convo.id, { current_state: "GV_BUYER_NAME", state_data: { ...sd, gift_message: giftMsg } });
     }
@@ -2109,8 +2109,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     else if (state === "GV_BUYER_EMAIL") {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawText)) { await sendText(tenant, phone, "That doesn't look like a valid email. Try again?"); return; }
-      var buyerEmail = rawText.toLowerCase();
-      var summary = "\u{1F381} *Gift Voucher Summary*\n\n" +
+      const buyerEmail = rawText.toLowerCase();
+      let summary = "\u{1F381} *Gift Voucher Summary*\n\n" +
         "\u{1F6F6} " + sd.tour_name + "\n" +
         "\u{1F4B0} R" + sd.value + "\n" +
         "\u{1F465} For: " + sd.recipient_name + "\n";
@@ -2128,8 +2128,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       if (rid === "GV_CONFIRM" || input === "yes") {
         // Create voucher in PENDING status
-        var vcode = genVoucherCode();
-        var vr = await insertVoucherWithRetry({
+        const vcode = genVoucherCode();
+        const vr = await insertVoucherWithRetry({
           business_id: tenant.business.id, code: vcode, status: "PENDING", type: "FREE_TRIP",
           recipient_name: sd.recipient_name, gift_message: sd.gift_message || null,
           buyer_name: sd.buyer_name, buyer_email: sd.buyer_email, buyer_phone: phone,
@@ -2147,8 +2147,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
         // Create Yoco checkout
         // Uses global tenant.credentials.yocoSecretKey
-        var voucherSiteUrls = await getBusinessSiteUrls(tenant);
-        var yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+        const voucherSiteUrls = await getBusinessSiteUrls(tenant);
+        const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
           method: "POST",
           headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2159,7 +2159,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             metadata: { voucher_id: vr.data.id, voucher_code: vcode, type: "GIFT_VOUCHER" },
           }),
         });
-        var yocoData = await yocoRes.json();
+        const yocoData = await yocoRes.json();
         console.log("YOCO_GV:" + JSON.stringify(yocoData));
 
         if (yocoData && yocoData.id && yocoData.redirectUrl) {
@@ -2188,12 +2188,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
 
     else if (state === "REDEEM_VOUCHER") {
-      var code = rawText.toUpperCase().replace(/\s/g, "");
+      const code = rawText.toUpperCase().replace(/\s/g, "");
       if (code.length !== 8) { await sendText(tenant, phone, "Voucher codes are 8 characters long. Double-check and try again:"); return; }
-      var vr2 = await supabase.from("vouchers").select().eq("code", code).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
+      const vr2 = await supabase.from("vouchers").select().eq("code", code).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
       if (!vr2.data) {
         // Check if redeemed
-        var vUsed = await supabase.from("vouchers").select("status").eq("code", code).eq("business_id", tenant.business.id).single();
+        const vUsed = await supabase.from("vouchers").select("status").eq("code", code).eq("business_id", tenant.business.id).single();
         if (vUsed.data && vUsed.data.status === "REDEEMED") {
           await sendText(tenant, phone, "This voucher has already been redeemed. Each voucher code can only be used once.");
           await sendButtons(tenant, phone, "Options:", [{ id: "ADD_VOUCHER", title: "\u{1F39F} Try Another" }, { id: "CONFIRM", title: "\u2705 Continue" }, { id: "IDLE", title: "\u2B05 Back" }]);
@@ -2206,18 +2206,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (vr2.data.expires_at && new Date(vr2.data.expires_at) < new Date()) { await sendText(tenant, phone, "Unfortunately this voucher has expired. Type *speak to us* if you think this is a mistake."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
 
       // Get voucher value + type metadata for FREE_TRIP pax limit and peak arbitrage
-      var vVal = Number(vr2.data.current_balance || vr2.data.value || vr2.data.purchase_amount || 0);
-      var vType = vr2.data.type || "CREDIT";
-      var vPaxLimit = vr2.data.pax_limit || 1;
-      var vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
-      var tours3 = await getActiveTours(tenant);
+      const vVal = Number(vr2.data.current_balance || vr2.data.value || vr2.data.purchase_amount || 0);
+      const vType = vr2.data.type || "CREDIT";
+      const vPaxLimit = vr2.data.pax_limit || 1;
+      const vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
+      const tours3 = await getActiveTours(tenant);
       if (tours3.length === 1) {
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nHow many people will be joining?");
         await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
       } else {
-        var vtrows: any[] = [];
-        for (var vti = 0; vti < tours3.length; vti++) {
-          var vtr = tours3[vti];
+        const vtrows: any[] = [];
+        for (let vti = 0; vti < tours3.length; vti++) {
+          const vtr = tours3[vti];
           vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: vtr.duration_minutes + " min \u2022 normally R" + vtr.base_price_per_person + "/pp" });
         }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nWhich tour would you like?");
@@ -2229,11 +2229,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ADD EXTRA VOUCHER =====
     else if (state === "ADD_EXTRA_VOUCHER") {
-      var xcode = rawText.toUpperCase().replace(/\s/g, "");
+      const xcode = rawText.toUpperCase().replace(/\s/g, "");
       if (xcode.length !== 8) { await sendText(tenant, phone, "Voucher codes are 8 characters long. Try again:"); return; }
-      var xvr = await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
+      const xvr = await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
       if (!xvr.data) {
-        var xUsed = await supabase.from("vouchers").select("status").eq("code", xcode).eq("business_id", tenant.business.id).single();
+        const xUsed = await supabase.from("vouchers").select("status").eq("code", xcode).eq("business_id", tenant.business.id).single();
         if (xUsed.data && xUsed.data.status === "REDEEMED") {
           await sendText(tenant, phone, "This voucher has already been redeemed. Each code can only be used once.");
         } else {
@@ -2249,28 +2249,28 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       // Stack the voucher value
-      var xVal = Number(xvr.data.current_balance || xvr.data.value || xvr.data.purchase_amount || 0);
-      var existingVoucherValue = Number(sd.voucher_value || 0);
-      var newVoucherValue = existingVoucherValue + xVal;
+      const xVal = Number(xvr.data.current_balance || xvr.data.value || xvr.data.purchase_amount || 0);
+      const existingVoucherValue = Number(sd.voucher_value || 0);
+      const newVoucherValue = existingVoucherValue + xVal;
       // Store multiple voucher codes and IDs
-      var vCodes = (sd.voucher_codes || [sd.voucher_code].filter(Boolean));
+      const vCodes = (sd.voucher_codes || [sd.voucher_code].filter(Boolean));
       vCodes.push(xcode);
-      var vIds = (sd.voucher_ids || [sd.voucher_id].filter(Boolean));
+      const vIds = (sd.voucher_ids || [sd.voucher_id].filter(Boolean));
       vIds.push(xvr.data.id);
       // Recalculate total
-      var newDeduction = Math.min(newVoucherValue, Number(sd.base_total));
-      var newTotal = Math.max(0, Number(sd.base_total) - newDeduction);
+      const newDeduction = Math.min(newVoucherValue, Number(sd.base_total));
+      let newTotal = Math.max(0, Number(sd.base_total) - newDeduction);
       // Apply any other discounts too
       if (sd.discount_percent > 0 && !sd.voucher_id) {
-        var discSaving = Math.round(Number(sd.base_total) * sd.discount_percent / 100);
+        const discSaving = Math.round(Number(sd.base_total) * sd.discount_percent / 100);
         newTotal = Math.max(0, newTotal - discSaving);
       }
-      var xMsg = "\u{1F39F} *Second voucher applied!* (R" + xVal + " credit)\n\n";
+      const xMsg = "\u{1F39F} *Second voucher applied!* (R" + xVal + " credit)\n\n";
       if (newTotal === 0) xMsg += "Your trip is now *completely FREE!*";
       else xMsg += "Remaining balance: *R" + newTotal + "*";
       await sendText(tenant, phone, xMsg);
-      var updatedSd = { ...sd, voucher_value: newVoucherValue, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: newDeduction, total: newTotal };
-      var cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay R" + newTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
+      const updatedSd = { ...sd, voucher_value: newVoucherValue, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: newDeduction, total: newTotal };
+      const cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay R" + newTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (newTotal > 0) cBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, "Ready to proceed?", cBtns);
       await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: updatedSd });
@@ -2283,18 +2283,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await typingDelay();
 
       // PRIORITY 1: Check booking-related intents first (before FAQ!)
-      var wantReschedule = input.includes("reschedule") || input.includes("move") && (input.includes("booking") || input.includes("trip")) || (input.includes("change") && (input.includes("date") || input.includes("time") || input.includes("booking") || input.includes("day")));
-      var wantCancel = (input.includes("cancel") && !input.includes("cancellation") && !input.includes("policy")) || (input.includes("refund") && input.includes("my"));
-      var wantMyBooking = input.includes("my booking") || input.includes("my trip") || input.includes("my tour") || (input.includes("booking") && (input.includes("today") || input.includes("made") || input.includes("check") || input.includes("status") || input.includes("when") || input.includes("detail") || input.includes("info"))) || (input.includes("when") && (input.includes("my") || input.includes("trip") || input.includes("tour") || input.includes("paddle"))) || (input.includes("what time") && input.includes("my")) || (input.includes("how many") && input.includes("my")) || (input.includes("ref") && (input.includes("my") || input.includes("booking")));
-      var wantBook = input.includes("book") && (input.includes("want") || input.includes("like") || input.includes("can i"));
-      var wantAddPeople = (input.includes("add") || input.includes("more") || input.includes("extra")) && (input.includes("people") || input.includes("person") || input.includes("pax") || input.includes("guest") || input.includes("friend"));
-      var wantReducePeople = (input.includes("reduce") || input.includes("remove") || input.includes("less") || input.includes("fewer")) && (input.includes("people") || input.includes("person") || input.includes("pax"));
-      var wantChangeTour = (input.includes("change") || input.includes("switch") || input.includes("swap")) && (input.includes("tour") || input.includes("sea") || input.includes("sunset"));
-      var wantChangeName = (input.includes("change") || input.includes("update") || input.includes("wrong")) && (input.includes("name") || input.includes("person"));
-      var wantPaymentLink = input.includes("payment") && (input.includes("link") || input.includes("pay") || input.includes("again") || input.includes("new")) || (input.includes("didn") && input.includes("pay")) || input.includes("resend");
-      var wantConfirmEmail = (input.includes("email") || input.includes("confirmation")) && (input.includes("resend") || input.includes("again") || input.includes("didn") || input.includes("not received") || input.includes("haven"));
-      var wantReceipt = input.includes("receipt") || input.includes("invoice") || input.includes("proof") && input.includes("payment");
-      var wantWrongDate = (input.includes("wrong") && (input.includes("date") || input.includes("day") || input.includes("time"))) || (input.includes("booked") && input.includes("wrong"));
+      const wantReschedule = input.includes("reschedule") || input.includes("move") && (input.includes("booking") || input.includes("trip")) || (input.includes("change") && (input.includes("date") || input.includes("time") || input.includes("booking") || input.includes("day")));
+      const wantCancel = (input.includes("cancel") && !input.includes("cancellation") && !input.includes("policy")) || (input.includes("refund") && input.includes("my"));
+      const wantMyBooking = input.includes("my booking") || input.includes("my trip") || input.includes("my tour") || (input.includes("booking") && (input.includes("today") || input.includes("made") || input.includes("check") || input.includes("status") || input.includes("when") || input.includes("detail") || input.includes("info"))) || (input.includes("when") && (input.includes("my") || input.includes("trip") || input.includes("tour") || input.includes("paddle"))) || (input.includes("what time") && input.includes("my")) || (input.includes("how many") && input.includes("my")) || (input.includes("ref") && (input.includes("my") || input.includes("booking")));
+      const wantBook = input.includes("book") && (input.includes("want") || input.includes("like") || input.includes("can i"));
+      const wantAddPeople = (input.includes("add") || input.includes("more") || input.includes("extra")) && (input.includes("people") || input.includes("person") || input.includes("pax") || input.includes("guest") || input.includes("friend"));
+      const wantReducePeople = (input.includes("reduce") || input.includes("remove") || input.includes("less") || input.includes("fewer")) && (input.includes("people") || input.includes("person") || input.includes("pax"));
+      const wantChangeTour = (input.includes("change") || input.includes("switch") || input.includes("swap")) && (input.includes("tour") || input.includes("sea") || input.includes("sunset"));
+      const wantChangeName = (input.includes("change") || input.includes("update") || input.includes("wrong")) && (input.includes("name") || input.includes("person"));
+      const wantPaymentLink = input.includes("payment") && (input.includes("link") || input.includes("pay") || input.includes("again") || input.includes("new")) || (input.includes("didn") && input.includes("pay")) || input.includes("resend");
+      const wantConfirmEmail = (input.includes("email") || input.includes("confirmation")) && (input.includes("resend") || input.includes("again") || input.includes("didn") || input.includes("not received") || input.includes("haven"));
+      const wantReceipt = input.includes("receipt") || input.includes("invoice") || input.includes("proof") && input.includes("payment");
+      const wantWrongDate = (input.includes("wrong") && (input.includes("date") || input.includes("day") || input.includes("time"))) || (input.includes("booked") && input.includes("wrong"));
 
       // If they want to book, go straight to booking flow
       if (wantBook && !wantReschedule && !wantCancel) {
@@ -2308,13 +2308,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Handle add/reduce people, change tour, change name — connect to team
       if (wantAddPeople) {
-        var addBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time, capacity_total, booked, held), tours(name)")
+        const addBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time, capacity_total, booked, held), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (addBkr.data) {
-          var addBk = addBkr.data; var addRef = addBk.id.substring(0, 8).toUpperCase();
-          var addSlot = (addBk as any).slots; var addTour = (addBk as any).tours;
-          var addAvail = addSlot ? addSlot.capacity_total - addSlot.booked - (addSlot.held || 0) : 0;
+          const addBk = addBkr.data; const addRef = addBk.id.substring(0, 8).toUpperCase();
+          const addSlot = (addBk as any).slots; const addTour = (addBk as any).tours;
+          const addAvail = addSlot ? addSlot.capacity_total - addSlot.booked - (addSlot.held || 0) : 0;
           await sendText(tenant, phone, "Your booking *" + addRef + "* currently has " + addBk.qty + " people on " + (addTour?.name || "Tour") + " \u2014 " + (addSlot ? fmtTime(tenant, addSlot.start_time) : "TBC") + ".\n\n" + (addAvail > 0 ? "There are " + addAvail + " extra spots available.\n\n" : "This slot is full unfortunately.\n\n") + "How many people total would you like? (Currently " + addBk.qty + ")");
           await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: addBk.id, slot_id: addBk.slot_id, tour_id: addBk.tour_id, current_qty: addBk.qty, unit_price: addBk.unit_price, max_avail: addBk.qty + addAvail } });
         } else {
@@ -2326,14 +2326,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (wantReducePeople) {
-        var redBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
+        const redBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (redBkr.data) {
-          var redBk = redBkr.data; var redRef = redBk.id.substring(0, 8).toUpperCase();
-          var redSlot = (redBk as any).slots; var redTour = (redBk as any).tours;
-          var redHrs = redSlot ? (new Date(redSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-          var refundNote = redHrs >= 24 ? "You\u2019ll get a refund for the difference." : "As it\u2019s within 24 hours, the refund policy applies.";
+          const redBk = redBkr.data; const redRef = redBk.id.substring(0, 8).toUpperCase();
+          const redSlot = (redBk as any).slots; const redTour = (redBk as any).tours;
+          const redHrs = redSlot ? (new Date(redSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
+          const refundNote = redHrs >= 24 ? "You\u2019ll get a refund for the difference." : "As it\u2019s within 24 hours, the refund policy applies.";
           await sendText(tenant, phone, "Your booking *" + redRef + "* has " + redBk.qty + " people on " + (redTour?.name || "Tour") + ".\n\n" + refundNote + "\n\nHow many people total would you like? (Currently " + redBk.qty + ")");
           await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: redBk.id, slot_id: redBk.slot_id, tour_id: redBk.tour_id, current_qty: redBk.qty, unit_price: redBk.unit_price, max_avail: 30, hours_before: redHrs } });
         } else {
@@ -2344,18 +2344,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (wantChangeTour) {
-        var ctBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
+        const ctBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (ctBkr.data) {
-          var ctBk = ctBkr.data; var ctRef = ctBk.id.substring(0, 8).toUpperCase();
-          var ctTour = (ctBk as any).tours;
-          var ctSlot = (ctBk as any).slots;
-          var tours = await getActiveTours(tenant);
-          var otherTours = tours.filter(function (t: any) { return t.id !== ctBk.tour_id; });
+          const ctBk = ctBkr.data; const ctRef = ctBk.id.substring(0, 8).toUpperCase();
+          const ctTour = (ctBk as any).tours;
+          const ctSlot = (ctBk as any).slots;
+          const tours = await getActiveTours(tenant);
+          const otherTours = tours.filter(function (t: any) { return t.id !== ctBk.tour_id; });
           if (otherTours.length > 0) {
             await sendText(tenant, phone, "Your booking *" + ctRef + "* is for *" + (ctTour?.name || "Tour") + "* on " + (ctSlot ? fmtTime(tenant, ctSlot.start_time) : "TBC") + ".\n\nWhich tour would you like to switch to?");
-            var ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + t.duration_minutes + " min" }; });
+            const ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + t.duration_minutes + " min" }; });
             await sendList(tenant, phone, "Pick a new tour:", "Choose Tour", [{ title: "Available Tours", rows: ctRows }]);
             await setConvo(convo.id, { current_state: "CHANGE_TOUR_PICK", state_data: { booking_id: ctBk.id, slot_id: ctBk.slot_id, tour_id: ctBk.tour_id, qty: ctBk.qty, current_tour: ctTour?.name } });
           } else {
@@ -2370,11 +2370,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (wantChangeName) {
-        var nmBkr = await supabase.from("bookings").select("id, customer_name, slots(start_time), tours(name)")
+        const nmBkr = await supabase.from("bookings").select("id, customer_name, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (nmBkr.data) {
-          var nmBk = nmBkr.data; var nmRef = nmBk.id.substring(0, 8).toUpperCase();
+          const nmBk = nmBkr.data; const nmRef = nmBk.id.substring(0, 8).toUpperCase();
           await sendText(tenant, phone, "The booking *" + nmRef + "* is currently under *" + nmBk.customer_name + "*. What should the new name be?");
           await setConvo(convo.id, { current_state: "CHANGE_NAME", state_data: { booking_id: nmBk.id } });
         } else {
@@ -2386,15 +2386,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Handle payment link resend
       if (wantPaymentLink) {
-        var payBkr = await supabase.from("bookings").select("id, status, total_amount, yoco_checkout_id, slots(start_time), tours(name)")
+        const payBkr = await supabase.from("bookings").select("id, status, total_amount, yoco_checkout_id, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (payBkr.data && payBkr.data.yoco_checkout_id) {
           // Create new checkout
-          var rpBk = payBkr.data;
-          var rpRef = rpBk.id.substring(0, 8).toUpperCase();
-          var resendSiteUrls = await getBusinessSiteUrls(tenant);
-          var rpYoco = await fetch("https://payments.yoco.com/api/checkouts", {
+          const rpBk = payBkr.data;
+          const rpRef = rpBk.id.substring(0, 8).toUpperCase();
+          const resendSiteUrls = await getBusinessSiteUrls(tenant);
+          const rpYoco = await fetch("https://payments.yoco.com/api/checkouts", {
             method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
             body: JSON.stringify({
               amount: Math.round(Number(rpBk.total_amount) * 100), currency: tenant.business.currency || "ZAR",
@@ -2404,7 +2404,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               metadata: { booking_id: rpBk.id, type: "RESEND" },
             }),
           });
-          var rpYocoData = await rpYoco.json();
+          const rpYocoData = await rpYoco.json();
           if (rpYocoData?.redirectUrl) {
             await supabase.from("bookings").update({ yoco_checkout_id: rpYocoData.id }).eq("id", rpBk.id);
             await sendText(tenant, phone, "Here\u2019s a fresh payment link for booking *" + rpRef + "* (R" + rpBk.total_amount + "):\n\n" + rpYocoData.redirectUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
@@ -2422,11 +2422,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Handle confirmation email resend
       if (wantConfirmEmail) {
-        var emBkr = await supabase.from("bookings").select("id, email, customer_name, qty, total_amount, status, slots(start_time), tours(name)")
+        const emBkr = await supabase.from("bookings").select("id, email, customer_name, qty, total_amount, status, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (emBkr.data) {
-          var emBk = emBkr.data; var emRef = emBk.id.substring(0, 8).toUpperCase();
+          const emBk = emBkr.data; const emRef = emBk.id.substring(0, 8).toUpperCase();
           try {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -2445,9 +2445,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // Handle split payment
-      var wantSplit = (input.includes("split") && input.includes("pay")) || (input.includes("separate") && input.includes("pay"));
+      const wantSplit = (input.includes("split") && input.includes("pay")) || (input.includes("separate") && input.includes("pay"));
       if (wantSplit) {
-        var spBkr = await supabase.from("bookings").select("id, total_amount, status")
+        const spBkr = await supabase.from("bookings").select("id, total_amount, status")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (spBkr.data) {
@@ -2461,15 +2461,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // Handle cash/deposit request
-      var wantCash = input.includes("cash") || (input.includes("deposit") && !input.includes("refund"));
+      const wantCash = input.includes("cash") || (input.includes("deposit") && !input.includes("refund"));
       if (wantCash) {
-        var cashBkr = await supabase.from("bookings").select("id, total_amount, status")
+        const cashBkr = await supabase.from("bookings").select("id, total_amount, status")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (cashBkr.data) {
-          var depAmount = Math.round(Number(cashBkr.data.total_amount) * 0.5);
-          var depositSiteUrls = await getBusinessSiteUrls(tenant);
-          var depYoco = await fetch("https://payments.yoco.com/api/checkouts", {
+          const depAmount = Math.round(Number(cashBkr.data.total_amount) * 0.5);
+          const depositSiteUrls = await getBusinessSiteUrls(tenant);
+          const depYoco = await fetch("https://payments.yoco.com/api/checkouts", {
             method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
             body: JSON.stringify({
               amount: Math.round(depAmount * 100), currency: tenant.business.currency || "ZAR",
@@ -2478,7 +2478,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               metadata: { booking_id: cashBkr.data.id, type: "DEPOSIT_50" },
             }),
           });
-          var depData = await depYoco.json();
+          const depData = await depYoco.json();
           if (depData?.redirectUrl) {
             await sendText(tenant, phone, "No problem! Pay a 50% deposit (R" + depAmount + ") to secure your booking, and settle the rest in cash on the day:\n\n" + depData.redirectUrl);
           } else {
@@ -2501,22 +2501,22 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Check weather concern
       if (!wantReschedule && !wantCancel && !wantMyBooking) {
-        var weatherHandled = await checkWeatherConcern(tenant, phone, input);
+        const weatherHandled = await checkWeatherConcern(tenant, phone, input);
         if (weatherHandled) { await setConvo(convo.id, { current_state: "MENU" }); return; }
       }
 
       // Check smart availability before FAQ
       if (!wantReschedule && !wantCancel && !wantMyBooking && detectAvailQuery(input)) {
-        var askHandled = await handleSmartAvail(tenant, phone, input);
+        const askHandled = await handleSmartAvail(tenant, phone, input);
         if (askHandled) { await setConvo(convo.id, { current_state: "MENU" }); return; }
       }
 
       if (wantReschedule || wantCancel || wantMyBooking) {
         // Look up their bookings
-        var askBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, tour_id, created_at, slots(start_time), tours(name)")
+        const askBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, tour_id, created_at, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(5);
-        var askBookings = askBkr.data || [];
+        const askBookings = askBkr.data || [];
 
         if (askBookings.length === 0) {
           await sendText(tenant, phone, "I couldn\u2019t find any active bookings linked to this phone number. If you booked with a different number, try the My Bookings page on our website with your email.");
@@ -2528,9 +2528,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // If they want to reschedule
         if (wantReschedule) {
           if (askBookings.length === 1) {
-            var rb = askBookings[0]; var rbSlot = (rb as any).slots; var rbTour = (rb as any).tours;
-            var rbRef = rb.id.substring(0, 8).toUpperCase();
-            var rbHrs = rbSlot ? (new Date(rbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
+            const rb = askBookings[0]; const rbSlot = (rb as any).slots; const rbTour = (rb as any).tours;
+            const rbRef = rb.id.substring(0, 8).toUpperCase();
+            const rbHrs = rbSlot ? (new Date(rbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
 
             if (rbHrs < 24) {
               await sendText(tenant, phone, "Your booking *" + rbRef + "* for " + (rbTour?.name || "the tour") + " on " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + " is within 24 hours, so rescheduling isn\u2019t available anymore. You can contact our team for help.");
@@ -2540,7 +2540,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             }
 
             // Check reschedule count
-            var rCount = await supabase.from("bookings").select("reschedule_count").eq("id", rb.id).single();
+            const rCount = await supabase.from("bookings").select("reschedule_count").eq("id", rb.id).single();
             if (rCount.data && rCount.data.reschedule_count >= 2) {
               await sendText(tenant, phone, "You\u2019ve already rescheduled this booking twice. Let me connect you to our team.");
               await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
@@ -2548,8 +2548,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             }
 
             // Load slots for reschedule
-            var askRSlots = rb.tour_id ? await getAvailSlotsForTour(tenant, rb.tour_id, 60) : await getAvailSlots(tenant, 60);
-            var askRFitting = askRSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= rb.qty && s.id !== rb.slot_id; });
+            const askRSlots = rb.tour_id ? await getAvailSlotsForTour(tenant, rb.tour_id, 60) : await getAvailSlots(tenant, 60);
+            const askRFitting = askRSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= rb.qty && s.id !== rb.slot_id; });
 
             if (askRFitting.length === 0) {
               await sendText(tenant, phone, "No alternative slots with enough space right now. Let me connect you to our team.");
@@ -2560,20 +2560,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             await sendText(tenant, phone, "Sure! I found your booking:\n\n\u{1F6F6} *" + (rbTour?.name || "Tour") + "*\n\u{1F4C5} " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + "\n\u{1F465} " + rb.qty + " people\n\nPick a new date:");
 
             // Group by week
-            var askRGroups: any = {};
-            for (var ari = 0; ari < askRFitting.length; ari++) {
-              var ars = askRFitting[ari]; var arsDate = new Date(ars.start_time);
-              var arwStart = new Date(arsDate); arwStart.setDate(arwStart.getDate() - arwStart.getDay());
-              var arwLabel = formatDateOnly(tenant, arwStart.toISOString(), { day: "numeric", month: "short" });
-              var arwKey = arwStart.toISOString().split("T")[0];
+            const askRGroups: any = {};
+            for (let ari = 0; ari < askRFitting.length; ari++) {
+              const ars = askRFitting[ari]; const arsDate = new Date(ars.start_time);
+              const arwStart = new Date(arsDate); arwStart.setDate(arwStart.getDate() - arwStart.getDay());
+              const arwLabel = formatDateOnly(tenant, arwStart.toISOString(), { day: "numeric", month: "short" });
+              const arwKey = arwStart.toISOString().split("T")[0];
               if (!askRGroups[arwKey]) askRGroups[arwKey] = { label: "Week of " + arwLabel, rows: [] };
               if (askRGroups[arwKey].rows.length < 10) {
                 askRGroups[arwKey].rows.push({ id: "RSLOT_" + ars.id, title: fmtTime(tenant, ars.start_time).substring(0, 24), description: (ars.capacity_total - ars.booked - (ars.held || 0)) + " spots" });
               }
             }
-            var askRSecs: any[] = []; var askRKeys = Object.keys(askRGroups).sort(); var askRTotal = 0;
-            for (var ark = 0; ark < askRKeys.length && askRTotal < 10; ark++) {
-              var arg = askRGroups[askRKeys[ark]]; var arRem = 10 - askRTotal;
+            const askRSecs: any[] = []; const askRKeys = Object.keys(askRGroups).sort(); const askRTotal = 0;
+            for (let ark = 0; ark < askRKeys.length && askRTotal < 10; ark++) {
+              const arg = askRGroups[askRKeys[ark]]; const arRem = 10 - askRTotal;
               if (arg.rows.length > arRem) arg.rows = arg.rows.slice(0, arRem);
               askRTotal += arg.rows.length; askRSecs.push({ title: arg.label.substring(0, 24), rows: arg.rows });
             }
@@ -2582,11 +2582,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             return;
           } else {
             // Multiple bookings — let them pick
-            var rbMsg = "I found " + askBookings.length + " active bookings. Which one do you want to reschedule?\n\n";
-            var rbRows: any[] = [];
-            for (var rbi = 0; rbi < askBookings.length; rbi++) {
-              var rbb = askBookings[rbi]; var rbbSlot = (rbb as any).slots; var rbbTour = (rbb as any).tours;
-              var rbbRef = rbb.id.substring(0, 8).toUpperCase();
+            let rbMsg = "I found " + askBookings.length + " active bookings. Which one do you want to reschedule?\n\n";
+            const rbRows: any[] = [];
+            for (let rbi = 0; rbi < askBookings.length; rbi++) {
+              const rbb = askBookings[rbi]; const rbbSlot = (rbb as any).slots; const rbbTour = (rbb as any).tours;
+              const rbbRef = rbb.id.substring(0, 8).toUpperCase();
               rbMsg += (rbi + 1) + ". *" + rbbRef + "* \u2014 " + (rbbTour?.name || "Tour") + "\n   " + (rbbSlot ? fmtTime(tenant, rbbSlot.start_time) : "TBC") + "\n\n";
               rbRows.push({ id: "BK_" + rbb.id, title: rbbRef + " - " + (rbbTour?.name || "").substring(0, 15), description: rbbSlot ? fmtTime(tenant, rbbSlot.start_time).substring(0, 24) : "TBC" });
             }
@@ -2599,13 +2599,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // If they want to cancel
         if (wantCancel) {
           if (askBookings.length === 1) {
-            var cb = askBookings[0]; var cbSlot = (cb as any).slots; var cbTour = (cb as any).tours;
-            var cbRef = cb.id.substring(0, 8).toUpperCase();
-            var cbHrs = cbSlot ? (new Date(cbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-            var cbDetail = "I found your booking:\n\n\u{1F6F6} *" + (cbTour?.name || "Tour") + "*\n\u{1F4C5} " + (cbSlot ? fmtTime(tenant, cbSlot.start_time) : "TBC") + "\n\u{1F465} " + cb.qty + " people\n\n";
+            const cb = askBookings[0]; const cbSlot = (cb as any).slots; const cbTour = (cb as any).tours;
+            const cbRef = cb.id.substring(0, 8).toUpperCase();
+            const cbHrs = cbSlot ? (new Date(cbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
+            let cbDetail = "I found your booking:\n\n\u{1F6F6} *" + (cbTour?.name || "Tour") + "*\n\u{1F4C5} " + (cbSlot ? fmtTime(tenant, cbSlot.start_time) : "TBC") + "\n\u{1F465} " + cb.qty + " people\n\n";
             if (cbHrs >= 24) {
               // M4: Transition to CANCEL_CHOICE so user can pick voucher vs refund
-              var cbRefund = Math.round(Number(cb.total_amount) * 0.95 * 100) / 100;
+              const cbRefund = Math.round(Number(cb.total_amount) * 0.95 * 100) / 100;
               cbDetail += "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + cb.total_amount + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + cbRefund + " (5% processing fee) \u2022 5-7 business days";
               await sendButtons(tenant, phone, cbDetail, [
                 { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
@@ -2621,11 +2621,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             return;
           } else {
             // Multiple — show list
-            var cbMsg = "Which booking do you want to cancel?\n\n";
-            var cbRows: any[] = [];
-            for (var cbi = 0; cbi < askBookings.length; cbi++) {
-              var cbb = askBookings[cbi]; var cbbSlot = (cbb as any).slots; var cbbTour = (cbb as any).tours;
-              var cbbRef = cbb.id.substring(0, 8).toUpperCase();
+            const cbMsg = "Which booking do you want to cancel?\n\n";
+            const cbRows: any[] = [];
+            for (let cbi = 0; cbi < askBookings.length; cbi++) {
+              const cbb = askBookings[cbi]; const cbbSlot = (cbb as any).slots; const cbbTour = (cbb as any).tours;
+              const cbbRef = cbb.id.substring(0, 8).toUpperCase();
               cbRows.push({ id: "BK_" + cbb.id, title: cbbRef + " - " + (cbbTour?.name || "").substring(0, 15), description: cbbSlot ? fmtTime(tenant, cbbSlot.start_time).substring(0, 24) : "TBC" });
             }
             await sendList(tenant, phone, cbMsg, "Select Booking", [{ title: "Your Bookings", rows: cbRows }]);
@@ -2635,9 +2635,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
 
         // General booking inquiry
-        var bMsg = "Here are your active bookings:\n\n";
-        for (var abi = 0; abi < askBookings.length; abi++) {
-          var ab = askBookings[abi]; var abSlot = (ab as any).slots; var abTour = (ab as any).tours;
+        let bMsg = "Here are your active bookings:\n\n";
+        for (let abi = 0; abi < askBookings.length; abi++) {
+          const ab = askBookings[abi]; const abSlot = (ab as any).slots; const abTour = (ab as any).tours;
           bMsg += "\u{1F6F6} *" + (abTour?.name || "Tour") + "*\n\u{1F4C5} " + (abSlot ? fmtTime(tenant, abSlot.start_time) : "TBC") + "\n\u{1F465} " + ab.qty + " people \u2022 " + ab.status + "\nRef: " + ab.id.substring(0, 8).toUpperCase() + "\n\n";
         }
         bMsg += "Need to change anything?";
@@ -2647,8 +2647,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // PRIORITY 2: Check FAQ (after booking intents)
-      var askFaq = matchFAQ(input);
-      var askFaqAnswer = askFaq ? getFaqAnswer(tenant, askFaq) : null;
+      const askFaq = matchFAQ(input);
+      const askFaqAnswer = askFaq ? getFaqAnswer(tenant, askFaq) : null;
       if (askFaq && askFaqAnswer) {
         await sendText(tenant, phone, askFaqAnswer);
         await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -2657,26 +2657,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // PRIORITY 3: Try Gemini with database context
-      var gemContext = "";
+      let gemContext = "";
       // Get their bookings for context
-      var ctxBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
+      const ctxBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
         .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
         .order("created_at", { ascending: false }).limit(3);
-      var ctxBookings = ctxBkr.data || [];
+      const ctxBookings = ctxBkr.data || [];
       if (ctxBookings.length > 0) {
         gemContext = "\nUser has these active bookings: ";
-        for (var ci = 0; ci < ctxBookings.length; ci++) {
-          var cb2 = ctxBookings[ci]; var cb2Slot = (cb2 as any).slots; var cb2Tour = (cb2 as any).tours;
+        for (let ci = 0; ci < ctxBookings.length; ci++) {
+          const cb2 = ctxBookings[ci]; const cb2Slot = (cb2 as any).slots; const cb2Tour = (cb2 as any).tours;
           gemContext += (cb2Tour?.name || "Tour") + " on " + (cb2Slot ? fmtTime(tenant, cb2Slot.start_time) : "TBC") + " (" + cb2.qty + " ppl, " + cb2.status + "), ";
         }
       }
 
       // Get next available slots for context
-      var ctxSlots = await getAvailSlots(tenant, 5);
+      const ctxSlots = await getAvailSlots(tenant, 5);
       if (ctxSlots.length > 0) {
         gemContext += "\nNext available: ";
-        for (var csi = 0; csi < ctxSlots.length; csi++) {
-          var cs = ctxSlots[csi];
+        for (let csi = 0; csi < ctxSlots.length; csi++) {
+          const cs = ctxSlots[csi];
           gemContext += fmtTime(tenant, cs.start_time) + " (" + (cs.capacity_total - cs.booked - (cs.held || 0)) + " spots), ";
         }
       }
@@ -2684,7 +2684,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Call Gemini with full context
       if (GK) {
         try {
-          var ctxR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
+          const ctxR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               system_instruction: { parts: [{ text: buildGeminiInstruction(tenant, gemContext) }] },
@@ -2692,7 +2692,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
             })
           });
-          var ctxD = await ctxR.json();
+          const ctxD = await ctxR.json();
           if (ctxD.candidates?.[0]?.content?.parts?.[0]) {
             await sendText(tenant, phone, ctxD.candidates[0].content.parts[0].text);
             await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -2710,12 +2710,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== MODIFY QTY =====
     else if (state === "MODIFY_QTY") {
-      var newQty = parseInt(input);
+      const newQty = parseInt(input);
       if (isNaN(newQty) || newQty < 1 || newQty > 30) { await sendText(tenant, phone, "Just need a number between 1 and 30:"); return; }
       if (newQty === sd.current_qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (newQty > sd.max_avail) { await sendText(tenant, phone, "Only " + sd.max_avail + " spots available. Try a smaller number:"); return; }
       // M3: Block guest removal within 24 hours
-      var qtyDiff = newQty - sd.current_qty;
+      const qtyDiff = newQty - sd.current_qty;
       if (qtyDiff < 0 && sd.hours_before !== undefined && sd.hours_before < 24) {
         await sendText(tenant, phone, "Guest removal isn\u2019t available within 24 hours of the trip. You can contact our team for help.");
         await sendButtons(tenant, phone, "Options:", [{ id: "HUMAN", title: "\u{1F4AC} Speak to Team" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -2723,17 +2723,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       // Recalculate discount for new qty (group discount threshold may change)
-      var mqDisc = await calcDiscount(tenant, newQty, phone);
-      var mqBaseTotal = newQty * Number(sd.unit_price);
-      var newTotal = mqBaseTotal;
+      const mqDisc = await calcDiscount(tenant, newQty, phone);
+      const mqBaseTotal = newQty * Number(sd.unit_price);
+      const newTotal = mqBaseTotal;
       if (mqDisc.percent > 0) { newTotal = mqBaseTotal - Math.round(mqBaseTotal * mqDisc.percent / 100); }
-      var oldTotal = sd.current_qty * Number(sd.unit_price);
-      var oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
+      const oldTotal = sd.current_qty * Number(sd.unit_price);
+      const oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
       if (oldDisc.percent > 0) { oldTotal = oldTotal - Math.round(oldTotal * oldDisc.percent / 100); }
-      var diffAmount = Math.abs(newTotal - oldTotal);
+      const diffAmount = Math.abs(newTotal - oldTotal);
       if (qtyDiff > 0) {
         // Added people — use atomic capacity check via RPC
-        var mqHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+        const mqHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
           p_booking_id: sd.booking_id,
           p_slot_id: sd.slot_id,
           p_qty: qtyDiff,
@@ -2748,8 +2748,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // M8: Invalidate waiver on guest addition
         await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
         // Need additional payment
-        var addSiteUrls = await getBusinessSiteUrls(tenant);
-        var addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
+        const addSiteUrls = await getBusinessSiteUrls(tenant);
+        const addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
           method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: Math.round(diffAmount * 100), currency: tenant.business.currency || "ZAR",
@@ -2759,7 +2759,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             metadata: { booking_id: sd.booking_id, type: "ADD_PEOPLE", hold_id: mqHoldRes.data.hold_id, add_qty: qtyDiff, new_qty: newQty },
           }),
         });
-        var addYocoData = await addYoco.json();
+        const addYocoData = await addYoco.json();
         if (addYocoData?.redirectUrl) {
           await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nYou need to pay an extra *R" + diffAmount + "* for the " + qtyDiff + " additional " + (qtyDiff === 1 ? "person" : "people") + ":\n\n" + addYocoData.redirectUrl);
         } else {
@@ -2769,7 +2769,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Reduced people — update booking and release slot capacity
         // TODO: Replace with atomic increment RPC for slot decrement
         await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        var mqSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+        const mqSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
         if (mqSlot.data) await supabase.from("slots").update({ booked: Math.max(0, mqSlot.data.booked + qtyDiff) }).eq("id", sd.slot_id);
         if (sd.hours_before >= 24) {
           await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
@@ -2783,30 +2783,30 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== CHANGE TOUR PICK =====
     else if (state === "CHANGE_TOUR_PICK") {
-      var newTourId = rid ? rid.replace("CHTOUR_", "") : "";
+      const newTourId = rid ? rid.replace("CHTOUR_", "") : "";
       if (!newTourId) { await sendText(tenant, phone, "Please pick a tour from the list."); return; }
-      var newTourInfo = await supabase.from("tours").select("*").eq("id", newTourId).single();
+      const newTourInfo = await supabase.from("tours").select("*").eq("id", newTourId).single();
       if (!newTourInfo.data) { await sendText(tenant, phone, "Can\u2019t find that tour."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
-      var nt = newTourInfo.data;
+      const nt = newTourInfo.data;
       // Find a slot for the new tour on a similar date
-      var newSlots = await getAvailSlotsForTour(tenant, newTourId, 60);
-      var fitting2 = newSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= sd.qty; });
+      const newSlots = await getAvailSlotsForTour(tenant, newTourId, 60);
+      const fitting2 = newSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= sd.qty; });
       if (fitting2.length === 0) { await sendText(tenant, phone, "No available slots for " + nt.name + " with " + sd.qty + " spots. Contact our team for help."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       // Group by week
-      var ctGroups: any = {};
-      for (var cti = 0; cti < fitting2.length; cti++) {
-        var cts = fitting2[cti]; var ctsDate = new Date(cts.start_time);
-        var ctwStart = new Date(ctsDate); ctwStart.setDate(ctwStart.getDate() - ctwStart.getDay());
-        var ctwLabel = formatDateOnly(tenant, ctwStart.toISOString(), { day: "numeric", month: "short" });
-        var ctwKey = ctwStart.toISOString().split("T")[0];
+      const ctGroups: any = {};
+      for (let cti = 0; cti < fitting2.length; cti++) {
+        const cts = fitting2[cti]; const ctsDate = new Date(cts.start_time);
+        const ctwStart = new Date(ctsDate); ctwStart.setDate(ctwStart.getDate() - ctwStart.getDay());
+        const ctwLabel = formatDateOnly(tenant, ctwStart.toISOString(), { day: "numeric", month: "short" });
+        const ctwKey = ctwStart.toISOString().split("T")[0];
         if (!ctGroups[ctwKey]) ctGroups[ctwKey] = { label: "Week of " + ctwLabel, rows: [] };
         if (ctGroups[ctwKey].rows.length < 10) {
           ctGroups[ctwKey].rows.push({ id: "CTSLOT_" + cts.id, title: fmtTime(tenant, cts.start_time).substring(0, 24), description: (cts.capacity_total - cts.booked - (cts.held || 0)) + " spots" });
         }
       }
-      var ctSecs: any[] = []; var ctKeys2 = Object.keys(ctGroups).sort(); var ctTotal2 = 0;
-      for (var ctk = 0; ctk < ctKeys2.length && ctTotal2 < 10; ctk++) {
-        var ctg = ctGroups[ctKeys2[ctk]]; var ctRem = 10 - ctTotal2;
+      const ctSecs: any[] = []; const ctKeys2 = Object.keys(ctGroups).sort(); const ctTotal2 = 0;
+      for (let ctk = 0; ctk < ctKeys2.length && ctTotal2 < 10; ctk++) {
+        const ctg = ctGroups[ctKeys2[ctk]]; const ctRem = 10 - ctTotal2;
         if (ctg.rows.length > ctRem) ctg.rows = ctg.rows.slice(0, ctRem);
         ctTotal2 += ctg.rows.length; ctSecs.push({ title: ctg.label.substring(0, 24), rows: ctg.rows });
       }
@@ -2817,18 +2817,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== CHANGE TOUR SLOT =====
     else if (state === "CHANGE_TOUR_SLOT") {
-      var ctSlotId = rid ? rid.replace("CTSLOT_", "") : "";
+      const ctSlotId = rid ? rid.replace("CTSLOT_", "") : "";
       if (!ctSlotId) { await sendText(tenant, phone, "Please pick a slot."); return; }
       // TODO: Replace with atomic increment RPC for slot decrement/increment
       // Release old slot
-      var oldSlotR = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
+      const oldSlotR = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
       if (oldSlotR.data) await supabase.from("slots").update({ booked: Math.max(0, oldSlotR.data.booked - sd.qty) }).eq("id", sd.slot_id);
       // Book new slot
-      var newSlotR = await supabase.from("slots").select("booked, start_time").eq("id", ctSlotId).single();
+      const newSlotR = await supabase.from("slots").select("booked, start_time").eq("id", ctSlotId).single();
       if (newSlotR.data) await supabase.from("slots").update({ booked: newSlotR.data.booked + sd.qty }).eq("id", ctSlotId);
-      var newTotal2 = sd.qty * Number(sd.new_price);
+      const newTotal2 = sd.qty * Number(sd.new_price);
       await supabase.from("bookings").update({ tour_id: sd.new_tour_id, slot_id: ctSlotId, unit_price: sd.new_price, total_amount: newTotal2 }).eq("id", sd.booking_id);
-      var tsLoc = tenant.business.location_phrase;
+      const tsLoc = tenant.business.location_phrase;
       await sendText(tenant, phone, "All done! \u2705 Switched to *" + sd.new_tour_name + "* on " + (newSlotR.data ? fmtTime(tenant, newSlotR.data.start_time) : "TBC") + ".\n\n" + (tsLoc ? "See you " + tsLoc + "!" : "See you soon!"));
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
@@ -2843,13 +2843,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== SPLIT PAYMENT =====
     else if (state === "SPLIT_PAYMENT_COUNT") {
-      var splitCount = parseInt(input);
+      const splitCount = parseInt(input);
       if (isNaN(splitCount) || splitCount < 2 || splitCount > 10) { await sendText(tenant, phone, "How many payment links do you need? (2-10)"); return; }
-      var splitAmount = Math.round(Number(sd.split_total) / splitCount * 100) / 100;
-      var splitLinks = "";
-      for (var spi = 0; spi < splitCount; spi++) {
-        var splitSiteUrls = await getBusinessSiteUrls(tenant);
-        var spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
+      const splitAmount = Math.round(Number(sd.split_total) / splitCount * 100) / 100;
+      const splitLinks = "";
+      for (let spi = 0; spi < splitCount; spi++) {
+        const splitSiteUrls = await getBusinessSiteUrls(tenant);
+        const spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
           method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: Math.round(splitAmount * 100), currency: tenant.business.currency || "ZAR",
@@ -2858,7 +2858,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             metadata: { booking_id: sd.booking_id, type: "SPLIT_" + (spi + 1) + "_OF_" + splitCount },
           }),
         });
-        var spData = await spYoco.json();
+        const spData = await spYoco.json();
         if (spData?.redirectUrl) splitLinks += "\nPayment " + (spi + 1) + " (R" + splitAmount + "): " + spData.redirectUrl;
       }
       if (splitLinks) {
@@ -2872,7 +2872,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== WAITLIST OFFER =====
     else if (state === "WAITLIST_OFFER") {
       if (rid === "WAITLIST_YES" || input.includes("yes") || input.includes("waitlist")) {
-        var wlName = convo.customer_name || null;
+        const wlName = convo.customer_name || null;
         await supabase.from("waitlist").insert({
           business_id: tenant.business.id, tour_id: sd.tour_id, phone: phone,
           customer_name: wlName, qty: sd.qty, status: "WAITING"
@@ -2889,18 +2889,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== RESCHEDULE PICK (user picked a new slot from reschedule list) =====
     else if (state === "RESCHEDULE_PICK") {
-      var rSlotId = rid ? rid.replace("RSLOT_", "") : "";
+      const rSlotId = rid ? rid.replace("RSLOT_", "") : "";
       if (!rSlotId) { await sendText(tenant, phone, "Please pick a slot from the list."); return; }
       // Re-fetch and validate the slot
-      var rSlotR = await supabase.from("slots").select("*, tours(name)").eq("id", rSlotId).single();
-      var rSlot = rSlotR.data;
+      const rSlotR = await supabase.from("slots").select("*, tours(name)").eq("id", rSlotId).single();
+      const rSlot = rSlotR.data;
       if (!rSlot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s try again — type *reschedule* to start over."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (rSlot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Try *reschedule* again for updated options."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
-      var rAvail = rSlot.capacity_total - rSlot.booked - (rSlot.held || 0);
+      const rAvail = rSlot.capacity_total - rSlot.booked - (rSlot.held || 0);
       if (rAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that slot for " + sd.qty + " people. Try *reschedule* again."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       // Call rebook-booking
       await sendText(tenant, phone, "Processing your reschedule... \u23F3");
-      var { data: rbkData, error: rbkErr } = await supabase.functions.invoke("rebook-booking", {
+      const { data: rbkData, error: rbkErr } = await supabase.functions.invoke("rebook-booking", {
         body: {
           booking_id: sd.booking_id,
           new_slot_id: rSlotId,
@@ -2919,12 +2919,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== WEATHER REFUND =====
     else if (state === "MENU" && rid && rid.startsWith("WEATHER_REFUND_")) {
-      var wrBkId = rid.replace("WEATHER_REFUND_", "");
-      var wrBk = await supabase.from("bookings").select("id, total_amount, slot_id, qty").eq("id", wrBkId).single();
+      const wrBkId = rid.replace("WEATHER_REFUND_", "");
+      const wrBk = await supabase.from("bookings").select("id, total_amount, slot_id, qty").eq("id", wrBkId).single();
       if (wrBk.data) {
         await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Weather cancellation", refund_status: "ACTION_REQUIRED", refund_amount: wrBk.data.total_amount }).eq("id", wrBkId);
         if (wrBk.data.slot_id) {
-          var wrSl = await supabase.from("slots").select("booked").eq("id", wrBk.data.slot_id).single();
+          const wrSl = await supabase.from("slots").select("booked").eq("id", wrBk.data.slot_id).single();
           if (wrSl.data) await supabase.from("slots").update({ booked: Math.max(0, wrSl.data.booked - wrBk.data.qty) }).eq("id", wrBk.data.slot_id);
         }
         await sendText(tenant, phone, "Full refund of R" + wrBk.data.total_amount + " submitted \u2705 Expect it back on your card within 5-7 business days.\n\nWe\u2019d love to have you back when the weather plays along! Type *book* anytime \u{1F30A}");
@@ -2935,8 +2935,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== FALLBACK =====
     else {
       // Try FAQ match from any state
-      var fallbackFaq = matchFAQ(input);
-      var fallbackFaqAnswer = fallbackFaq ? getFaqAnswer(tenant, fallbackFaq) : null;
+      const fallbackFaq = matchFAQ(input);
+      const fallbackFaqAnswer = fallbackFaq ? getFaqAnswer(tenant, fallbackFaq) : null;
       if (fallbackFaq && fallbackFaqAnswer) {
         await sendText(tenant, phone, fallbackFaqAnswer);
         await sendButtons(tenant, phone, "Anything else?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "MY_BOOKINGS", title: "\u{1F4CB} My Bookings" }, { id: "IDLE", title: "\u2B05 Menu" }]);
@@ -2956,33 +2956,33 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 }
 
 Deno.serve(async (req: any) => {
-  var url = new URL(req.url);
+  const url = new URL(req.url);
   if (req.method === "GET") {
-    var mode = url.searchParams.get("hub.mode"); var token = url.searchParams.get("hub.verify_token"); var challenge = url.searchParams.get("hub.challenge");
+    const mode = url.searchParams.get("hub.mode"); const token = url.searchParams.get("hub.verify_token"); const challenge = url.searchParams.get("hub.challenge");
     if (mode === "subscribe" && token === VERIFY_TOKEN) return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
     return new Response("Forbidden", { status: 403 });
   }
   if (req.method === "POST") {
     try {
       // ── 1. Read raw body for signature verification ──
-      var rawBody = await req.text();
-      var signature = req.headers.get("x-hub-signature-256");
-      var verified = await verifyMetaSignature(rawBody, signature);
+      const rawBody = await req.text();
+      const signature = req.headers.get("x-hub-signature-256");
+      const verified = await verifyMetaSignature(rawBody, signature);
       if (!verified) {
         console.warn("WA webhook rejected — invalid or missing signature");
         return new Response("Invalid signature", { status: 401 });
       }
 
-      var body = JSON.parse(rawBody);
-      var tenant = await resolveTenantByWhatsappPayload(supabase, body);
-      var message = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0];
+      const body = JSON.parse(rawBody);
+      const tenant = await resolveTenantByWhatsappPayload(supabase, body);
+      const message = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0];
       if (!message) return new Response("OK", { status: 200 });
 
       // ── 2. Idempotency: dedup via processed_wa_messages (id TEXT PK) ──
-      var msgId = message.id || "";
+      const msgId = message.id || "";
       if (msgId) {
         try {
-          var dedupRes = await supabase
+          const dedupRes = await supabase
             .from("processed_wa_messages")
             .insert({ id: msgId });
           if (dedupRes.error) {
@@ -2999,7 +2999,7 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      var ph = message.from; var mt = message.type; var txt = ""; var inter = null;
+      const ph = message.from; const mt = message.type; const txt = ""; const inter = null;
       if (mt === "text") txt = (message.text && message.text.body) || "";
       else if (mt === "interactive") { inter = message.interactive; txt = (inter.button_reply && inter.button_reply.title) || (inter.list_reply && inter.list_reply.title) || ""; }
       else if (mt === "document") txt = "[Document Sent]";

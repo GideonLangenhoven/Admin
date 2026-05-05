@@ -4,8 +4,8 @@ import { withSentry } from "../_shared/sentry.ts";
 import { createViatorClient } from "../_shared/viator.ts";
 import { createGygClient, gygFetchBookings } from "../_shared/getyourguide.ts";
 
-var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
-var db = createServiceClient();
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+const db = createServiceClient();
 
 function headers() {
   return { "Content-Type": "application/json" };
@@ -23,26 +23,26 @@ Deno.serve(withSentry("ota-reconcile", async () => {
     return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
   }
 
-  var { data: integrations } = await db.from("ota_integrations")
+  const { data: integrations } = await db.from("ota_integrations")
     .select("business_id, channel, test_mode")
     .eq("enabled", true);
 
-  var now = new Date();
-  var fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60_000);
-  var results: any[] = [];
+  const now = new Date();
+  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60_000);
+  const results: any[] = [];
 
-  for (var i = 0; i < (integrations || []).length; i++) {
-    var integ: any = integrations![i];
+  for (let i = 0; i < (integrations || []).length; i++) {
+    const integ: any = integrations![i];
     try {
-      var { data: creds } = await db.rpc("get_ota_credentials", {
+      const { data: creds } = await db.rpc("get_ota_credentials", {
         p_business_id: integ.business_id,
         p_key: SETTINGS_ENCRYPTION_KEY,
         p_channel: integ.channel,
       });
-      var credRow = Array.isArray(creds) ? creds[0] : creds;
+      const credRow = Array.isArray(creds) ? creds[0] : creds;
       if (!credRow?.api_key) continue;
 
-      var otaBookings: any[] = [];
+      let otaBookings: any[] = [];
       try {
         otaBookings = await fetchOtaBookings(integ.channel, credRow, integ.test_mode, fortyEightHoursAgo.toISOString());
       } catch (fetchErr: any) {
@@ -59,41 +59,41 @@ Deno.serve(withSentry("ota-reconcile", async () => {
         continue;
       }
 
-      var { data: ourBookings } = await db.from("bookings")
+      const { data: ourBookings } = await db.from("bookings")
         .select("id, ota_external_booking_id, ota_net_amount, ota_gross_amount, status, qty")
         .eq("business_id", integ.business_id)
         .eq("ota_channel", integ.channel)
         .gte("created_at", fortyEightHoursAgo.toISOString())
         .not("ota_external_booking_id", "is", null);
 
-      var ourMap = new Map<string, any>();
+      const ourMap = new Map<string, any>();
       (ourBookings || []).forEach((b: any) => { if (b.ota_external_booking_id) ourMap.set(b.ota_external_booking_id, b); });
 
-      var otaMap = new Map<string, any>();
+      const otaMap = new Map<string, any>();
       otaBookings.forEach((b: any) => {
-        var ref = extractOtaRef(integ.channel, b);
+        const ref = extractOtaRef(integ.channel, b);
         if (ref) otaMap.set(ref, b);
       });
 
-      var drifts: Drift[] = [];
-      var matched = 0;
+      const drifts: Drift[] = [];
+      let matched = 0;
 
       otaMap.forEach((otaB, ref) => {
-        var ours = ourMap.get(ref);
+        const ours = ourMap.get(ref);
         if (!ours) {
           drifts.push({ type: "missing_locally", external_ref: ref, detail: "Booking exists on " + integ.channel + " but not in our DB" });
           return;
         }
         matched++;
-        var otaNet = extractOtaNetAmount(integ.channel, otaB);
+        const otaNet = extractOtaNetAmount(integ.channel, otaB);
         if (otaNet !== null && Math.abs(otaNet - Number(ours.ota_net_amount || 0)) > 0.01) {
           drifts.push({
             type: "amount_mismatch", external_ref: ref, our_booking_id: ours.id,
             detail: "Net amount: ours=" + ours.ota_net_amount + " OTA=" + otaNet,
           });
         }
-        var otaStatus = extractOtaStatus(integ.channel, otaB);
-        var ourStatus = ours.status;
+        const otaStatus = extractOtaStatus(integ.channel, otaB);
+        const ourStatus = ours.status;
         if (otaStatus === "CANCELLED" && ourStatus !== "CANCELLED") {
           drifts.push({
             type: "status_mismatch", external_ref: ref, our_booking_id: ours.id,
@@ -113,7 +113,7 @@ Deno.serve(withSentry("ota-reconcile", async () => {
         }
       });
 
-      var run = {
+      const run = {
         business_id: integ.business_id,
         channel: integ.channel,
         period_start: fortyEightHoursAgo.toISOString(),
@@ -151,17 +151,17 @@ Deno.serve(withSentry("ota-reconcile", async () => {
 
 async function fetchOtaBookings(channel: string, creds: any, testMode: boolean, since: string): Promise<any[]> {
   if (channel === "VIATOR") {
-    var client = createViatorClient({ apiKey: creds.api_key, testMode: !!testMode });
-    var r = await client.fetch("/bookings?modifiedSince=" + encodeURIComponent(since));
+    const client = createViatorClient({ apiKey: creds.api_key, testMode: !!testMode });
+    const r = await client.fetch("/bookings?modifiedSince=" + encodeURIComponent(since));
     if (!r.ok) {
-      var body = await r.text().catch(() => "");
+      const body = await r.text().catch(() => "");
       throw new Error("Viator bookings fetch: " + r.status + " " + body);
     }
-    var data = await r.json();
+    const data = await r.json();
     return data?.bookings || data?.data || [];
   }
   if (channel === "GETYOURGUIDE") {
-    var gygClient = createGygClient({ clientId: creds.api_key, clientSecret: creds.api_secret, testMode: !!testMode });
+    const gygClient = createGygClient({ clientId: creds.api_key, clientSecret: creds.api_secret, testMode: !!testMode });
     return await gygFetchBookings(gygClient, since);
   }
   return [];
@@ -175,18 +175,18 @@ function extractOtaRef(channel: string, booking: any): string {
 
 function extractOtaNetAmount(channel: string, booking: any): number | null {
   if (channel === "VIATOR") {
-    var v = booking?.totalNetPrice?.amount || booking?.netRate?.amount || booking?.supplierPrice;
+    const v = booking?.totalNetPrice?.amount || booking?.netRate?.amount || booking?.supplierPrice;
     return v != null ? Number(v) : null;
   }
   if (channel === "GETYOURGUIDE") {
-    var g = booking?.price?.net?.amount || booking?.net_price?.amount;
+    const g = booking?.price?.net?.amount || booking?.net_price?.amount;
     return g != null ? Number(g) : null;
   }
   return null;
 }
 
 function extractOtaStatus(channel: string, booking: any): string {
-  var status = "";
+  let status = "";
   if (channel === "VIATOR") status = String(booking?.status || booking?.bookingStatus || "").toUpperCase();
   if (channel === "GETYOURGUIDE") status = String(booking?.status || booking?.booking_status || "").toUpperCase();
   if (status.includes("CANCEL")) return "CANCELLED";

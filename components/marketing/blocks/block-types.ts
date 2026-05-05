@@ -34,7 +34,7 @@ export function uid(): string {
 }
 
 export function createBlock(type: Block["type"]): Block {
-  var id = uid();
+  const id = uid();
   switch (type) {
     case "text":
       return { type: "text", id, content: "<p></p>" };

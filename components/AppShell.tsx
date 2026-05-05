@@ -43,7 +43,7 @@ function isPrivilegedRole(r: string) {
   return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
-var SUSPENDED_ALLOWED = ["/reports", "/invoices", "/refunds", "/settings", "/super-admin"];
+const SUSPENDED_ALLOWED = ["/reports", "/invoices", "/refunds", "/settings", "/super-admin"];
 
 function isSuspendedAllowed(path: string) {
   return SUSPENDED_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
@@ -149,8 +149,8 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           <div className="px-2 pb-3 flex justify-center">
             <button
               onClick={() => {
-                var idx = operators.findIndex((o) => o.id === businessId);
-                var next = operators[(idx + 1) % operators.length];
+                const idx = operators.findIndex((o) => o.id === businessId);
+                const next = operators[(idx + 1) % operators.length];
                 if (next) switchOperator(next.id);
               }}
               className="rounded-lg border p-2 text-xs"

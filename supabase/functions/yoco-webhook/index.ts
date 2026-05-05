@@ -6,9 +6,9 @@ import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusines
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createServiceClient();
 function topupQuota(amount: number) {
   if (amount === 100) return 10;
   if (amount === 500) return 60;
@@ -17,29 +17,29 @@ function topupQuota(amount: number) {
 }
 
 async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
-  var metadata = payload?.metadata || {};
-  var metaType = String(metadata.type || "");
-  var metaBookingId = String(metadata.booking_id || "");
-  var metaVoucherId = String(metadata.voucher_id || "");
-  var metaBusinessId = String(metadata.business_id || "");
+  const metadata = payload?.metadata || {};
+  const metaType = String(metadata.type || "");
+  const metaBookingId = String(metadata.booking_id || "");
+  const metaVoucherId = String(metadata.voucher_id || "");
+  const metaBusinessId = String(metadata.business_id || "");
 
   if (metaType === "TOPUP" && metaBusinessId) return metaBusinessId;
 
   if (metaBookingId) {
-    var bookingLookup = await supabase.from("bookings").select("business_id").eq("id", metaBookingId).maybeSingle();
+    const bookingLookup = await supabase.from("bookings").select("business_id").eq("id", metaBookingId).maybeSingle();
     if (bookingLookup.data?.business_id) return String(bookingLookup.data.business_id);
   }
 
   if (metaVoucherId) {
-    var voucherLookup = await supabase.from("vouchers").select("business_id").eq("id", metaVoucherId).maybeSingle();
+    const voucherLookup = await supabase.from("vouchers").select("business_id").eq("id", metaVoucherId).maybeSingle();
     if (voucherLookup.data?.business_id) return String(voucherLookup.data.business_id);
   }
 
   if (checkoutId) {
-    var bookingByCheckout = await supabase.from("bookings").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
+    const bookingByCheckout = await supabase.from("bookings").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
     if (bookingByCheckout.data?.business_id) return String(bookingByCheckout.data.business_id);
 
-    var voucherByCheckout = await supabase.from("vouchers").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
+    const voucherByCheckout = await supabase.from("vouchers").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
     if (voucherByCheckout.data?.business_id) return String(voucherByCheckout.data.business_id);
   }
 
@@ -69,7 +69,7 @@ async function verifyWebhookSignature(
     );
   }
 
-  var tenant: any;
+  let tenant: any;
   try {
     tenant = await getTenantByBusinessId(supabase, businessId);
   } catch (credErr) {
@@ -89,7 +89,7 @@ async function verifyWebhookSignature(
     );
   }
 
-  var webhook = new Webhook(tenant.credentials.activeYocoWebhookSecret);
+  const webhook = new Webhook(tenant.credentials.activeYocoWebhookSecret);
   await webhook.verify(rawBody, {
     "webhook-id": req.headers.get("webhook-id") || "",
     "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
@@ -98,7 +98,7 @@ async function verifyWebhookSignature(
 }
 
 async function createInvoice(booking: any, tourName: string, slotTime: string, paymentRef: string) {
-  var existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order('created_at', { ascending: true }).limit(1).maybeSingle();
+  const existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order('created_at', { ascending: true }).limit(1).maybeSingle();
   if (existing.data) {
     if (existing.data.payment_reference !== paymentRef) {
       await supabase.from("invoices").update({ payment_method: "Yoco", payment_reference: paymentRef }).eq("id", existing.data.id);
@@ -108,16 +108,16 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
     return existing.data;
   }
 
-  var invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
+  const invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
   if (invNumR.error) {
     console.warn("next_invoice_number RPC failed (using fallback):", invNumR.error.message);
   }
-  var invNum = invNumR.data || ("INV-" + Date.now());
-  var subtotal = Number(booking.original_total || booking.total_amount);
-  var discountAmt = subtotal - Number(booking.total_amount);
+  const invNum = invNumR.data || ("INV-" + Date.now());
+  const subtotal = Number(booking.original_total || booking.total_amount);
+  const discountAmt = subtotal - Number(booking.total_amount);
   if (discountAmt < 0) discountAmt = 0;
 
-  var inv = await supabase.from("invoices").insert({
+  const inv = await supabase.from("invoices").insert({
     business_id: booking.business_id, booking_id: booking.id,
     invoice_number: invNum,
     customer_name: booking.customer_name, customer_email: booking.email, customer_phone: booking.phone,
@@ -139,7 +139,7 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
 
 async function sendBookingConfirmation(booking: any, yocoPaymentId: string, checkoutId: string, amount: number) {
   // Idempotency: check logs table first (always exists)
-  var existingLog = await supabase
+  const existingLog = await supabase
     .from("logs")
     .select("id")
     .eq("booking_id", booking.id)
@@ -154,7 +154,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   // Try atomic lock via confirmation_sent_at column (if migration was run).
   // If column doesn't exist or update fails, proceed anyway — logs check above is the primary guard.
   try {
-    var claimLock = await supabase
+    const claimLock = await supabase
       .from("bookings")
       .update({ confirmation_sent_at: new Date().toISOString() })
       .eq("id", booking.id)
@@ -173,19 +173,19 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
     console.warn("CONFIRM_LOCK_ERR (proceeding anyway):", lockErr);
   }
 
-  var tenant: any = null;
+  let tenant: any = null;
   try {
     tenant = await getTenantByBusinessId(supabase, booking.business_id);
   } catch (tenantErr) {
     console.error("CONFIRM_TENANT_ERR (will still attempt email via send-email):", tenantErr);
   }
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var slotTime = booking.slots?.start_time
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const slotTime = booking.slots?.start_time
     ? (tenant ? formatTenantDateTime(tenant.business, booking.slots.start_time) : new Date(booking.slots.start_time).toLocaleString())
     : "See email";
-  var tourName = booking.tours?.name || "Booking";
-  var brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
-  var waiver: any = { waiverStatus: "PENDING", waiverLink: "" };
+  const tourName = booking.tours?.name || "Booking";
+  const brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
+  let waiver: any = { waiverStatus: "PENDING", waiverLink: "" };
   try {
     waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
   } catch (waiverErr) {
@@ -193,28 +193,28 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   }
 
   // Last-minute booking: if trip is within 24 hours, always include waiver link prominently
-  var isLastMinute = false;
+  let isLastMinute = false;
   if (booking.slots?.start_time) {
-    var hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
+    const hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
     isLastMinute = hoursUntilTrip < 24 && hoursUntilTrip > 0;
   }
 
-  var invoice: any = null;
+  let invoice: any = null;
   try {
     invoice = await createInvoice(booking, tourName, slotTime, yocoPaymentId);
   } catch (invErr) {
     console.error("INVOICE_CREATE_ERR (continuing to send notifications):", invErr);
   }
 
-  var waSent = false;
-  var emailSent = false;
-  var waError = "";
-  var emailError = "";
+  let waSent = false;
+  let emailSent = false;
+  let waError = "";
+  let emailError = "";
 
   if (booking.phone && tenant) {
     try {
-      var currency = tenant.business.currency || "ZAR";
-      var myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+      const currency = tenant.business.currency || "ZAR";
+      const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
       await sendWhatsappTextForTenant(
         tenant,
         booking.phone,
@@ -251,7 +251,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
 
   if (booking.email) {
     try {
-      var emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+      const emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
         body: JSON.stringify({
@@ -276,7 +276,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
           }
         }),
       });
-      var emailData = await emailRes.json().catch(() => ({}));
+      const emailData = await emailRes.json().catch(() => ({}));
       if (!emailRes.ok || emailData?.error) {
         emailError = String(emailData?.error || emailRes.statusText || "Email send failed");
         console.error("CONFIRM_EMAIL_ERR:", emailError);
@@ -308,17 +308,17 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
 Deno.serve(withSentry("yoco-webhook", async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
   try {
-    var rawBody = await req.text();
-    var body = rawBody ? JSON.parse(rawBody) : {};
+    const rawBody = await req.text();
+    const body = rawBody ? JSON.parse(rawBody) : {};
     console.log("YOCO_WEBHOOK:" + JSON.stringify(body).substring(0, 500));
-    var type = body.type; var payload = body.payload;
+    const type = body.type; const payload = body.payload;
     if (type !== "payment.succeeded" && type !== "payment.failed") { console.log("Ignoring:" + type); return new Response("OK", { status: 200 }); }
-    var checkoutId = payload.metadata?.checkoutId || payload.checkoutId || payload.checkout_id || "";
-    var yocoPaymentId = payload.id || "";
-    var metaBookingId = payload.metadata?.booking_id || "";
-    var metaType = String(payload.metadata?.type || "");
+    const checkoutId = payload.metadata?.checkoutId || payload.checkoutId || payload.checkout_id || "";
+    const yocoPaymentId = payload.id || "";
+    const metaBookingId = payload.metadata?.booking_id || "";
+    const metaType = String(payload.metadata?.type || "");
     if (!checkoutId && !metaBookingId) { console.log("No checkoutId or booking_id in payload"); return new Response("OK", { status: 200 }); }
-    var businessId = await resolveWebhookBusinessId(checkoutId, payload);
+    const businessId = await resolveWebhookBusinessId(checkoutId, payload);
     try {
       await verifyWebhookSignature(req, rawBody, businessId, type);
     } catch (verifyError) {
@@ -344,8 +344,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     // ── IDEMPOTENCY CHECK ──
     // Prevent duplicate processing when Yoco sends the same webhook multiple times
     if (type === "payment.succeeded" && (yocoPaymentId || checkoutId)) {
-      var idempotencyKey = "yoco_payment:" + (yocoPaymentId || checkoutId);
-      var idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
+      const idempotencyKey = "yoco_payment:" + (yocoPaymentId || checkoutId);
+      const idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
       if (idempInsert.error && idempInsert.error.code === "23505") {
         // Duplicate key — this payment was already processed
         console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
@@ -356,19 +356,19 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     if (type === "payment.failed") {
       // Handle failed reschedule upgrade payment — cancel the pending reschedule and release hold
       if (metaType === "RESCHEDULE") {
-        var failedPrId = String(payload.metadata?.pending_reschedule_id || "");
+        const failedPrId = String(payload.metadata?.pending_reschedule_id || "");
         if (failedPrId) {
-          var failedPr = await supabase.from("pending_reschedules").select("*").eq("id", failedPrId).eq("status", "PENDING").single();
+          const failedPr = await supabase.from("pending_reschedules").select("*").eq("id", failedPrId).eq("status", "PENDING").single();
           if (failedPr.data) {
             await supabase.from("pending_reschedules").update({ status: "CANCELLED" }).eq("id", failedPr.data.id);
             if (failedPr.data.hold_id) {
               await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedPr.data.hold_id);
             }
             // Release held capacity on new slot
-            var failedSlot = await supabase.from("slots").select("held").eq("id", failedPr.data.new_slot_id).single();
+            const failedSlot = await supabase.from("slots").select("held").eq("id", failedPr.data.new_slot_id).single();
             if (failedSlot.data) {
-              var failedBooking = await supabase.from("bookings").select("qty").eq("id", failedPr.data.booking_id).single();
-              var failedQty = failedBooking.data?.qty || 0;
+              const failedBooking = await supabase.from("bookings").select("qty").eq("id", failedPr.data.booking_id).single();
+              const failedQty = failedBooking.data?.qty || 0;
               await supabase.from("slots").update({ held: Math.max(0, (failedSlot.data.held || 0) - failedQty) }).eq("id", failedPr.data.new_slot_id);
             }
             await supabase.from("logs").insert({
@@ -385,18 +385,18 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       // Handle failed ADD_GUESTS payment — release hold
       if (metaType === "ADD_GUESTS") {
-        var failedHoldId = String(payload.metadata?.hold_id || "");
-        var failedAgBookingId = String(payload.metadata?.booking_id || "");
-        var failedAgNewQty = Number(payload.metadata?.new_qty || 0);
+        const failedHoldId = String(payload.metadata?.hold_id || "");
+        const failedAgBookingId = String(payload.metadata?.booking_id || "");
+        const failedAgNewQty = Number(payload.metadata?.new_qty || 0);
         if (failedHoldId) {
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedHoldId);
           // Release held capacity
           if (failedAgBookingId) {
-            var failedAgBooking = await supabase.from("bookings").select("slot_id, qty").eq("id", failedAgBookingId).single();
+            const failedAgBooking = await supabase.from("bookings").select("slot_id, qty").eq("id", failedAgBookingId).single();
             if (failedAgBooking.data) {
-              var failedAgDelta = failedAgNewQty - failedAgBooking.data.qty;
+              const failedAgDelta = failedAgNewQty - failedAgBooking.data.qty;
               if (failedAgDelta > 0) {
-                var failedAgSlot = await supabase.from("slots").select("held").eq("id", failedAgBooking.data.slot_id).single();
+                const failedAgSlot = await supabase.from("slots").select("held").eq("id", failedAgBooking.data.slot_id).single();
                 if (failedAgSlot.data) {
                   await supabase.from("slots").update({ held: Math.max(0, (failedAgSlot.data.held || 0) - failedAgDelta) }).eq("id", failedAgBooking.data.slot_id);
                 }
@@ -414,7 +414,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         return new Response("OK", { status: 200 });
       }
 
-      var fb = checkoutId
+      let fb = checkoutId
         ? await supabase.from("bookings").select("id, status").eq("yoco_checkout_id", checkoutId).maybeSingle()
         : { data: null };
       if (!fb.data && metaBookingId) {
@@ -428,19 +428,19 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     if (metaType === "TOPUP") {
-      var topupBusinessId = String(payload.metadata?.business_id || "");
-      var amountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
-      var extraQuota = topupQuota(amountZar);
-      var periodStart = new Date();
+      const topupBusinessId = String(payload.metadata?.business_id || "");
+      const amountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
+      const extraQuota = topupQuota(amountZar);
+      const periodStart = new Date();
       periodStart.setDate(1);
       periodStart.setHours(0, 0, 0, 0);
       if (topupBusinessId && amountZar > 0 && extraQuota > 0) {
-        var existingByPayment = yocoPaymentId
+        const existingByPayment = yocoPaymentId
           ? await supabase.from("topup_orders").select("id").eq("yoco_payment_id", yocoPaymentId).limit(1).maybeSingle()
           : { data: null as any };
         if (existingByPayment.data?.id) return new Response("OK", { status: 200 });
 
-        var existingByCheckout = checkoutId
+        const existingByCheckout = checkoutId
           ? await supabase.from("topup_orders").select("id").eq("yoco_checkout_id", checkoutId).limit(1).maybeSingle()
           : { data: null as any };
         if (existingByCheckout.data?.id) return new Response("OK", { status: 200 });
@@ -468,13 +468,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
     // ── RESCHEDULE UPGRADE PAYMENT ──
     if (metaType === "RESCHEDULE") {
-      var pendingRescheduleId = String(payload.metadata?.pending_reschedule_id || "");
+      const pendingRescheduleId = String(payload.metadata?.pending_reschedule_id || "");
       if (!pendingRescheduleId) {
         console.log("RESCHEDULE webhook but no pending_reschedule_id in metadata");
         return new Response("OK", { status: 200 });
       }
 
-      var prRes = await supabase
+      const prRes = await supabase
         .from("pending_reschedules")
         .select("*")
         .eq("id", pendingRescheduleId)
@@ -486,8 +486,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         return new Response("OK", { status: 200 });
       }
 
-      var pr = prRes.data;
-      var prBooking = await supabase
+      const pr = prRes.data;
+      const prBooking = await supabase
         .from("bookings")
         .select("*, slots(start_time), tours(name)")
         .eq("id", pr.booking_id)
@@ -498,10 +498,10 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         return new Response("OK", { status: 200 });
       }
 
-      var rBooking = prBooking.data;
+      const rBooking = prBooking.data;
 
       // 1. Release old slot capacity (decrement booked)
-      var oldSlotData = await supabase.from("slots").select("booked").eq("id", pr.old_slot_id).single();
+      const oldSlotData = await supabase.from("slots").select("booked").eq("id", pr.old_slot_id).single();
       if (oldSlotData.data) {
         await supabase.from("slots").update({
           booked: Math.max(0, (oldSlotData.data.booked || 0) - rBooking.qty),
@@ -509,7 +509,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       }
 
       // 2. Convert hold on new slot: held -> booked
-      var newSlotData = await supabase.from("slots").select("booked, held").eq("id", pr.new_slot_id).single();
+      const newSlotData = await supabase.from("slots").select("booked, held").eq("id", pr.new_slot_id).single();
       if (newSlotData.data) {
         await supabase.from("slots").update({
           booked: (newSlotData.data.booked || 0) + rBooking.qty,
@@ -553,18 +553,18 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       // 7. Send reschedule confirmation notification
       try {
-        var rTenant = await getTenantByBusinessId(supabase, pr.business_id);
-        var rRef = pr.booking_id.substring(0, 8).toUpperCase();
+        const rTenant = await getTenantByBusinessId(supabase, pr.business_id);
+        const rRef = pr.booking_id.substring(0, 8).toUpperCase();
         // Re-fetch booking with new slot info for notification
-        var updatedBooking = await supabase
+        const updatedBooking = await supabase
           .from("bookings")
           .select("*, slots(start_time), tours(name)")
           .eq("id", pr.booking_id)
           .single();
-        var rBk = updatedBooking.data || rBooking;
-        var rTourName = rBk.tours?.name || "Booking";
-        var rSlotTime = rBk.slots?.start_time ? formatTenantDateTime(rTenant.business, rBk.slots.start_time) : "";
-        var rBrandName = getBusinessDisplayName(rTenant.business);
+        const rBk = updatedBooking.data || rBooking;
+        const rTourName = rBk.tours?.name || "Booking";
+        const rSlotTime = rBk.slots?.start_time ? formatTenantDateTime(rTenant.business, rBk.slots.start_time) : "";
+        const rBrandName = getBusinessDisplayName(rTenant.business);
 
         if (rBk.phone) {
           try {
@@ -610,22 +610,22 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
     // ── ADD_GUESTS PAYMENT ──
     if (metaType === "ADD_GUESTS") {
-      var agHoldId = String(payload.metadata?.hold_id || "");
-      var agNewQty = Number(payload.metadata?.new_qty || 0);
-      var agBookingId = String(payload.metadata?.booking_id || "");
+      const agHoldId = String(payload.metadata?.hold_id || "");
+      const agNewQty = Number(payload.metadata?.new_qty || 0);
+      const agBookingId = String(payload.metadata?.booking_id || "");
 
       if (agBookingId && agNewQty > 0) {
-        var agBooking = await supabase
+        const agBooking = await supabase
           .from("bookings")
           .select("*, slots(start_time), tours(name)")
           .eq("id", agBookingId)
           .single();
 
         if (agBooking.data) {
-          var agBk = agBooking.data;
-          var agDelta = agNewQty - agBk.qty;
-          var agUnitPrice = Number(agBk.unit_price || 0);
-          var agNewTotal = agNewQty * agUnitPrice;
+          const agBk = agBooking.data;
+          const agDelta = agNewQty - agBk.qty;
+          const agUnitPrice = Number(agBk.unit_price || 0);
+          const agNewTotal = agNewQty * agUnitPrice;
 
           // Update booking qty and total
           await supabase.from("bookings").update({
@@ -637,7 +637,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           if (agHoldId) {
             await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", agHoldId);
           }
-          var agSlot = await supabase.from("slots").select("booked, held").eq("id", agBk.slot_id).single();
+          const agSlot = await supabase.from("slots").select("booked, held").eq("id", agBk.slot_id).single();
           if (agSlot.data) {
             await supabase.from("slots").update({
               booked: (agSlot.data.booked || 0) + agDelta,
@@ -654,7 +654,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
           // Invalidate waiver if previously signed — new guests are uninsured
           if (agBk.waiver_status === "SIGNED") {
-            var newWaiverToken = crypto.randomUUID();
+            const newWaiverToken = crypto.randomUUID();
             await supabase.from("bookings").update({
               waiver_status: "PENDING",
               waiver_token: newWaiverToken,
@@ -664,8 +664,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
             // Send INDEMNITY email so the lead booker can update the waiver
             if (agBk.email) {
               try {
-                var agWaiverTenant = await getTenantByBusinessId(supabase, agBk.business_id);
-                var agWaiverRef = agBookingId.substring(0, 8).toUpperCase();
+                const agWaiverTenant = await getTenantByBusinessId(supabase, agBk.business_id);
+                const agWaiverRef = agBookingId.substring(0, 8).toUpperCase();
                 await fetch(SUPABASE_URL + "/functions/v1/send-email", {
                   method: "POST",
                   headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
@@ -699,11 +699,11 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
           // Send notification (WhatsApp + email)
           try {
-            var agTenant = await getTenantByBusinessId(supabase, agBk.business_id);
-            var agRef = agBookingId.substring(0, 8).toUpperCase();
-            var agTourName = agBk.tours?.name || "Booking";
-            var agBrandName = getBusinessDisplayName(agTenant.business);
-            var agSlotTime = agBk.slots?.start_time ? formatTenantDateTime(agTenant.business, agBk.slots.start_time) : "";
+            const agTenant = await getTenantByBusinessId(supabase, agBk.business_id);
+            const agRef = agBookingId.substring(0, 8).toUpperCase();
+            const agTourName = agBk.tours?.name || "Booking";
+            const agBrandName = getBusinessDisplayName(agTenant.business);
+            const agSlotTime = agBk.slots?.start_time ? formatTenantDateTime(agTenant.business, agBk.slots.start_time) : "";
 
             if (agBk.phone) {
               try {
@@ -748,9 +748,9 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Check if this is a gift voucher payment
-    var gvr = await supabase.from("vouchers").select("*").eq("yoco_checkout_id", checkoutId).single();
+    const gvr = await supabase.from("vouchers").select("*").eq("yoco_checkout_id", checkoutId).single();
     if (gvr.data && gvr.data.status === "PENDING") {
-      var gv = gvr.data;
+      const gv = gvr.data;
       await supabase.from("vouchers").update({ status: "ACTIVE", current_balance: gv.value || gv.purchase_amount || 0 }).eq("id", gv.id);
       // Send voucher email
       try {
@@ -774,7 +774,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       } catch (e) { console.log("gv email err"); }
       // WhatsApp confirmation
       if (gv.buyer_phone) {
-        var gvTenant = await getTenantByBusinessId(supabase, gv.business_id);
+        const gvTenant = await getTenantByBusinessId(supabase, gv.business_id);
         await sendWhatsappTextForTenant(gvTenant, gv.buyer_phone,
           "Gift voucher purchased\n\n" +
           "Code: " + gv.code + "\n" +
@@ -789,7 +789,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       return new Response("OK", { status: 200 });
     }
 
-    var br = checkoutId
+    let br = checkoutId
       ? await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("yoco_checkout_id", checkoutId).maybeSingle()
       : { data: null, error: null };
     if (!br.data && metaBookingId) {
@@ -797,7 +797,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       br = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", metaBookingId).maybeSingle();
     }
     if (!br.data) { console.log("No booking found. checkoutId=" + checkoutId + " bookingId=" + metaBookingId); return new Response("OK", { status: 200 }); }
-    var booking = br.data;
+    const booking = br.data;
     if (booking.status === "PAID" || booking.status === "COMPLETED") {
       console.log("Already paid, ensuring confirmation delivery:" + booking.id);
       try {
@@ -810,10 +810,10 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
     // ── LATE WEBHOOK OVERBOOKING CHECK ──
     // If the hold has expired/been released, check if capacity is still available
-    var activeHold = await supabase.from("holds").select("id, status").eq("booking_id", booking.id).eq("status", "ACTIVE").maybeSingle();
+    const activeHold = await supabase.from("holds").select("id, status").eq("booking_id", booking.id).eq("status", "ACTIVE").maybeSingle();
     if (!activeHold.data) {
       // Hold is gone (expired or cancelled) — check slot capacity before proceeding
-      var capacityCheck = await supabase.rpc("slot_has_capacity", { p_slot_id: booking.slot_id, p_qty: booking.qty });
+      const capacityCheck = await supabase.rpc("slot_has_capacity", { p_slot_id: booking.slot_id, p_qty: booking.qty });
       if (capacityCheck.data === false) {
         // Slot is full — auto-cancel and refund
         console.log("LATE_WEBHOOK_OVERBOOK: slot full, auto-cancelling booking:" + booking.id);
@@ -839,11 +839,11 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
         // Send apology notifications
         try {
-          var lateNotifyTenant = await getTenantByBusinessId(supabase, booking.business_id);
-          var lateBrandName = getBusinessDisplayName(lateNotifyTenant.business);
-          var lateRef = booking.id.substring(0, 8).toUpperCase();
-          var lateTourName = booking.tours?.name || "Booking";
-          var lateCurrency = lateNotifyTenant.business.currency || "ZAR";
+          const lateNotifyTenant = await getTenantByBusinessId(supabase, booking.business_id);
+          const lateBrandName = getBusinessDisplayName(lateNotifyTenant.business);
+          const lateRef = booking.id.substring(0, 8).toUpperCase();
+          const lateTourName = booking.tours?.name || "Booking";
+          const lateCurrency = lateNotifyTenant.business.currency || "ZAR";
 
           if (booking.phone) {
             try {
@@ -909,7 +909,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
     // ── MID-CHECKOUT SLOT CLOSURE CHECK ──
     // Before marking as PAID, verify the slot hasn't been closed/cancelled during checkout
-    var slotStatusCheck = await supabase.from("slots").select("status").eq("id", booking.slot_id).single();
+    const slotStatusCheck = await supabase.from("slots").select("status").eq("id", booking.slot_id).single();
     if (slotStatusCheck.data && (slotStatusCheck.data.status === "CLOSED" || slotStatusCheck.data.status === "CANCELLED")) {
       console.log("SLOT_CLOSED_DURING_CHECKOUT: slot " + booking.slot_id + " status=" + slotStatusCheck.data.status + " booking=" + booking.id);
 
@@ -938,11 +938,11 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       // Send customer apology email with reschedule option
       try {
-        var closedTenant = await getTenantByBusinessId(supabase, booking.business_id);
-        var closedRef = booking.id.substring(0, 8).toUpperCase();
-        var closedTourName = booking.tours?.name || "Booking";
-        var closedBrandName = getBusinessDisplayName(closedTenant.business);
-        var closedCurrency = closedTenant.business.currency || "ZAR";
+        const closedTenant = await getTenantByBusinessId(supabase, booking.business_id);
+        const closedRef = booking.id.substring(0, 8).toUpperCase();
+        const closedTourName = booking.tours?.name || "Booking";
+        const closedBrandName = getBusinessDisplayName(closedTenant.business);
+        const closedCurrency = closedTenant.business.currency || "ZAR";
 
         if (booking.phone) {
           try {
@@ -1004,13 +1004,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Verify payment amount matches expected booking total
-    var webhookAmountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
+    const webhookAmountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
     if (webhookAmountZar > 0 && Math.abs(webhookAmountZar - Number(booking.total_amount || 0)) > 1) {
       console.warn("YOCO_AMOUNT_MISMATCH: booking=" + booking.id + " expected=" + booking.total_amount + " received=" + webhookAmountZar);
     }
 
     // Atomically update to PAID — if already updated by a concurrent webhook, skip
-    var upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: booking.total_amount, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
+    const upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: booking.total_amount, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
     if (upd.error) {
       console.log("BOOKING_PAID_UPDATE_FAILED booking=" + booking.id + " err=" + upd.error.message);
       await supabase.from("logs").insert({
@@ -1030,11 +1030,11 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       }
       return new Response("OK", { status: 200 });
     }
-    var holdConvert = await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE").select("id").maybeSingle();
-    var sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
+    const holdConvert = await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE").select("id").maybeSingle();
+    const sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
     if (sr.data) {
       // If hold was still active, convert held -> booked. If hold expired, just increment booked.
-      var heldDecrement = holdConvert.data ? booking.qty : 0;
+      const heldDecrement = holdConvert.data ? booking.qty : 0;
       await supabase.from("slots").update({
         booked: sr.data.booked + booking.qty,
         held: Math.max(0, sr.data.held - heldDecrement),
@@ -1042,30 +1042,30 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Deduct voucher balances for vouchers applied to this booking (sequential, atomic RPC)
-    var metaVoucherIds = String(payload.metadata?.voucher_ids || "");
-    var metaVoucherCodes = String(payload.metadata?.voucher_codes || "");
+    const metaVoucherIds = String(payload.metadata?.voucher_ids || "");
+    const metaVoucherCodes = String(payload.metadata?.voucher_codes || "");
     if (metaVoucherIds || metaVoucherCodes) {
-      var voucherIdList = metaVoucherIds ? metaVoucherIds.split(",").filter(Boolean) : [];
-      var voucherCodeList = metaVoucherCodes ? metaVoucherCodes.split(",").filter(Boolean) : [];
-      var voucherDiscount = Number(booking.original_total || 0) - Number(booking.total_amount || 0);
+      const voucherIdList = metaVoucherIds ? metaVoucherIds.split(",").filter(Boolean) : [];
+      const voucherCodeList = metaVoucherCodes ? metaVoucherCodes.split(",").filter(Boolean) : [];
+      const voucherDiscount = Number(booking.original_total || 0) - Number(booking.total_amount || 0);
       if (voucherDiscount > 0) {
-        var vouchersToDeduct: any[] = [];
+        let vouchersToDeduct: any[] = [];
         if (voucherIdList.length > 0) {
-          var vr = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("id", voucherIdList);
+          const vr = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("id", voucherIdList);
           vouchersToDeduct = vr.data || [];
         } else if (voucherCodeList.length > 0) {
-          var vr2 = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("code", voucherCodeList);
+          const vr2 = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("code", voucherCodeList);
           vouchersToDeduct = vr2.data || [];
         }
-        var remainingDiscount = voucherDiscount;
-        for (var vi = 0; vi < vouchersToDeduct.length; vi++) {
+        let remainingDiscount = voucherDiscount;
+        for (let vi = 0; vi < vouchersToDeduct.length; vi++) {
           if (remainingDiscount <= 0) break;
-          var voucher = vouchersToDeduct[vi];
+          const voucher = vouchersToDeduct[vi];
           // Atomic deduction via RPC — sequential drain (Voucher A to R0 first, then Voucher B)
-          var rpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: remainingDiscount });
+          const rpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: remainingDiscount });
           if (rpcRes.data?.success) {
-            var deduction = Number(rpcRes.data.deducted);
-            var newBal = Number(rpcRes.data.remaining);
+            const deduction = Number(rpcRes.data.deducted);
+            const newBal = Number(rpcRes.data.remaining);
             remainingDiscount -= deduction;
             await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
             // Send remaining balance email if voucher still has credit
@@ -1098,8 +1098,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Apply promo code usage if one was used during checkout
-    var metaPromoId = payload?.metadata?.promo_id;
-    var metaPromoEmail = payload?.metadata?.customer_email || booking.customer_email || "";
+    const metaPromoId = payload?.metadata?.promo_id;
+    const metaPromoEmail = payload?.metadata?.customer_email || booking.customer_email || "";
     if (metaPromoId) {
       try {
         await supabase.rpc("apply_promo_code", { p_promo_id: metaPromoId, p_customer_email: metaPromoEmail, p_booking_id: booking.id, p_customer_phone: booking.phone || null });

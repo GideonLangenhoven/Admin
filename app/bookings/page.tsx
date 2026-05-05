@@ -208,16 +208,16 @@ export default function Bookings() {
   function clearSelection() { setSelected(new Set()); }
 
   const bookingsById = useMemo(() => {
-    var map: Record<string, Booking> = {};
-    for (var b of bookings) map[b.id] = b;
+    const map: Record<string, Booking> = {};
+    for (const b of bookings) map[b.id] = b;
     return map;
   }, [bookings]);
 
   async function runBulk(action: BulkAction) {
-    var ids = Array.from(selected);
+    const ids = Array.from(selected);
     if (ids.length === 0) return;
 
-    var confirmText: Record<BulkAction, string> = {
+    const confirmText: Record<BulkAction, string> = {
       cancel: "Cancel " + ids.length + " booking(s)? Each customer will be notified and refund calculated per the cancellation policy.",
       refund: "Refund " + ids.length + " booking(s)? Each will be processed via Yoco or marked as manual refund.",
       markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
@@ -225,21 +225,21 @@ export default function Bookings() {
     };
     if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" })) return;
 
-    var reason = "operator-cancel";
-    var weather = false;
+    let reason = "operator-cancel";
+    let weather = false;
     if (action === "cancel") {
       weather = confirm("Is this a weather cancel? (Weather cancels override the policy and refund 100%.)");
-      var prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
+      const prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
       reason = prompted || "operator-cancel";
     }
 
     setBulkActionInFlight(action);
-    var init: ProgressEvent[] = ids.map(id => ({ id, name: bookingsById[id]?.customer_name || id.slice(0, 8), status: "pending" as const }));
+    const init: ProgressEvent[] = ids.map(id => ({ id, name: bookingsById[id]?.customer_name || id.slice(0, 8), status: "pending" as const }));
     setBulkProgress(init);
 
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i];
-      var result: ActionResult;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      let result: ActionResult;
       switch (action) {
         case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
         case "refund":   result = await refundBookingAction(id); break;
@@ -256,8 +256,8 @@ export default function Bookings() {
 
     // Log bulk summary
     try {
-      var final = init.map(e => {
-        var match = bulkProgress?.find(p => p.id === e.id);
+      const final = init.map(e => {
+        const match = bulkProgress?.find(p => p.id === e.id);
         return match || e;
       });
       await supabase.from("logs").insert({
@@ -298,7 +298,7 @@ export default function Bookings() {
     const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
 
     // Step 2: Fetch bookings matching those slots
-    let allBookings: any[] = [];
+    const allBookings: any[] = [];
 
     if (slotIds.length > 0) {
       // Supabase .in() has a limit — batch if needed
@@ -397,7 +397,7 @@ export default function Bookings() {
   const selectionAllUnpaid = useMemo(() => {
     if (selected.size === 0) return false;
     return Array.from(selected).every(id => {
-      var b = bookingsById[id];
+      const b = bookingsById[id];
       return b && ["PENDING", "PENDING PAYMENT", "HELD"].includes(b.status);
     });
   }, [selected, bookingsById]);
@@ -1464,8 +1464,8 @@ export default function Bookings() {
               ))}
             </div>
             {!bulkActionInFlight && (() => {
-              var ok = bulkProgress.filter(p => p.status === "ok").length;
-              var err = bulkProgress.filter(p => p.status === "error").length;
+              const ok = bulkProgress.filter(p => p.status === "ok").length;
+              const err = bulkProgress.filter(p => p.status === "error").length;
               return (
                 <p className="mt-3 text-xs text-gray-600">
                   {ok} succeeded · {err} failed

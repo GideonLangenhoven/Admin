@@ -12,14 +12,14 @@ import {
   formatTenantDateTime,
 } from "../_shared/tenant.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createServiceClient();
 
 function getCors(req?: any) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -33,13 +33,13 @@ function getCors(req?: any) {
  * Returns null on any failure (missing header, invalid token, no admin row, suspended).
  */
 async function verifyAdminSession(req: any) {
-  var authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  var token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
   try {
-    var { data: userRes, error: authErr } = await supabase.auth.getUser(token);
+    const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !userRes?.user) return null;
-    var { data: admin } = await supabase
+    const { data: admin } = await supabase
       .from("admin_users")
       .select("id, business_id, role, suspended")
       .eq("user_id", userRes.user.id)
@@ -78,19 +78,19 @@ Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
-    var body = await req.json().catch(() => ({}));
-    var { booking_id, reason } = body as { booking_id?: string; reason?: string };
+    const body = await req.json().catch(() => ({}));
+    const { booking_id, reason } = body as { booking_id?: string; reason?: string };
 
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: getCors(req) });
     }
 
-    var session = await verifyAdminSession(req);
+    const session = await verifyAdminSession(req);
     if (!session) {
       return new Response(JSON.stringify({ error: "Admin session required" }), { status: 401, headers: getCors(req) });
     }
 
-    var { data: booking, error: loadErr } = await supabase
+    const { data: booking, error: loadErr } = await supabase
       .from("bookings")
       .select("id, business_id, customer_name, phone, email, qty, total_amount, status, slot_id, yoco_checkout_id, tours(name), slots(start_time)")
       .eq("id", booking_id)
@@ -109,16 +109,16 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ error: "Booking is already cancelled" }), { status: 400, headers: getCors(req) });
     }
 
-    var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-    var brandName = getBusinessDisplayName(tenant.business);
-    var cancelReason = String(reason || "Cancelled by admin").trim() || "Cancelled by admin";
-    var manageBookingUrl = resolveManageBookingsUrl(tenant.business);
-    var isPaid = ["PAID", "CONFIRMED"].includes(booking.status);
-    var refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
-    var nowIso = new Date().toISOString();
+    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const brandName = getBusinessDisplayName(tenant.business);
+    const cancelReason = String(reason || "Cancelled by admin").trim() || "Cancelled by admin";
+    const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
+    const isPaid = ["PAID", "CONFIRMED"].includes(booking.status);
+    const refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
+    const nowIso = new Date().toISOString();
 
     // Update booking row (mirrors weather-cancel's refund_status=ACTION_REQUIRED pattern)
-    var { error: updErr } = await supabase.from("bookings").update({
+    const { error: updErr } = await supabase.from("bookings").update({
       status: "CANCELLED",
       cancellation_reason: cancelReason,
       cancelled_at: nowIso,
@@ -138,7 +138,7 @@ Deno.serve(async (req: any) => {
 
     // Release slot capacity (atomic single update)
     if (booking.slot_id) {
-      var { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).maybeSingle();
+      const { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).maybeSingle();
       if (slotData) {
         await supabase.from("slots").update({
           booked: Math.max(0, (slotData.booked || 0) - Number(booking.qty || 0)),
@@ -147,9 +147,9 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    var ref = String(booking_id).substring(0, 8).toUpperCase();
-    var tourName = (booking as any).tours?.name || "Tour";
-    var startTime = (booking as any).slots?.start_time
+    const ref = String(booking_id).substring(0, 8).toUpperCase();
+    const tourName = (booking as any).tours?.name || "Tour";
+    const startTime = (booking as any).slots?.start_time
       ? formatTenantDateTime(tenant.business, (booking as any).slots.start_time, {
           weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
         })
@@ -158,8 +158,8 @@ Deno.serve(async (req: any) => {
     // WhatsApp notification — two-step flow if 24h window is closed
     if (booking.phone) {
       try {
-        var firstName = String(booking.customer_name || "").split(" ")[0] || "there";
-        var waMessage = isPaid
+        const firstName = String(booking.customer_name || "").split(" ")[0] || "there";
+        const waMessage = isPaid
           ? "Booking Cancelled\n\n" +
             "Hi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
             " has been cancelled.\n\n" +

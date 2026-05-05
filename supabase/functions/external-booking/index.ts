@@ -126,7 +126,7 @@ function normalizeEmail(value: unknown): string | null {
 
 function normalizePhone(value: unknown): string | null {
   if (!value) return null;
-  var digits = String(value).replace(/[^\d]/g, "");
+  const digits = String(value).replace(/[^\d]/g, "");
   if (!digits) return null;
   if (digits.startsWith("0")) digits = "27" + digits.substring(1);
   return digits;
@@ -709,13 +709,13 @@ Deno.serve(async (req: Request) => {
       const slot = await resolveSlot(businessId, tour.id, body, "create", businessTimezone);
       if (!slot) return await send(404, "SLOT_NOT_FOUND", "Open slot not found for the supplied date/time");
 
-      var totalPaid = totalPaidForPayload(body, slot, tour, qty);
+      let totalPaid = totalPaidForPayload(body, slot, tour, qty);
       if (!Number.isFinite(totalPaid)) return await send(400, "INVALID_TOTAL_PAID", "total_paid must be numeric", {}, "REJECTED");
 
       // Validate and apply promo code if provided
-      var extPromoCode = String(body.promo_code || "").trim();
-      var extPromoId: string | null = null;
-      var extPromoDiscount = 0;
+      const extPromoCode = String(body.promo_code || "").trim();
+      let extPromoId: string | null = null;
+      let extPromoDiscount = 0;
       if (extPromoCode) {
         const pv = await db.rpc("validate_promo_code", {
           p_business_id: businessId,
@@ -779,7 +779,7 @@ Deno.serve(async (req: Request) => {
       const firstName = customerName.split(" ")[0] || "there";
       const bookingRef = String(result.booking_id || "").slice(0, 8).toUpperCase();
       const slotInfo = slotSummary(slot, businessTimezone);
-      var paymentUrl: string | null = null;
+      let paymentUrl: string | null = null;
 
       if (result.booking_id && code !== "ALREADY_EXISTS") {
         if ((bookingStatus === "PENDING" || bookingStatus === "HELD") && totalPaid > 0) {

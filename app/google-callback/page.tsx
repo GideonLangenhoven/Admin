@@ -4,14 +4,14 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
 function CallbackHandler() {
-  var searchParams = useSearchParams();
-  var [status, setStatus] = useState("Connecting Google Drive...");
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState("Connecting Google Drive...");
 
   useEffect(() => {
     async function exchange() {
-      var code = searchParams.get("code");
-      var stateRaw = searchParams.get("state");
-      var error = searchParams.get("error");
+      const code = searchParams.get("code");
+      const stateRaw = searchParams.get("state");
+      const error = searchParams.get("error");
 
       if (error) {
         setStatus("Google authorization was denied.");
@@ -26,12 +26,12 @@ function CallbackHandler() {
       }
 
       try {
-        var stateData = JSON.parse(atob(stateRaw));
-        var businessId = stateData.business_id;
-        var returnTo = stateData.return_to || "/settings";
-        var redirectUri = "https://caepweb-admin.vercel.app/google-callback";
+        const stateData = JSON.parse(atob(stateRaw));
+        const businessId = stateData.business_id;
+        const returnTo = stateData.return_to || "/settings";
+        const redirectUri = "https://caepweb-admin.vercel.app/google-callback";
 
-        var { data, error: fnErr } = await supabase.functions.invoke("google-drive", {
+        const { data, error: fnErr } = await supabase.functions.invoke("google-drive", {
           body: { action: "exchange", business_id: businessId, code, redirect_uri: redirectUri },
         });
 

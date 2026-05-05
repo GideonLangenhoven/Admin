@@ -3,9 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
-    var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    var key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    let key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (serviceKey && serviceKey.length > 40 && !serviceKey.includes("your-")) {
         key = serviceKey;
     }
@@ -13,12 +13,12 @@ function serviceClient() {
 }
 
 export async function GET(req: NextRequest) {
-    var caller = await getCallerAdmin(req);
+    const caller = await getCallerAdmin(req);
     if (!caller || !isPrivilegedRole(caller.role)) {
         return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
     }
 
-    var businessId = req.nextUrl.searchParams.get("business_id");
+    const businessId = req.nextUrl.searchParams.get("business_id");
     if (!businessId) {
         return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
     }
@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "You can only view credentials for your own business" }, { status: 403 });
     }
 
-    var supabase = serviceClient();
-    var { data, error } = await supabase
+    const supabase = serviceClient();
+    const { data, error } = await supabase
         .from("businesses")
         .select("wa_token_encrypted, wa_phone_id_encrypted, yoco_secret_key_encrypted, yoco_webhook_secret_encrypted, yoco_test_mode, yoco_test_secret_key_encrypted, yoco_test_webhook_secret_encrypted")
         .eq("id", businessId)
@@ -47,20 +47,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    var caller = await getCallerAdmin(req);
+    const caller = await getCallerAdmin(req);
     if (!caller || !isPrivilegedRole(caller.role)) {
         return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
     }
 
-    var encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
+    const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
     if (!encryptionKey || encryptionKey.length < 32) {
         return NextResponse.json({
             error: "SETTINGS_ENCRYPTION_KEY is not configured on the server.",
         }, { status: 500 });
     }
-    var body: any;
+    let body: any;
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
-    var { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
+    const { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
     if (!section) return NextResponse.json({ error: "section is required ('wa', 'yoco', or 'yoco_test')" }, { status: 400 });
 
@@ -68,12 +68,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "You can only update credentials for your own business" }, { status: 403 });
     }
 
-    var supabase = serviceClient();
+    const supabase = serviceClient();
     if (section === "wa") {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {
             return NextResponse.json({ error: "Both WhatsApp Access Token and Phone Number ID are required." }, { status: 400 });
         }
-        var { error: waErr } = await supabase.rpc("set_wa_credentials", {
+        const { error: waErr } = await supabase.rpc("set_wa_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_wa_token: wa_token.trim(), p_wa_phone_id: wa_phone_id.trim(),
         });
         if (waErr) return NextResponse.json({ error: "Failed to save WhatsApp credentials: " + waErr.message }, { status: 500 });
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         if (!yoco_secret_key?.trim() || !yoco_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Secret Key and Webhook Signing Secret are required." }, { status: 400 });
         }
-        var { error: yocoErr } = await supabase.rpc("set_yoco_credentials", {
+        const { error: yocoErr } = await supabase.rpc("set_yoco_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_yoco_secret_key: yoco_secret_key.trim(), p_yoco_webhook_secret: yoco_webhook_secret.trim(),
         });
         if (yocoErr) return NextResponse.json({ error: "Failed to save Yoco credentials: " + yocoErr.message }, { status: 500 });
@@ -89,12 +89,12 @@ export async function POST(req: NextRequest) {
         if (!yoco_test_secret_key?.trim() || !yoco_test_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Test Secret Key and Test Webhook Signing Secret are required." }, { status: 400 });
         }
-        var { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
+        const { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_yoco_test_secret_key: yoco_test_secret_key.trim(), p_yoco_test_webhook_secret: yoco_test_webhook_secret.trim(),
         });
         if (testErr) return NextResponse.json({ error: "Failed to save Yoco test credentials: " + testErr.message }, { status: 500 });
     } else if (section === "yoco_test_mode") {
-        var { error: modeErr } = await supabase
+        const { error: modeErr } = await supabase
             .from("businesses")
             .update({ yoco_test_mode: yoco_test_mode === true })
             .eq("id", business_id);

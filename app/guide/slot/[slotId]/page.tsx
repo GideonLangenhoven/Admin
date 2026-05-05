@@ -17,11 +17,11 @@ type Booking = {
 };
 
 export default function GuideSlotPage({ params }: { params: Promise<{ slotId: string }> }) {
-  var { slotId } = use(params);
-  var { businessId } = useBusinessContext();
-  var [bookings, setBookings] = useState<Booking[]>([]);
-  var [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
-  var [loading, setLoading] = useState(true);
+  const { slotId } = use(params);
+  const { businessId } = useBusinessContext();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => { reload(); }, [slotId, businessId]);
 
@@ -29,7 +29,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     if (!businessId) return;
     setLoading(true);
 
-    var { data: slot } = await supabase
+    const { data: slot } = await supabase
       .from("slots")
       .select("start_time, tours(name)")
       .eq("id", slotId)
@@ -37,7 +37,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
     if (slot) setSlotInfo({ tour_name: (slot as any).tours?.name || "Tour", start_time: slot.start_time });
 
-    var { data } = await supabase
+    const { data } = await supabase
       .from("bookings")
       .select("id, customer_name, phone, qty, custom_fields, checked_in, checked_in_at, waiver_status")
       .eq("slot_id", slotId)
@@ -59,22 +59,22 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
   }
 
   async function checkIn(bookingId: string) {
-    var clientEventId = crypto.randomUUID();
-    var payload = { booking_id: bookingId, slot_id: slotId, client_event_id: clientEventId };
+    const clientEventId = crypto.randomUUID();
+    const payload = { booking_id: bookingId, slot_id: slotId, client_event_id: clientEventId };
 
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: true, checked_in_at: new Date().toISOString() } : b));
 
     if (!navigator.onLine) {
       await queueLocally({ id: clientEventId, payload, queuedAt: Date.now() });
       if ("serviceWorker" in navigator) {
-        var reg = await navigator.serviceWorker.ready;
+        const reg = await navigator.serviceWorker.ready;
         try { await (reg as any).sync?.register("sync-check-ins"); } catch (_) {}
       }
       return;
     }
 
     try {
-      var r = await fetch("/api/guide/check-in", {
+      const r = await fetch("/api/guide/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -85,8 +85,8 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     }
   }
 
-  var checkedCount = bookings.filter(b => b.checked_in).length;
-  var totalPax = bookings.reduce((s, b) => s + b.qty, 0);
+  const checkedCount = bookings.filter(b => b.checked_in).length;
+  const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
 
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
@@ -151,10 +151,10 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
 async function queueLocally(item: { id: string; payload: any; queuedAt: number }) {
   return new Promise<void>((resolve, reject) => {
-    var req = indexedDB.open("guide-queue", 1);
+    const req = indexedDB.open("guide-queue", 1);
     req.onupgradeneeded = () => req.result.createObjectStore("check-ins", { keyPath: "id" });
     req.onsuccess = () => {
-      var tx = req.result.transaction("check-ins", "readwrite");
+      const tx = req.result.transaction("check-ins", "readwrite");
       tx.objectStore("check-ins").put(item);
       tx.oncomplete = () => resolve();
       tx.onerror = (e) => reject(e);

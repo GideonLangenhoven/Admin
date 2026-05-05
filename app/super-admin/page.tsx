@@ -133,10 +133,10 @@ export default function SuperAdminPage() {
 
   async function saveSubdomain(businessId: string, raw: string) {
     setSavingSubdomain(true);
-    var slug = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
+    const slug = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
     if (!slug) { notify({ title: "Invalid", message: "Subdomain must contain at least one letter or number.", tone: "error" }); setSavingSubdomain(false); return; }
-    var base = `https://${slug}.${BOOKING_DOMAIN}`;
-    var { error } = await supabase.from("businesses").update({
+    const base = `https://${slug}.${BOOKING_DOMAIN}`;
+    const { error } = await supabase.from("businesses").update({
       subdomain: slug,
       booking_site_url: base,
       manage_bookings_url: base + "/my-bookings",
@@ -160,8 +160,8 @@ export default function SuperAdminPage() {
 
   async function regenerateDerivedUrls(businessId: string, subdomain: string | null) {
     if (!subdomain) { notify({ title: "No subdomain", message: "Set a subdomain first.", tone: "error" }); return; }
-    var base = `https://${subdomain}.${BOOKING_DOMAIN}`;
-    var { error } = await supabase.from("businesses").update({
+    const base = `https://${subdomain}.${BOOKING_DOMAIN}`;
+    const { error } = await supabase.from("businesses").update({
       booking_site_url: base,
       manage_bookings_url: base + "/my-bookings",
       booking_success_url: base + "/success",
@@ -180,8 +180,8 @@ export default function SuperAdminPage() {
 
   async function toggleSubscriptionStatus(bizId: string, current: string) {
     setTogglingStatusId(bizId);
-    var next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
-    var { error } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", bizId);
+    const next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+    const { error } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", bizId);
     if (error) {
       notify({ title: "Failed", message: error.message, tone: "error" });
     } else {
@@ -1034,7 +1034,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
     try {
       const res = await fetch(`/landing-pages/templates/${selectedTemplate}.html`);
       if (!res.ok) throw new Error("Template not found");
-      let tpl = await res.text();
+      const tpl = await res.text();
 
       // Simple template rendering (same logic as build.mjs but client-side)
       function render(template: string, data: Record<string, any>, parent: Record<string, any> = {}): string {
