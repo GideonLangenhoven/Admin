@@ -479,5 +479,52 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  try {
+    results.popia = await processPOPIARequests();
+  } catch (error) {
+    console.error("POPIA_CRON_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
+
+async function processPOPIARequests() {
+  const result = { promoted_to_review: 0, expired_unconfirmed: 0, expired_exports: 0 };
+
+  // Promote confirmed requests past their scheduled_for date to IN_REVIEW
+  const { data: due } = await supabase
+    .from("data_subject_requests")
+    .select("id, business_id")
+    .eq("status", "CONFIRMED")
+    .lte("scheduled_for", new Date().toISOString());
+
+  if (due && due.length > 0) {
+    await supabase
+      .from("data_subject_requests")
+      .update({ status: "IN_REVIEW", updated_at: new Date().toISOString() })
+      .in("id", due.map((d: { id: string }) => d.id));
+    result.promoted_to_review = due.length;
+    console.log("POPIA_PROMOTE_TO_REVIEW count=" + due.length);
+  }
+
+  // Expire unconfirmed requests after 24h
+  const { data: expired } = await supabase
+    .from("data_subject_requests")
+    .update({ status: "CANCELLED", cancellation_reason: "Confirmation expired", updated_at: new Date().toISOString() })
+    .eq("status", "PENDING_CONFIRMATION")
+    .lt("confirmation_expires_at", new Date().toISOString())
+    .select("id");
+  result.expired_unconfirmed = expired?.length ?? 0;
+
+  // Expire old export URLs
+  const { data: expiredExports } = await supabase
+    .from("data_subject_requests")
+    .update({ export_url: null, updated_at: new Date().toISOString() })
+    .lt("export_expires_at", new Date().toISOString())
+    .not("export_url", "is", null)
+    .select("id");
+  result.expired_exports = expiredExports?.length ?? 0;
+
+  return result;
+}

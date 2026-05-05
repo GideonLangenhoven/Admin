@@ -1616,6 +1616,80 @@ function broadcastHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function popiaConfirmRequestHtml(d: Record<string, unknown>) {
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">Confirm Your Data Request</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">
+      We received your <strong>${d.request_type}</strong> request. To proceed, please confirm by clicking the button below.
+    </p>
+    <p style="font-size: 13px; color: #666; line-height: 1.5;">
+      This link expires in <strong>24 hours</strong>. If you did not make this request, you can safely ignore this email.
+    </p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${d.confirm_url}" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Confirm Request</a>
+    </div>
+    <p style="font-size: 12px; color: #999;">If the button doesn't work, copy and paste this URL into your browser:<br>${d.confirm_url}</p>
+  </div>`;
+}
+
+function popiaRequestConfirmedHtml(d: Record<string, unknown>) {
+  const schedDate = d.scheduled_for ? new Date(String(d.scheduled_for)).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" }) : "30 days from now";
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">Your Request Is Confirmed</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">
+      Your <strong>${d.request_type}</strong> request has been confirmed and is scheduled for processing on <strong>${schedDate}</strong>.
+    </p>
+    <p style="font-size: 14px; color: #555; line-height: 1.6;">
+      You have 30 days to cancel this request if you change your mind. After that date, it will be reviewed and processed by the business.
+    </p>
+    <p style="font-size: 13px; color: #888; margin-top: 20px;">Under South Africa's Protection of Personal Information Act (POPIA), you have the right to access, correct, or delete your personal data.</p>
+  </div>`;
+}
+
+function popiaRequestFulfilledHtml(d: Record<string, unknown>) {
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">Your Data Request Has Been Processed</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">
+      Your <strong>${d.request_type}</strong> request has been fulfilled.
+    </p>
+    ${String(d.request_type) === "DELETION" ? `<p style="font-size: 14px; color: #555; line-height: 1.6;">
+      Your personal information (name, email, phone, etc.) has been permanently removed from our systems.
+      An anonymized record of your past bookings has been retained for financial and tax compliance purposes (SARS 5-year requirement),
+      but it can no longer be linked back to you.
+    </p>` : `<p style="font-size: 14px; color: #555; line-height: 1.6;">Your request has been processed. If you have any questions, please contact us.</p>`}
+  </div>`;
+}
+
+function popiaRequestRejectedHtml(d: Record<string, unknown>) {
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">Update on Your Data Request</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">
+      We've reviewed your <strong>${d.request_type}</strong> request but are unable to fulfill it at this time.
+    </p>
+    <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>Reason:</strong> ${d.reason}</p>
+    </div>
+    <p style="font-size: 13px; color: #666; line-height: 1.5;">
+      Under POPIA Section 11(3), a responsible party may refuse a request if it falls under a lawful exemption (e.g. active legal proceedings, financial record retention requirements).
+      If you believe this decision is incorrect, you may lodge a complaint with the Information Regulator at <a href="https://inforegulator.org.za">inforegulator.org.za</a>.
+    </p>
+  </div>`;
+}
+
+function popiaExportReadyHtml(d: Record<string, unknown>) {
+  const expiryDate = d.expires_at ? new Date(String(d.expires_at)).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" }) : "7 days";
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">Your Data Export Is Ready</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">
+      Your personal data export has been generated and is ready for download.
+    </p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${d.export_url}" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">Download Export</a>
+    </div>
+    <p style="font-size: 13px; color: #888;">This download link expires on <strong>${expiryDate}</strong>. The file contains all personal information we hold about you in JSON format.</p>
+  </div>`;
+}
+
 Deno.serve(withSentry("send-email", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
@@ -1738,6 +1812,26 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       case "TRIP_PHOTOS":
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
         html = tripPhotosHtml(d);
+        break;
+      case "POPIA_CONFIRM_REQUEST":
+        subject = "Confirm Your Data Request";
+        html = popiaConfirmRequestHtml(d);
+        break;
+      case "POPIA_REQUEST_CONFIRMED":
+        subject = "Your Data Request Has Been Confirmed";
+        html = popiaRequestConfirmedHtml(d);
+        break;
+      case "POPIA_REQUEST_FULFILLED":
+        subject = "Your Data Request Has Been Processed";
+        html = popiaRequestFulfilledHtml(d);
+        break;
+      case "POPIA_REQUEST_REJECTED":
+        subject = "Update on Your Data Request";
+        html = popiaRequestRejectedHtml(d);
+        break;
+      case "POPIA_EXPORT_READY":
+        subject = "Your Data Export Is Ready";
+        html = popiaExportReadyHtml(d);
         break;
       default:
         return new Response(JSON.stringify({ error: "Unknown email type: " + type }), { status: 400, headers: getCors(req) });
