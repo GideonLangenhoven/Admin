@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useMemo } from "react";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
 
 export interface Slot {
@@ -23,30 +23,33 @@ interface WeekViewProps {
     onToggleCancelDate?: (dateStr: string) => void;
 }
 
-export default function WeekView({ slots, currentDate, onSlotClick, selectedCancelDates, onToggleCancelDate }: WeekViewProps) {
-    const startOfWeek = new Date(currentDate);
-    const dayOfWeek = startOfWeek.getDay();
-    // Adjust to start on Monday (0 = Mon, 6 = Sun)
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    startOfWeek.setDate(startOfWeek.getDate() + diff);
-    startOfWeek.setHours(0, 0, 0, 0);
+export default React.memo(function WeekView({ slots, currentDate, onSlotClick, selectedCancelDates, onToggleCancelDate }: WeekViewProps) {
+    const days = useMemo(() => {
+        const startOfWeek = new Date(currentDate);
+        const dayOfWeek = startOfWeek.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        startOfWeek.setDate(startOfWeek.getDate() + diff);
+        startOfWeek.setHours(0, 0, 0, 0);
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(startOfWeek);
+            d.setDate(d.getDate() + i);
+            return d;
+        });
+    }, [currentDate]);
 
-    const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(startOfWeek);
-        d.setDate(d.getDate() + i);
-        return d;
-    });
-
-    const getSlotsForDay = (date: Date) => {
-        return slots.filter((slot) => {
-            const slotDate = new Date(slot.start_time);
-            return (
-                slotDate.getDate() === date.getDate() &&
-                slotDate.getMonth() === date.getMonth() &&
-                slotDate.getFullYear() === date.getFullYear()
-            );
-        }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-    };
+    const slotsByDay = useMemo(() => {
+        const map: Record<string, Slot[]> = {};
+        for (const slot of slots) {
+            const d = new Date(slot.start_time);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(slot);
+        }
+        for (const key of Object.keys(map)) {
+            map[key].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        }
+        return map;
+    }, [slots]);
 
     const fmtTime = (iso: string) => {
         return new Date(iso).toLocaleTimeString("en-ZA", {
@@ -80,6 +83,7 @@ export default function WeekView({ slots, currentDate, onSlotClick, selectedCanc
                     todayInTz.setHours(0, 0, 0, 0);
                     const isToday = day.toDateString() === todayInTz.toDateString();
                     const isPast = day < todayInTz;
+                    const daySlots = slotsByDay[dateStr] || [];
 
                     return (
                         <div key={dateStr} className="flex min-w-0 flex-col">
@@ -111,7 +115,7 @@ export default function WeekView({ slots, currentDate, onSlotClick, selectedCanc
                                         Now {nowLabel}
                                     </div>
                                 )}
-                                {getSlotsForDay(day).map((slot) => {
+                                {daySlots.map((slot) => {
                                     const { directAvailability, effectiveAvailability } = getVisibleAvailability(slot);
                                     const isClosed = slot.status !== "OPEN";
                                     const isResourceLimited = effectiveAvailability < directAvailability;
@@ -145,7 +149,7 @@ export default function WeekView({ slots, currentDate, onSlotClick, selectedCanc
                                         </div>
                                     );
                                 })}
-                                {getSlotsForDay(day).length === 0 && (
+                                {daySlots.length === 0 && (
                                     <div className="text-center text-xs text-gray-400 mt-4 italic">No slots</div>
                                 )}
                             </div>
@@ -155,4 +159,4 @@ export default function WeekView({ slots, currentDate, onSlotClick, selectedCanc
             </div>
         </div>
     );
-}
+});

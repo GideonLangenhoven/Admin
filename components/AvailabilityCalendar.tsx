@@ -66,7 +66,7 @@ function getPositions(count: number): { top?: string; bottom?: string; left?: st
 }
 
 /* ── Custom Day component ── */
-function CustomDay(props: any) {
+const CustomDay = React.memo(function CustomDay(props: any) {
     const { day, modifiers, children, ...tdProps } = props;
     const date: Date = day.date ?? day;
     const daySlots = useContext(SlotDataCtx);
@@ -114,7 +114,7 @@ function CustomDay(props: any) {
             })}
         </td>
     );
-}
+});
 
 /* ── main component ── */
 export default function AvailabilityCalendar({ value, onChange, tourId, businessId, minQty = 0 }: AvailabilityCalendarProps) {
@@ -217,7 +217,7 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                         onSelect={(d) => {
                             if (d) onChange(format(d, "yyyy-MM-dd"));
                         }}
-                        components={{ Day: CustomDay }}
+                        components={{ Day: CustomDay as any }}
                         disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                     />
 

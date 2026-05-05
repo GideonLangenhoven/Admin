@@ -1,11 +1,12 @@
 "use client";
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
+import { Virtuoso } from "react-virtuoso";
 
 function filterHumanConversation(all: any[]): any[] {
   const firstAdminIdx = all.findIndex(m => m.sender === "Admin");
@@ -364,6 +365,22 @@ function InboxContent() {
               <div className="flex-1 overflow-auto">
                 {convos.length === 0 ? (
                   <p className="p-4 text-sm text-gray-500 text-center">No conversations waiting ✓</p>
+                ) : convos.length > 50 ? (
+                  <Virtuoso
+                    style={{ height: "100%" }}
+                    data={convos}
+                    itemContent={(_, c: any) => (
+                      <div onClick={() => setSelected(c)}
+                        className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                          <IntentBadge intent={c.current_intent} size="xs" />
+                        </div>
+                        <p className="text-xs text-gray-500">{c.phone}</p>
+                        <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+                      </div>
+                    )}
+                  />
                 ) : convos.map((c: any) => (
                   <div key={c.id} onClick={() => setSelected(c)}
                     className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
