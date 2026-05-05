@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
 import { Virtuoso } from "react-virtuoso";
+import BotStatusBanner from "./components/BotStatusBanner";
 
 function filterHumanConversation(all: any[]): any[] {
   const firstAdminIdx = all.findIndex(m => m.sender === "Admin");
@@ -356,6 +357,8 @@ function InboxContent() {
       {/* ── Inbox Tab ── */}
       {activeTab === "inbox" && (
         loading ? <p className="text-gray-500">Loading...</p> : (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+          <BotStatusBanner />
           <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
             {/* Conversation list — hidden on mobile when a chat is selected */}
             <div className={`w-full md:w-72 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
@@ -456,6 +459,7 @@ function InboxContent() {
                 <p className="text-gray-400">Select a conversation to start chatting</p>
               </div>
             )}
+          </div>
           </div>
         )
       )}

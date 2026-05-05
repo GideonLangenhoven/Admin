@@ -9,6 +9,7 @@ import {
   type TenantContext,
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
+import { shouldBotReply } from "../_shared/bot-gate.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -727,6 +728,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       );
       return;
     }
+
+    // ── Bot mode gate ─────────────────────────────────────────────────────────
+    // Check tenant's whatsapp_bot_mode setting. If the bot is disabled (OFF or
+    // inside business hours for OUTSIDE_HOURS mode), skip all auto-reply logic.
+    // Stop-words (above) and HUMAN-mode routing (below) still work regardless.
+    const botGate = await shouldBotReply(supabase, tenant.business.id);
+    if (!botGate.active) {
+      // Tag the message so analytics can track "would have auto-replied but bot was disabled"
+      try {
+        await supabase.from("chat_messages")
+          .update({ bot_skipped_reason: botGate.reason })
+          .eq("business_id", tenant.business.id)
+          .eq("phone", phone)
+          .eq("direction", "IN")
+          .order("created_at", { ascending: false })
+          .limit(1);
+      } catch { /* non-critical */ }
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Allow "menu"/"start"/"restart" to escape HUMAN mode so the user can always get the bot back
     const isResetKeyword = (input === "menu" || input === "start" || input === "restart" || input === "back" || input === "home" || input === "main menu" || input === "start over");

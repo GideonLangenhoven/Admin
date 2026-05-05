@@ -7,6 +7,7 @@ import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
 import { DatePicker } from "../../components/DatePicker";
+import WhatsAppBotSection from "./components/WhatsAppBotSection";
 
 function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
     id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
@@ -2764,6 +2765,12 @@ export default function SettingsPage() {
                     </div>
                 </form>
             </CollapsibleSection>}
+
+            {isPrivileged(role) && (
+              <CollapsibleSection id="whatsapp-bot" title="WhatsApp Bot Mode" subtitle="Control when the AI assistant auto-replies to WhatsApp messages" openSections={openSections} toggle={toggleSection}>
+                <WhatsAppBotSection />
+              </CollapsibleSection>
+            )}
 
             {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={async (e) => {
