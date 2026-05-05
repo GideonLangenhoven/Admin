@@ -126,3 +126,25 @@ If production fails, rollback in this order:
 3. then database migrations only if strictly necessary
 
 Do not rotate `SETTINGS_ENCRYPTION_KEY` unless you have a re-encryption plan for stored credentials.
+
+---
+
+## Performance SLOs (V1 — 2026-05-05)
+
+| Metric | Target | Where |
+|--------|--------|-------|
+| Booking site mobile Lighthouse Performance | >= 90 | All routes |
+| Booking site mobile Lighthouse Accessibility | >= 90 | All routes |
+| Booking site mobile Lighthouse SEO | >= 90 | All routes |
+| Booking site LCP (mobile, cold) | <= 2.5s | Tour home, booking flow |
+| Booking site CLS | 0 | All routes |
+| Admin dashboard LCP (desktop, cold) | <= 2.5s | /, /bookings, /inbox |
+| Admin main bundle (gzip) | <= 250KB | .next/analyze/client.html |
+| Inbox scroll (500 threads) | No lag | Virtualized at >50 items |
+| Bookings table page size | 50 rows | Server-paginated with Load More |
+
+**Measurement:** Run `npx ts-node scripts/perf-summary.ts docs/perf/<dir>` after Lighthouse JSON exports.
+
+**CI guardrail:** `.github/workflows/lighthouse.yml` fails PRs that drop below 90 on the booking site.
+
+**Bundle analysis:** Run `ANALYZE=true npm run build` to generate `.next/analyze/client.html`.

@@ -150,6 +150,9 @@ export default function Bookings() {
   const isPrivilegedRole = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
   const [cancellingWeatherId, setCancellingWeatherId] = useState<string | null>(null);
   const [resendingInvoiceId, setResendingInvoiceId] = useState<string | null>(null);
@@ -297,11 +300,12 @@ export default function Bookings() {
 
     const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
 
-    // Step 2: Fetch bookings matching those slots
+    // Step 2: Fetch bookings matching those slots (paginated)
     const allBookings: any[] = [];
+    const rangeFrom = page * PAGE_SIZE;
+    const rangeTo = rangeFrom + PAGE_SIZE - 1;
 
     if (slotIds.length > 0) {
-      // Supabase .in() has a limit — batch if needed
       const BATCH = 500;
       for (let i = 0; i < slotIds.length; i += BATCH) {
         const batch = slotIds.slice(i, i + BATCH);
@@ -311,7 +315,7 @@ export default function Bookings() {
           .eq("business_id", businessId)
           .in("slot_id", batch)
           .order("created_at", { ascending: true })
-          .limit(2000);
+          .range(rangeFrom, rangeTo + 1);
         if (error) {
           console.error("[BOOKINGS] loadBookings batch fetch error:", error.message, error.code, error.details, error.hint);
         }
@@ -320,16 +324,18 @@ export default function Bookings() {
     }
 
     // Step 3: Also fetch unslotted bookings (created in range, no slot assigned)
-    const { data: unslotted } = await supabase
-      .from("bookings")
-      .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
-      .eq("business_id", businessId)
-      .is("slot_id", null)
-      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
-      .gte("created_at", rangeStart.toISOString())
-      .order("created_at", { ascending: true })
-      .limit(200);
-    if (unslotted) allBookings.push(...unslotted);
+    if (page === 0) {
+      const { data: unslotted } = await supabase
+        .from("bookings")
+        .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+        .eq("business_id", businessId)
+        .is("slot_id", null)
+        .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
+        .gte("created_at", rangeStart.toISOString())
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (unslotted) allBookings.push(...unslotted);
+    }
 
     // Deduplicate
     const seen = new Set<string>();
@@ -346,17 +352,27 @@ export default function Bookings() {
         slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
       }));
 
-    console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length });
-    setBookings(normalized as Booking[]);
+    console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length, page });
+    setHasMore(normalized.length > PAGE_SIZE);
+    const limited = normalized.slice(0, PAGE_SIZE);
+    if (page === 0) {
+      setBookings(limited as Booking[]);
+    } else {
+      setBookings(prev => [...prev, ...limited] as Booking[]);
+    }
     setLoading(false);
   }
+
+  useEffect(() => {
+    setPage(0);
+  }, [rangeStart, rangeEnd, businessId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       loadBookings();
     }, 0);
     return () => clearTimeout(t);
-  }, [rangeStart, rangeEnd, businessId]);
+  }, [rangeStart, rangeEnd, businessId, page]);
 
   // Auto-refresh when a booking status changes (e.g. payment received)
   useEffect(() => {
@@ -1441,6 +1457,16 @@ export default function Bookings() {
             );
           })}
         </div>
+        {hasMore && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={() => setPage(p => p + 1)}
+              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Load more bookings
+            </button>
+          </div>
+        )}
         </>
       )}
 

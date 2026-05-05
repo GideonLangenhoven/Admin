@@ -141,6 +141,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_name", data.name || "");
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
+      document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
     } else if (data) {
       // Admin exists but no business_id — legacy admin, still allow access
       setRole(data.role);
@@ -150,6 +151,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_name", data.name || "");
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
+      document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
     } else {
       await clearSession();
     }
@@ -167,6 +169,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("ck_operator_override_business_id");
     localStorage.removeItem("ck_admin_name");
     localStorage.removeItem("ck_admin_settings_perms");
+    document.cookie = "ck_session_hint=;path=/;max-age=0";
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
@@ -320,6 +323,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (checking) {
+    const hasHint = typeof document !== "undefined" && document.cookie.includes("ck_session_hint=1");
+    if (hasHint) {
+      return (
+        <div className="flex min-h-screen bg-[var(--ck-bg)]">
+          <div className="w-56 shrink-0 bg-[var(--ck-surface)] border-r border-[var(--ck-border)]">
+            <div className="p-4 space-y-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-8 rounded bg-[var(--ck-border-subtle)] animate-pulse" />
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 p-6">
+            <div className="h-8 w-48 rounded bg-[var(--ck-border-subtle)] animate-pulse mb-6" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-lg bg-[var(--ck-border-subtle)] animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
         <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
