@@ -17,18 +17,18 @@ type Slot = {
 };
 
 export default function GuideHomePage() {
-  var { businessId, businessName, role } = useBusinessContext();
-  var [slots, setSlots] = useState<Slot[]>([]);
-  var [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
-  var [loading, setLoading] = useState(true);
+  const { businessId, businessName, role } = useBusinessContext();
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!businessId) return;
     (async () => {
       setLoading(true);
-      var start = day + "T00:00:00.000Z";
-      var end = day + "T23:59:59.999Z";
-      var { data: slotRows } = await supabase
+      const start = day + "T00:00:00.000Z";
+      const end = day + "T23:59:59.999Z";
+      const { data: slotRows } = await supabase
         .from("slots")
         .select("id, start_time, capacity_total, booked, held, status, tour_id, tours(name)")
         .eq("business_id", businessId)
@@ -37,14 +37,14 @@ export default function GuideHomePage() {
         .eq("status", "OPEN")
         .order("start_time", { ascending: true });
 
-      var rows: Slot[] = [];
-      for (var s of (slotRows || []) as any[]) {
-        var { count, data: bkData } = await supabase
+      const rows: Slot[] = [];
+      for (const s of (slotRows || []) as any[]) {
+        const { count, data: bkData } = await supabase
           .from("bookings")
           .select("qty", { count: "exact" })
           .eq("slot_id", s.id)
           .in("status", ["PAID", "CONFIRMED", "COMPLETED"]);
-        var pax = (bkData || []).reduce((sum: number, b: any) => sum + (b.qty || 0), 0);
+        const pax = (bkData || []).reduce((sum: number, b: any) => sum + (b.qty || 0), 0);
         rows.push({
           id: s.id,
           start_time: s.start_time,

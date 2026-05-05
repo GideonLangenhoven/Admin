@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
 function serviceClient() {
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(url, key);
 }
 
@@ -13,13 +13,13 @@ function serviceClient() {
  * Returns null if no/invalid session.
  */
 async function verifyAdminSession(req: NextRequest, supabase: any) {
-  var authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  var token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
   try {
-    var { data: userRes, error: authErr } = await supabase.auth.getUser(token);
+    const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !userRes?.user) return null;
-    var { data: admin } = await supabase
+    const { data: admin } = await supabase
       .from("admin_users")
       .select("id, business_id, role, suspended")
       .eq("user_id", userRes.user.id)
@@ -43,10 +43,10 @@ async function verifyAdminSession(req: NextRequest, supabase: any) {
 //
 // body: { combo_booking_id, initiated_by, business_id?, customer_email?, reason? }
 export async function POST(req: NextRequest) {
-  var body: any;
+  let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  var { combo_booking_id, initiated_by, business_id, reason } = body;
+  const { combo_booking_id, initiated_by, business_id, reason } = body;
   if (!combo_booking_id) return NextResponse.json({ error: "combo_booking_id is required" }, { status: 400 });
   if (!initiated_by || !["customer", "operator"].includes(initiated_by)) {
     return NextResponse.json({ error: "initiated_by must be 'customer' or 'operator'" }, { status: 400 });
@@ -55,10 +55,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "business_id is required for operator-initiated cancellations" }, { status: 400 });
   }
 
-  var supabase = serviceClient();
+  const supabase = serviceClient();
 
   // Load combo booking
-  var { data: combo, error: comboErr } = await supabase
+  const { data: combo, error: comboErr } = await supabase
     .from("combo_bookings")
     .select("*")
     .eq("id", combo_booking_id)
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   // ── Authentication gate ──────────────────────────────────────────────────────
   if (initiated_by === "operator") {
-    var session = await verifyAdminSession(req, supabase);
+    const session = await verifyAdminSession(req, supabase);
     if (!session) {
       return NextResponse.json({ error: "Admin authentication required. Log in and try again." }, { status: 401 });
     }
@@ -79,8 +79,8 @@ export async function POST(req: NextRequest) {
     }
   } else {
     // Customer path — verify claimed email against the combo record (case-insensitive)
-    var customerEmail = String(body.customer_email || "").trim().toLowerCase();
-    var comboEmail = String(combo.customer_email || "").trim().toLowerCase();
+    const customerEmail = String(body.customer_email || "").trim().toLowerCase();
+    const comboEmail = String(combo.customer_email || "").trim().toLowerCase();
     if (!customerEmail) {
       return NextResponse.json({ error: "customer_email is required for customer-initiated cancellations." }, { status: 400 });
     }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
   // ─────────────────────────────────────────────────────────────────────────────
 
   // Load all booking items for this combo
-  var { data: comboItems } = await supabase
+  let { data: comboItems } = await supabase
     .from("combo_booking_items")
     .select("id, booking_id, business_id, split_amount, position")
     .eq("combo_booking_id", combo_booking_id)
@@ -101,22 +101,22 @@ export async function POST(req: NextRequest) {
   if (!comboItems || comboItems.length === 0) {
     comboItems = [];
     if (combo.booking_a_id) {
-      var { data: bA } = await supabase.from("bookings").select("business_id").eq("id", combo.booking_a_id).single();
+      const { data: bA } = await supabase.from("bookings").select("business_id").eq("id", combo.booking_a_id).single();
       comboItems.push({ id: null, booking_id: combo.booking_a_id, business_id: bA?.business_id, split_amount: combo.split_a_amount, position: 1 });
     }
     if (combo.booking_b_id) {
-      var { data: bB } = await supabase.from("bookings").select("business_id").eq("id", combo.booking_b_id).single();
+      const { data: bB } = await supabase.from("bookings").select("business_id").eq("id", combo.booking_b_id).single();
       comboItems.push({ id: null, booking_id: combo.booking_b_id, business_id: bB?.business_id, split_amount: combo.split_b_amount, position: 2 });
     }
   }
 
-  var nowIso = new Date().toISOString();
-  var cancelReason = reason || (initiated_by === "customer" ? "Customer requested combo cancellation" : "Operator cancelled");
-  var vouchers: any[] = [];
-  var cancelledBookingIds: string[] = [];
+  const nowIso = new Date().toISOString();
+  const cancelReason = reason || (initiated_by === "customer" ? "Customer requested combo cancellation" : "Operator cancelled");
+  const vouchers: any[] = [];
+  const cancelledBookingIds: string[] = [];
 
   // Determine which items to cancel
-  var itemsToCancel = initiated_by === "customer"
+  const itemsToCancel = initiated_by === "customer"
     ? comboItems  // Cancel all legs
     : (comboItems || []).filter((item: any) => item.business_id === business_id);  // Only this operator's leg(s)
 
@@ -125,8 +125,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Cancel each booking and create a voucher per operator
-  for (var item of itemsToCancel as any[]) {
-    var { data: booking } = await supabase
+  for (const item of itemsToCancel as any[]) {
+    const { data: booking } = await supabase
       .from("bookings")
       .select("id, business_id, tour_id, customer_name, email, phone, total_amount, status, tours(name)")
       .eq("id", item.booking_id)
@@ -142,13 +142,13 @@ export async function POST(req: NextRequest) {
 
     cancelledBookingIds.push(item.booking_id);
 
-    var voucherAmount = Number(item.split_amount || booking.total_amount || 0);
+    const voucherAmount = Number(item.split_amount || booking.total_amount || 0);
     if (voucherAmount <= 0) continue;
 
-    var voucherCode = "COMBO-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-    var expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const voucherCode = "COMBO-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
-    var { data: voucher, error: voucherErr } = await supabase.from("vouchers").insert({
+    const { data: voucher, error: voucherErr } = await supabase.from("vouchers").insert({
       business_id: booking.business_id,
       code: voucherCode,
       type: "FIXED",
@@ -178,9 +178,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Update combo booking status
-  var totalItems = (comboItems || []).length;
-  var allCancelledNow = cancelledBookingIds.length === totalItems;
-  var newStatus = allCancelledNow ? "CANCELLED" : "VOUCHER_ISSUED";
+  const totalItems = (comboItems || []).length;
+  const allCancelledNow = cancelledBookingIds.length === totalItems;
+  const newStatus = allCancelledNow ? "CANCELLED" : "VOUCHER_ISSUED";
 
   await supabase.from("combo_bookings").update({ payment_status: newStatus }).eq("id", combo_booking_id);
 

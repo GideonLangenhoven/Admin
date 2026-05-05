@@ -35,7 +35,7 @@ interface Contact {
   last_name: string | null;
 }
 
-var stepTypeInfo: Record<string, { label: string }> = {
+const stepTypeInfo: Record<string, { label: string }> = {
   send_email: { label: "Send Email" },
   delay: { label: "Delay" },
   condition: { label: "Condition" },
@@ -44,21 +44,21 @@ var stepTypeInfo: Record<string, { label: string }> = {
 };
 
 export default function AutomationBuilderPage() {
-  var { businessId } = useBusinessContext();
-  var params = useParams();
-  var router = useRouter();
-  var automationId = params?.id as string;
+  const { businessId } = useBusinessContext();
+  const params = useParams();
+  const router = useRouter();
+  const automationId = params?.id as string;
 
-  var [automation, setAutomation] = useState<Automation | null>(null);
-  var [steps, setSteps] = useState<Step[]>([]);
-  var [templates, setTemplates] = useState<Template[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [saving, setSaving] = useState(false);
+  const [automation, setAutomation] = useState<Automation | null>(null);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Manual enrollment state
-  var [enrollSearch, setEnrollSearch] = useState("");
-  var [enrollResults, setEnrollResults] = useState<Contact[]>([]);
-  var [enrolling, setEnrolling] = useState(false);
+  const [enrollSearch, setEnrollSearch] = useState("");
+  const [enrollResults, setEnrollResults] = useState<Contact[]>([]);
+  const [enrolling, setEnrolling] = useState(false);
 
   useEffect(() => {
     if (businessId && automationId) {
@@ -69,7 +69,7 @@ export default function AutomationBuilderPage() {
 
   async function loadAutomation() {
     setLoading(true);
-    var { data: autoData } = await supabase
+    const { data: autoData } = await supabase
       .from("marketing_automations")
       .select("id, name, description, trigger_type, trigger_config, status")
       .eq("id", automationId)
@@ -82,7 +82,7 @@ export default function AutomationBuilderPage() {
     }
     setAutomation(autoData as Automation);
 
-    var { data: stepData } = await supabase
+    const { data: stepData } = await supabase
       .from("marketing_automation_steps")
       .select("id, position, step_type, config")
       .eq("automation_id", automationId)
@@ -92,7 +92,7 @@ export default function AutomationBuilderPage() {
   }
 
   async function loadTemplates() {
-    var { data } = await supabase
+    const { data } = await supabase
       .from("marketing_templates")
       .select("id, name, subject_line")
       .eq("business_id", businessId)
@@ -105,7 +105,7 @@ export default function AutomationBuilderPage() {
     setSaving(true);
 
     // Save automation metadata
-    var { error: autoErr } = await supabase
+    const { error: autoErr } = await supabase
       .from("marketing_automations")
       .update({
         name: automation.name,
@@ -126,13 +126,13 @@ export default function AutomationBuilderPage() {
     await supabase.from("marketing_automation_steps").delete().eq("automation_id", automationId);
 
     if (steps.length > 0) {
-      var stepRows = steps.map((s, i) => ({
+      const stepRows = steps.map((s, i) => ({
         automation_id: automationId,
         position: i,
         step_type: s.step_type,
         config: s.config,
       }));
-      var { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
+      const { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
       if (stepErr) {
         notify({ message: stepErr.message, tone: "error" });
         setSaving(false);
@@ -146,7 +146,7 @@ export default function AutomationBuilderPage() {
 
   async function toggleAutomationStatus() {
     if (!automation) return;
-    var newStatus = automation.status === "active" ? "paused" : "active";
+    const newStatus = automation.status === "active" ? "paused" : "active";
 
     // Require at least one step to activate
     if (newStatus === "active" && steps.length === 0) {
@@ -157,7 +157,7 @@ export default function AutomationBuilderPage() {
     // Save first, then toggle
     await saveAutomation();
 
-    var { error } = await supabase
+    const { error } = await supabase
       .from("marketing_automations")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq("id", automationId);
@@ -171,7 +171,7 @@ export default function AutomationBuilderPage() {
   }
 
   function addStep(index: number, type: string) {
-    var newStep: Step = {
+    const newStep: Step = {
       position: index,
       step_type: type,
       config: type === "delay" ? { duration: 1, unit: "days" } :
@@ -180,21 +180,21 @@ export default function AutomationBuilderPage() {
               type === "generate_promo" ? { discount_type: "PERCENT", discount_value: 10, code_prefix: "PROMO", valid_days: 30, max_uses: 1 } :
               { template_id: "", subject_override: "" },
     };
-    var updated = [...steps];
+    const updated = [...steps];
     updated.splice(index, 0, newStep);
     // Re-index positions
     setSteps(updated.map((s, i) => ({ ...s, position: i })));
   }
 
   function removeStep(index: number) {
-    var updated = steps.filter((_, i) => i !== index);
+    const updated = steps.filter((_, i) => i !== index);
     setSteps(updated.map((s, i) => ({ ...s, position: i })));
   }
 
   function moveStep(index: number, direction: -1 | 1) {
-    var target = index + direction;
+    const target = index + direction;
     if (target < 0 || target >= steps.length) return;
-    var updated = [...steps];
+    const updated = [...steps];
     [updated[index], updated[target]] = [updated[target], updated[index]];
     setSteps(updated.map((s, i) => ({ ...s, position: i })));
   }
@@ -206,7 +206,7 @@ export default function AutomationBuilderPage() {
   // Manual enrollment
   async function searchContacts() {
     if (!enrollSearch.trim()) return;
-    var { data } = await supabase
+    const { data } = await supabase
       .from("marketing_contacts")
       .select("id, email, first_name, last_name")
       .eq("business_id", businessId)
@@ -219,7 +219,7 @@ export default function AutomationBuilderPage() {
   async function enrollContact(contactId: string) {
     setEnrolling(true);
     // Check if already enrolled
-    var { data: existing } = await supabase
+    const { data: existing } = await supabase
       .from("marketing_automation_enrollments")
       .select("id, status")
       .eq("automation_id", automationId)
@@ -247,7 +247,7 @@ export default function AutomationBuilderPage() {
       return;
     }
 
-    var { error } = await supabase.from("marketing_automation_enrollments").insert({
+    const { error } = await supabase.from("marketing_automation_enrollments").insert({
       automation_id: automationId,
       contact_id: contactId,
       business_id: businessId,
@@ -461,7 +461,7 @@ export default function AutomationBuilderPage() {
 
         {/* Steps */}
         {steps.map((step, idx) => {
-          var info = stepTypeInfo[step.step_type] || stepTypeInfo.send_email;
+          const info = stepTypeInfo[step.step_type] || stepTypeInfo.send_email;
           return (
             <div key={step.id ?? `step-${idx}`}>
               {/* Connecting line */}
@@ -827,8 +827,8 @@ export default function AutomationBuilderPage() {
 
 // Reusable add-step dropdown
 function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
-  var [open, setOpen] = useState(false);
-  var dropdownRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -841,7 +841,7 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  var types = [
+  const types = [
     { type: "send_email", label: "Send Email" },
     { type: "delay", label: "Delay" },
     { type: "condition", label: "Condition" },

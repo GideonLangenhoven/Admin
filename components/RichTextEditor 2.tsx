@@ -32,8 +32,8 @@ const FONT_SIZES = [
 ];
 
 export default function RichTextEditor({ value, onChange, rows = 10, placeholder }: Props) {
-  var editorRef = useRef<HTMLDivElement>(null);
-  var internalUpdate = useRef(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const internalUpdate = useRef(false);
 
   // Sync external value changes into the editor
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function RichTextEditor({ value, onChange, rows = 10, placeholder
     exec("fontSize", size);
   }
 
-  var minH = rows * 24;
+  const minH = rows * 24;
 
   return (
     <div className="rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden bg-white">

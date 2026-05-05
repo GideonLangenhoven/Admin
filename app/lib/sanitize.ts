@@ -44,7 +44,7 @@ export function isOneOf<T extends string>(val: unknown, options: readonly T[]): 
 /** Sanitize a URL — must start with http(s)://. Returns "" for invalid. */
 export function sanitizeUrl(val: unknown, maxLen = 2048): string {
   if (typeof val !== "string") return "";
-  var s = val.trim().slice(0, maxLen);
+  const s = val.trim().slice(0, maxLen);
   if (s && !/^https?:\/\//i.test(s)) return "";
   return s;
 }
@@ -54,12 +54,12 @@ export async function parseBody(
   req: Request,
   maxSize = MAX_BODY,
 ): Promise<{ data: Record<string, unknown>; error?: undefined } | { data: null; error: string }> {
-  var cl = req.headers.get("content-length");
+  const cl = req.headers.get("content-length");
   if (cl && parseInt(cl, 10) > maxSize) {
     return { data: null, error: `Request body too large (max ${Math.round(maxSize / 1024)}KB)` };
   }
 
-  var text: string;
+  let text: string;
   try {
     text = await req.text();
   } catch {
@@ -70,7 +70,7 @@ export async function parseBody(
     return { data: null, error: `Request body too large (max ${Math.round(maxSize / 1024)}KB)` };
   }
 
-  var parsed: unknown;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {

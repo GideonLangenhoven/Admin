@@ -8,7 +8,7 @@ export interface StarterTemplate {
   blocks: () => Block[];
 }
 
-var defaultFooter = (): Block => ({
+const defaultFooter = (): Block => ({
   type: "footer",
   id: uid(),
   companyName: "{company_name}",
@@ -17,13 +17,13 @@ var defaultFooter = (): Block => ({
   socials: { facebook: "", instagram: "" },
 });
 
-var defaultSocial = (): Block => ({
+const defaultSocial = (): Block => ({
   type: "social",
   id: uid(),
   platforms: { facebook: "", instagram: "", whatsapp: "" },
 });
 
-export var starterTemplates: StarterTemplate[] = [
+export const starterTemplates: StarterTemplate[] = [
   /* ── 1 — Blank Canvas ── */
   {
     name: "Blank Canvas",

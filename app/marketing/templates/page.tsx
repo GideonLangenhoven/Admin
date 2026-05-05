@@ -27,18 +27,18 @@ interface SendFormState {
 }
 
 export default function TemplatesPage() {
-  var { businessId } = useBusinessContext();
-  var [templates, setTemplates] = useState<Template[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [editing, setEditing] = useState<Template | null>(null);
-  var [creating, setCreating] = useState(false);
-  var [showGallery, setShowGallery] = useState(false);
-  var [initialTemplate, setInitialTemplate] = useState<StarterTemplate | null>(null);
-  var [sending, setSending] = useState<Template | null>(null);
-  var [sendForm, setSendForm] = useState<SendFormState>({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
-  var [sendingInProgress, setSendingInProgress] = useState(false);
-  var [availableTags, setAvailableTags] = useState<string[]>([]);
-  var [audienceCount, setAudienceCount] = useState<number | null>(null);
+  const { businessId } = useBusinessContext();
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Template | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [initialTemplate, setInitialTemplate] = useState<StarterTemplate | null>(null);
+  const [sending, setSending] = useState<Template | null>(null);
+  const [sendForm, setSendForm] = useState<SendFormState>({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
+  const [sendingInProgress, setSendingInProgress] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [audienceCount, setAudienceCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (businessId) load();
@@ -46,7 +46,7 @@ export default function TemplatesPage() {
 
   async function load() {
     setLoading(true);
-    var { data } = await supabase.from("marketing_templates")
+    const { data } = await supabase.from("marketing_templates")
       .select("*")
       .eq("business_id", businessId)
       .order("updated_at", { ascending: false });
@@ -56,18 +56,18 @@ export default function TemplatesPage() {
 
   // Load unique tags when send modal opens
   async function loadTags() {
-    var { data } = await supabase.from("marketing_contacts")
+    const { data } = await supabase.from("marketing_contacts")
       .select("tags")
       .eq("business_id", businessId)
       .eq("status", "active");
-    var tagSet = new Set<string>();
-    for (var row of (data || []) as any[]) {
-      var tags = row.tags;
+    const tagSet = new Set<string>();
+    for (const row of (data || []) as any[]) {
+      const tags = row.tags;
       if (Array.isArray(tags)) {
-        for (var t of tags) if (typeof t === "string" && t.trim()) tagSet.add(t.trim().toLowerCase());
+        for (const t of tags) if (typeof t === "string" && t.trim()) tagSet.add(t.trim().toLowerCase());
       } else if (typeof tags === "string" && tags.trim()) {
         // Handle tags stored as a plain string or comma-separated
-        for (var s of tags.split(",")) if (s.trim()) tagSet.add(s.trim().toLowerCase());
+        for (const s of tags.split(",")) if (s.trim()) tagSet.add(s.trim().toLowerCase());
       }
     }
     setAvailableTags([...tagSet].sort());
@@ -75,27 +75,27 @@ export default function TemplatesPage() {
 
   // Compute audience count based on current filter
   async function computeAudienceCount(filter: "all" | "tagged", tags: string[]) {
-    var q = supabase.from("marketing_contacts")
+    let q = supabase.from("marketing_contacts")
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId)
       .eq("status", "active");
     if (filter === "tagged" && tags.length > 0) {
       q = q.overlaps("tags", tags);
     }
-    var { count } = await q;
+    const { count } = await q;
     setAudienceCount(count || 0);
   }
 
   async function handleSave(name: string, subjectLine: string, category: string, blocks: any[], html: string) {
     if (editing) {
-      var { error } = await supabase.from("marketing_templates").update({
+      const { error } = await supabase.from("marketing_templates").update({
         name, subject_line: subjectLine, category, editor_json: blocks, html_content: html, updated_at: new Date().toISOString(),
       }).eq("id", editing.id);
       if (error) { notify({ message: error.message, tone: "error" }); return; }
       notify({ message: "Template updated.", tone: "success" });
       setEditing(null);
     } else {
-      var { error: createErr } = await supabase.from("marketing_templates").insert({
+      const { error: createErr } = await supabase.from("marketing_templates").insert({
         business_id: businessId, name, subject_line: subjectLine, category, editor_json: blocks, html_content: html,
       });
       if (createErr) { notify({ message: createErr.message, tone: "error" }); return; }
@@ -123,11 +123,11 @@ export default function TemplatesPage() {
   async function sendTestEmail(t: Template) {
     try {
       // Resolve test recipient: designated marketing test email > current admin's email
-      var testEmail = "";
-      var testName = "Admin";
+      let testEmail = "";
+      let testName = "Admin";
 
       // Check if business has a designated marketing test email
-      var { data: biz, error: bizErr } = await supabase
+      const { data: biz, error: bizErr } = await supabase
         .from("businesses")
         .select("marketing_test_email")
         .eq("id", businessId)
@@ -135,7 +135,7 @@ export default function TemplatesPage() {
       if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
       if (biz?.marketing_test_email) {
         testEmail = biz.marketing_test_email;
-        var { data: adminRow } = await supabase
+        const { data: adminRow } = await supabase
           .from("admin_users")
           .select("name")
           .eq("email", testEmail)
@@ -152,7 +152,7 @@ export default function TemplatesPage() {
 
       // If still no email, look up the first admin for this business
       if (!testEmail) {
-        var { data: fallbackAdmin } = await supabase
+        const { data: fallbackAdmin } = await supabase
           .from("admin_users")
           .select("email, name")
           .eq("business_id", businessId)
@@ -176,7 +176,7 @@ export default function TemplatesPage() {
       console.log("[MARKETING_TEST] Sending to:", testEmail, "template:", t.name, "businessId:", businessId);
       notify({ message: `Sending test email to ${testEmail}...`, tone: "info" });
 
-      var { data: sendResult, error: sendErr } = await supabase.functions.invoke("send-email", {
+      const { data: sendResult, error: sendErr } = await supabase.functions.invoke("send-email", {
         body: {
           type: "MARKETING_TEST",
           data: {
@@ -193,9 +193,9 @@ export default function TemplatesPage() {
 
       if (sendErr) {
         // supabase.functions.invoke wraps non-2xx as FunctionsHttpError — read the body
-        var errDetail = sendErr.message || "Unknown error";
+        let errDetail = sendErr.message || "Unknown error";
         try {
-          var errBody = typeof sendResult === "object" ? sendResult : null;
+          const errBody = typeof sendResult === "object" ? sendResult : null;
           if (errBody?.error) errDetail = errBody.error;
         } catch { /* ignore */ }
         notify({ message: "Test email failed: " + errDetail, tone: "error" });
@@ -218,10 +218,10 @@ export default function TemplatesPage() {
     if (!sending || !sendForm.name.trim()) return;
     setSendingInProgress(true);
 
-    var isScheduled = !!sendForm.scheduledAt;
+    const isScheduled = !!sendForm.scheduledAt;
 
     // 1. Create campaign
-    var { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
+    const { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
       business_id: businessId,
       template_id: sending.id,
       name: sendForm.name.trim(),
@@ -237,14 +237,14 @@ export default function TemplatesPage() {
     }
 
     // 2. Get audience contacts
-    var q = supabase.from("marketing_contacts")
+    let q = supabase.from("marketing_contacts")
       .select("id, email, first_name")
       .eq("business_id", businessId)
       .eq("status", "active");
     if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
       q = q.overlaps("tags", sendForm.selectedTags);
     }
-    var { data: contacts } = await q;
+    const { data: contacts } = await q;
 
     if (!contacts || contacts.length === 0) {
       notify({ message: "No active contacts match the selected audience.", tone: "warning" });
@@ -255,14 +255,14 @@ export default function TemplatesPage() {
     }
 
     // 3. Insert queue rows (DB UNIQUE constraint handles dedup)
-    var queueRows = contacts.map((c: any) => ({
+    const queueRows = contacts.map((c: any) => ({
       business_id: businessId,
       campaign_id: campaign!.id,
       contact_id: c.id,
       email: c.email,
       first_name: c.first_name || "",
     }));
-    var { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows);
+    const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows);
     if (queueErr) {
       // If partial insert due to dedup constraint, still proceed
       console.warn("Queue insert warning:", queueErr.message);
@@ -278,11 +278,11 @@ export default function TemplatesPage() {
     //    (don't rely solely on the cron job — fire it now for instant delivery)
     if (!isScheduled) {
       // Fire dispatch in batches until all queue items are processed
-      var dispatchedTotal = 0;
-      for (var attempt = 0; attempt < Math.ceil(contacts.length / 50) + 1; attempt++) {
+      let dispatchedTotal = 0;
+      for (let attempt = 0; attempt < Math.ceil(contacts.length / 50) + 1; attempt++) {
         try {
-          var dispRes = await supabase.functions.invoke("marketing-dispatch", { body: {} });
-          var processed = dispRes.data?.sent || 0;
+          const dispRes = await supabase.functions.invoke("marketing-dispatch", { body: {} });
+          const processed = dispRes.data?.sent || 0;
           dispatchedTotal += processed;
           if (processed === 0) break; // no more items to process
         } catch (dispErr) {
@@ -494,12 +494,12 @@ export default function TemplatesPage() {
                       <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>No tags found. Add tags to contacts first.</p>
                     ) : (
                       availableTags.map((tag) => {
-                        var selected = sendForm.selectedTags.includes(tag);
+                        const selected = sendForm.selectedTags.includes(tag);
                         return (
                           <button
                             key={tag}
                             onClick={() => {
-                              var newTags = selected ? sendForm.selectedTags.filter((t) => t !== tag) : [...sendForm.selectedTags, tag];
+                              const newTags = selected ? sendForm.selectedTags.filter((t) => t !== tag) : [...sendForm.selectedTags, tag];
                               setSendForm({ ...sendForm, selectedTags: newTags });
                               computeAudienceCount("tagged", newTags);
                             }}

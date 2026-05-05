@@ -7,8 +7,8 @@ import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
 
-var SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-var SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
@@ -24,45 +24,45 @@ function htmlToPlainText(html: string) {
 type SlotData = { id: string; start_time: string; capacity_total: number; booked: number; held: number; status: string; tours: { name: string } };
 
 export default function BroadcastsPage() {
-  var { businessId } = useBusinessContext();
-  var [manageBookingUrl, setManageBookingUrl] = useState("");
-  var [vMonth, setVMonth] = useState(new Date().getMonth());
-  var [vYear, setVYear] = useState(new Date().getFullYear());
-  var [allSlots, setAllSlots] = useState<SlotData[]>([]);
-  var [paxByDate, setPaxByDate] = useState<Record<string, number>>({});
-  var [selectedDate, setSelectedDate] = useState<string | null>(null);
-  var [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
-  var [bookings, setBookings] = useState<any[]>([]);
-  var [loadingBookings, setLoadingBookings] = useState(false);
-  var [message, setMessage] = useState("");
-  var [sending, setSending] = useState(false);
-  var [result, setResult] = useState<any>(null);
-  var [history, setHistory] = useState<any[]>([]);
-  var [weatherMode, setWeatherMode] = useState(false);
-  var [weatherReason, setWeatherReason] = useState("unfavourable weather conditions");
-  var [weatherResult, setWeatherResult] = useState<any>(null);
-  var [cancellingWeather, setCancellingWeather] = useState(false);
+  const { businessId } = useBusinessContext();
+  const [manageBookingUrl, setManageBookingUrl] = useState("");
+  const [vMonth, setVMonth] = useState(new Date().getMonth());
+  const [vYear, setVYear] = useState(new Date().getFullYear());
+  const [allSlots, setAllSlots] = useState<SlotData[]>([]);
+  const [paxByDate, setPaxByDate] = useState<Record<string, number>>({});
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [weatherMode, setWeatherMode] = useState(false);
+  const [weatherReason, setWeatherReason] = useState("unfavourable weather conditions");
+  const [weatherResult, setWeatherResult] = useState<any>(null);
+  const [cancellingWeather, setCancellingWeather] = useState(false);
 
   useEffect(() => { loadSlots(); loadHistory(); loadBusinessLinks(); }, [businessId]);
 
   async function loadBusinessLinks() {
-    var { data } = await supabase.from("businesses").select("booking_site_url, manage_bookings_url").eq("id", businessId).maybeSingle();
-    var bookingSiteUrl = String(data?.booking_site_url || "").replace(/\/+$/, "");
+    const { data } = await supabase.from("businesses").select("booking_site_url, manage_bookings_url").eq("id", businessId).maybeSingle();
+    const bookingSiteUrl = String(data?.booking_site_url || "").replace(/\/+$/, "");
     setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : ""));
   }
 
   async function loadSlots() {
     // Start of today in admin timezone, converted back to UTC for the query
-    var now = new Date();
-    var saDate = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
+    const now = new Date();
+    const saDate = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
     saDate.setHours(0, 0, 0, 0);
     // Compute dynamic offset between local-interpreted timezone and UTC
-    var offsetMs = saDate.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
-    var todayMidnightLocal = new Date(saDate.getTime());
+    const offsetMs = saDate.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+    const todayMidnightLocal = new Date(saDate.getTime());
     todayMidnightLocal.setHours(0, 0, 0, 0);
-    var todayStart = new Date(todayMidnightLocal.getTime() - offsetMs);
-    var future = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-    var { data } = await supabase.from("slots")
+    const todayStart = new Date(todayMidnightLocal.getTime() - offsetMs);
+    const future = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    const { data } = await supabase.from("slots")
       .select("id, start_time, capacity_total, booked, held, tours(name), status")
       .eq("business_id", businessId)
       .gte("start_time", todayStart.toISOString())
@@ -70,17 +70,17 @@ export default function BroadcastsPage() {
       .order("start_time", { ascending: true });
     setAllSlots((data || []) as any);
 
-    var { data: bData } = await supabase.from("bookings")
+    const { data: bData } = await supabase.from("bookings")
       .select("qty, status, slots(start_time)")
       .eq("business_id", businessId)
       .in("status", ["PAID", "CONFIRMED", "PENDING", "HELD"])
       .gte("slots.start_time", todayStart.toISOString())
       .lt("slots.start_time", future.toISOString());
 
-    var pByDate: Record<string, number> = {};
-    for (var b of (bData || [])) {
+    const pByDate: Record<string, number> = {};
+    for (const b of (bData || [])) {
       if ((b as any).slots?.start_time) {
-        var d = new Date((b as any).slots.start_time).toLocaleDateString("en-CA", { timeZone: getAdminTimezone() });
+        const d = new Date((b as any).slots.start_time).toLocaleDateString("en-CA", { timeZone: getAdminTimezone() });
         pByDate[d] = (pByDate[d] || 0) + b.qty;
       }
     }
@@ -88,50 +88,50 @@ export default function BroadcastsPage() {
   }
 
   async function loadHistory() {
-    var { data } = await supabase.from("broadcasts").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(15);
+    const { data } = await supabase.from("broadcasts").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(15);
     setHistory(data || []);
   }
 
   // Calendar helpers
-  var dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-  var firstDay = new Date(vYear, vMonth, 1).getDay();
-  var daysInMonth = new Date(vYear, vMonth + 1, 0).getDate();
-  var monthName = new Date(vYear, vMonth).toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
-  var now = new Date();
-  var canPrev = vYear > now.getFullYear() || (vYear === now.getFullYear() && vMonth > now.getMonth());
+  const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const firstDay = new Date(vYear, vMonth, 1).getDay();
+  const daysInMonth = new Date(vYear, vMonth + 1, 0).getDate();
+  const monthName = new Date(vYear, vMonth).toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+  const now = new Date();
+  const canPrev = vYear > now.getFullYear() || (vYear === now.getFullYear() && vMonth > now.getMonth());
 
   // Slots grouped by date
-  var slotsByDate: Record<string, SlotData[]> = {};
-  for (var s of allSlots) {
-    var d = new Date(s.start_time).toLocaleDateString("en-CA", { timeZone: getAdminTimezone() });
+  const slotsByDate: Record<string, SlotData[]> = {};
+  for (const s of allSlots) {
+    const d = new Date(s.start_time).toLocaleDateString("en-CA", { timeZone: getAdminTimezone() });
     if (!slotsByDate[d]) slotsByDate[d] = [];
     slotsByDate[d].push(s);
   }
 
   // Calendar cells
-  var cells: { day: number; date: string; isPast: boolean; hasSlots: boolean; bookCount: number }[] = [];
-  for (var i = 1; i <= daysInMonth; i++) {
-    var ds = vYear + "-" + String(vMonth + 1).padStart(2, "0") + "-" + String(i).padStart(2, "0");
-    var isPast = new Date(ds + "T23:59:59") < now;
-    var daySlots = slotsByDate[ds] || [];
-    var bookCount = paxByDate[ds] || 0;
+  const cells: { day: number; date: string; isPast: boolean; hasSlots: boolean; bookCount: number }[] = [];
+  for (let i = 1; i <= daysInMonth; i++) {
+    const ds = vYear + "-" + String(vMonth + 1).padStart(2, "0") + "-" + String(i).padStart(2, "0");
+    const isPast = new Date(ds + "T23:59:59") < now;
+    const daySlots = slotsByDate[ds] || [];
+    const bookCount = paxByDate[ds] || 0;
     cells.push({ day: i, date: ds, isPast, hasSlots: daySlots.length > 0, bookCount });
   }
 
   // Selected date slots
-  var dateSlots = selectedDate ? (slotsByDate[selectedDate] || []) : [];
+  const dateSlots = selectedDate ? (slotsByDate[selectedDate] || []) : [];
 
   function toggleSlot(slotId: string) {
-    var next = selectedSlotIds.includes(slotId) ? selectedSlotIds.filter(id => id !== slotId) : [...selectedSlotIds, slotId];
+    const next = selectedSlotIds.includes(slotId) ? selectedSlotIds.filter(id => id !== slotId) : [...selectedSlotIds, slotId];
     setSelectedSlotIds(next);
     if (next.length > 0) loadAffected(next);
     else setBookings([]);
   }
 
   function selectAllDate() {
-    var ids = dateSlots.map(s => s.id);
-    var allSelected = ids.every(id => selectedSlotIds.includes(id));
-    var next = allSelected ? selectedSlotIds.filter(id => !ids.includes(id)) : [...new Set([...selectedSlotIds, ...ids])];
+    const ids = dateSlots.map(s => s.id);
+    const allSelected = ids.every(id => selectedSlotIds.includes(id));
+    const next = allSelected ? selectedSlotIds.filter(id => !ids.includes(id)) : [...new Set([...selectedSlotIds, ...ids])];
     setSelectedSlotIds(next);
     if (next.length > 0) loadAffected(next);
     else setBookings([]);
@@ -139,7 +139,7 @@ export default function BroadcastsPage() {
 
   async function loadAffected(slotIds: string[]) {
     setLoadingBookings(true);
-    var { data } = await supabase.from("bookings")
+    const { data } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, status, slots(start_time), tours(name)")
       .eq("business_id", businessId)
       .in("slot_id", slotIds)
@@ -149,7 +149,7 @@ export default function BroadcastsPage() {
   }
 
   async function sendBroadcast() {
-    var plainMessage = htmlToPlainText(message);
+    const plainMessage = htmlToPlainText(message);
     if (!plainMessage.trim() || selectedSlotIds.length === 0 || bookings.length === 0) return;
     if (!await confirmAction({
       title: "Send broadcast",
@@ -159,12 +159,12 @@ export default function BroadcastsPage() {
     })) return;
     setSending(true); setResult(null);
     try {
-      var r = await fetch(SU + "/functions/v1/broadcast", {
+      const r = await fetch(SU + "/functions/v1/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
         body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, send_email: true, send_whatsapp: true, business_id: businessId }),
       });
-      var d = await r.json();
+      const d = await r.json();
       setResult(d);
       if (!d.error) { setMessage(""); setSelectedSlotIds([]); setBookings([]); }
       loadHistory();
@@ -186,25 +186,25 @@ export default function BroadcastsPage() {
     })) return;
     setCancellingWeather(true); setWeatherResult(null);
 
-    var totalAffected = 0;
-    var totalSent = 0;
+    let totalAffected = 0;
+    let totalSent = 0;
 
     try {
-      for (var slotId of selectedSlotIds) {
+      for (const slotId of selectedSlotIds) {
         // Close the slot
         await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slotId);
 
         // Fetch all active bookings on this slot
-        var { data: slotBookings } = await supabase
+        const { data: slotBookings } = await supabase
           .from("bookings")
           .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
           .eq("business_id", businessId)
           .eq("slot_id", slotId)
           .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
 
-        var affected = slotBookings || [];
+        const affected = slotBookings || [];
 
-        for (var b of affected) {
+        for (const b of affected) {
           // Cancel booking (no auto-refund — customer chooses)
           await supabase.from("bookings").update({
             status: "CANCELLED",
@@ -213,7 +213,7 @@ export default function BroadcastsPage() {
           }).eq("id", b.id);
 
           // Release capacity
-          var slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
+          const slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
           if (slotData.data) {
             await supabase.from("slots").update({
               booked: Math.max(0, slotData.data.booked - b.qty),
@@ -224,10 +224,10 @@ export default function BroadcastsPage() {
           // Cancel active holds
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
 
-          var ref = b.id.substring(0, 8).toUpperCase();
-          var tourName = (b as any).tours?.name || "Tour";
-          var startTime = (b as any).slots?.start_time ? fmtDateTime((b as any).slots.start_time) : "";
-          var paidAmount = Number(b.total_amount || 0);
+          const ref = b.id.substring(0, 8).toUpperCase();
+          const tourName = (b as any).tours?.name || "Tour";
+          const startTime = (b as any).slots?.start_time ? fmtDateTime((b as any).slots.start_time) : "";
+          const paidAmount = Number(b.total_amount || 0);
 
           // WhatsApp notification — with 3 options
           if (b.phone) {
@@ -329,8 +329,8 @@ export default function BroadcastsPage() {
               {Array.from({ length: firstDay }, (_, i) => <div key={"e" + i} />)}
               {cells.map(c => {
                 if (c.isPast || !c.hasSlots) return <div key={c.date} className="text-center py-2 text-sm text-gray-300 rounded-lg">{c.day}</div>;
-                var isSelected = selectedDate === c.date;
-                var hasSelectedSlots = (slotsByDate[c.date] || []).some(s => selectedSlotIds.includes(s.id));
+                const isSelected = selectedDate === c.date;
+                const hasSelectedSlots = (slotsByDate[c.date] || []).some(s => selectedSlotIds.includes(s.id));
                 return (
                   <button key={c.date} onClick={() => { setSelectedDate(c.date); }}
                     className={"text-center py-2 text-sm font-semibold rounded-lg transition-colors relative " +
@@ -362,8 +362,8 @@ export default function BroadcastsPage() {
               </div>
               <div className="space-y-2">
                 {dateSlots.map(s => {
-                  var isSelected = selectedSlotIds.includes(s.id);
-                  var booked = s.booked;
+                  const isSelected = selectedSlotIds.includes(s.id);
+                  const booked = s.booked;
                   return (
                     <button key={s.id} onClick={() => toggleSlot(s.id)}
                       className={"w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-colors " +

@@ -4,21 +4,21 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getAdminAppOrigins } from "../_shared/tenant.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createServiceClient();
 
 function getCors(req?: any) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = origins.includes(origin) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = origins.includes(origin) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
-  var auth;
+  let auth;
   try {
     auth = await requireAuth(req);
   } catch (authErr: any) {
@@ -26,8 +26,8 @@ Deno.serve(async (req: any) => {
   }
 
   try {
-    var body = await req.json();
-    var { booking_ids } = body;
+    const body = await req.json();
+    const { booking_ids } = body;
 
     if (!Array.isArray(booking_ids) || booking_ids.length === 0) {
       return new Response(JSON.stringify({ error: "booking_ids array required" }), { status: 400, headers: getCors(req) });
@@ -39,26 +39,26 @@ Deno.serve(async (req: any) => {
 
     // Tenant guard: verify all bookings belong to the authenticated admin's business
     if (!auth.isServiceRole && auth.businessId) {
-      var { data: owned } = await supabase.from("bookings").select("id").in("id", booking_ids).eq("business_id", auth.businessId);
-      var ownedIds = new Set((owned || []).map((b: any) => b.id));
-      var foreign = booking_ids.filter((id: string) => !ownedIds.has(id));
+      const { data: owned } = await supabase.from("bookings").select("id").in("id", booking_ids).eq("business_id", auth.businessId);
+      const ownedIds = new Set((owned || []).map((b: any) => b.id));
+      const foreign = booking_ids.filter((id: string) => !ownedIds.has(id));
       if (foreign.length > 0) {
         return new Response(JSON.stringify({ error: "Some booking IDs do not belong to your business", foreign_ids: foreign }), { status: 403, headers: getCors(req) });
       }
     }
 
     // Create a batch record so the frontend can track progress
-    var batchId = crypto.randomUUID();
-    var results: Array<{ booking_id: string; ok: boolean; error?: string; amount?: number }> = [];
-    var processed = 0;
-    var succeeded = 0;
-    var failed = 0;
+    const batchId = crypto.randomUUID();
+    const results: Array<{ booking_id: string; ok: boolean; error?: string; amount?: number }> = [];
+    let processed = 0;
+    let succeeded = 0;
+    let failed = 0;
 
-    for (var i = 0; i < booking_ids.length; i++) {
-      var bookingId = booking_ids[i];
+    for (let i = 0; i < booking_ids.length; i++) {
+      const bookingId = booking_ids[i];
       try {
         // Call the existing process-refund edge function for each booking
-        var refundRes = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
+        const refundRes = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -67,7 +67,7 @@ Deno.serve(async (req: any) => {
           body: JSON.stringify({ booking_id: bookingId }),
         });
 
-        var refundData = await refundRes.json();
+        const refundData = await refundRes.json();
 
         if (!refundRes.ok || refundData?.error) {
           failed++;

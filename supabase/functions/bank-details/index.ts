@@ -3,14 +3,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
-var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 
-var db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 function getCors(req: Request) {
-  var origin = req.headers.get("origin") || "";
+  const origin = req.headers.get("origin") || "";
   return {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -28,11 +28,11 @@ function fail(req: Request, msg: string, status = 400) {
 }
 
 async function verifyAdmin(req: Request, businessId: string) {
-  var jwt = req.headers.get("authorization")?.replace("Bearer ", "");
+  const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!jwt) return null;
-  var { data: { user }, error } = await db.auth.getUser(jwt);
+  const { data: { user }, error } = await db.auth.getUser(jwt);
   if (error || !user) return null;
-  var { data: row } = await db
+  const { data: row } = await db
     .from("admin_users")
     .select("id")
     .eq("user_id", user.id)
@@ -50,26 +50,26 @@ Deno.serve(async (req) => {
     return fail(req, "Encryption key not configured", 503);
   }
 
-  var body: any;
+  let body: any;
   try {
     body = await req.json();
   } catch {
     return fail(req, "Invalid JSON");
   }
 
-  var { action, business_id } = body;
+  const { action, business_id } = body;
   if (!business_id) return fail(req, "business_id required");
 
-  var user = await verifyAdmin(req, business_id);
+  const user = await verifyAdmin(req, business_id);
   if (!user) return fail(req, "Unauthorized", 401);
 
   if (action === "get") {
-    var { data, error } = await db.rpc("get_business_bank_details", {
+    const { data, error } = await db.rpc("get_business_bank_details", {
       p_business_id: business_id,
       p_key: SETTINGS_ENCRYPTION_KEY,
     });
     if (error) return fail(req, error.message, 500);
-    var row = Array.isArray(data) ? data[0] : data;
+    const row = Array.isArray(data) ? data[0] : data;
     return ok(req, {
       account_owner: row?.account_owner || null,
       account_number: row?.account_number || null,
@@ -80,8 +80,8 @@ Deno.serve(async (req) => {
   }
 
   if (action === "set") {
-    var { account_owner, account_number, account_type, bank_name, branch_code } = body;
-    var { error: setErr } = await db.rpc("set_business_bank_details", {
+    const { account_owner, account_number, account_type, bank_name, branch_code } = body;
+    const { error: setErr } = await db.rpc("set_business_bank_details", {
       p_business_id: business_id,
       p_key: SETTINGS_ENCRYPTION_KEY,
       p_account_owner: account_owner ?? null,

@@ -14,12 +14,12 @@
  */
 
 export function isComboEnabledServer(): boolean {
-  var v = (process.env.ENABLE_COMBO_DEALS || "").toLowerCase().trim();
+  const v = (process.env.ENABLE_COMBO_DEALS || "").toLowerCase().trim();
   return v === "true" || v === "1" || v === "yes";
 }
 
 export function isComboEnabledClient(): boolean {
-  var v = (process.env.NEXT_PUBLIC_ENABLE_COMBO_DEALS || "").toLowerCase().trim();
+  const v = (process.env.NEXT_PUBLIC_ENABLE_COMBO_DEALS || "").toLowerCase().trim();
   return v === "true" || v === "1" || v === "yes";
 }
 

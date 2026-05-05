@@ -3,14 +3,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappWithWindowReopen, resolveManageBookingsUrl, getAdminAppOrigins, isAllowedOrigin, formatTenantDateTime } from "../_shared/tenant.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createServiceClient();
 
 function getCors(req?: any) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
@@ -18,37 +18,37 @@ Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
-    var body = await req.json();
-    var { slot_ids, business_id, reason } = body;
+    const body = await req.json();
+    const { slot_ids, business_id, reason } = body;
 
     if (!business_id) return new Response(JSON.stringify({ error: "business_id required" }), { status: 400, headers: getCors(req) });
     if (!Array.isArray(slot_ids) || slot_ids.length === 0) return new Response(JSON.stringify({ error: "slot_ids array required" }), { status: 400, headers: getCors(req) });
 
-    var tenant = await getTenantByBusinessId(supabase, business_id);
-    var brandName = getBusinessDisplayName(tenant.business);
-    var cancelReason = reason || "weather conditions";
-    var manageBookingUrl = resolveManageBookingsUrl(tenant.business);
+    const tenant = await getTenantByBusinessId(supabase, business_id);
+    const brandName = getBusinessDisplayName(tenant.business);
+    const cancelReason = reason || "weather conditions";
+    const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
     await supabase.from("slots").update({ status: "CLOSED" }).in("id", slot_ids);
 
     // 2. Fetch all active bookings on these slots
-    var { data: bookings } = await supabase
+    const { data: bookings } = await supabase
       .from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, status, yoco_checkout_id, tours(name), slots(start_time), slot_id")
       .eq("business_id", business_id)
       .in("slot_id", slot_ids)
       .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
 
-    var affected = bookings || [];
-    var nowIso = new Date().toISOString();
+    const affected = bookings || [];
+    const nowIso = new Date().toISOString();
 
     // ── Phase 1: Cancel all bookings and compute per-slot capacity deltas ──
-    var slotDeltas: Record<string, { booked: number; held: number }> = {};
-    for (var i = 0; i < affected.length; i++) {
-      var b = affected[i] as any;
-      var isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      var refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
+    const slotDeltas: Record<string, { booked: number; held: number }> = {};
+    for (let i = 0; i < affected.length; i++) {
+      const b = affected[i] as any;
+      const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
+      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
 
       // Cancel the booking
       await supabase.from("bookings").update({
@@ -72,9 +72,9 @@ Deno.serve(async (req: any) => {
     }
 
     // ── Phase 2: Release slot capacity in one atomic update per slot ──
-    for (var slotId of Object.keys(slotDeltas)) {
-      var delta = slotDeltas[slotId];
-      var { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", slotId).maybeSingle();
+    for (const slotId of Object.keys(slotDeltas)) {
+      const delta = slotDeltas[slotId];
+      const { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", slotId).maybeSingle();
       if (slotData) {
         await supabase.from("slots").update({
           booked: Math.max(0, (slotData.booked || 0) - delta.booked),
@@ -84,21 +84,21 @@ Deno.serve(async (req: any) => {
     }
 
     // ── Phase 3: Send notifications (after all DB state is consistent) ──
-    for (var i = 0; i < affected.length; i++) {
-      var b = affected[i] as any;
-      var isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      var refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
-      var ref = b.id.substring(0, 8).toUpperCase();
-      var tourName = b.tours?.name || "Tour";
-      var startTime = b.slots?.start_time
+    for (let i = 0; i < affected.length; i++) {
+      const b = affected[i] as any;
+      const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
+      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
+      const ref = b.id.substring(0, 8).toUpperCase();
+      const tourName = b.tours?.name || "Tour";
+      const startTime = b.slots?.start_time
         ? formatTenantDateTime(tenant.business, b.slots.start_time, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
         : "";
 
       // WhatsApp notification — paid customers get compensation options, unpaid get simple notice
       if (b.phone) {
         try {
-          var firstName = b.customer_name?.split(" ")[0] || "there";
-          var waMessage = isPaid
+          const firstName = b.customer_name?.split(" ")[0] || "there";
+          const waMessage = isPaid
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +

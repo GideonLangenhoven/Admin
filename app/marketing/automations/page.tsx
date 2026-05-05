@@ -19,7 +19,7 @@ interface Automation {
   description: string | null;
 }
 
-var triggerBadge: Record<string, { bg: string; text: string; label: string }> = {
+const triggerBadge: Record<string, { bg: string; text: string; label: string }> = {
   contact_added: { bg: "bg-blue-100", text: "text-blue-700", label: "Contact Added" },
   tag_added: { bg: "bg-purple-100", text: "text-purple-700", label: "Tag Added" },
   post_booking: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Post Booking" },
@@ -27,7 +27,7 @@ var triggerBadge: Record<string, { bg: string; text: string; label: string }> = 
   manual: { bg: "bg-gray-100", text: "text-gray-500", label: "Manual" },
 };
 
-var statusBadge: Record<string, { bg: string; text: string }> = {
+const statusBadge: Record<string, { bg: string; text: string }> = {
   draft: { bg: "bg-gray-100", text: "text-gray-500" },
   active: { bg: "bg-emerald-100", text: "text-emerald-700" },
   paused: { bg: "bg-yellow-100", text: "text-yellow-700" },
@@ -49,7 +49,7 @@ interface AutomationTemplate {
   exampleEmail: string;
 }
 
-var TEMPLATES: AutomationTemplate[] = [
+const TEMPLATES: AutomationTemplate[] = [
   {
     key: "welcome-series",
     name: "Welcome Series",
@@ -296,20 +296,20 @@ var TEMPLATES: AutomationTemplate[] = [
   },
 ];
 
-var TIER_INFO: Record<string, { label: string; bg: string; text: string; description: string }> = {
+const TIER_INFO: Record<string, { label: string; bg: string; text: string; description: string }> = {
   "must-have": { label: "Must-Have", bg: "bg-red-50", text: "text-red-700", description: "Highest ROI — implement these first" },
   "high-value": { label: "High-Value", bg: "bg-amber-50", text: "text-amber-700", description: "Strong returns — implement after core" },
   "growth": { label: "Growth", bg: "bg-blue-50", text: "text-blue-700", description: "Long-term engagement and scale" },
 };
 
 export default function AutomationsPage() {
-  var { businessId } = useBusinessContext();
-  var router = useRouter();
-  var [automations, setAutomations] = useState<Automation[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [showGallery, setShowGallery] = useState(false);
-  var [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
-  var [creating, setCreating] = useState(false);
+  const { businessId } = useBusinessContext();
+  const router = useRouter();
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showGallery, setShowGallery] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (businessId) load();
@@ -317,7 +317,7 @@ export default function AutomationsPage() {
 
   async function load() {
     setLoading(true);
-    var { data } = await supabase
+    const { data } = await supabase
       .from("marketing_automations")
       .select("id, name, trigger_type, status, enrolled_count, completed_count, created_at, description")
       .eq("business_id", businessId)
@@ -327,7 +327,7 @@ export default function AutomationsPage() {
   }
 
   async function createBlankAutomation() {
-    var { data, error } = await supabase
+    const { data, error } = await supabase
       .from("marketing_automations")
       .insert({
         business_id: businessId,
@@ -347,7 +347,7 @@ export default function AutomationsPage() {
   async function createFromTemplate(template: AutomationTemplate) {
     setCreating(true);
     // Create automation
-    var { data: autoData, error: autoErr } = await supabase
+    const { data: autoData, error: autoErr } = await supabase
       .from("marketing_automations")
       .insert({
         business_id: businessId,
@@ -366,17 +366,17 @@ export default function AutomationsPage() {
       return;
     }
 
-    var newAutoId = autoData.id;
+    const newAutoId = autoData.id;
 
     // Create steps
     if (template.steps.length > 0) {
-      var stepRows = template.steps.map((s, i) => ({
+      const stepRows = template.steps.map((s, i) => ({
         automation_id: newAutoId,
         position: i,
         step_type: s.step_type,
         config: s.config,
       }));
-      var { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
+      const { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
       if (stepErr) {
         notify({ message: stepErr.message, tone: "error" });
         setCreating(false);
@@ -392,8 +392,8 @@ export default function AutomationsPage() {
   }
 
   async function toggleStatus(a: Automation) {
-    var newStatus = a.status === "active" ? "paused" : "active";
-    var { error } = await supabase
+    const newStatus = a.status === "active" ? "paused" : "active";
+    const { error } = await supabase
       .from("marketing_automations")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq("id", a.id);
@@ -407,7 +407,7 @@ export default function AutomationsPage() {
 
   async function deleteAutomation(id: string) {
     if (!confirm("Delete this automation? This cannot be undone.")) return;
-    var { error } = await supabase.from("marketing_automations").delete().eq("id", id);
+    const { error } = await supabase.from("marketing_automations").delete().eq("id", id);
     if (error) {
       notify({ message: error.message, tone: "error" });
       return;
@@ -426,9 +426,9 @@ export default function AutomationsPage() {
 
   /* ─── TEMPLATE DETAIL MODAL ─── */
   if (selectedTemplate) {
-    var t = selectedTemplate;
-    var tier = TIER_INFO[t.tier];
-    var stepLabels: Record<string, string> = {
+    const t = selectedTemplate;
+    const tier = TIER_INFO[t.tier];
+    const stepLabels: Record<string, string> = {
       send_email: "Send Email",
       delay: "Wait",
       condition: "Check",
@@ -525,7 +525,7 @@ export default function AutomationsPage() {
           {/* Steps */}
           <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border)" }}>
             {t.steps.map((step, i) => {
-              var label = stepLabels[step.step_type] || "Send Email";
+              let label = stepLabels[step.step_type] || "Send Email";
               if (step.step_type === "delay") {
                 label = `Wait ${step.config.duration} ${step.config.unit}`;
               } else if (step.step_type === "send_email") {
@@ -595,7 +595,7 @@ export default function AutomationsPage() {
 
   /* ─── TEMPLATE GALLERY ─── */
   if (showGallery) {
-    var tiers: ("must-have" | "high-value" | "growth")[] = ["must-have", "high-value", "growth"];
+    const tiers: ("must-have" | "high-value" | "growth")[] = ["must-have", "high-value", "growth"];
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -615,8 +615,8 @@ export default function AutomationsPage() {
         </div>
 
         {tiers.map((tier) => {
-          var info = TIER_INFO[tier];
-          var tierTemplates = TEMPLATES.filter((t) => t.tier === tier);
+          const info = TIER_INFO[tier];
+          const tierTemplates = TEMPLATES.filter((t) => t.tier === tier);
           return (
             <div key={tier}>
               <div className="flex items-center gap-2 mb-3">
@@ -627,8 +627,8 @@ export default function AutomationsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {tierTemplates.map((t) => {
-                  var tb = triggerBadge[t.triggerType] || triggerBadge.manual;
-                  var emailSteps = t.steps.filter((s) => s.step_type === "send_email").length;
+                  const tb = triggerBadge[t.triggerType] || triggerBadge.manual;
+                  const emailSteps = t.steps.filter((s) => s.step_type === "send_email").length;
                   return (
                     <button
                       key={t.key}
@@ -850,8 +850,8 @@ export default function AutomationsPage() {
             </thead>
             <tbody>
               {automations.map((a) => {
-                var tb = triggerBadge[a.trigger_type] || triggerBadge.manual;
-                var sb = statusBadge[a.status] || statusBadge.draft;
+                const tb = triggerBadge[a.trigger_type] || triggerBadge.manual;
+                const sb = statusBadge[a.status] || statusBadge.draft;
                 return (
                   <tr key={a.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
                     <td className="px-4 py-3">

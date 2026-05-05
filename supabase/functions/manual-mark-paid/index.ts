@@ -17,7 +17,7 @@ function getCors(req: Request) {
 }
 
 async function createInvoice(supabase: any, booking: any, tenant: any, paymentMethod: string) {
-  var existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
+  const existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
   if (existing.data) {
     if (existing.data.payment_method !== paymentMethod) {
       await supabase.from("invoices").update({ payment_method: paymentMethod }).eq("id", existing.data.id);
@@ -26,12 +26,12 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
     return existing.data;
   }
 
-  var invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id });
-  var invNum = invNumR.data || "INV-0";
-  var subtotal = Number(booking.original_total || booking.total_amount);
-  var discountAmt = Math.max(subtotal - Number(booking.total_amount), 0);
+  const invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id });
+  const invNum = invNumR.data || "INV-0";
+  const subtotal = Number(booking.original_total || booking.total_amount);
+  const discountAmt = Math.max(subtotal - Number(booking.total_amount), 0);
 
-  var inv = await supabase.from("invoices").insert({
+  const inv = await supabase.from("invoices").insert({
     business_id: booking.business_id,
     booking_id: booking.id,
     invoice_number: invNum,
@@ -60,7 +60,7 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
-  var auth;
+  let auth;
   try {
     auth = await requireAuth(req);
   } catch (authErr: any) {
@@ -74,8 +74,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createServiceClient();
-    var bookingRes = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).maybeSingle();
-    var booking = bookingRes.data;
+    const bookingRes = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).maybeSingle();
+    const booking = bookingRes.data;
     if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
 
     // Tenant guard: admin can only mark-paid bookings from their own business
@@ -83,14 +83,14 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "You can only mark bookings for your own business as paid" }), { status: 403, headers: getCors(req) });
     }
 
-    var tenant = await getTenantByBusinessId(supabase, booking.business_id);
-    var brandName = getBusinessDisplayName(tenant.business);
+    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const brandName = getBusinessDisplayName(tenant.business);
 
     if (booking.status === "PAID") {
       return new Response(JSON.stringify({ ok: true, message: "Already paid" }), { status: 200, headers: getCors(req) });
     }
 
-    var upd = await supabase.from("bookings")
+    const upd = await supabase.from("bookings")
       .update({ status: "PAID" })
       .eq("id", booking.id)
       .neq("status", "PAID")
@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
 
     await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
 
-    var sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
+    const sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
     if (sr.data) {
       await supabase.from("slots").update({
         booked: sr.data.booked + booking.qty,
@@ -114,11 +114,11 @@ Deno.serve(async (req: Request) => {
     await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);
 
-    var ref = booking.id.substring(0, 8).toUpperCase();
-    var slotTime = booking.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "See email";
-    var tourName = booking.tours?.name || "Booking";
-    var waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
-    var invoice = await createInvoice(supabase, booking, tenant, "Admin (Manual)");
+    const ref = booking.id.substring(0, 8).toUpperCase();
+    const slotTime = booking.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "See email";
+    const tourName = booking.tours?.name || "Booking";
+    const waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
+    const invoice = await createInvoice(supabase, booking, tenant, "Admin (Manual)");
 
     if (booking.phone) {
       try {

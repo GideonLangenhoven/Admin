@@ -17,10 +17,10 @@ type Customer = {
 };
 
 export default function CustomersPage() {
-  var { businessId } = useBusinessContext();
-  var [rows, setRows] = useState<Customer[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [search, setSearch] = useState("");
+  const { businessId } = useBusinessContext();
+  const [rows, setRows] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!businessId) return;
@@ -36,9 +36,9 @@ export default function CustomersPage() {
       });
   }, [businessId]);
 
-  var filtered = search
+  const filtered = search
     ? rows.filter(function (r) {
-        var q = search.toLowerCase();
+        const q = search.toLowerCase();
         return (r.name || "").toLowerCase().includes(q) || r.email.toLowerCase().includes(q) || (r.phone || "").includes(q);
       })
     : rows;

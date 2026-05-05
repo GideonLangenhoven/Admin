@@ -7,22 +7,22 @@ import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
-var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
-var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 // Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
 // Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
-var supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
 console.log("SEND_EMAIL_INIT supabase=" + (supabase ? "OK" : "NULL") + " url=" + (SUPABASE_URL ? "set" : "MISSING") + " key=" + (SUPABASE_SERVICE_ROLE_KEY ? "set" : "MISSING"));
 
 function getCors(req?: Request) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -49,16 +49,16 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   }
   // Always send FROM a platform-controlled domain to pass DMARC/SPF.
   // The tenant's email goes in Reply-To so customers reply to the right place.
-  var payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html };
+  const payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html };
   if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
-  var res = await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  var data = await res.json();
+  const data = await res.json();
   if (!res.ok) {
     console.error("RESEND_ERR status=" + res.status + " from=" + (fromEmail || FROM_EMAIL) + " to=" + to + " subject=" + subject + ":", JSON.stringify(data));
     // Log specific failure reasons for operational visibility
@@ -75,30 +75,30 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
 }
 
 // Default email images — empty means no image shown unless business uploads one via Settings
-var IMG_PAYMENT = "";
-var IMG_CONFIRM = "";
-var IMG_INVOICE = "";
-var IMG_GIFT = "";
-var IMG_CANCEL_GENERAL = "";
-var IMG_CANCEL_WEATHER = "";
-var IMG_INDEMNITY = "";
-var IMG_ADMIN = "";
-var IMG_VOUCHER = "";
-var IMG_PHOTOS = "";
+const IMG_PAYMENT = "";
+const IMG_CONFIRM = "";
+const IMG_INVOICE = "";
+const IMG_GIFT = "";
+const IMG_CANCEL_GENERAL = "";
+const IMG_CANCEL_WEATHER = "";
+const IMG_INDEMNITY = "";
+const IMG_ADMIN = "";
+const IMG_VOUCHER = "";
+const IMG_PHOTOS = "";
 
-var SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
+const SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
 
 // Render hero image placeholder — uses {{IMG_KEY}} markers that get resolved after branding
 function heroImg(key: string, alt: string, bgColor = "#1b3b36") {
   return `<!--HERO_IMG:${key}:${bgColor}:${alt}-->`;
 }
 
-var MANAGE_BOOKING_URL = "";
+const MANAGE_BOOKING_URL = "";
 
 async function enrichWaiverEmailData(d: Record<string, unknown>) {
   if (!supabase) return d;
   try {
-    var ctx = await getWaiverContext(supabase, {
+    const ctx = await getWaiverContext(supabase, {
       businessId: String(d.business_id || ""),
       bookingId: String(d.booking_id || ""),
       waiverStatus: String(d.waiver_status || ""),
@@ -116,19 +116,19 @@ async function enrichWaiverEmailData(d: Record<string, unknown>) {
 }
 
 async function resolveBrandingBusinessId(d: Record<string, unknown>) {
-  var directBusinessId = String(d.business_id || "").trim();
+  const directBusinessId = String(d.business_id || "").trim();
   if (directBusinessId) return directBusinessId;
   if (!supabase) return "";
 
-  var bookingId = String(d.booking_id || "").trim();
+  const bookingId = String(d.booking_id || "").trim();
   if (bookingId) {
-    var bookingRes = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
+    const bookingRes = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
     if (bookingRes.data?.business_id) return String(bookingRes.data.business_id);
   }
 
-  var invoiceNumber = String(d.invoice_number || "").trim();
+  const invoiceNumber = String(d.invoice_number || "").trim();
   if (invoiceNumber) {
-    var invoiceRes = await supabase.from("invoices").select("business_id").eq("invoice_number", invoiceNumber).maybeSingle();
+    const invoiceRes = await supabase.from("invoices").select("business_id").eq("invoice_number", invoiceNumber).maybeSingle();
     if (invoiceRes.data?.business_id) return String(invoiceRes.data.business_id);
   }
 
@@ -136,9 +136,9 @@ async function resolveBrandingBusinessId(d: Record<string, unknown>) {
 }
 
 function deriveAccentColor(hex: string): string {
-  var r = parseInt(hex.slice(1, 3), 16);
-  var g = parseInt(hex.slice(3, 5), 16);
-  var b = parseInt(hex.slice(5, 7), 16);
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
   // Blend 60% toward white for a muted light accent
   r = Math.round(r + (255 - r) * 0.6);
   g = Math.round(g + (255 - g) * 0.6);
@@ -147,11 +147,11 @@ function deriveAccentColor(hex: string): string {
 }
 
 async function loadEmailBranding(d: Record<string, unknown>) {
-  var businessId = await resolveBrandingBusinessId(d);
+  const businessId = await resolveBrandingBusinessId(d);
   console.log("BRANDING_RESOLVE bizId=" + businessId + " supabase=" + (supabase ? "OK" : "NULL") + " d.business_id=" + d.business_id);
   if (!businessId || !supabase) {
     console.warn("BRANDING_FALLBACK: no businessId or no supabase client");
-    var fallbackBrand = String(d.business_name || d.brand_name || "Your Booking");
+    const fallbackBrand = String(d.business_name || d.brand_name || "Your Booking");
     return {
       businessId: "",
       brandName: fallbackBrand,
@@ -172,9 +172,9 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     };
   }
 
-  var data: Record<string, unknown> | null = null;
+  let data: Record<string, unknown> | null = null;
   try {
-    var res = await supabase
+    const res = await supabase
       .from("businesses")
       .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase")
       .eq("id", businessId)
@@ -185,7 +185,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     console.warn("BRANDING_QUERY_ERR (will use fallbacks):", brandErr);
     // Try a simpler query without the email_img columns in case they don't exist yet
     try {
-      var res2 = await supabase
+      const res2 = await supabase
         .from("businesses")
         .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
         .eq("id", businessId)
@@ -196,7 +196,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     }
   }
 
-  var brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
+  const brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
     businessId,
     brandName,
@@ -256,7 +256,7 @@ type InvoiceContext = {
 };
 
 async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
-  var empty: InvoiceContext = {
+  const empty: InvoiceContext = {
     companyName: "",
     addressLines: [],
     reg: "",
@@ -265,25 +265,25 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
   };
   if (!businessId || !supabase) return empty;
 
-  var { data: biz } = await supabase
+  const { data: biz } = await supabase
     .from("businesses")
     .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number")
     .eq("id", businessId)
     .maybeSingle();
 
-  var companyName = String(biz?.invoice_company_name || biz?.business_name || "");
-  var addressLines = [biz?.invoice_address_line1, biz?.invoice_address_line2, biz?.invoice_address_line3].filter(Boolean) as string[];
-  var reg = String(biz?.invoice_reg_number || "");
-  var vat = String(biz?.invoice_vat_number || "");
+  const companyName = String(biz?.invoice_company_name || biz?.business_name || "");
+  const addressLines = [biz?.invoice_address_line1, biz?.invoice_address_line2, biz?.invoice_address_line3].filter(Boolean) as string[];
+  const reg = String(biz?.invoice_reg_number || "");
+  const vat = String(biz?.invoice_vat_number || "");
 
-  var bank = empty.bank;
+  let bank = empty.bank;
   if (SETTINGS_ENCRYPTION_KEY) {
     try {
-      var { data: bankRows } = await supabase.rpc("get_business_bank_details", {
+      const { data: bankRows } = await supabase.rpc("get_business_bank_details", {
         p_business_id: businessId,
         p_key: SETTINGS_ENCRYPTION_KEY,
       });
-      var row = Array.isArray(bankRows) ? bankRows[0] : bankRows;
+      const row = Array.isArray(bankRows) ? bankRows[0] : bankRows;
       if (row) {
         bank = {
           account_owner: row.account_owner || null,
@@ -304,11 +304,11 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
 }
 
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
-  var icons: string[] = [];
-  var iconStyle = "display: inline-block; margin: 0 6px; text-decoration: none;";
-  var svgStyle = "width: 24px; height: 24px;";
+  const icons: string[] = [];
+  const iconStyle = "display: inline-block; margin: 0 6px; text-decoration: none;";
+  const svgStyle = "width: 24px; height: 24px;";
   // Use accent color derived from brand, fallback to light muted
-  var fill = "#A8C2B8";
+  const fill = "#A8C2B8";
 
   if (branding.socialFacebook) icons.push(`<a href="${branding.socialFacebook}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>`);
   if (branding.socialInstagram) icons.push(`<a href="${branding.socialInstagram}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>`);
@@ -324,17 +324,17 @@ function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagra
 }
 
 function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>) {
-  var brandedHtml = html;
+  let brandedHtml = html;
 
   // Safety: NEVER produce empty URLs — Gmail strips href="" making buttons unclickable
-  var fallbackUrl = "https://bookingtours.co.za";
-  var safeManageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : fallbackUrl);
-  var safeBookingUrl = branding.bookingSiteUrl || fallbackUrl;
+  const fallbackUrl = "https://bookingtours.co.za";
+  const safeManageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : fallbackUrl);
+  const safeBookingUrl = branding.bookingSiteUrl || fallbackUrl;
   if (safeManageUrl === fallbackUrl) {
     console.warn("BRANDING_WARN: manageBookingUrl is empty for business=" + branding.businessId + " brandName=" + branding.brandName + " — using fallback");
   }
 
-  var replacements: Array<[string, string]> = [
+  const replacements: Array<[string, string]> = [
     ["Cape Kayak Adventures", branding.brandName],
     ["Cape Kayak Adventure", branding.brandName],
     ["Cape Kayak Admin Dashboard", branding.brandName + " Admin Dashboard"],
@@ -344,7 +344,7 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     ["{{BOOKING_URL}}", safeBookingUrl],
   ];
 
-  for (var i = 0; i < replacements.length; i++) {
+  for (let i = 0; i < replacements.length; i++) {
     brandedHtml = brandedHtml.split(replacements[i][0]).join(replacements[i][1]);
   }
 
@@ -403,12 +403,12 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   }
 
   // Inject social media icons inside the dark email footer
-  var socialHtml = buildSocialIconsHtml(branding);
+  const socialHtml = buildSocialIconsHtml(branding);
   if (socialHtml) {
     // Find the footer </td> — it's the last </td> before </body>
-    var bodyClose = brandedHtml.lastIndexOf("</body>");
+    const bodyClose = brandedHtml.lastIndexOf("</body>");
     if (bodyClose > -1) {
-      var footerTdClose = brandedHtml.lastIndexOf("</td>", bodyClose);
+      const footerTdClose = brandedHtml.lastIndexOf("</td>", bodyClose);
       if (footerTdClose > -1) {
         brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + socialHtml + "\n          " + brandedHtml.slice(footerTdClose);
       }
@@ -416,7 +416,7 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   }
 
   // Resolve hero image markers — show uploaded image or remove the block entirely
-  var imgMap: Record<string, string> = {
+  const imgMap: Record<string, string> = {
     IMG_PAYMENT: branding.imgPayment,
     IMG_CONFIRM: branding.imgConfirm,
     IMG_INVOICE: branding.imgInvoice,
@@ -429,19 +429,19 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     IMG_PHOTOS: branding.imgPhotos,
   };
   brandedHtml = brandedHtml.replace(/<!--HERO_IMG:(\w+):([^:]*):([^>]*)-->/g, (_match, key, bgColor, alt) => {
-    var url = imgMap[key] || "";
+    const url = imgMap[key] || "";
     if (!url) return "";
     return `<tr><td style="background-color: ${bgColor}; padding: 0 30px 30px; text-align: center;"><img src="${url}" alt="${alt}" style="${SQ_IMG_STYLE}" /></td></tr>`;
   });
 
   // Replace email brand color
   if (branding.emailColor && branding.emailColor !== "#1b3b36") {
-    var accent = deriveAccentColor(branding.emailColor);
+    const accent = deriveAccentColor(branding.emailColor);
     brandedHtml = brandedHtml.split("#1b3b36").join(branding.emailColor);
     brandedHtml = brandedHtml.split("#A8C2B8").join(accent);
   }
 
-  var brandedSubject = subject
+  const brandedSubject = subject
     .replace(/^Cape Kayak Admin\b/, branding.brandName + " Admin")
     .replace(/^Cape Kayak\b/, branding.brandName);
 
@@ -515,9 +515,9 @@ function paymentLinkHtml(d: Record<string, unknown>) {
 }
 
 function bookingConfirmHtml(d: Record<string, unknown>) {
-  var waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
-  var waiverUrl = String(d.waiver_url || "");
-  var waiverBlock = waiverPending && waiverUrl
+  const waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
+  const waiverUrl = String(d.waiver_url || "");
+  const waiverBlock = waiverPending && waiverUrl
     ? `
         <tr>
           <td style="padding: 0 40px 24px;">
@@ -548,8 +548,8 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
         </tr>
       `;
   // Activity-aware messaging based on tour name
-  var tourLower = String(d.tour_name || "").toLowerCase();
-  var activityFlavor = "Get ready for an unforgettable experience.";
+  const tourLower = String(d.tour_name || "").toLowerCase();
+  const activityFlavor = "Get ready for an unforgettable experience.";
   if (/kayak|paddle|canoe/.test(tourLower)) activityFlavor = "Get ready for an unforgettable experience on the water.";
   else if (/hike|hiking|trail|walk|mountain/.test(tourLower)) activityFlavor = "Lace up your boots and get ready for an incredible adventure on the trail.";
   else if (/surf|wave/.test(tourLower)) activityFlavor = "Get ready to catch some waves and have an amazing time.";
@@ -652,9 +652,9 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
 }
 
 function bookingUpdatedHtml(d: Record<string, unknown>) {
-  var eventLabel = String(d.event || "updated");
-  var eventTitle = eventLabel === "rescheduled" ? "Booking Rescheduled" : "Booking Updated";
-  var eventMessage = eventLabel === "rescheduled"
+  const eventLabel = String(d.event || "updated");
+  const eventTitle = eventLabel === "rescheduled" ? "Booking Rescheduled" : "Booking Updated";
+  const eventMessage = eventLabel === "rescheduled"
     ? "Your booking has been moved to a new date/time. Here are your updated details."
     : String(d.message || "Your booking details have been updated.");
   return `
@@ -834,23 +834,23 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 }
 
 function cancellationHtml(d: Record<string, unknown>) {
-  var isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
-  var cancelText = isWeather
+  const isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
+  const cancelText = isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
     : `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. We sincerely apologise for the inconvenience.`;
 
-  var amountRow = d.total_amount ? `<tr>
+  const amountRow = d.total_amount ? `<tr>
                 <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Amount Paid:</td>
                 <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 15px; text-align: right;">R${d.total_amount}</td>
               </tr>` : "";
 
   // Use directly-injected URL (set before template runs) with placeholder fallback
-  var manageUrl = String(d._manageUrl || "{{BOOKING_URL}}/my-bookings");
+  const manageUrl = String(d._manageUrl || "{{BOOKING_URL}}/my-bookings");
 
   // Bulletproof table-based button — works in all email clients
   // NEVER produce empty href — Gmail strips href="" making buttons unclickable
   function emailBtn(label: string, url: string, bgColor: string) {
-    var safeUrl = url || "https://bookingtours.co.za";
+    const safeUrl = url || "https://bookingtours.co.za";
     return `<table cellpadding="0" cellspacing="0" border="0" style="margin: 4px auto; display: inline-table;"><tr>
       <td align="center" bgcolor="${bgColor}" style="border-radius: 30px; padding: 0;">
         <a href="${safeUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 30px; letter-spacing: 0.03em;">${label}</a>
@@ -859,7 +859,7 @@ function cancellationHtml(d: Record<string, unknown>) {
   }
 
   // Weather cancellations get a prominent self-service block
-  var optionsBlock = isWeather
+  const optionsBlock = isWeather
     ? `
         <tr>
           <td style="padding: 0 40px 10px;">
@@ -955,8 +955,8 @@ function cancellationHtml(d: Record<string, unknown>) {
 }
 
 function indemnityHtml(d: Record<string, unknown>) {
-  var waiverUrl = String(d.waiver_url || "");
-  var waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
+  const waiverUrl = String(d.waiver_url || "");
+  const waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
   return `
     <!DOCTYPE html>
     <html>
@@ -1413,49 +1413,49 @@ function adminResetPasswordHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-var VAT_RATE = 0.15;
+const VAT_RATE = 0.15;
 
 function escHtml(raw: string) {
   return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContext): Promise<Uint8Array> {
-  var doc = await PDFDocument.create();
-  var page = doc.addPage([595.28, 841.89]); // A4
-  var font = await doc.embedFont(StandardFonts.Helvetica);
-  var fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  var fontMono = await doc.embedFont(StandardFonts.Courier);
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595.28, 841.89]); // A4
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fontMono = await doc.embedFont(StandardFonts.Courier);
 
-  var W = 595.28;
-  var margin = 40;
-  var usable = W - margin * 2;
-  var y = 800;
-  var black = rgb(0, 0, 0);
-  var grey = rgb(0.5, 0.5, 0.5);
-  var lightGrey = rgb(0.85, 0.85, 0.85);
-  var darkGreen = rgb(0.106, 0.231, 0.212);
+  const W = 595.28;
+  const margin = 40;
+  const usable = W - margin * 2;
+  const y = 800;
+  const black = rgb(0, 0, 0);
+  const grey = rgb(0.5, 0.5, 0.5);
+  const lightGrey = rgb(0.85, 0.85, 0.85);
+  const darkGreen = rgb(0.106, 0.231, 0.212);
 
   // Invoice data
-  var invNo = String(d.invoice_number || "");
-  var ref = String(d.payment_reference || invNo).substring(0, 8).toUpperCase();
-  var toName = String(d.customer_name || "Customer");
-  var toEmail = String(d.customer_email || "");
-  var toPhone = String(d.phone || "");
-  var tourName = String(d.tour_name || "Booking");
-  var tourDate = String(d.tour_date || d.invoice_date || "-");
-  var qty = Number(d.qty) || 1;
-  var totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
-  var total = parseFloat(totalStr) || 0;
-  var subtotal = total / (1 + VAT_RATE);
-  var vatAmt = total - subtotal;
-  var invDate = String(d.invoice_date || "-");
+  const invNo = String(d.invoice_number || "");
+  const ref = String(d.payment_reference || invNo).substring(0, 8).toUpperCase();
+  const toName = String(d.customer_name || "Customer");
+  const toEmail = String(d.customer_email || "");
+  const toPhone = String(d.phone || "");
+  const tourName = String(d.tour_name || "Booking");
+  const tourDate = String(d.tour_date || d.invoice_date || "-");
+  const qty = Number(d.qty) || 1;
+  const totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
+  const total = parseFloat(totalStr) || 0;
+  const subtotal = total / (1 + VAT_RATE);
+  const vatAmt = total - subtotal;
+  const invDate = String(d.invoice_date || "-");
   function m(n: number) { return "R" + n.toFixed(2); }
 
   // ── Header ──
   page.drawText(invCtx.companyName || "Tax Invoice", { x: margin, y, font: fontBold, size: 18, color: black });
   page.drawText("TAX INVOICE", { x: W - margin - fontBold.widthOfTextAtSize("TAX INVOICE", 22), y, font: fontBold, size: 22, color: grey });
   y -= 16;
-  var regLine = [invCtx.reg ? invCtx.reg : "", invCtx.vat ? "VAT: " + invCtx.vat : ""].filter(Boolean).join("  ");
+  const regLine = [invCtx.reg ? invCtx.reg : "", invCtx.vat ? "VAT: " + invCtx.vat : ""].filter(Boolean).join("  ");
   if (regLine) page.drawText(regLine, { x: margin, y, font, size: 8, color: grey });
   y -= 30;
 
@@ -1467,16 +1467,16 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   page.drawText("From:", { x: margin, y, font: fontBold, size: 10, color: black });
   page.drawText("To:", { x: margin + usable * 0.5, y, font: fontBold, size: 10, color: black });
   y -= 14;
-  var fromLines = [invCtx.companyName, ...invCtx.addressLines].filter(Boolean);
-  for (var fl of fromLines) {
+  const fromLines = [invCtx.companyName, ...invCtx.addressLines].filter(Boolean);
+  for (const fl of fromLines) {
     page.drawText(fl, { x: margin, y, font, size: 9, color: black });
     y -= 12;
   }
-  var toY = y + 12 + fromLines.length * 12 - 14;
-  var toLines = [toName];
+  let toY = y + 12 + fromLines.length * 12 - 14;
+  const toLines = [toName];
   if (toPhone) toLines.push(toPhone);
   toLines.push(toEmail);
-  for (var tl of toLines) {
+  for (const tl of toLines) {
     page.drawText(tl, { x: margin + usable * 0.5, y: toY, font, size: 9, color: black });
     toY -= 12;
   }
@@ -1485,9 +1485,9 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   // ── Invoice details ──
   page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: lightGrey });
   y -= 20;
-  var detailLabels = ["Invoice #:", "Booking Ref:", "Date:", "Amount Due:"];
-  var detailValues = [invNo, ref, invDate, "R0.00"];
-  for (var di = 0; di < detailLabels.length; di++) {
+  const detailLabels = ["Invoice #:", "Booking Ref:", "Date:", "Amount Due:"];
+  const detailValues = [invNo, ref, invDate, "R0.00"];
+  for (let di = 0; di < detailLabels.length; di++) {
     page.drawText(detailLabels[di], { x: W - margin - 200, y, font: fontBold, size: 9, color: black });
     page.drawText(detailValues[di], { x: W - margin - 80, y, font: fontMono, size: 9, color: black });
     y -= 14;
@@ -1495,15 +1495,15 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   y -= 15;
 
   // ── Service table ──
-  var tableTop = y;
-  var colWidths = [usable * 0.45, usable * 0.15, usable * 0.15, usable * 0.25];
-  var colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
-  var rowH = 20;
+  const tableTop = y;
+  const colWidths = [usable * 0.45, usable * 0.15, usable * 0.15, usable * 0.25];
+  const colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
+  const rowH = 20;
 
   // Header row
   page.drawRectangle({ x: margin, y: tableTop - rowH, width: usable, height: rowH, color: lightGrey });
-  var headers = ["Service", "Qty", "Unit Price", "Total (ZAR)"];
-  for (var hi = 0; hi < headers.length; hi++) {
+  const headers = ["Service", "Qty", "Unit Price", "Total (ZAR)"];
+  for (let hi = 0; hi < headers.length; hi++) {
     page.drawText(headers[hi], { x: colX[hi] + 5, y: tableTop - 14, font: fontBold, size: 9, color: black });
   }
   y = tableTop - rowH;
@@ -1517,26 +1517,26 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   y -= rowH;
 
   // Table borders
-  for (var r = 0; r <= 2; r++) {
+  for (let r = 0; r <= 2; r++) {
     page.drawLine({ start: { x: margin, y: tableTop - r * rowH }, end: { x: W - margin, y: tableTop - r * rowH }, thickness: 0.5, color: grey });
   }
-  for (var c = 0; c <= 4; c++) {
-    var cx = c < 4 ? colX[c] : W - margin;
+  for (let c = 0; c <= 4; c++) {
+    const cx = c < 4 ? colX[c] : W - margin;
     page.drawLine({ start: { x: cx, y: tableTop }, end: { x: cx, y: tableTop - 2 * rowH }, thickness: 0.5, color: grey });
   }
   y -= 10;
 
   // ── Totals ──
-  var totalsX = W - margin - 200;
-  var totalsValX = W - margin - 60;
+  const totalsX = W - margin - 200;
+  const totalsValX = W - margin - 60;
 
-  var totalRows = [
+  const totalRows = [
     ["Sub-total (Excl VAT):", m(subtotal)],
     ["VAT - " + (VAT_RATE * 100).toFixed(1) + "%:", m(vatAmt)],
     ["Total:", m(total)],
     ["Amount Paid:", m(total)],
   ];
-  for (var tr of totalRows) {
+  for (const tr of totalRows) {
     page.drawText(tr[0], { x: totalsX, y, font: tr[0] === "Total:" ? fontBold : font, size: 9, color: black });
     page.drawText(tr[1], { x: totalsValX, y, font: fontMono, size: 9, color: black });
     y -= 14;
@@ -1550,11 +1550,11 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   y -= 35;
 
   // ── Banking Details (only if business has bank details populated) ──
-  var hasBank = invCtx.bank.account_number || invCtx.bank.account_owner;
+  const hasBank = invCtx.bank.account_number || invCtx.bank.account_owner;
   if (hasBank) {
     page.drawText("Banking Details", { x: margin, y, font: fontBold, size: 12, color: black });
     y -= 18;
-    var bankRows = [
+    const bankRows = [
       ["Account Owner:", invCtx.bank.account_owner || ""],
       ["Account Number:", invCtx.bank.account_number || ""],
       ["Account Type:", invCtx.bank.account_type || ""],
@@ -1562,7 +1562,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
       ["Branch Code:", invCtx.bank.branch_code || ""],
       ["Reference:", invNo],
     ].filter(row => row[1]);
-    for (var br of bankRows) {
+    for (const br of bankRows) {
       page.drawText(br[0], { x: margin, y, font: fontBold, size: 9, color: black });
       page.drawText(br[1], { x: margin + 110, y, font, size: 9, color: black });
       y -= 13;
@@ -1573,9 +1573,9 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
 }
 
 function toBase64(str: string): string {
-  var bytes = new TextEncoder().encode(str);
-  var binary = "";
-  for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const bytes = new TextEncoder().encode(str);
+  const binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 
@@ -1625,23 +1625,23 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       return new Response(JSON.stringify({ error: "Email service not configured" }), { status: 503, headers: getCors(req) });
     }
 
-    var body = await req.json();
-    var type = body.type as string;
-    var d = body.data as Record<string, unknown>;
+    const body = await req.json();
+    const type = body.type as string;
+    const d = body.data as Record<string, unknown>;
 
     // Escape user-controlled fields to prevent HTML injection in email templates
-    var fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
-    for (var fi = 0; fi < fieldsToEscape.length; fi++) {
-      var fk = fieldsToEscape[fi];
+    const fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
+    for (let fi = 0; fi < fieldsToEscape.length; fi++) {
+      const fk = fieldsToEscape[fi];
       if (d[fk] && typeof d[fk] === "string") d[fk] = escHtml(d[fk] as string);
     }
 
-    var branding: Awaited<ReturnType<typeof loadEmailBranding>>;
+    let branding: Awaited<ReturnType<typeof loadEmailBranding>>;
     try {
       branding = await loadEmailBranding(d);
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
-      var fb = String(d.business_name || d.brand_name || "Your Booking");
+      const fb = String(d.business_name || d.brand_name || "Your Booking");
       branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
@@ -1650,7 +1650,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     // Validate recipient email before processing the template
-    var recipientEmail = String(d.email || "").trim();
+    const recipientEmail = String(d.email || "").trim();
     if (!recipientEmail || !isValidEmail(recipientEmail)) {
       console.warn("SEND_EMAIL_SKIP type=" + type + " invalid_email=" + recipientEmail);
       return new Response(JSON.stringify({ ok: false, error: "invalid_email", message: "Recipient email '" + recipientEmail + "' is missing or invalid" }), { status: 200, headers: getCors(req) });
@@ -1667,7 +1667,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     // Last resort: if URL is still empty, try to construct from business_id lookup
     if (!d._manageUrl && d.business_id && supabase) {
       try {
-        var bizLookup = await supabase.from("businesses").select("subdomain, manage_bookings_url, booking_site_url").eq("id", String(d.business_id)).maybeSingle();
+        const bizLookup = await supabase.from("businesses").select("subdomain, manage_bookings_url, booking_site_url").eq("id", String(d.business_id)).maybeSingle();
         if (bizLookup.data) {
           d._manageUrl = String(bizLookup.data.manage_bookings_url || (bizLookup.data.booking_site_url ? String(bizLookup.data.booking_site_url).replace(/\/+$/, "") + "/my-bookings" : (bizLookup.data.subdomain ? "https://" + bizLookup.data.subdomain + ".booking.bookingtours.co.za/my-bookings" : "")));
           d._siteUrl = String(bizLookup.data.booking_site_url || (bizLookup.data.subdomain ? "https://" + bizLookup.data.subdomain + ".booking.bookingtours.co.za" : ""));
@@ -1679,9 +1679,9 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       console.error("BRANDING_EMPTY_URL: no manage URL resolved for type=" + type + " biz=" + branding.businessId);
     }
 
-    var subject = "";
-    var html = "";
-    var bcc: string | undefined;
+    let subject = "";
+    let html = "";
+    let bcc: string | undefined;
 
     switch (type) {
       case "PAYMENT_LINK":
@@ -1744,15 +1744,15 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     // Build tax invoice PDF attachment for INVOICE and BOOKING_CONFIRM emails
-    var attachments: Array<{ filename: string; content: string }> | undefined;
+    let attachments: Array<{ filename: string; content: string }> | undefined;
     if (type === "INVOICE" || type === "BOOKING_CONFIRM") {
       try {
         if (d.invoice_number) {
-          var invNum = String(d.invoice_number);
-          var invCtx = await getInvoiceContext(branding.businessId);
-          var pdfBytes = await buildInvoicePdf(d, invCtx);
-          var pdfB64 = "";
-          for (var pi = 0; pi < pdfBytes.length; pi++) pdfB64 += String.fromCharCode(pdfBytes[pi]);
+          const invNum = String(d.invoice_number);
+          const invCtx = await getInvoiceContext(branding.businessId);
+          const pdfBytes = await buildInvoicePdf(d, invCtx);
+          let pdfB64 = "";
+          for (let pi = 0; pi < pdfBytes.length; pi++) pdfB64 += String.fromCharCode(pdfBytes[pi]);
           pdfB64 = btoa(pdfB64);
           attachments = [{ filename: "TaxInvoice-" + invNum + ".pdf", content: pdfB64 }];
         }
@@ -1762,8 +1762,8 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     console.log("BRANDING_URLS type=" + type + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
-    var branded = applyBranding(subject, html, branding);
-    var result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
+    const branded = applyBranding(subject, html, branding);
+    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
     if (result?.statusCode && result.statusCode >= 400) {
       return new Response(JSON.stringify({ ok: false, error: result.message || "Resend API error", result }), { status: 200, headers: getCors(req) });
     }

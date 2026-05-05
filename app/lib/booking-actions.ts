@@ -7,23 +7,23 @@ export type ActionResult = { ok: boolean; error?: string; data?: any };
 
 export async function cancelBookingAction(bookingId: string, opts: { reason?: string; weather?: boolean } = {}): Promise<ActionResult> {
   try {
-    var { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return { ok: false, error: "Session expired" };
 
     if (opts.weather) {
-      var wRes = await supabase.functions.invoke("weather-cancel", {
+      const wRes = await supabase.functions.invoke("weather-cancel", {
         body: { booking_ids: [bookingId], reason: opts.reason || "weather conditions" },
       });
       if (wRes.error) return { ok: false, error: wRes.error.message };
       return { ok: true, data: wRes.data };
     }
 
-    var res = await fetch(SU + "/functions/v1/cancel-booking", {
+    const res = await fetch(SU + "/functions/v1/cancel-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
       body: JSON.stringify({ booking_id: bookingId, reason: opts.reason || "Cancelled by admin" }),
     });
-    var data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.error) return { ok: false, error: data?.error || res.statusText };
     return { ok: true, data };
   } catch (e: any) {
@@ -33,24 +33,24 @@ export async function cancelBookingAction(bookingId: string, opts: { reason?: st
 
 export async function refundBookingAction(bookingId: string): Promise<ActionResult> {
   try {
-    var { data: booking } = await supabase.from("bookings").select("total_amount, yoco_checkout_id").eq("id", bookingId).single();
+    const { data: booking } = await supabase.from("bookings").select("total_amount, yoco_checkout_id").eq("id", bookingId).single();
     if (!booking) return { ok: false, error: "Booking not found" };
 
-    var amount = Number(booking.total_amount || 0);
+    const amount = Number(booking.total_amount || 0);
     if (amount <= 0) return { ok: false, error: "Nothing to refund" };
 
     if (booking.yoco_checkout_id) {
-      var res = await fetch(SU + "/functions/v1/process-refund", {
+      const res = await fetch(SU + "/functions/v1/process-refund", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
         body: JSON.stringify({ booking_id: bookingId, amount }),
       });
-      var data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.error) return { ok: false, error: data?.error || res.statusText };
       return { ok: true, data };
     }
 
-    var { error } = await supabase.from("bookings").update({
+    const { error } = await supabase.from("bookings").update({
       status: "CANCELLED",
       refund_status: "PROCESSED",
       refund_amount: amount,
@@ -67,7 +67,7 @@ export async function refundBookingAction(bookingId: string): Promise<ActionResu
 
 export async function markPaidAction(bookingId: string): Promise<ActionResult> {
   try {
-    var res = await supabase.functions.invoke("manual-mark-paid", {
+    const res = await supabase.functions.invoke("manual-mark-paid", {
       body: { action: "mark_paid", booking_id: bookingId },
     });
     if (res.error) return { ok: false, error: res.error.message };
@@ -80,7 +80,7 @@ export async function markPaidAction(bookingId: string): Promise<ActionResult> {
 
 export async function checkInAction(bookingId: string): Promise<ActionResult> {
   try {
-    var { error } = await supabase.from("bookings").update({ status: "CONFIRMED" }).eq("id", bookingId);
+    const { error } = await supabase.from("bookings").update({ status: "CONFIRMED" }).eq("id", bookingId);
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   } catch (e: any) {

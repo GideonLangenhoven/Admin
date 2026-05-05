@@ -49,7 +49,7 @@ export type TenantContext = {
   resolvedBy: "business_id" | "wa_phone_id";
 };
 
-var SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 
 function asRow(data: any) {
   if (Array.isArray(data)) return data[0] || null;
@@ -72,7 +72,7 @@ export function normalizePhoneLookup(value?: string | null) {
  */
 export function normalizePhone(value?: string | null): string {
   if (!value) return "";
-  var digits = String(value).replace(/[^\d]/g, "");
+  let digits = String(value).replace(/[^\d]/g, "");
   if (!digits) return "";
   // South-African local numbers starting with 0 → prepend 27
   if (digits.startsWith("0")) {
@@ -96,7 +96,7 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
 
   // Single RPC call — key passed as an explicit parameter.
   // Fixes the broken two-step GUC pattern that failed with connection pooling.
-  var { data, error } = await supabase.rpc("get_business_credentials", {
+  const { data, error } = await supabase.rpc("get_business_credentials", {
     p_business_id: businessId,
     p_key: SETTINGS_ENCRYPTION_KEY,
   });
@@ -105,16 +105,16 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     throw new Error("Credential lookup failed: " + error.message);
   }
 
-  var row = asRow(data);
+  const row = asRow(data);
   if (!row) {
     throw new Error("No credential record found for business " + businessId);
   }
 
-  var testMode = row.yoco_test_mode === true;
-  var liveKey = String(row.yoco_secret_key || "");
-  var liveWebhook = String(row.yoco_webhook_secret || "");
-  var testKey = String(row.yoco_test_secret_key || "");
-  var testWebhook = String(row.yoco_test_webhook_secret || "");
+  const testMode = row.yoco_test_mode === true;
+  const liveKey = String(row.yoco_secret_key || "");
+  const liveWebhook = String(row.yoco_webhook_secret || "");
+  const testKey = String(row.yoco_test_secret_key || "");
+  const testWebhook = String(row.yoco_test_webhook_secret || "");
   return {
     waToken: String(row.wa_token || ""),
     waPhoneId: String(row.wa_phone_id || ""),
@@ -129,7 +129,7 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
 }
 
 export async function getBusinessConfig(supabase: any, businessId: string): Promise<TenantBusiness> {
-  var { data, error } = await supabase
+  const { data, error } = await supabase
     .from("businesses")
     .select([
       "id",
@@ -176,8 +176,8 @@ export async function getBusinessConfig(supabase: any, businessId: string): Prom
 }
 
 export async function getTenantByBusinessId(supabase: any, businessId: string): Promise<TenantContext> {
-  var business = await getBusinessConfig(supabase, businessId);
-  var credentials = await getBusinessCredentials(supabase, businessId);
+  const business = await getBusinessConfig(supabase, businessId);
+  const credentials = await getBusinessCredentials(supabase, businessId);
   return {
     business,
     credentials,
@@ -186,14 +186,14 @@ export async function getTenantByBusinessId(supabase: any, businessId: string): 
 }
 
 export async function resolveTenantByWhatsappPayload(supabase: any, payload: any): Promise<TenantContext> {
-  var metadata = payload?.entry?.[0]?.changes?.[0]?.value?.metadata || {};
-  var incomingPhoneId = normalizePhoneLookup(metadata.phone_number_id || "");
+  const metadata = payload?.entry?.[0]?.changes?.[0]?.value?.metadata || {};
+  const incomingPhoneId = normalizePhoneLookup(metadata.phone_number_id || "");
 
   if (!incomingPhoneId) {
     throw new Error("WhatsApp metadata.phone_number_id is missing");
   }
 
-  var { data, error } = await supabase
+  const { data, error } = await supabase
     .from("businesses")
     .select([
       "id",
@@ -231,10 +231,10 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
     throw new Error("Business scan failed: " + error.message);
   }
 
-  var businesses = data || [];
-  for (var i = 0; i < businesses.length; i++) {
-    var business = businesses[i] as TenantBusiness;
-    var credentials = await getBusinessCredentials(supabase, business.id);
+  const businesses = data || [];
+  for (let i = 0; i < businesses.length; i++) {
+    const business = businesses[i] as TenantBusiness;
+    const credentials = await getBusinessCredentials(supabase, business.id);
     if (normalizePhoneLookup(credentials.waPhoneId) === incomingPhoneId) {
       return {
         business,
@@ -252,7 +252,7 @@ export function trimTrailingSlash(url?: string | null) {
 }
 
 export function urlToOrigin(url?: string | null) {
-  var value = String(url || "").trim();
+  const value = String(url || "").trim();
   if (!value) return "";
   try {
     return new URL(value).origin;
@@ -262,7 +262,7 @@ export function urlToOrigin(url?: string | null) {
 }
 
 export function getAdminAppOrigins() {
-  var configured = String(Deno.env.get("ADMIN_APP_ORIGINS") || "")
+  const configured = String(Deno.env.get("ADMIN_APP_ORIGINS") || "")
     .split(",")
     .map(function (value) { return value.trim(); })
     .filter(Boolean);
@@ -278,7 +278,7 @@ export function getAdminAppOrigins() {
 }
 
 export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
-  var urls = [
+  const urls = [
     business?.booking_site_url,
     business?.manage_bookings_url,
     business?.gift_voucher_url,
@@ -286,14 +286,14 @@ export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
     business?.booking_cancel_url,
     business?.voucher_success_url,
   ];
-  var origins = urls
+  const origins = urls
     .map(function (url) { return urlToOrigin(url); })
     .filter(Boolean);
   return Array.from(new Set(getAdminAppOrigins().concat(origins)));
 }
 
 // Wildcard patterns for bookingtours.co.za subdomains
-var WILDCARD_ORIGINS = [
+const WILDCARD_ORIGINS = [
   ".admin.bookingtours.co.za",
   ".booking.bookingtours.co.za",
   ".bookingtours.co.za",
@@ -305,8 +305,8 @@ export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
   if (allowedOrigins.includes(origin)) return true;
   // Wildcard match: any *.admin.bookingtours.co.za or *.booking.bookingtours.co.za
   try {
-    var hostname = new URL(origin).hostname;
-    for (var i = 0; i < WILDCARD_ORIGINS.length; i++) {
+    const hostname = new URL(origin).hostname;
+    for (let i = 0; i < WILDCARD_ORIGINS.length; i++) {
       if (hostname.endsWith(WILDCARD_ORIGINS[i])) return true;
     }
   } catch (_) { /* invalid URL */ }
@@ -318,11 +318,11 @@ export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?:
   bookingCancelUrl?: string;
   voucherSuccessUrl?: string;
 }) {
-  var defaultSuccessUrl = defaults?.bookingSuccessUrl || "";
-  var defaultCancelUrl = defaults?.bookingCancelUrl || "";
-  var defaultVoucherSuccessUrl = defaults?.voucherSuccessUrl || "";
-  var bookingSiteUrl = trimTrailingSlash(data?.booking_site_url);
-  var fallbackSiteUrl = trimTrailingSlash(defaultSuccessUrl).replace(/\/success$/, "");
+  const defaultSuccessUrl = defaults?.bookingSuccessUrl || "";
+  const defaultCancelUrl = defaults?.bookingCancelUrl || "";
+  const defaultVoucherSuccessUrl = defaults?.voucherSuccessUrl || "";
+  const bookingSiteUrl = trimTrailingSlash(data?.booking_site_url);
+  const fallbackSiteUrl = trimTrailingSlash(defaultSuccessUrl).replace(/\/success$/, "");
 
   return {
     bookingSiteUrl: bookingSiteUrl || fallbackSiteUrl,
@@ -333,7 +333,7 @@ export function resolveBusinessSiteUrls(data?: TenantBusiness | null, defaults?:
 }
 
 export function resolveBookingSiteUrl(business?: TenantBusiness | null): string {
-  var bookingSiteUrl = trimTrailingSlash(business?.booking_site_url);
+  const bookingSiteUrl = trimTrailingSlash(business?.booking_site_url);
   if (bookingSiteUrl) return bookingSiteUrl;
   if (business?.subdomain) return "https://" + business.subdomain + ".booking.bookingtours.co.za";
   return "";
@@ -341,7 +341,7 @@ export function resolveBookingSiteUrl(business?: TenantBusiness | null): string 
 
 export function resolveManageBookingsUrl(business?: TenantBusiness | null): string {
   if (business?.manage_bookings_url) return String(business.manage_bookings_url);
-  var siteUrl = resolveBookingSiteUrl(business);
+  const siteUrl = resolveBookingSiteUrl(business);
   if (siteUrl) return siteUrl + "/my-bookings";
   return "";
 }
@@ -365,8 +365,8 @@ export function resolveManageBookingsUrl(business?: TenantBusiness | null): stri
 // ──────────────────────────────────────────────────────────────────
 
 export function createServiceClient() {
-  var supabaseUrl = Deno.env.get("SUPABASE_URL");
-  var supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -417,14 +417,14 @@ export async function sendWhatsappTemplate(
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     throw new Error("WhatsApp is not configured for " + getBusinessDisplayName(tenant.business));
   }
-  var normalizedTo = String(to || "").replace(/\D/g, "");
+  const normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
 
-  var components = bodyParams.length > 0
+  const components = bodyParams.length > 0
     ? [{ type: "body", parameters: bodyParams.map(function (text) { return { type: "text", text: String(text) }; }) }]
     : [];
 
-  var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -434,7 +434,7 @@ export async function sendWhatsappTemplate(
       template: { name: templateName, language: { code: languageCode }, components },
     }),
   });
-  var data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(String(data?.error?.message || "WhatsApp template send failed: " + templateName));
   return data;
 }
@@ -457,21 +457,21 @@ export async function sendWhatsappFreeformOrSignal(
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     return { ok: false, windowClosed: false, error: "WhatsApp not configured for this business" };
   }
-  var normalizedTo = String(to || "").replace(/\D/g, "");
+  const normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   try {
-    var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+    const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
       method: "POST",
       headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
       body: JSON.stringify({ messaging_product: "whatsapp", to: normalizedTo, type: "text", text: { body: message } }),
     });
-    var data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      var errCode = data?.error?.code;
-      var windowClosed = errCode === 131047 || errCode === 131026;
+      const errCode = data?.error?.code;
+      const windowClosed = errCode === 131047 || errCode === 131026;
       return { ok: false, windowClosed: windowClosed, error: String(data?.error?.message || data?.message || "send failed") };
     }
-    var messageId = data?.messages?.[0]?.id || undefined;
+    const messageId = data?.messages?.[0]?.id || undefined;
     return { ok: true, windowClosed: false, error: "", messageId };
   } catch (e: any) {
     return { ok: false, windowClosed: false, error: String(e?.message || e) };
@@ -503,7 +503,7 @@ export async function sendWhatsappWithWindowReopen(
     customer_first_name: string;
   },
 ): Promise<{ sent: "direct" | "template"; queued: boolean }> {
-  var res = await sendWhatsappFreeformOrSignal(tenant, params.to, params.full_message);
+  const res = await sendWhatsappFreeformOrSignal(tenant, params.to, params.full_message);
   if (res.ok) {
     return { sent: "direct", queued: false };
   }
@@ -513,9 +513,9 @@ export async function sendWhatsappWithWindowReopen(
   }
 
   // Window closed → send reopener template + queue full message for later drain.
-  var reopenerTemplateName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
-  var brandName = getBusinessDisplayName(tenant.business);
-  var firstName = params.customer_first_name || "there";
+  const reopenerTemplateName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const firstName = params.customer_first_name || "there";
   try {
     await sendWhatsappTemplate(tenant, params.to, reopenerTemplateName, [firstName, brandName]);
   } catch (templateErr: any) {
@@ -525,7 +525,7 @@ export async function sendWhatsappWithWindowReopen(
     throw new Error("Reopener template send failed (" + reopenerTemplateName + "): " + (templateErr?.message || templateErr));
   }
 
-  var normalizedTo = String(params.to || "").replace(/\D/g, "");
+  const normalizedTo = String(params.to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   await supabase.from("outbox").insert({
     business_id: tenant.business.id,
@@ -547,15 +547,15 @@ export async function sendWhatsappTextForTenant(
 ) {
   // Guard: fail fast with a clear message instead of a malformed API call
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
-    var bName = getBusinessDisplayName(tenant.business);
+    const bName = getBusinessDisplayName(tenant.business);
     throw new Error(
       "WhatsApp is not configured for " + bName + ". " +
       "Please add the Access Token and Phone Number ID in Admin → Settings → Integration Credentials."
     );
   }
-  var normalizedTo = String(to || "").replace(/\D/g, "");
+  const normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
-  var res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + tenant.credentials.waToken,
@@ -568,10 +568,10 @@ export async function sendWhatsappTextForTenant(
       text: { body: message },
     }),
   });
-  var data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    var errCode = data?.error?.code;
+    const errCode = data?.error?.code;
     // 131047 = outside 24h customer service window
     // 131026 = recipient hasn't messaged this number before
     if ((errCode === 131047 || errCode === 131026) && templateFallback) {

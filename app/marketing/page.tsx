@@ -33,23 +33,23 @@ function fmtDate(iso: string) {
 }
 
 export default function MarketingOverview() {
-  var { businessId } = useBusinessContext();
-  var [contacts, setContacts] = useState(0);
-  var [unsubscribed, setUnsubscribed] = useState(0);
-  var [bounced, setBounced] = useState(0);
-  var [templates, setTemplates] = useState(0);
-  var [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-  var [emailsSent, setEmailsSent] = useState(0);
-  var [includedEmails, setIncludedEmails] = useState(500);
-  var [overageRate, setOverageRate] = useState(0.15);
-  var [monthlyUsage, setMonthlyUsage] = useState(0);
-  var [loading, setLoading] = useState(true);
+  const { businessId } = useBusinessContext();
+  const [contacts, setContacts] = useState(0);
+  const [unsubscribed, setUnsubscribed] = useState(0);
+  const [bounced, setBounced] = useState(0);
+  const [templates, setTemplates] = useState(0);
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [emailsSent, setEmailsSent] = useState(0);
+  const [includedEmails, setIncludedEmails] = useState(500);
+  const [overageRate, setOverageRate] = useState(0.15);
+  const [monthlyUsage, setMonthlyUsage] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!businessId) return;
     async function load() {
-      var currentPeriod = new Date().toISOString().slice(0, 7);
-      var [activeRes, unsubRes, bouncedRes, tRes, campRes, bizRes, usageRes] = await Promise.all([
+      const currentPeriod = new Date().toISOString().slice(0, 7);
+      const [activeRes, unsubRes, bouncedRes, tRes, campRes, bizRes, usageRes] = await Promise.all([
         supabase.from("marketing_contacts").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "active"),
         supabase.from("marketing_contacts").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "unsubscribed"),
         supabase.from("marketing_contacts").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "bounced"),
@@ -80,13 +80,13 @@ export default function MarketingOverview() {
     return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--ck-accent)" }} /></div>;
   }
 
-  var totalSent = campaigns.reduce((s, c) => s + (c.total_sent || 0), 0);
-  var totalOpens = campaigns.reduce((s, c) => s + (c.total_opens || 0), 0);
-  var totalClicks = campaigns.reduce((s, c) => s + (c.total_clicks || 0), 0);
-  var totalUnsub = campaigns.reduce((s, c) => s + (c.total_unsubscribes || 0), 0);
+  const totalSent = campaigns.reduce((s, c) => s + (c.total_sent || 0), 0);
+  const totalOpens = campaigns.reduce((s, c) => s + (c.total_opens || 0), 0);
+  const totalClicks = campaigns.reduce((s, c) => s + (c.total_clicks || 0), 0);
+  const totalUnsub = campaigns.reduce((s, c) => s + (c.total_unsubscribes || 0), 0);
 
   // Build campaign performance data for charts (most recent first → reverse for chronological)
-  var campaignChartData = [...campaigns]
+  const campaignChartData = [...campaigns]
     .filter(c => c.total_sent > 0)
     .reverse()
     .slice(-8)
@@ -100,16 +100,16 @@ export default function MarketingOverview() {
     }));
 
   // Audience breakdown for donut chart
-  var audienceData = [
+  const audienceData = [
     { name: "Active", value: contacts, color: "#10b981" },
     { name: "Unsubscribed", value: unsubscribed, color: "#f59e0b" },
     { name: "Bounced", value: bounced, color: "#ef4444" },
   ].filter(d => d.value > 0);
-  var totalAudience = contacts + unsubscribed + bounced;
+  const totalAudience = contacts + unsubscribed + bounced;
 
   // Usage percentage
-  var usagePct = includedEmails > 0 ? Math.min(100, (monthlyUsage / includedEmails) * 100) : 0;
-  var usageColor = monthlyUsage >= includedEmails ? "#ef4444" : monthlyUsage >= includedEmails * 0.8 ? "#f59e0b" : "var(--ck-accent)";
+  const usagePct = includedEmails > 0 ? Math.min(100, (monthlyUsage / includedEmails) * 100) : 0;
+  const usageColor = monthlyUsage >= includedEmails ? "#ef4444" : monthlyUsage >= includedEmails * 0.8 ? "#f59e0b" : "var(--ck-accent)";
 
   return (
     <div className="space-y-6">
@@ -350,7 +350,7 @@ export default function MarketingOverview() {
 }
 
 function CampaignStatusBadge({ status }: { status: string }) {
-  var config: Record<string, { bg: string; text: string; dot: string }> = {
+  const config: Record<string, { bg: string; text: string; dot: string }> = {
     draft: { bg: "rgba(107,114,128,0.1)", text: "#6b7280", dot: "#6b7280" },
     pending: { bg: "rgba(245,158,11,0.1)", text: "#d97706", dot: "#f59e0b" },
     scheduled: { bg: "rgba(139,92,246,0.1)", text: "#7c3aed", dot: "#8b5cf6" },
@@ -359,7 +359,7 @@ function CampaignStatusBadge({ status }: { status: string }) {
     done: { bg: "rgba(16,185,129,0.1)", text: "#059669", dot: "#10b981" },
     cancelled: { bg: "rgba(239,68,68,0.1)", text: "#dc2626", dot: "#ef4444" },
   };
-  var c = config[status] || config.draft;
+  const c = config[status] || config.draft;
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: c.bg, color: c.text }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.dot }} />

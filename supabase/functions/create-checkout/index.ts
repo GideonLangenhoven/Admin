@@ -9,10 +9,10 @@ import {
   resolveBusinessSiteUrls,
 } from "../_shared/tenant.ts";
 
-var BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
-var BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
-var VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
-var supabase = createServiceClient();
+const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
+const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
+const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
+const supabase = createServiceClient();
 function buildCors(origin?: string | null) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
@@ -24,8 +24,8 @@ function buildCors(origin?: string | null) {
 
 function withQuery(base: string, params: Record<string, string>) {
   if (!base) return "";
-  var url = new URL(base);
-  for (var [key, value] of Object.entries(params)) {
+  const url = new URL(base);
+  for (const [key, value] of Object.entries(params)) {
     if (value) url.searchParams.set(key, value);
   }
   return url.toString();
@@ -39,23 +39,23 @@ function ensureCheckoutUrls(urls: { bookingSuccessUrl?: string; bookingCancelUrl
 }
 
 async function resolveCheckoutBusiness(params: { bookingId?: string; voucherId?: string; businessId?: string }) {
-  var businessId = params.businessId || "";
-  var bookingStatus = "";
+  let businessId = params.businessId || "";
+  let bookingStatus = "";
 
   if (!businessId && params.bookingId) {
-    var bookingRow = await supabase.from("bookings").select("business_id, status").eq("id", params.bookingId).maybeSingle();
+    const bookingRow = await supabase.from("bookings").select("business_id, status").eq("id", params.bookingId).maybeSingle();
     businessId = String(bookingRow.data?.business_id || "");
     bookingStatus = String(bookingRow.data?.status || "");
   }
   if (!businessId && params.voucherId) {
-    var voucherRow = await supabase.from("vouchers").select("business_id").eq("id", params.voucherId).maybeSingle();
+    const voucherRow = await supabase.from("vouchers").select("business_id").eq("id", params.voucherId).maybeSingle();
     businessId = String(voucherRow.data?.business_id || "");
   }
   if (!businessId) {
     throw new Error("Unable to resolve business for checkout");
   }
 
-  var tenant = await getTenantByBusinessId(supabase, businessId);
+  const tenant = await getTenantByBusinessId(supabase, businessId);
   return {
     businessId,
     bookingStatus,
@@ -74,57 +74,57 @@ Deno.serve(async (req: any) => {
   }
 
   try {
-    var body = await req.json();
-    var amount = body.amount;
-    var bookingId = body.booking_id;
-    var voucherId = body.voucher_id;
-    var voucherCode = body.voucher_code;
-    var promoCode = body.promo_code || "";
-    var customerEmail = body.customer_email || "";
-    var type = body.type || "BOOKING";
-    var topupBusinessId = body.business_id;
-    var skipNotifications = body.skip_notifications === true;
+    const body = await req.json();
+    let amount = body.amount;
+    const bookingId = body.booking_id;
+    const voucherId = body.voucher_id;
+    const voucherCode = body.voucher_code;
+    const promoCode = body.promo_code || "";
+    const customerEmail = body.customer_email || "";
+    const type = body.type || "BOOKING";
+    const topupBusinessId = body.business_id;
+    const skipNotifications = body.skip_notifications === true;
 
     if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
     // FIX 4: Server-side price verification for BOOKING checkouts
     // Never trust frontend pricing — calculate from DB for standard bookings
-    var promoDiscount = 0;
-    var promoId: string | null = null;
-    var appliedPromoCode = "";
+    let promoDiscount = 0;
+    let promoId: string | null = null;
+    let appliedPromoCode = "";
 
     if (type === "BOOKING" && bookingId) {
-      var bookingRow = await supabase
+      const bookingRow = await supabase
         .from("bookings")
         .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, customer_email, phone")
         .eq("id", bookingId)
         .maybeSingle();
       if (bookingRow.data) {
-        var bk = bookingRow.data;
-        var resolvedEmail = customerEmail || bk.customer_email || "";
+        const bk = bookingRow.data;
+        const resolvedEmail = customerEmail || bk.customer_email || "";
 
         // Look up current base price from tour
-        var tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();
-        var basePrice = Number(tourRow.data?.base_price_per_person || 0);
+        const tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();
+        let basePrice = Number(tourRow.data?.base_price_per_person || 0);
         // Check for slot-level price override (peak pricing)
         if (bk.slot_id) {
-          var slotRow = await supabase.from("slots").select("price_per_person_override").eq("id", bk.slot_id).maybeSingle();
+          const slotRow = await supabase.from("slots").select("price_per_person_override").eq("id", bk.slot_id).maybeSingle();
           if (slotRow.data?.price_per_person_override != null) {
             basePrice = Number(slotRow.data.price_per_person_override);
           }
         }
-        var serverTotal = basePrice * Number(bk.qty || 1);
+        let serverTotal = basePrice * Number(bk.qty || 1);
 
         // Apply promo code if provided (before other discounts)
         if (promoCode) {
-          var promoResult = await supabase.rpc("validate_promo_code", {
+          const promoResult = await supabase.rpc("validate_promo_code", {
             p_business_id: bk.business_id,
             p_code: promoCode,
             p_order_amount: serverTotal,
             p_customer_email: resolvedEmail,
           });
           if (promoResult.data?.valid) {
-            var promo = promoResult.data;
+            const promo = promoResult.data;
             promoId = promo.promo_id;
             appliedPromoCode = promo.code;
             if (promo.discount_type === "PERCENT") {
@@ -158,8 +158,8 @@ Deno.serve(async (req: any) => {
         }
         serverTotal = Math.max(0, serverTotal);
         // Subtract any voucher portion already applied
-        var voucherApplied = Number(bk.voucher_amount_paid || 0);
-        var serverCashDue = Math.max(0, serverTotal - voucherApplied);
+        const voucherApplied = Number(bk.voucher_amount_paid || 0);
+        let serverCashDue = Math.max(0, serverTotal - voucherApplied);
         // Round to 2 decimals
         serverCashDue = Math.round(serverCashDue * 100) / 100;
 
@@ -180,21 +180,21 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    var resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
-    var tenant = resolved.tenant;
-    var businessUrls = resolved.businessUrls;
-    var origin = req?.headers?.get("origin") || "";
-    var allowedOrigins = getBusinessAllowedOrigins(tenant.business);
+    const resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
+    const tenant = resolved.tenant;
+    const businessUrls = resolved.businessUrls;
+    const origin = req?.headers?.get("origin") || "";
+    const allowedOrigins = getBusinessAllowedOrigins(tenant.business);
     if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
       return new Response(
         JSON.stringify({ error: "ORIGIN_NOT_ALLOWED", reason: "This origin is not allowed for the selected business checkout." }),
         { status: 403, headers: buildCors(allowedOrigins[0] || "*") },
       );
     }
-    var corsHeaders = buildCors(origin || allowedOrigins[0] || "*");
-    var metadata: any = { type: type };
-    var successUrl = businessUrls.bookingSuccessUrl;
-    var cancelUrl = businessUrls.bookingCancelUrl;
+    const corsHeaders = buildCors(origin || allowedOrigins[0] || "*");
+    const metadata: any = { type: type };
+    let successUrl = businessUrls.bookingSuccessUrl;
+    const cancelUrl = businessUrls.bookingCancelUrl;
 
     if (type === "TOPUP") {
       return new Response(
@@ -242,10 +242,10 @@ Deno.serve(async (req: any) => {
       );
     }
 
-    var isTestMode = tenant.credentials.yocoTestMode === true;
+    const isTestMode = tenant.credentials.yocoTestMode === true;
     console.log("CREATING CHECKOUT: test_mode=" + isTestMode);
 
-    var yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+    const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
       method: "POST",
       headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -258,7 +258,7 @@ Deno.serve(async (req: any) => {
       }),
     });
 
-    var yocoData = await yocoRes.json();
+    const yocoData = await yocoRes.json();
     console.log("CHECKOUT:" + JSON.stringify(yocoData));
 
     if (!yocoRes.ok) {
@@ -283,32 +283,32 @@ Deno.serve(async (req: any) => {
       // Send payment link via WhatsApp + email for BOOKING checkouts (unless caller already handles notifications)
       if (type === "BOOKING" && bookingId && !skipNotifications) {
         try {
-          var SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
-          var SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+          const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
+          const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
           // Fetch full booking details for notification
-          var bkNotif = await supabase.from("bookings")
+          const bkNotif = await supabase.from("bookings")
             .select("id, business_id, customer_name, email, phone, qty, total_amount, slots(start_time), tours(name)")
             .eq("id", bookingId)
             .maybeSingle();
-          var bk = bkNotif.data;
+          const bk = bkNotif.data;
           if (bk && SERVICE_ROLE_KEY_ENV) {
-            var notifEmail = String(bk.email || customerEmail || "").trim().toLowerCase();
-            var notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
+            const notifEmail = String(bk.email || customerEmail || "").trim().toLowerCase();
+            const notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
             if (notifPhone && notifPhone.startsWith("0")) notifPhone = "27" + notifPhone.substring(1);
-            var notifName = String(bk.customer_name || body.customer_name || "").trim();
-            var notifFirst = notifName.split(" ")[0] || "there";
-            var notifRef = String(bk.id || "").slice(0, 8).toUpperCase();
-            var notifTour = (bk.tours as any)?.name || "Tour";
-            var notifSlot = bk.slots as any;
-            var notifTime = "";
+            const notifName = String(bk.customer_name || body.customer_name || "").trim();
+            const notifFirst = notifName.split(" ")[0] || "there";
+            const notifRef = String(bk.id || "").slice(0, 8).toUpperCase();
+            const notifTour = (bk.tours as any)?.name || "Tour";
+            const notifSlot = bk.slots as any;
+            let notifTime = "";
             if (notifSlot?.start_time) {
               try {
-                var tz = tenant.business?.timezone || "Africa/Johannesburg";
+                const tz = tenant.business?.timezone || "Africa/Johannesburg";
                 notifTime = new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz }).format(new Date(notifSlot.start_time));
               } catch { notifTime = String(notifSlot.start_time || ""); }
             }
-            var notifAmount = Number(bk.total_amount || amount || 0);
-            var notifQty = Number(bk.qty || body.qty || 1);
+            const notifAmount = Number(bk.total_amount || amount || 0);
+            const notifQty = Number(bk.qty || body.qty || 1);
 
             // Send WhatsApp with payment link
             if (notifPhone) {

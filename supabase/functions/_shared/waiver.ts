@@ -1,8 +1,8 @@
 import type { TenantBusiness } from "./tenant.ts";
 
 function appendQuery(base: string, params: Record<string, string>) {
-  var url = new URL(base);
-  for (var [key, value] of Object.entries(params)) {
+  const url = new URL(base);
+  for (const [key, value] of Object.entries(params)) {
     if (value) url.searchParams.set(key, value);
   }
   return url.toString();
@@ -10,10 +10,10 @@ function appendQuery(base: string, params: Record<string, string>) {
 
 export function resolveWaiverLink(business: Pick<TenantBusiness, "waiver_url"> & { booking_site_url?: string | null } | null | undefined, bookingId: string, waiverToken?: string | null) {
   if (!bookingId || !waiverToken) return "";
-  var customUrl = String(business?.waiver_url || "").trim();
+  const customUrl = String(business?.waiver_url || "").trim();
   if (customUrl) return appendQuery(customUrl, { booking: bookingId, token: waiverToken });
   // Use the booking site URL if available
-  var bookingSiteUrl = String(business?.booking_site_url || "").replace(/\/+$/, "");
+  const bookingSiteUrl = String(business?.booking_site_url || "").replace(/\/+$/, "");
   if (!bookingSiteUrl) return "";
   return appendQuery(bookingSiteUrl + "/waiver", {
     booking: bookingId,
@@ -27,13 +27,13 @@ export async function getWaiverContext(supabase: any, options: {
   waiverStatus?: string | null;
   waiverToken?: string | null;
 }) {
-  var businessId = options.businessId || "";
-  var bookingId = options.bookingId || "";
-  var waiverStatus = options.waiverStatus || "";
-  var waiverToken = options.waiverToken || "";
+  let businessId = options.businessId || "";
+  const bookingId = options.bookingId || "";
+  let waiverStatus = options.waiverStatus || "";
+  let waiverToken = options.waiverToken || "";
 
   if (bookingId && (!businessId || !waiverStatus || !waiverToken)) {
-    var bookingRes = await supabase
+    const bookingRes = await supabase
       .from("bookings")
       .select("id, business_id, waiver_status, waiver_token")
       .eq("id", bookingId)
@@ -45,9 +45,9 @@ export async function getWaiverContext(supabase: any, options: {
     }
   }
 
-  var business: TenantBusiness | null = null;
+  let business: TenantBusiness | null = null;
   if (businessId) {
-    var businessRes = await supabase
+    const businessRes = await supabase
       .from("businesses")
       .select("id, name, waiver_url, booking_site_url, timezone, currency")
       .eq("id", businessId)

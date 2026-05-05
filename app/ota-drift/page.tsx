@@ -23,10 +23,10 @@ type Run = {
 };
 
 export default function OtaDriftPage() {
-  var { businessId } = useBusinessContext();
-  var [runs, setRuns] = useState<Run[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [expanded, setExpanded] = useState<string | null>(null);
+  const { businessId } = useBusinessContext();
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     if (businessId) refresh();
@@ -34,7 +34,7 @@ export default function OtaDriftPage() {
 
   async function refresh() {
     setLoading(true);
-    var { data } = await supabase
+    const { data } = await supabase
       .from("ota_reconciliation_runs")
       .select("*")
       .eq("business_id", businessId)
@@ -48,7 +48,7 @@ export default function OtaDriftPage() {
     setExpanded(expanded === id ? null : id);
   }
 
-  var totalDrifts = runs.reduce((s, r) => s + (r.drifts?.length || 0), 0);
+  const totalDrifts = runs.reduce((s, r) => s + (r.drifts?.length || 0), 0);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -86,9 +86,9 @@ export default function OtaDriftPage() {
       )}
 
       {runs.map(run => {
-        var isExpanded = expanded === run.id;
-        var hasDrifts = run.drifts && run.drifts.length > 0;
-        var drifts = typeof run.drifts === "string" ? JSON.parse(run.drifts) : (run.drifts || []);
+        const isExpanded = expanded === run.id;
+        const hasDrifts = run.drifts && run.drifts.length > 0;
+        const drifts = typeof run.drifts === "string" ? JSON.parse(run.drifts) : (run.drifts || []);
         return (
           <div key={run.id} className={"mb-3 rounded-xl border transition-colors " + (hasDrifts ? "border-amber-200 bg-amber-50/50" : "border-[color:var(--border)] bg-[color:var(--surface)]")}>
             <button onClick={() => toggleExpand(run.id)} className="w-full flex items-center gap-3 p-4 text-left">

@@ -4,16 +4,16 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAdminAppOrigins } from "../_shared/tenant.ts";
 
-var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 
 function getCors(req?: Request) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = origins.includes(origin) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = origins.includes(origin) ? origin : origins[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -22,8 +22,8 @@ function getCors(req?: Request) {
   };
 }
 
-var IMG_INVOICE = "";
-var SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
+const IMG_INVOICE = "";
+const SQ_IMG_STYLE = "width: 100%; max-width: 540px; border-radius: 12px; display: block; margin: 0 auto;";
 
 function money(n: number) {
   return n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,7 +31,7 @@ function money(n: number) {
 
 function fmtDate(iso: string | null, timezone: string) {
   if (!iso) return "-";
-  var d = new Date(iso);
+  const d = new Date(iso);
   if (isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-ZA", {
     day: "numeric",
@@ -106,9 +106,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
-    var body = await req.json();
-    var bookingId = body.booking_id as string | null;
-    var invoiceId = body.invoice_id as string | null;
+    const body = await req.json();
+    const bookingId = body.booking_id as string | null;
+    const invoiceId = body.invoice_id as string | null;
 
     if (!bookingId && !invoiceId) {
       return new Response(
@@ -118,17 +118,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // Try to fetch invoice data if invoice_id is provided
-    var invoiceRow: Record<string, unknown> | null = null;
+    const invoiceRow: Record<string, unknown> | null = null;
     if (invoiceId) {
-      var { data: inv } = await supabase.from("invoices").select("*").eq("id", invoiceId).single();
+      const { data: inv } = await supabase.from("invoices").select("*").eq("id", invoiceId).single();
       if (inv) invoiceRow = inv;
     }
 
     // Fetch booking data
-    var bookingRow: Record<string, unknown> | null = null;
-    var resolvedBookingId = bookingId || (invoiceRow?.booking_id as string | null);
+    const bookingRow: Record<string, unknown> | null = null;
+    const resolvedBookingId = bookingId || (invoiceRow?.booking_id as string | null);
     if (resolvedBookingId) {
-      var { data: bk } = await supabase
+      const { data: bk } = await supabase
         .from("bookings")
         .select("id, customer_name, email, phone, qty, total_amount, status, tours(name), slots(start_time), business_id")
         .eq("id", resolvedBookingId)
@@ -144,26 +144,26 @@ Deno.serve(async (req: Request) => {
     }
 
     // Resolve values — prefer invoice data, fall back to booking data
-    var customerName = String(invoiceRow?.customer_name || bookingRow?.customer_name || "Customer");
-    var customerEmail = String(invoiceRow?.customer_email || bookingRow?.email || "");
-    var qty = Number(invoiceRow?.qty || bookingRow?.qty || 1);
-    var totalAmount = Number(invoiceRow?.total_amount || bookingRow?.total_amount || 0);
-    var unitPrice = qty > 0 ? money(totalAmount / qty) : money(totalAmount);
-    var tourName = String(invoiceRow?.tour_name || (bookingRow?.tours as any)?.name || "Kayak Booking");
-    var startTime = (bookingRow?.slots as any)?.start_time || invoiceRow?.tour_date || null;
-    var ref = resolvedBookingId ? resolvedBookingId.substring(0, 8).toUpperCase() : (invoiceId || "").substring(0, 8).toUpperCase();
-    var businessId = bookingRow?.business_id || invoiceRow?.business_id;
-    var { data: business } = businessId
+    const customerName = String(invoiceRow?.customer_name || bookingRow?.customer_name || "Customer");
+    const customerEmail = String(invoiceRow?.customer_email || bookingRow?.email || "");
+    const qty = Number(invoiceRow?.qty || bookingRow?.qty || 1);
+    const totalAmount = Number(invoiceRow?.total_amount || bookingRow?.total_amount || 0);
+    const unitPrice = qty > 0 ? money(totalAmount / qty) : money(totalAmount);
+    const tourName = String(invoiceRow?.tour_name || (bookingRow?.tours as any)?.name || "Kayak Booking");
+    const startTime = (bookingRow?.slots as any)?.start_time || invoiceRow?.tour_date || null;
+    const ref = resolvedBookingId ? resolvedBookingId.substring(0, 8).toUpperCase() : (invoiceId || "").substring(0, 8).toUpperCase();
+    const businessId = bookingRow?.business_id || invoiceRow?.business_id;
+    const { data: business } = businessId
       ? await supabase.from("businesses").select("business_name, name, subdomain, timezone, notification_email, footer_line_one, footer_line_two").eq("id", businessId).maybeSingle()
       : { data: null as any };
-    var brandName = String(business?.business_name || business?.name || "Your Booking");
-    var businessTimezone = String(business?.timezone || "UTC");
-    var footerLineOne = String(business?.footer_line_one || "Thanks for choosing " + brandName + ".");
-    var footerLineTwo = String(business?.footer_line_two || "Reply to this email if you need anything.");
-    var tourDate = fmtDate(startTime as string | null, businessTimezone);
+    const brandName = String(business?.business_name || business?.name || "Your Booking");
+    const businessTimezone = String(business?.timezone || "UTC");
+    const footerLineOne = String(business?.footer_line_one || "Thanks for choosing " + brandName + ".");
+    const footerLineTwo = String(business?.footer_line_two || "Reply to this email if you need anything.");
+    const tourDate = fmtDate(startTime as string | null, businessTimezone);
 
     // Determine invoice number
-    var invNumber = body.invoice_number
+    const invNumber = body.invoice_number
       || String(invoiceRow?.invoice_number || "")
       || ref;
     if (!invNumber) invNumber = ref;
@@ -176,10 +176,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // Fetch admin email for BCC
-    var adminEmail = business?.notification_email ? String(business.notification_email) : undefined;
+    const adminEmail = business?.notification_email ? String(business.notification_email) : undefined;
 
     // Build email data
-    var emailData = {
+    const emailData = {
       email: customerEmail,
       customer_name: customerName,
       customer_email: customerEmail,
@@ -193,23 +193,23 @@ Deno.serve(async (req: Request) => {
       ref: ref,
     };
 
-    var subject = brandName + " - Invoice " + invNumber;
-    var html = invoiceHtml(emailData, brandName, footerLineOne, footerLineTwo);
+    const subject = brandName + " - Invoice " + invNumber;
+    const html = invoiceHtml(emailData, brandName, footerLineOne, footerLineTwo);
 
     // Send via Resend
     // Always derive from subdomain: noreply@{slug}.bookingtours.co.za
-    var fromAddr = business?.subdomain
+    const fromAddr = business?.subdomain
       ? brandName + " <noreply@" + business.subdomain + ".bookingtours.co.za>"
       : FROM_EMAIL;
-    var payload: Record<string, unknown> = { from: fromAddr, to: [customerEmail], subject, html };
+    const payload: Record<string, unknown> = { from: fromAddr, to: [customerEmail], subject, html };
     if (adminEmail) payload.bcc = [adminEmail];
 
-    var resendRes = await fetch("https://api.resend.com/emails", {
+    const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    var resendData = await resendRes.json();
+    const resendData = await resendRes.json();
     if (!resendRes.ok) {
       console.error("RESEND_ERR:", JSON.stringify(resendData));
       return new Response(

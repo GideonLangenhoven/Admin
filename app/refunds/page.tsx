@@ -4,23 +4,23 @@ import { supabase } from "../lib/supabase";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 
-var SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-var SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
 }
 
 export default function Refunds() {
-  var { businessId } = useBusinessContext();
-  var [refunds, setRefunds] = useState<any[]>([]);
-  var [processed, setProcessed] = useState<any[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [processing, setProcessing] = useState<string | null>(null);
-  var [results, setResults] = useState<Record<string, any>>({});
-  var [showProcessed, setShowProcessed] = useState(false);
-  var [editedAmounts, setEditedAmounts] = useState<Record<string, string>>({});
-  var [confirmState, setConfirmState] = useState<null | {
+  const { businessId } = useBusinessContext();
+  const [refunds, setRefunds] = useState<any[]>([]);
+  const [processed, setProcessed] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, any>>({});
+  const [showProcessed, setShowProcessed] = useState(false);
+  const [editedAmounts, setEditedAmounts] = useState<Record<string, string>>({});
+  const [confirmState, setConfirmState] = useState<null | {
     title: string;
     message: string;
     tone: "danger" | "default";
@@ -30,14 +30,14 @@ export default function Refunds() {
   useEffect(() => { load(); }, [businessId]);
 
   async function load() {
-    var { data: pending } = await supabase.from("bookings")
+    const { data: pending } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
       .eq("business_id", businessId)
       .in("refund_status", ["REQUESTED", "ACTION_REQUIRED"])
       .order("cancelled_at", { ascending: false });
     setRefunds(pending || []);
 
-    var { data: done } = await supabase.from("bookings")
+    const { data: done } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancelled_at, slots(start_time), tours(name)")
       .eq("business_id", businessId)
       .in("refund_status", ["PROCESSED", "FAILED"])
@@ -48,7 +48,7 @@ export default function Refunds() {
   }
 
   function getRefundAmount(b: any): number {
-    var edited = editedAmounts[b.id];
+    const edited = editedAmounts[b.id];
     if (edited !== undefined) return Math.max(0, parseFloat(edited) || 0);
     return Number(b.refund_amount || 0);
   }
@@ -58,17 +58,17 @@ export default function Refunds() {
   }
 
   async function executeAutoRefund(id: string) {
-    var booking = refunds.find(b => b.id === id);
-    var amount = booking ? getRefundAmount(booking) : 0;
+    const booking = refunds.find(b => b.id === id);
+    const amount = booking ? getRefundAmount(booking) : 0;
     setProcessing(id);
     try {
       await saveRefundAmount(id, amount);
-      var r = await fetch(SU + "/functions/v1/process-refund", {
+      const r = await fetch(SU + "/functions/v1/process-refund", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
         body: JSON.stringify({ booking_id: id, amount }),
       });
-      var d = await r.json();
+      const d = await r.json();
       setResults(prev => ({ ...prev, [id]: d }));
       load();
     } catch (e) {
@@ -78,9 +78,9 @@ export default function Refunds() {
   }
 
   async function executeManualRefund(id: string) {
-    var booking = refunds.find(b => b.id === id);
-    var amount = booking ? getRefundAmount(booking) : 0;
-    var isPartial = booking && amount < Number(booking.total_amount || 0);
+    const booking = refunds.find(b => b.id === id);
+    const amount = booking ? getRefundAmount(booking) : 0;
+    const isPartial = booking && amount < Number(booking.total_amount || 0);
     await saveRefundAmount(id, amount);
     await supabase.from("bookings").update({
       refund_status: "PROCESSED",
@@ -90,15 +90,15 @@ export default function Refunds() {
   }
 
   async function executeRefundAll() {
-    for (var r of refunds) {
+    for (const r of refunds) {
       setProcessing(r.id);
       try {
-        var res = await fetch(SU + "/functions/v1/process-refund", {
+        const res = await fetch(SU + "/functions/v1/process-refund", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
           body: JSON.stringify({ booking_id: r.id }),
         });
-        var d = await res.json();
+        const d = await res.json();
         setResults(prev => ({ ...prev, [r.id]: d }));
       } catch (e) {
         setResults(prev => ({ ...prev, [r.id]: { error: String(e) } }));
@@ -110,9 +110,9 @@ export default function Refunds() {
   }
 
   function autoRefund(id: string) {
-    var booking = refunds.find(b => b.id === id);
-    var amount = booking ? getRefundAmount(booking) : 0;
-    var isPartial = booking && amount < Number(booking.total_amount || 0);
+    const booking = refunds.find(b => b.id === id);
+    const amount = booking ? getRefundAmount(booking) : 0;
+    const isPartial = booking && amount < Number(booking.total_amount || 0);
     setConfirmState({
       title: isPartial ? "Confirm partial automatic refund" : "Confirm automatic refund",
       message: isPartial
@@ -127,9 +127,9 @@ export default function Refunds() {
   }
 
   function manualRefund(id: string) {
-    var booking = refunds.find(b => b.id === id);
-    var amount = booking ? getRefundAmount(booking) : 0;
-    var isPartial = booking && amount < Number(booking.total_amount || 0);
+    const booking = refunds.find(b => b.id === id);
+    const amount = booking ? getRefundAmount(booking) : 0;
+    const isPartial = booking && amount < Number(booking.total_amount || 0);
     setConfirmState({
       title: isPartial ? "Confirm partial manual refund" : "Mark refund as processed",
       message: isPartial
@@ -157,7 +157,7 @@ export default function Refunds() {
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
 
-  var totalRefund = refunds.reduce((sum, b) => sum + Number(b.refund_amount || 0), 0);
+  const totalRefund = refunds.reduce((sum, b) => sum + Number(b.refund_amount || 0), 0);
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -179,9 +179,9 @@ export default function Refunds() {
       ) : (
         <div className="space-y-3">
           {refunds.map((b: any) => {
-            var res = results[b.id];
-            var isProcessing = processing === b.id;
-            var hasCheckout = !!b.yoco_checkout_id;
+            const res = results[b.id];
+            const isProcessing = processing === b.id;
+            const hasCheckout = !!b.yoco_checkout_id;
             return (
               <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

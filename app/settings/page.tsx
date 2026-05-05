@@ -41,7 +41,7 @@ function isPrivileged(r: string | null) {
 }
 
 // Settings sections that MAIN_ADMIN can grant to regular admins
-var SETTINGS_SECTIONS = [
+const SETTINGS_SECTIONS = [
     { key: "tours", label: "Tours & Activities" },
     { key: "addons", label: "Booking Add-Ons" },
     { key: "resources", label: "Shared Resources" },
@@ -54,14 +54,14 @@ var SETTINGS_SECTIONS = [
 type SettingsSectionKey = typeof SETTINGS_SECTIONS[number]["key"];
 
 // Default Booking App URLs (separate from Admin Dashboard: https://admin-tawny-delta-92.vercel.app)
-var DEFAULT_BOOKING_URL = "";
-var DEFAULT_MANAGE_BOOKINGS_URL = "";
-var DEFAULT_GIFT_VOUCHER_URL = "";
-var DEFAULT_BOOKING_SUCCESS_URL = "";
-var DEFAULT_BOOKING_CANCEL_URL = "";
-var DEFAULT_VOUCHER_SUCCESS_URL = "";
+const DEFAULT_BOOKING_URL = "";
+const DEFAULT_MANAGE_BOOKINGS_URL = "";
+const DEFAULT_GIFT_VOUCHER_URL = "";
+const DEFAULT_BOOKING_SUCCESS_URL = "";
+const DEFAULT_BOOKING_CANCEL_URL = "";
+const DEFAULT_VOUCHER_SUCCESS_URL = "";
 
-var DEFAULT_SITE_SETTINGS = {
+const DEFAULT_SITE_SETTINGS = {
     directions: "",
     terms_conditions: "",
     privacy_policy: "Cookies help us deliver our services. By using our services, you agree to our use of cookies. OK Kayaks Adventures Privacy Policy\nThank you for visiting our web site...",
@@ -136,111 +136,111 @@ interface AddOn {
 }
 
 export default function SettingsPage() {
-    var { businessId } = useBusinessContext();
-    var [admins, setAdmins] = useState<any[]>([]);
-    var [loading, setLoading] = useState(true);
-    var [role, setRole] = useState<string | null>(null);
+    const { businessId } = useBusinessContext();
+    const [admins, setAdmins] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [role, setRole] = useState<string | null>(null);
 
     // Collapsible section state
-    var [openSections, setOpenSections] = useState<Record<string, boolean>>({ admins: true });
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ admins: true });
     function toggleSection(id: string) { setOpenSections((prev) => ({ ...prev, [id]: !(prev[id] ?? false) })); }
 
     // New Admin Form
-    var [newName, setNewName] = useState("");
-    var [newEmail, setNewEmail] = useState("");
-    var [adding, setAdding] = useState(false);
-    var [error, setError] = useState("");
-    var [adminMessage, setAdminMessage] = useState("");
-    var [resendingAdminId, setResendingAdminId] = useState("");
-    var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
-    var [togglingSubscription, setTogglingSubscription] = useState(false);
+    const [newName, setNewName] = useState("");
+    const [newEmail, setNewEmail] = useState("");
+    const [adding, setAdding] = useState(false);
+    const [error, setError] = useState("");
+    const [adminMessage, setAdminMessage] = useState("");
+    const [resendingAdminId, setResendingAdminId] = useState("");
+    const [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
+    const [togglingSubscription, setTogglingSubscription] = useState(false);
 
     // Tours state
-    var [tours, setTours] = useState<Tour[]>([]);
-    var [editingTour, setEditingTour] = useState<Tour | null>(null);
-    var [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
-    var [tourSaving, setTourSaving] = useState(false);
-    var [tourError, setTourError] = useState("");
-    var [slotMessage, setSlotMessage] = useState("");
-    var [slotGenerating, setSlotGenerating] = useState(false);
-    var [tourSlotCounts, setTourSlotCounts] = useState<Record<string, number>>({});
-    var [resources, setResources] = useState<ResourceRecord[]>([]);
-    var [tourResourceLinks, setTourResourceLinks] = useState<TourResourceLink[]>([]);
-    var [resourceForm, setResourceForm] = useState({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
-    var [assignmentForm, setAssignmentForm] = useState({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
-    var [resourceSaving, setResourceSaving] = useState(false);
-    var [assignmentSaving, setAssignmentSaving] = useState(false);
-    var [resourceMessage, setResourceMessage] = useState({ type: "", text: "" });
+    const [tours, setTours] = useState<Tour[]>([]);
+    const [editingTour, setEditingTour] = useState<Tour | null>(null);
+    const [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourSaving, setTourSaving] = useState(false);
+    const [tourError, setTourError] = useState("");
+    const [slotMessage, setSlotMessage] = useState("");
+    const [slotGenerating, setSlotGenerating] = useState(false);
+    const [tourSlotCounts, setTourSlotCounts] = useState<Record<string, number>>({});
+    const [resources, setResources] = useState<ResourceRecord[]>([]);
+    const [tourResourceLinks, setTourResourceLinks] = useState<TourResourceLink[]>([]);
+    const [resourceForm, setResourceForm] = useState({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
+    const [assignmentForm, setAssignmentForm] = useState({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
+    const [resourceSaving, setResourceSaving] = useState(false);
+    const [assignmentSaving, setAssignmentSaving] = useState(false);
+    const [resourceMessage, setResourceMessage] = useState({ type: "", text: "" });
 
     // Site Settings State
-    var [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
-    var [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
-    var [siteSaving, setSiteSaving] = useState(false);
-    var [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
-    var [refundTiers, setRefundTiers] = useState<Array<{ hours_before: number; refund_percent: number }>>([]);
-    var [refundPolicyText, setRefundPolicyText] = useState("");
-    var [refundSaving, setRefundSaving] = useState(false);
-    var [refundMessage, setRefundMessage] = useState({ type: "", text: "" });
-    var [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
+    const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
+    const [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
+    const [siteSaving, setSiteSaving] = useState(false);
+    const [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
+    const [refundTiers, setRefundTiers] = useState<Array<{ hours_before: number; refund_percent: number }>>([]);
+    const [refundPolicyText, setRefundPolicyText] = useState("");
+    const [refundSaving, setRefundSaving] = useState(false);
+    const [refundMessage, setRefundMessage] = useState({ type: "", text: "" });
+    const [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
 
     // Email Header Images State
-    var [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
-    var [emailImgsSaving, setEmailImgsSaving] = useState(false);
-    var [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
-    var [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
-    var [emailColor, setEmailColor] = useState("#1b3b36");
-    var [socialLinks, setSocialLinks] = useState({ facebook: "", instagram: "", tiktok: "", youtube: "", twitter: "", linkedin: "", tripadvisor: "", google_reviews: "" });
+    const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
+    const [emailImgsSaving, setEmailImgsSaving] = useState(false);
+    const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
+    const [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
+    const [emailColor, setEmailColor] = useState("#1b3b36");
+    const [socialLinks, setSocialLinks] = useState({ facebook: "", instagram: "", tiktok: "", youtube: "", twitter: "", linkedin: "", tripadvisor: "", google_reviews: "" });
 
     // Operations & AI config (trapped data from onboarding)
-    var [opsConfig, setOpsConfig] = useState({ what_to_bring: "", what_to_wear: "", ai_system_prompt: "", faq_json: {} as Record<string, string> });
-    var [opsSaving, setOpsSaving] = useState(false);
-    var [faqEntries, setFaqEntries] = useState<{ q: string; a: string }[]>([]);
+    const [opsConfig, setOpsConfig] = useState({ what_to_bring: "", what_to_wear: "", ai_system_prompt: "", faq_json: {} as Record<string, string> });
+    const [opsSaving, setOpsSaving] = useState(false);
+    const [faqEntries, setFaqEntries] = useState<{ q: string; a: string }[]>([]);
 
     // Automation tag config
-    var [autoTagConfig, setAutoTagConfig] = useState({
+    const [autoTagConfig, setAutoTagConfig] = useState({
         vip_bookings: 3, vip_window_days: 90, vip_valid_days: 365, vip_renewal_bookings: 3,
         lapsed_days: 90, new_booker_enabled: true, completed_tour_enabled: true, voucher_expiry_days: 30,
     });
-    var [autoTagSaving, setAutoTagSaving] = useState(false);
+    const [autoTagSaving, setAutoTagSaving] = useState(false);
 
     // Credentials State
-    var [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean; yoco_test_mode: boolean; yoco_test: boolean } | null>(null);
-    var [waForm, setWaForm] = useState({ token: "", phoneId: "" });
-    var [yocoForm, setYocoForm] = useState({ secretKey: "", webhookSecret: "" });
-    var [yocoTestForm, setYocoTestForm] = useState({ secretKey: "", webhookSecret: "" });
-    var [waSaving, setWaSaving] = useState(false);
-    var [yocoSaving, setYocoSaving] = useState(false);
-    var [yocoTestSaving, setYocoTestSaving] = useState(false);
-    var [testModeToggling, setTestModeToggling] = useState(false);
-    var [gdriveConnected, setGdriveConnected] = useState(false);
-    var [gdriveEmail, setGdriveEmail] = useState("");
-    var [gdriveLoading, setGdriveLoading] = useState(false);
-    var [googlePlaceId, setGooglePlaceId] = useState("");
-    var [googlePlaceSaving, setGooglePlaceSaving] = useState(false);
-    var [credMessage, setCredMessage] = useState({ type: "", text: "" });
+    const [credStatus, setCredStatus] = useState<{ wa: boolean; yoco: boolean; yoco_test_mode: boolean; yoco_test: boolean } | null>(null);
+    const [waForm, setWaForm] = useState({ token: "", phoneId: "" });
+    const [yocoForm, setYocoForm] = useState({ secretKey: "", webhookSecret: "" });
+    const [yocoTestForm, setYocoTestForm] = useState({ secretKey: "", webhookSecret: "" });
+    const [waSaving, setWaSaving] = useState(false);
+    const [yocoSaving, setYocoSaving] = useState(false);
+    const [yocoTestSaving, setYocoTestSaving] = useState(false);
+    const [testModeToggling, setTestModeToggling] = useState(false);
+    const [gdriveConnected, setGdriveConnected] = useState(false);
+    const [gdriveEmail, setGdriveEmail] = useState("");
+    const [gdriveLoading, setGdriveLoading] = useState(false);
+    const [googlePlaceId, setGooglePlaceId] = useState("");
+    const [googlePlaceSaving, setGooglePlaceSaving] = useState(false);
+    const [credMessage, setCredMessage] = useState({ type: "", text: "" });
 
     // Add-ons state
-    var [addOns, setAddOns] = useState<AddOn[]>([]);
-    var [editingAddOn, setEditingAddOn] = useState<AddOn | null>(null);
-    var [addOnForm, setAddOnForm] = useState({ name: "", description: "", price: "", image_url: "", sort_order: "0", active: true });
-    var [addOnSaving, setAddOnSaving] = useState(false);
-    var [addOnError, setAddOnError] = useState("");
-    var [addOnDragIdx, setAddOnDragIdx] = useState<number | null>(null);
+    const [addOns, setAddOns] = useState<AddOn[]>([]);
+    const [editingAddOn, setEditingAddOn] = useState<AddOn | null>(null);
+    const [addOnForm, setAddOnForm] = useState({ name: "", description: "", price: "", image_url: "", sort_order: "0", active: true });
+    const [addOnSaving, setAddOnSaving] = useState(false);
+    const [addOnError, setAddOnError] = useState("");
+    const [addOnDragIdx, setAddOnDragIdx] = useState<number | null>(null);
 
     // Invoice & Banking state
-    var [invoiceForm, setInvoiceForm] = useState({ company_name: "", address_line1: "", address_line2: "", address_line3: "", reg_number: "", vat_number: "" });
-    var [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
-    var [invoiceSaving, setInvoiceSaving] = useState(false);
-    var [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
+    const [invoiceForm, setInvoiceForm] = useState({ company_name: "", address_line1: "", address_line2: "", address_line3: "", reg_number: "", vat_number: "" });
+    const [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
+    const [invoiceSaving, setInvoiceSaving] = useState(false);
+    const [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
 
     // Marketing test email recipient
-    var [marketingTestEmail, setMarketingTestEmail] = useState("");
-    var [savingTestEmail, setSavingTestEmail] = useState(false);
+    const [marketingTestEmail, setMarketingTestEmail] = useState("");
+    const [savingTestEmail, setSavingTestEmail] = useState(false);
 
     // Per-section permissions for the current admin
-    var [myPerms, setMyPerms] = useState<Record<string, boolean>>({});
-    var [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
-    var [savingPerms, setSavingPerms] = useState<string | null>(null);
+    const [myPerms, setMyPerms] = useState<Record<string, boolean>>({});
+    const [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
+    const [savingPerms, setSavingPerms] = useState<string | null>(null);
 
     function canAccess(section: string): boolean {
         if (isPrivileged(role)) return true;
@@ -248,7 +248,7 @@ export default function SettingsPage() {
     }
 
     useEffect(() => {
-        var r = localStorage.getItem("ck_admin_role");
+        const r = localStorage.getItem("ck_admin_role");
         setRole(r);
         if (isPrivileged(r)) {
             fetchAdmins();
@@ -264,7 +264,7 @@ export default function SettingsPage() {
         }
 
         if (!document.getElementById("dotlottie-script")) {
-            var script = document.createElement("script");
+            const script = document.createElement("script");
             script.id = "dotlottie-script";
             script.src = "https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js";
             script.type = "module";
@@ -273,17 +273,17 @@ export default function SettingsPage() {
     }, [businessId]);
 
     async function loadMyPermissions() {
-        var adminEmail = localStorage.getItem("ck_admin_email");
+        const adminEmail = localStorage.getItem("ck_admin_email");
         if (!adminEmail) { setLoading(false); return; }
-        var { data } = await supabase
+        const { data } = await supabase
             .from("admin_users")
             .select("settings_permissions")
             .eq("email", adminEmail)
             .eq("business_id", businessId)
             .maybeSingle();
-        var perms = (data?.settings_permissions || {}) as Record<string, boolean>;
+        const perms = (data?.settings_permissions || {}) as Record<string, boolean>;
         setMyPerms(perms);
-        var hasAny = Object.values(perms).some(Boolean);
+        const hasAny = Object.values(perms).some(Boolean);
         if (hasAny) {
             if (perms.tours) fetchTours();
             if (perms.addons) fetchAddOns();
@@ -296,14 +296,14 @@ export default function SettingsPage() {
 
     async function fetchAdmins() {
         setLoading(true);
-        var { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
+        const { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
         if (data) setAdmins(data);
         setLoading(false);
     }
 
     async function fetchPlanUsage() {
         try {
-            var usage = await fetchUsageSnapshot(businessId);
+            const usage = await fetchUsageSnapshot(businessId);
             setUsageSnapshot(usage);
         } catch (e) {
             console.error("Failed to load plan usage:", e);
@@ -314,16 +314,16 @@ export default function SettingsPage() {
     async function handleAddAdmin(e: React.FormEvent) {
         e.preventDefault();
         if (!newName.trim() || !newEmail.trim()) return setError("Name and email are required.");
-        var seatLimit = usageSnapshot?.seat_limit || 10;
+        const seatLimit = usageSnapshot?.seat_limit || 10;
         if (admins.length >= seatLimit) return setError("Admin seat limit reached for your current plan (" + seatLimit + "). Upgrade to add more admins.");
 
         setAdding(true);
         setError("");
         setAdminMessage("");
 
-        var hash = await sha256(generateSecureToken(24));
-        var adminEmail = newEmail.trim().toLowerCase();
-        var { data: insertedAdmin, error: insertErr } = await supabase.from("admin_users").insert({
+        const hash = await sha256(generateSecureToken(24));
+        const adminEmail = newEmail.trim().toLowerCase();
+        const { data: insertedAdmin, error: insertErr } = await supabase.from("admin_users").insert({
             name: newName.trim(),
             email: adminEmail,
             password_hash: hash,
@@ -351,7 +351,7 @@ export default function SettingsPage() {
             setAdminMessage("Admin added. A secure password setup email has been sent.");
         } catch (emailErr: any) {
             console.error("Welcome email failed:", emailErr);
-            var emailErrMsg = String(emailErr?.message || "");
+            const emailErrMsg = String(emailErr?.message || "");
             if (emailErrMsg.includes("onboarding@resend.dev") || emailErrMsg.includes("sandbox") || emailErrMsg.includes("Sandbox")) {
                 setError("Admin added, but email couldn't be delivered: " + emailErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
@@ -376,7 +376,7 @@ export default function SettingsPage() {
             fetchAdmins();
         } catch (resendError: any) {
             console.error("Failed to resend password setup link:", resendError);
-            var resendErrMsg = String(resendError?.message || "");
+            const resendErrMsg = String(resendError?.message || "");
             if (resendErrMsg.includes("onboarding@resend.dev") || resendErrMsg.includes("sandbox") || resendErrMsg.includes("Sandbox")) {
                 setError("Setup link was saved, but the email couldn't be delivered: " + resendErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
@@ -388,7 +388,7 @@ export default function SettingsPage() {
 
     function adminPasswordStatus(admin: any) {
         if (admin.must_set_password || !admin.password_set_at) {
-            var sentLabel = admin.invite_sent_at ? "Setup email sent " + new Date(admin.invite_sent_at).toLocaleDateString() : "Setup email not sent yet";
+            const sentLabel = admin.invite_sent_at ? "Setup email sent " + new Date(admin.invite_sent_at).toLocaleDateString() : "Setup email not sent yet";
             return { label: "Password setup pending", detail: sentLabel, tone: "text-amber-700" };
         }
 
@@ -400,7 +400,7 @@ export default function SettingsPage() {
     }
 
     async function fetchTours() {
-        var { data } = await supabase.from("tours").select("*").eq("business_id", businessId).order("sort_order", { ascending: true });
+        const { data } = await supabase.from("tours").select("*").eq("business_id", businessId).order("sort_order", { ascending: true });
         setTours((data || []) as Tour[]);
         if (data && data.length > 0) {
             fetchSlotCounts(data.map((t: any) => t.id));
@@ -408,16 +408,16 @@ export default function SettingsPage() {
     }
 
     async function fetchSlotCounts(tourIds: string[]) {
-        var now = new Date().toISOString();
-        var counts: Record<string, number> = {};
-        for (var tid of tourIds) {
-            var { count } = await supabase.from("slots").select("id", { count: "exact", head: true }).eq("tour_id", tid).eq("status", "OPEN").gte("start_time", now);
+        const now = new Date().toISOString();
+        const counts: Record<string, number> = {};
+        for (const tid of tourIds) {
+            const { count } = await supabase.from("slots").select("id", { count: "exact", head: true }).eq("tour_id", tid).eq("status", "OPEN").gte("start_time", now);
             counts[tid] = count || 0;
         }
         setTourSlotCounts(counts);
     }
 
-    var [dragIdx, setDragIdx] = useState<number | null>(null);
+    const [dragIdx, setDragIdx] = useState<number | null>(null);
 
     function resetTourForm() {
         setEditingTour(null);
@@ -444,17 +444,17 @@ export default function SettingsPage() {
         setTourError("");
     }
 
-    var DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     function toggleDay(day: number) {
         setTourForm(prev => {
-            var days = prev.slotDays.includes(day) ? prev.slotDays.filter(d => d !== day) : [...prev.slotDays, day];
+            const days = prev.slotDays.includes(day) ? prev.slotDays.filter(d => d !== day) : [...prev.slotDays, day];
             return { ...prev, slotDays: days };
         });
     }
 
     async function generateSlotsForTour(tourId: string) {
-        var validTimes = tourForm.slotTimes.filter(t => t.trim() !== "");
+        const validTimes = tourForm.slotTimes.filter(t => t.trim() !== "");
         if (!tourForm.slotStartDate || !tourForm.slotEndDate || validTimes.length === 0) {
             setTourError("Please fill in start date, end date, and at least one start time.");
             return 0;
@@ -464,21 +464,21 @@ export default function SettingsPage() {
             return 0;
         }
 
-        var slots: any[] = [];
-        var start = new Date(tourForm.slotStartDate + "T00:00:00");
-        var end = new Date(tourForm.slotEndDate + "T00:00:00");
-        var capacity = Number(tourForm.default_capacity) || 10;
+        const slots: any[] = [];
+        const start = new Date(tourForm.slotStartDate + "T00:00:00");
+        const end = new Date(tourForm.slotEndDate + "T00:00:00");
+        const capacity = Number(tourForm.default_capacity) || 10;
 
-        for (var d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             if (!tourForm.slotDays.includes(d.getDay())) continue;
 
-            var localDateStr = d.toISOString().split("T")[0];
+            const localDateStr = d.toISOString().split("T")[0];
 
-            for (var ti = 0; ti < validTimes.length; ti++) {
-                var localDateTime = localDateStr + "T" + validTimes[ti] + ":00";
-                var localDate = new Date(localDateTime);
+            for (let ti = 0; ti < validTimes.length; ti++) {
+                const localDateTime = localDateStr + "T" + validTimes[ti] + ":00";
+                const localDate = new Date(localDateTime);
                 localDate.setHours(localDate.getHours() - 2);
-                var utcStart = localDate.toISOString();
+                const utcStart = localDate.toISOString();
 
                 slots.push({
                     business_id: businessId,
@@ -497,7 +497,7 @@ export default function SettingsPage() {
             return 0;
         }
 
-        var { error: slotErr } = await supabase.from("slots").insert(slots);
+        const { error: slotErr } = await supabase.from("slots").insert(slots);
         if (slotErr) {
             setTourError("Slots failed: " + slotErr.message);
             return 0;
@@ -510,7 +510,7 @@ export default function SettingsPage() {
         setSlotGenerating(true);
         setTourError("");
         setSlotMessage("");
-        var count = await generateSlotsForTour(editingTour.id);
+        const count = await generateSlotsForTour(editingTour.id);
         if (count > 0) {
             setSlotMessage(count + " slot" + (count !== 1 ? "s" : "") + " generated for " + editingTour.name + "!");
             setTimeout(() => setSlotMessage(""), 5000);
@@ -528,7 +528,7 @@ export default function SettingsPage() {
         setTourSaving(true);
         setTourError("");
 
-        var payload = {
+        const payload = {
             name: tourForm.name.trim(),
             description: tourForm.description.trim() || null,
             base_price_per_person: Number(tourForm.price),
@@ -540,15 +540,15 @@ export default function SettingsPage() {
         };
 
         if (editingTour) {
-            var { error: upErr } = await supabase.from("tours").update(payload).eq("id", editingTour.id);
+            const { error: upErr } = await supabase.from("tours").update(payload).eq("id", editingTour.id);
             if (upErr) { setTourError("Failed: " + upErr.message); setTourSaving(false); return; }
         } else {
-            var { data: newTour, error: inErr } = await supabase.from("tours").insert({ ...payload, business_id: businessId }).select().single();
+            const { data: newTour, error: inErr } = await supabase.from("tours").insert({ ...payload, business_id: businessId }).select().single();
             if (inErr) { setTourError("Failed: " + inErr.message); setTourSaving(false); return; }
 
             // Auto-generate slots if date range and time are provided
             if (newTour && tourForm.slotStartDate && tourForm.slotEndDate && tourForm.slotTimes.some(t => t.trim() !== "")) {
-                var count = await generateSlotsForTour(newTour.id);
+                const count = await generateSlotsForTour(newTour.id);
                 if (count > 0) {
                     setSlotMessage("Tour created with " + count + " slot" + (count !== 1 ? "s" : "") + " generated!");
                     setTimeout(() => setSlotMessage(""), 5000);
@@ -563,7 +563,7 @@ export default function SettingsPage() {
 
     async function handleDeleteTour(id: string, name: string) {
         // Check for active unredeemed vouchers linked to this tour
-        var { count: activeVoucherCount } = await supabase
+        const { count: activeVoucherCount } = await supabase
             .from("vouchers")
             .select("id", { count: "exact", head: true })
             .eq("business_id", businessId)
@@ -586,7 +586,7 @@ export default function SettingsPage() {
             confirmLabel: "Delete tour",
         })) return;
 
-        var { error: delErr } = await supabase.from("tours").delete().eq("id", id);
+        const { error: delErr } = await supabase.from("tours").delete().eq("id", id);
         if (delErr) {
             notify({ title: "Delete failed", message: delErr.message, tone: "error" });
             return;
@@ -598,7 +598,7 @@ export default function SettingsPage() {
 
     async function handleSaveAdminPerms(adminId: string, perms: Record<string, boolean>) {
         setSavingPerms(adminId);
-        var { error: updateErr } = await supabase
+        const { error: updateErr } = await supabase
             .from("admin_users")
             .update({ settings_permissions: perms })
             .eq("id", adminId);
@@ -613,7 +613,7 @@ export default function SettingsPage() {
 
     async function handleSaveMarketingTestEmail(email: string) {
         setSavingTestEmail(true);
-        var { error: updateErr } = await supabase
+        const { error: updateErr } = await supabase
             .from("businesses")
             .update({ marketing_test_email: email || null })
             .eq("id", businessId);
@@ -638,12 +638,12 @@ export default function SettingsPage() {
 
     async function handleDrop(targetIdx: number) {
         if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
-        var reordered = [...tours];
-        var [moved] = reordered.splice(dragIdx, 1);
+        const reordered = [...tours];
+        const [moved] = reordered.splice(dragIdx, 1);
         reordered.splice(targetIdx, 0, moved);
         setTours(reordered);
         setDragIdx(null);
-        for (var i = 0; i < reordered.length; i++) {
+        for (let i = 0; i < reordered.length; i++) {
             await supabase.from("tours").update({ sort_order: i }).eq("id", reordered[i].id);
         }
     }
@@ -666,7 +666,7 @@ export default function SettingsPage() {
     }
 
     async function fetchSiteSettings() {
-        var { data } = await supabase.from("businesses").select("*").eq("id", businessId).maybeSingle();
+        const { data } = await supabase.from("businesses").select("*").eq("id", businessId).maybeSingle();
         if (data) {
             setSiteSettings({
                 directions: data.directions || DEFAULT_SITE_SETTINGS.directions,
@@ -758,10 +758,10 @@ export default function SettingsPage() {
                 ai_system_prompt: data.ai_system_prompt || "",
                 faq_json: data.faq_json || {},
             });
-            var faqObj = data.faq_json || {};
+            const faqObj = data.faq_json || {};
             setFaqEntries(Object.entries(faqObj).map(([q, a]) => ({ q, a: String(a) })));
             // Load automation config
-            var ac = data.automation_config || {};
+            const ac = data.automation_config || {};
             setAutoTagConfig({
                 vip_bookings: ac.vip_bookings ?? 3,
                 vip_window_days: ac.vip_window_days ?? 90,
@@ -776,8 +776,8 @@ export default function SettingsPage() {
     }
 
     async function toggleSubscription() {
-        var next = subscriptionStatus === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
-        var action = next === "SUSPENDED" ? "suspend" : "reactivate";
+        const next = subscriptionStatus === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+        const action = next === "SUSPENDED" ? "suspend" : "reactivate";
         if (!await confirmAction({
             title: next === "SUSPENDED" ? "Suspend subscription" : "Reactivate subscription",
             message: next === "SUSPENDED"
@@ -787,7 +787,7 @@ export default function SettingsPage() {
             confirmLabel: next === "SUSPENDED" ? "Suspend" : "Reactivate",
         })) return;
         setTogglingSubscription(true);
-        var { error: err } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", businessId);
+        const { error: err } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", businessId);
         if (err) {
             notify({ title: "Failed", message: "Could not " + action + " subscription: " + err.message, tone: "error" });
         } else {
@@ -807,7 +807,7 @@ export default function SettingsPage() {
 
     async function fetchResources() {
         try {
-            var [resourcesRes, linksRes] = await Promise.all([
+            const [resourcesRes, linksRes] = await Promise.all([
                 supabase.from("resources").select("id, name, resource_type, capacity_total, active").eq("business_id", businessId).order("active", { ascending: false }).order("name"),
                 supabase.from("tour_resources").select("id, tour_id, resource_id, units_per_guest, active, tours(id, name), resources(id, name, resource_type, capacity_total, active)").eq("business_id", businessId).order("created_at", { ascending: true }),
             ]);
@@ -841,7 +841,7 @@ export default function SettingsPage() {
         setResourceSaving(true);
         setResourceMessage({ type: "", text: "" });
 
-        var payload = {
+        const payload = {
             business_id: businessId,
             name: resourceForm.name.trim(),
             resource_type: resourceForm.resource_type.trim() || "GENERAL",
@@ -849,11 +849,11 @@ export default function SettingsPage() {
             active: resourceForm.active,
         };
 
-        var query = resourceForm.id
+        const query = resourceForm.id
             ? supabase.from("resources").update(payload).eq("id", resourceForm.id)
             : supabase.from("resources").insert(payload);
 
-        var { error: saveError } = await query;
+        const { error: saveError } = await query;
         if (saveError) {
             setResourceMessage({ type: "error", text: "Failed to save resource: " + saveError.message });
         } else {
@@ -872,7 +872,7 @@ export default function SettingsPage() {
             confirmLabel: "Delete resource",
         })) return;
 
-        var { error: deleteError } = await supabase.from("resources").delete().eq("id", resource.id);
+        const { error: deleteError } = await supabase.from("resources").delete().eq("id", resource.id);
         if (deleteError) {
             setResourceMessage({ type: "error", text: "Failed to delete resource: " + deleteError.message });
             return;
@@ -896,7 +896,7 @@ export default function SettingsPage() {
         setAssignmentSaving(true);
         setResourceMessage({ type: "", text: "" });
 
-        var payload = {
+        const payload = {
             business_id: businessId,
             tour_id: assignmentForm.tour_id,
             resource_id: assignmentForm.resource_id,
@@ -904,11 +904,11 @@ export default function SettingsPage() {
             active: assignmentForm.active,
         };
 
-        var query = assignmentForm.id
+        const query = assignmentForm.id
             ? supabase.from("tour_resources").update(payload).eq("id", assignmentForm.id)
             : supabase.from("tour_resources").upsert(payload, { onConflict: "tour_id,resource_id" });
 
-        var { error: saveError } = await query;
+        const { error: saveError } = await query;
         if (saveError) {
             setResourceMessage({ type: "error", text: "Failed to save resource mapping: " + saveError.message });
         } else {
@@ -927,7 +927,7 @@ export default function SettingsPage() {
             confirmLabel: "Remove mapping",
         })) return;
 
-        var { error: deleteError } = await supabase.from("tour_resources").delete().eq("id", link.id);
+        const { error: deleteError } = await supabase.from("tour_resources").delete().eq("id", link.id);
         if (deleteError) {
             setResourceMessage({ type: "error", text: "Failed to remove mapping: " + deleteError.message });
             return;
@@ -942,7 +942,7 @@ export default function SettingsPage() {
         setSiteSaving(true);
         setSiteMessage({ type: "", text: "" });
 
-        var parsedBookingFields: any[] = [];
+        let parsedBookingFields: any[] = [];
         try {
             parsedBookingFields = JSON.parse(bookingCustomFieldsJson || "[]");
             if (!Array.isArray(parsedBookingFields)) throw new Error("Custom booking fields must be a JSON array.");
@@ -953,14 +953,14 @@ export default function SettingsPage() {
         }
 
         // Get the single business row that exists
-        var { data: biz } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
+        const { data: biz } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
         if (!biz) {
             setSiteMessage({ type: "error", text: "No business record found to update." });
             setSiteSaving(false);
             return;
         }
 
-        var { error } = await supabase.from("businesses").update({
+        const { error } = await supabase.from("businesses").update({
             directions: siteSettings.directions,
             terms_conditions: siteSettings.terms_conditions,
             privacy_policy: siteSettings.privacy_policy,
@@ -1006,14 +1006,14 @@ export default function SettingsPage() {
     async function handleSaveRefundPolicy() {
         setRefundSaving(true);
         setRefundMessage({ type: "", text: "" });
-        var sorted = [...refundTiers].sort((a, b) => b.hours_before - a.hours_before);
-        var valid = sorted.every(t => t.hours_before >= 0 && t.refund_percent >= 0 && t.refund_percent <= 100);
+        const sorted = [...refundTiers].sort((a, b) => b.hours_before - a.hours_before);
+        const valid = sorted.every(t => t.hours_before >= 0 && t.refund_percent >= 0 && t.refund_percent <= 100);
         if (!valid) {
             setRefundMessage({ type: "error", text: "Hours must be ≥ 0 and percent must be 0–100." });
             setRefundSaving(false);
             return;
         }
-        var { error } = await supabase.from("businesses").update({
+        const { error } = await supabase.from("businesses").update({
             refund_policy_tiers: sorted,
             refund_policy_text: refundPolicyText.trim(),
         }).eq("id", businessId);
@@ -1032,7 +1032,7 @@ export default function SettingsPage() {
         setInvoiceSaving(true);
         setInvoiceMessage({ type: "", text: "" });
 
-        var updatePayload: Record<string, string | null> = {
+        const updatePayload: Record<string, string | null> = {
             invoice_company_name: invoiceForm.company_name || null,
             invoice_address_line1: invoiceForm.address_line1 || null,
             invoice_address_line2: invoiceForm.address_line2 || null,
@@ -1041,14 +1041,14 @@ export default function SettingsPage() {
             invoice_vat_number: invoiceForm.vat_number || null,
         };
 
-        var { error: invErr } = await supabase.from("businesses").update(updatePayload).eq("id", businessId);
+        const { error: invErr } = await supabase.from("businesses").update(updatePayload).eq("id", businessId);
         if (invErr) {
             setInvoiceMessage({ type: "error", text: "Error saving invoice: " + invErr.message });
             setInvoiceSaving(false);
             return;
         }
 
-        var { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
+        const { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
             body: {
                 action: "set",
                 business_id: businessId,
@@ -1073,8 +1073,8 @@ export default function SettingsPage() {
 
     async function fetchCredStatus() {
         try {
-            var headers = await getAuthHeaders();
-            var res = await fetch("/api/credentials?business_id=" + businessId, { headers });
+            const headers = await getAuthHeaders();
+            const res = await fetch("/api/credentials?business_id=" + businessId, { headers });
             if (res.ok) setCredStatus(await res.json());
         } catch (e) {
             console.error("Failed to load credential status:", e);
@@ -1086,12 +1086,12 @@ export default function SettingsPage() {
         setWaSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
-            var res = await fetch("/api/credentials", {
+            const res = await fetch("/api/credentials", {
                 method: "POST",
                 headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "wa", wa_token: waForm.token, wa_phone_id: waForm.phoneId }),
             });
-            var d = await res.json();
+            const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Save failed");
             setCredMessage({ type: "success", text: "WhatsApp credentials saved and encrypted successfully." });
             setWaForm({ token: "", phoneId: "" });
@@ -1107,12 +1107,12 @@ export default function SettingsPage() {
         setYocoSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
-            var res = await fetch("/api/credentials", {
+            const res = await fetch("/api/credentials", {
                 method: "POST",
                 headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco", yoco_secret_key: yocoForm.secretKey, yoco_webhook_secret: yocoForm.webhookSecret }),
             });
-            var d = await res.json();
+            const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Save failed");
             setCredMessage({ type: "success", text: "Yoco credentials saved and encrypted successfully." });
             setYocoForm({ secretKey: "", webhookSecret: "" });
@@ -1126,14 +1126,14 @@ export default function SettingsPage() {
     async function handleToggleTestMode() {
         setTestModeToggling(true);
         setCredMessage({ type: "", text: "" });
-        var newMode = !(credStatus?.yoco_test_mode);
+        const newMode = !(credStatus?.yoco_test_mode);
         try {
-            var res = await fetch("/api/credentials", {
+            const res = await fetch("/api/credentials", {
                 method: "POST",
                 headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test_mode", yoco_test_mode: newMode }),
             });
-            var d = await res.json();
+            const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
             setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled — sandbox keys will be used for payments." : "Yoco TEST MODE disabled — live keys are active." });
             fetchCredStatus();
@@ -1149,12 +1149,12 @@ export default function SettingsPage() {
         setYocoTestSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
-            var res = await fetch("/api/credentials", {
+            const res = await fetch("/api/credentials", {
                 method: "POST",
                 headers: await getAuthHeaders(),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test", yoco_test_secret_key: yocoTestForm.secretKey, yoco_test_webhook_secret: yocoTestForm.webhookSecret }),
             });
-            var d = await res.json();
+            const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Save failed");
             setCredMessage({ type: "success", text: "Yoco test credentials saved and encrypted successfully." });
             setYocoTestForm({ secretKey: "", webhookSecret: "" });
@@ -1167,7 +1167,7 @@ export default function SettingsPage() {
 
     async function checkGdriveStatus() {
         try {
-            var { data } = await supabase.functions.invoke("google-drive", {
+            const { data } = await supabase.functions.invoke("google-drive", {
                 body: { action: "status", business_id: businessId },
             });
             if (data && !data.error) {
@@ -1180,7 +1180,7 @@ export default function SettingsPage() {
     async function handleConnectGdrive() {
         setGdriveLoading(true);
         try {
-            var { data, error } = await supabase.functions.invoke("google-drive", {
+            const { data, error } = await supabase.functions.invoke("google-drive", {
                 body: {
                     action: "auth_url",
                     business_id: businessId,
@@ -1200,11 +1200,11 @@ export default function SettingsPage() {
     }
 
     async function handleDisconnectGdrive() {
-        var ok = await confirmAction("Disconnect Google Drive? Photo uploads will stop working until you reconnect.");
+        const ok = await confirmAction("Disconnect Google Drive? Photo uploads will stop working until you reconnect.");
         if (!ok) return;
         setGdriveLoading(true);
         try {
-            var { data, error } = await supabase.functions.invoke("google-drive", {
+            const { data, error } = await supabase.functions.invoke("google-drive", {
                 body: { action: "disconnect", business_id: businessId },
             });
             if (error || data?.error) {
@@ -1220,10 +1220,10 @@ export default function SettingsPage() {
         setGdriveLoading(false);
     }
 
-    var [uploadingField, setUploadingField] = useState<string | null>(null);
+    const [uploadingField, setUploadingField] = useState<string | null>(null);
 
     async function handleImageUpload(file: File, bucket: string, folder: string, onUrl: (url: string) => void) {
-        var ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
         if (!["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(ext)) {
             notify({ title: "Invalid file", message: "Please upload an image file (jpg, png, webp, gif, svg).", tone: "warning" });
             return;
@@ -1232,16 +1232,16 @@ export default function SettingsPage() {
             notify({ title: "File too large", message: "Image must be under 5 MB.", tone: "warning" });
             return;
         }
-        var path = folder + "/" + Date.now() + "." + ext;
-        var { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+        const path = folder + "/" + Date.now() + "." + ext;
+        const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
         if (error) { notify({ title: "Upload failed", message: error.message, tone: "error" }); return; }
-        var { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
         onUrl(urlData.publicUrl);
     }
 
     // ── Add-Ons CRUD ──
     async function fetchAddOns() {
-        var { data } = await supabase.from("add_ons").select("*").eq("business_id", businessId).order("sort_order", { ascending: true });
+        const { data } = await supabase.from("add_ons").select("*").eq("business_id", businessId).order("sort_order", { ascending: true });
         setAddOns((data || []) as AddOn[]);
     }
 
@@ -1272,7 +1272,7 @@ export default function SettingsPage() {
         setAddOnSaving(true);
         setAddOnError("");
 
-        var payload = {
+        const payload = {
             name: addOnForm.name.trim(),
             description: addOnForm.description.trim() || null,
             price: Number(addOnForm.price),
@@ -1282,10 +1282,10 @@ export default function SettingsPage() {
         };
 
         if (editingAddOn) {
-            var { error: upErr } = await supabase.from("add_ons").update(payload).eq("id", editingAddOn.id);
+            const { error: upErr } = await supabase.from("add_ons").update(payload).eq("id", editingAddOn.id);
             if (upErr) { setAddOnError("Failed: " + upErr.message); setAddOnSaving(false); return; }
         } else {
-            var { error: inErr } = await supabase.from("add_ons").insert({ ...payload, business_id: businessId });
+            const { error: inErr } = await supabase.from("add_ons").insert({ ...payload, business_id: businessId });
             if (inErr) { setAddOnError("Failed: " + inErr.message); setAddOnSaving(false); return; }
         }
 
@@ -1302,7 +1302,7 @@ export default function SettingsPage() {
             confirmLabel: "Delete add-on",
         })) return;
 
-        var { error: delErr } = await supabase.from("add_ons").delete().eq("id", id);
+        const { error: delErr } = await supabase.from("add_ons").delete().eq("id", id);
         if (delErr) {
             notify({ title: "Delete failed", message: delErr.message, tone: "error" });
             return;
@@ -1319,12 +1319,12 @@ export default function SettingsPage() {
 
     async function handleAddOnDrop(targetIdx: number) {
         if (addOnDragIdx === null || addOnDragIdx === targetIdx) { setAddOnDragIdx(null); return; }
-        var reordered = [...addOns];
-        var [moved] = reordered.splice(addOnDragIdx, 1);
+        const reordered = [...addOns];
+        const [moved] = reordered.splice(addOnDragIdx, 1);
         reordered.splice(targetIdx, 0, moved);
         setAddOns(reordered);
         setAddOnDragIdx(null);
-        for (var i = 0; i < reordered.length; i++) {
+        for (let i = 0; i < reordered.length; i++) {
             await supabase.from("add_ons").update({ sort_order: i }).eq("id", reordered[i].id);
         }
     }
@@ -1332,11 +1332,11 @@ export default function SettingsPage() {
     async function handleUploadEmailImage(key: string, file: File) {
         setEmailImgUploading(key);
         try {
-            var ext = file.name.split(".").pop() || "jpg";
-            var path = `${businessId}/${key}.${ext}`;
-            var { error } = await supabase.storage.from("email-images").upload(path, file, { upsert: true });
+            const ext = file.name.split(".").pop() || "jpg";
+            const path = `${businessId}/${key}.${ext}`;
+            const { error } = await supabase.storage.from("email-images").upload(path, file, { upsert: true });
             if (error) { notify("Upload failed: " + error.message); return; }
-            var { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
+            const { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
             setEmailImgs(prev => ({ ...prev, [key]: urlData.publicUrl }));
             notify("Image uploaded — click Save Email Images to persist.");
         } catch (err: any) {
@@ -1350,7 +1350,7 @@ export default function SettingsPage() {
         e.preventDefault();
         setEmailImgsSaving(true);
         setEmailImgsMessage({ type: "", text: "" });
-        var { error } = await supabase.from("businesses").update({
+        const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
@@ -1382,7 +1382,7 @@ export default function SettingsPage() {
 
     if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
 
-    var hasAnyPerm = Object.values(myPerms).some(Boolean);
+    const hasAnyPerm = Object.values(myPerms).some(Boolean);
     if (!isPrivileged(role) && !hasAnyPerm) {
         return (
             <div className="max-w-2xl">
@@ -1412,10 +1412,10 @@ export default function SettingsPage() {
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
                         <div className="divide-y divide-[var(--ck-border-subtle)]">
                             {admins.map(a => {
-                                var status = adminPasswordStatus(a);
-                                var perms = (a.settings_permissions || {}) as Record<string, boolean>;
-                                var grantedCount = SETTINGS_SECTIONS.filter(s => perms[s.key]).length;
-                                var isExpanded = expandedPermsAdmin === a.id;
+                                const status = adminPasswordStatus(a);
+                                const perms = (a.settings_permissions || {}) as Record<string, boolean>;
+                                const grantedCount = SETTINGS_SECTIONS.filter(s => perms[s.key]).length;
+                                const isExpanded = expandedPermsAdmin === a.id;
                                 return (
                                     <div key={a.id}>
                                         <div className="p-4 flex items-center justify-between">
@@ -1470,7 +1470,7 @@ export default function SettingsPage() {
                                                                 type="checkbox"
                                                                 checked={perms[section.key] === true}
                                                                 onChange={() => {
-                                                                    var newPerms = { ...perms, [section.key]: !perms[section.key] };
+                                                                    const newPerms = { ...perms, [section.key]: !perms[section.key] };
                                                                     // Optimistic update
                                                                     setAdmins(admins.map(x => x.id === a.id ? { ...x, settings_permissions: newPerms } : x));
                                                                     handleSaveAdminPerms(a.id, newPerms);
@@ -1674,7 +1674,7 @@ export default function SettingsPage() {
                                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "tour_image" ? "Uploading..." : (tourForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                                var file = e.target.files?.[0];
+                                                const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 setUploadingField("tour_image");
                                                 await handleImageUpload(file, "email-images", businessId + "/tours", (url) => setTourForm(prev => ({ ...prev, image_url: url })));
@@ -1753,10 +1753,10 @@ export default function SettingsPage() {
                                     <div className="space-y-2">
                                         {tourForm.slotTimes.map((t, idx) => (
                                             <div key={idx} className="flex gap-2 items-center">
-                                                <input type="time" value={t} onChange={e => { var times = [...tourForm.slotTimes]; times[idx] = e.target.value; setTourForm({ ...tourForm, slotTimes: times }); }}
+                                                <input type="time" value={t} onChange={e => { const times = [...tourForm.slotTimes]; times[idx] = e.target.value; setTourForm({ ...tourForm, slotTimes: times }); }}
                                                     className="ui-control flex-1 px-3 py-2 text-sm rounded-lg outline-none" />
                                                 {tourForm.slotTimes.length > 1 && (
-                                                    <button type="button" onClick={() => { var times = tourForm.slotTimes.filter((_, i) => i !== idx); setTourForm({ ...tourForm, slotTimes: times }); }}
+                                                    <button type="button" onClick={() => { const times = tourForm.slotTimes.filter((_, i) => i !== idx); setTourForm({ ...tourForm, slotTimes: times }); }}
                                                         className="text-[var(--ck-danger)] hover:bg-red-50 rounded-lg p-1.5" title="Remove time">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                                     </button>
@@ -1896,7 +1896,7 @@ export default function SettingsPage() {
                                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "addon_image" ? "Uploading..." : (addOnForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                                var file = e.target.files?.[0];
+                                                const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 setUploadingField("addon_image");
                                                 await handleImageUpload(file, "email-images", businessId + "/addons", (url) => setAddOnForm(prev => ({ ...prev, image_url: url })));
@@ -2145,7 +2145,7 @@ export default function SettingsPage() {
                                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                                var file = e.target.files?.[0];
+                                                const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 setUploadingField("logo");
                                                 await handleImageUpload(file, "email-images", businessId + "/branding", (url) => setSiteSettings(prev => ({ ...prev, logo_url: url })));
@@ -2525,11 +2525,11 @@ export default function SettingsPage() {
                         {refundTiers.map((t, i) => (
                             <div key={i} className="flex items-center gap-2">
                                 <input type="number" value={t.hours_before} min={0} onChange={e => setRefundTiers(prev => {
-                                    var next = [...prev]; next[i] = { ...next[i], hours_before: Number(e.target.value) }; return next;
+                                    const next = [...prev]; next[i] = { ...next[i], hours_before: Number(e.target.value) }; return next;
                                 })} className="ui-control w-20 px-2 py-1.5 text-sm rounded-lg outline-none text-center" />
                                 <span className="text-xs text-[var(--ck-text-muted)]">hours before →</span>
                                 <input type="number" value={t.refund_percent} min={0} max={100} onChange={e => setRefundTiers(prev => {
-                                    var next = [...prev]; next[i] = { ...next[i], refund_percent: Number(e.target.value) }; return next;
+                                    const next = [...prev]; next[i] = { ...next[i], refund_percent: Number(e.target.value) }; return next;
                                 })} className="ui-control w-20 px-2 py-1.5 text-sm rounded-lg outline-none text-center" />
                                 <span className="text-xs text-[var(--ck-text-muted)]">% refund</span>
                                 <button type="button" onClick={() => setRefundTiers(prev => prev.filter((_, j) => j !== i))}
@@ -2630,7 +2630,7 @@ export default function SettingsPage() {
                                             ) : (
                                                 <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> Upload</>
                                             )}
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => { var f = e.target.files?.[0]; if (f) handleUploadEmailImage(key, f); e.target.value = ""; }} />
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadEmailImage(key, f); e.target.value = ""; }} />
                                         </label>
                                         {emailImgs[key] && (
                                             <button type="button" onClick={() => setEmailImgs({ ...emailImgs, [key]: "" })}
@@ -2694,9 +2694,9 @@ export default function SettingsPage() {
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     setOpsSaving(true);
-                    var faqObj: Record<string, string> = {};
-                    for (var entry of faqEntries) { if (entry.q.trim() && entry.a.trim()) faqObj[entry.q.trim()] = entry.a.trim(); }
-                    var { error } = await supabase.from("businesses").update({
+                    const faqObj: Record<string, string> = {};
+                    for (const entry of faqEntries) { if (entry.q.trim() && entry.a.trim()) faqObj[entry.q.trim()] = entry.a.trim(); }
+                    const { error } = await supabase.from("businesses").update({
                         what_to_bring: opsConfig.what_to_bring || null,
                         what_to_wear: opsConfig.what_to_wear || null,
                         ai_system_prompt: opsConfig.ai_system_prompt || null,
@@ -2747,9 +2747,9 @@ export default function SettingsPage() {
                                         <button type="button" onClick={() => setFaqEntries(faqEntries.filter((_, j) => j !== i))}
                                             className="text-xs text-red-500 hover:text-red-700">Remove</button>
                                     </div>
-                                    <input type="text" value={faq.q} onChange={e => { var next = [...faqEntries]; next[i] = { ...next[i], q: e.target.value }; setFaqEntries(next); }}
+                                    <input type="text" value={faq.q} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], q: e.target.value }; setFaqEntries(next); }}
                                         placeholder="Question" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
-                                    <textarea value={faq.a} onChange={e => { var next = [...faqEntries]; next[i] = { ...next[i], a: e.target.value }; setFaqEntries(next); }}
+                                    <textarea value={faq.a} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], a: e.target.value }; setFaqEntries(next); }}
                                         rows={2} placeholder="Answer" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                                 </div>
                             ))}
@@ -2769,7 +2769,7 @@ export default function SettingsPage() {
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     setAutoTagSaving(true);
-                    var { error } = await supabase.from("businesses").update({ automation_config: autoTagConfig }).eq("id", businessId);
+                    const { error } = await supabase.from("businesses").update({ automation_config: autoTagConfig }).eq("id", businessId);
                     setAutoTagSaving(false);
                     if (error) { notify({ message: error.message, tone: "error" }); return; }
                     notify({ message: "Automation tag rules saved.", tone: "success" });
@@ -3190,7 +3190,7 @@ export default function SettingsPage() {
                             disabled={googlePlaceSaving}
                             onClick={async () => {
                                 setGooglePlaceSaving(true);
-                                var { error } = await supabase.from("businesses").update({ google_place_id: googlePlaceId.trim() || null }).eq("id", businessId);
+                                const { error } = await supabase.from("businesses").update({ google_place_id: googlePlaceId.trim() || null }).eq("id", businessId);
                                 setCredMessage(error ? { type: "error", text: "Failed to save Place ID." } : { type: "success", text: "Google Place ID saved." });
                                 setGooglePlaceSaving(false);
                             }}

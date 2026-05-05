@@ -23,36 +23,36 @@ interface Contact {
 }
 
 export default function ContactsPage() {
-  var { businessId } = useBusinessContext();
-  var [contacts, setContacts] = useState<Contact[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [search, setSearch] = useState("");
-  var [showAdd, setShowAdd] = useState(false);
-  var [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
-  var [saving, setSaving] = useState(false);
-  var [showImport, setShowImport] = useState(false);
-  var [importText, setImportText] = useState("");
-  var [importing, setImporting] = useState(false);
-  var [csvRows, setCsvRows] = useState<Array<{ data: Record<string, string>; errors: string[] }>>([]);
-  var [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  var [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
-  var [csvStep, setCsvStep] = useState<"upload" | "map" | "preview" | "done">("upload");
-  var [showValidate, setShowValidate] = useState(false);
-  var [validating, setValidating] = useState(false);
-  var [filterStatus, setFilterStatus] = useState<"all" | "active" | "unsubscribed" | "bounced" | "inactive">("all");
-  var [filterTag, setFilterTag] = useState("");
-  var [tagInput, setTagInput] = useState<{ contactId: string; value: string } | null>(null);
-  var [page, setPage] = useState(0);
-  var PAGE_SIZE = 100;
-  var [showCleanList, setShowCleanList] = useState(false);
-  var [staleContacts, setStaleContacts] = useState<Contact[]>([]);
-  var [cleaning, setCleaning] = useState(false);
-  var [showDeleteAll, setShowDeleteAll] = useState(false);
-  var [deleteConfirmText, setDeleteConfirmText] = useState("");
-  var [deletingAll, setDeletingAll] = useState(false);
-  var [editingId, setEditingId] = useState<string | null>(null);
-  var [editForm, setEditForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
-  var [editSaving, setEditSaving] = useState(false);
+  const { businessId } = useBusinessContext();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
+  const [saving, setSaving] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [csvRows, setCsvRows] = useState<Array<{ data: Record<string, string>; errors: string[] }>>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
+  const [csvStep, setCsvStep] = useState<"upload" | "map" | "preview" | "done">("upload");
+  const [showValidate, setShowValidate] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "unsubscribed" | "bounced" | "inactive">("all");
+  const [filterTag, setFilterTag] = useState("");
+  const [tagInput, setTagInput] = useState<{ contactId: string; value: string } | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 100;
+  const [showCleanList, setShowCleanList] = useState(false);
+  const [staleContacts, setStaleContacts] = useState<Contact[]>([]);
+  const [cleaning, setCleaning] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     if (businessId) load();
@@ -61,11 +61,11 @@ export default function ContactsPage() {
   async function load() {
     setLoading(true);
     // Fetch all contacts in batches of 1000 (Supabase default limit)
-    var all: Contact[] = [];
-    var batchSize = 1000;
-    var from = 0;
+    const all: Contact[] = [];
+    const batchSize = 1000;
+    let from = 0;
     while (true) {
-      var { data, error: loadErr } = await supabase.from("marketing_contacts")
+      const { data, error: loadErr } = await supabase.from("marketing_contacts")
         .select("id, email, first_name, last_name, phone, status, source, tags, total_received, total_opens, total_clicks, created_at, date_of_birth")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false })
@@ -81,20 +81,20 @@ export default function ContactsPage() {
   }
 
   async function checkAutoEnroll(contactId: string, event: string, eventData?: any) {
-    var { data: automations } = await supabase
+    const { data: automations } = await supabase
       .from("marketing_automations")
       .select("id, trigger_type, trigger_config")
       .eq("business_id", businessId)
       .eq("status", "active")
       .eq("trigger_type", event);
 
-    for (var automation of (automations || []) as any[]) {
+    for (const automation of (automations || []) as any[]) {
       if (event === "tag_added" && automation.trigger_config?.tag) {
         if (eventData?.tag !== automation.trigger_config.tag) continue;
       }
 
       // Check if already enrolled (avoid inflating enrolled_count on duplicate)
-      var { data: existing } = await supabase
+      const { data: existing } = await supabase
         .from("marketing_automation_enrollments")
         .select("id")
         .eq("automation_id", automation.id)
@@ -125,10 +125,10 @@ export default function ContactsPage() {
     if (!addForm.last_name.trim()) { notify({ message: "Last name is required.", tone: "warning" }); return; }
     if (!addForm.phone.trim()) { notify({ message: "Phone number is required.", tone: "warning" }); return; }
     setSaving(true);
-    var tags = addForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
-    var normalizedPhone = addForm.phone.trim().replace(/\D/g, "");
+    const tags = addForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    let normalizedPhone = addForm.phone.trim().replace(/\D/g, "");
     if (normalizedPhone.startsWith("0")) normalizedPhone = "27" + normalizedPhone.substring(1);
-    var { data: inserted, error } = await supabase.from("marketing_contacts").insert({
+    const { data: inserted, error } = await supabase.from("marketing_contacts").insert({
       business_id: businessId,
       email: addForm.email.trim().toLowerCase(),
       first_name: addForm.first_name.trim(),
@@ -171,10 +171,10 @@ export default function ContactsPage() {
     if (!editingId) return;
     if (!editForm.email.trim()) { notify({ message: "Email is required.", tone: "warning" }); return; }
     setEditSaving(true);
-    var tags = editForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
-    var normalizedPhone = editForm.phone.trim().replace(/\D/g, "");
+    const tags = editForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    let normalizedPhone = editForm.phone.trim().replace(/\D/g, "");
     if (normalizedPhone.startsWith("0")) normalizedPhone = "27" + normalizedPhone.substring(1);
-    var { error: updateErr } = await supabase.from("marketing_contacts").update({
+    const { error: updateErr } = await supabase.from("marketing_contacts").update({
       email: editForm.email.trim().toLowerCase(),
       first_name: editForm.first_name.trim() || null,
       last_name: editForm.last_name.trim() || null,
@@ -202,7 +202,7 @@ export default function ContactsPage() {
   }
 
   // ── DB fields that can be mapped ──
-  var DB_FIELDS: { key: string; label: string; required?: boolean }[] = [
+  const DB_FIELDS: { key: string; label: string; required?: boolean }[] = [
     { key: "email", label: "Email", required: true },
     { key: "first_name", label: "First Name" },
     { key: "last_name", label: "Last Name" },
@@ -219,7 +219,7 @@ export default function ContactsPage() {
   }
   function cleanEmail(raw: string): string { return cleanVal(raw).toLowerCase(); }
   function cleanPhone(raw: string): string {
-    var c = raw.replace(/[\s\-\(\)\.]+/g, "").replace(/^["']+|["']+$/g, "");
+    let c = raw.replace(/[\s\-\(\)\.]+/g, "").replace(/^["']+|["']+$/g, "");
     if (c.startsWith("0") && c.length === 10) c = "+27" + c.substring(1);
     if (/^\d{9,}$/.test(c) && !c.startsWith("+")) c = "+" + c;
     return c;
@@ -228,16 +228,16 @@ export default function ContactsPage() {
   function isValidEmail(e: string): boolean { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 
   function parseRawCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
-    var lines = text.split(/\r?\n/).filter((l) => l.trim());
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
     // Detect delimiter: tab, comma, semicolon
-    var firstLine = lines[0];
-    var delim = firstLine.includes("\t") ? "\t" : firstLine.includes(";") ? ";" : ",";
+    const firstLine = lines[0];
+    const delim = firstLine.includes("\t") ? "\t" : firstLine.includes(";") ? ";" : ",";
 
     function splitLine(line: string): string[] {
-      var parts: string[] = []; var cur = ""; var inQ = false;
-      for (var ch of line) {
+      const parts: string[] = []; let cur = ""; let inQ = false;
+      for (const ch of line) {
         if (ch === '"') { inQ = !inQ; continue; }
         if (ch === delim && !inQ) { parts.push(cur); cur = ""; continue; }
         cur += ch;
@@ -247,15 +247,15 @@ export default function ContactsPage() {
     }
 
     // Detect if first row is a header (contains common header words)
-    var firstLower = firstLine.toLowerCase();
-    var hasHeader = /email|name|phone|mobile|first|last|tag|birth|notes|address|company|city|country/.test(firstLower);
-    var headerParts = splitLine(lines[0]);
-    var headers = hasHeader ? headerParts.map((h) => h.trim()) : headerParts.map((_, i) => `Column ${i + 1}`);
-    var dataLines = hasHeader ? lines.slice(1) : lines;
+    const firstLower = firstLine.toLowerCase();
+    const hasHeader = /email|name|phone|mobile|first|last|tag|birth|notes|address|company|city|country/.test(firstLower);
+    const headerParts = splitLine(lines[0]);
+    const headers = hasHeader ? headerParts.map((h) => h.trim()) : headerParts.map((_, i) => `Column ${i + 1}`);
+    const dataLines = hasHeader ? lines.slice(1) : lines;
 
-    var rows = dataLines.map((line) => {
-      var parts = splitLine(line);
-      var row: Record<string, string> = {};
+    const rows = dataLines.map((line) => {
+      const parts = splitLine(line);
+      const row: Record<string, string> = {};
       headers.forEach((h, i) => { row[h] = parts[i] || ""; });
       return row;
     }).filter((r) => Object.values(r).some((v) => v.trim())); // skip fully empty rows
@@ -264,8 +264,8 @@ export default function ContactsPage() {
   }
 
   function autoMapHeaders(headers: string[]): Record<string, string> {
-    var map: Record<string, string> = {};
-    var patterns: [string, RegExp][] = [
+    const map: Record<string, string> = {};
+    const patterns: [string, RegExp][] = [
       ["email", /e[\-_]?mail|email.?address/i],
       ["first_name", /first[\s_-]?name|fname|given[\s_-]?name|^name$/i],
       ["last_name", /last[\s_-]?name|lname|surname|family[\s_-]?name/i],
@@ -275,8 +275,8 @@ export default function ContactsPage() {
       ["anniversary_date", /anniversary|anniv/i],
       ["notes", /note|comment|remark|description|memo|info|detail|other|custom|extra|address|company|city|country|state|zip|postal/i],
     ];
-    for (var h of headers) {
-      for (var [field, regex] of patterns) {
+    for (const h of headers) {
+      for (const [field, regex] of patterns) {
         if (regex.test(h) && !Object.values(map).includes(h)) {
           map[field] = h;
           break;
@@ -290,33 +290,33 @@ export default function ContactsPage() {
 
   function handleCsvFile(file: File | null) {
     if (!file) return;
-    var ext = file.name.split(".").pop()?.toLowerCase() || "";
-    var isExcel = ["xlsx", "xls", "xlsb", "xlsm"].includes(ext);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const isExcel = ["xlsx", "xls", "xlsb", "xlsm"].includes(ext);
 
     if (isExcel) {
       // Read Excel with SheetJS
-      var reader = new FileReader();
+      const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          var data = new Uint8Array(e.target?.result as ArrayBuffer);
-          var workbook = XLSX.read(data, { type: "array" });
-          var sheetName = workbook.SheetNames[0];
-          var sheet = workbook.Sheets[sheetName];
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
           // Convert to array of arrays, then to CSV-like structure
-          var jsonRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          const jsonRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
           if (jsonRows.length === 0) {
             notify({ message: "Excel file is empty.", tone: "warning" });
             return;
           }
-          var headers = Object.keys(jsonRows[0]).map((h) => String(h).trim());
-          var rows = jsonRows.map((row) => {
-            var mapped: Record<string, string> = {};
+          const headers = Object.keys(jsonRows[0]).map((h) => String(h).trim());
+          const rows = jsonRows.map((row) => {
+            const mapped: Record<string, string> = {};
             headers.forEach((h) => { mapped[h] = String(row[h] ?? "").trim(); });
             return mapped;
           }).filter((r) => Object.values(r).some((v) => v));
 
           setCsvHeaders(headers);
-          var autoMap = autoMapHeaders(headers);
+          const autoMap = autoMapHeaders(headers);
           setCsvMapping(autoMap);
           setCsvRows(rows.map((r) => ({ data: r, errors: [] })));
           setCsvStep("map");
@@ -328,13 +328,13 @@ export default function ContactsPage() {
       reader.readAsArrayBuffer(file);
     } else {
       // Read as text (CSV, TSV, TXT)
-      var reader = new FileReader();
+      const reader = new FileReader();
       reader.onload = (e) => {
-        var text = e.target?.result as string;
+        const text = e.target?.result as string;
         setImportText(text);
-        var { headers, rows } = parseRawCsv(text);
+        const { headers, rows } = parseRawCsv(text);
         setCsvHeaders(headers);
-        var autoMap = autoMapHeaders(headers);
+        const autoMap = autoMapHeaders(headers);
         setCsvMapping(autoMap);
         setCsvRows(rows.map((r) => ({ data: r, errors: [] })));
         setCsvStep("map");
@@ -345,9 +345,9 @@ export default function ContactsPage() {
 
   function handlePasteImport() {
     if (!importText.trim()) return;
-    var { headers, rows } = parseRawCsv(importText);
+    const { headers, rows } = parseRawCsv(importText);
     setCsvHeaders(headers);
-    var autoMap = autoMapHeaders(headers);
+    const autoMap = autoMapHeaders(headers);
     setCsvMapping(autoMap);
     setCsvRows(rows.map((r) => ({ data: r, errors: [] })));
     setCsvStep("map");
@@ -355,38 +355,38 @@ export default function ContactsPage() {
 
   function applyMappingAndValidate() {
     // Reverse mapping: dbField → csvHeader
-    var reverseMap: Record<string, string> = {};
-    for (var [dbField, csvHeader] of Object.entries(csvMapping)) {
+    const reverseMap: Record<string, string> = {};
+    for (const [dbField, csvHeader] of Object.entries(csvMapping)) {
       if (csvHeader && dbField !== "_skip") reverseMap[dbField] = csvHeader;
     }
     // Gather all "notes" columns (unmapped + explicitly mapped to notes)
-    var notesCols = csvHeaders.filter((h) => {
-      var mappedTo = Object.entries(csvMapping).find(([, v]) => v === h)?.[0];
+    const notesCols = csvHeaders.filter((h) => {
+      const mappedTo = Object.entries(csvMapping).find(([, v]) => v === h)?.[0];
       return mappedTo === "notes" || (!mappedTo && !Object.values(csvMapping).includes(h));
     });
 
-    var validated = csvRows.map((row) => {
-      var d = row.data;
-      var email = cleanEmail(d[reverseMap.email] || "");
-      var first_name = reverseMap.first_name ? cleanName(d[reverseMap.first_name] || "") : "";
-      var last_name = reverseMap.last_name ? cleanName(d[reverseMap.last_name] || "") : "";
-      var phone = reverseMap.phone ? cleanPhone(d[reverseMap.phone] || "") : "";
-      var tags = reverseMap.tags ? cleanVal(d[reverseMap.tags] || "") : "";
-      var dob = reverseMap.date_of_birth ? cleanVal(d[reverseMap.date_of_birth] || "") : "";
-      var anniversary = reverseMap.anniversary_date ? cleanVal(d[reverseMap.anniversary_date] || "") : "";
+    const validated = csvRows.map((row) => {
+      const d = row.data;
+      const email = cleanEmail(d[reverseMap.email] || "");
+      const first_name = reverseMap.first_name ? cleanName(d[reverseMap.first_name] || "") : "";
+      const last_name = reverseMap.last_name ? cleanName(d[reverseMap.last_name] || "") : "";
+      const phone = reverseMap.phone ? cleanPhone(d[reverseMap.phone] || "") : "";
+      const tags = reverseMap.tags ? cleanVal(d[reverseMap.tags] || "") : "";
+      const dob = reverseMap.date_of_birth ? cleanVal(d[reverseMap.date_of_birth] || "") : "";
+      const anniversary = reverseMap.anniversary_date ? cleanVal(d[reverseMap.anniversary_date] || "") : "";
 
       // Collect notes from all notes-mapped + unmapped columns
-      var noteParts: string[] = [];
+      const noteParts: string[] = [];
       if (reverseMap.notes) noteParts.push(cleanVal(d[reverseMap.notes] || ""));
-      for (var nc of notesCols) {
+      for (const nc of notesCols) {
         if (nc !== reverseMap.notes) {
-          var val = cleanVal(d[nc] || "");
+          const val = cleanVal(d[nc] || "");
           if (val) noteParts.push(nc + ": " + val);
         }
       }
-      var notes = noteParts.filter(Boolean).join(" | ");
+      const notes = noteParts.filter(Boolean).join(" | ");
 
-      var errors: string[] = [];
+      const errors: string[] = [];
       if (!email) errors.push("No email");
       else if (!isValidEmail(email)) errors.push("Bad email");
       if (phone && !/^\+?\d{7,15}$/.test(phone.replace(/\s/g, ""))) errors.push("Bad phone");
@@ -398,13 +398,13 @@ export default function ContactsPage() {
   }
 
   async function importContacts() {
-    var validRows = csvRows.filter((r) => r.errors.length === 0 && r.data._email);
+    const validRows = csvRows.filter((r) => r.errors.length === 0 && r.data._email);
     if (validRows.length === 0) { notify({ message: "No valid contacts to import.", tone: "warning" }); return; }
     setImporting(true);
 
-    var dbRows = validRows.map((r) => {
-      var d = r.data;
-      var row: Record<string, any> = {
+    const dbRows = validRows.map((r) => {
+      const d = r.data;
+      const row: Record<string, any> = {
         business_id: businessId,
         email: d._email,
         source: "import",
@@ -419,11 +419,11 @@ export default function ContactsPage() {
       return row;
     });
 
-    var { data: imported, error } = await supabase.from("marketing_contacts").upsert(dbRows, { onConflict: "business_id,email", ignoreDuplicates: true }).select("id");
+    const { data: imported, error } = await supabase.from("marketing_contacts").upsert(dbRows, { onConflict: "business_id,email", ignoreDuplicates: true }).select("id");
     setImporting(false);
     if (error) { notify({ message: error.message, tone: "error" }); return; }
-    var importedCount = imported?.length ?? 0;
-    for (var row of (imported || []) as any[]) { checkAutoEnroll(row.id, "contact_added"); }
+    const importedCount = imported?.length ?? 0;
+    for (const row of (imported || []) as any[]) { checkAutoEnroll(row.id, "contact_added"); }
     notify({ message: `Imported ${importedCount} contacts (${validRows.length - importedCount} dupes skipped, ${csvRows.length - validRows.length} invalid excluded).`, tone: "success" });
     setImportText(""); setCsvRows([]); setCsvHeaders([]); setCsvMapping({}); setCsvStep("upload"); setShowImport(false);
     load();
@@ -431,9 +431,9 @@ export default function ContactsPage() {
 
   async function runValidation() {
     setValidating(true);
-    var issues: { id: string; email: string; issue: string; action: string }[] = [];
+    const issues: { id: string; email: string; issue: string; action: string }[] = [];
 
-    for (var c of contacts) {
+    for (const c of contacts) {
       if (!isValidEmail(c.email)) {
         issues.push({ id: c.id, email: c.email, issue: "Invalid email format", action: "deactivate" });
       }
@@ -449,12 +449,12 @@ export default function ContactsPage() {
     }
 
     // Apply segmentation tags
-    var tagUpdates: Record<string, string[]> = {};
-    for (var issue of issues) {
+    const tagUpdates: Record<string, string[]> = {};
+    for (const issue of issues) {
       if (issue.action.startsWith("tag:")) {
-        var tag = issue.action.replace("tag:", "");
+        const tag = issue.action.replace("tag:", "");
         if (!tagUpdates[issue.id]) {
-          var contact = contacts.find((c) => c.id === issue.id);
+          const contact = contacts.find((c) => c.id === issue.id);
           tagUpdates[issue.id] = [...(contact?.tags || [])];
         }
         if (!tagUpdates[issue.id].includes(tag)) {
@@ -464,18 +464,18 @@ export default function ContactsPage() {
     }
 
     // Deactivate invalid emails
-    var deactivateIds = issues.filter((i) => i.action === "deactivate").map((i) => i.id);
+    const deactivateIds = issues.filter((i) => i.action === "deactivate").map((i) => i.id);
     if (deactivateIds.length > 0) {
       await supabase.from("marketing_contacts").update({ status: "inactive" }).in("id", deactivateIds);
     }
 
     // Apply tags
-    for (var [contactId, tags] of Object.entries(tagUpdates)) {
+    for (const [contactId, tags] of Object.entries(tagUpdates)) {
       await supabase.from("marketing_contacts").update({ tags }).eq("id", contactId);
     }
 
-    var deactivated = deactivateIds.length;
-    var tagged = Object.keys(tagUpdates).length;
+    const deactivated = deactivateIds.length;
+    const tagged = Object.keys(tagUpdates).length;
 
     notify({ message: `Validation complete: ${deactivated} deactivated, ${tagged} contacts tagged for segmentation.`, tone: "success" });
     setValidating(false);
@@ -484,7 +484,7 @@ export default function ContactsPage() {
   }
 
   async function toggleStatus(contact: Contact) {
-    var newStatus = contact.status === "active" ? "unsubscribed" : "active";
+    const newStatus = contact.status === "active" ? "unsubscribed" : "active";
     await supabase.from("marketing_contacts").update({ status: newStatus }).eq("id", contact.id);
     setContacts(contacts.map((c) => c.id === contact.id ? { ...c, status: newStatus } : c));
   }
@@ -497,7 +497,7 @@ export default function ContactsPage() {
 
   async function deleteAllContacts() {
     setDeletingAll(true);
-    var { error } = await supabase.from("marketing_contacts").delete().eq("business_id", businessId);
+    const { error } = await supabase.from("marketing_contacts").delete().eq("business_id", businessId);
     if (error) {
       notify({ title: "Delete failed", message: error.message, tone: "error" });
     } else {
@@ -510,10 +510,10 @@ export default function ContactsPage() {
   }
 
   async function addTagToContact(contactId: string, tag: string) {
-    var contact = contacts.find((c) => c.id === contactId);
+    const contact = contacts.find((c) => c.id === contactId);
     if (!contact || !tag.trim()) return;
-    var normalizedTag = tag.trim().toLowerCase();
-    var newTags = [...new Set([...(contact.tags || []), normalizedTag])];
+    const normalizedTag = tag.trim().toLowerCase();
+    const newTags = [...new Set([...(contact.tags || []), normalizedTag])];
     await supabase.from("marketing_contacts").update({ tags: newTags }).eq("id", contactId);
     setContacts(contacts.map((c) => c.id === contactId ? { ...c, tags: newTags } : c));
     setTagInput(null);
@@ -521,15 +521,15 @@ export default function ContactsPage() {
   }
 
   async function removeTagFromContact(contactId: string, tag: string) {
-    var contact = contacts.find((c) => c.id === contactId);
+    const contact = contacts.find((c) => c.id === contactId);
     if (!contact) return;
-    var newTags = (contact.tags || []).filter((t) => t !== tag);
+    const newTags = (contact.tags || []).filter((t) => t !== tag);
     await supabase.from("marketing_contacts").update({ tags: newTags }).eq("id", contactId);
     setContacts(contacts.map((c) => c.id === contactId ? { ...c, tags: newTags } : c));
   }
 
   async function previewCleanList() {
-    var { data } = await supabase.from("marketing_contacts")
+    const { data } = await supabase.from("marketing_contacts")
       .select("id, email, first_name, last_name, phone, status, source, tags, total_received, total_opens, total_clicks, created_at, date_of_birth")
       .eq("business_id", businessId)
       .eq("status", "active")
@@ -541,8 +541,8 @@ export default function ContactsPage() {
 
   async function deactivateStaleContacts() {
     setCleaning(true);
-    var ids = staleContacts.map((c) => c.id);
-    var { error } = await supabase.from("marketing_contacts")
+    const ids = staleContacts.map((c) => c.id);
+    const { error } = await supabase.from("marketing_contacts")
       .update({ status: "inactive" })
       .in("id", ids);
     setCleaning(false);
@@ -556,23 +556,23 @@ export default function ContactsPage() {
   }
 
   // Collect all unique tags for filter
-  var allTags = [...new Set(contacts.flatMap((c) => c.tags || []))].sort();
+  const allTags = [...new Set(contacts.flatMap((c) => c.tags || []))].sort();
 
-  var filtered = contacts.filter((c) => {
+  const filtered = contacts.filter((c) => {
     if (filterStatus !== "all" && c.status !== filterStatus) return false;
     if (filterTag && !(c.tags || []).includes(filterTag)) return false;
     if (!search) return true;
-    var q = search.toLowerCase();
+    const q = search.toLowerCase();
     return (c.email?.toLowerCase().includes(q) || c.first_name?.toLowerCase().includes(q) || c.last_name?.toLowerCase().includes(q));
   });
 
-  var totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  var paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  var activeCount = contacts.filter((c) => c.status === "active").length;
-  var unsubCount = contacts.filter((c) => c.status === "unsubscribed").length;
-  var bouncedCount = contacts.filter((c) => c.status === "bounced").length;
-  var inactiveCount = contacts.filter((c) => c.status === "inactive").length;
+  const activeCount = contacts.filter((c) => c.status === "active").length;
+  const unsubCount = contacts.filter((c) => c.status === "unsubscribed").length;
+  const bouncedCount = contacts.filter((c) => c.status === "bounced").length;
+  const inactiveCount = contacts.filter((c) => c.status === "inactive").length;
 
   if (loading) {
     return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
@@ -667,7 +667,7 @@ export default function ContactsPage() {
             </thead>
             <tbody>
               {paginated.map((c) => {
-                var isEditing = editingId === c.id;
+                const isEditing = editingId === c.id;
                 return isEditing ? (
                   <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle, var(--ck-bg))" }}>
                     <td className="px-4 py-2">
@@ -809,7 +809,7 @@ export default function ContactsPage() {
               className="rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-30"
               style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Prev</button>
             {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-              var p: number;
+              let p: number;
               if (totalPages <= 7) p = i;
               else if (page < 3) p = i;
               else if (page > totalPages - 4) p = totalPages - 7 + i;
@@ -941,7 +941,7 @@ export default function ContactsPage() {
                   {/* Column mapping dropdowns */}
                   <div className="grid grid-cols-2 gap-3">
                     {csvHeaders.map((h) => {
-                      var mappedField = Object.entries(csvMapping).find(([, v]) => v === h)?.[0] || "";
+                      const mappedField = Object.entries(csvMapping).find(([, v]) => v === h)?.[0] || "";
                       return (
                         <div key={h} className="flex items-center gap-2">
                           <span className="w-32 text-xs font-mono truncate" style={{ color: "var(--ck-text)" }} title={h}>{h}</span>
@@ -949,9 +949,9 @@ export default function ContactsPage() {
                           <select
                             value={mappedField}
                             onChange={(e) => {
-                              var newMap = { ...csvMapping };
+                              const newMap = { ...csvMapping };
                               // Remove old mapping for this header
-                              for (var [k, v] of Object.entries(newMap)) { if (v === h) delete newMap[k]; }
+                              for (const [k, v] of Object.entries(newMap)) { if (v === h) delete newMap[k]; }
                               // Set new mapping
                               if (e.target.value && e.target.value !== "_skip") newMap[e.target.value] = h;
                               setCsvMapping(newMap);

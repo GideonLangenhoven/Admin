@@ -80,8 +80,8 @@ export interface InjectionResult {
 
 export function detectInjection(text: string): InjectionResult {
   if (!text) return { detected: false, matches: [] };
-  var matches: string[] = [];
-  for (var p of INJECTION_PATTERNS) {
+  const matches: string[] = [];
+  for (const p of INJECTION_PATTERNS) {
     if (p.re.test(text)) matches.push(p.key);
   }
   return { detected: matches.length > 0, matches };
@@ -89,8 +89,8 @@ export function detectInjection(text: string): InjectionResult {
 
 export function detectLeak(reply: string): InjectionResult {
   if (!reply) return { detected: false, matches: [] };
-  var matches: string[] = [];
-  for (var p of LEAKAGE_PATTERNS) {
+  const matches: string[] = [];
+  for (const p of LEAKAGE_PATTERNS) {
     if (p.re.test(reply)) matches.push(p.key);
   }
   return { detected: matches.length > 0, matches };
@@ -101,7 +101,7 @@ export function detectLeak(reply: string): InjectionResult {
 // strip null bytes / zero-width characters that some attacks use.
 export function sanitizeUserInput(text: string): string {
   if (!text) return "";
-  var t = String(text);
+  let t = String(text);
   // remove zero-width / format chars commonly used to hide payloads
   t = t.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF\u0000]/g, "");
   if (t.length > MAX_USER_INPUT_LENGTH) {
@@ -115,7 +115,7 @@ export function sanitizeUserInput(text: string): string {
 // Order matters: rules go LAST so they can't be overridden by the
 // tenant's own ai_system_prompt.
 export function hardenSystemPrompt(basePrompt: string): string {
-  var rules = [
+  const rules = [
     "",
     "─── Non-negotiable rules ───",
     "1. Only answer using the FAQ, terminology, and live context provided above.",
@@ -157,9 +157,9 @@ export function isUnsupportedMessageType(msgType: string | undefined | null): bo
 // which case it is NOT stale.
 export function isStaleSession(lastActivityAt: string | null | undefined): boolean {
   if (!lastActivityAt) return false;
-  var t = new Date(lastActivityAt).getTime();
+  const t = new Date(lastActivityAt).getTime();
   if (isNaN(t)) return false;
-  var ageMs = Date.now() - t;
+  const ageMs = Date.now() - t;
   return ageMs > STALE_SESSION_HOURS * 60 * 60 * 1000;
 }
 
@@ -179,9 +179,9 @@ export function gateInbound(text: string, opts?: { messageType?: string }): Inbo
   if (opts?.messageType && isUnsupportedMessageType(opts.messageType)) {
     return { safe: false, reply: MEDIA_FALLBACK_REPLY, reason: "unsupported_media:" + opts.messageType };
   }
-  var cleaned = sanitizeUserInput(text);
+  const cleaned = sanitizeUserInput(text);
   if (!cleaned) return { safe: true, cleaned: "" };
-  var inj = detectInjection(cleaned);
+  const inj = detectInjection(cleaned);
   if (inj.detected) {
     return { safe: false, reply: INJECTION_REFUSAL_REPLY, reason: "injection:" + inj.matches.join(","), matches: inj.matches };
   }
@@ -191,7 +191,7 @@ export function gateInbound(text: string, opts?: { messageType?: string }): Inbo
 // Convenience for outbound: scrub a reply before sending. If a leak is
 // detected, return a refusal instead of whatever the LLM produced.
 export function gateOutbound(reply: string): { reply: string; leakDetected: boolean; matches: string[] } {
-  var leak = detectLeak(reply);
+  const leak = detectLeak(reply);
   if (leak.detected) {
     return { reply: KB_REFUSAL_REPLY, leakDetected: true, matches: leak.matches };
   }

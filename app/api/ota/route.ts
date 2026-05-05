@@ -2,31 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
-var VALID_CHANNELS = ["VIATOR", "GETYOURGUIDE"];
+const VALID_CHANNELS = ["VIATOR", "GETYOURGUIDE"];
 
 function serviceClient() {
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  var key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  let key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (serviceKey && serviceKey.length > 40 && !serviceKey.includes("your-")) key = serviceKey;
   return createClient(url, key);
 }
 
 export async function GET(req: NextRequest) {
-  var caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req);
   if (!caller || !isPrivilegedRole(caller.role)) {
     return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
   }
-  var businessId = req.nextUrl.searchParams.get("business_id");
-  var channel = (req.nextUrl.searchParams.get("channel") || "VIATOR").toUpperCase();
+  const businessId = req.nextUrl.searchParams.get("business_id");
+  const channel = (req.nextUrl.searchParams.get("channel") || "VIATOR").toUpperCase();
   if (!businessId) return NextResponse.json({ error: "business_id required" }, { status: 400 });
   if (!VALID_CHANNELS.includes(channel)) return NextResponse.json({ error: "Invalid channel" }, { status: 400 });
   if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
     return NextResponse.json({ error: "Not your business" }, { status: 403 });
   }
 
-  var supabase = serviceClient();
-  var { data } = await supabase
+  const supabase = serviceClient();
+  const { data } = await supabase
     .from("ota_integrations")
     .select("id, channel, enabled, test_mode, last_sync_at, last_sync_status, last_sync_error, api_key_encrypted, api_secret_encrypted, webhook_secret_encrypted")
     .eq("business_id", businessId)
@@ -47,20 +47,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  var caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req);
   if (!caller || !isPrivilegedRole(caller.role)) {
     return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
   }
 
-  var encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
+  const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
   if (!encryptionKey || encryptionKey.length < 32) {
     return NextResponse.json({ error: "SETTINGS_ENCRYPTION_KEY not configured" }, { status: 500 });
   }
 
-  var body: any;
+  let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  var { business_id, action, channel, api_key, api_secret, webhook_secret, test_mode, enabled } = body;
+  let { business_id, action, channel, api_key, api_secret, webhook_secret, test_mode, enabled } = body;
   channel = (channel || "VIATOR").toUpperCase();
   if (!business_id) return NextResponse.json({ error: "business_id required" }, { status: 400 });
   if (!VALID_CHANNELS.includes(channel)) return NextResponse.json({ error: "Invalid channel" }, { status: 400 });
@@ -68,11 +68,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not your business" }, { status: 403 });
   }
 
-  var supabase = serviceClient();
+  const supabase = serviceClient();
 
   if (action === "save_credentials") {
     if (!api_key?.trim()) return NextResponse.json({ error: "API key / Client ID is required" }, { status: 400 });
-    var { error: rpcErr } = await supabase.rpc("set_ota_credentials", {
+    const { error: rpcErr } = await supabase.rpc("set_ota_credentials", {
       p_business_id: business_id,
       p_key: encryptionKey,
       p_channel: channel,
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "toggle_enabled") {
-    var { error } = await supabase
+    const { error } = await supabase
       .from("ota_integrations")
       .update({ enabled: enabled === true, updated_at: new Date().toISOString() })
       .eq("business_id", business_id)
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "toggle_test_mode") {
-    var { error: tmErr } = await supabase
+    const { error: tmErr } = await supabase
       .from("ota_integrations")
       .update({ test_mode: test_mode === true, updated_at: new Date().toISOString() })
       .eq("business_id", business_id)

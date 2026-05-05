@@ -252,7 +252,7 @@ function Slots() {
     setLoading(true);
 
     // Calculate time range based on view mode
-    let start = new Date(currentDate);
+    const start = new Date(currentDate);
     start.setHours(0, 0, 0, 0);
     let end = new Date(currentDate);
     end.setHours(23, 59, 59, 999);
@@ -352,7 +352,7 @@ function Slots() {
 
     try {
       // Always update the single slot we clicked
-      let { error: singleUpdateError } = await supabase
+      const { error: singleUpdateError } = await supabase
         .from("slots")
         .update({
           capacity_total: Number(editForm.capacity) || selectedSlot.capacity_total,

@@ -11,11 +11,11 @@ test.describe("Smoke", () => {
   test("chat widget opens and shows input", async ({ page }) => {
     await page.goto(BASE_URL + "/", { waitUntil: "networkidle" });
     // Dismiss cookie banner if visible
-    var okBtn = page.getByRole("button", { name: "OK" });
+    const okBtn = page.getByRole("button", { name: "OK" });
     if (await okBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await okBtn.click();
     }
-    var chatBtn = page.getByRole("button", { name: /open chat/i });
+    const chatBtn = page.getByRole("button", { name: /open chat/i });
     await expect(chatBtn).toBeVisible({ timeout: 10_000 });
     await chatBtn.click();
     // Chat panel opens with a message input

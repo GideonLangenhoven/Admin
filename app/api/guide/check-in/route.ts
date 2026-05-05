@@ -2,26 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
 import { createClient } from "@supabase/supabase-js";
 
-var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-var key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 function adminClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
 export async function POST(req: NextRequest) {
-  var caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req);
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  var body: any;
+  let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  var { booking_id, slot_id, client_event_id, notes } = body;
+  const { booking_id, slot_id, client_event_id, notes } = body;
   if (!booking_id) return NextResponse.json({ error: "booking_id required" }, { status: 400 });
 
-  var db = adminClient();
+  const db = adminClient();
 
-  var { data: bk } = await db.from("bookings")
+  const { data: bk } = await db.from("bookings")
     .select("id, business_id, slot_id")
     .eq("id", booking_id)
     .maybeSingle();
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Booking not found" }, { status: 403 });
   }
 
-  var { error: insertErr } = await db.from("slot_check_ins").insert({
+  const { error: insertErr } = await db.from("slot_check_ins").insert({
     booking_id,
     slot_id: slot_id || bk.slot_id,
     business_id: bk.business_id,

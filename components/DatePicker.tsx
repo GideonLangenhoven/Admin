@@ -21,14 +21,14 @@ export function DatePicker({ value, onChange, className = "", placeholder = "Pic
     const btnRef = useRef<HTMLButtonElement>(null);
     const popRef = useRef<HTMLDivElement>(null);
 
-    var cellSize = compact ? 22 : 38;
-    var calWidth = cellSize * 7 + (compact ? 36 : 48);
+    const cellSize = compact ? 22 : 38;
+    const calWidth = cellSize * 7 + (compact ? 36 : 48);
 
-    var updateCoords = useCallback(() => {
+    const updateCoords = useCallback(() => {
         if (!btnRef.current) return;
-        var rect = btnRef.current.getBoundingClientRect();
-        var top = position === "top" ? rect.top - 4 : rect.bottom + 4;
-        var left = alignRight ? rect.right - calWidth : rect.left;
+        const rect = btnRef.current.getBoundingClientRect();
+        const top = position === "top" ? rect.top - 4 : rect.bottom + 4;
+        let left = alignRight ? rect.right - calWidth : rect.left;
         // Clamp to viewport
         if (left < 8) left = 8;
         if (left + calWidth > window.innerWidth - 8) left = window.innerWidth - calWidth - 8;

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UsersThree, Layout, ChartBar, Lightning, Tag } from "@phosphor-icons/react";
 
-var tabs = [
+const tabs = [
   { href: "/marketing", label: "Overview", icon: ChartBar, exact: true },
   { href: "/marketing/contacts", label: "Contacts", icon: UsersThree },
   { href: "/marketing/templates", label: "Templates", icon: Layout },
@@ -12,7 +12,7 @@ var tabs = [
 ];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
-  var pathname = usePathname() || "";
+  const pathname = usePathname() || "";
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -23,8 +23,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
       <nav className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border)" }}>
         {tabs.map((t) => {
-          var isActive = t.exact ? pathname === t.href : pathname.startsWith(t.href);
-          var Icon = t.icon;
+          const isActive = t.exact ? pathname === t.href : pathname.startsWith(t.href);
+          const Icon = t.icon;
           return (
             <Link
               key={t.href}

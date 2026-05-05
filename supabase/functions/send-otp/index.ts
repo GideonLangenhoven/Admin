@@ -3,15 +3,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-var SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-var RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-var FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
-var OTP_SECRET = Deno.env.get("OTP_HMAC_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+const OTP_SECRET = Deno.env.get("OTP_HMAC_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 
-var supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-var corsHeaders = {
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -23,13 +23,13 @@ function respond(status: number, body: Record<string, unknown>) {
 }
 
 /* ── Rate limiting (in-memory, resets on cold start) ── */
-var rateLimitMap = new Map<string, number[]>();
-var RATE_LIMIT_MAX = 3;
-var RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 
 function checkRateLimit(email: string): boolean {
-  var now = Date.now();
-  var timestamps = rateLimitMap.get(email) || [];
+  const now = Date.now();
+  let timestamps = rateLimitMap.get(email) || [];
   timestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
   if (timestamps.length >= RATE_LIMIT_MAX) return false;
   timestamps.push(now);
@@ -39,39 +39,39 @@ function checkRateLimit(email: string): boolean {
 
 /* ── HMAC helpers ── */
 async function hmacSign(payload: string): Promise<string> {
-  var key = await crypto.subtle.importKey(
+  const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(OTP_SECRET),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  var sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function createToken(email: string, phoneTail: string, code: string, expiresTs: number): Promise<string> {
-  var payload = [email, phoneTail, code, expiresTs].join("|");
-  var sig = await hmacSign(payload);
+  const payload = [email, phoneTail, code, expiresTs].join("|");
+  const sig = await hmacSign(payload);
   // base64-encode the payload + signature for transport
-  var raw = payload + "|" + sig;
+  const raw = payload + "|" + sig;
   return btoa(raw);
 }
 
 async function verifyToken(token: string, userCode: string): Promise<{ valid: boolean; error?: string; email?: string; phoneTail?: string }> {
   try {
-    var raw = atob(token);
-    var parts = raw.split("|");
+    const raw = atob(token);
+    const parts = raw.split("|");
     if (parts.length !== 5) return { valid: false, error: "Invalid token format" };
-    var [email, phoneTail, code, expiresStr, sig] = parts;
-    var expiresTs = Number(expiresStr);
+    const [email, phoneTail, code, expiresStr, sig] = parts;
+    const expiresTs = Number(expiresStr);
 
     // Check expiry
     if (Date.now() > expiresTs) return { valid: false, error: "Code expired. Please request a new one." };
 
     // Verify HMAC
-    var payload = [email, phoneTail, code, expiresStr].join("|");
-    var expectedSig = await hmacSign(payload);
+    const payload = [email, phoneTail, code, expiresStr].join("|");
+    const expectedSig = await hmacSign(payload);
     if (sig !== expectedSig) return { valid: false, error: "Invalid token" };
 
     // Check code
@@ -115,13 +115,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    var body = await req.json();
-    var action = String(body.action || "send");
+    const body = await req.json();
+    const action = String(body.action || "send");
 
     /* ── SEND OTP (customer login) ── */
     if (action === "send") {
-      var email = String(body.email || "").trim().toLowerCase();
-      var phoneTail = String(body.phone_tail || "").replace(/\D/g, "").slice(-9);
+      const email = String(body.email || "").trim().toLowerCase();
+      const phoneTail = String(body.phone_tail || "").replace(/\D/g, "").slice(-9);
 
       if (!email || !phoneTail) {
         return respond(400, { success: false, error: "Email and phone are required." });
@@ -133,14 +133,14 @@ Deno.serve(async (req) => {
       }
 
       // Verify bookings exist (prevents enumeration / spam)
-      var { data: bookings } = await supabase
+      const { data: bookings } = await supabase
         .from("bookings")
         .select("id, phone")
         .eq("email", email)
         .limit(20);
 
-      var matched = (bookings || []).filter(function (b: { phone?: string }) {
-        var rawPhone = (b.phone || "").replace(/\D/g, "");
+      const matched = (bookings || []).filter(function (b: { phone?: string }) {
+        const rawPhone = (b.phone || "").replace(/\D/g, "");
         if (!rawPhone) return true;
         return rawPhone.slice(-9) === phoneTail;
       });
@@ -150,15 +150,15 @@ Deno.serve(async (req) => {
       }
 
       // Generate 6-digit code
-      var codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
-      var code = String(codeNum);
-      var expiresTs = Date.now() + 15 * 60 * 1000; // 15 min TTL
+      const codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
+      const code = String(codeNum);
+      const expiresTs = Date.now() + 15 * 60 * 1000; // 15 min TTL
 
       // Create signed token
-      var token = await createToken(email, phoneTail, code, expiresTs);
+      const token = await createToken(email, phoneTail, code, expiresTs);
 
       // Send email via Resend
-      var res = await fetch("https://api.resend.com/emails", {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       });
 
       if (!res.ok) {
-        var errData = await res.json();
+        const errData = await res.json();
         console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
         return respond(500, { success: false, error: "Failed to send verification email. Please try again." });
       }
@@ -180,8 +180,8 @@ Deno.serve(async (req) => {
 
     /* ── SEND ADMIN OTP (settings verification) ── */
     if (action === "send_admin") {
-      var email = String(body.email || "").trim().toLowerCase();
-      var businessId = String(body.business_id || "");
+      const email = String(body.email || "").trim().toLowerCase();
+      const businessId = String(body.business_id || "");
 
       if (!email || !businessId) {
         return respond(400, { success: false, error: "Email and business_id are required." });
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
       }
 
       // Verify the email belongs to an admin of this business
-      var { data: admin } = await supabase
+      const { data: admin } = await supabase
         .from("admin_users")
         .select("id, role")
         .eq("business_id", businessId)
@@ -204,12 +204,12 @@ Deno.serve(async (req) => {
         return respond(403, { success: false, error: "Not authorised." });
       }
 
-      var codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
-      var code = String(codeNum);
-      var expiresTs = Date.now() + 15 * 60 * 1000;
-      var token = await createToken(email, "admin", code, expiresTs);
+      const codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
+      const code = String(codeNum);
+      const expiresTs = Date.now() + 15 * 60 * 1000;
+      const token = await createToken(email, "admin", code, expiresTs);
 
-      var res = await fetch("https://api.resend.com/emails", {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
       });
 
       if (!res.ok) {
-        var errData = await res.json();
+        const errData = await res.json();
         console.error("RESEND_ADMIN_OTP_ERR", res.status, JSON.stringify(errData));
         return respond(500, { success: false, error: "Failed to send verification email." });
       }
@@ -231,14 +231,14 @@ Deno.serve(async (req) => {
 
     /* ── VERIFY OTP ── */
     if (action === "verify") {
-      var token = String(body.token || "");
-      var userCode = String(body.code || "").trim();
+      const token = String(body.token || "");
+      const userCode = String(body.code || "").trim();
 
       if (!token || !userCode) {
         return respond(400, { success: false, error: "Token and code are required." });
       }
 
-      var result = await verifyToken(token, userCode);
+      const result = await verifyToken(token, userCode);
       if (!result.valid) {
         return respond(200, { success: false, verified: false, error: result.error });
       }

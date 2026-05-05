@@ -8,14 +8,14 @@ const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPAB
 
 Deno.serve(async (req) => {
   try {
-    var auth = await requireAuth(req);
+    const auth = await requireAuth(req);
     if (!auth.businessId && !auth.isServiceRole) {
       return new Response(JSON.stringify({ error: "business_id required" }), { status: 400 });
     }
 
-    var body: any = {};
+    const body: any = {};
     try { body = await req.json(); } catch (_) {}
-    var businessId = auth.isServiceRole ? (body.business_id || "") : auth.businessId;
+    const businessId = auth.isServiceRole ? (body.business_id || "") : auth.businessId;
     if (!businessId) {
       return new Response(JSON.stringify({ error: "business_id required" }), { status: 400 });
     }

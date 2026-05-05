@@ -13,9 +13,9 @@ import { getAdminTimezone } from "../app/lib/admin-timezone";
 
 /* ── timezone offset helper ── */
 function getTimezoneOffsetMs() {
-    var now = new Date();
-    var tzLocal = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
-    var tzUtc = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
+    const now = new Date();
+    const tzLocal = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
+    const tzUtc = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
     return tzLocal.getTime() - tzUtc.getTime();
 }
 
@@ -35,12 +35,12 @@ interface AvailabilityCalendarProps {
 }
 
 /* ── context to pass slot data + minQty into Day component ── */
-var SlotDataCtx = createContext<DaySlotMap>({});
-var MinQtyCtx = createContext<number>(0);
+const SlotDataCtx = createContext<DaySlotMap>({});
+const MinQtyCtx = createContext<number>(0);
 
 /* ── colour palette per position ── */
-var SLOT_COLORS = ["#10b981", "#a855f7", "#f59e0b", "#3b82f6"]; // brighter: emerald, purple, amber, blue
-var FULL_COLOR = "#9ca3af"; // gray-400
+const SLOT_COLORS = ["#10b981", "#a855f7", "#f59e0b", "#3b82f6"]; // brighter: emerald, purple, amber, blue
+const FULL_COLOR = "#9ca3af"; // gray-400
 
 /* ── position configs ── */
 function getPositions(count: number): { top?: string; bottom?: string; left?: string; right?: string }[] {
@@ -67,30 +67,30 @@ function getPositions(count: number): { top?: string; bottom?: string; left?: st
 
 /* ── Custom Day component ── */
 function CustomDay(props: any) {
-    var { day, modifiers, children, ...tdProps } = props;
-    var date: Date = day.date ?? day;
-    var daySlots = useContext(SlotDataCtx);
-    var minQty = useContext(MinQtyCtx);
-    var key = format(date, "yyyy-MM-dd");
-    var allSlots = daySlots[key] || [];
-    var isOutside = modifiers?.outside;
-    var isDisabled = modifiers?.disabled;
+    const { day, modifiers, children, ...tdProps } = props;
+    const date: Date = day.date ?? day;
+    const daySlots = useContext(SlotDataCtx);
+    const minQty = useContext(MinQtyCtx);
+    const key = format(date, "yyyy-MM-dd");
+    const allSlots = daySlots[key] || [];
+    const isOutside = modifiers?.outside;
+    const isDisabled = modifiers?.disabled;
 
     // Filter out slots that don't have enough capacity for the party size
-    var slots = minQty > 0 ? allSlots.filter(s => s.available >= minQty) : allSlots;
+    const slots = minQty > 0 ? allSlots.filter(s => s.available >= minQty) : allSlots;
 
     // Limit to max 4 badge positions
-    var displaySlots = slots.slice(0, 4);
-    var positions = getPositions(displaySlots.length);
+    const displaySlots = slots.slice(0, 4);
+    const positions = getPositions(displaySlots.length);
 
     return (
         <td {...tdProps} style={{ ...(tdProps.style || {}), padding: 0, position: "relative" }}>
             {children}
             {/* availability badges */}
             {!isOutside && !isDisabled && displaySlots.map((s, i) => {
-                var pos = positions[i];
-                var color = s.available > 0 ? SLOT_COLORS[i] : FULL_COLOR;
-                var style: React.CSSProperties = {
+                const pos = positions[i];
+                const color = s.available > 0 ? SLOT_COLORS[i] : FULL_COLOR;
+                const style: React.CSSProperties = {
                     position: "absolute",
                     fontSize: 10,
                     fontWeight: 800,
@@ -118,47 +118,47 @@ function CustomDay(props: any) {
 
 /* ── main component ── */
 export default function AvailabilityCalendar({ value, onChange, tourId, businessId, minQty = 0 }: AvailabilityCalendarProps) {
-    var parsedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : new Date();
-    var validDate = isValid(parsedDate) ? parsedDate : new Date();
+    const parsedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : new Date();
+    const validDate = isValid(parsedDate) ? parsedDate : new Date();
 
-    var [displayMonth, setDisplayMonth] = useState(() => startOfMonth(validDate));
-    var [daySlots, setDaySlots] = useState<DaySlotMap>({});
+    const [displayMonth, setDisplayMonth] = useState(() => startOfMonth(validDate));
+    const [daySlots, setDaySlots] = useState<DaySlotMap>({});
 
-    var availabilitySummary = useMemo(() => {
-        var days = Object.entries(daySlots).map(([day, slots]) => {
-            var openSlots = slots.filter((slot) => slot.available >= Math.max(minQty, 1)).length;
+    const availabilitySummary = useMemo(() => {
+        const days = Object.entries(daySlots).map(([day, slots]) => {
+            const openSlots = slots.filter((slot) => slot.available >= Math.max(minQty, 1)).length;
             return { day, openSlots, totalSlots: slots.length };
         });
-        var openDays = days.filter((entry) => entry.openSlots > 0).length;
-        var fullDays = days.filter((entry) => entry.totalSlots > 0 && entry.openSlots === 0).length;
+        const openDays = days.filter((entry) => entry.openSlots > 0).length;
+        const fullDays = days.filter((entry) => entry.totalSlots > 0 && entry.openSlots === 0).length;
         return { openDays, fullDays };
     }, [daySlots, minQty]);
 
-    var fetchMonthSlots = useCallback(async () => {
+    const fetchMonthSlots = useCallback(async () => {
         if (!tourId || !businessId) { setDaySlots({}); return; }
 
         // Month range in admin timezone → convert to UTC
-        var mStart = startOfMonth(displayMonth);
-        var mEnd = endOfMonth(displayMonth);
-        var offsetMs = getTimezoneOffsetMs();
-        var utcStart = new Date(new Date(mStart.getFullYear(), mStart.getMonth(), mStart.getDate(), 0, 0, 0).getTime() - offsetMs);
-        var utcEnd = new Date(new Date(mEnd.getFullYear(), mEnd.getMonth(), mEnd.getDate(), 23, 59, 59).getTime() - offsetMs);
+        const mStart = startOfMonth(displayMonth);
+        const mEnd = endOfMonth(displayMonth);
+        const offsetMs = getTimezoneOffsetMs();
+        const utcStart = new Date(new Date(mStart.getFullYear(), mStart.getMonth(), mStart.getDate(), 0, 0, 0).getTime() - offsetMs);
+        const utcEnd = new Date(new Date(mEnd.getFullYear(), mEnd.getMonth(), mEnd.getDate(), 23, 59, 59).getTime() - offsetMs);
 
-        var data = await listAvailableSlots({
+        const data = await listAvailableSlots({
             businessId,
             tourId,
             startIso: utcStart.toISOString(),
             endIso: new Date(utcEnd.getTime() + 1000).toISOString(),
         });
 
-        var map: DaySlotMap = {};
-        for (var slot of (data || [])) {
+        const map: DaySlotMap = {};
+        for (const slot of (data || [])) {
             // Convert UTC start_time to admin timezone date key
-            var dt = new Date(slot.start_time);
-            var sastDate = new Date(dt.getTime() + getTimezoneOffsetMs());
-            var key = format(sastDate, "yyyy-MM-dd");
-            var time = format(sastDate, "HH:mm");
-            var available = Math.max(0, Number(slot.available_capacity || 0));
+            const dt = new Date(slot.start_time);
+            const sastDate = new Date(dt.getTime() + getTimezoneOffsetMs());
+            const key = format(sastDate, "yyyy-MM-dd");
+            const time = format(sastDate, "HH:mm");
+            const available = Math.max(0, Number(slot.available_capacity || 0));
             if (!map[key]) map[key] = [];
             map[key].push({ available, time });
         }

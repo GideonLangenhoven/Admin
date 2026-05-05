@@ -7,22 +7,22 @@ export type CallerAdmin = {
 };
 
 export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> {
-  var auth = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  var token = auth.replace(/^Bearer\s+/i, "").trim();
+  const auth = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
 
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   if (!serviceKey || serviceKey.length < 40) return null;
 
-  var admin = createClient(url, serviceKey, {
+  const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  var { data, error } = await admin.auth.getUser(token);
+  const { data, error } = await admin.auth.getUser(token);
   if (error || !data?.user) return null;
 
-  var { data: adminRow } = await admin
+  const { data: adminRow } = await admin
     .from("admin_users")
     .select("id, role, business_id, suspended")
     .eq("user_id", data.user.id)

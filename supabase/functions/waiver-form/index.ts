@@ -3,9 +3,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-var supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function esc(value: unknown) {
   return String(value || "")
@@ -184,8 +184,8 @@ function pageShell(title: string, body: string) {
 }
 
 function waiverPage(data: any, business: any, message?: string) {
-  var title = (business?.name || "Booking") + " waiver";
-  var signed = data.waiver_status === "SIGNED";
+  const title = (business?.name || "Booking") + " waiver";
+  const signed = data.waiver_status === "SIGNED";
   return pageShell(title, `
     <div class="card">
       <div class="hero">
@@ -282,26 +282,26 @@ Deno.serve(async (req) => {
       return new Response("Method not allowed", { status: 405 });
     }
 
-    var url = new URL(req.url);
-    var form = req.method === "POST" ? await req.formData() : null;
-    var bookingId = String(form?.get("booking") || url.searchParams.get("booking") || "");
-    var token = String(form?.get("token") || url.searchParams.get("token") || "");
+    const url = new URL(req.url);
+    const form = req.method === "POST" ? await req.formData() : null;
+    const bookingId = String(form?.get("booking") || url.searchParams.get("booking") || "");
+    const token = String(form?.get("token") || url.searchParams.get("token") || "");
 
     // Redirect GET requests to the booking app's waiver page (Supabase Edge Functions
     // force text/plain content-type which prevents HTML rendering in browsers)
     if (req.method === "GET" && bookingId && token) {
       // Look up the business booking site URL from the booking
-      var waiverBaseUrl = "";
+      const waiverBaseUrl = "";
       try {
-        var { data: wbk } = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
+        const { data: wbk } = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
         if (wbk?.business_id) {
-          var { data: wbiz } = await supabase.from("businesses").select("booking_site_url, subdomain").eq("id", wbk.business_id).maybeSingle();
+          const { data: wbiz } = await supabase.from("businesses").select("booking_site_url, subdomain").eq("id", wbk.business_id).maybeSingle();
           if (wbiz?.booking_site_url) waiverBaseUrl = String(wbiz.booking_site_url).replace(/\/+$/, "");
           else if (wbiz?.subdomain) waiverBaseUrl = "https://" + wbiz.subdomain + ".booking.bookingtours.co.za";
         }
       } catch (_) { /* fallback below */ }
       if (!waiverBaseUrl) waiverBaseUrl = "https://booking.bookingtours.co.za";
-      var redirectUrl = new URL(waiverBaseUrl + "/waiver");
+      const redirectUrl = new URL(waiverBaseUrl + "/waiver");
       redirectUrl.searchParams.set("booking", bookingId);
       redirectUrl.searchParams.set("token", token);
       return Response.redirect(redirectUrl.toString(), 302);
@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    var bookingRes = await supabase
+    const bookingRes = await supabase
       .from("bookings")
       .select("id, business_id, customer_name, qty, waiver_status, waiver_token, waiver_token_expires_at, waiver_signed_at, waiver_signed_name, waiver_payload, slots(start_time)")
       .eq("id", bookingId)
@@ -330,7 +330,7 @@ Deno.serve(async (req) => {
     // Check token expiry (public access only — admin auth bypasses this in the admin app).
     // The expiry is set to slot_time + duration_minutes so the waiver stays signable
     // until the trip actually ends, not just when it starts.
-    var expiresAt = bookingRes.data.waiver_token_expires_at;
+    const expiresAt = bookingRes.data.waiver_token_expires_at;
     if (expiresAt && new Date(expiresAt) < new Date()) {
       return new Response(pageShell("Waiver link expired", `<div class="card"><div class="content"><div class="warn">This waiver link has expired. The signing window closes when the trip ends. Please contact the operator to request a new link if needed.</div></div></div>`), {
         status: 410,
@@ -340,12 +340,12 @@ Deno.serve(async (req) => {
 
     // If already signed, return a confirmation-only page without PII
     if (bookingRes.data.waiver_status === "SIGNED") {
-      var signedBusiness = await supabase
+      const signedBusiness = await supabase
         .from("businesses")
         .select("id, name, timezone")
         .eq("id", bookingRes.data.business_id)
         .maybeSingle();
-      var safeData = {
+      const safeData = {
         id: bookingRes.data.id,
         customer_name: bookingRes.data.customer_name,
         qty: bookingRes.data.qty,
@@ -363,19 +363,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    var businessRes = await supabase
+    const businessRes = await supabase
       .from("businesses")
       .select("id, name, timezone")
       .eq("id", bookingRes.data.business_id)
       .maybeSingle();
 
     if (req.method === "POST") {
-      var signerName = String(form?.get("signer_name") || "").trim();
-      var acceptRisk = String(form?.get("accept_risk") || "") === "yes";
-      var guardianConsent = String(form?.get("guardian_consent") || "") === "yes";
-      var notes = String(form?.get("notes") || "").trim();
-      var idNumber = String(form?.get("id_number") || "").trim();
-      var dateOfBirth = String(form?.get("date_of_birth") || "").trim();
+      const signerName = String(form?.get("signer_name") || "").trim();
+      const acceptRisk = String(form?.get("accept_risk") || "") === "yes";
+      const guardianConsent = String(form?.get("guardian_consent") || "") === "yes";
+      const notes = String(form?.get("notes") || "").trim();
+      const idNumber = String(form?.get("id_number") || "").trim();
+      const dateOfBirth = String(form?.get("date_of_birth") || "").trim();
 
       if (!signerName || !acceptRisk || !guardianConsent) {
         return new Response(waiverPage(bookingRes.data, businessRes.data, "Please complete all required waiver confirmations."), {
@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      var payload = {
+      const payload = {
         notes: notes || null,
         id_number: idNumber || null,
         date_of_birth: dateOfBirth || null,
@@ -405,16 +405,16 @@ Deno.serve(async (req) => {
 
       // Upsert DOB into marketing_contacts for birthday promotions
       if (dateOfBirth) {
-        var booking = bookingRes.data;
+        const booking = bookingRes.data;
         // Find the contact by email from the booking
-        var { data: bookingFull } = await supabase
+        const { data: bookingFull } = await supabase
           .from("bookings")
           .select("email, customer_name, business_id")
           .eq("id", bookingId)
           .maybeSingle();
         if (bookingFull?.email) {
           // Update existing contact's DOB, or create one tagged as "waiver"
-          var { data: existing } = await supabase
+          const { data: existing } = await supabase
             .from("marketing_contacts")
             .select("id, date_of_birth")
             .eq("business_id", bookingFull.business_id)
@@ -430,7 +430,7 @@ Deno.serve(async (req) => {
             }
           } else {
             // Create a new marketing contact from the waiver signer
-            var nameParts = (bookingFull.customer_name || signerName || "").split(" ");
+            const nameParts = (bookingFull.customer_name || signerName || "").split(" ");
             await supabase.from("marketing_contacts").insert({
               business_id: bookingFull.business_id,
               email: bookingFull.email.toLowerCase(),
@@ -445,7 +445,7 @@ Deno.serve(async (req) => {
       }
 
       // Return confirmation without PII
-      var signedData = {
+      const signedData = {
         id: bookingRes.data.id,
         customer_name: bookingRes.data.customer_name,
         qty: bookingRes.data.qty,

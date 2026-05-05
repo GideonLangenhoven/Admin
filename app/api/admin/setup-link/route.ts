@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   // -------- send: generate token, store hash, email setup link --------
   if (action === "send") {
-    var caller = await getCallerAdmin(req);
+    const caller = await getCallerAdmin(req);
     if (!caller || !isPrivilegedRole(caller.role)) {
       return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required to send setup links" }, { status: 403 });
     }

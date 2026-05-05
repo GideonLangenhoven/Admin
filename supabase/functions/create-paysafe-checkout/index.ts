@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessCredentials } from "../_shared/tenant.ts";
 
-var supabase = createServiceClient();
+const supabase = createServiceClient();
 
 function buildCors(origin?: string | null) {
   return {
@@ -19,14 +19,14 @@ function jsonRes(data: any, status: number, cors: Record<string, string>) {
 }
 
 async function handleCreate(body: any, cors: Record<string, string>) {
-  var { combo_offer_id, slot_a_id, slot_b_id, qty, customer_name, customer_email, customer_phone, promo_code } = body;
+  const { combo_offer_id, slot_a_id, slot_b_id, qty, customer_name, customer_email, customer_phone, promo_code } = body;
   if (!combo_offer_id || !slot_a_id || !slot_b_id || !qty) {
     return jsonRes({ error: "combo_offer_id, slot_a_id, slot_b_id, and qty are required" }, 400, cors);
   }
   qty = Number(qty);
 
   // Load combo offer and validate
-  var { data: offer, error: offerErr } = await supabase
+  const { data: offer, error: offerErr } = await supabase
     .from("combo_offers")
     .select("*")
     .eq("id", combo_offer_id)
@@ -37,31 +37,31 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
 
   // Verify both slots have capacity
-  var { data: slotA } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_a_id).single();
-  var { data: slotB } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_b_id).single();
+  const { data: slotA } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_a_id).single();
+  const { data: slotB } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_b_id).single();
   if (!slotA || !slotB) {
     return jsonRes({ error: "One or both slots not found" }, 404, cors);
   }
-  var availA = (slotA.capacity_total || 0) - (slotA.booked || 0) - (slotA.held || 0);
-  var availB = (slotB.capacity_total || 0) - (slotB.booked || 0) - (slotB.held || 0);
+  const availA = (slotA.capacity_total || 0) - (slotA.booked || 0) - (slotA.held || 0);
+  const availB = (slotB.capacity_total || 0) - (slotB.booked || 0) - (slotB.held || 0);
   if (availA < qty) return jsonRes({ error: "Slot A does not have enough capacity (available: " + availA + ")" }, 400, cors);
   if (availB < qty) return jsonRes({ error: "Slot B does not have enough capacity (available: " + availB + ")" }, 400, cors);
 
   // Validate and apply promo code if provided
-  var promoDiscount = 0;
-  var promoId: string | null = null;
-  var appliedPromoCode = "";
-  var comboTotal = Number(offer.combo_price) * qty;
+  let promoDiscount = 0;
+  let promoId: string | null = null;
+  let appliedPromoCode = "";
+  let comboTotal = Number(offer.combo_price) * qty;
 
   if (promo_code) {
-    var promoResult = await supabase.rpc("validate_promo_code", {
+    const promoResult = await supabase.rpc("validate_promo_code", {
       p_business_id: offer.business_a_id,
       p_code: promo_code,
       p_order_amount: comboTotal,
       p_customer_email: customer_email || null,
     });
     if (promoResult.data?.valid) {
-      var promo = promoResult.data;
+      const promo = promoResult.data;
       promoId = promo.promo_id;
       appliedPromoCode = promo.code;
       if (promo.discount_type === "PERCENT") {
@@ -78,8 +78,8 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
 
   // Calculate totals based on split type
-  var splitA: number;
-  var splitB: number;
+  let splitA: number;
+  let splitB: number;
   if (offer.split_type === "PERCENT") {
     splitA = Number(offer.split_a_percent) / 100 * comboTotal;
     splitB = comboTotal - splitA;
@@ -93,7 +93,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   splitB = Math.round(splitB * 100) / 100;
 
   // Create booking A (business_a)
-  var { data: bookingA, error: bookAErr } = await supabase.from("bookings").insert({
+  const { data: bookingA, error: bookAErr } = await supabase.from("bookings").insert({
     business_id: offer.business_a_id,
     tour_id: offer.tour_a_id,
     slot_id: slot_a_id,
@@ -114,7 +114,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
 
   // Create booking B (business_b)
-  var { data: bookingB, error: bookBErr } = await supabase.from("bookings").insert({
+  const { data: bookingB, error: bookBErr } = await supabase.from("bookings").insert({
     business_id: offer.business_b_id,
     tour_id: offer.tour_b_id,
     slot_id: slot_b_id,
@@ -136,7 +136,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
 
   // Create combo_bookings record
-  var { data: comboBooking, error: comboErr } = await supabase.from("combo_bookings").insert({
+  const { data: comboBooking, error: comboErr } = await supabase.from("combo_bookings").insert({
     combo_offer_id: offer.id,
     booking_a_id: bookingA.id,
     booking_b_id: bookingB.id,
@@ -164,7 +164,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   await supabase.from("slots").update({ held: (slotB.held || 0) + qty }).eq("id", slot_b_id);
 
   // Load Paysafe account ID (public key for SDK) from business_a
-  var { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, currency").eq("id", offer.business_a_id).single();
+  const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, currency").eq("id", offer.business_a_id).single();
 
   await supabase.from("logs").insert({
     business_id: offer.business_a_id,
@@ -192,13 +192,13 @@ async function handleCreate(body: any, cors: Record<string, string>) {
 }
 
 async function handleProcess(body: any, cors: Record<string, string>) {
-  var { combo_booking_id, paymentHandleToken } = body;
+  const { combo_booking_id, paymentHandleToken } = body;
   if (!combo_booking_id || !paymentHandleToken) {
     return jsonRes({ error: "combo_booking_id and paymentHandleToken are required" }, 400, cors);
   }
 
   // Load combo booking
-  var { data: combo, error: comboErr } = await supabase
+  const { data: combo, error: comboErr } = await supabase
     .from("combo_bookings")
     .select("*, combo_offers(*)")
     .eq("id", combo_booking_id)
@@ -210,25 +210,25 @@ async function handleProcess(body: any, cors: Record<string, string>) {
     return jsonRes({ error: "Payment already processed" }, 400, cors);
   }
 
-  var offer = combo.combo_offers;
+  const offer = combo.combo_offers;
 
   // Load Paysafe credentials for business_a (primary)
-  var credsA = await getBusinessCredentials(supabase, offer.business_a_id);
-  var { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, paysafe_linked_account_id").eq("id", offer.business_a_id).single();
-  var { data: bizB } = await supabase.from("businesses").select("paysafe_linked_account_id").eq("id", offer.business_b_id).single();
+  const credsA = await getBusinessCredentials(supabase, offer.business_a_id);
+  const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, paysafe_linked_account_id").eq("id", offer.business_a_id).single();
+  const { data: bizB } = await supabase.from("businesses").select("paysafe_linked_account_id").eq("id", offer.business_b_id).single();
 
   if (!credsA.paysafeApiKey || !credsA.paysafeApiSecret) {
     return jsonRes({ error: "Paysafe credentials not configured for primary business" }, 503, cors);
   }
 
-  var totalCents = Math.round(Number(combo.combo_total) * 100);
-  var splitACents = Math.round(Number(combo.split_a_amount) * 100);
+  const totalCents = Math.round(Number(combo.combo_total) * 100);
+  const splitACents = Math.round(Number(combo.split_a_amount) * 100);
   // Derive splitB from total to guarantee splitA + splitB === totalCents (avoids rounding mismatch)
-  var splitBCents = totalCents - splitACents;
+  const splitBCents = totalCents - splitACents;
 
   // Build Paysafe payment request
-  var authHeader = "Basic " + btoa(credsA.paysafeApiKey + ":" + credsA.paysafeApiSecret);
-  var paysafeBody: any = {
+  const authHeader = "Basic " + btoa(credsA.paysafeApiKey + ":" + credsA.paysafeApiSecret);
+  const paysafeBody: any = {
     merchantRefNum: combo_booking_id,
     amount: totalCents,
     currencyCode: offer.currency || "ZAR",
@@ -241,7 +241,7 @@ async function handleProcess(body: any, cors: Record<string, string>) {
 
   console.log("PAYSAFE_PAYMENT_REQUEST: combo=" + combo_booking_id + " amount=" + totalCents);
 
-  var paysafeRes = await fetch("https://api.paysafe.com/paymenthub/v1/payments", {
+  const paysafeRes = await fetch("https://api.paysafe.com/paymenthub/v1/payments", {
     method: "POST",
     headers: {
       Authorization: authHeader,
@@ -250,11 +250,11 @@ async function handleProcess(body: any, cors: Record<string, string>) {
     body: JSON.stringify(paysafeBody),
   });
 
-  var paysafeData = await paysafeRes.json();
+  const paysafeData = await paysafeRes.json();
   console.log("PAYSAFE_PAYMENT_RESPONSE: " + JSON.stringify(paysafeData).substring(0, 500));
 
   if (!paysafeRes.ok || paysafeData.status === "FAILED") {
-    var errMsg = paysafeData?.error?.message || paysafeData?.message || "Paysafe payment failed";
+    const errMsg = paysafeData?.error?.message || paysafeData?.message || "Paysafe payment failed";
     await supabase.from("combo_bookings").update({ payment_status: "FAILED" }).eq("id", combo_booking_id);
     await supabase.from("logs").insert({
       business_id: offer.business_a_id,
@@ -265,7 +265,7 @@ async function handleProcess(body: any, cors: Record<string, string>) {
   }
 
   // Payment succeeded — update combo booking
-  var paymentId = paysafeData.id || paysafeData.paymentId || "";
+  const paymentId = paysafeData.id || paysafeData.paymentId || "";
   await supabase.from("combo_bookings").update({
     paysafe_payment_id: paymentId,
     paysafe_payment_handle: paymentHandleToken,
@@ -291,9 +291,9 @@ Deno.serve(async (req: any) => {
   }
 
   try {
-    var body = await req.json();
-    var cors = buildCors(req?.headers?.get("origin") || "*");
-    var action = body.action || "create";
+    const body = await req.json();
+    const cors = buildCors(req?.headers?.get("origin") || "*");
+    const action = body.action || "create";
 
     if (action === "process") {
       return await handleProcess(body, cors);

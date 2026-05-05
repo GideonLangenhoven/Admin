@@ -5,11 +5,11 @@ import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 
-var PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
-var MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
-var SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
-var MAX_ATTEMPTS = 5;
-var LOCKOUT_DURATION = 30 * 60 * 1000;
+const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
+const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
+const SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 30 * 60 * 1000;
 
 interface OperatorOption {
   id: string;
@@ -21,26 +21,26 @@ interface OperatorOption {
 }
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  var pathname = usePathname();
-  var [authed, setAuthed] = useState(false);
-  var [email, setEmail] = useState("");
-  var [pass, setPass] = useState("");
-  var [error, setError] = useState("");
-  var [loading, setLoading] = useState(false);
-  var [checking, setChecking] = useState(true);
-  var [locked, setLocked] = useState(false);
-  var [resetSent, setResetSent] = useState(false);
+  const pathname = usePathname();
+  const [authed, setAuthed] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [locked, setLocked] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   // Business context from login/session
-  var [businessId, setBusinessId] = useState("");
-  var [businessName, setBusinessName] = useState("");
-  var [logoUrl, setLogoUrl] = useState("");
-  var [timezone, setTimezone] = useState("UTC");
-  var [role, setRole] = useState("");
-  var [operators, setOperators] = useState<OperatorOption[]>([]);
-  var [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
-  var [yocoTestMode, setYocoTestMode] = useState(false);
-  var [notice, setNotice] = useState("");
+  const [businessId, setBusinessId] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
+  const [role, setRole] = useState("");
+  const [operators, setOperators] = useState<OperatorOption[]>([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
+  const [yocoTestMode, setYocoTestMode] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     validateSession();
@@ -48,7 +48,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   function checkLockout() {
-    var lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
+    const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
     if (lockUntil > Date.now()) {
       setLocked(true);
     } else if (lockUntil > 0) {
@@ -58,20 +58,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function loadBusinessContext(adminRole: string, defaultBusinessId: string) {
-    var isMultiOperator = /super/i.test(adminRole);
-    var overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
-    var targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
+    const isMultiOperator = /super/i.test(adminRole);
+    const overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
+    const targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
-    var baseQuery = supabase
+    const baseQuery = supabase
       .from("businesses")
       .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode")
       .order("business_name", { ascending: true });
 
-    var businessesRes = isMultiOperator
+    const businessesRes = isMultiOperator
       ? await baseQuery
       : await baseQuery.eq("id", defaultBusinessId);
 
-    var businessRows = (businessesRes.data || []) as Array<{
+    const businessRows = (businessesRes.data || []) as Array<{
       id: string;
       name: string | null;
       business_name: string | null;
@@ -79,7 +79,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       timezone: string | null;
     }>;
 
-    var operatorOptions = businessRows.map((biz) => ({
+    const operatorOptions = businessRows.map((biz) => ({
       id: biz.id,
       name: biz.business_name || biz.name || "Operator",
       logoUrl: biz.logo_url || "",
@@ -88,7 +88,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       yocoTestMode: (biz as any).yoco_test_mode === true,
     }));
 
-    var activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
+    const activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
 
     return {
       businessId: activeOperator?.id || defaultBusinessId,
@@ -102,8 +102,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function validateSession() {
-    var savedEmail = localStorage.getItem("ck_admin_email");
-    var savedTime = localStorage.getItem("ck_admin_time");
+    const savedEmail = localStorage.getItem("ck_admin_email");
+    const savedTime = localStorage.getItem("ck_admin_time");
 
     if (!savedEmail || !savedTime || Date.now() - Number(savedTime) > SESSION_TIMEOUT) {
       await clearSession();
@@ -112,21 +112,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     // Confirm we still have a Supabase Auth session (set during login or auto-restored from storage).
-    var { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData?.session) {
       await clearSession();
       setChecking(false);
       return;
     }
 
-    var { data } = await supabase
+    const { data } = await supabase
       .from("admin_users")
       .select("role, business_id, name, settings_permissions")
       .eq("email", savedEmail)
       .maybeSingle();
 
     if (data && data.business_id) {
-      var context = await loadBusinessContext(data.role, data.business_id);
+      const context = await loadBusinessContext(data.role, data.business_id);
       setRole(data.role);
       setBusinessId(context.businessId);
       setBusinessName(context.businessName);
@@ -179,7 +179,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function login() {
-    var lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
+    const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
     if (lockUntil > Date.now()) {
       setLocked(true);
       setError("");
@@ -191,13 +191,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setNotice("");
 
     try {
-      var normalizedEmail = email.trim().toLowerCase();
-      var res = await fetch("/api/admin/login", {
+      const normalizedEmail = email.trim().toLowerCase();
+      const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail, password: pass }),
       });
-      var data: any = await res.json().catch(() => ({}));
+      const data: any = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         // Special: account exists but needs password setup
@@ -218,7 +218,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         }
 
         // Failed credentials — increment counter
-        var failCount = Number(localStorage.getItem("ck_fail_count") || "0") + 1;
+        const failCount = Number(localStorage.getItem("ck_fail_count") || "0") + 1;
         localStorage.setItem("ck_fail_count", String(failCount));
 
         if (failCount >= MAX_ATTEMPTS) {
@@ -232,8 +232,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      var session = data?.session;
-      var adminInfo = data?.admin;
+      const session = data?.session;
+      const adminInfo = data?.admin;
       if (!session?.access_token || !adminInfo) {
         setError("Login response was malformed");
         setLoading(false);
@@ -241,7 +241,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       // Set Supabase Auth session — every subsequent supabase-js call now goes as the authenticated user.
-      var setRes = await supabase.auth.setSession({
+      const setRes = await supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
       });
@@ -263,7 +263,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setRole(adminInfo.role);
 
       if (adminInfo.business_id) {
-        var context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
+        const context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
         localStorage.setItem("ck_admin_business_id", context.businessId);
         localStorage.setItem("ck_admin_timezone", context.timezone);
         setBusinessId(context.businessId);
@@ -285,7 +285,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function sendResetEmail(targetEmail: string) {
-    var { data: admin } = await supabase
+    const { data: admin } = await supabase
       .from("admin_users")
       .select("id, email, name")
       .eq("email", targetEmail)
@@ -304,7 +304,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
     localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
     localStorage.setItem("ck_admin_business_id", nextBusinessId);
-    var nextOperator = operators.find((operator) => operator.id === nextBusinessId);
+    const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
     setBusinessId(nextOperator.id);
     setBusinessName(nextOperator.name);

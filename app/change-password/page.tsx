@@ -10,24 +10,24 @@ import {
 } from "../lib/admin-auth";
 
 function ChangePasswordForm() {
-  var searchParams = useSearchParams();
-  var mode = searchParams.get("mode");
-  var token = searchParams.get("token") || "";
-  var setupEmailParam = searchParams.get("email") || "";
-  var setupMode = useMemo(() => mode === "setup" && !!token && !!setupEmailParam, [mode, token, setupEmailParam]);
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode");
+  const token = searchParams.get("token") || "";
+  const setupEmailParam = searchParams.get("email") || "";
+  const setupMode = useMemo(() => mode === "setup" && !!token && !!setupEmailParam, [mode, token, setupEmailParam]);
 
-  var [email, setEmail] = useState(setupEmailParam);
-  var [currentPass, setCurrentPass] = useState("");
-  var [newPass, setNewPass] = useState("");
-  var [confirmPass, setConfirmPass] = useState("");
-  var [loading, setLoading] = useState(false);
-  var [error, setError] = useState("");
-  var [success, setSuccess] = useState(false);
-  var [resetSent, setResetSent] = useState(false);
-  var [tokenChecking, setTokenChecking] = useState(setupMode);
-  var [tokenValid, setTokenValid] = useState(false);
-  var [setupName, setSetupName] = useState("");
-  var [resetEmail, setResetEmail] = useState(setupEmailParam);
+  const [email, setEmail] = useState(setupEmailParam);
+  const [currentPass, setCurrentPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [tokenChecking, setTokenChecking] = useState(setupMode);
+  const [tokenValid, setTokenValid] = useState(false);
+  const [setupName, setSetupName] = useState("");
+  const [resetEmail, setResetEmail] = useState(setupEmailParam);
 
   useEffect(() => {
     setEmail(setupEmailParam);
@@ -45,7 +45,7 @@ function ChangePasswordForm() {
       setTokenChecking(true);
       setError("");
       try {
-        var admin = await validateAdminSetupToken(setupEmailParam, token);
+        const admin = await validateAdminSetupToken(setupEmailParam, token);
         if (!admin) {
           setTokenValid(false);
           setError("This password setup link is invalid or has expired.");
@@ -67,7 +67,7 @@ function ChangePasswordForm() {
   }, [setupEmailParam, setupMode, token]);
 
   async function requestResetLink(targetEmail: string) {
-    var normalizedEmail = targetEmail.trim().toLowerCase();
+    const normalizedEmail = targetEmail.trim().toLowerCase();
     if (!normalizedEmail) {
       setError("Enter an email address first.");
       return;
@@ -77,12 +77,12 @@ function ChangePasswordForm() {
     setError("");
 
     try {
-      var res = await fetch("/api/admin/setup-link", {
+      const res = await fetch("/api/admin/setup-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "send", email: normalizedEmail, reason: "RESET" }),
       });
-      var data: any = await res.json().catch(() => ({}));
+      const data: any = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error || "Failed to send the reset link.");
       } else {
@@ -134,8 +134,8 @@ function ChangePasswordForm() {
 
     setLoading(true);
 
-    var currentHash = await sha256(currentPass);
-    var { data: user } = await supabase
+    const currentHash = await sha256(currentPass);
+    const { data: user } = await supabase
       .from("admin_users")
       .select("id")
       .eq("email", email.trim().toLowerCase())
@@ -147,8 +147,8 @@ function ChangePasswordForm() {
       return setError("Incorrect email or current password.");
     }
 
-    var newHash = await sha256(newPass);
-    var { error: updateErr } = await supabase
+    const newHash = await sha256(newPass);
+    const { error: updateErr } = await supabase
       .from("admin_users")
       .update({
         password_hash: newHash,

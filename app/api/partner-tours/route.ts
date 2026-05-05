@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
 
 function serviceClient() {
-    var url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     return createClient(url, key);
 }
 
@@ -12,16 +12,16 @@ function serviceClient() {
 // Returns active tours for the partner business, after verifying an active partnership exists.
 export async function GET(req: NextRequest) {
     if (!isComboEnabledServer()) return comboDisabledResponse();
-    var businessId = req.nextUrl.searchParams.get("business_id");
-    var partnerId = req.nextUrl.searchParams.get("partner_id");
+    const businessId = req.nextUrl.searchParams.get("business_id");
+    const partnerId = req.nextUrl.searchParams.get("partner_id");
 
     if (!businessId) return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
     if (!partnerId) return NextResponse.json({ error: "partner_id query param is required" }, { status: 400 });
 
-    var supabase = serviceClient();
+    const supabase = serviceClient();
 
     // Verify active partnership exists between these two businesses
-    var { data: partnership, error: pErr } = await supabase
+    const { data: partnership, error: pErr } = await supabase
         .from("business_partnerships")
         .select("id")
         .or(`and(business_a_id.eq.${businessId},business_b_id.eq.${partnerId}),and(business_a_id.eq.${partnerId},business_b_id.eq.${businessId})`)
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get partner's active tours
-    var { data: tours, error: tErr } = await supabase
+    const { data: tours, error: tErr } = await supabase
         .from("tours")
         .select("id, name, base_price_per_person, peak_price_per_person, duration_minutes")
         .eq("business_id", partnerId)

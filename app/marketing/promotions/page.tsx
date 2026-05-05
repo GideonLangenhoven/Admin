@@ -21,23 +21,23 @@ interface Promotion {
 }
 
 export default function PromotionsPage() {
-  var { businessId } = useBusinessContext();
-  var [promos, setPromos] = useState<Promotion[]>([]);
-  var [loading, setLoading] = useState(true);
-  var [showForm, setShowForm] = useState(false);
-  var [saving, setSaving] = useState(false);
+  const { businessId } = useBusinessContext();
+  const [promos, setPromos] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Form state
-  var [code, setCode] = useState("");
-  var [description, setDescription] = useState("");
-  var [discountType, setDiscountType] = useState<"FLAT" | "PERCENT">("PERCENT");
-  var [discountValue, setDiscountValue] = useState<number>(10);
-  var [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
-  var [validUntil, setValidUntil] = useState("");
-  var [maxUses, setMaxUses] = useState<string>("");
-  var [minOrderAmount, setMinOrderAmount] = useState<number>(0);
-  var [active, setActive] = useState(true);
-  var [editId, setEditId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [discountType, setDiscountType] = useState<"FLAT" | "PERCENT">("PERCENT");
+  const [discountValue, setDiscountValue] = useState<number>(10);
+  const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [validUntil, setValidUntil] = useState("");
+  const [maxUses, setMaxUses] = useState<string>("");
+  const [minOrderAmount, setMinOrderAmount] = useState<number>(0);
+  const [active, setActive] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
 
   useEffect(() => {
     if (businessId) loadPromos();
@@ -45,7 +45,7 @@ export default function PromotionsPage() {
 
   async function loadPromos() {
     setLoading(true);
-    var { data } = await supabase
+    const { data } = await supabase
       .from("promotions")
       .select("*")
       .eq("business_id", businessId)
@@ -68,9 +68,9 @@ export default function PromotionsPage() {
   }
 
   function generateCode() {
-    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    var result = "";
-    for (var i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
     setCode(result);
   }
 
@@ -94,7 +94,7 @@ export default function PromotionsPage() {
     if (discountType === "PERCENT" && discountValue > 100) { notify({ message: "Percentage cannot exceed 100.", tone: "error" }); return; }
 
     setSaving(true);
-    var row = {
+    const row = {
       business_id: businessId,
       code: code.toUpperCase().trim(),
       description,
@@ -108,11 +108,11 @@ export default function PromotionsPage() {
     };
 
     if (editId) {
-      var { error } = await supabase.from("promotions").update(row).eq("id", editId);
+      const { error } = await supabase.from("promotions").update(row).eq("id", editId);
       if (error) { notify({ message: error.message, tone: "error" }); setSaving(false); return; }
       notify({ message: "Promo updated.", tone: "success" });
     } else {
-      var { error: insertErr } = await supabase.from("promotions").insert(row);
+      const { error: insertErr } = await supabase.from("promotions").insert(row);
       if (insertErr) {
         if (insertErr.message.includes("duplicate")) notify({ message: "Code already exists.", tone: "error" });
         else notify({ message: insertErr.message, tone: "error" });
@@ -322,8 +322,8 @@ export default function PromotionsPage() {
               </thead>
               <tbody>
                 {promos.map(p => {
-                  var isExpired = p.valid_until && new Date(p.valid_until) < new Date();
-                  var isExhausted = p.max_uses != null && p.used_count >= p.max_uses;
+                  const isExpired = p.valid_until && new Date(p.valid_until) < new Date();
+                  const isExhausted = p.max_uses != null && p.used_count >= p.max_uses;
                   return (
                     <tr key={p.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
                       <td className="px-4 py-3">

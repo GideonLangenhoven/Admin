@@ -4,33 +4,33 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 function getCors(req?: any) {
-  var origins = getAdminAppOrigins();
-  var origin = req?.headers?.get("origin") || "";
-  var allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
+  const origins = getAdminAppOrigins();
+  const origin = req?.headers?.get("origin") || "";
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
   try {
-    var body = await req.json();
-    var to = body.to;
-    var message = body.message;
-    var businessId = String(body.business_id || "");
-    var bookingId = String(body.booking_id || "");
+    const body = await req.json();
+    const to = body.to;
+    const message = body.message;
+    let businessId = String(body.business_id || "");
+    const bookingId = String(body.booking_id || "");
     if (!to || !message) return new Response(JSON.stringify({ error: "Missing to or message" }), { status: 400, headers: getCors(req) });
 
-    var supabase = createServiceClient();
+    const supabase = createServiceClient();
 
     if (!businessId && bookingId) {
-      var bookingRes = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
+      const bookingRes = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
       businessId = String(bookingRes.data?.business_id || "");
     }
     if (!businessId) return new Response(JSON.stringify({ error: "business_id or booking_id is required" }), { status: 400, headers: getCors(req) });
 
-    var tenant = await getTenantByBusinessId(supabase, businessId);
+    const tenant = await getTenantByBusinessId(supabase, businessId);
     // Support template fallback for outbound messages outside the 24h window
-    var templateFallback = body.template_fallback
+    const templateFallback = body.template_fallback
       ? { name: body.template_fallback.name, params: body.template_fallback.params || [], language: body.template_fallback.language }
       : undefined;
     await sendWhatsappTextForTenant(tenant, to, message, templateFallback);

@@ -4,10 +4,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
-var SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-var SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-var PAYSAFE_WEBHOOK_SECRET = Deno.env.get("PAYSAFE_WEBHOOK_SECRET") || "";
-var supabase = createServiceClient();
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const PAYSAFE_WEBHOOK_SECRET = Deno.env.get("PAYSAFE_WEBHOOK_SECRET") || "";
+const supabase = createServiceClient();
 
 /* ───── Paysafe webhook signature verification ───── */
 async function verifyPaysafeSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
@@ -16,21 +16,21 @@ async function verifyPaysafeSignature(rawBody: string, signatureHeader: string |
     return false;
   }
   if (!signatureHeader) return false;
-  var key = new TextEncoder().encode(PAYSAFE_WEBHOOK_SECRET);
-  var data = new TextEncoder().encode(rawBody);
-  var cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  var sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
-  var expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const key = new TextEncoder().encode(PAYSAFE_WEBHOOK_SECRET);
+  const data = new TextEncoder().encode(rawBody);
+  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
+  const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
   // Constant-time comparison
-  var receivedHex = signatureHeader.toLowerCase();
+  const receivedHex = signatureHeader.toLowerCase();
   if (receivedHex.length !== expectedHex.length) return false;
-  var mismatch = 0;
-  for (var i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  const mismatch = 0;
+  for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
 
 async function createComboInvoice(booking: any, tourName: string, slotTime: string, paymentRef: string, paymentMethod: string) {
-  var existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
+  const existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
   if (existing.data) {
     if (existing.data.payment_reference !== paymentRef) {
       await supabase.from("invoices").update({ payment_method: paymentMethod, payment_reference: paymentRef }).eq("id", existing.data.id);
@@ -38,14 +38,14 @@ async function createComboInvoice(booking: any, tourName: string, slotTime: stri
     return existing.data;
   }
 
-  var invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
+  const invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
   if (invNumR.error) {
     console.warn("next_invoice_number RPC failed (using fallback):", invNumR.error.message);
   }
-  var invNum = invNumR.data || ("INV-" + Date.now());
-  var subtotal = Number(booking.total_amount);
+  const invNum = invNumR.data || ("INV-" + Date.now());
+  const subtotal = Number(booking.total_amount);
 
-  var inv = await supabase.from("invoices").insert({
+  const inv = await supabase.from("invoices").insert({
     business_id: booking.business_id,
     booking_id: booking.id,
     invoice_number: invNum,
@@ -72,22 +72,22 @@ async function createComboInvoice(booking: any, tourName: string, slotTime: stri
 }
 
 async function sendComboConfirmation(booking: any, comboBookingId: string, paymentId: string) {
-  var tenant: any = null;
+  let tenant: any = null;
   try {
     tenant = await getTenantByBusinessId(supabase, booking.business_id);
   } catch (tenantErr) {
     console.error("COMBO_CONFIRM_TENANT_ERR:", tenantErr);
   }
 
-  var ref = booking.id.substring(0, 8).toUpperCase();
-  var tourName = booking.tours?.name || "Booking";
-  var slotTime = booking.slots?.start_time
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = booking.tours?.name || "Booking";
+  const slotTime = booking.slots?.start_time
     ? (tenant ? formatTenantDateTime(tenant.business, booking.slots.start_time) : new Date(booking.slots.start_time).toLocaleString())
     : "See email";
-  var brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
-  var currency = tenant?.business?.currency || "ZAR";
+  const brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
+  const currency = tenant?.business?.currency || "ZAR";
 
-  var invoice: any = null;
+  let invoice: any = null;
   try {
     invoice = await createComboInvoice(booking, tourName, slotTime, paymentId, "Paysafe (Combo)");
   } catch (invErr) {
@@ -149,15 +149,15 @@ async function sendComboConfirmation(booking: any, comboBookingId: string, payme
 
 async function handlePaymentCompleted(paymentId: string, merchantRefNum: string) {
   // Idempotency check
-  var idempotencyKey = "paysafe_payment:" + paymentId;
-  var idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
+  const idempotencyKey = "paysafe_payment:" + paymentId;
+  const idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
   if (idempInsert.error && idempInsert.error.code === "23505") {
     console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
     return;
   }
 
   // Look up combo_booking by paysafe_payment_id or merchantRefNum (which is combo_booking_id)
-  var { data: combo } = await supabase
+  const { data: combo } = await supabase
     .from("combo_bookings")
     .select("*, combo_offers(*)")
     .or("paysafe_payment_id.eq." + paymentId + ",id.eq." + merchantRefNum)
@@ -184,7 +184,7 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
   // booking_a_id/booking_b_id for older 2-party combos), confirms every leg
   // in a single transaction, and flips the combo_bookings parent row. Any
   // error rolls back the entire combo — no more "A confirmed, B orphaned".
-  var confirmRes = await supabase.rpc("confirm_combo_payment_atomic", {
+  const confirmRes = await supabase.rpc("confirm_combo_payment_atomic", {
     p_combo_booking_id: combo.id,
     p_paysafe_payment_id: "PAYSAFE_" + paymentId,
     p_payment_method: "PAYSAFE_COMBO",
@@ -201,15 +201,15 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
 
   // Load the confirmed bookings so we can send confirmations — supports N-party
   // via combo_booking_items, with legacy booking_a_id/booking_b_id as fallback.
-  var bookingsToNotify: any[] = [];
-  var confirmPath = (confirmRes.data && (confirmRes.data as any).path) || "legacy";
+  const bookingsToNotify: any[] = [];
+  const confirmPath = (confirmRes.data && (confirmRes.data as any).path) || "legacy";
   if (confirmPath === "items") {
-    var { data: items } = await supabase
+    const { data: items } = await supabase
       .from("combo_booking_items")
       .select("booking_id")
       .eq("combo_booking_id", combo.id);
-    for (var it of (items || [])) {
-      var { data: bk } = await supabase
+    for (const it of (items || [])) {
+      const { data: bk } = await supabase
         .from("bookings")
         .select("*, slots(start_time, booked, held), tours(name)")
         .eq("id", (it as any).booking_id)
@@ -218,7 +218,7 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
     }
   } else {
     if (combo.booking_a_id) {
-      var { data: bA } = await supabase
+      const { data: bA } = await supabase
         .from("bookings")
         .select("*, slots(start_time, booked, held), tours(name)")
         .eq("id", combo.booking_a_id)
@@ -226,7 +226,7 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
       if (bA) bookingsToNotify.push(bA);
     }
     if (combo.booking_b_id) {
-      var { data: bB } = await supabase
+      const { data: bB } = await supabase
         .from("bookings")
         .select("*, slots(start_time, booked, held), tours(name)")
         .eq("id", combo.booking_b_id)
@@ -248,14 +248,14 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
   }).catch(function (e: any) { console.error("LOG_ERR:", e); });
 
   // Send confirmation emails/WhatsApp for every operator whose leg we just confirmed
-  for (var nb of bookingsToNotify) {
+  for (const nb of bookingsToNotify) {
     await sendComboConfirmation(nb, combo.id, paymentId);
   }
 }
 
 async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
   // Look up combo booking
-  var { data: combo } = await supabase
+  const { data: combo } = await supabase
     .from("combo_bookings")
     .select("*, combo_offers(*)")
     .or("paysafe_payment_id.eq." + paymentId + ",id.eq." + merchantRefNum)
@@ -267,12 +267,12 @@ async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
   }
 
   // Load both bookings
-  var { data: bookingA } = await supabase
+  const { data: bookingA } = await supabase
     .from("bookings")
     .select("*, slots(held)")
     .eq("id", combo.booking_a_id)
     .single();
-  var { data: bookingB } = await supabase
+  const { data: bookingB } = await supabase
     .from("bookings")
     .select("*, slots(held)")
     .eq("id", combo.booking_b_id)
@@ -317,22 +317,22 @@ Deno.serve(withSentry("paysafe-webhook", async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
 
   try {
-    var rawBody = await req.text();
+    const rawBody = await req.text();
 
     // Verify Paysafe webhook signature
-    var sigHeader = req.headers.get("x-paysafe-signature") || req.headers.get("signature");
-    var sigValid = await verifyPaysafeSignature(rawBody, sigHeader);
+    const sigHeader = req.headers.get("x-paysafe-signature") || req.headers.get("signature");
+    const sigValid = await verifyPaysafeSignature(rawBody, sigHeader);
     if (!sigValid) {
       console.error("PAYSAFE_WEBHOOK_SIGNATURE_INVALID: rejected request with bad or missing signature");
       return new Response("Unauthorized", { status: 401 });
     }
 
-    var body = rawBody ? JSON.parse(rawBody) : {};
+    const body = rawBody ? JSON.parse(rawBody) : {};
     console.log("PAYSAFE_WEBHOOK:" + JSON.stringify(body).substring(0, 500));
 
-    var eventType = body.eventType || body.type || "";
-    var paymentId = body.id || body.paymentId || body.data?.id || "";
-    var merchantRefNum = body.merchantRefNum || body.data?.merchantRefNum || "";
+    const eventType = body.eventType || body.type || "";
+    const paymentId = body.id || body.paymentId || body.data?.id || "";
+    const merchantRefNum = body.merchantRefNum || body.data?.merchantRefNum || "";
 
     if (eventType === "PAYMENT_COMPLETED" || eventType === "payment.completed") {
       await handlePaymentCompleted(paymentId, merchantRefNum);

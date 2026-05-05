@@ -5,8 +5,8 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 
-var SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-var SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: getAdminTimezone() });
@@ -18,32 +18,32 @@ function fmtTime(iso: string) {
 type SlotGroup = { date: string; label: string; slots: any[] };
 
 export default function PhotosPage() {
-  var { businessId } = useBusinessContext();
-  var [bookingSiteUrl, setBookingSiteUrl] = useState("");
-  var [slots, setSlots] = useState<SlotGroup[]>([]);
-  var [selectedSlot, setSelectedSlot] = useState<any>(null);
-  var [urls, setUrls] = useState<string[]>([""]);
-  var [sending, setSending] = useState(false);
-  var [result, setResult] = useState<any>(null);
-  var [sentHistory, setSentHistory] = useState<any[]>([]);
-  var [bulkInput, setBulkInput] = useState("");
-  var [sendProgress, setSendProgress] = useState(0);
+  const { businessId } = useBusinessContext();
+  const [bookingSiteUrl, setBookingSiteUrl] = useState("");
+  const [slots, setSlots] = useState<SlotGroup[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [urls, setUrls] = useState<string[]>([""]);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [sentHistory, setSentHistory] = useState<any[]>([]);
+  const [bulkInput, setBulkInput] = useState("");
+  const [sendProgress, setSendProgress] = useState(0);
 
   // Google Drive upload state
-  var [gdriveConnected, setGdriveConnected] = useState(false);
-  var [gdriveEmail, setGdriveEmail] = useState("");
-  var [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  var [uploading, setUploading] = useState(false);
-  var [uploadProgress, setUploadProgress] = useState(0);
-  var [uploadedFolderUrl, setUploadedFolderUrl] = useState("");
-  var [dragOver, setDragOver] = useState(false);
-  var fileInputRef = useRef<HTMLInputElement>(null);
+  const [gdriveConnected, setGdriveConnected] = useState(false);
+  const [gdriveEmail, setGdriveEmail] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedFolderUrl, setUploadedFolderUrl] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadSlots(); loadHistory(); loadBusinessLinks(); checkGdrive(); }, [businessId]);
 
   async function checkGdrive() {
     try {
-      var { data } = await supabase.functions.invoke("google-drive", {
+      const { data } = await supabase.functions.invoke("google-drive", {
         body: { action: "status", business_id: businessId },
       });
       if (data && !data.error) {
@@ -56,12 +56,12 @@ export default function PhotosPage() {
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    var files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    var files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []);
     if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
     e.target.value = "";
   }
@@ -76,11 +76,11 @@ export default function PhotosPage() {
 
     try {
       // Create a trip subfolder
-      var tourName = (selectedSlot as any).tours?.name || "Trip";
-      var tripDate = fmtDate(selectedSlot.start_time);
-      var folderName = tripDate + " — " + tourName;
+      const tourName = (selectedSlot as any).tours?.name || "Trip";
+      const tripDate = fmtDate(selectedSlot.start_time);
+      const folderName = tripDate + " — " + tourName;
 
-      var { data: folderData, error: folderErr } = await supabase.functions.invoke("google-drive", {
+      const { data: folderData, error: folderErr } = await supabase.functions.invoke("google-drive", {
         body: { action: "create_folder", business_id: businessId, folder_name: folderName },
       });
       if (folderErr || folderData?.error) {
@@ -89,11 +89,11 @@ export default function PhotosPage() {
         return;
       }
 
-      var folderId = folderData.folder_id;
-      var folderUrl = folderData.folder_url;
+      const folderId = folderData.folder_id;
+      const folderUrl = folderData.folder_url;
 
       // Get a fresh access token for direct browser-to-Google uploads
-      var { data: tokenData, error: tokenErr } = await supabase.functions.invoke("google-drive", {
+      const { data: tokenData, error: tokenErr } = await supabase.functions.invoke("google-drive", {
         body: { action: "token", business_id: businessId },
       });
       if (tokenErr || tokenData?.error) {
@@ -102,24 +102,24 @@ export default function PhotosPage() {
         return;
       }
 
-      var accessToken = tokenData.access_token;
+      const accessToken = tokenData.access_token;
 
       // Upload each file directly to Google Drive
-      for (var i = 0; i < uploadFiles.length; i++) {
-        var file = uploadFiles[i];
-        var metadata = JSON.stringify({ name: file.name, parents: [folderId] });
-        var form = new FormData();
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        const metadata = JSON.stringify({ name: file.name, parents: [folderId] });
+        const form = new FormData();
         form.append("metadata", new Blob([metadata], { type: "application/json" }));
         form.append("file", file);
 
-        var res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
           method: "POST",
           headers: { Authorization: "Bearer " + accessToken },
           body: form,
         });
 
         if (!res.ok) {
-          var errBody = await res.text();
+          const errBody = await res.text();
           console.error("Drive upload failed for", file.name, errBody);
         }
 
@@ -142,23 +142,23 @@ export default function PhotosPage() {
   }
 
   async function loadBusinessLinks() {
-    var { data } = await supabase.from("businesses").select("booking_site_url").eq("id", businessId).maybeSingle();
+    const { data } = await supabase.from("businesses").select("booking_site_url").eq("id", businessId).maybeSingle();
     setBookingSiteUrl(data?.booking_site_url || "");
   }
 
   async function loadSlots() {
-    var past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    var now = new Date().toISOString();
-    var { data } = await supabase.from("slots")
+    const past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+    const { data } = await supabase.from("slots")
       .select("id, start_time, booked, tours(name)")
       .eq("business_id", businessId)
       .gt("booked", 0)
       .lt("start_time", now)
       .gt("start_time", past)
       .order("start_time", { ascending: false });
-    var groups: Record<string, SlotGroup> = {};
-    for (var s of (data || [])) {
-      var d = new Date(s.start_time).toISOString().split("T")[0];
+    const groups: Record<string, SlotGroup> = {};
+    for (const s of (data || [])) {
+      const d = new Date(s.start_time).toISOString().split("T")[0];
       if (!groups[d]) groups[d] = { date: d, label: fmtDate(s.start_time), slots: [] };
       groups[d].slots.push(s);
     }
@@ -166,7 +166,7 @@ export default function PhotosPage() {
   }
 
   async function loadHistory() {
-    var { data } = await supabase.from("trip_photos")
+    const { data } = await supabase.from("trip_photos")
       .select("id, photo_url, uploaded_at, slots(start_time, tours(name))")
       .eq("business_id", businessId)
       .order("uploaded_at", { ascending: false })
@@ -176,9 +176,9 @@ export default function PhotosPage() {
 
   function addUrl() { setUrls([...urls, ""]); }
   function removeUrl(i: number) { setUrls(urls.filter((_, idx) => idx !== i)); }
-  function updateUrl(i: number, v: string) { var n = [...urls]; n[i] = v; setUrls(n); }
+  function updateUrl(i: number, v: string) { const n = [...urls]; n[i] = v; setUrls(n); }
   function importBulkUrls() {
-    var next = bulkInput
+    const next = bulkInput
       .split(/\r?\n|,/)
       .map((value) => value.trim())
       .filter(Boolean);
@@ -189,7 +189,7 @@ export default function PhotosPage() {
 
   async function sendPhotos() {
     if (!selectedSlot) { notify({ title: "Select a trip", message: "Select a trip slot first.", tone: "warning" }); return; }
-    var validUrls = urls.filter(u => u.trim().length > 0);
+    const validUrls = urls.filter(u => u.trim().length > 0);
     if (validUrls.length === 0) { notify({ title: "No photo links", message: "Add at least one photo URL.", tone: "warning" }); return; }
     if (!await confirmAction({
       title: "Send trip photos",
@@ -202,26 +202,26 @@ export default function PhotosPage() {
     setResult(null);
     setSendProgress(10);
     try {
-      var tourName = (selectedSlot as any).tours?.name || "kayak trip";
-      var photoLink = validUrls.length === 1 ? validUrls[0] : validUrls[0];
+      const tourName = (selectedSlot as any).tours?.name || "kayak trip";
+      const photoLink = validUrls.length === 1 ? validUrls[0] : validUrls[0];
 
       // Fetch bookings for this slot
-      var { data: bookings } = await supabase.from("bookings")
+      const { data: bookings } = await supabase.from("bookings")
         .select("id, customer_name, phone, email, status")
         .eq("business_id", businessId)
         .eq("slot_id", selectedSlot.id)
         .in("status", ["PAID", "CONFIRMED", "COMPLETED"]);
       setSendProgress(35);
 
-      var sent = 0;
-      for (var b of (bookings || [])) {
+      let sent = 0;
+      for (const b of (bookings || [])) {
         // Send WhatsApp photo notification via template (24h compliant).
         // Uses send-whatsapp-text which has built-in template fallback for
         // customers outside the 24h window. The message is kept short and
         // asks the customer to reply YES to receive the photo link,
         // ensuring we open a new 24h window for follow-up.
         if (b.phone) {
-          var waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
+          const waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
             "! 📸 Your trip photos from the " + tourName +
             " are ready! Reply YES to this message to receive the photo link." +
             "\n\nShare with your group once you get it!";
@@ -258,7 +258,7 @@ export default function PhotosPage() {
       }
 
       // Log to trip_photos
-      for (var url of validUrls) {
+      for (const url of validUrls) {
         await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: url, business_id: businessId });
       }
       setSendProgress(100);
@@ -271,7 +271,7 @@ export default function PhotosPage() {
     setSending(false);
   }
 
-  var validUrls = urls.filter(u => u.trim().length > 0);
+  const validUrls = urls.filter(u => u.trim().length > 0);
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -290,7 +290,7 @@ export default function PhotosPage() {
                 <div key={group.date}>
                   <p className="text-xs font-semibold text-gray-400 mb-1">{group.label}</p>
                   {group.slots.map(s => {
-                    var isSelected = selectedSlot?.id === s.id;
+                    const isSelected = selectedSlot?.id === s.id;
                     return (
                       <button key={s.id} onClick={() => setSelectedSlot(s)}
                         className={"w-full text-left flex items-center gap-3 p-3 rounded-lg border mb-1 transition-colors " +
