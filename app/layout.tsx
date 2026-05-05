@@ -34,6 +34,7 @@ const nav = [
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },
   { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
+  { href: "/settings/chat-faq", label: "Chat FAQ", icon: "MessageCircle", privilegedOnly: true },
   { href: "/ota-drift", label: "OTA Drift", icon: "Warning", privilegedOnly: true },
   { href: "/super-admin/data-requests", label: "Data Requests", icon: "Shield", privilegedOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },

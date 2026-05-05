@@ -5,6 +5,7 @@ import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
+import IntentBadge from "../../components/inbox/IntentBadge";
 
 function filterHumanConversation(all: any[]): any[] {
   const firstAdminIdx = all.findIndex(m => m.sender === "Admin");
@@ -183,7 +184,7 @@ function InboxContent() {
   async function loadConvos() {
     // Cap at 200 — anything beyond is paginated history (loaded via the History tab)
     const { data } = await supabase.from("conversations")
-      .select("id, phone, customer_name, email, status, current_state, updated_at")
+      .select("id, phone, customer_name, email, status, current_state, updated_at, current_intent")
       .eq("business_id", businessId)
       .in("status", ["HUMAN", "AGENT_PENDING"])
       .order("updated_at", { ascending: false })
@@ -195,7 +196,7 @@ function InboxContent() {
   async function loadHistoryConvos() {
     setHistoryLoading(true);
     const { data } = await supabase.from("conversations")
-      .select("id, phone, customer_name, email, status, current_state, updated_at")
+      .select("id, phone, customer_name, email, status, current_state, updated_at, current_intent")
       .eq("business_id", businessId)
       .not("status", "in", '("HUMAN", "AGENT_PENDING")')
       .order("updated_at", { ascending: false })
@@ -366,7 +367,10 @@ function InboxContent() {
                 ) : convos.map((c: any) => (
                   <div key={c.id} onClick={() => setSelected(c)}
                     className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
-                    <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                      <IntentBadge intent={c.current_intent} size="xs" />
+                    </div>
                     <p className="text-xs text-gray-500">{c.phone}</p>
                     <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
                   </div>
@@ -455,7 +459,10 @@ function InboxContent() {
                 ) : historyConvos.map((c: any) => (
                   <div key={c.id} onClick={() => { setHistorySelected(c); loadHistoryMessages(c.phone); }}
                     className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${historySelected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
-                    <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                      <IntentBadge intent={c.current_intent} size="xs" />
+                    </div>
                     <p className="text-xs text-gray-500">{c.phone}</p>
                     <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
                   </div>

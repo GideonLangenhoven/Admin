@@ -10,6 +10,7 @@ import {
   hardenSystemPrompt,
   KB_REFUSAL_REPLY,
 } from "../_shared/bot-guards.ts";
+import { classifyIntent, priorityForIntent, findFaqMatch } from "../_shared/intent.ts";
 const GK = Deno.env.get("GEMINI_API_KEY");
 const SU = Deno.env.get("SUPABASE_URL");
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -972,10 +973,71 @@ Deno.serve(withSentry("web-chat", async (req) => {
       else { reply = "Ready to purchase?"; buttons = [{ label: "\u2705 Purchase R" + ns.gtprice, value: "gift_confirm" }, { label: "\u274c Cancel", value: "cancel_booking" }]; }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, paymentUrl: pay }), { status: 200, headers: gCors(req) });
     }
-    // ===== FALLBACK =====
+    // ===== INTENT CLASSIFICATION + FALLBACK =====
+    const businessName = getBusinessDisplayName(requestTenant?.business) || "Tour Business";
+    const classification = await classifyIntent(msg, businessName);
+    const priority = priorityForIntent(classification.intent);
+
+    // Log classification to chat_messages for analytics
+    if (classification.intent !== "OTHER" || classification.confidence > 0) {
+      db.from("chat_messages").insert({
+        business_id: requestedBusinessId,
+        phone: state.phone || body.phone || "web",
+        direction: "IN",
+        body: msg,
+        sender: body.name || "Website visitor",
+        sender_type: "CUSTOMER",
+        intent: classification.intent,
+        intent_confidence: classification.confidence,
+        classification_model: classification.model,
+        classification_ms: classification.ms,
+      }).then(() => {});
+    }
+
+    // Update conversation intent if we have one
+    if (state.convo_id) {
+      db.from("conversations").update({
+        current_intent: classification.intent,
+        priority,
+        last_classified_at: new Date().toISOString(),
+      }).eq("id", state.convo_id).then(() => {});
+    }
+
+    // Auto-reply: MARKETING_OPTOUT
+    if (classification.intent === "MARKETING_OPTOUT" && classification.confidence >= 0.7) {
+      if (body.email) {
+        await db.from("customers").update({ marketing_consent: false })
+          .eq("business_id", requestedBusinessId)
+          .ilike("email", body.email);
+      }
+      reply = "You've been unsubscribed from marketing messages. We'll only contact you about your bookings.";
+      ns = { step: "IDLE" };
+      return new Response(JSON.stringify({ reply, state: ns, intent: classification.intent }), { status: 200, headers: gCors(req) });
+    }
+
+    // Auto-reply: FAQ-type intents with high confidence
+    if (["BOOKING_QUESTION", "LOGISTICS", "BOOKING_MODIFY"].includes(classification.intent) && classification.confidence >= 0.75) {
+      const faqAnswer = await findFaqMatch(db, requestedBusinessId, classification.intent, msg);
+      if (faqAnswer) {
+        // Log the auto-reply
+        db.from("chat_messages").insert({
+          business_id: requestedBusinessId,
+          phone: state.phone || body.phone || "web",
+          direction: "OUT",
+          body: faqAnswer,
+          sender: "Bot",
+          sender_type: "BOT",
+          auto_replied: true,
+          intent: classification.intent,
+        }).then(() => {});
+        return new Response(JSON.stringify({ reply: faqAnswer, state: { step: "IDLE" }, intent: classification.intent, autoReplied: true }), { status: 200, headers: gCors(req) });
+      }
+    }
+
+    // Standard Gemini fallback
     const gem2 = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id);
     reply = gem2 || "Hey! Need help booking or got a question?";
     ns = { step: "IDLE" };
-    return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+    return new Response(JSON.stringify({ reply: reply, state: ns, intent: classification.intent }), { status: 200, headers: gCors(req) });
   } catch (err) { console.error("ERR:", err); return new Response(JSON.stringify({ reply: "Ah sorry, try that again?", state: { step: "IDLE" } }), { status: 500, headers: gCors(req) }); }
 }));
