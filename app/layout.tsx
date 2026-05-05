@@ -27,18 +27,18 @@ const nav = [
   { href: "/photos", label: "Photos", icon: "Camera" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
-  { href: "/customers", label: "Customers", icon: "Users" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
   { href: "/reviews", label: "Reviews", icon: "Star" },
-  // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN only
+  // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },
   { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
   { href: "/settings/chat-faq", label: "Chat FAQ", icon: "MessageCircle", privilegedOnly: true },
-  { href: "/ota-drift", label: "OTA Drift", icon: "Warning", privilegedOnly: true },
-  { href: "/super-admin/data-requests", label: "Data Requests", icon: "Shield", privilegedOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
-  { href: "/super-admin", label: "Super Admin", icon: "Shield", privilegedOnly: true },
+  // superAdminOnly — visible to SUPER_ADMIN only
+  { href: "/ota-drift", label: "OTA Drift", icon: "Warning", superAdminOnly: true },
+  { href: "/super-admin/data-requests", label: "Data Requests", icon: "Shield", superAdminOnly: true },
+  { href: "/super-admin", label: "Super Admin", icon: "Shield", superAdminOnly: true },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

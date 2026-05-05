@@ -30,7 +30,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: string;
-  privilegedOnly?: boolean; // if true, hidden for plain ADMIN role
+  privilegedOnly?: boolean;
+  superAdminOnly?: boolean;
 }
 
 const MARKETING_PATHS = ["/operators", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
@@ -65,8 +66,8 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     }
   }, [displayName]);
 
-  // Strip privileged-only items for plain ADMIN users, but show Settings if they have granted permissions
   const visibleNav = nav.filter((n) => {
+    if (n.superAdminOnly) return role === "SUPER_ADMIN";
     if (!n.privilegedOnly) return true;
     if (isPrivilegedRole(role)) return true;
     // Show Settings for admins who have been granted section permissions
