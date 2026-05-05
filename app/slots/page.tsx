@@ -11,6 +11,7 @@ import CalendarHeader from "../../components/CalendarHeader";
 import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
+import BulkSlotWizard from "../../components/BulkSlotWizard";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -53,6 +54,7 @@ function Slots() {
 
   // Add Slot State
   const [showAddSlot, setShowAddSlot] = useState(false);
+  const [bulkGenOpen, setBulkGenOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     tourId: "",
     time: "06:00",
@@ -695,6 +697,12 @@ function Slots() {
             + Add Slot
           </button>
           <button
+            onClick={() => setBulkGenOpen(true)}
+            className="px-3 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+          >
+            Bulk Generate
+          </button>
+          <button
             onClick={() => setShowBulkEdit(true)}
             className="px-3 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
@@ -1066,6 +1074,8 @@ function Slots() {
           </div>
         </div>
       )}
+
+      {bulkGenOpen && <BulkSlotWizard tours={tours} onClose={() => { setBulkGenOpen(false); load(); }} />}
 
       {/* REOPEN DAY MODAL */}
       {showReopenDay && (
