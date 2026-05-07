@@ -45,7 +45,7 @@ export default function ChatFaqPage() {
 
   async function handleSave() {
     if (!form.question_pattern || !form.keywords || !form.answer) {
-      notify({ title: "Missing fields", message: "All fields are required", tone: "error" });
+      notify({ title: "Missing info", message: "Please fill in all the fields before saving.", tone: "error" });
       return;
     }
     setSaving(true);
@@ -57,16 +57,16 @@ export default function ChatFaqPage() {
         headers: await authHeaders(),
         body: JSON.stringify({ intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
       });
-      if (r.ok) { notify({ title: "Updated", message: "FAQ entry updated", tone: "success" }); }
-      else { notify({ title: "Error", message: (await r.json()).error, tone: "error" }); }
+      if (r.ok) { notify({ title: "Saved", message: "Quick answer updated.", tone: "success" }); }
+      else { notify({ title: "Something went wrong", message: (await r.json()).error, tone: "error" }); }
     } else {
       const r = await fetch("/api/admin/chat-faq", {
         method: "POST",
         headers: await authHeaders(),
         body: JSON.stringify({ intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
       });
-      if (r.ok) { notify({ title: "Created", message: "FAQ entry added", tone: "success" }); }
-      else { notify({ title: "Error", message: (await r.json()).error, tone: "error" }); }
+      if (r.ok) { notify({ title: "Done", message: "Quick answer added. Customers will start getting this reply automatically.", tone: "success" }); }
+      else { notify({ title: "Something went wrong", message: (await r.json()).error, tone: "error" }); }
     }
     setSaving(false);
     setShowAdd(false);
@@ -85,7 +85,7 @@ export default function ChatFaqPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this FAQ entry?")) return;
+    if (!confirm("Remove this quick answer? Customers will no longer get an automatic reply for this question.")) return;
     const r = await fetch(`/api/admin/chat-faq/${id}`, { method: "DELETE", headers: await authHeaders() });
     if (r.ok) load();
   }
@@ -109,51 +109,51 @@ export default function ChatFaqPage() {
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Chat FAQ Bank</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
           <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>
-            Auto-reply entries matched by intent + keywords. High-confidence FAQ matches are sent instantly to customers.
+            Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly — no waiting for you to type it.
           </p>
         </div>
         <button
           onClick={() => { setShowAdd(true); setEditId(null); setForm({ intent: "BOOKING_QUESTION", question_pattern: "", keywords: "", answer: "" }); }}
           className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
         >
-          + Add entry
+          + Add a quick answer
         </button>
       </div>
 
       {/* Add/Edit form */}
       {showAdd && (
         <div className="p-4 rounded-xl border space-y-3" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
-          <h3 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{editId ? "Edit" : "New"} FAQ Entry</h3>
+          <h3 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{editId ? "Edit" : "New"} Quick Answer</h3>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Intent</span>
+              <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>What type of question is this?</span>
               <select value={form.intent} onChange={e => setForm({ ...form, intent: e.target.value })}
                 className="mt-1 w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}>
                 {CHAT_INTENTS.map(i => <option key={i} value={i}>{INTENT_LABELS[i]}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Label</span>
+              <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>The question (how a customer would ask it)</span>
               <input value={form.question_pattern} onChange={e => setForm({ ...form, question_pattern: e.target.value })}
                 placeholder="e.g. What time does the tour start?" className="mt-1 w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
             </label>
           </div>
           <label className="block">
-            <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Keywords (comma-separated)</span>
+            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words (separate with commas) — if a message contains these words, this answer is sent</span>
             <input value={form.keywords} onChange={e => setForm({ ...form, keywords: e.target.value })}
-              placeholder="time, start, when, schedule" className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              placeholder="e.g. time, start, when, schedule, what time" className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
           </label>
           <label className="block">
-            <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Answer (max 1000 chars)</span>
+            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Your reply (this is what the customer will receive)</span>
             <textarea value={form.answer} onChange={e => setForm({ ...form, answer: e.target.value.slice(0, 1000) })} rows={3}
-              placeholder="Our tours depart at 06:00 and 08:30 daily..." className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              placeholder="e.g. Our tours depart at 06:00 and 08:30 daily. Please arrive 15 minutes early at the shop." className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
           </label>
           <div className="flex gap-2 justify-end">
             <button onClick={() => { setShowAdd(false); setEditId(null); }} className="px-3 py-1.5 rounded text-sm" style={{ color: "var(--ck-text)" }}>Cancel</button>
             <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium disabled:opacity-50">
-              {saving ? "Saving..." : editId ? "Update" : "Create"}
+              {saving ? "Saving..." : editId ? "Save changes" : "Save"}
             </button>
           </div>
         </div>
@@ -169,16 +169,16 @@ export default function ChatFaqPage() {
                 style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: "var(--ck-text-strong)" }}>{entry.question_pattern}</p>
-                  <p className="text-xs mt-0.5 truncate" style={{ color: "var(--ck-text-muted)" }}>Keywords: {entry.match_keywords.join(", ")}</p>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: "var(--ck-text-muted)" }}>Trigger words: {entry.match_keywords.join(", ")}</p>
                   <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--ck-text)" }}>{entry.answer}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{entry.use_count}x</span>
+                  <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Sent {entry.use_count} {entry.use_count === 1 ? "time" : "times"}</span>
                   <button onClick={() => toggleEnabled(entry)} className="text-xs px-2 py-1 rounded border" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-                    {entry.enabled ? "Disable" : "Enable"}
+                    {entry.enabled ? "Turn off" : "Turn on"}
                   </button>
                   <button onClick={() => startEdit(entry)} className="text-xs px-2 py-1 rounded border" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Edit</button>
-                  <button onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded text-red-600">Del</button>
+                  <button onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded text-red-600">Delete</button>
                 </div>
               </div>
             ))}
@@ -187,9 +187,12 @@ export default function ChatFaqPage() {
       ))}
 
       {entries.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: "var(--ck-text-muted)" }}>
-          No FAQ entries yet. Add entries to enable auto-replies for common questions.
-        </p>
+        <div className="text-center py-10 space-y-2">
+          <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>No quick answers yet</p>
+          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+            Add your first one above. For example: if customers always ask &quot;What should I bring?&quot;, you can set up an automatic reply with your packing list so they get an instant answer.
+          </p>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import {
   ADMIN_URL,
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
-  TEST_CARD,
   TEST_CUSTOMER,
   requireAdminCreds,
 } from "./helpers/env";
@@ -128,50 +127,43 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     await page.waitForLoadState("domcontentloaded");
 
     // ============================================================
-    // STEP 7 — Fill Yoco test card details
+    // STEP 7 — Pay via Yoco test card
     // ============================================================
-    // Yoco hosted checkout may use iframes for PCI compliance or direct inputs.
-    // We try both approaches.
-    const cardInput = page.locator(
-      'input[name*="card"], input[placeholder*="card" i], input[data-testid*="card"], input[autocomplete="cc-number"]',
-    ).first();
+    // Yoco hosted checkout uses custom buttons (NOT native radios) with
+    // stable data-testid attributes:
+    //   data-testid="card-radio"      — selects the Card payment method
+    //   data-testid="card-pay-button" — submits the payment
+    // In test mode, Yoco pre-fills the test card (4111…1111 / 01/30 / CVC),
+    // so we don't need to fill any iframe inputs — just select Card and pay.
+    const cardRadio = page.locator('[data-testid="card-radio"]');
+    await expect(cardRadio, "Yoco card-radio button not visible — is checkout in test mode?")
+      .toBeVisible({ timeout: 15_000 });
+    await cardRadio.click();
+    await page.waitForTimeout(500);
 
-    const cardFrame = page.frameLocator("iframe").first();
-    let usedFrame = false;
+    // Yoco renders the card number / expiry / CVC inputs in 3 separate
+    // PCI iframes (each empty-src), nested inside card-number-field /
+    // card-expiry-field / card-cvv-field DIVs. Fill each via frameLocator.
+    const numberFrame = page.frameLocator('[data-testid="card-number-field"] iframe');
+    const expiryFrame = page.frameLocator('[data-testid="card-expiry-field"] iframe');
+    const cvvFrame = page.frameLocator('[data-testid="card-cvv-field"] iframe');
+    const numberInput = numberFrame.locator("input").first();
+    const expiryInput = expiryFrame.locator("input").first();
+    const cvvInput = cvvFrame.locator("input").first();
+    await expect(numberInput, "Yoco card-number iframe input not visible").toBeVisible({ timeout: 15_000 });
+    await numberInput.click();
+    await numberInput.fill("4111111111111111");
+    await expect(expiryInput).toBeVisible({ timeout: 5_000 });
+    await expiryInput.click();
+    await expiryInput.fill("01/30");
+    await expect(cvvInput).toBeVisible({ timeout: 5_000 });
+    await cvvInput.click();
+    await cvvInput.fill("123");
+    await page.waitForTimeout(500);
 
-    if (await cardInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      // Direct inputs on the page
-      await cardInput.fill(TEST_CARD);
-      await page
-        .locator('input[name*="exp"], input[placeholder*="MM" i], input[autocomplete="cc-exp"]')
-        .first()
-        .fill("1230");
-      await page
-        .locator('input[name*="cvv" i], input[name*="cvc" i], input[placeholder*="CVV" i], input[autocomplete="cc-csc"]')
-        .first()
-        .fill("123");
-    } else {
-      // Try inside an iframe
-      usedFrame = true;
-      const iframeCard = cardFrame.locator(
-        'input[name*="card"], input[placeholder*="card" i], input[autocomplete="cc-number"]',
-      ).first();
-      await expect(iframeCard).toBeVisible({ timeout: 15_000 });
-      await iframeCard.fill(TEST_CARD);
-      await cardFrame
-        .locator('input[name*="exp"], input[placeholder*="MM" i], input[autocomplete="cc-exp"]')
-        .first()
-        .fill("1230");
-      await cardFrame
-        .locator('input[name*="cvv" i], input[name*="cvc" i], input[placeholder*="CVV" i], input[autocomplete="cc-csc"]')
-        .first()
-        .fill("123");
-    }
-
-    // Click the Yoco pay/submit button
-    const yocoPayBtn = page.locator("button[type='submit'], button").filter({
-      hasText: /pay/i,
-    }).first();
+    const yocoPayBtn = page.locator('[data-testid="card-pay-button"]');
+    await expect(yocoPayBtn).toBeVisible({ timeout: 10_000 });
+    await expect(yocoPayBtn).toBeEnabled({ timeout: 10_000 });
     await yocoPayBtn.click();
 
     // ============================================================
@@ -211,16 +203,27 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     }
     await adminPage.waitForTimeout(1_000);
 
-    // Find the booking by customer name
-    const bookingRow = adminPage.getByText(TEST_CUSTOMER.name).first();
+    // Find the booking by customer email (unique identifier).
+    // Note: the booking site dedupes customers by email, so the on-screen
+    // name may be the existing customer record's name rather than what we
+    // typed into the form. Email is the stable lookup key.
+    const bookingRow = adminPage.getByText(TEST_CUSTOMER.email).first();
     await expect(
       bookingRow,
-      "Booking with customer name '" + TEST_CUSTOMER.name + "' should appear in admin bookings",
+      "Booking with customer email '" + TEST_CUSTOMER.email + "' should appear in admin bookings",
     ).toBeVisible({ timeout: 15_000 });
 
-    // Verify PAID status badge near the customer name
-    const row = adminPage.locator("tr").filter({ hasText: TEST_CUSTOMER.name }).first();
-    await expect(row.getByText(/PAID/i).first()).toBeVisible({ timeout: 5_000 });
+    // Verify a PAID booking exists for this customer email.
+    // (Other rows with the same email may be EXPIRED — filter for the one
+    //  that is also PAID.)
+    const paidRow = adminPage
+      .locator("tr")
+      .filter({ hasText: TEST_CUSTOMER.email })
+      .filter({ hasText: /PAID/i })
+      .first();
+    await expect(paidRow, "Expected a PAID booking row for the customer email").toBeVisible({
+      timeout: 10_000,
+    });
 
     await adminContext.close();
     await customerContext.close();

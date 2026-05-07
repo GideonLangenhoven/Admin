@@ -12,13 +12,13 @@ export const CHAT_INTENTS = [
 export type ChatIntent = typeof CHAT_INTENTS[number];
 
 export const INTENT_LABELS: Record<ChatIntent, string> = {
-  BOOKING_QUESTION: "Booking Q",
-  BOOKING_MODIFY: "Modify",
-  REFUND_REQUEST: "Refund",
-  WEATHER_CONCERN: "Weather",
-  LOGISTICS: "Logistics",
-  COMPLAINT: "Complaint",
-  MARKETING_OPTOUT: "Opt-out",
+  BOOKING_QUESTION: "Questions about bookings",
+  BOOKING_MODIFY: "Change or reschedule",
+  REFUND_REQUEST: "Refund requests",
+  WEATHER_CONCERN: "Weather worries",
+  LOGISTICS: "Getting there & what to bring",
+  COMPLAINT: "Complaints",
+  MARKETING_OPTOUT: "Unsubscribe requests",
   OTHER: "Other",
 };
 

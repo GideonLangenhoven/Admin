@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Both Yoco Test Secret Key and Test Webhook Signing Secret are required." }, { status: 400 });
         }
         const { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
-            p_business_id: business_id, p_key: encryptionKey, p_yoco_test_secret_key: yoco_test_secret_key.trim(), p_yoco_test_webhook_secret: yoco_test_webhook_secret.trim(),
+            p_business_id: business_id, p_key: encryptionKey, p_test_secret_key: yoco_test_secret_key.trim(), p_test_webhook_secret: yoco_test_webhook_secret.trim(),
         });
         if (testErr) return NextResponse.json({ error: "Failed to save Yoco test credentials: " + testErr.message }, { status: 500 });
     } else if (section === "yoco_test_mode") {

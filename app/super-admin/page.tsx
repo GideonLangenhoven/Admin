@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
-import { sendAdminSetupLink } from "../lib/admin-auth";
+import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 type OnboardForm = {
@@ -37,11 +37,6 @@ const DEFAULT_FORM: OnboardForm = {
 };
 
 const BOOKING_DOMAIN = "bookingtours.co.za";
-
-async function sha256(msg: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(msg));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
 
 type BusinessRow = {
   id: string;
@@ -302,16 +297,13 @@ export default function SuperAdminPage() {
     }
     setResettingPasswordId(adminId);
     try {
-      const hashed = await sha256(newPassword);
-      const { error } = await supabase
-        .from("admin_users")
-        .update({
-          password_hash: hashed,
-          must_set_password: false,
-          password_set_at: new Date().toISOString(),
-        })
-        .eq("id", adminId);
-      if (error) throw error;
+      const res = await fetch("/api/admin/update", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: "reset_password", admin_id: adminId, password: newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Could not reset password.");
       notify({ title: "Password reset", message: `Password updated for ${adminEmail}.`, tone: "success" });
     } catch (err: any) {
       notify({ title: "Reset failed", message: err.message || "Could not reset password.", tone: "error" });

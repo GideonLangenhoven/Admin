@@ -2,10 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "../lib/supabase";
 import {
   completeAdminPasswordSetup,
-  sha256,
   validateAdminSetupToken,
 } from "../lib/admin-auth";
 
@@ -134,37 +132,28 @@ function ChangePasswordForm() {
 
     setLoading(true);
 
-    const currentHash = await sha256(currentPass);
-    const { data: user } = await supabase
-      .from("admin_users")
-      .select("id")
-      .eq("email", email.trim().toLowerCase())
-      .eq("password_hash", currentHash)
-      .maybeSingle();
-
-    if (!user) {
+    try {
+      const res = await fetch("/api/admin/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "change_password",
+          email: email.trim().toLowerCase(),
+          current_password: currentPass,
+          new_password: newPass,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoading(false);
+        return setError(data?.error || "Failed to update password.");
+      }
+    } catch {
       setLoading(false);
-      return setError("Incorrect email or current password.");
+      return setError("Failed to update password.");
     }
-
-    const newHash = await sha256(newPass);
-    const { error: updateErr } = await supabase
-      .from("admin_users")
-      .update({
-        password_hash: newHash,
-        password_set_at: new Date().toISOString(),
-        must_set_password: false,
-        setup_token_hash: null,
-        setup_token_expires_at: null,
-      })
-      .eq("id", user.id);
 
     setLoading(false);
-
-    if (updateErr) {
-      return setError("Failed to update password: " + updateErr.message);
-    }
-
     setSuccess(true);
   }
 

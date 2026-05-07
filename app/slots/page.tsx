@@ -13,6 +13,38 @@ import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
 
+const TZ_FMT_OPTS: Intl.DateTimeFormatOptions = {
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit",
+  hour12: false, hourCycle: "h23",
+};
+
+function tzParts(d: Date, tz: string) {
+  const p = new Intl.DateTimeFormat("en-US", { ...TZ_FMT_OPTS, timeZone: tz }).formatToParts(d);
+  const g = (t: string) => Number(p.find(x => x.type === t)?.value ?? 0);
+  return { year: g("year"), month: g("month"), day: g("day"), hours: g("hour"), mins: g("minute"), secs: g("second") };
+}
+
+function zonedToUtc(localIso: string, tz: string): number {
+  const wall = new Date(localIso + "Z");
+  const wallMs = wall.getTime();
+  const local = tzParts(wall, tz);
+  const localMs = Date.UTC(local.year, local.month - 1, local.day, local.hours, local.mins, local.secs);
+  return wallMs - (localMs - wallMs);
+}
+
+function utcToLocalParts(utcIso: string, tz: string) {
+  const d = new Date(utcIso);
+  const { year, month, day, hours, mins } = tzParts(d, tz);
+  return { year, month, day, hours, mins };
+}
+
+function changeLocalTime(utcIso: string, tz: string, hours: number, mins: number): string {
+  const l = utcToLocalParts(utcIso, tz);
+  const iso = `${l.year}-${String(l.month).padStart(2,"0")}-${String(l.day).padStart(2,"0")}T${String(hours).padStart(2,"0")}:${String(mins).padStart(2,"0")}:00`;
+  return new Date(zonedToUtc(iso, tz)).toISOString();
+}
+
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
@@ -316,10 +348,10 @@ function Slots() {
   function handleSlotClick(slot: Slot) {
     setSelectedSlot(slot);
 
-    // Extract local time from the UTC timestamp (SAST is UTC+2)
-    const sastDate = new Date(new Date(slot.start_time).getTime() + 2 * 60 * 60 * 1000);
-    const hrs = String(sastDate.getUTCHours()).padStart(2, "0");
-    const mins = String(sastDate.getUTCMinutes()).padStart(2, "0");
+    const tz = getAdminTimezone();
+    const local = utcToLocalParts(slot.start_time, tz);
+    const hrs = String(local.hours).padStart(2, "0");
+    const mins = String(local.mins).padStart(2, "0");
 
     setEditForm({
       capacity: slot.capacity_total,
@@ -340,20 +372,54 @@ function Slots() {
 
     const priceVal = editForm.price.trim() === "" ? null : Number(editForm.price);
 
-    // Compute new UTC timestamp based on old date + new time
     const [newHours, newMins] = editForm.time.split(":").map(Number);
-    const oldSastDate = new Date(new Date(selectedSlot.start_time).getTime() + 2 * 60 * 60 * 1000);
-
-    // Store original hours/mins to check if time actually changed
-    const originalHrs = oldSastDate.getUTCHours();
-    const originalMins = oldSastDate.getUTCMinutes();
+    const tz = getAdminTimezone();
+    const originalLocal = utcToLocalParts(selectedSlot.start_time, tz);
+    const originalHrs = originalLocal.hours;
+    const originalMins = originalLocal.mins;
     const timeChanged = (originalHrs !== newHours || originalMins !== newMins);
+    const newUtcTime = new Date(changeLocalTime(selectedSlot.start_time, tz, newHours, newMins));
 
-    oldSastDate.setUTCHours(newHours, newMins, 0, 0); // Apply new local time
-    const newUtcTime = new Date(oldSastDate.getTime() - 2 * 60 * 60 * 1000); // Back to UTC
+    let applyToFuture = false;
+
+    if (timeChanged) {
+      const oldTimeString = `${String(originalHrs).padStart(2, "0")}:${String(originalMins).padStart(2, "0")}`;
+      const newTimeString = `${String(newHours).padStart(2, "0")}:${String(newMins).padStart(2, "0")}`;
+
+      const choice = await confirmAction({
+        title: "Move matching future slots",
+        message: `Would you also like to move all future ${oldTimeString} slots across all days to ${newTimeString}?`,
+        tone: "info",
+        confirmLabel: "Move future slots",
+        altLabel: "Just this slot",
+      });
+
+      if (choice === false) { setSaving(false); return; }
+      applyToFuture = choice === true;
+    }
 
     try {
-      // Always update the single slot we clicked
+      if (timeChanged) {
+        const tourId = (selectedSlot as any).tour_id || (selectedSlot.tours as any)?.id;
+        const { data: conflict } = await supabase
+          .from("slots")
+          .select("id")
+          .eq("tour_id", tourId)
+          .eq("start_time", newUtcTime.toISOString())
+          .neq("id", selectedSlot.id)
+          .maybeSingle();
+
+        if (conflict) {
+          notify({
+            title: "Time already taken",
+            message: `There's already a slot at ${editForm.time} for this tour on this date. Pick a different time.`,
+            tone: "warning",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error: singleUpdateError } = await supabase
         .from("slots")
         .update({
@@ -366,54 +432,37 @@ function Slots() {
 
       if (singleUpdateError) throw singleUpdateError;
 
-      // If time changed, auto-update all targeted future slots for this tour matching the old time
-      if (timeChanged) {
+      if (applyToFuture) {
         const oldTimeString = `${String(originalHrs).padStart(2, "0")}:${String(originalMins).padStart(2, "0")}`;
         const newTimeString = `${String(newHours).padStart(2, "0")}:${String(newMins).padStart(2, "0")}`;
+        const targetTourId = (selectedSlot as any).tour_id || (selectedSlot.tours as any)?.id;
+        const { data: futureSlots, error: futureErr } = await supabase
+          .from("slots")
+          .select("id, start_time")
+          .eq("tour_id", targetTourId)
+          .gt("start_time", selectedSlot.start_time);
 
-        if (await confirmAction({
-          title: "Move matching future slots",
-          message: `Would you also like to move all future ${oldTimeString} slots across all days to ${newTimeString}?`,
-          tone: "info",
-          confirmLabel: "Move future slots",
-        })) {
-          // Fetch all slots for this tour that happen AFTER the original select slot's UTC time.
-          const targetTourId = (selectedSlot as any).tour_id || (selectedSlot.tours as any)?.id;
-          const { data: futureSlots, error: futureErr } = await supabase
-            .from("slots")
-            .select("id, start_time")
-            .eq("tour_id", targetTourId)
-            .gt("start_time", selectedSlot.start_time);
+        if (futureErr) throw futureErr;
 
-          if (futureErr) throw futureErr;
+        if (futureSlots) {
+          const promises = futureSlots.map(slot => {
+            const slotLocal = utcToLocalParts(slot.start_time, tz);
 
-          if (futureSlots) {
-            const promises = futureSlots.map(slot => {
-              // Extract SAST time of future slot
-              const slotSastDate = new Date(new Date(slot.start_time).getTime() + 2 * 60 * 60 * 1000);
-              const slotHrs = slotSastDate.getUTCHours();
-              const slotMins = slotSastDate.getUTCMinutes();
-
-              // Only update if it matches the EXACT original local time (e.g. 07:00)
-              if (slotHrs === originalHrs && slotMins === originalMins) {
-                slotSastDate.setUTCHours(newHours, newMins, 0, 0); // shift to new time
-                const slotNewUtc = new Date(slotSastDate.getTime() - 2 * 60 * 60 * 1000);
-
-                return supabase.from("slots").update({
-                  start_time: slotNewUtc.toISOString()
-                }).eq("id", slot.id);
-              }
-              return null;
-            }).filter(Boolean); // remove nulls
-
-            if (promises.length > 0) {
-              await Promise.all(promises);
-              notify({
-                title: "Future slots moved",
-                message: `Moved ${promises.length} future slot${promises.length === 1 ? "" : "s"} to ${newTimeString}.`,
-                tone: "success",
-              });
+            if (slotLocal.hours === originalHrs && slotLocal.mins === originalMins) {
+              return supabase.from("slots").update({
+                start_time: changeLocalTime(slot.start_time, tz, newHours, newMins)
+              }).eq("id", slot.id);
             }
+            return null;
+          }).filter(Boolean);
+
+          if (promises.length > 0) {
+            await Promise.all(promises);
+            notify({
+              title: "Future slots moved",
+              message: `Moved ${promises.length} future slot${promises.length === 1 ? "" : "s"} to ${newTimeString}.`,
+              tone: "success",
+            });
           }
         }
       }
@@ -504,7 +553,10 @@ function Slots() {
       setSelectedSlot(null);
       load();
     } catch (err: any) {
-      notify({ title: "Slot update failed", message: "Error saving slot: " + err.message, tone: "error" });
+      const msg = (err.message || "").includes("duplicate key")
+        ? "A slot already exists at that time for this tour. Pick a different time or delete the existing one first."
+        : "Something went wrong saving this slot. Please try again.";
+      notify({ title: "Slot update failed", message: msg, tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -543,17 +595,11 @@ function Slots() {
 
         if (slotsToUpdate) {
           const [newHours, newMins] = bulkForm.newTime.split(":").map(Number);
+          const tz = getAdminTimezone();
           const promises = slotsToUpdate.map(slot => {
-            // SAST is UTC+2. Shift time by +2 hours to get wall-clock UTC equivalent.
-            const sastDate = new Date(new Date(slot.start_time).getTime() + 2 * 60 * 60 * 1000);
-            sastDate.setUTCHours(newHours, newMins, 0, 0); // Set new wall clock time
-
-            // Convert back to true UTC
-            const finalUtcTime = new Date(sastDate.getTime() - 2 * 60 * 60 * 1000);
-
             return supabase.from("slots").update({
               ...baseUpdates,
-              start_time: finalUtcTime.toISOString()
+              start_time: changeLocalTime(slot.start_time, tz, newHours, newMins)
             }).eq("id", slot.id);
           });
 
@@ -596,20 +642,21 @@ function Slots() {
 
     const [hours, mins] = addForm.time.split(":").map(Number);
     const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
+    const tz = getAdminTimezone();
 
     const start = new Date(addForm.startDate + "T00:00:00");
     const end = new Date(addForm.endDate + "T00:00:00");
     const rows: any[] = [];
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const slotTime = new Date(d);
-      slotTime.setHours(hours, mins, 0, 0);
-      // Convert SA local to UTC — SA is UTC+2
-      const utcTime = new Date(slotTime.getTime() - 2 * 60 * 60 * 1000);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
+      const localIso = `${dateStr}T${timeStr}`;
+      const utcMs = zonedToUtc(localIso, tz);
 
       rows.push({
         tour_id: addForm.tourId,
-        start_time: utcTime.toISOString(),
+        start_time: new Date(utcMs).toISOString(),
         capacity_total: Number(addForm.capacity),
         booked: 0,
         held: 0,
@@ -629,7 +676,10 @@ function Slots() {
     setSavingAdd(false);
 
     if (error) {
-      notify({ title: "Slot creation failed", message: "Error creating slots: " + error.message, tone: "error" });
+      const msg = error.message?.includes("duplicate key")
+        ? "Some of these slots already exist. Change the date range or time to avoid overlapping with existing slots."
+        : "Something went wrong: " + error.message;
+      notify({ title: "Could not create slots", message: msg, tone: "error" });
     } else {
       setShowAddSlot(false);
       setAddForm({ tourId: "", time: "06:00", startDate: "", endDate: "", capacity: "12", price: "" });

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
+import { getAuthHeaders } from "../../lib/admin-auth";
 import { notify } from "../../lib/app-notify";
 import LiveStatusBadge from "./LiveStatusBadge";
 import ModeOption from "./ModeOption";
@@ -20,22 +20,21 @@ export default function WhatsAppBotSection() {
   const [selectedMode, setSelectedMode] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function authHeaders() {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-  }
-
   async function load() {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const r = await fetch("/api/admin/whatsapp/bot-mode", {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const headers = await getAuthHeaders();
+    const r = await fetch("/api/admin/whatsapp/bot-mode", { headers });
     if (r.ok) {
       const data = await r.json();
       setState(data);
       setSelectedMode(data.mode);
+      setLoadError("");
+    } else if (r.status === 401) {
+      setLoadError("sign-in");
+    } else {
+      setLoadError("failed");
     }
     setLoading(false);
   }
@@ -51,7 +50,7 @@ export default function WhatsAppBotSection() {
     setSaving(true);
     const r = await fetch("/api/admin/whatsapp/bot-mode", {
       method: "PUT",
-      headers: await authHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ mode: selectedMode }),
     });
     if (r.ok) {
@@ -60,7 +59,7 @@ export default function WhatsAppBotSection() {
       notify({ title: "Saved", message: `WhatsApp bot mode set to ${data.mode.replace("_", " ").toLowerCase()}`, tone: "success" });
     } else {
       const err = await r.json();
-      notify({ title: "Error", message: err.error || "Failed to save", tone: "error" });
+      notify({ title: "Something went wrong", message: err.error || "Could not save. Try again.", tone: "error" });
     }
     setSaving(false);
   }
@@ -74,7 +73,20 @@ export default function WhatsAppBotSection() {
     );
   }
 
-  if (!state) return null;
+  if (loadError || !state) {
+    return (
+      <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+          {loadError === "sign-in"
+            ? "Please sign out and sign back in to manage WhatsApp auto-replies."
+            : "Could not load WhatsApp settings. Try refreshing the page."}
+        </p>
+        <button onClick={() => { setLoading(true); load(); }} className="mt-3 text-sm text-emerald-600 hover:underline">
+          Try again
+        </button>
+      </section>
+    );
+  }
 
   const businessHoursSummary = state.businessHours
     ? "your configured business hours"

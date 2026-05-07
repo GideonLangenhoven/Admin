@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { buildAdminVoucherPurchase } from "./voucher-purchase";
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: "bg-green-100 text-green-700",
@@ -90,7 +91,7 @@ export default function Vouchers() {
     gift_message: "",
   });
 
-  async function loadVouchers() {
+  const loadVouchers = useCallback(async () => {
     const { data } = await supabase
       .from("vouchers")
       .select("*")
@@ -99,14 +100,14 @@ export default function Vouchers() {
       .limit(500);
     setVouchers((data || []) as Voucher[]);
     setLoading(false);
-  }
+  }, [businessId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       loadVouchers();
     }, 0);
     return () => clearTimeout(t);
-  }, [businessId]);
+  }, [loadVouchers]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -163,39 +164,47 @@ export default function Vouchers() {
     e.preventDefault();
     if (!businessId) return;
     if (Number(form.value || 0) <= 0) { setCreateMessage("Value must be greater than 0."); return; }
+    if (!form.buyer_email.trim()) { setCreateMessage("Buyer email is required so the payment link can be sent."); return; }
     if (form.expires_at && new Date(`${form.expires_at}T23:59:59+02:00`) < new Date()) { setCreateMessage("Expiry date must be in the future."); return; }
     setCreating(true);
     setCreateMessage("");
-    const expiresAt = form.expires_at ? new Date(`${form.expires_at}T23:59:59+02:00`).toISOString() : null;
-    const payload = {
-      business_id: businessId,
-      code: form.code.trim().toUpperCase(),
-      status: "ACTIVE",
+    const purchase = buildAdminVoucherPurchase({
+      businessId,
+      code: form.code,
+      recipientName: form.recipient_name,
+      buyerName: form.buyer_name,
+      buyerEmail: form.buyer_email,
+      tourName: form.tour_name,
       type: form.type,
-      recipient_name: form.recipient_name.trim() || null,
-      buyer_name: form.buyer_name.trim() || null,
-      buyer_email: form.buyer_email.trim().toLowerCase() || null,
-      tour_name: form.tour_name.trim() || null,
-      value: Number(form.value || 0),
-      purchase_amount: Number(form.value || 0),
-      expires_at: expiresAt,
-      gift_message: form.gift_message.trim() || null,
-    };
+      value: form.value,
+      expiresAt: form.expires_at,
+      giftMessage: form.gift_message,
+    });
+    const payload = purchase.voucherPayload;
     // Retry on unique constraint violation (code collision)
     let lastError: any = null;
-    let created = false;
+    let createdVoucherId = "";
     for (let attempt = 0; attempt < 5; attempt++) {
       if (attempt > 0) payload.code = generateVoucherCode();
-      const { error } = await supabase.from("vouchers").insert(payload);
-      if (!error) { created = true; break; }
-      if (error.code === "23505" && attempt < 4) { lastError = error; continue; }
+      const { data, error } = await supabase.from("vouchers").insert(payload).select("id").single();
+      if (!error && data?.id) { createdVoucherId = data.id; break; }
+      if (error?.code === "23505" && attempt < 4) { lastError = error; continue; }
       lastError = error;
       break;
     }
-    if (!created && lastError) {
-      setCreateMessage(lastError.message);
+    if (!createdVoucherId) {
+      setCreateMessage(lastError?.message || "Voucher could not be created.");
     } else {
-      setCreateMessage(`Voucher ${payload.code} created.`);
+      const checkout = await supabase.functions.invoke("create-checkout", {
+        body: { ...purchase.checkoutBody, voucher_id: createdVoucherId, voucher_code: payload.code },
+      });
+      if (checkout.error || !checkout.data?.redirectUrl) {
+        setCreateMessage(`Voucher ${payload.code} is pending, but the payment link could not be sent.`);
+        setCreating(false);
+        await loadVouchers();
+        return;
+      }
+      setCreateMessage(`Payment link sent to ${payload.buyer_email}. Voucher ${payload.code} will activate after payment.`);
       setForm({
         code: generateVoucherCode(),
         recipient_name: "",
@@ -221,7 +230,7 @@ export default function Vouchers() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Create voucher</h3>
-              <p className="text-sm text-gray-500">Generate an active code with recipient details and an expiry date.</p>
+              <p className="text-sm text-gray-500">Send the buyer a payment link. The code activates only after payment.</p>
             </div>
             <button type="button" onClick={() => setForm((current) => ({ ...current, code: generateVoucherCode() }))} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
               Regenerate code
@@ -273,9 +282,9 @@ export default function Vouchers() {
           </label>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className={`text-sm ${createMessage.includes("created") ? "text-emerald-700" : "text-red-600"}`}>{createMessage}</p>
+            <p className={`text-sm ${createMessage.includes("sent") ? "text-emerald-700" : "text-red-600"}`}>{createMessage}</p>
             <button type="submit" disabled={creating || !form.code.trim()} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50">
-              {creating ? "Creating..." : "Create voucher"}
+              {creating ? "Creating..." : "Send payment link"}
             </button>
           </div>
         </form>

@@ -514,6 +514,58 @@ function paymentLinkHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function voucherPaymentLinkHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Complete Voucher Payment</h1>
+          </td>
+        </tr>
+        ${heroImg("IMG_PAYMENT", "Cape Kayak")}
+        <tr>
+          <td style="padding: 40px 40px 10px; text-align: center;">
+            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.buyer_name},</h2>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Please complete payment for the gift voucher for <strong>${d.recipient_name}</strong>. The voucher code will be emailed after payment is confirmed.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 30px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px;">
+              <tr>
+                <td width="45%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 15px;">Voucher:</td>
+                <td width="55%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; text-align: right;">${d.tour_name || "Gift Voucher"}</td>
+              </tr>
+              <tr>
+                <td width="45%" style="padding: 18px 20px; color: #1b3b36; font-size: 16px;">Total Due:</td>
+                <td width="55%" style="padding: 18px 20px; color: #1b3b36; font-size: 16px; text-align: right;">${String(d.total_amount).match(/^[0-9]/) ? "R" + d.total_amount : d.total_amount}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 40px; text-align: center;">
+            <a href="${d.payment_url}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Pay Securely Now</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; color: #A8C2B8; text-align: center; padding: 30px; font-size: 12px; line-height: 1.5;">
+            Three Anchor Bay, Sea Point, Cape Town<br>
+            If you have any questions, reply to this email or contact us on WhatsApp.
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 function bookingConfirmHtml(d: Record<string, unknown>) {
   const waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
   const waiverUrl = String(d.waiver_url || "");
@@ -1761,6 +1813,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       case "PAYMENT_LINK":
         subject = "Cape Kayak - Payment Link (Ref: " + d.ref + ")";
         html = paymentLinkHtml(d);
+        break;
+      case "VOUCHER_PAYMENT_LINK":
+        subject = "Cape Kayak - Gift Voucher Payment Link";
+        html = voucherPaymentLinkHtml(d);
         break;
       case "BOOKING_CONFIRM":
         subject = "Cape Kayak - Booking Confirmed! (Ref: " + d.ref + ")";

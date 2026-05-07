@@ -115,6 +115,7 @@ const AUTH_LIMIT: RateLimitConfig = { name: "auth", limit: 5, windowMs: 15 * 60_
 
 export function proxy(req: NextRequest) {
   if (!req.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+  if (process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
 
   const ip = getClientIp(req);
   const isAuth =

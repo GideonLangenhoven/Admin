@@ -412,6 +412,33 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
+  if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
+        <div className="ui-surface-elevated w-full max-w-md p-8 text-center space-y-4">
+          <div className="text-4xl">⏸️</div>
+          <h1 className="text-xl font-semibold text-[var(--ck-text-strong)]">
+            {subscriptionStatus === "PAUSED" ? "Your account is paused" : "Your account has been suspended"}
+          </h1>
+          <p className="text-sm text-[var(--ck-text-muted)]">
+            {subscriptionStatus === "PAUSED"
+              ? "Your subscription is paused for the off-season. When you're ready to get back to it, reactivate below."
+              : "Your subscription has been suspended. Please contact support or reactivate your subscription to continue."}
+          </p>
+          {role === "MAIN_ADMIN" && (
+            <a href="/billing" className="inline-block mt-4 px-5 py-3 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
+              Go to Billing
+            </a>
+          )}
+          <button onClick={clearSession} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, operators, switchOperator }}>
       {children}

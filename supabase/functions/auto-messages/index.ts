@@ -400,50 +400,27 @@ async function autoExpireBookingsForBusiness(businessId: string) {
 
     await db.from("bookings").update({
       status: "CANCELLED",
-      cancellation_reason: "Auto-cancelled: payment deadline expired",
+      cancellation_reason: "Auto-expired: checkout not completed",
       cancelled_at: nowIso,
     }).eq("id", booking.id);
 
-    if (booking.email) {
-      try {
-        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
-          body: JSON.stringify({
-            type: "CANCELLATION",
-            data: {
-              business_id: businessId,
-              email: booking.email,
-              customer_name: booking.customer_name || "Guest",
-              ref: String(booking.id || "").substring(0, 8).toUpperCase(),
-              tour_name: booking?.tours?.name || "Experience",
-              start_time: booking?.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "TBC",
-              reason: "Payment deadline expired",
-            },
-          }),
-        });
-      } catch (error) {
-        console.error("AUTO_CANCEL_EMAIL_ERR", businessId, booking.id, error);
-      }
-    }
+    // Release held capacity
+    await db.from("holds").update({ status: "EXPIRED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
 
-    if (booking.phone) {
+    // No email on auto-expire — only send a friendly WhatsApp nudge if they have a phone
+    if (booking.phone && bookingSiteUrl) {
       try {
-        const cancelRef = String(booking.id || "").substring(0, 8).toUpperCase();
-        const cancelTourName = booking?.tours?.name || "Experience";
-        const cancelDate = booking?.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "TBC";
+        const firstName = (booking.customer_name || "").split(" ")[0] || "Hi";
         await sendWhatsappTextForTenant(
           tenant,
           booking.phone,
-          "Your booking " + cancelRef + " was released because the payment deadline passed." +
-            (bookingSiteUrl ? "\n\nYou can create a new booking here: " + bookingSiteUrl : ""),
-          {
-            name: "booking_cancelled",
-            params: [cancelRef, cancelTourName, cancelDate, "Payment deadline expired"],
-          },
+          firstName + ", looks like you didn't finish booking your " +
+            (booking?.tours?.name || "trip") + ". No worries — spots are still available!\n\n" +
+            "Book again here: " + bookingSiteUrl,
+          undefined,
         );
       } catch (error) {
-        console.error("AUTO_CANCEL_WA_ERR", businessId, booking.id, error);
+        console.error("AUTO_EXPIRE_WA_ERR", businessId, booking.id, error);
       }
     }
 

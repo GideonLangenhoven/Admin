@@ -280,6 +280,43 @@ Deno.serve(async (req: any) => {
         await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", voucherId);
       }
 
+      // Send payment link email for gift voucher checkouts. The voucher code is only delivered by the webhook after payment succeeds.
+      if (type === "GIFT_VOUCHER" && voucherId && !skipNotifications) {
+        try {
+          const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
+          const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+          const voucherNotif = await supabase
+            .from("vouchers")
+            .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount")
+            .eq("id", voucherId)
+            .maybeSingle();
+          const gv = voucherNotif.data;
+          const voucherEmail = String(gv?.buyer_email || customerEmail || "").trim().toLowerCase();
+          if (gv && SERVICE_ROLE_KEY_ENV && voucherEmail && voucherEmail.includes("@")) {
+            const voucherAmount = Number(gv.value || gv.purchase_amount || amount || 0);
+            await fetch(SUPABASE_URL_ENV + "/functions/v1/send-email", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + SERVICE_ROLE_KEY_ENV, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "VOUCHER_PAYMENT_LINK",
+                data: {
+                  email: voucherEmail,
+                  business_id: gv.business_id,
+                  buyer_name: gv.buyer_name || "there",
+                  recipient_name: gv.recipient_name || "your recipient",
+                  tour_name: gv.tour_name || "Gift Voucher",
+                  total_amount: voucherAmount.toFixed(2),
+                  payment_url: yocoData.redirectUrl,
+                },
+              }),
+            });
+            console.log("CHECKOUT_EMAIL_VOUCHER_PAYMENT_LINK_SENT voucher=" + voucherId);
+          }
+        } catch (voucherEmailErr) {
+          console.error("CHECKOUT_VOUCHER_EMAIL_PAYMENT_LINK_ERR:", voucherEmailErr);
+        }
+      }
+
       // Send payment link via WhatsApp + email for BOOKING checkouts (unless caller already handles notifications)
       if (type === "BOOKING" && bookingId && !skipNotifications) {
         try {

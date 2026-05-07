@@ -2,7 +2,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
-import { generateSecureToken, sendAdminSetupLink, sha256, getAuthHeaders } from "../lib/admin-auth";
+import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
@@ -322,25 +322,19 @@ export default function SettingsPage() {
         setError("");
         setAdminMessage("");
 
-        const hash = await sha256(generateSecureToken(24));
         const adminEmail = newEmail.trim().toLowerCase();
-        const { data: insertedAdmin, error: insertErr } = await supabase.from("admin_users").insert({
-            name: newName.trim(),
-            email: adminEmail,
-            password_hash: hash,
-            role: "ADMIN",
-            business_id: businessId,
-            must_set_password: true,
-            password_set_at: null,
-        }).select("id, email, name").single();
-
-        if (insertErr) {
+        const res = await fetch("/api/admin/add", {
+            method: "POST",
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ name: newName.trim(), email: adminEmail, business_id: businessId }),
+        });
+        const resData = await res.json().catch(() => ({}));
+        if (!res.ok) {
             setAdding(false);
-            if (insertErr.code === "23505") setError("Email already exists");
-            else setError("Failed to add admin: " + insertErr.message);
+            setError(resData?.error || "Failed to add admin.");
             return;
         }
-
+        const insertedAdmin = resData.admin;
         if (!insertedAdmin) {
             setAdding(false);
             setError("Admin created, but failed to retrieve details for setup link.");
@@ -599,12 +593,14 @@ export default function SettingsPage() {
 
     async function handleSaveAdminPerms(adminId: string, perms: Record<string, boolean>) {
         setSavingPerms(adminId);
-        const { error: updateErr } = await supabase
-            .from("admin_users")
-            .update({ settings_permissions: perms })
-            .eq("id", adminId);
-        if (updateErr) {
-            notify({ title: "Failed to save permissions", message: updateErr.message, tone: "error" });
+        const res = await fetch("/api/admin/update", {
+            method: "POST",
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ action: "update_permissions", admin_id: adminId, permissions: perms }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            notify({ title: "Failed to save permissions", message: data?.error || "Unknown error", tone: "error" });
         } else {
             setAdmins(admins.map(a => a.id === adminId ? { ...a, settings_permissions: perms } : a));
             notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
@@ -661,7 +657,17 @@ export default function SettingsPage() {
             confirmLabel: "Remove admin",
         })) return;
 
-        await supabase.from("admin_users").delete().eq("id", id);
+        const res = await fetch("/api/admin/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...await getAuthHeaders() },
+            body: JSON.stringify({ admin_id: id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            notify({ title: "Failed", message: data?.error || "Could not remove admin.", tone: "error" });
+            return;
+        }
+        notify({ title: "Removed", message: "Admin has been removed.", tone: "success" });
         fetchAdmins();
         fetchPlanUsage();
     }

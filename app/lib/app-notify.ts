@@ -13,14 +13,17 @@ export type AppConfirmPayload = {
   tone?: AppNoticeTone;
   confirmLabel?: string;
   cancelLabel?: string;
+  altLabel?: string;
 };
 
+export type AppConfirmResult = boolean | "alt";
+
 let notifyHandler: ((payload: AppNoticePayload) => void) | null = null;
-let confirmHandler: ((payload: AppConfirmPayload) => Promise<boolean>) | null = null;
+let confirmHandler: ((payload: AppConfirmPayload) => Promise<AppConfirmResult>) | null = null;
 
 export function registerAppNotifications(handlers: {
   notify: (payload: AppNoticePayload) => void;
-  confirm: (payload: AppConfirmPayload) => Promise<boolean>;
+  confirm: (payload: AppConfirmPayload) => Promise<AppConfirmResult>;
 }) {
   notifyHandler = handlers.notify;
   confirmHandler = handlers.confirm;
@@ -42,7 +45,7 @@ export function notify(payload: string | AppNoticePayload) {
   }
 }
 
-export async function confirmAction(payload: string | AppConfirmPayload) {
+export async function confirmAction(payload: string | AppConfirmPayload): Promise<AppConfirmResult> {
   const normalized = typeof payload === "string" ? { message: payload } : payload;
   if (confirmHandler) {
     return confirmHandler(normalized);

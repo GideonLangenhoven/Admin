@@ -6,6 +6,7 @@ import {
   registerAppNotifications,
   unregisterAppNotifications,
   type AppConfirmPayload,
+  type AppConfirmResult,
   type AppNoticePayload,
   type AppNoticeTone,
 } from "../app/lib/app-notify";
@@ -15,7 +16,7 @@ type NoticeItem = AppNoticePayload & {
 };
 
 type ConfirmState = AppConfirmPayload & {
-  resolve: (value: boolean) => void;
+  resolve: (value: AppConfirmResult) => void;
 };
 
 const TONE_STYLES: Record<AppNoticeTone, { bg: string; text: string; Icon: typeof Info }> = {
@@ -49,7 +50,7 @@ export default function AppNotifications() {
         }, duration);
       },
       confirm(payload) {
-        return new Promise<boolean>((resolve) => {
+        return new Promise<AppConfirmResult>((resolve) => {
           setConfirmState({ ...payload, resolve });
         });
       },
@@ -89,7 +90,7 @@ export default function AppNotifications() {
     setNotices((current) => current.filter((item) => item.id !== id));
   }
 
-  function resolveConfirm(value: boolean) {
+  function resolveConfirm(value: AppConfirmResult) {
     if (!confirmState) return;
     confirmState.resolve(value);
     setConfirmState(null);
@@ -137,10 +138,19 @@ export default function AppNotifications() {
                   >
                     {confirmState.confirmLabel || "Confirm"}
                   </button>
+                  {confirmState.altLabel && (
+                    <button
+                      type="button"
+                      onClick={() => resolveConfirm("alt")}
+                      className="rounded-xl border border-current/15 bg-white/60 px-4 py-2 text-sm font-semibold text-current hover:bg-white"
+                    >
+                      {confirmState.altLabel}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => resolveConfirm(false)}
-                    className="rounded-xl border border-current/15 bg-white/60 px-4 py-2 text-sm font-semibold text-current hover:bg-white"
+                    className="rounded-xl border border-current/15 bg-white/30 px-4 py-2 text-sm font-semibold text-current/70 hover:bg-white/50"
                   >
                     {confirmState.cancelLabel || "Cancel"}
                   </button>

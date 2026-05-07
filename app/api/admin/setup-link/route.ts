@@ -44,19 +44,22 @@ export async function POST(req: NextRequest) {
 
   // -------- send: generate token, store hash, email setup link --------
   if (action === "send") {
-    const caller = await getCallerAdmin(req);
-    if (!caller || !isPrivilegedRole(caller.role)) {
-      return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required to send setup links" }, { status: 403 });
-    }
-
     const adminId = body.admin_id ? String(body.admin_id) : "";
     const adminEmail = body.email ? String(body.email).trim().toLowerCase() : "";
     const reason = String(body.reason || "ADMIN_INVITE");
     const businessId = body.business_id ? String(body.business_id) : null;
     if (!adminId && !adminEmail) return NextResponse.json({ error: "admin_id or email is required" }, { status: 400 });
 
-    if (caller.role !== "SUPER_ADMIN" && businessId && caller.business_id !== businessId) {
-      return NextResponse.json({ error: "You can only send setup links for your own business" }, { status: 403 });
+    const isSelfReset = reason === "RESET" && !!adminEmail && !adminId;
+
+    if (!isSelfReset) {
+      const caller = await getCallerAdmin(req);
+      if (!caller || !isPrivilegedRole(caller.role)) {
+        return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required to send setup links" }, { status: 403 });
+      }
+      if (caller.role !== "SUPER_ADMIN" && businessId && caller.business_id !== businessId) {
+        return NextResponse.json({ error: "You can only send setup links for your own business" }, { status: 403 });
+      }
     }
 
     let lookupQuery = admin.from("admin_users").select("id, email, name");
@@ -67,7 +70,10 @@ export async function POST(req: NextRequest) {
     }
     const { data: user, error: lookupErr } = await lookupQuery.maybeSingle();
     if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 });
-    if (!user) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    if (!user) {
+      if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
+      return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    }
 
     const rawToken = hexToken(24);
     const tokenHash = sha256(rawToken);
