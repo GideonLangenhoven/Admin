@@ -460,14 +460,20 @@ export default function BookingDetailPage() {
         // Update booking
         const updateFields: Record<string, unknown> = {
           total_amount: newTotal,
-          voucher_deduction: deduction,
+          voucher_code: code,
           discount_type: "VOUCHER",
         };
         if (newTotal <= 0) {
           updateFields.status = "PAID";
           updateFields.yoco_payment_id = "VOUCHER_ADMIN_" + code;
         }
-        await supabase.from("bookings").update(updateFields).eq("id", booking.id);
+        const { error: updateErr } = await supabase.from("bookings").update(updateFields).eq("id", booking.id);
+        if (updateErr) {
+          console.error("Booking voucher update failed:", updateErr);
+          setCodeResult({ type: "error", message: "Voucher deducted but booking update failed: " + updateErr.message });
+          setCodeApplying(false);
+          return;
+        }
 
         setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER", status: newTotal <= 0 ? "PAID" : booking.status } as BookingDetail);
         setCodeResult({ type: "success", message: `Voucher applied: R${deduction} off. ${newTotal <= 0 ? "Booking is now fully paid!" : `New total: R${newTotal}`}` });
@@ -478,12 +484,19 @@ export default function BookingDetailPage() {
 
       // Try promo code via validate_promo_code RPC
       const baseTotal = Number(booking.unit_price) * booking.qty;
-      const { data: promoResult } = await supabase.rpc("validate_promo_code", {
+      const { data: promoResult, error: promoError } = await supabase.rpc("validate_promo_code", {
         p_business_id: booking.business_id,
         p_code: code,
         p_order_amount: baseTotal,
         p_customer_email: booking.email || null,
       });
+
+      if (promoError) {
+        console.error("validate_promo_code RPC error:", promoError);
+        setCodeResult({ type: "error", message: promoError.message || "Failed to validate promo code" });
+        setCodeApplying(false);
+        return;
+      }
 
       if (promoResult?.valid) {
         let discountAmt = 0;
