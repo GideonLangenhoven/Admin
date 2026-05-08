@@ -87,7 +87,6 @@ export default function Vouchers() {
     tour_name: "",
     type: "FREE_TRIP",
     value: "0",
-    expires_at: "",
     gift_message: "",
   });
 
@@ -165,7 +164,6 @@ export default function Vouchers() {
     if (!businessId) return;
     if (Number(form.value || 0) <= 0) { setCreateMessage("Value must be greater than 0."); return; }
     if (!form.buyer_email.trim()) { setCreateMessage("Buyer email is required so the payment link can be sent."); return; }
-    if (form.expires_at && new Date(`${form.expires_at}T23:59:59+02:00`) < new Date()) { setCreateMessage("Expiry date must be in the future."); return; }
     setCreating(true);
     setCreateMessage("");
     const purchase = buildAdminVoucherPurchase({
@@ -177,7 +175,7 @@ export default function Vouchers() {
       tourName: form.tour_name,
       type: form.type,
       value: form.value,
-      expiresAt: form.expires_at,
+      expiresAt: "",
       giftMessage: form.gift_message,
     });
     const payload = purchase.voucherPayload;
@@ -213,7 +211,6 @@ export default function Vouchers() {
         tour_name: "",
         type: "FREE_TRIP",
         value: "0",
-        expires_at: "",
         gift_message: "",
       });
       await loadVouchers();
@@ -242,10 +239,10 @@ export default function Vouchers() {
               Voucher code
               <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
             </label>
-            <label className="text-sm text-gray-600">
-              Expiry date
-              <DatePicker value={form.expires_at} onChange={(v) => setForm({ ...form, expires_at: v })} placeholder="Pick expiry date" compact disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }} />
-            </label>
+            <div className="text-sm text-gray-600">
+              Expiry
+              <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Auto — 3 years from purchase</p>
+            </div>
             <label className="text-sm text-gray-600">
               Recipient
               <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

@@ -13,9 +13,7 @@ export interface AdminVoucherPurchaseInput {
 
 export function buildAdminVoucherPurchase(input: AdminVoucherPurchaseInput) {
   const value = Number(input.value || 0);
-  const expiresAt = input.expiresAt
-    ? new Date(`${input.expiresAt}T23:59:59+02:00`).toISOString()
-    : null;
+  const expiresAt = new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString();
   const code = input.code.trim().toUpperCase();
 
   return {
