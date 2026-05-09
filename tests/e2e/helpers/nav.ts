@@ -27,7 +27,7 @@ export const PRIVILEGED_NAV_ITEMS: NavItem[] = [
   { href: "/settings/ota", label: "OTA Channels" },
   { href: "/settings/chat-faq", label: "Chat FAQ" },
   { href: "/ota-drift", label: "OTA Drift" },
-  { href: "/super-admin/data-requests", label: "Data Requests" },
+  { href: "/privacy/data-requests", label: "Data Requests" },
   { href: "/settings", label: "Settings" },
   { href: "/super-admin", label: "Super Admin" },
 ];

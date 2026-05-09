@@ -37,7 +37,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   // superAdminOnly — visible to SUPER_ADMIN only
   { href: "/ota-drift", label: "OTA Drift", icon: "Warning", superAdminOnly: true },
-  { href: "/super-admin/data-requests", label: "Data Requests", icon: "Shield", superAdminOnly: true },
+  { href: "/privacy/data-requests", label: "Data Requests", icon: "Shield", privilegedOnly: true },
   { href: "/super-admin", label: "Super Admin", icon: "Shield", superAdminOnly: true },
 ];
 

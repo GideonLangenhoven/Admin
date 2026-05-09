@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      { source: "/super-admin/data-requests", destination: "/privacy/data-requests", permanent: false },
+    ];
+  },
 };
 
 export default withSentryConfig(withBundleAnalyzer(nextConfig), {
