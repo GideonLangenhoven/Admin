@@ -142,6 +142,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
       document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
+      document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
     } else if (data) {
       // Admin exists but no business_id — legacy admin, still allow access
       setRole(data.role);
@@ -152,6 +153,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
       setAuthed(true);
       document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
+      document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
     } else {
       await clearSession();
     }
@@ -170,6 +172,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("ck_admin_name");
     localStorage.removeItem("ck_admin_settings_perms");
     document.cookie = "ck_session_hint=;path=/;max-age=0";
+    document.cookie = "ck_admin_role=;path=/;max-age=0";
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
@@ -264,6 +267,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
 
       setRole(adminInfo.role);
+      // Set ck_admin_role cookie immediately so proxy.ts page-gating works on the
+      // very next navigation (without waiting for validateSession to run on next mount).
+      document.cookie = "ck_admin_role=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
 
       if (adminInfo.business_id) {
         const context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);

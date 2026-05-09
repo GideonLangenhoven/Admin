@@ -113,7 +113,58 @@ function cleanupStores(maxWindowMs: number) {
 const API_LIMIT: RateLimitConfig = { name: "api", limit: 100, windowMs: 60_000 };
 const AUTH_LIMIT: RateLimitConfig = { name: "auth", limit: 5, windowMs: 15 * 60_000 };
 
+/**
+ * Page-level role gating (advisory UX, NOT a security boundary).
+ *
+ * Reads the ck_admin_role cookie set by components/AuthGate.tsx and redirects
+ * unauthorised callers away from privileged pages so they don't render empty
+ * scaffolding before the API gates kick in.
+ *
+ * The actual security boundary is the per-route auth check in app/lib/api-auth.ts —
+ * a forged cookie buys nothing, because every privileged API call validates the
+ * Supabase access token + admin_users.role server-side. This gate exists only to
+ * spare OPERATOR users a confusing UX (loading skeleton → empty page → "why?").
+ *
+ * Cookie may be absent on legitimate flows (just logged in for the first time,
+ * change-password, marketing pages). When absent, fall through and let AuthGate
+ * handle it client-side.
+ */
+
+type RoleRequirement = "SUPER_ADMIN_ONLY" | "PRIVILEGED";
+
+const PAGE_GATES: Array<{ pattern: RegExp; requirement: RoleRequirement }> = [
+  { pattern: /^\/super-admin(\/|$)/, requirement: "SUPER_ADMIN_ONLY" },
+  { pattern: /^\/ota-drift(\/|$)/, requirement: "SUPER_ADMIN_ONLY" },
+  { pattern: /^\/billing(\/|$)/, requirement: "PRIVILEGED" },
+  { pattern: /^\/settings(\/|$)/, requirement: "PRIVILEGED" },
+  { pattern: /^\/privacy\/data-requests(\/|$)/, requirement: "PRIVILEGED" },
+];
+
+function checkPageRoleGate(req: NextRequest): NextResponse | null {
+  const pathname = req.nextUrl.pathname;
+  const gate = PAGE_GATES.find((g) => g.pattern.test(pathname));
+  if (!gate) return null;
+
+  const role = req.cookies.get("ck_admin_role")?.value;
+  if (!role) return null;
+
+  const allowed =
+    gate.requirement === "SUPER_ADMIN_ONLY"
+      ? role === "SUPER_ADMIN"
+      : role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
+
+  if (allowed) return null;
+
+  const url = req.nextUrl.clone();
+  url.pathname = "/";
+  url.search = "?denied=1";
+  return NextResponse.redirect(url);
+}
+
 export function proxy(req: NextRequest) {
+  const pageGate = checkPageRoleGate(req);
+  if (pageGate) return pageGate;
+
   if (!req.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
   if (process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
 
