@@ -1474,11 +1474,11 @@ export default function SettingsPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 shrink-0">
                                                 {a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
                                                     <button
                                                         onClick={() => setExpandedPermsAdmin(isExpanded ? null : a.id)}
-                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline"
+                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline whitespace-nowrap"
                                                     >
                                                         {isExpanded ? "Close" : "Permissions"}
                                                     </button>
@@ -1487,13 +1487,13 @@ export default function SettingsPage() {
                                                     <button
                                                         onClick={() => handleResendSetup(a)}
                                                         disabled={resendingAdminId === a.id}
-                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50"
+                                                        className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
                                                     >
                                                         {resendingAdminId === a.id ? "Sending..." : ((a.must_set_password || !a.password_set_at) ? "Resend setup link" : "Email reset link")}
                                                     </button>
                                                 )}
                                                 {a.role !== "MAIN_ADMIN" && (
-                                                    <button onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline">
+                                                    <button onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline whitespace-nowrap">
                                                         Remove
                                                     </button>
                                                 )}
