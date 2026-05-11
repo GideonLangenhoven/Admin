@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
-import { getAdminTimezone } from "../lib/admin-timezone";
+import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import { DatePicker } from "../../components/DatePicker";
@@ -12,38 +12,6 @@ import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
-
-const TZ_FMT_OPTS: Intl.DateTimeFormatOptions = {
-  year: "numeric", month: "2-digit", day: "2-digit",
-  hour: "2-digit", minute: "2-digit", second: "2-digit",
-  hour12: false, hourCycle: "h23",
-};
-
-function tzParts(d: Date, tz: string) {
-  const p = new Intl.DateTimeFormat("en-US", { ...TZ_FMT_OPTS, timeZone: tz }).formatToParts(d);
-  const g = (t: string) => Number(p.find(x => x.type === t)?.value ?? 0);
-  return { year: g("year"), month: g("month"), day: g("day"), hours: g("hour"), mins: g("minute"), secs: g("second") };
-}
-
-function zonedToUtc(localIso: string, tz: string): number {
-  const wall = new Date(localIso + "Z");
-  const wallMs = wall.getTime();
-  const local = tzParts(wall, tz);
-  const localMs = Date.UTC(local.year, local.month - 1, local.day, local.hours, local.mins, local.secs);
-  return wallMs - (localMs - wallMs);
-}
-
-function utcToLocalParts(utcIso: string, tz: string) {
-  const d = new Date(utcIso);
-  const { year, month, day, hours, mins } = tzParts(d, tz);
-  return { year, month, day, hours, mins };
-}
-
-function changeLocalTime(utcIso: string, tz: string, hours: number, mins: number): string {
-  const l = utcToLocalParts(utcIso, tz);
-  const iso = `${l.year}-${String(l.month).padStart(2,"0")}-${String(l.day).padStart(2,"0")}T${String(hours).padStart(2,"0")}:${String(mins).padStart(2,"0")}:00`;
-  return new Date(zonedToUtc(iso, tz)).toISOString();
-}
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -672,21 +640,26 @@ function Slots() {
       return;
     }
 
-    const { error } = await supabase.from("slots").insert(rows);
+    const { data: inserted, error } = await supabase
+      .from("slots")
+      .upsert(rows, { onConflict: "business_id,tour_id,start_time", ignoreDuplicates: true })
+      .select("id");
     setSavingAdd(false);
 
     if (error) {
-      const msg = error.message?.includes("duplicate key")
-        ? "Some of these slots already exist. Change the date range or time to avoid overlapping with existing slots."
-        : "Something went wrong: " + error.message;
-      notify({ title: "Could not create slots", message: msg, tone: "error" });
+      notify({ title: "Could not create slots", message: "Something went wrong: " + error.message, tone: "error" });
     } else {
+      const insertedCount = inserted?.length ?? 0;
+      const skipped = rows.length - insertedCount;
       setShowAddSlot(false);
       setAddForm({ tourId: "", time: "06:00", startDate: "", endDate: "", capacity: "12", price: "" });
+      const message = skipped > 0
+        ? `${insertedCount} slot(s) created. ${skipped} already existed and were skipped.`
+        : `${insertedCount} slot(s) created successfully.`;
       notify({
-        title: "Slots created",
-        message: rows.length + " slot(s) created successfully.",
-        tone: "success",
+        title: insertedCount > 0 ? "Slots created" : "No new slots",
+        message,
+        tone: insertedCount > 0 ? "success" : "warning",
       });
       load();
     }

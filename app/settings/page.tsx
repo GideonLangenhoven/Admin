@@ -3,6 +3,7 @@ import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
+import { getAdminTimezone, setAdminTimezone, zonedToUtc, COMMON_TIMEZONES } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
@@ -93,6 +94,7 @@ const DEFAULT_SITE_SETTINGS = {
     chat_widget_label: "Book here",
     footer_line_one: "",
     footer_line_two: "",
+    timezone: "Africa/Johannesburg",
 };
 
 interface Tour {
@@ -178,6 +180,7 @@ export default function SettingsPage() {
     const [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
     const [siteSaving, setSiteSaving] = useState(false);
     const [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
+    const [chatbotAvatars, setChatbotAvatars] = useState<Array<{ id: string; lottie_url: string; label: string | null }>>([]);
     const [refundTiers, setRefundTiers] = useState<Array<{ hours_before: number; refund_percent: number }>>([]);
     const [refundPolicyText, setRefundPolicyText] = useState("");
     const [refundSaving, setRefundSaving] = useState(false);
@@ -271,7 +274,22 @@ export default function SettingsPage() {
             script.type = "module";
             document.head.appendChild(script);
         }
+
+        fetchChatbotAvatars();
     }, [businessId]);
+
+    async function fetchChatbotAvatars() {
+        const { data, error } = await supabase
+            .from("chatbot_avatars")
+            .select("id, lottie_url, label")
+            .eq("active", true)
+            .order("sort_order", { ascending: true });
+        if (error) {
+            console.error("CHATBOT_AVATARS_ERR", error.message);
+            return;
+        }
+        setChatbotAvatars((data || []) as Array<{ id: string; lottie_url: string; label: string | null }>);
+    }
 
     async function loadMyPermissions() {
         const adminEmail = localStorage.getItem("ck_admin_email");
@@ -448,32 +466,34 @@ export default function SettingsPage() {
         });
     }
 
-    async function generateSlotsForTour(tourId: string) {
+    async function generateSlotsForTour(tourId: string): Promise<{ created: number; skipped: number }> {
         const validTimes = tourForm.slotTimes.filter(t => t.trim() !== "");
         if (!tourForm.slotStartDate || !tourForm.slotEndDate || validTimes.length === 0) {
             setTourError("Please fill in start date, end date, and at least one start time.");
-            return 0;
+            return { created: 0, skipped: 0 };
         }
         if (tourForm.slotDays.length === 0) {
             setTourError("Please select at least one day of the week.");
-            return 0;
+            return { created: 0, skipped: 0 };
         }
 
         const slots: any[] = [];
-        const start = new Date(tourForm.slotStartDate + "T00:00:00");
-        const end = new Date(tourForm.slotEndDate + "T00:00:00");
+        const tz = getAdminTimezone();
+        const [startYear, startMonth, startDay] = tourForm.slotStartDate.split("-").map(Number);
+        const [endYear, endMonth, endDay] = tourForm.slotEndDate.split("-").map(Number);
         const capacity = Number(tourForm.default_capacity) || 10;
 
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const cursor = new Date(startYear, startMonth - 1, startDay);
+        const stop = new Date(endYear, endMonth - 1, endDay);
+
+        for (let d = new Date(cursor); d <= stop; d.setDate(d.getDate() + 1)) {
             if (!tourForm.slotDays.includes(d.getDay())) continue;
 
-            const localDateStr = d.toISOString().split("T")[0];
+            const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
             for (let ti = 0; ti < validTimes.length; ti++) {
-                const localDateTime = localDateStr + "T" + validTimes[ti] + ":00";
-                const localDate = new Date(localDateTime);
-                localDate.setHours(localDate.getHours() - 2);
-                const utcStart = localDate.toISOString();
+                const localIso = `${localDateStr}T${validTimes[ti]}:00`;
+                const utcStart = new Date(zonedToUtc(localIso, tz)).toISOString();
 
                 slots.push({
                     business_id: businessId,
@@ -489,15 +509,19 @@ export default function SettingsPage() {
 
         if (slots.length === 0) {
             setTourError("No slots to create — no matching days in the selected date range.");
-            return 0;
+            return { created: 0, skipped: 0 };
         }
 
-        const { error: slotErr } = await supabase.from("slots").insert(slots);
+        const { data: inserted, error: slotErr } = await supabase
+            .from("slots")
+            .upsert(slots, { onConflict: "business_id,tour_id,start_time", ignoreDuplicates: true })
+            .select("id");
         if (slotErr) {
             setTourError("Slots failed: " + slotErr.message);
-            return 0;
+            return { created: 0, skipped: 0 };
         }
-        return slots.length;
+        const created = inserted?.length ?? 0;
+        return { created, skipped: slots.length - created };
     }
 
     async function handleGenerateSlots() {
@@ -505,11 +529,14 @@ export default function SettingsPage() {
         setSlotGenerating(true);
         setTourError("");
         setSlotMessage("");
-        const count = await generateSlotsForTour(editingTour.id);
-        if (count > 0) {
-            setSlotMessage(count + " slot" + (count !== 1 ? "s" : "") + " generated for " + editingTour.name + "!");
-            setTimeout(() => setSlotMessage(""), 5000);
-            fetchSlotCounts(tours.map(t => t.id));
+        const { created, skipped } = await generateSlotsForTour(editingTour.id);
+        if (created > 0 || skipped > 0) {
+            const parts: string[] = [];
+            if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
+            if (skipped > 0) parts.push(`${skipped} already existed and were skipped`);
+            setSlotMessage(parts.join(" — ") + " for " + editingTour.name + ".");
+            setTimeout(() => setSlotMessage(""), 6000);
+            if (created > 0) fetchSlotCounts(tours.map(t => t.id));
         }
         setSlotGenerating(false);
     }
@@ -543,10 +570,13 @@ export default function SettingsPage() {
 
             // Auto-generate slots if date range and time are provided
             if (newTour && tourForm.slotStartDate && tourForm.slotEndDate && tourForm.slotTimes.some(t => t.trim() !== "")) {
-                const count = await generateSlotsForTour(newTour.id);
-                if (count > 0) {
-                    setSlotMessage("Tour created with " + count + " slot" + (count !== 1 ? "s" : "") + " generated!");
-                    setTimeout(() => setSlotMessage(""), 5000);
+                const { created, skipped } = await generateSlotsForTour(newTour.id);
+                if (created > 0 || skipped > 0) {
+                    const parts: string[] = [];
+                    if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
+                    if (skipped > 0) parts.push(`${skipped} already existed`);
+                    setSlotMessage("Tour created — " + parts.join(", ") + ".");
+                    setTimeout(() => setSlotMessage(""), 6000);
                 }
             }
         }
@@ -706,6 +736,7 @@ export default function SettingsPage() {
                 chat_widget_label: data.chat_widget_label || DEFAULT_SITE_SETTINGS.chat_widget_label,
                 footer_line_one: data.footer_line_one || DEFAULT_SITE_SETTINGS.footer_line_one,
                 footer_line_two: data.footer_line_two || DEFAULT_SITE_SETTINGS.footer_line_two,
+                timezone: data.timezone || DEFAULT_SITE_SETTINGS.timezone,
             });
             setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
             setRefundTiers(Array.isArray(data.refund_policy_tiers) ? data.refund_policy_tiers : []);
@@ -998,12 +1029,14 @@ export default function SettingsPage() {
             chat_widget_label: siteSettings.chat_widget_label || null,
             footer_line_one: siteSettings.footer_line_one || null,
             footer_line_two: siteSettings.footer_line_two || null,
+            timezone: siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone,
             booking_custom_fields: parsedBookingFields,
         }).eq("id", biz.id);
 
         if (error) {
             setSiteMessage({ type: "error", text: "Error saving: " + error.message });
         } else {
+            setAdminTimezone(siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone);
             setSiteMessage({ type: "success", text: "Site settings saved successfully!" });
             setTimeout(() => setSiteMessage({ type: "", text: "" }), 3000);
         }
@@ -2186,6 +2219,23 @@ export default function SettingsPage() {
                     </div>
 
                     <div>
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Locale &amp; Timezone</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Sets the timezone used when generating slots and displaying booking times in the dashboard. Existing bookings store their times in UTC and will re-render in the new zone after the next page load.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Timezone</label>
+                                <select value={siteSettings.timezone} onChange={e => setSiteSettings({ ...siteSettings, timezone: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
+                                    {COMMON_TIMEZONES.map(tz => (
+                                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                    ))}
+                                </select>
+                                <p className="mt-1 text-[11px] text-[var(--ck-text-muted)]">Save Site Settings to apply.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Navigation, Buttons &amp; Footer Copy</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -2474,27 +2524,19 @@ export default function SettingsPage() {
                     <div>
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Chatbot Avatar</h3>
                         <div className="flex flex-wrap gap-4">
-                            {[
-                                "https://lottie.host/f88dfbd9-9fbb-43af-9ac4-400d4f0b96ae/tc9tMgAjqf.lottie",
-                                "https://lottie.host/b37e717c-85a0-4b3a-85ac-da0d0c21d0ce/6y2qqYBhTF.lottie",
-                                "https://lottie.host/e1aecbea-cf94-47e8-aae2-5f59c567c6d9/zHX4Roi2Eb.lottie",
-                                "https://lottie.host/deee1aa7-f9b1-4869-8191-b9dccacb0017/Inaq5Gmhwf.lottie",
-                                "https://lottie.host/b73fce61-6b44-489d-9692-f0a769da24a4/dhP4Oftcxd.lottie",
-                                "https://lottie.host/ec6b7394-d3cb-4e43-97b5-804cd66d76ad/QhsvIwZ3y8.lottie",
-                                "https://lottie.host/ff097c6d-c89a-4206-9b49-002cb4536da9/VHw4byv4mh.lottie",
-                                "https://lottie.host/4392b24a-4204-4e8d-9148-6744361410d6/c3f09SNsC0.lottie",
-                                "https://lottie.host/f69dd8f8-82b1-476d-b903-d8aa74eba356/o2oHgsa2mD.lottie",
-                                "https://lottie.host/0b80a0e1-bc90-4e40-9e0a-602afab059d1/HYkrm9Y0bN.lottie",
-                                "https://lottie.host/28fea83d-7e0e-442d-9146-02fb112a8116/uUo4UHGopv.lottie"
-                            ].map(url => {
-                                const isSelected = siteSettings.chatbot_avatar === url;
+                            {chatbotAvatars.length === 0 && (
+                                <p className="text-xs text-[var(--ck-text-muted)]">No avatars available. Ask a super admin to add some.</p>
+                            )}
+                            {chatbotAvatars.map(({ id, lottie_url, label }) => {
+                                const isSelected = siteSettings.chatbot_avatar === lottie_url;
                                 return (
-                                    <div key={url}
-                                        onClick={() => setSiteSettings({ ...siteSettings, chatbot_avatar: url })}
+                                    <div key={id}
+                                        title={label || ""}
+                                        onClick={() => setSiteSettings({ ...siteSettings, chatbot_avatar: lottie_url })}
                                         className={"relative cursor-pointer transition-all hover:scale-105 rounded-xl p-1 " + (isSelected ? "bg-[var(--ck-accent)] ring-2 ring-offset-2 ring-[var(--ck-accent)]" : "bg-transparent")}
                                     >
                                         <div className="w-16 h-16 bg-[var(--ck-surface)] rounded-lg flex items-center justify-center shadow-inner overflow-hidden border border-[var(--ck-border-subtle)]"
-                                            dangerouslySetInnerHTML={{ __html: `<dotlottie-wc src="${url}" style="width: 100%; height: 100%" autoplay loop></dotlottie-wc>` }}
+                                            dangerouslySetInnerHTML={{ __html: `<dotlottie-wc src="${lottie_url}" style="width: 100%; height: 100%" autoplay loop></dotlottie-wc>` }}
                                         />
                                     </div>
                                 );

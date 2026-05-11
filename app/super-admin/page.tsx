@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { notify } from "../lib/app-notify";
+import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -948,6 +948,9 @@ export default function SuperAdminPage() {
 
       {/* ── Email Usage & Billing ── */}
       <EmailUsageBilling />
+
+      {/* ── Chatbot Avatars (global catalog) ── */}
+      <ChatbotAvatarManager />
     </div>
   );
 }
@@ -1490,5 +1493,164 @@ function EmailUsageBilling() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Chatbot Avatar Manager — global catalog, super-admin only
+   ══════════════════════════════════════════════════════════════ */
+
+type AvatarRow = { id: string; lottie_url: string; label: string | null; sort_order: number; active: boolean };
+
+function ChatbotAvatarManager() {
+  const [rows, setRows] = useState<AvatarRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [newUrl, setNewUrl] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [newSortOrder, setNewSortOrder] = useState<number>(0);
+  const [adding, setAdding] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("chatbot_avatars")
+      .select("id, lottie_url, label, sort_order, active")
+      .order("sort_order", { ascending: true });
+    if (error) {
+      notify({ title: "Failed to load avatars", message: error.message, tone: "error" });
+    } else {
+      setRows((data || []) as AvatarRow[]);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    if (!document.getElementById("dotlottie-script")) {
+      const script = document.createElement("script");
+      script.id = "dotlottie-script";
+      script.src = "https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js";
+      script.type = "module";
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  async function addAvatar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newUrl.trim()) return;
+    setAdding(true);
+    const { error } = await supabase
+      .from("chatbot_avatars")
+      .insert({ lottie_url: newUrl.trim(), label: newLabel.trim() || null, sort_order: newSortOrder });
+    setAdding(false);
+    if (error) {
+      notify({ title: "Failed to add avatar", message: error.message, tone: "error" });
+      return;
+    }
+    setNewUrl("");
+    setNewLabel("");
+    setNewSortOrder(0);
+    notify({ title: "Avatar added", tone: "success" });
+    load();
+  }
+
+  async function toggleActive(row: AvatarRow) {
+    setSavingId(row.id);
+    const { error } = await supabase
+      .from("chatbot_avatars")
+      .update({ active: !row.active, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      notify({ title: "Failed to update avatar", message: error.message, tone: "error" });
+      return;
+    }
+    load();
+  }
+
+  async function updateSortOrder(row: AvatarRow, value: number) {
+    setSavingId(row.id);
+    const { error } = await supabase
+      .from("chatbot_avatars")
+      .update({ sort_order: value, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      notify({ title: "Failed to update sort", message: error.message, tone: "error" });
+      return;
+    }
+    load();
+  }
+
+  async function deleteAvatar(row: AvatarRow) {
+    const ok = await confirmAction({ title: "Delete avatar?", message: row.label || row.lottie_url, confirmLabel: "Delete", tone: "error" });
+    if (ok !== true) return;
+    setSavingId(row.id);
+    const { error } = await supabase.from("chatbot_avatars").delete().eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      notify({ title: "Failed to delete avatar", message: error.message, tone: "error" });
+      return;
+    }
+    notify({ title: "Avatar deleted", tone: "success" });
+    load();
+  }
+
+  return (
+    <section className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Avatars</h2>
+        <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Global catalog. Every tenant sees the active avatars in their booking-site settings. Only super admins can add, edit, or remove entries.</p>
+      </div>
+
+      <form onSubmit={addAvatar} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_90px_auto] items-end border-t border-[var(--ck-border-subtle)] pt-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Lottie URL</label>
+          <input value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required placeholder="https://lottie.host/.../foo.lottie" className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Label (optional)</label>
+          <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Friendly name" className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Sort</label>
+          <input type="number" value={newSortOrder} onChange={(e) => setNewSortOrder(parseInt(e.target.value || "0", 10))} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" />
+        </div>
+        <button type="submit" disabled={adding || !newUrl.trim()} className="rounded-lg bg-[var(--ck-text-strong)] px-4 py-2 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+          {adding ? "Adding..." : "Add Avatar"}
+        </button>
+      </form>
+
+      <div className="border-t border-[var(--ck-border-subtle)] pt-4">
+        {loading && <p className="text-xs text-[var(--ck-text-muted)]">Loading…</p>}
+        {!loading && rows.length === 0 && <p className="text-xs text-[var(--ck-text-muted)]">No avatars yet.</p>}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {rows.map((row) => (
+            <div key={row.id} className={"flex items-center gap-3 rounded-xl border p-3 " + (row.active ? "border-[var(--ck-border-subtle)]" : "border-dashed border-[var(--ck-border-subtle)] opacity-60")}>
+              <div className="w-14 h-14 shrink-0 bg-[var(--ck-surface)] rounded-lg flex items-center justify-center shadow-inner overflow-hidden border border-[var(--ck-border-subtle)]"
+                dangerouslySetInnerHTML={{ __html: `<dotlottie-wc src="${row.lottie_url}" style="width: 100%; height: 100%" autoplay loop></dotlottie-wc>` }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-[var(--ck-text-strong)] truncate">{row.label || "(no label)"}</div>
+                <div className="text-[10px] text-[var(--ck-text-muted)] truncate">{row.lottie_url}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <label className="text-[10px] text-[var(--ck-text-muted)]">Sort
+                    <input type="number" defaultValue={row.sort_order} onBlur={(e) => { const v = parseInt(e.target.value || "0", 10); if (v !== row.sort_order) updateSortOrder(row, v); }}
+                      disabled={savingId === row.id} className="ml-1 w-14 ui-control rounded px-1 py-0.5 text-[11px]" />
+                  </label>
+                  <button type="button" onClick={() => toggleActive(row)} disabled={savingId === row.id} className="text-[10px] underline text-[var(--ck-text-muted)] hover:text-[var(--ck-text-strong)]">
+                    {row.active ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" onClick={() => deleteAvatar(row)} disabled={savingId === row.id} className="text-[10px] underline text-[var(--ck-danger)] hover:opacity-80">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
