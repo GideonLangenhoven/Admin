@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Default limit
-    let limit = 500;
+    const limit = 500;
 
     // Get bookings scoped to this business
     let query = supabase.from("bookings")
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
     let waSent = 0;
     let emailSent = 0;
     let totalSent = 0;
-    let errors = [];
+    const errors: string[] = [];
 
     for (const b of bookings) {
       let sentToCustomer = false;

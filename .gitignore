@@ -53,9 +53,11 @@ secrets/
 
 # separate repos inside project
 .activityhub-onboarding-staging/
+/booking/
 
 # backups & temp files
 .backups/
+landing-pages/output/
 node_modules_old/
 .git_broken/
 *.log

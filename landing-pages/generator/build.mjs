@@ -11,12 +11,20 @@
  *   Exports business data as JSON, picks template, runs this script.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
+const TEMPLATE_ROOT = join(ROOT, "..", "public", "landing-pages", "templates");
+
+function availableTemplates() {
+  return readdirSync(TEMPLATE_ROOT)
+    .filter((file) => file.endsWith(".html"))
+    .map((file) => file.replace(/\.html$/, ""))
+    .sort();
+}
 
 // Parse args
 const args = process.argv.slice(2);
@@ -30,7 +38,7 @@ const templateName = getArg("template") || "adventure";
 const outDir = getArg("out") || join(ROOT, "output", "site");
 
 if (!dataPath) {
-  console.error("Usage: node build.mjs --data business.json [--template adventure|luxury|safari|modern] [--out ./output/site]");
+  console.error(`Usage: node build.mjs --data business.json [--template ${availableTemplates().join("|")}] [--out ./output/site]`);
   process.exit(1);
 }
 
@@ -38,13 +46,13 @@ if (!dataPath) {
 const data = JSON.parse(readFileSync(dataPath, "utf8"));
 
 // Load template
-const templatePath = join(ROOT, "templates", templateName + ".html");
+const templatePath = join(TEMPLATE_ROOT, templateName + ".html");
 if (!existsSync(templatePath)) {
   console.error(`Template not found: ${templatePath}`);
-  console.error("Available: adventure, luxury, safari, modern");
+  console.error(`Available: ${availableTemplates().join(", ")}`);
   process.exit(1);
 }
-let html = readFileSync(templatePath, "utf8");
+const html = readFileSync(templatePath, "utf8");
 
 // Simple Handlebars-like replacement
 // {{variable}} → data.variable

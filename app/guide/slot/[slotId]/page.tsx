@@ -65,7 +65,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: true, checked_in_at: new Date().toISOString() } : b));
 
     if (!navigator.onLine) {
-      await queueLocally({ id: clientEventId, payload, queuedAt: Date.now() });
+      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime() });
       if ("serviceWorker" in navigator) {
         const reg = await navigator.serviceWorker.ready;
         try { await (reg as any).sync?.register("sync-check-ins"); } catch (_) {}
@@ -81,7 +81,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       });
       if (!r.ok) throw new Error("failed");
     } catch (_) {
-      await queueLocally({ id: clientEventId, payload, queuedAt: Date.now() });
+      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime() });
     }
   }
 

@@ -3,6 +3,15 @@ import { useEffect, useState, useRef } from "react";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { getAuthHeaders } from "../../lib/admin-auth";
 import { notify } from "../../lib/app-notify";
+import {
+  DAY_KEYS,
+  DAY_LABELS,
+  type BusinessHours,
+  type DayBusinessHours,
+  type DayKey,
+  isCompleteBusinessHours,
+  normalizeBusinessHours,
+} from "../../lib/business-hours";
 import LiveStatusBadge from "./LiveStatusBadge";
 import ModeOption from "./ModeOption";
 
@@ -21,7 +30,9 @@ export default function WhatsAppBotSection() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [hoursDraft, setHoursDraft] = useState<BusinessHours>(() => normalizeBusinessHours(null));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hoursDirtyRef = useRef(false);
 
   async function load() {
     const headers = await getAuthHeaders();
@@ -30,6 +41,9 @@ export default function WhatsAppBotSection() {
       const data = await r.json();
       setState(data);
       setSelectedMode(data.mode);
+      if (!hoursDirtyRef.current) {
+        setHoursDraft(normalizeBusinessHours(data.businessHours));
+      }
       setLoadError("");
     } else if (r.status === 401) {
       setLoadError("sign-in");
@@ -46,22 +60,29 @@ export default function WhatsAppBotSection() {
   }, [businessId]);
 
   async function save() {
-    if (!isPrivileged || selectedMode === state?.mode) return;
+    if (!isPrivileged || !state || (selectedMode === state.mode && !hasHoursChanged)) return;
     setSaving(true);
     const r = await fetch("/api/admin/whatsapp/bot-mode", {
       method: "PUT",
       headers: await getAuthHeaders(),
-      body: JSON.stringify({ mode: selectedMode }),
+      body: JSON.stringify({ mode: selectedMode, businessHours: hoursDraft }),
     });
     if (r.ok) {
       const data = await r.json();
-      setState(prev => prev ? { ...prev, mode: data.mode, currentlyActive: data.currentlyActive } : prev);
-      notify({ title: "Saved", message: `WhatsApp bot mode set to ${data.mode.replace("_", " ").toLowerCase()}`, tone: "success" });
+      hoursDirtyRef.current = false;
+      setState(prev => prev ? { ...prev, mode: data.mode, currentlyActive: data.currentlyActive, businessHours: data.businessHours } : prev);
+      setHoursDraft(normalizeBusinessHours(data.businessHours));
+      notify({ title: "Saved", message: "WhatsApp auto-reply settings updated.", tone: "success" });
     } else {
       const err = await r.json();
       notify({ title: "Something went wrong", message: err.error || "Could not save. Try again.", tone: "error" });
     }
     setSaving(false);
+  }
+
+  function updateDay(day: DayKey, patch: Partial<DayBusinessHours>) {
+    hoursDirtyRef.current = true;
+    setHoursDraft(prev => ({ ...prev, [day]: { ...prev[day], ...patch } }));
   }
 
   if (loading) {
@@ -88,8 +109,12 @@ export default function WhatsAppBotSection() {
     );
   }
 
-  const businessHoursSummary = state.businessHours
-    ? "your configured business hours"
+  const hasSavedBusinessHours = isCompleteBusinessHours(state.businessHours);
+  const savedHours = normalizeBusinessHours(state.businessHours);
+  const hasHoursChanged = !hasSavedBusinessHours || JSON.stringify(hoursDraft) !== JSON.stringify(savedHours);
+  const canSave = isPrivileged && !saving && (selectedMode !== state.mode || hasHoursChanged);
+  const businessHoursSummary = hasSavedBusinessHours
+    ? "the support hours below"
     : "business hours (not yet configured)";
 
   return (
@@ -131,10 +156,69 @@ export default function WhatsAppBotSection() {
         />
       </div>
 
+      <div className="mt-6 rounded-xl border p-4" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>WhatsApp support hours</h4>
+            <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+              When set to outside-hours mode, the assistant replies outside these times.
+            </p>
+          </div>
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(16, 185, 129, 0.12)", color: "var(--ck-accent)" }}>
+            {state.timezone || "UTC"}
+          </span>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {DAY_KEYS.map(day => {
+            const hours = hoursDraft[day];
+            return (
+              <div key={day} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(110px,1fr)_auto_auto_auto]" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}>
+                <label className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>
+                  <input
+                    type="checkbox"
+                    checked={!hours.closed}
+                    disabled={!isPrivileged}
+                    onChange={(e) => updateDay(day, { closed: !e.target.checked })}
+                    className="accent-emerald-600"
+                  />
+                  {DAY_LABELS[day]}
+                </label>
+                <label className="grid gap-1 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>
+                  Opens
+                  <input
+                    type="time"
+                    value={hours.open}
+                    disabled={!isPrivileged || hours.closed}
+                    onChange={(e) => updateDay(day, { open: e.target.value })}
+                    className="h-9 rounded-lg border px-2 text-sm normal-case"
+                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  />
+                </label>
+                <label className="grid gap-1 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>
+                  Closes
+                  <input
+                    type="time"
+                    value={hours.close}
+                    disabled={!isPrivileged || hours.closed}
+                    onChange={(e) => updateDay(day, { close: e.target.value })}
+                    className="h-9 rounded-lg border px-2 text-sm normal-case"
+                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  />
+                </label>
+                <div className="flex items-end text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                  {hours.closed ? "Closed all day" : `${hours.open} to ${hours.close}`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {isPrivileged ? (
         <button
           onClick={save}
-          disabled={selectedMode === state.mode || saving}
+          disabled={!canSave}
           className="mt-6 rounded-xl px-6 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save changes"}
@@ -145,15 +229,9 @@ export default function WhatsAppBotSection() {
         </p>
       )}
 
-      {selectedMode === "OUTSIDE_HOURS" && !state.businessHours && (
-        <p className="mt-4 text-xs text-red-600">
-          You must configure business hours in the General tab before using this mode.
-        </p>
-      )}
-
-      {state.mode === "OUTSIDE_HOURS" && state.businessHours && (
+      {state.mode === "OUTSIDE_HOURS" && hasSavedBusinessHours && (
         <p className="mt-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-          Tip: your business hours are managed in the General tab. The assistant uses those to decide when to reply.
+          The assistant uses these support hours to decide when to reply.
         </p>
       )}
     </section>

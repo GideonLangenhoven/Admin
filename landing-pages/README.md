@@ -4,6 +4,9 @@ Auto-generated landing pages for each client business, deployed to Firebase Host
 
 ## Templates
 
+Templates live in `public/landing-pages/templates/` so the super-admin preview
+and the static generator use the same source files.
+
 | Template | Style | Inspired By |
 |----------|-------|-------------|
 | **adventure** | Cinematic full-width hero, bold outdoor feel | [Iceland Travel](https://icelandtravel.is) |
@@ -91,13 +94,8 @@ Firebase provides the DNS records to add:
 ## Structure
 ```
 landing-pages/
-├── templates/
-│   ├── adventure.html    ← Cinematic outdoor
-│   ├── luxury.html       ← Elegant minimal
-│   ├── safari.html       ← Warm lodge
-│   └── modern.html       ← Bold split-hero
 ├── generator/
-│   └── build.mjs         ← Template → static HTML
+│   └── build.mjs         ← public template → static HTML
 ├── output/               ← Generated sites (gitignored)
 ├── firebase.json         ← Firebase hosting config
 ├── .firebaserc           ← Firebase project link

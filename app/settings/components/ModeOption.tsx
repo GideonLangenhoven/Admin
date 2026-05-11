@@ -13,8 +13,9 @@ export default function ModeOption({ value, checked, onChange, title, descriptio
   return (
     <label
       className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-colors ${
-        checked ? "border-emerald-300 bg-emerald-50/50" : "border-[var(--ck-border)] hover:bg-[var(--ck-surface)]"
+        checked ? "border-emerald-300" : "border-[var(--ck-border)] hover:bg-[var(--ck-surface)]"
       } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+      style={checked ? { background: "rgba(16, 185, 129, 0.12)" } : undefined}
     >
       <input
         type="radio"

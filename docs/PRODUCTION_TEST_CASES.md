@@ -736,15 +736,15 @@
 
 | Template | File |
 |----------|------|
-| Adventure | `landing-pages/templates/adventure.html` |
-| Coastal | `landing-pages/templates/coastal.html` |
-| Dark | `landing-pages/templates/dark.html` |
-| Luxury | `landing-pages/templates/luxury.html` |
-| Minimal | `landing-pages/templates/minimal.html` |
-| Modern | `landing-pages/templates/modern.html` |
-| Retro | `landing-pages/templates/retro.html` |
-| Safari | `landing-pages/templates/safari.html` |
-| Tropical | `landing-pages/templates/tropical.html` |
+| Adventure | `public/landing-pages/templates/adventure.html` |
+| Coastal | `public/landing-pages/templates/coastal.html` |
+| Dark | `public/landing-pages/templates/dark.html` |
+| Luxury | `public/landing-pages/templates/luxury.html` |
+| Minimal | `public/landing-pages/templates/minimal.html` |
+| Modern | `public/landing-pages/templates/modern.html` |
+| Retro | `public/landing-pages/templates/retro.html` |
+| Safari | `public/landing-pages/templates/safari.html` |
+| Tropical | `public/landing-pages/templates/tropical.html` |
 
 ---
 

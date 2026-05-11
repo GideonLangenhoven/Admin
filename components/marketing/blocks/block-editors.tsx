@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Image as ImageIcon, Plus, Trash, X, TextB, TextItalic, TextUnderline, TextAlignLeft, TextAlignCenter, TextAlignRight } from "@phosphor-icons/react";
 import type {
   Block,
@@ -127,10 +127,12 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
 
   // Only set innerHTML from props when NOT actively editing (initial load / block switch)
   const lastSetRef = useRef(block.content);
-  if (editorRef.current && !editingRef.current && block.content !== lastSetRef.current) {
-    editorRef.current.innerHTML = block.content;
-    lastSetRef.current = block.content;
-  }
+  useEffect(() => {
+    if (editorRef.current && !editingRef.current && block.content !== lastSetRef.current) {
+      editorRef.current.innerHTML = block.content;
+      lastSetRef.current = block.content;
+    }
+  }, [block.content]);
 
   const btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-bg-subtle)] transition-colors";
   const btnActive = "bg-[var(--ck-bg-subtle)]";

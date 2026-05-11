@@ -81,6 +81,7 @@ export default function Dashboard() {
     // Roll call state
     const [activeSlotIdx, setActiveSlotIdx] = useState(0);
     const [manualSlotNav, setManualSlotNav] = useState(false);
+    const [now, setNow] = useState(() => Date.now());
 
     // Weather location
     const [locations, setLocations] = useState<WeatherLocation[]>([]);
@@ -101,6 +102,11 @@ export default function Dashboard() {
         if (!businessId) return;
         loadWeatherLocations();
     }, [businessId]);
+
+    useEffect(() => {
+        const iv = setInterval(() => setNow(Date.now()), 60_000);
+        return () => clearInterval(iv);
+    }, []);
 
     async function loadWeatherLocations() {
         try {
@@ -535,7 +541,7 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                                     {slotGroups.map((slot, i) => {
-                                        const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < Date.now());
+                                        const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < now);
                                         return (
                                             <tr
                                                 key={slot.timeRaw}

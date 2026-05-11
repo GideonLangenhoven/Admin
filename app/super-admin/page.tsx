@@ -1551,7 +1551,7 @@ function ChatbotAvatarManager() {
     setNewUrl("");
     setNewLabel("");
     setNewSortOrder(0);
-    notify({ title: "Avatar added", tone: "success" });
+    notify({ title: "Avatar added", message: "New chatbot avatar saved.", tone: "success" });
     load();
   }
 
@@ -1593,7 +1593,7 @@ function ChatbotAvatarManager() {
       notify({ title: "Failed to delete avatar", message: error.message, tone: "error" });
       return;
     }
-    notify({ title: "Avatar deleted", tone: "success" });
+    notify({ title: "Avatar deleted", message: "Chatbot avatar removed.", tone: "success" });
     load();
   }
 

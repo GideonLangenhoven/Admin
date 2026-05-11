@@ -2,6 +2,10 @@ video/
 video1/
 my-video/
 auto-research/
+booking/
+.next/
+node_modules/
+coverage/
 docs/
 landing-pages/
 public/pictures/
@@ -18,5 +22,6 @@ playwright.config.ts
 .backups/
 .git_broken/
 node_modules_old/
+next-env.d.ts
 tsconfig.tsbuildinfo
 .activityhub-onboarding-staging/

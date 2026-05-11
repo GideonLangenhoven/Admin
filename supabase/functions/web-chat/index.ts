@@ -545,7 +545,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         if (_slotData?.price_per_person_override != null) {
           serverUnitPrice = Number(_slotData.price_per_person_override);
         }
-        let priceCheck = verifyChatBookingPricing({
+        const priceCheck = verifyChatBookingPricing({
           quotedTotal: ft,
           qty: Number(ns.qty || 0),
           unitPrice: serverUnitPrice,
@@ -563,10 +563,10 @@ Deno.serve(withSentry("web-chat", async (req) => {
           buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
           return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
         }
-        let serverBaseTotal = priceCheck.pricing?.baseTotal || 0;
-        let serverDiscount = priceCheck.pricing?.discount || 0;
-        let serverVded = priceCheck.pricing?.voucherDeduction || 0;
-        let serverTotal = priceCheck.pricing?.total || 0;
+        const serverBaseTotal = priceCheck.pricing?.baseTotal || 0;
+        const serverDiscount = priceCheck.pricing?.discount || 0;
+        const serverVded = priceCheck.pricing?.voucherDeduction || 0;
+        const serverTotal = priceCheck.pricing?.total || 0;
 
         // H2: Re-validate voucher at finalization time
         if (ns.vid) {

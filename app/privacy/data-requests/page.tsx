@@ -36,7 +36,13 @@ export default function DataRequestsPage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
+
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(iv);
+  }, []);
 
   async function authHeaders() {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -185,7 +191,7 @@ export default function DataRequestsPage() {
         <div className="space-y-3">
           {filtered.map(r => {
             const daysUntilDue = r.scheduled_for
-              ? Math.max(0, Math.ceil((new Date(r.scheduled_for).getTime() - Date.now()) / 86_400_000))
+              ? Math.max(0, Math.ceil((new Date(r.scheduled_for).getTime() - now) / 86_400_000))
               : null;
             return (
               <div key={r.id} className="p-4 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
