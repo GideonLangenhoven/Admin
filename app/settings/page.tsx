@@ -1537,33 +1537,19 @@ export default function SettingsPage() {
 
                 {/* Add Admin Form + Subscription */}
                 <div className="space-y-6">
-                    {/* Subscription Status */}
-                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
-                        <h2 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">Subscription Status</h2>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold " +
-                                    (subscriptionStatus === "SUSPENDED" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
-                                    {subscriptionStatus}
-                                </span>
-                                <span className="text-xs text-[var(--ck-text-muted)]">
-                                    {subscriptionStatus === "SUSPENDED" ? "Dashboard access is blocked for all admins" : "Dashboard is accessible"}
-                                </span>
-                            </div>
-                            <button
-                                onClick={toggleSubscription}
-                                disabled={togglingSubscription}
-                                className={"text-xs font-medium px-3 py-1.5 rounded-lg border disabled:opacity-50 " +
-                                    (subscriptionStatus === "SUSPENDED"
-                                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                                        : "border-red-300 text-red-700 hover:bg-red-50")}
-                            >
-                                {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
-                            </button>
-                        </div>
+                    <div className="flex items-center justify-between gap-4">
+                        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Add New Admin</h2>
+                        <button
+                            onClick={toggleSubscription}
+                            disabled={togglingSubscription}
+                            className={"text-xs font-medium px-3 py-1.5 rounded-lg border disabled:opacity-50 whitespace-nowrap " +
+                                (subscriptionStatus === "SUSPENDED"
+                                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                    : "border-red-300 text-red-700 hover:bg-red-50")}
+                        >
+                            {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
+                        </button>
                     </div>
-
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Add New Admin</h2>
                     <form onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
                             <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm">
