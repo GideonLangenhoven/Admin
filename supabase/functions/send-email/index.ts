@@ -573,17 +573,19 @@ function voucherPaymentLinkHtml(d: Record<string, unknown>) {
 function bookingConfirmHtml(d: Record<string, unknown>) {
   const waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
   const waiverUrl = String(d.waiver_url || "");
+  // Use #1b3b36 / #A8C2B8 tokens so the post-processor at
+  // line ~442 swaps them to the tenant's emailColor + derived accent.
   const waiverBlock = waiverPending && waiverUrl
     ? `
         <tr>
           <td style="padding: 0 40px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border: 1px solid #A8C2B8; border-radius: 12px;">
               <tr>
                 <td style="padding: 22px; text-align: center;">
-                  <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #047857;">Action required</p>
-                  <h3 style="margin: 0 0 10px 0; font-family: Georgia, serif; font-size: 22px; color: #14532d;">Complete your waiver</h3>
-                  <p style="margin: 0 0 18px 0; font-size: 14px; color: #166534; line-height: 1.6;">Please complete the waiver for this booking before the trip. The link covers the booking contact and the guests on this reservation.</p>
-                  <a href="${waiverUrl}" style="display: inline-block; background-color: #166534; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;">Sign waiver</a>
+                  <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #1b3b36;">Action required</p>
+                  <h3 style="margin: 0 0 10px 0; font-family: Georgia, serif; font-size: 22px; color: #1b3b36;">Complete your waiver</h3>
+                  <p style="margin: 0 0 18px 0; font-size: 14px; color: #1b3b36; line-height: 1.6;">Please complete the waiver for this booking before the trip. The link covers the booking contact and the guests on this reservation.</p>
+                  <a href="${waiverUrl}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;">Sign waiver</a>
                 </td>
               </tr>
             </table>
@@ -593,10 +595,10 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
     : `
         <tr>
           <td style="padding: 0 40px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border: 1px solid #A8C2B8; border-radius: 12px;">
               <tr>
                 <td style="padding: 18px 22px; text-align: center;">
-                  <p style="margin: 0; font-size: 14px; color: #1d4ed8; line-height: 1.6;"><strong>Waiver status:</strong> Completed for this booking.</p>
+                  <p style="margin: 0; font-size: 14px; color: #1b3b36; line-height: 1.6;"><strong>Waiver status:</strong> Completed for this booking.</p>
                 </td>
               </tr>
             </table>
@@ -680,7 +682,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
               180 Beach Rd, Three Anchor Bay<br>
               Cape Town, 8005
             </p>
-            <a href="https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>
+            <a href="https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>
             <p style="font-size: 14px; color: #555; line-height: 1.5; margin: 15px 0 0 0;">
               Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.
             </p>
