@@ -3,7 +3,7 @@ import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
-import { getAdminTimezone, setAdminTimezone, zonedToUtc, COMMON_TIMEZONES } from "../lib/admin-timezone";
+import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
 import { ChevronDown } from "lucide-react";
@@ -2214,23 +2214,6 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
                                 <input type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Locale &amp; Timezone</h3>
-                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Sets the timezone used when generating slots and displaying booking times in the dashboard. Existing bookings store their times in UTC and will re-render in the new zone after the next page load.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Timezone</label>
-                                <select value={siteSettings.timezone} onChange={e => setSiteSettings({ ...siteSettings, timezone: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
-                                    {COMMON_TIMEZONES.map(tz => (
-                                        <option key={tz.value} value={tz.value}>{tz.label}</option>
-                                    ))}
-                                </select>
-                                <p className="mt-1 text-[11px] text-[var(--ck-text-muted)]">Save Site Settings to apply.</p>
                             </div>
                         </div>
                     </div>
