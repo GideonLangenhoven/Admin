@@ -208,9 +208,13 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     voucherUrl: String(data?.gift_voucher_url || d.gift_voucher_url || (data?.booking_site_url ? String(data.booking_site_url).replace(/\/+$/, "") + "/gift-voucher" : (data?.subdomain ? "https://" + data.subdomain + ".booking.bookingtours.co.za/gift-voucher" : ""))),
     waiverUrl: String(data?.waiver_url || d.waiver_url || ""),
     directions: String(data?.directions || d.directions || ""),
-    // Always derive from subdomain: noreply@{slug}.bookingtours.co.za
-    fromEmail: data?.subdomain
-      ? brandName + " <noreply@" + data.subdomain + ".bookingtours.co.za>"
+    // Use the verified root domain for the envelope and pass the tenant brand
+    // in the display name. Per-subdomain From requires the subdomain to be
+    // added + DNS-verified in Resend, which isn't done per tenant — so until
+    // each tenant verifies its own subdomain, sending from there gets a 403
+    // "domain not verified" and the email never goes out.
+    fromEmail: brandName
+      ? brandName + " <noreply@bookingtours.co.za>"
       : FROM_EMAIL,
     // Reply-To uses the tenant's notification_email so customer replies go to the right place
     replyToEmail: String(data?.notification_email || ""),
@@ -601,7 +605,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
       `;
   // Activity-aware messaging based on tour name
   const tourLower = String(d.tour_name || "").toLowerCase();
-  const activityFlavor = "Get ready for an unforgettable experience.";
+  let activityFlavor = "Get ready for an unforgettable experience.";
   if (/kayak|paddle|canoe/.test(tourLower)) activityFlavor = "Get ready for an unforgettable experience on the water.";
   else if (/hike|hiking|trail|walk|mountain/.test(tourLower)) activityFlavor = "Lace up your boots and get ready for an incredible adventure on the trail.";
   else if (/surf|wave/.test(tourLower)) activityFlavor = "Get ready to catch some waves and have an amazing time.";
