@@ -73,8 +73,10 @@ Deno.serve(async (req: any) => {
     return new Response("ok", { headers: buildCors(req?.headers?.get("origin") || "*") });
   }
 
+  let _reqBody: any = {};
   try {
     const body = await req.json();
+    _reqBody = { booking_id: body.booking_id, voucher_id: body.voucher_id, type: body.type || "BOOKING", amount: body.amount };
     let amount = body.amount;
     const bookingId = body.booking_id;
     const voucherId = body.voucher_id;
@@ -330,7 +332,7 @@ Deno.serve(async (req: any) => {
           const bk = bkNotif.data;
           if (bk && SERVICE_ROLE_KEY_ENV) {
             const notifEmail = String(bk.email || customerEmail || "").trim().toLowerCase();
-            const notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
+            let notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
             if (notifPhone && notifPhone.startsWith("0")) notifPhone = "27" + notifPhone.substring(1);
             const notifName = String(bk.customer_name || body.customer_name || "").trim();
             const notifFirst = notifName.split(" ")[0] || "there";
@@ -412,7 +414,7 @@ Deno.serve(async (req: any) => {
 
     return new Response(JSON.stringify({ error: "Yoco error", details: yocoData }), { status: 500, headers: corsHeaders });
   } catch (err: any) {
-    console.error("CHECKOUT_ERR:", err);
+    console.error("CHECKOUT_ERR:", err?.message || err, JSON.stringify(_reqBody));
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: buildCors(req?.headers?.get("origin") || "*") });
   }
 });

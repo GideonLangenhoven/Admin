@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappWithWindowReopen, resolveManageBookingsUrl, getAdminAppOrigins, isAllowedOrigin, formatTenantDateTime } from "../_shared/tenant.ts";
+import { requireAuth, type AuthResult } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -14,14 +15,42 @@ function getCors(req?: any) {
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
+function canWeatherCancel(auth: AuthResult, businessId: string) {
+  if (auth.isServiceRole) return true;
+  if (auth.businessId !== businessId) return false;
+  return auth.role === "MAIN_ADMIN" || auth.role === "SUPER_ADMIN";
+}
+
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
+    let auth: AuthResult;
+    try {
+      auth = await requireAuth(req);
+    } catch (authErr: any) {
+      return new Response(JSON.stringify({ error: authErr?.message || "Unauthorized" }), { status: 401, headers: getCors(req) });
+    }
+
     const body = await req.json();
-    const { slot_ids, business_id, reason } = body;
+    let { slot_ids, business_id, booking_ids, reason } = body;
+
+    if (!business_id && !auth.isServiceRole) business_id = auth.businessId;
 
     if (!business_id) return new Response(JSON.stringify({ error: "business_id required" }), { status: 400, headers: getCors(req) });
+    if (!canWeatherCancel(auth, business_id)) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+
+    if ((!Array.isArray(slot_ids) || slot_ids.length === 0) && Array.isArray(booking_ids) && booking_ids.length > 0) {
+      const { data: bookingSlots, error: bookingSlotErr } = await supabase
+        .from("bookings")
+        .select("slot_id")
+        .eq("business_id", business_id)
+        .in("id", booking_ids)
+        .not("slot_id", "is", null);
+      if (bookingSlotErr) throw bookingSlotErr;
+      slot_ids = [...new Set((bookingSlots || []).map((b: any) => b.slot_id).filter(Boolean))];
+    }
+
     if (!Array.isArray(slot_ids) || slot_ids.length === 0) return new Response(JSON.stringify({ error: "slot_ids array required" }), { status: 400, headers: getCors(req) });
 
     const tenant = await getTenantByBusinessId(supabase, business_id);
@@ -30,7 +59,7 @@ Deno.serve(async (req: any) => {
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
-    await supabase.from("slots").update({ status: "CLOSED" }).in("id", slot_ids);
+    await supabase.from("slots").update({ status: "CLOSED" }).eq("business_id", business_id).in("id", slot_ids);
 
     // 2. Fetch all active bookings on these slots
     const { data: bookings } = await supabase
@@ -60,7 +89,7 @@ Deno.serve(async (req: any) => {
           refund_amount: refundAmount,
           refund_notes: "Weather cancellation — customer to choose: reschedule, voucher, or refund via My Bookings",
         } : {}),
-      }).eq("id", b.id);
+      }).eq("business_id", business_id).eq("id", b.id);
 
       // Accumulate capacity deltas per slot (avoids read-then-write race)
       if (!slotDeltas[b.slot_id]) slotDeltas[b.slot_id] = { booked: 0, held: 0 };
@@ -68,18 +97,26 @@ Deno.serve(async (req: any) => {
       if (b.status === "HELD") slotDeltas[b.slot_id].held += Number(b.qty || 0);
 
       // Cancel any active holds
-      await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
+      await supabase.from("holds").update({ status: "CANCELLED" }).eq("business_id", business_id).eq("booking_id", b.id).eq("status", "ACTIVE");
     }
 
     // ── Phase 2: Release slot capacity in one atomic update per slot ──
     for (const slotId of Object.keys(slotDeltas)) {
       const delta = slotDeltas[slotId];
-      const { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", slotId).maybeSingle();
-      if (slotData) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotData.booked || 0) - delta.booked),
-          held: Math.max(0, (slotData.held || 0) - delta.held),
-        }).eq("id", slotId);
+      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
+        p_slot_id: slotId,
+        p_business_id: business_id,
+        p_booked_delta: -delta.booked,
+        p_held_delta: -delta.held,
+      });
+      if (rpcRes.error) {
+        const { data: slotData } = await supabase.from("slots").select("booked, held").eq("business_id", business_id).eq("id", slotId).maybeSingle();
+        if (slotData) {
+          await supabase.from("slots").update({
+            booked: Math.max(0, (slotData.booked || 0) - delta.booked),
+            held: Math.max(0, (slotData.held || 0) - delta.held),
+          }).eq("business_id", business_id).eq("id", slotId);
+        }
       }
     }
 

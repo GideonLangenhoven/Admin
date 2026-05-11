@@ -7,8 +7,6 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 
-const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const DAYS = 7;
 
 type WeatherLocation = { id: string; name: string; lat: number; lon: number; wgSpot?: number; isDefault?: boolean };
@@ -127,19 +125,16 @@ export default function Weather() {
     })) return;
     setCancelling(slotId);
     try {
-      const r = await fetch(SU + "/functions/v1/weather-cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-        body: JSON.stringify({ slot_ids: [slotId], business_id: businessId, reason }),
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: { slot_ids: [slotId], business_id: businessId, reason },
       });
-      const d = await r.json();
-      if (!r.ok || d?.error) {
-        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      if (error || (data as any)?.error) {
+        notify({ title: "Weather cancellation failed", message: error?.message || (data as any)?.error || "Unknown error", tone: "error" });
       } else {
-        const refundMsg = d.refunds_queued > 0
-          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+        const refundMsg = (data as any)?.refunds_queued > 0
+          ? ` ${(data as any).refunds_queued} refund(s) processed server-side.`
           : "";
-        notify({ title: "Weather cancellation completed", message: `${d.bookings_cancelled} booking(s) cancelled and notified.${refundMsg}`, tone: "success" });
+        notify({ title: "Weather cancellation completed", message: `${(data as any)?.bookings_cancelled || 0} booking(s) cancelled and notified.${refundMsg}`, tone: "success" });
       }
     } catch (err: any) {
       notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });
@@ -159,19 +154,16 @@ export default function Weather() {
     setCancellingAll(true);
     try {
       const allSlotIds = slots.map((s: any) => s.id);
-      const r = await fetch(SU + "/functions/v1/weather-cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-        body: JSON.stringify({ slot_ids: allSlotIds, business_id: businessId, reason }),
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: { slot_ids: allSlotIds, business_id: businessId, reason },
       });
-      const d = await r.json();
-      if (!r.ok || d?.error) {
-        notify({ title: "Weather cancellation failed", message: d?.error || r.statusText || "Unknown error", tone: "error" });
+      if (error || (data as any)?.error) {
+        notify({ title: "Weather cancellation failed", message: error?.message || (data as any)?.error || "Unknown error", tone: "error" });
       } else {
-        const refundMsg = d.refunds_queued > 0
-          ? ` ${d.refunds_queued} refund(s) processed server-side.`
+        const refundMsg = (data as any)?.refunds_queued > 0
+          ? ` ${(data as any).refunds_queued} refund(s) processed server-side.`
           : "";
-        notify({ title: "All slots cancelled", message: `${d.slots_closed} slot(s) closed, ${d.bookings_cancelled} booking(s) cancelled.${refundMsg}`, tone: "success" });
+        notify({ title: "All slots cancelled", message: `${(data as any)?.slots_closed || 0} slot(s) closed, ${(data as any)?.bookings_cancelled || 0} booking(s) cancelled.${refundMsg}`, tone: "success" });
       }
     } catch (err: any) {
       notify({ title: "Weather cancellation failed", message: "Error: " + err.message, tone: "error" });

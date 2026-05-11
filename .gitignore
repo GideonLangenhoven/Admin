@@ -59,6 +59,8 @@ secrets/
 node_modules_old/
 .git_broken/
 *.log
+_tmp_*
+supabase/.temp/
 
 # editor & OS
 .vscode/settings.json

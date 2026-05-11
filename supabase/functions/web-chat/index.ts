@@ -11,6 +11,7 @@ import {
   KB_REFUSAL_REPLY,
 } from "../_shared/bot-guards.ts";
 import { classifyIntent, priorityForIntent, findFaqMatch } from "../_shared/intent.ts";
+import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 const GK = Deno.env.get("GEMINI_API_KEY");
 const SU = Deno.env.get("SUPABASE_URL");
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -65,7 +66,7 @@ function fmtDate(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return 
 function fmtTime(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
 function dateKey(iso) { const d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: _requestTimezone }).format(d); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
-function normP(p) { if (!p) return ""; const c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c; }
+function normP(p) { if (!p) return ""; let c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c; }
 function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any): string | null {
   if (faq) {
     if (Array.isArray(faq)) {
@@ -183,7 +184,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
   try {
     const body = await req.json(); const hist = body.messages || []; const msg = body.message || ""; const state = body.state || { step: "IDLE" };
     const now = new Date(); let ns = { ...state }; let pay = null; let reply = ""; let buttons = null; let calendar = null;
-    const requestedBusinessId = body.business_id || body.businessId || state.bid || "";
+    let requestedBusinessId = body.business_id || body.businessId || state.bid || "";
     const requestOrigin = req?.headers?.get("origin") || "";
     // L10: Reset timezone at start of each request
     _requestTimezone = "UTC";
@@ -293,7 +294,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
       }
       if (wBook || wAvail) {
-        const mt = null;
+        let mt = null;
         for (const t of tours) {
           const tn = t.name.toLowerCase();
           if (tn.includes("private") && lo.includes("private")) { mt = t; break; }
@@ -322,7 +323,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     // ===== PICK_TOUR =====
     if (step === "PICK_TOUR") {
-      const picked = null;
+      let picked = null;
       if (isBtnClick) picked = tours.find(function (t) { return t.id === btnVal; });
       else {
         for (const t5 of tours) {
@@ -403,7 +404,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     // ===== PICK_TIME =====
     if (step === "PICK_TIME") {
-      const slotId = null; const slotTime = null;
+      let slotId = null; let slotTime = null;
       if (isBtnClick) {
         // L22: Verify slot belongs to the selected tour to prevent slot ownership tampering
         const { data: sl } = await db.from("slots").select("id,start_time,tour_id").eq("id", btnVal).single();
@@ -429,7 +430,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         const mx = Number(sc || 10);
         if (n > mx) { reply = "Only " + mx + " spots left — would " + mx + " work?"; }
         else {
-          const tot = n * ns.tprice; const disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
+          let tot = n * ns.tprice; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
           if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*";
           else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*"]);
         }
@@ -439,7 +440,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // ===== ASK_NAME =====
     if (step === "ASK_DETAILS") {
       const dParts = msg.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
-      const dName = ""; const dEmail = ""; const dPhone = "";
+      let dName = ""; let dEmail = ""; let dPhone = "";
       for (const dp of dParts) { const dc = dp.replace(/^(name|email|phone|tel|mobile|cell|number)[:\-\s]*/i, "").trim(); if (!dc) continue; if (dc.includes("@") && dc.includes(".") && !dEmail) { dEmail = dc.toLowerCase(); } else if (dc.replace(/[\s\-\+\(\)]/g, "").match(/^\d{7,15}$/) && !dPhone) { dPhone = normP(dc); } else if (dc.match(/[a-zA-Z]/) && !dName) { dName = dc; } }
       if (!dName || !dEmail || !dPhone) {
         const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address"); if (!dPhone) dMiss.push("phone number");
@@ -495,7 +496,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         if (vc.length === 8) {
           // C2: Filter vouchers by business_id to prevent cross-tenant usage
           const { data: vd } = await db.from("vouchers").select("*").eq("code", vc).eq("business_id", requestedBusinessId).single();
-          if (vd && vd.status === "ACTIVE") { const vv = Number(vd.current_balance || vd.value || vd.purchase_amount || 0); const dd = vv; if (vd.type === "FREE_TRIP") { const ftPax = Math.min(vd.pax_limit || 1, ns.qty); const ftSlotCost = ns.tprice * ftPax; const ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, ns.total); } else { dd = Math.min(vv, ftSlotCost, ns.total); } } else { dd = Math.min(vv, ns.total); } const nt = Math.max(0, ns.total - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+          if (vd && vd.status === "ACTIVE") { const vv = Number(vd.current_balance || vd.value || vd.purchase_amount || 0); let dd = vv; if (vd.type === "FREE_TRIP") { const ftPax = Math.min(vd.pax_limit || 1, ns.qty); const ftSlotCost = ns.tprice * ftPax; const ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, ns.total); } else { dd = Math.min(vv, ftSlotCost, ns.total); } } else { dd = Math.min(vv, ns.total); } const nt = Math.max(0, ns.total - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
           else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
           else { reply = "Can't find that code — double-check it?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
         } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
@@ -510,7 +511,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (vc2.length === 8) {
         // C2: Filter vouchers by business_id to prevent cross-tenant usage
         const { data: vd2 } = await db.from("vouchers").select("*").eq("code", vc2).eq("business_id", requestedBusinessId).single();
-        if (vd2 && vd2.status === "ACTIVE") { const vv2 = Number(vd2.current_balance || vd2.value || vd2.purchase_amount || 0); const dd2 = vv2; if (vd2.type === "FREE_TRIP") { const ft2Pax = Math.min(vd2.pax_limit || 1, ns.qty); const ft2SlotCost = ns.tprice * ft2Pax; const ft2PurchaseVal = Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0); if (ft2SlotCost > ft2PurchaseVal) { dd2 = Math.min(ft2PurchaseVal, ns.total); } else { dd2 = Math.min(vv2, ft2SlotCost, ns.total); } } else { dd2 = Math.min(vv2, ns.total); } const nt2 = Math.max(0, ns.total - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type, vpaxlimit: vd2.pax_limit || 1, vpurchasevalue: Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0) }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+        if (vd2 && vd2.status === "ACTIVE") { const vv2 = Number(vd2.current_balance || vd2.value || vd2.purchase_amount || 0); let dd2 = vv2; if (vd2.type === "FREE_TRIP") { const ft2Pax = Math.min(vd2.pax_limit || 1, ns.qty); const ft2SlotCost = ns.tprice * ft2Pax; const ft2PurchaseVal = Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0); if (ft2SlotCost > ft2PurchaseVal) { dd2 = Math.min(ft2PurchaseVal, ns.total); } else { dd2 = Math.min(vv2, ft2SlotCost, ns.total); } } else { dd2 = Math.min(vv2, ns.total); } const nt2 = Math.max(0, ns.total - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type, vpaxlimit: vd2.pax_limit || 1, vpurchasevalue: Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0) }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
         else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
         else { reply = "Code not found. Check and try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
       } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
@@ -521,33 +522,51 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (lo.includes("start over") || lo.includes("restart") || (lo.includes("back") && lo.includes("start"))) { ns = { step: "IDLE" }; reply = "No problem! What would you like to do?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }]; return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
 
       if (btnVal === "confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("go ahead") || lo.includes("sure") || lo.includes("yep")) {
-        let ft = ns.total || 0;
-        const businessId = ns.bid || tours[0]?.business_id;
-        // L1: Fetch meeting point dynamically from tour or business record
-        const { data: _tourData } = await db.from("tours").select("meeting_point, base_price_per_person, business_id").eq("id", ns.tid).maybeSingle();
-        let meetingPointText = _tourData?.meeting_point || "";
+        let ft = Number(ns.total || 0);
+        const businessId = ns.bid || requestedBusinessId;
+        // L1: Fetch meeting point dynamically from the business record.
+        const { data: _tourData } = await db.from("tours").select("base_price_per_person, business_id").eq("id", ns.tid).eq("business_id", requestedBusinessId).maybeSingle();
+        let meetingPointText = "";
         if (!meetingPointText) {
-          const { data: _bizData } = await db.from("businesses").select("meeting_point").eq("id", businessId).maybeSingle();
-          meetingPointText = _bizData?.meeting_point || "Check your confirmation email for meeting point details";
+          const { data: _bizData } = await db.from("businesses").select("meeting_point_address, arrival_instructions").eq("id", businessId).maybeSingle();
+          meetingPointText = [_bizData?.meeting_point_address, _bizData?.arrival_instructions].filter(Boolean).join("\n") || "Check your confirmation email for meeting point details";
         }
 
         // C1: Server-side price re-verification to prevent client state tampering
-        let serverUnitPrice = _tourData?.base_price_per_person || 0;
+        let serverUnitPrice = Number(_tourData?.base_price_per_person || 0);
         // Check for slot-level price override (peak pricing)
-        const { data: _slotData } = await db.from("slots").select("price_per_person_override").eq("id", ns.slotId).maybeSingle();
+        const { data: _slotData } = await db.from("slots").select("price_per_person_override,tour_id,status").eq("id", ns.slotId).eq("business_id", requestedBusinessId).maybeSingle();
+        if (!_tourData || !_slotData || _slotData.tour_id !== ns.tid || _slotData.status !== "OPEN") {
+          reply = "I couldn't verify that tour and time anymore. Please start again so I can give you the correct options.";
+          ns = { step: "IDLE" };
+          buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
+          return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+        }
         if (_slotData?.price_per_person_override != null) {
           serverUnitPrice = Number(_slotData.price_per_person_override);
         }
-        const serverBaseTotal = ns.qty * serverUnitPrice;
-        const serverDiscount = 0;
-        if (ns.qty >= 6) { serverDiscount = Math.round(serverBaseTotal * 0.05); }
-        let serverTotal = serverBaseTotal - serverDiscount;
-        // Apply voucher deduction if applicable
-        let serverVded = 0;
-        if (ns.vid && ns.vded > 0) {
-          serverVded = Math.min(ns.vded, serverTotal);
-          serverTotal = Math.max(0, serverTotal - serverVded);
+        let priceCheck = verifyChatBookingPricing({
+          quotedTotal: ft,
+          qty: Number(ns.qty || 0),
+          unitPrice: serverUnitPrice,
+          voucherDeduction: ns.vid ? Number(ns.vded || 0) : 0,
+        });
+        if (!priceCheck.ok && priceCheck.reason === "INVALID_PRICE") {
+          reply = "I couldn't verify the price for that tour. Please start again so I don't quote you incorrectly.";
+          ns = { step: "IDLE" };
+          buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
+          return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
         }
+        if (!priceCheck.ok && priceCheck.reason === "INVALID_QTY") {
+          reply = "I couldn't verify the number of people for this booking. Please start again.";
+          ns = { step: "IDLE" };
+          buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
+          return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+        }
+        let serverBaseTotal = priceCheck.pricing?.baseTotal || 0;
+        let serverDiscount = priceCheck.pricing?.discount || 0;
+        let serverVded = priceCheck.pricing?.voucherDeduction || 0;
+        let serverTotal = priceCheck.pricing?.total || 0;
 
         // H2: Re-validate voucher at finalization time
         if (ns.vid) {
@@ -567,7 +586,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         }
 
         // C1: Reject if server-calculated total differs from client total by more than R1
-        if (Math.abs(serverTotal - ft) > 1) {
+        if (!priceCheck.ok) {
           reply = "The price has changed since you started. The correct total is R" + serverTotal + ". Please review and confirm again.";
           ns = { ...ns, total: serverTotal, baseTotal: serverBaseTotal, discount: serverDiscount, tprice: serverUnitPrice, vded: serverVded };
           buttons = [{ label: "✅ Confirm" + (serverTotal > 0 ? " & Pay R" + serverTotal : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }];
@@ -611,7 +630,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           try { await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: bk.id, business_id: businessId, email: ns.email, customer_name: ns.name, ref: vRef, tour_name: ns.tname, start_time: fmtS(ns.slotTime), qty: ns.qty, total_amount: "FREE (voucher)" } }) }); } catch (e) { console.log("webchat voucher confirm email err"); }
           // Send WhatsApp confirmation if phone provided
           // L1: Use dynamic meeting point instead of hardcoded address
-          const wcLoc = tenant?.business?.location_phrase; const wcWtb = tenant?.business?.what_to_bring;
+          const wcLoc = requestTenant?.business?.location_phrase; const wcWtb = requestTenant?.business?.what_to_bring;
           if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
           reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!"); ns = { step: "IDLE" };
         } else {
@@ -661,13 +680,16 @@ Deno.serve(withSentry("web-chat", async (req) => {
           reply = "Found your bookings:\n\n";
           for (const b of activeBks) {
             const bRef = b.id.substring(0, 8).toUpperCase();
-            const bTime = b.slots?.start_time ? fmtS(b.slots.start_time) : "?";
-            reply += (b.tours?.name || "Tour") + " \u2014 " + bTime + "\n" + b.qty + " people \u2014 " + b.status + "\nRef: " + bRef + "\n\n";
+            const bSlot: any = Array.isArray(b.slots) ? b.slots[0] : b.slots;
+            const bTour: any = Array.isArray(b.tours) ? b.tours[0] : b.tours;
+            const bTime = bSlot?.start_time ? fmtS(bSlot.start_time) : "?";
+            reply += (bTour?.name || "Tour") + " \u2014 " + bTime + "\n" + b.qty + " people \u2014 " + b.status + "\nRef: " + bRef + "\n\n";
           }
           reply += "What would you like to do with your booking?";
           // M2: Show comprehensive action buttons based on booking timing
           const lookupB = activeBks[0];
-          const lookupHrs = lookupB?.slots?.start_time ? (new Date(lookupB.slots.start_time).getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
+          const lookupSlot: any = Array.isArray(lookupB?.slots) ? lookupB.slots[0] : lookupB?.slots;
+          const lookupHrs = lookupSlot?.start_time ? (new Date(lookupSlot.start_time).getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
           const lookupButtons: any[] = [];
           if (lookupHrs >= 24) {
             lookupButtons.push({ label: "📅 Reschedule", value: "btn:reschedule" });
@@ -806,7 +828,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       });
       if (rbErr || rbData?.error) { reply = "Something went wrong changing your booking. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      const rsLoc = tenant?.business?.location_phrase;
+      const rsLoc = requestTenant?.business?.location_phrase;
       reply = "\u2705 Rescheduled to " + fmt(rsSlot.start_time) + "!\n\n" + (rsLoc ? "See you " + rsLoc + "!" : "See you soon!");
       if (rbData?.diff > 0) {
         reply = "\u2705 Timeslot updated!\n\nAs this was more expensive, you have a balance of R" + rbData.diff + ". Please pay using the link below:";
@@ -888,7 +910,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       });
       if (rbErr2 || rbData2?.error) { reply = "Something went wrong changing your tour. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
-      const ctsLoc = tenant?.business?.location_phrase;
+      const ctsLoc = requestTenant?.business?.location_phrase;
       reply = "\u2705 Switched to *" + ns.new_tour_name + "* on " + fmt(ctsSl.start_time) + "!\n\n" + (ctsLoc ? "See you " + ctsLoc + "!" : "See you soon!");
       if (rbData2?.diff > 0) {
         reply = "\u2705 Tour switched!\n\nAs this tour is more expensive, you have a balance of R" + rbData2.diff + ". Please pay using the link below:";
@@ -918,7 +940,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
 
     // ===== GIFT VOUCHER FLOW =====
     if (step === "GIFT_PICK_TOUR") {
-      const gPicked = null;
+      let gPicked: any = null;
       if (isBtnClick) gPicked = tours.find(function (t) { return t.id === btnVal; });
       else { for (const gt of tours) { if ((lo.includes("sea") || lo.includes("morning") || lo.includes("kayak")) && gt.name.includes("Sea")) gPicked = gt; if ((lo.includes("sunset") || lo.includes("evening")) && gt.name.includes("Sunset")) gPicked = gt; } }
       if (gPicked) { ns = { step: "GIFT_RECIPIENT", gtid: gPicked.id, gtname: gPicked.name, gtprice: gPicked.base_price_per_person, gbid: gPicked.business_id }; reply = "" + gPicked.name + " voucher (R" + gPicked.base_price_per_person + ") \u2014 great choice! Who is it for? (Their name)"; }
@@ -952,9 +974,9 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     if (step === "GIFT_CONFIRM") {
       if (btnVal === "gift_confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("sure") || lo.includes("yep")) {
-        const vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
+        let vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
         // Retry on unique constraint violation (code collision)
-        const gv: any = null;
+        let gv: any = null;
         for (let _retry = 0; _retry < 5; _retry++) {
           if (_retry > 0) vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
           const _ins = await db.from("vouchers").insert({ business_id: ns.gbid, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, current_balance: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();

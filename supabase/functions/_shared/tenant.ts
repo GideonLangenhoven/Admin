@@ -19,6 +19,7 @@ export type TenantBusiness = {
   booking_success_url?: string | null;
   booking_cancel_url?: string | null;
   voucher_success_url?: string | null;
+  subdomain?: string | null;
   directions?: string | null;
   footer_line_one?: string | null;
   footer_line_two?: string | null;
@@ -419,7 +420,7 @@ export async function sendWhatsappTemplate(
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     throw new Error("WhatsApp is not configured for " + getBusinessDisplayName(tenant.business));
   }
-  const normalizedTo = String(to || "").replace(/\D/g, "");
+  let normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
 
   const components = bodyParams.length > 0
@@ -459,7 +460,7 @@ export async function sendWhatsappFreeformOrSignal(
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     return { ok: false, windowClosed: false, error: "WhatsApp not configured for this business" };
   }
-  const normalizedTo = String(to || "").replace(/\D/g, "");
+  let normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   try {
     const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
@@ -527,7 +528,7 @@ export async function sendWhatsappWithWindowReopen(
     throw new Error("Reopener template send failed (" + reopenerTemplateName + "): " + (templateErr?.message || templateErr));
   }
 
-  const normalizedTo = String(params.to || "").replace(/\D/g, "");
+  let normalizedTo = String(params.to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   await supabase.from("outbox").insert({
     business_id: tenant.business.id,
@@ -555,7 +556,7 @@ export async function sendWhatsappTextForTenant(
       "Please add the Access Token and Phone Number ID in Admin → Settings → Integration Credentials."
     );
   }
-  const normalizedTo = String(to || "").replace(/\D/g, "");
+  let normalizedTo = String(to || "").replace(/\D/g, "");
   if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
   const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
     method: "POST",

@@ -10,6 +10,7 @@ import {
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
+import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -24,7 +25,7 @@ const GK = Deno.env.get("GEMINI_API_KEY") || "";
 // ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
-  const diff = 0;
+  let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
 }
@@ -303,14 +304,14 @@ async function getLoyaltyCount(tenant: TenantContext, phone: any) {
 }
 async function calcDiscount(tenant: TenantContext, qty: any, phone: any) {
   const pol = await supabase.from("policies").select().eq("business_id", tenant.business.id).single();
-  const p = pol.data; const discount = { type: "", percent: 0 };
+  const p = pol.data; let discount = { type: "", percent: 0 };
   const lc = await getLoyaltyCount(tenant, phone);
   if (p && lc >= (p.loyalty_bookings_threshold || 2)) discount = { type: "LOYALTY", percent: p.loyalty_discount_percent || 10 };
   if (p && qty >= (p.group_discount_min_qty || 6)) { const gp = p.group_discount_percent || 5; if (gp > discount.percent) discount = { type: "GROUP", percent: gp }; }
   return discount;
 }
 function genVoucherCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const code = "";
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code = "";
   for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
 }
@@ -372,14 +373,14 @@ function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end:
     const days: string[] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     for (let d = 0; d < days.length; d++) {
       if (i.includes(days[d]) || i.includes(days[d].substring(0, 3))) {
-        const currentDay = today.getDay(); const diff = d - currentDay; if (diff <= 0) diff += 7;
+        const currentDay = today.getDay(); let diff = d - currentDay; if (diff <= 0) diff += 7;
         targetDate = new Date(today); targetDate.setDate(targetDate.getDate() + diff);
         label = days[d].charAt(0).toUpperCase() + days[d].slice(1); break;
       }
     }
   }
   if (i.includes("weekend")) {
-    const sat = new Date(today); const daysToSat = 6 - sat.getDay(); if (daysToSat <= 0) daysToSat += 7;
+    const sat = new Date(today); let daysToSat = 6 - sat.getDay(); if (daysToSat <= 0) daysToSat += 7;
     sat.setDate(sat.getDate() + daysToSat);
     const mon = new Date(sat); mon.setDate(mon.getDate() + 2);
     return { start: sat, end: mon, label: "this weekend" };
@@ -399,13 +400,13 @@ function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end:
     }
   }
   if (!targetDate) return null;
-  const start = new Date(targetDate); const end = new Date(targetDate); end.setDate(end.getDate() + 1);
+  const start = new Date(targetDate); let end = new Date(targetDate); end.setDate(end.getDate() + 1);
   if (i.includes("morning") || i.includes("early")) { start.setHours(5, 0, 0, 0); end = new Date(targetDate); end.setHours(12, 0, 0, 0); label += " morning"; }
   else if (i.includes("afternoon")) { start.setHours(12, 0, 0, 0); end = new Date(targetDate); end.setHours(17, 0, 0, 0); label += " afternoon"; }
   else if (i.includes("evening") || i.includes("sunset")) { start.setHours(16, 0, 0, 0); end = new Date(targetDate); end.setHours(21, 0, 0, 0); label += " evening"; }
   const tm = i.match(/(\d{1,2})\s*(am|pm)/);
   if (tm) {
-    const hr = parseInt(tm[1]); if (tm[2] === "pm" && hr < 12) hr += 12; if (tm[2] === "am" && hr === 12) hr = 0;
+    let hr = parseInt(tm[1]); if (tm[2] === "pm" && hr < 12) hr += 12; if (tm[2] === "am" && hr === 12) hr = 0;
     start.setHours(hr, 0, 0, 0); end = new Date(targetDate); end.setHours(hr + 2, 0, 0, 0);
   }
   return { start: start, end: end, label: label };
@@ -466,7 +467,7 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     const weatherCode = wData?.daily?.weather_code?.[weatherDayIndex] || 0;
 
     // Check visibility at tour hours (7-9am = indices 7-9) on the booking day
-    const minVis = 99999;
+    let minVis = 99999;
     const hourlyVis = wData?.hourly?.visibility || [];
     const hourlyTimes = wData?.hourly?.time || [];
     for (let hi = 0; hi < hourlyTimes.length; hi++) {
@@ -786,7 +787,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         .order("cancelled_at", { ascending: false }).limit(1).single();
 
       if (cb.data && cb.data.cancellation_reason && cb.data.cancellation_reason.includes("Weather")) {
-        const choiceDesc = "";
+        let choiceDesc = "";
         if (input.includes("1") || input.includes("reschedule")) choiceDesc = "RESCHEDULE";
         else if (input.includes("2") || input.includes("voucher")) choiceDesc = "VOUCHER";
         else if (input.includes("3") || input.includes("refund")) choiceDesc = "REFUND";
@@ -807,7 +808,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     // POP / Payment Issue Intercept
-    const isPaymentIssue = false;
+    let isPaymentIssue = false;
     if (msgType === "document" || msgType === "image") isPaymentIssue = true;
     if (input.includes("proof") || input.includes("pop") || input.includes("receipt") || input.includes("paid it") || input.includes("just paid")) isPaymentIssue = true;
     if (input.includes("payment") && (input.includes("fail") || input.includes("error") || input.includes("won't") || input.includes("issue"))) isPaymentIssue = true;
@@ -1525,7 +1526,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const gvSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
         if (gvSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (gvSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
         // Create voucher
-        const gvCode = genVoucherCode();
+        let gvCode = genVoucherCode();
         const gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (gvResult.data) gvCode = gvResult.data.code;
         await logE(tenant, "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode, amount: sd.rm_amount }, sd.booking_id);
@@ -1579,7 +1580,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "UPDATE_CONTACT_VALUE") {
       if (!rawText || rawText.length < 2) { await sendText(tenant, phone, "Please type a valid value."); return; }
       const ucField = sd.contact_field;
-      const ucValue = rawText.trim();
+      let ucValue = rawText.trim();
       // Validation
       if (ucField === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ucValue)) { await sendText(tenant, phone, "That doesn\u2019t look like a valid email. Please try again:"); return; }
       if (ucField === "phone") { ucValue = ucValue.replace(/\D/g, ""); if (ucValue.length < 9) { await sendText(tenant, phone, "Phone number seems too short. Please include country code (e.g. 27812345678):"); return; } }
@@ -1635,7 +1636,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
-      const previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
       try {
         const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
@@ -1670,7 +1671,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK DATE (new step) =====
     else if (state === "PICK_DATE") {
-      const pickedDate = "";
+      let pickedDate = "";
 
       // Attempt Natural Language Date Parsing if they typed it instead of clicking
       if (rawText) {
@@ -1813,7 +1814,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const price = await getSlotPrice(slot);
       const baseTotal = price * sd.qty;
       const disc = await calcDiscount(tenant, sd.qty, phone);
-      let finalTotal = baseTotal; const discountMsg = "";
+      let finalTotal = baseTotal; let discountMsg = "";
       if (disc.percent > 0) {
         const saving = Math.round(baseTotal * disc.percent / 100); finalTotal = baseTotal - saving;
         if (disc.type === "GROUP") discountMsg = "\n\u{1F389} *5% group discount applied!* You save R" + saving;
@@ -1876,8 +1877,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "ASK_DETAILS" || state === "ASK_NAME_EMAIL") {
       const dParts = rawText.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
       // Restore any partial data saved from a previous message in this state
-      const dName = sd.partial_name || "";
-      const dEmail = sd.partial_email || "";
+      let dName = sd.partial_name || "";
+      let dEmail = sd.partial_email || "";
       for (const dp of dParts) {
         const dc = dp.replace(/^(name|email)[:\-\s]*/i, "").trim();
         if (!dc) continue;
@@ -1943,18 +1944,62 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== FINALIZE BOOKING =====
     else if (state === "FINALIZE_BOOKING") {
       // M5: Final 60-min cutoff check before creating the booking
-      const finalSlotCheck = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
+      const finalSlotCheck = await supabase.from("slots").select("id,start_time,status,tour_id,price_per_person_override,business_id").eq("id", sd.slot_id).eq("business_id", tenant.business.id).single();
       if (finalSlotCheck.data && new Date(finalSlotCheck.data.start_time).getTime() - Date.now() < 60 * 60 * 1000) {
         await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. This slot is no longer available. Please type *menu* to start a new booking.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         return;
       }
+      if (!finalSlotCheck.data || finalSlotCheck.data.status !== "OPEN" || (sd.tour_id && finalSlotCheck.data.tour_id !== sd.tour_id)) {
+        await sendText(tenant, phone, "I couldn't verify that tour and time anymore. Please type *book* to start again with the latest options.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
+      const finalTourCheck = await supabase.from("tours").select("id,base_price_per_person").eq("id", finalSlotCheck.data.tour_id).eq("business_id", tenant.business.id).single();
+      const finalUnitPrice = finalSlotCheck.data.price_per_person_override != null
+        ? Number(finalSlotCheck.data.price_per_person_override)
+        : Number(finalTourCheck.data?.base_price_per_person || 0);
+      const finalPriceCheck = verifyChatBookingPricing({
+        quotedTotal: Number(sd.total || 0),
+        qty: Number(sd.qty || 0),
+        unitPrice: finalUnitPrice,
+        voucherDeduction: sd.voucher_id ? Number(sd.voucher_deduction || 0) : 0,
+        groupDiscountPercent: Number(sd.discount_percent || 0),
+      });
+      if (!finalPriceCheck.ok && finalPriceCheck.reason !== "PRICE_CHANGED") {
+        await sendText(tenant, phone, "I couldn't verify the price for that trip, so I won't create the booking yet. Please type *book* to start again.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
+      if (!finalPriceCheck.ok && finalPriceCheck.reason === "PRICE_CHANGED" && finalPriceCheck.pricing) {
+        const fp = finalPriceCheck.pricing;
+        await sendButtons(tenant, phone, "The price has changed since we started. The correct total is *R" + fp.total + "*.\n\nPlease confirm again.", [{ id: "CONFIRM", title: fp.total > 0 ? "\u2705 Pay R" + fp.total : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }]);
+        await setConvo(convo.id, {
+          current_state: "CONFIRM_BOOKING",
+          state_data: { ...sd, tour_id: finalSlotCheck.data.tour_id, unit_price: fp.unitPrice, base_total: fp.baseTotal, total: fp.total, voucher_deduction: fp.voucherDeduction },
+        });
+        return;
+      }
+      if (!finalPriceCheck.pricing) {
+        await sendText(tenant, phone, "I couldn't verify the price for that trip, so I won't create the booking yet. Please type *book* to start again.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
+      const verifiedPricing = finalPriceCheck.pricing;
+      const verifiedSd = {
+        ...sd,
+        tour_id: finalSlotCheck.data.tour_id,
+        unit_price: verifiedPricing.unitPrice,
+        base_total: verifiedPricing.baseTotal,
+        total: verifiedPricing.total,
+        voucher_deduction: verifiedPricing.voucherDeduction,
+      };
       const email = sd.email;
       const br2 = await supabase.from("bookings").insert({
-        business_id: tenant.business.id, tour_id: sd.tour_id, slot_id: sd.slot_id,
+        business_id: tenant.business.id, tour_id: verifiedSd.tour_id, slot_id: verifiedSd.slot_id,
         customer_name: sd.customer_name, phone: phone, email: email,
-        qty: sd.qty, unit_price: sd.unit_price, total_amount: sd.total,
-        original_total: sd.base_total, discount_type: sd.discount_type || null, discount_percent: sd.discount_percent || 0,
+        qty: verifiedSd.qty, unit_price: verifiedSd.unit_price, total_amount: verifiedSd.total,
+        original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
         marketing_opt_in: null, total_captured: 0, total_refunded: 0,
       }).select().single();
@@ -1962,11 +2007,24 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const booking = br2.data;
 
       // VOUCHER BOOKING — skip payment
-      if (sd.voucher_id && sd.total <= 0) {
-        await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + sd.voucher_code }).eq("id", booking.id);
+      if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
+        // H1: Atomic capacity check must run before voucher deduction.
+        const vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+          p_booking_id: booking.id,
+          p_slot_id: verifiedSd.slot_id,
+          p_qty: verifiedSd.qty,
+          p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
+        });
+        if (vHoldRes.error || !vHoldRes.data?.success) {
+          await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id);
+          await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
+        await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + verifiedSd.voucher_code, total_captured: 0 }).eq("id", booking.id);
         // Deduct voucher balances — sequential drain using atomic RPC (prevents double-spend)
-        const allVIds = sd.voucher_ids || [sd.voucher_id];
-        let waRemainingCost = Number(sd.voucher_deduction || sd.original_total || sd.base_total || 0);
+        const allVIds = verifiedSd.voucher_ids || [verifiedSd.voucher_id];
+        let waRemainingCost = Number(verifiedSd.voucher_deduction || 0);
         for (let vi = 0; vi < allVIds.length; vi++) {
           if (!allVIds[vi] || waRemainingCost <= 0) continue;
           // Atomic deduction via RPC — drains Voucher A to R0 first, then Voucher B
@@ -1986,26 +2044,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_by_phone: phone, redeemed_booking_id: booking.id }).eq("id", allVIds[vi]);
           }
         }
-        // H1: Atomic slot update for voucher bookings via RPC
-        const vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: booking.id,
-          p_slot_id: sd.slot_id,
-          p_qty: sd.qty,
-          p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(), // Short hold, already confirmed
-        });
-        if (vHoldRes.error || !vHoldRes.data?.success) {
-          await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id);
-          await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
-          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
-          return;
-        }
         const vref = booking.id.substring(0, 8).toUpperCase();
-        const vslot = await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single();
-        const vtour = await supabase.from("tours").select("name").eq("id", sd.tour_id).single();
+        const vslot = await supabase.from("slots").select("start_time").eq("id", verifiedSd.slot_id).single();
+        const vtour = await supabase.from("tours").select("name").eq("id", verifiedSd.tour_id).single();
         const waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
-        await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: sd.voucher_code }, booking.id);
+        await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: verifiedSd.voucher_code }, booking.id);
         // Upsell second trip
-        const otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== sd.tour_id; });
+        const otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
         if (otherTours2.length > 0) {
           const upsellTour = otherTours2[0];
           setTimeout(async function () {
@@ -2019,8 +2064,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           "\u{1F4CB} Ref: " + vref + "\n" +
           "\u{1F6F6} " + (vtour.data?.name || "Tour") + "\n" +
           "\u{1F4C5} " + (vslot.data ? fmtTime(tenant, vslot.data.start_time) : "TBC") + "\n" +
-          "\u{1F465} " + sd.qty + " people\n" +
-          "\u{1F39F} Paid with voucher *" + sd.voucher_code + "*\n\n" +
+          "\u{1F465} " + verifiedSd.qty + " people\n" +
+          "\u{1F39F} Paid with voucher *" + verifiedSd.voucher_code + "*\n\n" +
           (waiverLink ? "\u{1F4DD} Waiver: " + waiverLink + "\n\n" : "") +
           "\u{1F4CD} *Meeting Point:* " + (tenant.business.directions || "Check your confirmation details from " + businessName(tenant) + " for arrival instructions.") + "\n\n" +
           ((tenant.business as any).what_to_bring ? "\u{1F392} *Bring:* " + (tenant.business as any).what_to_bring + "\n\n" : "") +
@@ -2031,7 +2076,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await fetch(SUPABASE_URL + "/functions/v1/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-            body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: booking.id, business_id: tenant.business.id, email: email, customer_name: sd.customer_name, ref: vref, tour_name: vtour.data?.name || "Tour", start_time: vslot.data ? fmtTime(tenant, vslot.data.start_time) : "TBC", qty: sd.qty, total_amount: "FREE (voucher)" } }),
+            body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: booking.id, business_id: tenant.business.id, email: email, customer_name: sd.customer_name, ref: vref, tour_name: vtour.data?.name || "Tour", start_time: vslot.data ? fmtTime(tenant, vslot.data.start_time) : "TBC", qty: verifiedSd.qty, total_amount: "FREE (voucher)" } }),
           });
         } catch (e) { }
         await setConvo(convo.id, { current_state: "IDLE", state_data: {}, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
@@ -2041,8 +2086,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // PAID BOOKING — atomic capacity check + hold creation to prevent overbooking
       const holdRes = await supabase.rpc("create_hold_with_capacity_check", {
         p_booking_id: booking.id,
-        p_slot_id: sd.slot_id,
-        p_qty: sd.qty,
+        p_slot_id: verifiedSd.slot_id,
+        p_qty: verifiedSd.qty,
         p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       });
       if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
@@ -2050,14 +2095,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
       const bookingSiteUrls = await getBusinessSiteUrls(tenant);
-      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(sd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(verifiedSd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
         method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: Math.round(sd.total * 100), currency: tenant.business.currency || "ZAR",
+          amount: Math.round(verifiedSd.total * 100), currency: tenant.business.currency || "ZAR",
           successUrl: withQuery(bookingSiteUrls.bookingSuccessUrl, { ref: booking.id }),
           cancelUrl: bookingSiteUrls.bookingCancelUrl,
           failureUrl: bookingSiteUrls.bookingCancelUrl,
-          metadata: { booking_id: booking.id, customer_name: sd.customer_name, qty: String(sd.qty) },
+          metadata: { booking_id: booking.id, customer_name: sd.customer_name, qty: String(verifiedSd.qty) },
         }),
       });
       const yocoData = await yocoRes.json();
@@ -2068,7 +2113,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable \u2014 type *speak to us* for help"; }
       const ref = booking.id.substring(0, 8).toUpperCase();
-      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + sd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
+      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
     }
@@ -2286,7 +2331,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const discSaving = Math.round(Number(sd.base_total) * sd.discount_percent / 100);
         newTotal = Math.max(0, newTotal - discSaving);
       }
-      const xMsg = "\u{1F39F} *Second voucher applied!* (R" + xVal + " credit)\n\n";
+      let xMsg = "\u{1F39F} *Second voucher applied!* (R" + xVal + " credit)\n\n";
       if (newTotal === 0) xMsg += "Your trip is now *completely FREE!*";
       else xMsg += "Remaining balance: *R" + newTotal + "*";
       await sendText(tenant, phone, xMsg);
@@ -2304,7 +2349,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await typingDelay();
 
       // PRIORITY 1: Check booking-related intents first (before FAQ!)
-      const wantReschedule = input.includes("reschedule") || input.includes("move") && (input.includes("booking") || input.includes("trip")) || (input.includes("change") && (input.includes("date") || input.includes("time") || input.includes("booking") || input.includes("day")));
+      let wantReschedule = input.includes("reschedule") || input.includes("move") && (input.includes("booking") || input.includes("trip")) || (input.includes("change") && (input.includes("date") || input.includes("time") || input.includes("booking") || input.includes("day")));
       const wantCancel = (input.includes("cancel") && !input.includes("cancellation") && !input.includes("policy")) || (input.includes("refund") && input.includes("my"));
       const wantMyBooking = input.includes("my booking") || input.includes("my trip") || input.includes("my tour") || (input.includes("booking") && (input.includes("today") || input.includes("made") || input.includes("check") || input.includes("status") || input.includes("when") || input.includes("detail") || input.includes("info"))) || (input.includes("when") && (input.includes("my") || input.includes("trip") || input.includes("tour") || input.includes("paddle"))) || (input.includes("what time") && input.includes("my")) || (input.includes("how many") && input.includes("my")) || (input.includes("ref") && (input.includes("my") || input.includes("booking")));
       const wantBook = input.includes("book") && (input.includes("want") || input.includes("like") || input.includes("can i"));
@@ -2592,7 +2637,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
                 askRGroups[arwKey].rows.push({ id: "RSLOT_" + ars.id, title: fmtTime(tenant, ars.start_time).substring(0, 24), description: (ars.capacity_total - ars.booked - (ars.held || 0)) + " spots" });
               }
             }
-            const askRSecs: any[] = []; const askRKeys = Object.keys(askRGroups).sort(); const askRTotal = 0;
+            const askRSecs: any[] = []; const askRKeys = Object.keys(askRGroups).sort(); let askRTotal = 0;
             for (let ark = 0; ark < askRKeys.length && askRTotal < 10; ark++) {
               const arg = askRGroups[askRKeys[ark]]; const arRem = 10 - askRTotal;
               if (arg.rows.length > arRem) arg.rows = arg.rows.slice(0, arRem);
@@ -2746,9 +2791,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Recalculate discount for new qty (group discount threshold may change)
       const mqDisc = await calcDiscount(tenant, newQty, phone);
       const mqBaseTotal = newQty * Number(sd.unit_price);
-      const newTotal = mqBaseTotal;
+      let newTotal = mqBaseTotal;
       if (mqDisc.percent > 0) { newTotal = mqBaseTotal - Math.round(mqBaseTotal * mqDisc.percent / 100); }
-      const oldTotal = sd.current_qty * Number(sd.unit_price);
+      let oldTotal = sd.current_qty * Number(sd.unit_price);
       const oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
       if (oldDisc.percent > 0) { oldTotal = oldTotal - Math.round(oldTotal * oldDisc.percent / 100); }
       const diffAmount = Math.abs(newTotal - oldTotal);
@@ -2825,7 +2870,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           ctGroups[ctwKey].rows.push({ id: "CTSLOT_" + cts.id, title: fmtTime(tenant, cts.start_time).substring(0, 24), description: (cts.capacity_total - cts.booked - (cts.held || 0)) + " spots" });
         }
       }
-      const ctSecs: any[] = []; const ctKeys2 = Object.keys(ctGroups).sort(); const ctTotal2 = 0;
+      const ctSecs: any[] = []; const ctKeys2 = Object.keys(ctGroups).sort(); let ctTotal2 = 0;
       for (let ctk = 0; ctk < ctKeys2.length && ctTotal2 < 10; ctk++) {
         const ctg = ctGroups[ctKeys2[ctk]]; const ctRem = 10 - ctTotal2;
         if (ctg.rows.length > ctRem) ctg.rows = ctg.rows.slice(0, ctRem);
@@ -2867,7 +2912,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const splitCount = parseInt(input);
       if (isNaN(splitCount) || splitCount < 2 || splitCount > 10) { await sendText(tenant, phone, "How many payment links do you need? (2-10)"); return; }
       const splitAmount = Math.round(Number(sd.split_total) / splitCount * 100) / 100;
-      const splitLinks = "";
+      let splitLinks = "";
       for (let spi = 0; spi < splitCount; spi++) {
         const splitSiteUrls = await getBusinessSiteUrls(tenant);
         const spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
@@ -3020,7 +3065,7 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      const ph = message.from; const mt = message.type; const txt = ""; const inter = null;
+      const ph = message.from; const mt = message.type; let txt = ""; let inter: any = null;
       if (mt === "text") txt = (message.text && message.text.body) || "";
       else if (mt === "interactive") { inter = message.interactive; txt = (inter.button_reply && inter.button_reply.title) || (inter.list_reply && inter.list_reply.title) || ""; }
       else if (mt === "document") txt = "[Document Sent]";

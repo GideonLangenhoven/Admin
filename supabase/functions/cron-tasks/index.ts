@@ -7,6 +7,7 @@ import { withSentry } from "../_shared/sentry.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createServiceClient();
+const CRON_BATCH_SIZE = 500;
 
 function headers() {
   return { "Content-Type": "application/json" };
@@ -24,7 +25,9 @@ async function cleanupExpiredHolds() {
     .from("holds")
     .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, qty, status, yoco_payment_id), slots(start_time), tours(name)")
     .eq("status", "ACTIVE")
-    .lt("expires_at", cutoffIso);
+    .lt("expires_at", cutoffIso)
+    .order("expires_at", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
 
   for (const hold of expiredHolds || []) {
     // Check if the booking has already been paid — if so, convert the hold
@@ -72,11 +75,19 @@ async function cleanupExpiredHolds() {
         // Release held capacity on the new slot
         const qty = (hold.bookings as any)?.qty || 0;
         if (qty > 0) {
-          const { data: slotHeldData } = await supabase.from("slots").select("held").eq("id", pr.new_slot_id).maybeSingle();
-          if (slotHeldData) {
-            await supabase.from("slots").update({
-              held: Math.max(0, (slotHeldData.held || 0) - qty),
-            }).eq("id", pr.new_slot_id);
+          const rpcRes = await supabase.rpc("adjust_slot_capacity", {
+            p_slot_id: pr.new_slot_id,
+            p_business_id: pr.business_id,
+            p_booked_delta: 0,
+            p_held_delta: -qty,
+          });
+          if (rpcRes.error) {
+            const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", pr.business_id).eq("id", pr.new_slot_id).maybeSingle();
+            if (slotHeldData) {
+              await supabase.from("slots").update({
+                held: Math.max(0, (slotHeldData.held || 0) - qty),
+              }).eq("business_id", pr.business_id).eq("id", pr.new_slot_id);
+            }
           }
         }
 
@@ -96,14 +107,17 @@ async function cleanupExpiredHolds() {
     }
 
     // ── Regular booking hold expiry ──
-    if (hold.bookings?.phone && hold.business_id) {
+    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string } | null;
+    const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
+    const holdTour = Array.isArray(hold.tours) ? hold.tours[0] : hold.tours as { name?: string } | null;
+    if (holdBooking?.phone && hold.business_id) {
       try {
         const tenant = await getTenantByBusinessId(supabase, hold.business_id);
-        const slotLabel = hold.slots?.start_time ? formatTenantDateTime(tenant.business, hold.slots.start_time) : "your selected slot";
+        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "your selected slot";
         const message =
-          "Your held booking for " + (hold.tours?.name || "the experience") + " at " + slotLabel + " has expired.\n\n" +
+          "Your held booking for " + (holdTour?.name || "the experience") + " at " + slotLabel + " has expired.\n\n" +
           "If you still want those spots, start a new booking and we’ll help from there.";
-        await sendWhatsappTextForTenant(tenant, hold.bookings.phone, message);
+        await sendWhatsappTextForTenant(tenant, holdBooking.phone, message);
       } catch (error) {
         console.error("HOLD_EXPIRY_WA_ERR", hold.id, error);
       }
@@ -124,7 +138,9 @@ async function cleanupExpiredManualBookings() {
     .eq("status", "PENDING")
     .eq("source", "ADMIN")
     .not("payment_deadline", "is", null)
-    .lt("payment_deadline", new Date().toISOString());
+    .lt("payment_deadline", new Date().toISOString())
+    .order("payment_deadline", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
 
   for (const booking of expiredBookings || []) {
     // Cancel the booking
@@ -135,11 +151,19 @@ async function cleanupExpiredManualBookings() {
     }).eq("id", booking.id);
 
     // Release the capacity (decrement slot.booked)
-    const { data: slotData } = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
-    if (slotData) {
-      await supabase.from("slots").update({
-        booked: Math.max(0, (slotData.booked || 0) - booking.qty),
-      }).eq("id", booking.slot_id);
+    const rpcRes = await supabase.rpc("adjust_slot_capacity", {
+      p_slot_id: booking.slot_id,
+      p_business_id: booking.business_id,
+      p_booked_delta: -Number(booking.qty || 0),
+      p_held_delta: 0,
+    });
+    if (rpcRes.error) {
+      const { data: slotData } = await supabase.from("slots").select("booked").eq("business_id", booking.business_id).eq("id", booking.slot_id).single();
+      if (slotData) {
+        await supabase.from("slots").update({
+          booked: Math.max(0, (slotData.booked || 0) - booking.qty),
+        }).eq("business_id", booking.business_id).eq("id", booking.slot_id);
+      }
     }
 
     // Log the expiry
@@ -193,6 +217,16 @@ async function cleanupExpiredManualBookings() {
   return results;
 }
 
+async function cleanupExpiredOtpAttempts() {
+  const cutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error } = await supabase
+    .from("otp_attempts")
+    .delete({ count: "exact" })
+    .lt("expires_at", cutoffIso);
+  if (error) throw error;
+  return { otp_attempts_cleaned: count || 0 };
+}
+
 async function cleanupAbandonedVouchers() {
   const results = { vouchers_cleaned: 0 };
 
@@ -202,7 +236,9 @@ async function cleanupAbandonedVouchers() {
     .from("vouchers")
     .select("id")
     .eq("status", "PENDING")
-    .lt("created_at", cutoff);
+    .lt("created_at", cutoff)
+    .order("created_at", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
 
   if (abandoned && abandoned.length > 0) {
     const ids = abandoned.map((v: any) => v.id);
@@ -434,7 +470,7 @@ async function autoTagContacts() {
 }
 
 Deno.serve(withSentry("cron-tasks", async (_req) => {
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, auto_tags: null, errors: [] };
+  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, auto_tags: null, errors: [] };
 
   try {
     const reminderRes = await fetch(SUPABASE_URL + "/functions/v1/auto-messages", {
@@ -469,6 +505,14 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const otpCleanup = await cleanupExpiredOtpAttempts();
+    results.otp_attempts_cleaned = otpCleanup.otp_attempts_cleaned;
+  } catch (error) {
+    console.error("OTP_ATTEMPT_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

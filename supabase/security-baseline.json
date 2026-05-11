@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-05-02T18:30:00Z",
-  "note": "Prompt 23 \u2014 added meeting_point_address, arrival_instructions, business_address column grants for anon",
+  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking",
   "grants": [
     {
       "grantee": "anon",
@@ -50,7 +50,17 @@
     {
       "grantee": "anon",
       "table_name": "bookings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "bookings",
       "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "bookings",
+      "privilege_type": "UPDATE"
     },
     {
       "grantee": "anon",
@@ -4911,6 +4921,11 @@
     },
     {
       "schema": "public",
+      "table_name": "otp_attempts",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "peak_periods",
       "rls_enabled": true
     },
@@ -5235,6 +5250,33 @@
     {
       "schemaname": "public",
       "tablename": "bookings",
+      "policyname": "bookings_anon_select",
+      "cmd": "SELECT",
+      "roles": "{anon}",
+      "qual": "((COALESCE(current_setting('request.method'::text, true), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (bt_request_header('x-booking-success-token'::text) = (id)::text) OR ((bt_request_header('x-booking-id'::text) = (id)::text) AND (bt_request_header('x-booking-waiver-token'::text) = (waiver_token)::text)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "bookings",
+      "policyname": "bookings_anon_update",
+      "cmd": "UPDATE",
+      "roles": "{anon}",
+      "qual": "(status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "bookings",
+      "policyname": "bookings_self_read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(customer_id IN ( SELECT customers.id\n   FROM customers\n  WHERE (customers.user_id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "bookings",
       "policyname": "bookings_tenant_delete",
       "cmd": "DELETE",
       "roles": "{authenticated}",
@@ -5310,7 +5352,7 @@
       "policyname": "businesses_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "true",
+      "qual": "(((id)::text = bt_request_header('x-tenant-business-id'::text)) OR (subdomain = bt_request_header('x-tenant-subdomain'::text)) OR (regexp_replace(COALESCE(booking_site_url, ''::text), '/+$'::text, ''::text) = regexp_replace(COALESCE(NULLIF(bt_request_header('origin'::text), ''::text), bt_request_header('x-tenant-origin'::text)), '/+$'::text, ''::text)))",
       "with_check": null
     },
     {
@@ -6170,6 +6212,15 @@
     },
     {
       "schemaname": "public",
+      "tablename": "otp_attempts",
+      "policyname": "otp_attempts_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
       "tablename": "peak_periods",
       "policyname": "peak_periods_tenant",
       "cmd": "ALL",
@@ -6462,7 +6513,7 @@
       "policyname": "slots_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "((status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
+      "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
       "with_check": null
     },
     {
@@ -6615,7 +6666,7 @@
       "policyname": "tours_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "((active = true) AND (COALESCE(hidden, false) = false))",
+      "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (active = true) AND (COALESCE(hidden, false) = false))",
       "with_check": null
     },
     {
@@ -6741,7 +6792,7 @@
       "policyname": "vouchers_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "true",
+      "qual": "((upper(regexp_replace((code)::text, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(bt_request_header('x-voucher-code'::text), '\\s+'::text, ''::text, 'g'::text))) AND (bt_request_header('x-voucher-code'::text) <> ''::text))",
       "with_check": null
     },
     {

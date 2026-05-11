@@ -2,6 +2,19 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveBusinessFromOrigin, type LookupBusinessRow } from "../_shared/my-bookings-lookup.ts";
+import {
+  createOpaqueOtpToken,
+  generateOtpCode,
+  getClientIp,
+  insertOtpAttempt,
+  normalizeOtpCode,
+  OTP_EMAIL_SEND_LIMIT,
+  OTP_IP_SEND_LIMIT,
+  OTP_TTL_MS,
+  countRecentOtpAttempts,
+  verifyTrackedOtp,
+} from "../_shared/otp-attempts.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -22,65 +35,53 @@ function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-/* ── Rate limiting (in-memory, resets on cold start) ── */
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT_MAX = 3;
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-
-function checkRateLimit(email: string): boolean {
-  const now = Date.now();
-  let timestamps = rateLimitMap.get(email) || [];
-  timestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
-  if (timestamps.length >= RATE_LIMIT_MAX) return false;
-  timestamps.push(now);
-  rateLimitMap.set(email, timestamps);
-  return true;
-}
-
-/* ── HMAC helpers ── */
-async function hmacSign(payload: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(OTP_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
+async function resolveRequestBusiness(req: Request, body: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from("businesses")
+    .select("id, subdomain, booking_site_url, manage_bookings_url")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error("Business lookup failed: " + error.message);
+  return resolveBusinessFromOrigin(
+    (data || []) as LookupBusinessRow[],
+    req.headers.get("origin") || "",
+    typeof body.business_id === "string" ? body.business_id : "",
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function createToken(email: string, phoneTail: string, code: string, expiresTs: number): Promise<string> {
-  const payload = [email, phoneTail, code, expiresTs].join("|");
-  const sig = await hmacSign(payload);
-  // base64-encode the payload + signature for transport
-  const raw = payload + "|" + sig;
-  return btoa(raw);
-}
-
-async function verifyToken(token: string, userCode: string): Promise<{ valid: boolean; error?: string; email?: string; phoneTail?: string }> {
-  try {
-    const raw = atob(token);
-    const parts = raw.split("|");
-    if (parts.length !== 5) return { valid: false, error: "Invalid token format" };
-    const [email, phoneTail, code, expiresStr, sig] = parts;
-    const expiresTs = Number(expiresStr);
-
-    // Check expiry
-    if (Date.now() > expiresTs) return { valid: false, error: "Code expired. Please request a new one." };
-
-    // Verify HMAC
-    const payload = [email, phoneTail, code, expiresStr].join("|");
-    const expectedSig = await hmacSign(payload);
-    if (sig !== expectedSig) return { valid: false, error: "Invalid token" };
-
-    // Check code
-    if (userCode.trim() !== code) return { valid: false, error: "Incorrect code. Please try again." };
-
-    return { valid: true, email, phoneTail };
-  } catch {
-    return { valid: false, error: "Invalid token" };
+/* ── DB-backed rate limiting ── */
+async function enforceSendRateLimit(email: string, ipAddress: string) {
+  const emailCount = await countRecentOtpAttempts(supabase, "email", email);
+  if (emailCount >= OTP_EMAIL_SEND_LIMIT) {
+    return { allowed: false, status: 429, error: "Too many requests. Please wait a few minutes." };
   }
+  const ipCount = await countRecentOtpAttempts(supabase, "ip_address", ipAddress);
+  if (ipCount >= OTP_IP_SEND_LIMIT) {
+    return { allowed: false, status: 429, error: "Too many requests. Please wait a few minutes." };
+  }
+  return { allowed: true };
+}
+
+async function issueOtpAttempt(input: {
+  businessId: string;
+  email: string;
+  phoneTail: string;
+  ipAddress: string;
+  purpose: string;
+}) {
+  const code = generateOtpCode();
+  const expiresTs = Date.now() + OTP_TTL_MS;
+  const token = createOpaqueOtpToken();
+  await insertOtpAttempt(supabase, OTP_SECRET, {
+    token,
+    businessId: input.businessId,
+    email: input.email,
+    phoneTail: input.phoneTail,
+    code,
+    expiresTs,
+    ipAddress: input.ipAddress,
+    purpose: input.purpose,
+  });
+  return { token, code };
 }
 
 /* ── Email template ── */
@@ -127,15 +128,21 @@ Deno.serve(async (req) => {
         return respond(400, { success: false, error: "Email and phone are required." });
       }
 
-      // Rate limit
-      if (!checkRateLimit(email)) {
-        return respond(429, { success: false, error: "Too many requests. Please wait a few minutes." });
+      const business = await resolveRequestBusiness(req, body);
+      if (!business) {
+        return respond(403, { success: false, error: "Unknown booking site." });
       }
 
-      // Verify bookings exist (prevents enumeration / spam)
+      const clientIp = getClientIp(req);
+
+      const rateLimit = await enforceSendRateLimit(email, clientIp);
+      if (!rateLimit.allowed) return respond(rateLimit.status || 429, { success: false, error: rateLimit.error });
+
+      // Check for matching bookings
       const { data: bookings } = await supabase
         .from("bookings")
         .select("id, phone")
+        .eq("business_id", business.id)
         .eq("email", email)
         .limit(20);
 
@@ -145,34 +152,33 @@ Deno.serve(async (req) => {
         return rawPhone.slice(-9) === phoneTail;
       });
 
-      if (matched.length === 0) {
-        return respond(404, { success: false, error: "No bookings found for this email and phone combination." });
-      }
-
-      // Generate 6-digit code
-      const codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
-      const code = String(codeNum);
-      const expiresTs = Date.now() + 15 * 60 * 1000; // 15 min TTL
-
-      // Create signed token
-      const token = await createToken(email, phoneTail, code, expiresTs);
-
-      // Send email via Resend
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: [email],
-          subject: "Your verification code",
-          html: otpEmailHtml(code),
-        }),
+      // Always issue an opaque token and return 200. Only matched customers get emailed.
+      const { token, code } = await issueOtpAttempt({
+        businessId: business.id,
+        email,
+        phoneTail,
+        ipAddress: clientIp,
+        purpose: "my_bookings",
       });
 
-      if (!res.ok) {
-        const errData = await res.json();
-        console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
-        return respond(500, { success: false, error: "Failed to send verification email. Please try again." });
+      // Only send the email if bookings matched — but always return 200
+      if (matched.length > 0) {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [email],
+            subject: "Your verification code",
+            html: otpEmailHtml(code),
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
+          // Still return 200 with token — don't leak send failure vs no-match
+        }
       }
 
       return respond(200, { success: true, token });
@@ -187,9 +193,9 @@ Deno.serve(async (req) => {
         return respond(400, { success: false, error: "Email and business_id are required." });
       }
 
-      if (!checkRateLimit("admin:" + email)) {
-        return respond(429, { success: false, error: "Too many requests. Please wait a few minutes." });
-      }
+      const clientIp = getClientIp(req);
+      const rateLimit = await enforceSendRateLimit("admin:" + email, clientIp);
+      if (!rateLimit.allowed) return respond(rateLimit.status || 429, { success: false, error: rateLimit.error });
 
       // Verify the email belongs to an admin of this business
       const { data: admin } = await supabase
@@ -204,10 +210,13 @@ Deno.serve(async (req) => {
         return respond(403, { success: false, error: "Not authorised." });
       }
 
-      const codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000;
-      const code = String(codeNum);
-      const expiresTs = Date.now() + 15 * 60 * 1000;
-      const token = await createToken(email, "admin", code, expiresTs);
+      const { token, code } = await issueOtpAttempt({
+        businessId,
+        email: "admin:" + email,
+        phoneTail: "admin",
+        ipAddress: clientIp,
+        purpose: "admin_settings",
+      });
 
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -232,14 +241,17 @@ Deno.serve(async (req) => {
     /* ── VERIFY OTP ── */
     if (action === "verify") {
       const token = String(body.token || "");
-      const userCode = String(body.code || "").trim();
+      const userCode = normalizeOtpCode(String(body.code || ""));
 
       if (!token || !userCode) {
         return respond(400, { success: false, error: "Token and code are required." });
       }
 
-      const result = await verifyToken(token, userCode);
+      const result = await verifyTrackedOtp(supabase, OTP_SECRET, token, userCode);
       if (!result.valid) {
+        if (result.status === 429) {
+          return respond(429, { success: false, verified: false, error: result.error });
+        }
         return respond(200, { success: false, verified: false, error: result.error });
       }
 

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
+import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
@@ -194,6 +195,7 @@ export default function Bookings() {
   const [waSending, setWaSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [quickResendingId, setQuickResendingId] = useState<string | null>(null);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -376,17 +378,30 @@ export default function Bookings() {
 
   // Auto-refresh when a booking status changes (e.g. payment received)
   useEffect(() => {
-    supabase.removeChannel(supabase.channel("bookings-status"));
+    if (!businessId) return;
     const channel = supabase
-      .channel("bookings-status")
+      .channel("bookings-status:" + businessId)
       .on(
         "postgres_changes" as any,
-        { event: "UPDATE", schema: "public", table: "bookings" },
-        () => loadBookings()
+        { event: "UPDATE", schema: "public", table: "bookings", filter: bookingRealtimeFilter(businessId) },
+        (payload: any) => {
+          if (!shouldRefreshBookingsForPayload(payload, businessId)) return;
+          if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+          realtimeRefreshTimerRef.current = setTimeout(() => {
+            realtimeRefreshTimerRef.current = null;
+            loadBookings();
+          }, 750);
+        }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [rangeStart, rangeEnd]);
+    return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [businessId, rangeStart, rangeEnd, page]);
 
   const STATUS_FILTER_MAP: Record<string, string[]> = {
     ALL: [],

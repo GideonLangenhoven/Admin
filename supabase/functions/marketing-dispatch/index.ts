@@ -12,6 +12,33 @@ const MAX_RETRIES = 3;
 
 const supabase = createServiceClient();
 
+async function claimPendingQueueItems() {
+  const { data, error } = await supabase.rpc("claim_marketing_queue", {
+    p_limit: BATCH_SIZE,
+    p_max_retries: MAX_RETRIES,
+  });
+
+  if (!error) return { items: data || [], error: null };
+
+  console.warn("CLAIM_MARKETING_QUEUE_RPC_FALLBACK:", error.message);
+
+  const { data: fallbackItems, error: fetchErr } = await supabase
+    .from("marketing_queue")
+    .select("id, business_id, campaign_id, contact_id, email, first_name, retry_count")
+    .eq("status", "pending")
+    .lt("retry_count", MAX_RETRIES)
+    .or("next_retry_at.is.null,next_retry_at.lte." + new Date().toISOString())
+    .order("created_at", { ascending: true })
+    .limit(BATCH_SIZE);
+
+  if (fetchErr) return { items: [], error: fetchErr };
+  if (!fallbackItems || fallbackItems.length === 0) return { items: [], error: null };
+
+  const itemIds = fallbackItems.map((i: any) => i.id);
+  await supabase.from("marketing_queue").update({ status: "processing" }).in("id", itemIds).eq("status", "pending");
+  return { items: fallbackItems, error: null };
+}
+
 Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
   try {
     if (!RESEND_API_KEY) {
@@ -25,17 +52,8 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
       .eq("status", "scheduled")
       .lte("scheduled_at", new Date().toISOString());
 
-    // ── 1. Fetch pending queue items (oldest first, respecting retry backoff) ──
-    // Atomically claim items by updating status to "processing" in the same query.
-    // This prevents a concurrent dispatch invocation from picking up the same items.
-    const { data: items, error: fetchErr } = await supabase
-      .from("marketing_queue")
-      .select("id, business_id, campaign_id, contact_id, email, first_name, retry_count")
-      .eq("status", "pending")
-      .lt("retry_count", MAX_RETRIES)
-      .or("next_retry_at.is.null,next_retry_at.lte." + new Date().toISOString())
-      .order("created_at", { ascending: true })
-      .limit(BATCH_SIZE);
+    // ── 1. Atomically claim pending queue items (oldest first, respecting retry backoff) ──
+    const { items, error: fetchErr } = await claimPendingQueueItems();
 
     if (fetchErr) {
       console.error("QUEUE_FETCH_ERR:", fetchErr.message);
@@ -44,10 +62,6 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     if (!items || items.length === 0) {
       return jsonRes({ ok: true, processed: 0, message: "Queue empty" }, 200);
     }
-
-    // Mark items as "processing" to prevent concurrent dispatch from picking them up
-    const itemIds = items.map((i: any) => i.id);
-    await supabase.from("marketing_queue").update({ status: "processing" }).in("id", itemIds).eq("status", "pending");
 
     // ── 2. Load campaigns + templates (only campaigns in "sending" status) ──
     const campaignIds = [...new Set(items.map((i: any) => i.campaign_id))];

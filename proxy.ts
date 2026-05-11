@@ -88,6 +88,40 @@ function rateLimit(config: RateLimitConfig, key: string): RateLimitResult {
   };
 }
 
+async function distributedRateLimit(config: RateLimitConfig, key: string): Promise<RateLimitResult | null> {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+
+  const redisKey = `ck:rl:${config.name}:${key}`;
+  const res = await fetch(`${url}/multi-exec`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["SET", redisKey, "0", "NX", "PX", config.windowMs],
+      ["INCR", redisKey],
+      ["PTTL", redisKey],
+    ]),
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error(`Redis rate limit failed: ${res.status}`);
+  const results = await res.json();
+  const count = Number(results?.[1]?.result || 0);
+  const ttl = Number(results?.[2]?.result || config.windowMs);
+  if (!Number.isFinite(count) || count <= 0) throw new Error("Redis rate limit returned invalid count");
+
+  return {
+    allowed: count <= config.limit,
+    limit: config.limit,
+    remaining: Math.max(0, config.limit - count),
+    retryAfterMs: count > config.limit ? Math.max(0, ttl) : 0,
+  };
+}
+
 function getClientIp(req: NextRequest): string {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0].trim();
@@ -161,7 +195,7 @@ function checkPageRoleGate(req: NextRequest): NextResponse | null {
   return NextResponse.redirect(url);
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const pageGate = checkPageRoleGate(req);
   if (pageGate) return pageGate;
 
@@ -174,7 +208,13 @@ export function proxy(req: NextRequest) {
     req.nextUrl.pathname.startsWith("/api/admin/setup-link");
   const config = isAuth ? AUTH_LIMIT : API_LIMIT;
 
-  const result = rateLimit(config, ip);
+  let result: RateLimitResult;
+  try {
+    result = (await distributedRateLimit(config, ip)) || rateLimit(config, ip);
+  } catch (error) {
+    console.error("RATE_LIMIT_DISTRIBUTED_FALLBACK:", error);
+    result = rateLimit(config, ip);
+  }
   cleanupStores(Math.max(API_LIMIT.windowMs, AUTH_LIMIT.windowMs));
 
   if (!result.allowed) {

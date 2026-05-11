@@ -1,12 +1,10 @@
-import { SupabaseClient } from "jsr:@supabase/supabase-js@2";
-
 export interface BotGateResult {
   active: boolean;
   reason: string;
 }
 
 export async function shouldBotReply(
-  supabase: SupabaseClient,
+  supabase: any,
   businessId: string
 ): Promise<BotGateResult> {
   const { data: biz } = await supabase
