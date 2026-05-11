@@ -196,7 +196,7 @@ export default function SettingsPage() {
     const [socialLinks, setSocialLinks] = useState({ facebook: "", instagram: "", tiktok: "", youtube: "", twitter: "", linkedin: "", tripadvisor: "", google_reviews: "" });
 
     // Operations & AI config (trapped data from onboarding)
-    const [opsConfig, setOpsConfig] = useState({ what_to_bring: "", what_to_wear: "", ai_system_prompt: "", faq_json: {} as Record<string, string> });
+    const [opsConfig, setOpsConfig] = useState({ what_to_bring: "", what_to_wear: "", arrival_instructions: "", ai_system_prompt: "", faq_json: {} as Record<string, string> });
     const [opsSaving, setOpsSaving] = useState(false);
     const [faqEntries, setFaqEntries] = useState<{ q: string; a: string }[]>([]);
 
@@ -793,6 +793,7 @@ export default function SettingsPage() {
             setOpsConfig({
                 what_to_bring: data.what_to_bring || "",
                 what_to_wear: data.what_to_wear || "",
+                arrival_instructions: data.arrival_instructions || "",
                 ai_system_prompt: data.ai_system_prompt || "",
                 faq_json: data.faq_json || {},
             });
@@ -2717,6 +2718,7 @@ export default function SettingsPage() {
                     const { error } = await supabase.from("businesses").update({
                         what_to_bring: opsConfig.what_to_bring || null,
                         what_to_wear: opsConfig.what_to_wear || null,
+                        arrival_instructions: opsConfig.arrival_instructions || null,
                         ai_system_prompt: opsConfig.ai_system_prompt || null,
                         faq_json: faqObj,
                     }).eq("id", businessId);
@@ -2736,6 +2738,13 @@ export default function SettingsPage() {
                                 rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
                         </label>
                     </div>
+
+                    <label className="block">
+                        <span className="text-xs font-medium text-[var(--ck-text-muted)]">Arrival instructions</span>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
+                        <textarea value={opsConfig.arrival_instructions} onChange={e => setOpsConfig({ ...opsConfig, arrival_instructions: e.target.value })}
+                            rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                    </label>
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
