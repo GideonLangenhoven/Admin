@@ -386,7 +386,6 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pt-2">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h2>
-                    <p className="text-sm text-gray-500 mt-1">Plan, prioritize, and accomplish your bookings with ease.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Link href="/new-booking" className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 bg-donezo-gradient shadow-sm">

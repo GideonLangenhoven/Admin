@@ -295,11 +295,12 @@ export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
   return Array.from(new Set(getAdminAppOrigins().concat(origins)));
 }
 
-// Wildcard patterns for bookingtours.co.za subdomains
+// Wildcard patterns for bookingtours.co.za subdomains and trusted Vercel team deploys
 const WILDCARD_ORIGINS = [
   ".admin.bookingtours.co.za",
   ".booking.bookingtours.co.za",
   ".bookingtours.co.za",
+  "-jerrys-projects-f4e4eaf9.vercel.app",
 ];
 
 export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
