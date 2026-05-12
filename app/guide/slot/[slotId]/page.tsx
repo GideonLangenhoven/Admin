@@ -14,6 +14,7 @@ type Booking = {
   checked_in_at: string | null;
   waiver_status: string | null;
   dietary: string | null;
+  add_ons: Array<{ name: string; qty: number }>;
 };
 
 export default function GuideSlotPage({ params }: { params: Promise<{ slotId: string }> }) {
@@ -45,6 +46,20 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
       .order("customer_name", { ascending: true });
 
+    const bookingIds = (data || []).map((b: any) => b.id);
+    const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+    if (bookingIds.length > 0) {
+      const { data: addOnRows } = await supabase
+        .from("booking_add_ons")
+        .select("booking_id, qty, add_ons(name)")
+        .in("booking_id", bookingIds);
+      for (const row of (addOnRows || []) as any[]) {
+        const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
+        if (!ao?.name) continue;
+        (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
+      }
+    }
+
     setBookings((data || []).map((b: any) => ({
       id: b.id,
       customer_name: b.customer_name || "Guest",
@@ -54,6 +69,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       checked_in_at: b.checked_in_at || null,
       waiver_status: b.waiver_status || null,
       dietary: b.custom_fields?.dietary || null,
+      add_ons: addOnsByBooking[b.id] || [],
     })));
     setLoading(false);
   }
@@ -89,35 +105,44 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
   const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
+    <div className="max-w-md mx-auto p-4 pb-20" style={{ color: "var(--ck-text)" }}>
       <header className="flex items-center justify-between mb-4">
-        <Link href="/guide" className="text-sm text-[color:var(--accent)] font-medium">&larr; Back</Link>
+        <Link href="/guide" className="text-sm font-medium" style={{ color: "var(--ck-accent)" }}>&larr; Back</Link>
         {slotInfo && (
           <div className="text-right">
-            <p className="text-sm font-bold text-[color:var(--text)]">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
-            <p className="text-xs text-[color:var(--textMuted)]">{slotInfo.tour_name}</p>
+            <p className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
+            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{slotInfo.tour_name}</p>
           </div>
         )}
       </header>
 
       <div className="flex items-center gap-4 mb-4 px-1">
-        <span className="text-sm text-[color:var(--text)]"><strong>{totalPax}</strong> guest{totalPax !== 1 ? "s" : ""}</span>
+        <span className="text-sm" style={{ color: "var(--ck-text-strong)" }}><strong>{totalPax}</strong> guest{totalPax !== 1 ? "s" : ""}</span>
         <span className="text-sm text-emerald-600"><strong>{checkedCount}</strong>/{bookings.length} checked in</span>
-        <Link href={"/guide/photos/" + slotId} className="ml-auto text-sm text-[color:var(--accent)] font-medium">Photos &rarr;</Link>
+        <Link href={"/guide/photos/" + slotId} className="ml-auto text-sm font-medium" style={{ color: "var(--ck-accent)" }}>Photos &rarr;</Link>
       </div>
 
-      {loading && <p className="text-sm text-[color:var(--textMuted)]">Loading...</p>}
+      {loading && <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Loading...</p>}
 
       <ul className="space-y-2">
         {bookings.map(b => (
-          <li key={b.id} className={"p-3 rounded-xl border transition-colors " + (b.checked_in ? "bg-emerald-50 border-emerald-200" : "bg-[color:var(--surface)] border-[color:var(--border)]")}>
+          <li key={b.id} className={"p-3 rounded-xl border transition-colors " + (b.checked_in ? "bg-emerald-50 border-emerald-200" : "")} style={!b.checked_in ? { background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" } : undefined}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-[color:var(--text)] truncate">{b.customer_name}</p>
-                <div className="flex items-center gap-2 text-xs text-[color:var(--textMuted)] mt-0.5">
+                <p className="font-bold truncate" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
                   <span>{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
                   {b.phone && <a href={"tel:" + b.phone} className="underline">{b.phone}</a>}
                 </div>
+                {b.add_ons.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {b.add_ons.map((ao, idx) => (
+                      <span key={idx} className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
+                        {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {b.dietary && <p className="text-xs text-amber-700 mt-1 font-medium">Dietary: {b.dietary}</p>}
                 {b.waiver_status && b.waiver_status !== "SIGNED" && (
                   <p className="text-xs text-red-600 mt-0.5 font-medium">Waiver: {b.waiver_status}</p>

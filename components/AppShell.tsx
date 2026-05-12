@@ -97,10 +97,6 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     return <main className="min-h-screen">{children}</main>;
   }
 
-  if (pathname.startsWith("/guide")) {
-    return <main className="min-h-screen" style={{ background: "var(--ck-bg)" }}>{children}</main>;
-  }
-
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className={`hidden shrink-0 flex-col bg-white transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`} style={{ boxShadow: "1px 0 20px rgba(0,0,0,0.02)" }}>

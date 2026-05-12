@@ -19,6 +19,7 @@ const nav = [
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
+  { href: "/guide", label: "Guide", icon: "Users" },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },
   { href: "/vouchers", label: "Vouchers", icon: "Ticket" },

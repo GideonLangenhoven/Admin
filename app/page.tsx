@@ -51,6 +51,7 @@ interface ManifestBooking {
     checked_in: boolean;
     tours: { name?: string } | null;
     slots: { start_time?: string } | null;
+    add_ons: Array<{ name: string; qty: number }>;
 }
 
 interface SlotSummary {
@@ -298,10 +299,23 @@ export default function Dashboard() {
                 .select("id, customer_name, phone, qty, total_amount, status, checked_in, slots(start_time), tours(name)")
                 .eq("business_id", businessId).neq("status", "CANCELLED").in("slot_id", slotIds)
                 .order("created_at", { ascending: true });
+            const bookingIds = (bks || []).map((b: any) => b.id);
+            const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+            if (bookingIds.length > 0) {
+                const { data: addOnRows } = await supabase.from("booking_add_ons")
+                    .select("booking_id, qty, add_ons(name)")
+                    .in("booking_id", bookingIds);
+                for (const row of (addOnRows || []) as any[]) {
+                    const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
+                    if (!ao?.name) continue;
+                    (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
+                }
+            }
             return (bks || []).map((b: any) => ({
                 ...b,
                 tours: Array.isArray(b.tours) ? b.tours[0] : b.tours,
                 slots: Array.isArray(b.slots) ? b.slots[0] : b.slots,
+                add_ons: addOnsByBooking[b.id] || [],
             })).filter((b: any) => b.slots?.start_time);
         }
 
@@ -672,6 +686,15 @@ export default function Dashboard() {
                                                 </td>
                                                 <td className="px-4 py-3.5">
                                                     <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</div>
+                                                    {b.add_ons && b.add_ons.length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {b.add_ons.map((ao, idx) => (
+                                                                <span key={idx} className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                                                                    {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3.5 hidden sm:table-cell">
                                                     <div className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</div>
