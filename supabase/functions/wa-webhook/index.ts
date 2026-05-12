@@ -11,6 +11,7 @@ import {
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -154,8 +155,9 @@ function getFaqAnswer(tenant: TenantContext, key: string) {
 
 function buildGeminiInstruction(tenant: TenantContext, extraContext?: string) {
   const sections = [
+    PLATFORM_INVARIANTS,
     String(tenant.business.ai_system_prompt || "").trim(),
-    "Use the tenant FAQ and terminology below. Keep replies short, factual, and never invent availability, pricing, or policies.",
+    "Use the tenant FAQ and terminology below. Keep replies short and factual.",
   ];
 
   const terminologyText = serializeTerminology(tenant.business.terminology);

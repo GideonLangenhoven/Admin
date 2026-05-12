@@ -12,6 +12,7 @@ import {
 } from "../_shared/bot-guards.ts";
 import { classifyIntent, priorityForIntent, findFaqMatch } from "../_shared/intent.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 const GK = Deno.env.get("GEMINI_API_KEY");
 const SU = Deno.env.get("SUPABASE_URL");
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -128,7 +129,8 @@ async function gemChat(hist, msg, toursList, businessId) {
     }
     const c = []; for (const h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] });
     c.push({ role: "user", parts: [{ text: gate.cleaned || msg }] });
-    const sysBase = (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human. Never invent availability, pricing, or policy details."))
+    const sysBase = PLATFORM_INVARIANTS + "\n\n"
+      + (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human."))
       + "\n\nCurrent available tours:\n" + tsText
       + (faq ? "\n\nFAQ:\n" + JSON.stringify(faq) : "")
       + (tenant?.business?.terminology ? "\n\nTerminology:\n" + JSON.stringify(tenant.business.terminology) : "");
