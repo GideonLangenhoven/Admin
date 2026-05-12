@@ -508,15 +508,24 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // ===== PICK_TIME =====
     if (step === "PICK_TIME") {
       let slotId = null; let slotTime = null;
+      const basePrice = ns.tprice;
+      let slotUnitPrice = basePrice;
       if (isBtnClick) {
-        // L22: Verify slot belongs to the selected tour to prevent slot ownership tampering
-        const { data: sl } = await db.from("slots").select("id,start_time,tour_id").eq("id", btnVal).single();
-        if (sl && sl.tour_id === ns.tid) { slotId = sl.id; slotTime = sl.start_time; }
+        // L22: Verify slot belongs to the selected tour to prevent slot ownership tampering.
+        // Also pull price_per_person_override so peak-priced slots quote the right total
+        // immediately rather than springing a "price has changed" message at Confirm.
+        const { data: sl } = await db.from("slots").select("id,start_time,tour_id,price_per_person_override").eq("id", btnVal).single();
+        if (sl && sl.tour_id === ns.tid) {
+          slotId = sl.id;
+          slotTime = sl.start_time;
+          if (sl.price_per_person_override != null) slotUnitPrice = Number(sl.price_per_person_override);
+        }
         else if (sl) { /* Slot exists but belongs to a different tour — ignore */ }
       }
       if (slotId && slotTime) {
-        ns = { ...ns, step: "ASK_QTY", slotId: slotId, slotTime: slotTime };
-        reply = pick([fmt(slotTime) + " — great pick! How many people?", fmt(slotTime) + " it is! 🙌 How many of you are coming?"]);
+        ns = { ...ns, step: "ASK_QTY", slotId: slotId, slotTime: slotTime, tprice: slotUnitPrice };
+        const priceNote = slotUnitPrice !== basePrice ? " (peak rate R" + slotUnitPrice + " per person)" : "";
+        reply = pick([fmt(slotTime) + " — great pick!" + priceNote + " How many people?", fmt(slotTime) + " it is! 🙌" + priceNote + " How many of you are coming?"]);
       } else {
         const slots5 = await getSlots(ns.tid, now);
         const daySlots2 = slots5.filter(function (s6) { return dateKey(s6.start_time) === ns.selectedDate; });
@@ -761,7 +770,24 @@ Deno.serve(withSentry("web-chat", async (req) => {
             const paidWaiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
             reply = "🙌 Spots held for 15 minutes!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nClick below to complete payment." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "");
           }
-          else { reply = "Payment link didn't work — try the Book Now page?"; }
+          else {
+            // Surface the real reason from create-checkout instead of the
+            // generic "didn't work" message. Common cases: missing Yoco key,
+            // missing booking-site URLs in env, PROMO_INVALID, Yoco upstream
+            // failure. Also flag the booking as ABANDONED so the admin sees
+            // it in the inbox and can chase the customer manually.
+            const errReason = yd?.reason || yd?.error || "unknown error";
+            console.error("WEB_CHAT_CHECKOUT_FAILED status=" + yr.status + " booking=" + bk.id + " err=" + errReason);
+            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Chat checkout failed: " + errReason }).eq("id", bk.id).catch(() => {});
+            const refShort = bk.id.substring(0, 8).toUpperCase();
+            reply = "Sorry — something stopped me generating your payment link (" + errReason + ").\n\nYour booking reference is " + refShort + ". I've flagged a human to follow up — they'll send you a payment link within 30 minutes. Or you can use the Book Now page directly to retry.";
+            // Set conversation priority HIGH so admin sees the abandoned checkout
+            if (state.conversation_id) {
+              try {
+                await db.from("conversations").update({ priority: "HIGH", current_intent: "CHECKOUT_FAILED", last_classified_at: new Date().toISOString() }).eq("id", state.conversation_id);
+              } catch (_) { /* best effort */ }
+            }
+          }
           ns = { step: "IDLE" };
         }
       } else if (btnVal === "cancel_booking" || lo.includes("cancel") || lo.includes("nevermind")) {
