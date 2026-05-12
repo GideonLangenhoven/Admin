@@ -72,6 +72,13 @@ Deno.serve(async (req: Request) => {
     if (body.action !== "mark_paid" || !body.booking_id) {
       return new Response(JSON.stringify({ error: "Invalid parameters" }), { status: 400, headers: getCors(req) });
     }
+    // Optional: caller can specify how the payment was received so the
+    // invoice/audit log records "Cash", "EFT", "Card (terminal)", etc.
+    // Falls back to "Admin (Manual)" for back-compat with older callers.
+    const rawMethod = String(body.payment_method || "").trim();
+    const allowedMethods = ["Cash", "EFT", "Card (terminal)", "Other"];
+    const paymentMethod = allowedMethods.includes(rawMethod) ? rawMethod : "Admin (Manual)";
+    const paymentNote = String(body.payment_note || "").trim().slice(0, 280);
 
     const supabase = createServiceClient();
     const bookingRes = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).maybeSingle();
@@ -111,14 +118,14 @@ Deno.serve(async (req: Request) => {
       }).eq("id", booking.slot_id);
     }
 
-    await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true } });
+    await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true, payment_method: paymentMethod, payment_note: paymentNote || null, user_id: auth?.userId || null } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);
 
     const ref = booking.id.substring(0, 8).toUpperCase();
     const slotTime = booking.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "See email";
     const tourName = booking.tours?.name || "Booking";
     const waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
-    const invoice = await createInvoice(supabase, booking, tenant, "Admin (Manual)");
+    const invoice = await createInvoice(supabase, booking, tenant, paymentMethod);
 
     if (booking.phone) {
       try {

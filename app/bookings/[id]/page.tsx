@@ -293,6 +293,14 @@ export default function BookingDetailPage() {
   const [codeApplying, setCodeApplying] = useState(false);
   const [codeResult, setCodeResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [resendingPayment, setResendingPayment] = useState(false);
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
+  const [markPaidMethod, setMarkPaidMethod] = useState<"Cash" | "EFT" | "Card (terminal)" | "Other">("Cash");
+  const [markPaidNote, setMarkPaidNote] = useState("");
+  const [markPaidLoading, setMarkPaidLoading] = useState(false);
+  const [reduceGuestsOpen, setReduceGuestsOpen] = useState(false);
+  const [reduceGuestsTarget, setReduceGuestsTarget] = useState(1);
+  const [reduceGuestsRefundMode, setReduceGuestsRefundMode] = useState<"REFUND" | "VOUCHER" | "NONE">("REFUND");
+  const [reduceGuestsLoading, setReduceGuestsLoading] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !businessId) return;
@@ -552,6 +560,74 @@ export default function BookingDetailPage() {
     setCodeApplying(false);
   }
 
+  async function reduceGuests() {
+    if (!booking) return;
+    if (reduceGuestsTarget < 1 || reduceGuestsTarget >= booking.qty) {
+      notify({ title: "Invalid guest count", message: `Please pick a number between 1 and ${booking.qty - 1}.`, tone: "warning" });
+      return;
+    }
+    const isPaidStatus = ["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status);
+    setReduceGuestsLoading(true);
+    try {
+      const res = await supabase.functions.invoke("rebook-booking", {
+        body: {
+          booking_id: booking.id,
+          action: "REMOVE_GUESTS",
+          new_qty: reduceGuestsTarget,
+          excess_action: isPaidStatus ? reduceGuestsRefundMode : "NONE",
+        },
+      });
+      const data = res.data || {};
+      if (res.error || data?.error) {
+        notify({ title: "Reduce failed", message: res.error?.message || data?.error || "Failed", tone: "error" });
+      } else {
+        const msg = data.refund_amount
+          ? `Reduced to ${reduceGuestsTarget} guests. ${fmtCurrency(data.refund_amount)} refund initiated.`
+          : data.voucher_code
+            ? `Reduced to ${reduceGuestsTarget} guests. Voucher ${data.voucher_code} issued for ${fmtCurrency(data.voucher_amount)}.`
+            : `Reduced to ${reduceGuestsTarget} guests.`;
+        notify({ title: "Guest count reduced", message: msg, tone: "success" });
+        setBooking({
+          ...booking,
+          qty: reduceGuestsTarget,
+          total_amount: booking.qty > 0 ? (Number(booking.total_amount) / booking.qty) * reduceGuestsTarget : Number(booking.total_amount),
+        } as BookingDetail);
+        setReduceGuestsOpen(false);
+      }
+    } catch (err: any) {
+      notify({ title: "Reduce failed", message: err?.message || String(err), tone: "error" });
+    }
+    setReduceGuestsLoading(false);
+  }
+
+  async function markBookingPaid() {
+    if (!booking) return;
+    setMarkPaidLoading(true);
+    try {
+      const res = await supabase.functions.invoke("manual-mark-paid", {
+        body: {
+          action: "mark_paid",
+          booking_id: booking.id,
+          payment_method: markPaidMethod,
+          payment_note: markPaidNote.trim() || undefined,
+        },
+      });
+      if (res.error) {
+        notify({ title: "Mark Paid failed", message: res.error.message, tone: "error" });
+      } else if (res.data?.error) {
+        notify({ title: "Mark Paid failed", message: res.data.error, tone: "error" });
+      } else {
+        notify({ title: "Booking marked paid", message: `${markPaidMethod} payment recorded. Customer notified.`, tone: "success" });
+        setBooking({ ...booking, status: "PAID" });
+        setMarkPaidOpen(false);
+        setMarkPaidNote("");
+      }
+    } catch (err: any) {
+      notify({ title: "Mark Paid failed", message: err?.message || String(err), tone: "error" });
+    }
+    setMarkPaidLoading(false);
+  }
+
   async function resendPaymentLink() {
     if (!booking) return;
     setResendingPayment(true);
@@ -604,16 +680,81 @@ export default function BookingDetailPage() {
           <Badge className="bg-gray-100 text-gray-600 border-gray-200">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>
         {isPending && Number(booking.total_amount) > 0 && (
-          <button
-            onClick={resendPaymentLink}
-            disabled={resendingPayment}
-            className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#0f595e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b4347] disabled:opacity-50 transition-colors"
-          >
-            <PaperPlaneTilt size={14} />
-            {resendingPayment ? "Sending..." : "Resend Payment Link"}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setMarkPaidOpen((v) => !v)}
+              disabled={markPaidLoading}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+            >
+              {markPaidOpen ? "Cancel" : "Mark as Paid"}
+            </button>
+            <button
+              onClick={resendPaymentLink}
+              disabled={resendingPayment}
+              className="flex items-center gap-1.5 rounded-lg bg-[#0f595e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b4347] disabled:opacity-50 transition-colors"
+            >
+              <PaperPlaneTilt size={14} />
+              {resendingPayment ? "Sending..." : "Resend Payment Link"}
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Mark-as-Paid inline panel — for cash, EFT, or in-person card payments. */}
+      {isPending && Number(booking.total_amount) > 0 && markPaidOpen && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-emerald-900">Record manual payment</h3>
+            <p className="mt-1 text-xs text-emerald-800">
+              Use this to record a cash, EFT, or in-person card payment. The customer will be marked as paid, a confirmation
+              email + WhatsApp will be sent, and an invoice will be issued.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-medium text-emerald-900">
+              Payment method
+              <select
+                value={markPaidMethod}
+                onChange={(e) => setMarkPaidMethod(e.target.value as typeof markPaidMethod)}
+                disabled={markPaidLoading}
+                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="Cash">Cash</option>
+                <option value="EFT">EFT / Bank transfer</option>
+                <option value="Card (terminal)">Card (in-person terminal)</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-emerald-900">
+              Reference / note (optional)
+              <input
+                type="text"
+                value={markPaidNote}
+                onChange={(e) => setMarkPaidNote(e.target.value.slice(0, 280))}
+                disabled={markPaidLoading}
+                placeholder={markPaidMethod === "EFT" ? "Bank reference, e.g. EFT-1234" : markPaidMethod === "Cash" ? "Receipt number, etc." : "Reference"}
+                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-gray-900"
+              />
+            </label>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => { setMarkPaidOpen(false); setMarkPaidNote(""); }}
+              disabled={markPaidLoading}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={markBookingPaid}
+              disabled={markPaidLoading}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {markPaidLoading ? "Recording…" : `Mark ${fmtCurrency(Number(booking.total_amount))} as paid`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Booking ID + Created */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
@@ -687,7 +828,23 @@ export default function BookingDetailPage() {
                 : "—"
             }
           />
-          <InfoRow label="Guests" value={booking.qty} />
+          <div className="flex items-start justify-between gap-4 py-2 border-b border-gray-100">
+            <span className="text-xs font-medium text-gray-500 shrink-0">Guests</span>
+            <span className="text-sm text-gray-900 flex items-center gap-2">
+              {booking.qty}
+              {!isCancelled && booking.qty > 1 && (
+                <button
+                  onClick={() => {
+                    setReduceGuestsOpen((v) => !v);
+                    setReduceGuestsTarget(Math.max(1, booking.qty - 1));
+                  }}
+                  className="rounded-md border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  {reduceGuestsOpen ? "Cancel" : "Reduce"}
+                </button>
+              )}
+            </span>
+          </div>
           <InfoRow label="Duration" value={booking.tours?.duration_minutes ? `${booking.tours.duration_minutes} minutes` : "—"} />
           <InfoRow
             label="Slot Status"
@@ -699,6 +856,60 @@ export default function BookingDetailPage() {
               ) : "—"
             }
           />
+          {reduceGuestsOpen && !isCancelled && booking.qty > 1 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+              <p className="text-xs text-amber-900 leading-snug">
+                <span className="font-semibold">Reduce guest count.</span> Slot capacity will be freed and the customer will be notified.
+                Within 24 hours of the trip this action is blocked.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="block text-xs font-medium text-amber-900">
+                  New guest count
+                  <select
+                    value={reduceGuestsTarget}
+                    onChange={(e) => setReduceGuestsTarget(Number(e.target.value))}
+                    disabled={reduceGuestsLoading}
+                    className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+                  >
+                    {Array.from({ length: booking.qty - 1 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n} guest{n === 1 ? "" : "s"}</option>
+                    ))}
+                  </select>
+                </label>
+                {["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status) && (
+                  <label className="block text-xs font-medium text-amber-900">
+                    Refund the difference as
+                    <select
+                      value={reduceGuestsRefundMode}
+                      onChange={(e) => setReduceGuestsRefundMode(e.target.value as typeof reduceGuestsRefundMode)}
+                      disabled={reduceGuestsLoading}
+                      className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+                    >
+                      <option value="REFUND">Refund (95% to card / EFT)</option>
+                      <option value="VOUCHER">Voucher (100% credit)</option>
+                      <option value="NONE">No refund</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setReduceGuestsOpen(false)}
+                  disabled={reduceGuestsLoading}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={reduceGuests}
+                  disabled={reduceGuestsLoading}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {reduceGuestsLoading ? "Reducing…" : `Reduce to ${reduceGuestsTarget} guest${reduceGuestsTarget === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Pricing & Payment */}
