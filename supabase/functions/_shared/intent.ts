@@ -40,29 +40,38 @@ export type ClassificationResult = {
   ms: number;
 };
 
+// Strip ```json ... ``` or ``` ... ``` fences that Gemini sometimes wraps
+// JSON output in despite the "JSON only, no prose" instruction.
+function stripCodeFences(s: string): string {
+  return s.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+}
+
 export async function classifyIntent(message: string, businessName: string): Promise<ClassificationResult> {
   const start = Date.now();
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return { intent: "OTHER", confidence: 0, model: null, ms: 0 };
   }
 
+  const model = "gemini-2.0-flash";
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(5000),
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text: `Business: ${businessName}\nMessage: ${message}` }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 60,
+            responseMimeType: "application/json",
+          },
+        }),
       },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 50,
-        system: SYSTEM,
-        messages: [{ role: "user", content: `Business: ${businessName}\nMessage: ${message}` }],
-      }),
-    });
+    );
 
     if (!res.ok) {
       console.warn("INTENT_CLASSIFY_ERR status=" + res.status);
@@ -70,12 +79,18 @@ export async function classifyIntent(message: string, businessName: string): Pro
     }
 
     const data = await res.json();
-    const text = data?.content?.[0]?.text ?? "{}";
-    const parsed = JSON.parse(text);
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    let parsed: any;
+    try {
+      parsed = JSON.parse(stripCodeFences(raw));
+    } catch {
+      console.warn("INTENT_CLASSIFY_PARSE_ERR raw=" + raw.slice(0, 200));
+      return { intent: "OTHER", confidence: 0, model: model, ms: Date.now() - start };
+    }
     return {
       intent: validIntent(parsed.intent),
       confidence: clamp01(Number(parsed.confidence) || 0),
-      model: data.model || "claude-haiku-4-5-20251001",
+      model,
       ms: Date.now() - start,
     };
   } catch (e) {
