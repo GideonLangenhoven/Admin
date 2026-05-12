@@ -763,20 +763,35 @@ export default function Bookings() {
   async function cancelBooking(b: Booking) {
     console.log("[BOOKINGS] cancelBooking", { bookingId: b.id, status: b.status, customerName: b.customer_name });
     const isVoucherPaid = ((b as any).payment_method || "").toUpperCase() === "VOUCHER" || ((b as any).payment_method || "").toUpperCase() === "GIFT_VOUCHER";
-    const confirmMsg = isVoucherPaid
-      ? `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? This booking was paid via voucher — a new voucher will be issued for the full amount (no refund to card).`
-      : `Cancel booking ${b.id.substring(0, 8).toUpperCase()}? The customer will be notified via email and WhatsApp.`;
+    const isCardPaid = !isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status);
+    const ref = b.id.substring(0, 8).toUpperCase();
 
-    if (!await confirmAction({
-      title: "Cancel booking",
-      message: confirmMsg,
-      tone: "warning",
-      confirmLabel: "Cancel booking",
-    })) return;
+    // For card-paid bookings, give the admin an explicit refund-method choice:
+    // primary = refund-to-card (95%), alt = issue voucher (100%). For voucher-paid
+    // bookings the path is fixed (CANCEL_VOUCHER) so a single confirm is fine.
+    let issueVoucherInstead = false;
+    if (isCardPaid) {
+      const choice = await confirmAction({
+        title: "Cancel booking",
+        message: `Cancel booking ${ref}? Choose how to refund the customer.`,
+        tone: "warning",
+        confirmLabel: "Cancel → Refund to card",
+        altLabel: "Cancel → Issue voucher (100%)",
+        cancelLabel: "Keep booking",
+      });
+      if (!choice) return;
+      if (choice === "alt") issueVoucherInstead = true;
+    } else {
+      const msg = isVoucherPaid
+        ? `Cancel booking ${ref}? A new voucher will be issued for the full amount.`
+        : `Cancel booking ${ref}? The customer will be notified via email and WhatsApp.`;
+      if (!await confirmAction({ title: "Cancel booking", message: msg, tone: "warning", confirmLabel: "Cancel booking" })) return;
+    }
     setActionBookingId(b.id);
 
-    // For voucher-paid bookings, use rebook-booking CANCEL_VOUCHER to issue a voucher instead of Yoco refund
-    if (isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
+    // For voucher-paid bookings, use rebook-booking CANCEL_VOUCHER to issue a voucher instead of Yoco refund.
+    // Also use this path when admin explicitly chose "issue voucher" for a card-paid booking.
+    if ((isVoucherPaid || issueVoucherInstead) && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
       try {
         const res = await fetch(SU + "/functions/v1/rebook-booking", {
           method: "POST",
