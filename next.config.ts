@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.windguru.cz https://unpkg.com",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.resend.com https://api.yoco.com https://api.whatsapp.com https://generativelanguage.googleapis.com https://lottie.host https://unpkg.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.resend.com https://api.yoco.com https://api.whatsapp.com https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.googleusercontent.com https://lottie.host https://unpkg.com",
               "frame-src 'self' https://www.windguru.cz",
             ].join("; "),
           },
