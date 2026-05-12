@@ -261,6 +261,7 @@ export default function SettingsPage() {
             fetchSiteSettings();
             fetchPlanUsage();
             fetchCredStatus();
+            checkGdriveStatus();
             fetchAddOns();
         } else {
             // Regular admin — load their permissions, then fetch data for granted sections
