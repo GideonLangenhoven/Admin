@@ -99,6 +99,7 @@ interface Booking {
   custom_fields: Record<string, string> | null;
   tours: TourRel;
   slots: SlotRel;
+  add_ons: Array<{ name: string; qty: number }>;
 }
 
 interface SlotGroup {
@@ -347,11 +348,26 @@ export default function Bookings() {
       return true;
     });
 
+    // Fetch booking_add_ons in one round-trip and group by booking_id.
+    const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+    const bookingIds = deduped.map((b: any) => b.id);
+    if (bookingIds.length > 0) {
+      const { data: addOnRows } = await supabase.from("booking_add_ons")
+        .select("booking_id, qty, add_ons(name)")
+        .in("booking_id", bookingIds);
+      for (const row of (addOnRows || []) as any[]) {
+        const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
+        if (!ao?.name) continue;
+        (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
+      }
+    }
+
     const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
       .map((b) => ({
         ...b,
         tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
         slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
+        add_ons: addOnsByBooking[b.id] || [],
       }));
 
     console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length, page });
@@ -1875,6 +1891,15 @@ function SlotRows({
                     )}
                     <SourceBadge source={b.source} />
                   </button>
+                  {b.add_ons && b.add_ons.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pl-[18px] lg:pl-0">
+                      {b.add_ons.map((ao, idx) => (
+                        <span key={idx} className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                          {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {b.external_ref && (
                     <span className="text-[10px] text-gray-400 font-mono lg:pl-0 pl-[18px]">
                       Ref: {b.external_ref}
