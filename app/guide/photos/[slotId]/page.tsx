@@ -76,18 +76,19 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
+    <div className="max-w-md mx-auto p-4 pb-20" style={{ color: "var(--ck-text)" }}>
       <header className="flex items-center justify-between mb-4">
-        <Link href={"/guide/slot/" + slotId} className="text-sm text-[color:var(--accent)] font-medium">&larr; Back to check-in</Link>
+        <Link href={"/guide/slot/" + slotId} className="text-sm font-medium" style={{ color: "var(--ck-accent)" }}>&larr; Back to check-in</Link>
         {slotInfo && (
           <div className="text-right">
-            <p className="text-sm font-bold text-[color:var(--text)]">{slotInfo.tour_name}</p>
-            <p className="text-xs text-[color:var(--textMuted)]">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
+            <p className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{slotInfo.tour_name}</p>
+            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
           </div>
         )}
       </header>
 
-      <h1 className="text-xl font-bold text-[color:var(--text)] mb-4">Trip Photos</h1>
+      <h1 className="text-xl font-bold mb-1" style={{ color: "var(--ck-text-strong)" }}>Trip Photos</h1>
+      <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Photos are uploaded to your Google Drive and attached as a private gallery link in the thank-you email.</p>
 
       <label className={"block p-4 rounded-xl text-center font-semibold cursor-pointer transition-colors " + (uploading ? "bg-emerald-400 text-white" : "bg-emerald-600 text-white active:bg-emerald-700")}>
         {uploading ? ("Uploading " + (progress?.done || 0) + "/" + (progress?.total || 0) + "...") : "Pick / take photos"}
@@ -97,11 +98,12 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
 
       {photos.length > 0 && (
         <>
-          <h2 className="mt-6 text-sm font-semibold text-[color:var(--text)]">Uploaded ({photos.length})</h2>
+          <h2 className="mt-6 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Uploaded ({photos.length})</h2>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {photos.map(p => (
                 <a key={p.id} href={p.gdrive_view_url || p.photo_url} target="_blank" rel="noreferrer"
-                  className="block aspect-square rounded-lg bg-[color:var(--surface2)] overflow-hidden border border-[color:var(--border)]">
+                  className="block aspect-square rounded-lg overflow-hidden border"
+                  style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-subtle)" }}>
                   <img src={p.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                 </a>
             ))}
@@ -116,7 +118,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
         </button>
       )}
       {emailStatus && (
-        <p className={"mt-2 text-sm text-center " + (emailStatus.startsWith("Sent") ? "text-emerald-600" : emailStatus.startsWith("Sending") ? "text-[color:var(--textMuted)]" : "text-red-500")}>{emailStatus}</p>
+        <p className={"mt-2 text-sm text-center " + (emailStatus.startsWith("Sent") ? "text-emerald-600" : emailStatus.startsWith("Sending") ? "" : "text-red-500")} style={emailStatus.startsWith("Sending") ? { color: "var(--ck-text-muted)" } : undefined}>{emailStatus}</p>
       )}
     </div>
   );
