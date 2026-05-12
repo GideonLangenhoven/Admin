@@ -33,6 +33,7 @@ function Slots() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [filterTourId, setFilterTourId] = useState<string | null>(() => searchParams.get("tour"));
+  const [showClosedSlots, setShowClosedSlots] = useState(false);
 
   // Individual Edit State
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -665,7 +666,11 @@ function Slots() {
     }
   }
 
-  const filteredSlots = filterTourId ? slots.filter(s => (s as any).tour_id === filterTourId || (s.tours as any)?.id === filterTourId) : slots;
+  // By default hide slots that have been zeroed-out (CLOSED status or capacity = 0)
+  // so the table doesn't show orphan rows like "04:00 — 0 OPEN" for tours that
+  // never actually ran at that time. Toggle to show them when managing closed slots.
+  const filteredSlots = (filterTourId ? slots.filter(s => (s as any).tour_id === filterTourId || (s.tours as any)?.id === filterTourId) : slots)
+    .filter(s => showClosedSlots || (Number((s as any).capacity_total || 0) > 0 && (s as any).status !== "CLOSED"));
   const filterTourName = filterTourId ? tours.find(t => t.id === filterTourId)?.name : null;
 
   return (
@@ -679,6 +684,15 @@ function Slots() {
               <button onClick={() => setFilterTourId(null)} className="ml-0.5 text-emerald-600 hover:text-emerald-900 font-bold">×</button>
             </span>
           )}
+          <label className="ml-2 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showClosedSlots}
+              onChange={(e) => setShowClosedSlots(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 accent-[#0f595e]"
+            />
+            Show closed / 0-capacity
+          </label>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
           <button

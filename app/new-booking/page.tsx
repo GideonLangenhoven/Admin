@@ -477,8 +477,37 @@ export default function NewBookingPage() {
     if (missingFields.length > 0) {
       console.log("[NEW_BOOKING] createBooking validation failed", { missingFields });
       setMissingField(missingFields[0]);
+      // Always surface a toast so admins don't get a silent no-op when fields
+      // are missing. Field-level highlighting still happens via missingField.
+      const fieldLabels: Record<string, string> = {
+        tour: "Tour",
+        date: "Date",
+        slot: "Time slot",
+        pax: "Number of guests",
+        name: "Customer name",
+        mobile: "Mobile number",
+        mobile_format: "Mobile number (needs country code)",
+        email: "Email",
+        discount_reason: "Override reason",
+      };
+      const customLabel = (key: string) => {
+        if (!key.startsWith("custom_")) return key;
+        const def = customFieldDefinitions.find((f) => `custom_${f.key}` === key);
+        return def?.label || key.replace("custom_", "");
+      };
+      const labels = missingFields.map((f) => fieldLabels[f] || customLabel(f));
       if (missingFields.includes("mobile_format")) {
-        notify({ title: "Invalid mobile format", message: "Please include the correct international country code for the mobile number (for example +27 or +44).", tone: "warning" });
+        notify({
+          title: "Invalid mobile format",
+          message: "Please include the correct international country code for the mobile number (for example +27 or +44).",
+          tone: "warning",
+        });
+      } else {
+        notify({
+          title: "Missing required field" + (labels.length > 1 ? "s" : ""),
+          message: "Please fill in: " + labels.join(", "),
+          tone: "warning",
+        });
       }
       return;
     }
