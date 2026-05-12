@@ -66,6 +66,8 @@ interface BookingDetail {
   promo_code: string | null;
   discount_amount: number | null;
   discount_notes: string | null;
+  voucher_code: string | null;
+  voucher_amount_paid: number | null;
   created_at: string;
   tours: { name?: string; duration_minutes?: number; base_price_per_person?: number } | null;
   slots: { start_time?: string; capacity_total?: number; booked?: number; status?: string } | null;
@@ -465,10 +467,14 @@ export default function BookingDetailPage() {
           await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
         }
 
-        // Update booking
+        // Update booking. Preserve any prior promo attribution and store the
+        // voucher deduction as a *separate* field (voucher_amount_paid) so the
+        // audit trail shows promo + voucher individually. discount_type kept
+        // as VOUCHER for backward-compatibility with downstream summarisation.
         const updateFields: Record<string, unknown> = {
           total_amount: newTotal,
           voucher_code: code,
+          voucher_amount_paid: Math.round(deduction * 100) / 100,
           discount_type: "VOUCHER",
         };
         if (newTotal <= 0) {
@@ -490,8 +496,15 @@ export default function BookingDetailPage() {
         return;
       }
 
-      // Try promo code via validate_promo_code RPC
-      const baseTotal = Number(booking.unit_price) * booking.qty;
+      // Try promo code via validate_promo_code RPC.
+      // E4: include add-ons in the order amount so the promo applies to
+      // (base + add-ons), matching the New Booking page math. Otherwise
+      // a 10% promo gives different totals depending on where staff apply it.
+      const addOnsTotalForPromo = bookingAddOns.reduce(
+        (sum, ao) => sum + Number(ao.qty || 0) * Number(ao.unit_price || 0),
+        0,
+      );
+      const baseTotal = Number(booking.unit_price) * booking.qty + addOnsTotalForPromo;
       const { data: promoResult, error: promoError } = await supabase.rpc("validate_promo_code", {
         p_business_id: booking.business_id,
         p_code: code,
@@ -919,19 +932,66 @@ export default function BookingDetailPage() {
           {booking.original_total && discountAmount > 0 && (
             <>
               <InfoRow label="Subtotal" value={fmtCurrency(booking.original_total)} />
-              <InfoRow
-                label="Discount"
-                value={
-                  <span className="text-red-600">
-                    -{fmtCurrency(discountAmount)}
-                    {booking.promo_code
-                      ? ` (${booking.promo_code}${booking.discount_type === "PERCENT" && booking.discount_percent ? ` \u2014 ${booking.discount_percent}%` : ""})`
-                      : booking.discount_type === "PERCENT" && booking.discount_percent
-                        ? ` (${booking.discount_percent}%)`
-                        : booking.discount_type ? ` (${booking.discount_type})` : ""}
-                  </span>
+              {/* E3: split promo vs voucher into two lines so the audit trail
+                  shows each adjustment separately. Falls back to a single
+                  Discount line for legacy bookings without split tracking. */}
+              {(() => {
+                const voucherAmt = Number(booking.voucher_amount_paid || 0);
+                const promoAmt = Math.max(0, discountAmount - voucherAmt);
+                const hasBoth = voucherAmt > 0 && promoAmt > 0;
+                if (hasBoth) {
+                  return (
+                    <>
+                      <InfoRow
+                        label="Promo"
+                        value={
+                          <span className="text-red-600">
+                            -{fmtCurrency(promoAmt)}
+                            {booking.promo_code ? ` (${booking.promo_code}${booking.discount_type === "PERCENT" && booking.discount_percent ? ` \u2014 ${booking.discount_percent}%` : ""})` : ""}
+                          </span>
+                        }
+                      />
+                      <InfoRow
+                        label="Voucher"
+                        value={
+                          <span className="text-red-600">
+                            -{fmtCurrency(voucherAmt)}
+                            {booking.voucher_code ? ` (${booking.voucher_code})` : ""}
+                          </span>
+                        }
+                      />
+                    </>
+                  );
                 }
-              />
+                if (voucherAmt > 0) {
+                  return (
+                    <InfoRow
+                      label="Voucher"
+                      value={
+                        <span className="text-red-600">
+                          -{fmtCurrency(voucherAmt)}
+                          {booking.voucher_code ? ` (${booking.voucher_code})` : ""}
+                        </span>
+                      }
+                    />
+                  );
+                }
+                return (
+                  <InfoRow
+                    label="Discount"
+                    value={
+                      <span className="text-red-600">
+                        -{fmtCurrency(discountAmount)}
+                        {booking.promo_code
+                          ? ` (${booking.promo_code}${booking.discount_type === "PERCENT" && booking.discount_percent ? ` \u2014 ${booking.discount_percent}%` : ""})`
+                          : booking.discount_type === "PERCENT" && booking.discount_percent
+                            ? ` (${booking.discount_percent}%)`
+                            : booking.discount_type ? ` (${booking.discount_type})` : ""}
+                      </span>
+                    }
+                  />
+                );
+              })()}
             </>
           )}
           <InfoRow

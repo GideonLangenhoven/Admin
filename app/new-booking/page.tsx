@@ -401,8 +401,11 @@ export default function NewBookingPage() {
       ? grandTotal * (Number(promoResult.discount_value) / 100)
       : Math.min(Number(promoResult.discount_value), grandTotal)
     : 0;
+  // Manual override replaces the *tour subtotal*, but add-ons stay on top.
+  // Otherwise admins applying a staff discount silently lose add-on revenue
+  // (and the customer ends up with paid add-ons that aren't in total_amount).
   const totalAmount = discountType === "manual"
-    ? Math.max(0, discountNum)
+    ? Math.max(0, discountNum + addOnsTotal)
     : Math.max(0, grandTotal - promoDiscountCalc);
   const availableSlots = slots.filter((s) => {
     const avail = Math.max(Number(s.available_capacity || 0), 0);
@@ -1290,7 +1293,8 @@ export default function NewBookingPage() {
 
         {discountType === "manual" && (
           <div className="mt-3 flex flex-wrap items-center gap-4 rounded-lg bg-amber-50 px-4 py-3 text-sm">
-            <span className="text-gray-500">Base: <span className="line-through">{fmtCurrency(baseTotal)}</span></span>
+            <span className="text-gray-500">Tour: <span className="line-through">{fmtCurrency(baseTotal)}</span> → {fmtCurrency(discountNum)}</span>
+            {addOnsTotal > 0 && <span className="text-gray-500">+ Add-ons {fmtCurrency(addOnsTotal)}</span>}
             <span className="text-gray-800 font-bold text-base">→ Final: {fmtCurrency(totalAmount)}</span>
           </div>
         )}
