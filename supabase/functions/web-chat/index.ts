@@ -24,6 +24,66 @@ const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 // Deno edge functions process one request per isolate, so this is safe.
 let _requestTimezone = "UTC";
 function gCors(r) { const o = typeof r === "string" ? r : (r?.headers?.get("origin") || ""); return { "Access-Control-Allow-Origin": o || "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
+
+// Pluralisation helper used throughout user-facing strings ("1 person" not "1 people").
+function pl(n: number, singular: string, plural: string) { return n === 1 ? singular : plural; }
+
+// Escalation pre-check. Runs before any flow logic to catch safety / legal /
+// data / human-handoff signals that must never be swallowed by the booking
+// flow's fallback responses. Each match returns a fixed reply + intent label
+// that we then write to the conversations row so an admin can pick it up.
+function detectEscalation(lo: string): { intent: string; reply: string } | null {
+  // Medical emergency — keep tone calm and route to 10177 (SA emergency).
+  if (/\b(chest pain|heart attack|having a stroke|seizure|can'?t breathe|cannot breathe|drowning|drown(ed|ing)|bleeding (badly|heavily)|unconscious|fainted|collapsed|allergic reaction|anaphylaxis|severe pain)\b/.test(lo)) {
+    return {
+      intent: "MEDICAL_EMERGENCY",
+      reply: "Please call emergency services right now — 10177 in South Africa. I'm flagging this to our team — please keep your phone on. If you can, message us back once you're safe.",
+    };
+  }
+  // Legal threat
+  if (/\b(get(ting)? (a |my )?lawyer|attorney|i'?ll sue|going to sue|small claims|file (a )?(suit|lawsuit)|legal action|legal team)\b/.test(lo)) {
+    return {
+      intent: "LEGAL_THREAT",
+      reply: "I'm sorry it's reached this point. I'm flagging this for a human to handle directly — they'll be in touch within an hour during business hours. Please share your booking reference (8 characters from your confirmation email) when they reach out so they can find your details.",
+    };
+  }
+  // POPIA / data deletion
+  if (/\b(delete (my )?(data|account|personal info|details)|gdpr|popia|data subject (request|access)|right to (be )?forgotten|erase (my )?data|forget me)\b/.test(lo)) {
+    return {
+      intent: "DATA_REQUEST",
+      reply: "Thanks — under POPIA you have the right to ask us to delete your data. I'm raising a formal data-subject request now. You'll get a confirmation email within an hour with the next steps and a reference number; please reply to that email so we can verify your identity before processing.",
+    };
+  }
+  // Fraud allegation / unauthorized charge
+  if (/\b(fraud|fraudulent|unauthori[sz]ed charge|didn'?t (make|authori[sz]e) (this )?(booking|payment|charge)|stolen card|chargeback)\b/.test(lo)) {
+    return {
+      intent: "FRAUD_REVIEW",
+      reply: "I'm escalating this immediately to our team — they'll review the booking and payment. Please do not cancel through your bank yet; we can usually resolve faster directly. Please share the booking reference (8 characters in the email) and the last 4 digits of the card used.",
+    };
+  }
+  // Press / media
+  if (/\b(press (enquiry|inquiry|request)|i'?m (a )?(journalist|reporter|from .* news)|media (request|enquiry))\b/.test(lo)) {
+    return {
+      intent: "PRESS",
+      reply: "Thanks for getting in touch. For press enquiries please email press@bookingtours.co.za — I've flagged this for the right person here.",
+    };
+  }
+  // Explicit human-handoff request
+  if (
+    /\b(speak|talk|chat) to (a |an |the )?(human|person|manager|owner|real person|staff member|someone real)\b/.test(lo) ||
+    /\b(real|live) (person|human|agent|operator)\b/.test(lo) ||
+    /\b(connect|put) me (with|through to) (a |an |the )?(human|manager|person|someone)\b/.test(lo) ||
+    /\bi want (to )?speak\b/.test(lo) ||
+    /^\s*manager\s*\??\s*$/.test(lo) ||
+    /\bescalate\b/.test(lo)
+  ) {
+    return {
+      intent: "ESCALATE_HUMAN",
+      reply: "Of course — let me get a human on this. Drop your booking reference (8 characters in your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours. You can also WhatsApp us via the number on the booking site footer.",
+    };
+  }
+  return null;
+}
 function withQuery(base, params) { const u = new URL(base); for (const k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
 function trimTrailingSlash(url) { return String(url || "").replace(/\/+$/, ""); }
 function appendQuery(base, params) { const u = new URL(base); for (const k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
@@ -234,6 +294,47 @@ Deno.serve(withSentry("web-chat", async (req) => {
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
+    // ===== ESCALATION PRE-CHECK =====
+    // Catches medical / legal / data / fraud / press / human-handoff signals
+    // regardless of current step. Never swallowed by booking-flow fallbacks.
+    // Sets the conversation priority HIGH so admins see it surface in the inbox.
+    if (!isBtnClick) {
+      const esc = detectEscalation(lo);
+      if (esc) {
+        if (state.conversation_id) {
+          try {
+            await db.from("conversations").update({
+              priority: "HIGH",
+              current_intent: esc.intent,
+              last_classified_at: new Date().toISOString(),
+            }).eq("id", state.conversation_id);
+          } catch (_) { /* best-effort flag */ }
+        }
+        return new Response(JSON.stringify({
+          reply: esc.reply,
+          state: { ...state, escalated: true, escalation_intent: esc.intent },
+          buttons: null,
+        }), { status: 200, headers: gCors(req) });
+      }
+    }
+    // Handle persistent "Talk to a human" button anywhere in the flow.
+    if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
+      if (state.conversation_id) {
+        try {
+          await db.from("conversations").update({
+            priority: "HIGH",
+            current_intent: "ESCALATE_HUMAN",
+            last_classified_at: new Date().toISOString(),
+          }).eq("id", state.conversation_id);
+        } catch (_) { /* best-effort flag */ }
+      }
+      return new Response(JSON.stringify({
+        reply: "No problem — I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.",
+        state: { ...state, escalated: true, escalation_intent: "ESCALATE_HUMAN" },
+        buttons: null,
+      }), { status: 200, headers: gCors(req) });
+    }
+
     // L8: "Go back" navigation — map each step to its previous step
     const isGoBack = !isBtnClick && (lo === "back" || lo === "go back" || lo === "previous");
     if (isGoBack && step !== "IDLE") {
@@ -253,7 +354,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       reply = "OK, going back.";
       if (prevStep === "IDLE") {
         ns = { step: "IDLE" };
-        buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
+        buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }];
       } else if (prevStep === "PICK_TOUR") {
         buttons = tours.map(function (t) { return { label: t.name + " — R" + t.base_price_per_person, value: t.id }; });
         reply = "Which tour are you keen on?";
@@ -320,7 +421,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           buttons = tours.map(function (t4) { return { label: t4.name + " — R" + t4.base_price_per_person, value: t4.id }; });
         }
       }
-      else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I can help you book a tour or answer questions about our experiences!"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }]; } }
+      else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one — I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== PICK_TOUR =====
