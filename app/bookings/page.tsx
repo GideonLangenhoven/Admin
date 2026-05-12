@@ -454,7 +454,10 @@ export default function Bookings() {
     for (const [dk, slotMap] of dayMap) {
       const slots: SlotGroup[] = [];
       for (const [tk, bks] of slotMap) {
-        const activeBks = bks.filter((b) => b.status !== "CANCELLED");
+        // Only PAID / CONFIRMED / COMPLETED / PENDING count toward pax + price.
+        // EXPIRED (hold timer ran out) and CANCELLED rows still appear in the
+        // expanded list for diagnostics, but they don't inflate the slot total.
+        const activeBks = bks.filter((b) => b.status === "PAID" || b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "PENDING");
         const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
         const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
         const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
