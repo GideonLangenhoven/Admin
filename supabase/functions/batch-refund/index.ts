@@ -12,7 +12,7 @@ function getCors(req?: any) {
   const origins = getAdminAppOrigins();
   const origin = req?.headers?.get("origin") || "";
   const allowed = origins.includes(origin) ? origin : origins[0];
-  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
+  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
 Deno.serve(async (req: any) => {

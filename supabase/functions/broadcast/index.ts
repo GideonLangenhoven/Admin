@@ -13,7 +13,7 @@ function getCors(req: Request) {
   return {
     "Access-Control-Allow-Origin": isAllowedOrigin(origin, allowed) ? origin : allowed[0],
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
   };
 }
 

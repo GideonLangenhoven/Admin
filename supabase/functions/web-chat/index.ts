@@ -22,7 +22,7 @@ const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 // L10: Request-scoped timezone. Set at the start of each request handler.
 // Deno edge functions process one request per isolate, so this is safe.
 let _requestTimezone = "UTC";
-function gCors(r) { const o = typeof r === "string" ? r : (r?.headers?.get("origin") || ""); return { "Access-Control-Allow-Origin": o || "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
+function gCors(r) { const o = typeof r === "string" ? r : (r?.headers?.get("origin") || ""); return { "Access-Control-Allow-Origin": o || "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" }; }
 function withQuery(base, params) { const u = new URL(base); for (const k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
 function trimTrailingSlash(url) { return String(url || "").replace(/\/+$/, ""); }
 function appendQuery(base, params) { const u = new URL(base); for (const k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
