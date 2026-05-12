@@ -295,9 +295,14 @@ export default function Dashboard() {
                 .eq("business_id", businessId).gte("start_time", from.toISOString()).lt("start_time", to.toISOString());
             const slotIds = (slots || []).map((s: any) => s.id);
             if (slotIds.length === 0) return [];
+            // Only count real bookings towards pax / Roll Call. EXPIRED holds
+            // (slot reservations that never got paid for) and CANCELLED bookings
+            // were inflating "Today's Pax" by ~50% on busy days.
             const { data: bks } = await supabase.from("bookings")
                 .select("id, customer_name, phone, qty, total_amount, status, checked_in, slots(start_time), tours(name)")
-                .eq("business_id", businessId).neq("status", "CANCELLED").in("slot_id", slotIds)
+                .eq("business_id", businessId)
+                .in("status", ["PAID", "CONFIRMED", "COMPLETED", "PENDING"])
+                .in("slot_id", slotIds)
                 .order("created_at", { ascending: true });
             const bookingIds = (bks || []).map((b: any) => b.id);
             const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
