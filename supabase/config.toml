@@ -54,3 +54,16 @@ verify_jwt = false
 
 [functions.ota-reconcile]
 verify_jwt = false
+
+# create-checkout and send-whatsapp-text are called cross-function with the
+# project's SERVICE_ROLE_KEY as Bearer. Supabase rotated keys to the new
+# sb_secret_* format which is not a JWT, so the gateway's verify_jwt=true
+# default rejects these calls with UNAUTHORIZED_INVALID_JWT_FORMAT. Both
+# functions perform their own server-side validation (origin allowlist,
+# business_id check, server-side pricing), so gating at the gateway adds
+# no real protection.
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.send-whatsapp-text]
+verify_jwt = false
