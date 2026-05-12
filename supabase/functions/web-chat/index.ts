@@ -82,6 +82,23 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
       reply: "Of course — let me get a human on this. Drop your booking reference (8 characters in your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours. You can also WhatsApp us via the number on the booking site footer.",
     };
   }
+  // Accessibility / service animal / medical condition questions
+  // — never tries to answer these; routes to a human with the right
+  // context. Captures common phrasings around service dogs, mobility
+  // aids, pregnancy, and disability.
+  if (
+    /\b(service|guide|assistance|emotional support) (dog|animal|cat|pet)\b/.test(lo) ||
+    /\bwheelchair\b/.test(lo) ||
+    /\bmobility (aid|impair|scooter|issue)/.test(lo) ||
+    /\b(accessible|accessibility|wheelchair access|disabled access|disability access)\b/.test(lo) ||
+    /\bi('?m| am) (disabled|hearing impaired|visually impaired|deaf|blind)\b/.test(lo) ||
+    /\bpregnan(t|cy)\b/.test(lo)
+  ) {
+    return {
+      intent: "ACCESSIBILITY_QUESTION",
+      reply: "Great question — accessibility and medical considerations are always best handled by a human so we can confirm what's safe and possible for your specific situation. I'm flagging this to our team now; they'll come back to you within an hour during business hours. If you'd like to share details (mobility needs, service animal, medical condition), feel free to type them here and they'll see them too.",
+    };
+  }
   return null;
 }
 function withQuery(base, params) { const u = new URL(base); for (const k in params) if (params[k]) u.searchParams.set(k, params[k]); return u.toString(); }
@@ -151,14 +168,48 @@ function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any)
   if (lo.includes("price") || lo.includes("cost") || lo.includes("how much") || lo.includes("rate") || lo.includes("fee")) {
     return "Here are our current rates:\n" + tsText + "\n\nWould you like to book?";
   }
+  // Defence-in-depth: never answer accessibility/service-animal questions
+  // with the packing list. Escalation pre-check upstream should catch these,
+  // but if Gemini fell back into this function we still refuse politely.
+  if (
+    /\b(service|guide|assistance|emotional support) (dog|animal|cat|pet)\b/.test(lo) ||
+    /\bwheelchair\b/.test(lo) ||
+    /\b(disabled|disability|accessib(le|ility))\b/.test(lo)
+  ) {
+    return "That's a good one to check with a person — accessibility and service animal questions vary by tour and conditions. I'm flagging this for our team; they'll be in touch shortly with a clear answer.";
+  }
   if (lo.includes("bring") || lo.includes("wear") || lo.includes("need to have") || lo.includes("pack")) {
     const wtb = String(business?.what_to_bring || "").trim();
     if (wtb) return wtb;
     return "Comfortable clothes, sun protection, water. Would you like to book a tour?";
   }
-  if (lo.includes("meet") || lo.includes("where") || lo.includes("location") || lo.includes("direction") || lo.includes("address") || lo.includes("find you")) {
+  if (
+    lo.includes("meet") ||
+    lo.includes("where") ||
+    lo.includes("location") ||
+    lo.includes("direction") ||
+    lo.includes("address") ||
+    lo.includes("find you") ||
+    lo.includes("depart") ||
+    lo.includes("launch from") ||
+    lo.includes("start from")
+  ) {
+    // Prefer the canonical address fields over the legacy "directions" blob,
+    // which in some tenants is misconfigured (e.g. "Yo" or just timing notes).
+    const mpAddr = String(business?.meeting_point_address || "").trim();
+    const arrival = String(business?.arrival_instructions || "").trim();
+    const mpLegacy = String(business?.meeting_point || "").trim();
     const dir = String(business?.directions || "").trim();
-    if (dir) return dir;
+    const locPhrase = String(business?.location_phrase || "").trim();
+    const parts: string[] = [];
+    if (mpAddr) parts.push("📍 " + mpAddr);
+    else if (mpLegacy.length >= 5) parts.push("📍 " + mpLegacy);
+    else if (dir.length >= 5) parts.push("📍 " + dir);
+    if (arrival) parts.push(arrival);
+    if (parts.length > 0) {
+      const suffix = locPhrase ? "\n\nSee you " + locPhrase + "!" : "";
+      return parts.join("\n") + suffix;
+    }
   }
   if (lo.includes("time") || lo.includes("when") || lo.includes("start") || lo.includes("schedule")) {
     return "Our tours run at various times throughout the day. Here's what's available:\n" + tsText + "\n\nWould you like to pick a date to see specific times?";
@@ -171,7 +222,7 @@ function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any)
 async function gemChat(hist, msg, toursList, businessId) {
   const tenant = businessId ? await getTenantByBusinessId(db, businessId).catch(function () { return null; }) : null;
   const brandName = getBusinessDisplayName(tenant?.business);
-  const tsText = (toursList || []).map(function (t) { return "- " + t.name + ": R" + t.base_price_per_person + "/pp, " + t.duration_minutes + " min"; }).join("\n");
+  const tsText = (toursList || []).map(function (t) { const lbl = (t && (t as any).priceLabel) || ("R" + t.base_price_per_person); return "- " + t.name + ": " + lbl + "/pp, " + t.duration_minutes + " min" + ((t as any).priceNote || ""); }).join("\n");
   const faq = tenant?.business?.faq_json;
   try {
     // Pre-LLM injection check.
@@ -291,6 +342,42 @@ Deno.serve(withSentry("web-chat", async (req) => {
     const toursQuery = db.from("tours").select("*").eq("business_id", requestedBusinessId).eq("active", true).neq("hidden", true).order("sort_order", { ascending: true });
     const { data: allT } = await toursQuery;
     const tours = (allT || []).filter(function (t) { return !t.hidden; });
+    // Enrich each tour with a slot-aware effective price range so the chat
+    // doesn't quote the base price while the booking flow charges a peak
+    // override. Looks at the next 60 days of slots and computes min/max
+    // of (base, override) per tour. priceLabel is then used everywhere
+    // the chat surfaces a tour to the user.
+    if (tours.length > 0) {
+      const tourIds = tours.map(function (t) { return t.id; });
+      const horizonIso = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: slotPriceRows } = await db
+        .from("slots")
+        .select("tour_id, price_per_person_override")
+        .in("tour_id", tourIds)
+        .gte("start_time", now.toISOString())
+        .lte("start_time", horizonIso);
+      const ranges: Record<string, { min: number | null; max: number | null }> = {};
+      for (const r of (slotPriceRows || [])) {
+        if (r.price_per_person_override == null) continue;
+        const p = Number(r.price_per_person_override);
+        const cur = ranges[r.tour_id] || { min: null, max: null };
+        cur.min = cur.min == null ? p : Math.min(cur.min, p);
+        cur.max = cur.max == null ? p : Math.max(cur.max, p);
+        ranges[r.tour_id] = cur;
+      }
+      for (const t of tours) {
+        const base = Number(t.base_price_per_person || 0);
+        const r = ranges[t.id];
+        const effMin = r && r.min != null ? Math.min(base, r.min) : base;
+        const effMax = r && r.max != null ? Math.max(base, r.max) : base;
+        // Round to integers — no decimals in chat labels.
+        const minI = Math.round(effMin);
+        const maxI = Math.round(effMax);
+        (t as any).priceLabel = minI === maxI ? "R" + minI : "From R" + minI;
+        (t as any).priceNote = minI === maxI ? "" : " (rates vary by date — see calendar for the exact price)";
+      }
+    }
+    function tourPriceLabel(t: any): string { return (t && t.priceLabel) ? t.priceLabel : ("R" + Number(t?.base_price_per_person || 0)); }
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
@@ -356,7 +443,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         ns = { step: "IDLE" };
         buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }];
       } else if (prevStep === "PICK_TOUR") {
-        buttons = tours.map(function (t) { return { label: t.name + " — R" + t.base_price_per_person, value: t.id }; });
+        buttons = tours.map(function (t) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; });
         reply = "Which tour are you keen on?";
       } else if (prevStep === "ASK_VOUCHER") {
         reply = "Do you have a voucher or promo code?";
@@ -371,7 +458,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (btnVal === "book" || btnVal === "btn:book") {
         ns = { step: "PICK_TOUR" };
         reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
-        buttons = tours.map(function (t4) { return { label: t4.name + " \u2014 R" + t4.base_price_per_person, value: t4.id }; });
+        buttons = tours.map(function (t4) { return { label: t4.name + " \u2014 " + tourPriceLabel(t4), value: t4.id }; });
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
       if (btnVal === "question" || btnVal === "btn:question") {
@@ -388,7 +475,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       const wBook = !wLook && (lo.includes("book") || lo.includes("reserve") || lo.includes("interested") || lo.includes("i want") && lo.includes("tour") || lo.includes("id like") && lo.includes("tour") || lo.includes("sign up"));
       const wAvail = !wLook && !wBook && (lo.includes("available") || lo.includes("space") || lo.includes("tomorrow") && lo.includes("free") || lo.includes("weekend") && lo.includes("free"));
       const wGift = lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get"));
-      if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 R" + t9.base_price_per_person, value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       if (wLook) {
         if (wReschedule) ns = { step: "LOOKUP", intent: "reschedule" };
         else if (wCancel) ns = { step: "LOOKUP", intent: "cancel" };
@@ -414,11 +501,11 @@ Deno.serve(withSentry("web-chat", async (req) => {
             const dates = {}; for (const s of slots) { const dk = dateKey(s.start_time); if (!dates[dk]) dates[dk] = { date: dk, label: fmtDate(s.start_time), slots: [] }; dates[dk].slots.push({ id: s.id, time: s.start_time, avail: s.capacity_total - s.booked - (s.held || 0) }); }
             calendar = Object.values(dates);
             reply = pick(["Pick a date for the " + mt.name + " 📅", "When works for you? Here are the available dates for " + mt.name + ":"]);
-          } else { reply = "No " + mt.name + " slots in the next month 😔 Want to try the other tour?"; buttons = tours.filter(function (t2) { return t2.id !== mt.id; }).map(function (t3) { return { label: t3.name + " — R" + t3.base_price_per_person, value: t3.id }; }); ns.step = "PICK_TOUR"; }
+          } else { reply = "No " + mt.name + " slots in the next month 😔 Want to try the other tour?"; buttons = tours.filter(function (t2) { return t2.id !== mt.id; }).map(function (t3) { return { label: t3.name + " — " + tourPriceLabel(t3), value: t3.id }; }); ns.step = "PICK_TOUR"; }
         } else {
           ns = { step: "PICK_TOUR" };
           reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
-          buttons = tours.map(function (t4) { return { label: t4.name + " — R" + t4.base_price_per_person, value: t4.id }; });
+          buttons = tours.map(function (t4) { return { label: t4.name + " — " + tourPriceLabel(t4), value: t4.id }; });
         }
       }
       else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one — I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
@@ -447,7 +534,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           calendar = Object.values(dates2);
           reply = pick(["Great choice! Pick a date:", "" + picked.name + " it is! When works for you?"]);
         } else { reply = "Nothing open for " + picked.name + ". Try the other tour?"; ns.step = "PICK_TOUR"; buttons = tours.filter(function (t6) { return t6.id !== picked.id; }).map(function (t7) { return { label: t7.name, value: t7.id }; }); }
-      } else { reply = "Which tour are you keen on?"; buttons = tours.map(function (t8) { return { label: t8.name + " — R" + t8.base_price_per_person, value: t8.id }; }); }
+      } else { reply = "Which tour are you keen on?"; buttons = tours.map(function (t8) { return { label: t8.name + " — " + tourPriceLabel(t8), value: t8.id }; }); }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== PICK_DATE =====
@@ -907,7 +994,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         } else {
           ns = { ...ns, step: "CHANGE_TOUR", booking_id: b.id, slot_id: b.slot_id, tour_id: b.tour_id, qty: b.qty };
           reply = "Which tour would you like to switch to?";
-          buttons = tours.filter(function (t: any) { return t.id !== b.tour_id; }).map(function (t: any) { return { label: t.name + " — R" + t.base_price_per_person, value: "chtour_" + t.id }; });
+          buttons = tours.filter(function (t: any) { return t.id !== b.tour_id; }).map(function (t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: "chtour_" + t.id }; });
         }
       }
       else {
