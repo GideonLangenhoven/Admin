@@ -9,6 +9,7 @@ import {
   type LookupBusinessRow,
 } from "../_shared/my-bookings-lookup.ts";
 import { normalizeOtpCode, verifyTrackedOtp } from "../_shared/otp-attempts.ts";
+import { issueCustomerSession, verifyCustomerSession } from "../_shared/customer-session.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -94,11 +95,25 @@ Deno.serve(async (req) => {
     let phoneTail = "";
 
     const authEmail = await getAuthenticatedEmail(req);
+    const customerSessionToken = String(body.customer_session || "").trim();
+    let issueNewSession = false;
     if (authEmail) {
       if (requestedEmail && requestedEmail !== authEmail) {
         return respond(req, 403, { success: false, error: "Authenticated email does not match this lookup." });
       }
       verifiedEmail = authEmail;
+      phoneTail = normalizePhoneTail(String(body.phone_tail || ""));
+    } else if (customerSessionToken) {
+      // Resume path — used by the booking site to re-hydrate a logged-in
+      // customer after a page navigation without forcing another OTP.
+      const sess = await verifyCustomerSession(customerSessionToken);
+      if (!sess.valid || !sess.email) {
+        return respond(req, 401, { success: false, error: "Session expired. Please sign in again." });
+      }
+      if (sess.businessId && sess.businessId !== business.id) {
+        return respond(req, 403, { success: false, error: "Session not valid for this booking site." });
+      }
+      verifiedEmail = sess.email;
       phoneTail = normalizePhoneTail(String(body.phone_tail || ""));
     } else {
       const token = String(body.token || "");
@@ -116,6 +131,9 @@ Deno.serve(async (req) => {
       }
       verifiedEmail = verified.email;
       phoneTail = normalizePhoneTail(verified.phoneTail);
+      // Mint a customer-session token so the next page-load doesn't need
+      // another OTP. Returned alongside bookings below.
+      issueNewSession = true;
     }
 
     const { data, error } = await supabase
@@ -134,7 +152,17 @@ Deno.serve(async (req) => {
       emailOnly: Boolean(authEmail && emailOnly),
     });
 
-    return respond(req, 200, { success: true, bookings });
+    const responseBody: Record<string, unknown> = { success: true, bookings };
+    if (issueNewSession) {
+      try {
+        const minted = await issueCustomerSession({ email: verifiedEmail, businessId: business.id });
+        responseBody.customer_session = minted.token;
+        responseBody.customer_session_expires_at = minted.expiresAt;
+      } catch (mintErr) {
+        console.warn("CUSTOMER_SESSION_MINT_ERR", mintErr instanceof Error ? mintErr.message : mintErr);
+      }
+    }
+    return respond(req, 200, responseBody);
   } catch (error) {
     console.error("my-bookings-lookup error", error);
     return respond(req, 500, {
