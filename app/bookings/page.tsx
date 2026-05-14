@@ -97,9 +97,17 @@ interface Booking {
   payment_deadline: string | null;
   waiver_status: string | null;
   custom_fields: Record<string, string> | null;
+  tour_id?: string;
   tours: TourRel;
   slots: SlotRel;
   add_ons: Array<{ name: string; qty: number }>;
+  pending_reschedule?: {
+    pendingId: string;
+    newSlotStart: string | null;
+    newTourName: string | null;
+    diff: number;
+    expiresAt: string | null;
+  } | null;
 }
 
 interface SlotGroup {
@@ -364,13 +372,39 @@ export default function Bookings() {
       }
     }
 
+    // Fetch ACTIVE pending_reschedules so we can show a "Pending reschedule"
+    // badge on bookings that have a held-but-unpaid upgrade. Joined with the
+    // hold to pull expires_at and the new slot for context.
+    const pendingByBooking: Record<string, { newSlotStart: string | null; newTourName: string | null; diff: number; expiresAt: string | null; pendingId: string }> = {};
+    if (bookingIds.length > 0) {
+      const { data: prRows } = await supabase
+        .from("pending_reschedules")
+        .select("id, booking_id, new_slot_id, new_tour_id, diff, status, holds(expires_at, status), slots:new_slot_id(start_time), tours:new_tour_id(name)")
+        .in("booking_id", bookingIds)
+        .eq("status", "PENDING");
+      for (const row of (prRows || []) as any[]) {
+        const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
+        if (hold && hold.status && hold.status !== "ACTIVE") continue;
+        const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
+        const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
+        pendingByBooking[row.booking_id] = {
+          pendingId: row.id,
+          newSlotStart: slot?.start_time || null,
+          newTourName: tour?.name || null,
+          diff: Number(row.diff || 0),
+          expiresAt: hold?.expires_at || null,
+        };
+      }
+    }
+
     const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
       .map((b) => ({
         ...b,
         tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
         slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
         add_ons: addOnsByBooking[b.id] || [],
-      }));
+        pending_reschedule: pendingByBooking[b.id] || null,
+      } as Booking));
 
     console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length, page });
     setHasMore(normalized.length > PAGE_SIZE);
@@ -1077,6 +1111,13 @@ export default function Bookings() {
     rebookSubmittingRef.current = true;
     console.log("[BOOKINGS] saveRebook", { bookingId: rebookBooking.id, newSlotId: rebookSlotId, excessAction: rebookExcessAction });
     setActionBookingId(rebookBooking.id);
+    // Only include excess_action when the new slot actually costs less — the
+    // field is irrelevant on same-price / upgrade rebooks and was being sent
+    // by default (harmless but noisy in network panel).
+    const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
+    const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
+    const newUnitPrice = selectedSlot?.price_per_person_override ?? selectedSlot?.base_price_per_person ?? currentUnitPrice;
+    const willBeDowngrade = newUnitPrice < currentUnitPrice;
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
       body: {
         booking_id: rebookBooking.id,
@@ -1084,7 +1125,7 @@ export default function Bookings() {
         // it the function returns 400 "action required".
         action: "RESCHEDULE",
         new_slot_id: rebookSlotId,
-        excess_action: rebookExcessAction,
+        ...(willBeDowngrade ? { excess_action: rebookExcessAction } : {}),
       }
     });
 
@@ -1970,6 +2011,21 @@ function SlotRows({
                       ))}
                     </div>
                   )}
+                  {b.pending_reschedule && (() => {
+                    const pr = b.pending_reschedule;
+                    const exp = pr.expiresAt ? new Date(pr.expiresAt).getTime() : 0;
+                    const minsLeft = exp ? Math.max(0, Math.round((exp - Date.now()) / 60000)) : null;
+                    const newWhen = pr.newSlotStart ? new Date(pr.newSlotStart).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: getAdminTimezone() }) : "new slot";
+                    const label = `Pending reschedule → ${pr.newTourName || "Tour"} ${newWhen}${minsLeft !== null ? ` · hold ${minsLeft > 0 ? minsLeft + "m" : "expired"}` : ""} · +R${pr.diff.toFixed(0)}`;
+                    return (
+                      <span
+                        title={label + " — customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
+                        className={`mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold pl-[18px] lg:pl-2 ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
+                      >
+                        ⏳ {label}
+                      </span>
+                    );
+                  })()}
                   {b.external_ref && (
                     <span className="text-[10px] text-gray-400 font-mono lg:pl-0 pl-[18px]">
                       Ref: {b.external_ref}

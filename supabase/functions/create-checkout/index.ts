@@ -409,6 +409,112 @@ Deno.serve(async (req: any) => {
         }
       }
 
+      // Send payment link via WhatsApp + email for RESCHEDULE upgrades.
+      // The customer needs to know (a) the booking was moved, (b) there's a
+      // top-up payment due, (c) the new slot is held for 15 min.
+      if (type === "RESCHEDULE" && bookingId && !skipNotifications) {
+        try {
+          const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
+          const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+          const pendingId = String(body.pending_reschedule_id || "");
+          const bkNotif = await supabase.from("bookings")
+            .select("id, business_id, customer_name, email, phone")
+            .eq("id", bookingId)
+            .maybeSingle();
+          const bk = bkNotif.data;
+          if (bk && SERVICE_ROLE_KEY_ENV) {
+            // Resolve new-slot context from pending_reschedules so the email
+            // says "moving to 20 May 04:00 — pay R200 to confirm" instead of
+            // just "pay R200".
+            let newSlotStart = "";
+            let newTourName = "Tour";
+            let newQty = 1;
+            if (pendingId) {
+              const prRes = await supabase.from("pending_reschedules")
+                .select("new_slot_id, new_total_amount, diff")
+                .eq("id", pendingId)
+                .maybeSingle();
+              if (prRes.data?.new_slot_id) {
+                const slotRes = await supabase.from("slots")
+                  .select("start_time, tour_id")
+                  .eq("id", prRes.data.new_slot_id)
+                  .maybeSingle();
+                if (slotRes.data?.start_time) {
+                  try {
+                    const tz = tenant.business?.timezone || "Africa/Johannesburg";
+                    newSlotStart = new Intl.DateTimeFormat("en-ZA", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz }).format(new Date(slotRes.data.start_time));
+                  } catch { newSlotStart = String(slotRes.data.start_time); }
+                  if (slotRes.data.tour_id) {
+                    const tourRes = await supabase.from("tours").select("name").eq("id", slotRes.data.tour_id).maybeSingle();
+                    if (tourRes.data?.name) newTourName = tourRes.data.name;
+                  }
+                }
+              }
+            }
+            const notifEmail = String(bk.email || customerEmail || "").trim().toLowerCase();
+            let notifPhone = String(bk.phone || "").replace(/[^\d]/g, "");
+            if (notifPhone && notifPhone.startsWith("0")) notifPhone = "27" + notifPhone.substring(1);
+            const notifFirst = String(bk.customer_name || "").trim().split(" ")[0] || "there";
+            const notifRef = String(bk.id || "").slice(0, 8).toUpperCase();
+            const diffAmt = Number(amount || 0).toFixed(2);
+
+            if (notifPhone) {
+              try {
+                await fetch(SUPABASE_URL_ENV + "/functions/v1/send-whatsapp-text", {
+                  method: "POST",
+                  headers: { Authorization: "Bearer " + SERVICE_ROLE_KEY_ENV, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: notifPhone,
+                    business_id: bk.business_id,
+                    message:
+                      "Hi " + notifFirst + "!\n\n" +
+                      "Your booking has been moved to a new slot, but it costs a little more:\n\n" +
+                      "\uD83D\uDEF6 " + newTourName + "\n" +
+                      "\uD83D\uDCC5 " + (newSlotStart || "(new slot)") + "\n" +
+                      "\uD83D\uDCB0 Top-up due: R" + diffAmt + "\n\n" +
+                      "\uD83D\uDD17 Pay here: " + yocoData.redirectUrl + "\n\n" +
+                      "\u23F0 The new slot is held for 15 minutes. If you don't pay in time, your original booking stays as it was.\n\n" +
+                      "Ref: " + notifRef,
+                  }),
+                });
+                console.log("CHECKOUT_WA_RESCHEDULE_LINK_SENT booking=" + bookingId);
+              } catch (waErr) {
+                console.error("CHECKOUT_WA_RESCHEDULE_LINK_ERR:", waErr);
+              }
+            }
+
+            if (notifEmail && notifEmail.includes("@")) {
+              try {
+                await fetch(SUPABASE_URL_ENV + "/functions/v1/send-email", {
+                  method: "POST",
+                  headers: { Authorization: "Bearer " + SERVICE_ROLE_KEY_ENV, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "RESCHEDULE_PAYMENT_LINK",
+                    data: {
+                      email: notifEmail,
+                      booking_id: bookingId,
+                      business_id: bk.business_id,
+                      customer_name: bk.customer_name || notifFirst,
+                      ref: notifRef,
+                      tour_name: newTourName,
+                      tour_date: newSlotStart,
+                      qty: newQty,
+                      total_amount: diffAmt,
+                      payment_url: yocoData.redirectUrl,
+                    },
+                  }),
+                });
+                console.log("CHECKOUT_EMAIL_RESCHEDULE_LINK_SENT booking=" + bookingId);
+              } catch (emailErr) {
+                console.error("CHECKOUT_EMAIL_RESCHEDULE_LINK_ERR:", emailErr);
+              }
+            }
+          }
+        } catch (notifErr) {
+          console.error("CHECKOUT_RESCHEDULE_NOTIFICATION_ERR:", notifErr);
+        }
+      }
+
       return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl }), { status: 200, headers: corsHeaders });
     }
 
