@@ -1002,7 +1002,7 @@ export default function BookingDetailPage() {
           <InfoRow label="Payment Method" value={invoice?.payment_method || (booking.yoco_payment_id ? "Yoco" : "Pending")} />
           {invoice && (
             <>
-              <InfoRow label="Invoice #" value={invoice.invoice_number} />
+              <InfoRow label="Invoice #" value={(() => { const m = /^INV-?(\d+)$/i.exec(String(invoice.invoice_number || "").trim()); return m ? "INV-" + m[1].padStart(5, "0") : invoice.invoice_number; })()} />
               <InfoRow label="Payment Reference" value={invoice.payment_reference} mono />
               <InfoRow label="Invoice Created" value={fmtDateTime(invoice.created_at)} />
             </>

@@ -854,6 +854,19 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
 }
 
 function invoiceHtml(d: Record<string, unknown>) {
+  // Always compute the VAT breakdown locally so the email is a compliant
+  // SA tax invoice regardless of what the caller passed for `subtotal`.
+  // Some callers (admin /bookings page) pass `subtotal = total` which would
+  // hide the VAT line; deriving it from `total_amount` here keeps the email
+  // honest end-to-end.
+  const totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
+  const totalNum = parseFloat(totalStr) || 0;
+  const subtotalNum = totalNum / (1 + VAT_RATE);
+  const vatNum = totalNum - subtotalNum;
+  const m2 = (n: number) => n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const subtotalStr = m2(subtotalNum);
+  const vatStr = m2(vatNum);
+  const totalStrFmt = m2(totalNum);
   return `
     <!DOCTYPE html>
     <html>
@@ -866,7 +879,7 @@ function invoiceHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.invoice_number}</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Tax Invoice ${d.invoice_number}</h1>
           </td>
         </tr>
         ${heroImg("IMG_INVOICE", "Cape Kayak")}
@@ -895,12 +908,20 @@ function invoiceHtml(d: Record<string, unknown>) {
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333;"><strong style="color: #1b3b36;">${d.tour_name}</strong><br><span style="color: #888; font-size: 13px;">${d.tour_date}</span></td>
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">${d.qty}</td>
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">R${d.unit_price}</td>
-                <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">R${d.subtotal}</td>
+                <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">R${totalStrFmt}</td>
               </tr>
               ${Number(d.discount_amount) > 0 ? `<tr><td colspan="3" style="color: #B91C1C; border-bottom: none; padding-top: 10px;">Discount${d.discount_type === "PERCENT" ? " (" + d.discount_percent + "%)" : ""}</td><td style="color: #B91C1C; border-bottom: none; padding-top: 10px; text-align: right;">-R${d.discount_amount}</td></tr>` : ""}
               <tr>
-                <td colspan="3" style="padding: 20px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36;">Total Paid</td>
-                <td style="padding: 20px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36; text-align: right;">R${d.total_amount}</td>
+                <td colspan="3" style="padding: 14px 0 4px 0; border-bottom: none; color: #555; text-align: right;">Subtotal (excl. VAT)</td>
+                <td style="padding: 14px 0 4px 0; border-bottom: none; color: #555; text-align: right;">R${subtotalStr}</td>
+              </tr>
+              <tr>
+                <td colspan="3" style="padding: 4px 0; border-bottom: 1px solid #E5E5E5; color: #555; text-align: right;">VAT (${(VAT_RATE * 100).toFixed(0)}%)</td>
+                <td style="padding: 4px 0; border-bottom: 1px solid #E5E5E5; color: #555; text-align: right;">R${vatStr}</td>
+              </tr>
+              <tr>
+                <td colspan="3" style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36;">Total Paid (incl. VAT)</td>
+                <td style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36; text-align: right;">R${totalStrFmt}</td>
               </tr>
             </table>
           </td>
@@ -1564,7 +1585,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const W = 595.28;
   const margin = 40;
   const usable = W - margin * 2;
-  const y = 800;
+  let y = 800;
   const black = rgb(0, 0, 0);
   const grey = rgb(0.5, 0.5, 0.5);
   const lightGrey = rgb(0.85, 0.85, 0.85);
@@ -1709,7 +1730,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
 
 function toBase64(str: string): string {
   const bytes = new TextEncoder().encode(str);
-  const binary = "";
+  let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
@@ -1914,7 +1935,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         html = bookingUpdatedHtml(d);
         break;
       case "INVOICE":
-        subject = "Cape Kayak - Invoice " + d.invoice_number;
+        subject = "Cape Kayak - Tax Invoice " + d.invoice_number;
         html = invoiceHtml(d);
         bcc = d.admin_email as string;
         break;

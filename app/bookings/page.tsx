@@ -621,6 +621,10 @@ export default function Bookings() {
 
       // Check if an invoice already exists for this booking
       let invoiceNumber = ref;
+      const padInv = (raw: string) => {
+        const m = /^INV-?(\d+)$/i.exec(String(raw || "").trim());
+        return m ? "INV-" + m[1].padStart(5, "0") : raw;
+      };
       const { data: existingInv } = await supabase
         .from("invoices")
         .select("id, invoice_number")
@@ -630,12 +634,12 @@ export default function Bookings() {
         .maybeSingle();
 
       if (existingInv?.invoice_number) {
-        invoiceNumber = existingInv.invoice_number;
+        invoiceNumber = padInv(existingInv.invoice_number);
       } else {
         // Create invoice if it doesn't exist
         try {
           const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
-          invoiceNumber = invNumRes.data || ref;
+          invoiceNumber = padInv(invNumRes.data || ref);
 
           const { data: invData } = await supabase.from("invoices").insert({
             business_id: businessId,
@@ -2054,7 +2058,7 @@ function SlotRows({
                       <ActionButton label="Refund" onClick={() => onRefund(b)} disabled={isLoading || b.status === "CANCELLED"} tone="amber" />
                       <ActionButton label="Cancel" onClick={() => onCancel(b)} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
                       <ActionButton
-                        label={isResending ? "..." : "Invoice"}
+                        label={isResending ? "Sending…" : "Resend Inv"}
                         onClick={() => onResendInvoice(b.id)}
                         disabled={isResending}
                         tone="blue"
@@ -2142,7 +2146,11 @@ function ActionButton({
     <button
       type="button"
       onClick={(e) => {
+        // stopImmediatePropagation kills the document-level click handler
+        // that SlotRows registers to auto-close the menu — without it, the
+        // handler fires on the same tick and can race with router.push().
         e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
         onClick();
       }}
       disabled={disabled}
@@ -2215,6 +2223,7 @@ function ActionMenuItem({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
         onClick();
       }}
       disabled={disabled}

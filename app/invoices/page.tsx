@@ -99,9 +99,16 @@ function escapeHtml(raw: string) {
     .replaceAll("'", "&#39;");
 }
 
+function normalizeInvNo(raw: string) {
+  // Older rows stored as "INV-46"; newer rows pad to "INV-00046" via the
+  // next_invoice_number RPC. Display + email consistently in the padded form.
+  const m = /^INV-?(\d+)$/i.exec(raw.trim());
+  return m ? "INV-" + m[1].padStart(5, "0") : raw;
+}
+
 function invoiceNumber(inv: InvoiceRecord) {
   const fallback = inv.id ? inv.id.slice(0, 8).toUpperCase() : "00000000";
-  return asText(inv.invoice_number, fallback);
+  return normalizeInvNo(asText(inv.invoice_number, fallback));
 }
 
 function bookingRef(inv: InvoiceRecord) {
@@ -324,13 +331,20 @@ function downloadHtmlFile(filename: string, content: string) {
 }
 
 function openPrintWindow(html: string) {
-  const popup = window.open("", "_blank", "noopener,noreferrer");
-  if (!popup) return false;
-  popup.document.open();
-  popup.document.write(html);
-  popup.document.close();
-  popup.focus();
-  setTimeout(() => popup.print(), 300);
+  // Open the rendered HTML directly via a Blob URL. Earlier we used
+  // window.open("","_blank","noopener,noreferrer") + document.write, but
+  // modern browsers return null from window.open when "noopener" is set,
+  // leaving the tab stuck on about:blank with a 0-byte body. The Blob URL
+  // path lets the browser render and print natively, and works in popups
+  // gated by stricter same-origin rules.
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const popup = window.open(url, "_blank");
+  if (!popup) {
+    URL.revokeObjectURL(url);
+    return false;
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
   return true;
 }
 
@@ -340,6 +354,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [recentlySentId, setRecentlySentId] = useState<string | null>(null);
   const [openActions, setOpenActions] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"booking_desc" | "booking_asc" | "created_desc" | "created_asc">("booking_desc");
   const [exactDate, setExactDate] = useState("");
@@ -504,12 +519,14 @@ export default function Invoices() {
         },
       });
       if (res.error) {
-        notify({ title: "Invoice resend failed", message: res.error.message, tone: "error" });
+        notify({ title: "Invoice resend failed", message: res.error.message, tone: "error", duration: 6000 });
       } else {
-        notify({ title: "Invoice resent", message: "Invoice resent to " + email, tone: "success" });
+        notify({ title: "Invoice resent", message: "Tax invoice " + invNo + " sent to " + email, tone: "success", duration: 5000 });
+        setRecentlySentId(inv.id);
+        setTimeout(() => setRecentlySentId((cur) => (cur === inv.id ? null : cur)), 3500);
       }
     } catch (err: unknown) {
-      notify({ title: "Invoice resend failed", message: asText((err as Error)?.message, String(err)), tone: "error" });
+      notify({ title: "Invoice resend failed", message: asText((err as Error)?.message, String(err)), tone: "error", duration: 6000 });
     } finally {
       setResendingId(null);
     }
@@ -608,7 +625,7 @@ export default function Invoices() {
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
                         <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print</button>
-                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending..." : "Resend"}</button>
+                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
                       </div>
                     </div>
                   );
@@ -650,7 +667,7 @@ export default function Invoices() {
                               <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
                                 <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
                                 <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print / PDF</button>
-                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending..." : "Resend"}</button>
+                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
                               </div>
                             )}
                           </td>
@@ -666,7 +683,7 @@ export default function Invoices() {
                             <div className="flex flex-wrap gap-2">
                               <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
                               <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print / PDF</button>
-                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending..." : "Resend"}</button>
+                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
                             </div>
                           </td>
                         </tr>

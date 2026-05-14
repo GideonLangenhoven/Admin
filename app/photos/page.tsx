@@ -15,6 +15,18 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
 }
 
+function isImageUrl(url: string) {
+  return /\.(jpe?g|png|gif|webp|svg|avif)(\?|#|$)/i.test(url || "");
+}
+
+// Drive file URLs (https://drive.google.com/file/d/<id>/view) can be turned into
+// a CORS-friendly thumbnail. Folder URLs (drive/folders/<id>) cannot be embedded
+// directly — we render an icon for those instead of a broken <img>.
+function driveFileThumb(url: string): string | null {
+  const m = /drive\.google\.com\/file\/d\/([^/?#]+)/i.exec(url || "");
+  return m ? "https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w400" : null;
+}
+
 type SlotGroup = { date: string; label: string; slots: any[] };
 
 export default function PhotosPage() {
@@ -465,16 +477,35 @@ export default function PhotosPage() {
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sentHistory.map(p => (
-              <a key={p.id} href={p.photo_url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 transition-colors hover:border-gray-300">
-                <img src={p.photo_url} alt="Sent trip photo" loading="lazy" className="h-36 w-full object-cover" />
-                <div className="space-y-1 p-3 text-sm">
-                  <p className="truncate font-medium text-gray-900">{(p as any).slots?.tours?.name || "Trip photo"}</p>
-                  <p className="text-xs text-gray-500">{(p as any).slots?.start_time ? fmtDate((p as any).slots.start_time) : "Unknown trip date"}</p>
-                  <p className="truncate text-xs text-blue-600">{p.photo_url}</p>
-                </div>
-              </a>
-            ))}
+            {sentHistory.map(p => {
+              const url = String(p.photo_url || "");
+              const tripStart = (p as any).slots?.start_time as string | undefined;
+              const dateLabel = tripStart
+                ? fmtDate(tripStart)
+                : p.uploaded_at
+                  ? "Sent " + fmtDate(p.uploaded_at)
+                  : "Date unavailable";
+              const driveThumb = driveFileThumb(url);
+              const showImg = isImageUrl(url) || Boolean(driveThumb);
+              return (
+                <a key={p.id} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 transition-colors hover:border-gray-300">
+                  {showImg ? (
+                    <img src={driveThumb || url} alt="Sent trip photo" loading="lazy" referrerPolicy="no-referrer" className="h-36 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-36 w-full items-center justify-center bg-blue-50 text-blue-500">
+                      <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor" aria-hidden="true">
+                        <path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="space-y-1 p-3 text-sm">
+                    <p className="truncate font-medium text-gray-900">{(p as any).slots?.tours?.name || "Trip photo"}</p>
+                    <p className="text-xs text-gray-500">{dateLabel}</p>
+                    <p className="truncate text-xs text-blue-600">{url}</p>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         )}
       </div>
