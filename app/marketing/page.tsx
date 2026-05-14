@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { confirmAction, notify } from "../lib/app-notify";
 import { useBusinessContext } from "../../components/BusinessContext";
 import Link from "next/link";
 import {
@@ -84,6 +85,45 @@ export default function MarketingOverview() {
   const totalOpens = campaigns.reduce((s, c) => s + (c.total_opens || 0), 0);
   const totalClicks = campaigns.reduce((s, c) => s + (c.total_clicks || 0), 0);
   const totalUnsub = campaigns.reduce((s, c) => s + (c.total_unsubscribes || 0), 0);
+
+  async function cancelCampaign(c: CampaignRow) {
+    const wording = c.status === "scheduled"
+      ? "Cancel the scheduled campaign \"" + c.name + "\"? It will not fire at its scheduled time."
+      : "Stop sending campaign \"" + c.name + "\"? Pending recipients in the queue will be skipped. Already-delivered emails cannot be recalled.";
+    if (!await confirmAction({
+      title: c.status === "scheduled" ? "Cancel scheduled campaign" : "Pause campaign",
+      message: wording,
+      tone: "warning",
+      confirmLabel: c.status === "scheduled" ? "Cancel campaign" : "Stop sending",
+    })) return;
+    // marketing-dispatch's claim loop guards on status === "sending"; flipping
+    // the row to cancelled stops new queue items being claimed for this id.
+    const { error: campErr } = await supabase
+      .from("marketing_campaigns")
+      .update({ status: "cancelled", completed_at: new Date().toISOString() })
+      .eq("id", c.id)
+      .eq("business_id", businessId);
+    if (campErr) {
+      notify({ title: "Could not stop campaign", message: campErr.message, tone: "error" });
+      return;
+    }
+    // Best-effort clean-up: drop any pending queue items so the failed
+    // counter doesn't tick up after the operator has already aborted.
+    await supabase
+      .from("marketing_queue")
+      .update({ status: "cancelled" })
+      .eq("campaign_id", c.id)
+      .eq("business_id", businessId)
+      .in("status", ["pending", "processing"]);
+    notify({
+      title: c.status === "scheduled" ? "Scheduled campaign cancelled" : "Campaign stopped",
+      message: c.status === "scheduled"
+        ? "\"" + c.name + "\" will not fire."
+        : "\"" + c.name + "\" stopped. " + (c.total_sent || 0) + " of " + (c.total_recipients || 0) + " already delivered.",
+      tone: "success",
+    });
+    setCampaigns((prev) => prev.map((row) => row.id === c.id ? { ...row, status: "cancelled" } : row));
+  }
 
   // Build campaign performance data for charts (most recent first → reverse for chronological)
   const campaignChartData = [...campaigns]
@@ -314,10 +354,13 @@ export default function MarketingOverview() {
                     <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Clicks</th>
                     <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Unsub</th>
                     <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Date</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((c) => (
+                  {campaigns.map((c) => {
+                    const canCancel = c.status === "sending" || c.status === "scheduled";
+                    return (
                     <tr key={c.id} className="border-t transition-colors hover:opacity-80" style={{ borderColor: "var(--ck-border)" }}>
                       <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.name}</td>
                       <td className="px-4 py-3"><CampaignStatusBadge status={c.status} /></td>
@@ -337,8 +380,24 @@ export default function MarketingOverview() {
                       <td className="px-4 py-3 text-right text-xs" style={{ color: "var(--ck-text-muted)" }}>
                         {c.scheduled_at && c.status === "scheduled" ? fmtDate(c.scheduled_at) : fmtDate(c.created_at)}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        {canCancel ? (
+                          <button
+                            type="button"
+                            onClick={() => cancelCampaign(c)}
+                            className="rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors hover:opacity-80"
+                            style={{ borderColor: "var(--ck-border)", color: "#dc2626", background: "rgba(239,68,68,0.05)" }}
+                            title={c.status === "scheduled" ? "Cancel before it fires" : "Stop sending remaining recipients"}
+                          >
+                            {c.status === "scheduled" ? "Cancel" : "Pause"}
+                          </button>
+                        ) : (
+                          <span style={{ color: "var(--ck-text-muted)" }}>—</span>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

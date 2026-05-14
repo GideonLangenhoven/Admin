@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { notify } from "../../lib/app-notify";
+import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
@@ -115,39 +115,52 @@ export default function TemplatesPage() {
   }
 
   async function deleteTemplate(id: string) {
-    await supabase.from("marketing_templates").delete().eq("id", id);
+    const t = templates.find((row) => row.id === id);
+    if (!await confirmAction({
+      title: "Delete template",
+      message: t?.name ? "Delete the template \"" + t.name + "\"? Any scheduled campaigns that haven't fired yet still reference it." : "Delete this template?",
+      tone: "warning",
+      confirmLabel: "Delete template",
+    })) return;
+    const { error } = await supabase.from("marketing_templates").delete().eq("id", id);
+    if (error) {
+      notify({ title: "Delete failed", message: error.message, tone: "error" });
+      return;
+    }
     notify({ message: "Template deleted.", tone: "success" });
     load();
   }
 
   async function sendTestEmail(t: Template) {
     try {
-      // Resolve test recipient: designated marketing test email > current admin's email
-      let testEmail = "";
-      let testName = "Admin";
+      // Priority for the test recipient:
+      //  1. The currently logged-in admin (localStorage) — most likely
+      //     what an operator clicking "Send test" actually wants.
+      //  2. businesses.marketing_test_email — explicit per-tenant override
+      //     for unattended automation (e.g. a shared marketing inbox).
+      //  3. First admin on the business as a last resort.
+      // Previously (1) and (2) were swapped, which leaked test emails to a
+      // stale dev address seeded into Aonyx's marketing_test_email row.
+      let testEmail = localStorage.getItem("ck_admin_email") || "";
+      let testName = localStorage.getItem("ck_admin_name") || "Admin";
 
-      // Check if business has a designated marketing test email
-      const { data: biz, error: bizErr } = await supabase
-        .from("businesses")
-        .select("marketing_test_email")
-        .eq("id", businessId)
-        .maybeSingle();
-      if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
-      if (biz?.marketing_test_email) {
-        testEmail = biz.marketing_test_email;
-        const { data: adminRow } = await supabase
-          .from("admin_users")
-          .select("name")
-          .eq("email", testEmail)
-          .eq("business_id", businessId)
-          .maybeSingle();
-        testName = adminRow?.name || "Admin";
-      }
-
-      // Fallback to current admin's email from session or DB
       if (!testEmail) {
-        testEmail = localStorage.getItem("ck_admin_email") || "";
-        testName = localStorage.getItem("ck_admin_name") || "Admin";
+        const { data: biz, error: bizErr } = await supabase
+          .from("businesses")
+          .select("marketing_test_email")
+          .eq("id", businessId)
+          .maybeSingle();
+        if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
+        if (biz?.marketing_test_email) {
+          testEmail = biz.marketing_test_email;
+          const { data: adminRow } = await supabase
+            .from("admin_users")
+            .select("name")
+            .eq("email", testEmail)
+            .eq("business_id", businessId)
+            .maybeSingle();
+          testName = adminRow?.name || "Admin";
+        }
       }
 
       // If still no email, look up the first admin for this business
@@ -278,22 +291,62 @@ export default function TemplatesPage() {
     //    (don't rely solely on the cron job — fire it now for instant delivery)
     if (!isScheduled) {
       // Fire dispatch in batches until all queue items are processed
-      let dispatchedTotal = 0;
+      let sentTotal = 0;
+      let failedTotal = 0;
       for (let attempt = 0; attempt < Math.ceil(contacts.length / 50) + 1; attempt++) {
         try {
           const dispRes = await supabase.functions.invoke("marketing-dispatch", { body: {} });
-          const processed = dispRes.data?.sent || 0;
-          dispatchedTotal += processed;
+          const processed = dispRes.data?.processed || 0;
+          sentTotal += dispRes.data?.sent || 0;
+          failedTotal += dispRes.data?.failed || 0;
           if (processed === 0) break; // no more items to process
         } catch (dispErr) {
           console.warn("Dispatch batch error (cron will retry):", dispErr);
           break;
         }
       }
-      if (dispatchedTotal > 0) {
-        notify({ message: `${dispatchedTotal} of ${contacts.length} emails sent. Remaining will be sent by background process.`, tone: "success" });
+      // Cross-check against the canonical campaign row so cancelled / paused
+      // items don't get reported as "sent". We previously trusted the toast
+      // optimistically and showed "Campaign queued" even when every recipient
+      // failed (U-4).
+      const { data: campSummary } = await supabase
+        .from("marketing_campaigns")
+        .select("total_sent, total_failed, status")
+        .eq("id", campaign!.id)
+        .maybeSingle();
+      const finalSent = campSummary?.total_sent ?? sentTotal;
+      const finalFailed = campSummary?.total_failed ?? failedTotal;
+      const remaining = Math.max(0, contacts.length - finalSent - finalFailed);
+
+      if (finalFailed > 0 && finalSent === 0) {
+        notify({
+          title: "Campaign failed",
+          message: `${finalFailed} of ${contacts.length} recipients failed. Check Recent Campaigns for the failure reason; the queue won't retry beyond ${3} attempts.`,
+          tone: "error",
+          duration: 8000,
+        });
+      } else if (finalSent > 0 && finalFailed > 0) {
+        notify({
+          title: "Campaign partially sent",
+          message: `${finalSent} delivered, ${finalFailed} failed. ${remaining > 0 ? remaining + " queued for retry. " : ""}Open Recent Campaigns for detail.`,
+          tone: "warning",
+          duration: 7000,
+        });
+      } else if (finalSent > 0) {
+        notify({
+          title: "Campaign sent",
+          message: `${finalSent} of ${contacts.length} delivered.${remaining > 0 ? " " + remaining + " queued for retry." : ""}`,
+          tone: "success",
+        });
       } else {
-        notify({ message: `Campaign queued — ${contacts.length} recipients. Emails will be sent in batches by the background process.`, tone: "success" });
+        // sent === 0, failed === 0 — items got queued but dispatch returned
+        // zero processed. Could be RLS / cron lag. Tell the user honestly.
+        notify({
+          title: "Campaign queued",
+          message: `${contacts.length} recipients queued. None have been dispatched yet — the background process will pick them up. Refresh Recent Campaigns in ~1 min to see progress.`,
+          tone: "info",
+          duration: 7000,
+        });
       }
     } else {
       notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} — ${contacts.length} recipients.`, tone: "success" });

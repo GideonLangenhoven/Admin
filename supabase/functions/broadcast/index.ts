@@ -92,6 +92,39 @@ Deno.serve(async (req: Request) => {
       if (send_email && b.email) {
         emailAttempted++;
         try {
+          // Compliance: generate a one-click unsubscribe token per recipient.
+          // POPIA / CAN-SPAM / GDPR all require an opt-out path on every mass
+          // commercial communication. Broadcasts target bookings (not
+          // marketing_contacts), so we upsert a contact row first and tie the
+          // token to it — reusing the existing marketing-unsubscribe handler.
+          let unsubscribeUrl = "";
+          try {
+            const emailLower = String(b.email).toLowerCase();
+            const { data: contactRow } = await supabase.from("marketing_contacts")
+              .upsert({
+                business_id,
+                email: emailLower,
+                first_name: (b.customer_name || "").split(" ")[0] || null,
+                source: "booking",
+              }, { onConflict: "business_id,email", ignoreDuplicates: false })
+              .select("id")
+              .maybeSingle();
+            const contactId = contactRow?.id || null;
+            if (contactId) {
+              const token = crypto.randomUUID();
+              const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert({
+                business_id,
+                contact_id: contactId,
+                token,
+              });
+              if (!tokenErr) {
+                unsubscribeUrl = `${SUPABASE_URL}/functions/v1/marketing-unsubscribe?token=${token}`;
+              }
+            }
+          } catch (e) {
+            console.warn("BROADCAST_UNSUB_TOKEN_ERR for", b.email, ":", e);
+          }
+
           const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
@@ -101,7 +134,8 @@ Deno.serve(async (req: Request) => {
               data: {
                 email: b.email,
                 customer_name: b.customer_name,
-                message: parsedMessage
+                message: parsedMessage,
+                unsubscribe_url: unsubscribeUrl,
               }
             })
           });

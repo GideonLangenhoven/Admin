@@ -13,7 +13,14 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || D
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 // Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
 // Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+// Safety: refuse to send from the Resend developer sandbox even if the env
+// var got pasted with `onboarding@resend.dev`. That domain rate-limits hard
+// and routes straight to spam for many providers. Always fall through to the
+// platform-verified address when the env is missing or pointing at sandbox.
+const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
+const FROM_EMAIL = RAW_FROM_EMAIL && !/onboarding@resend\.dev|@resend\.dev/i.test(RAW_FROM_EMAIL)
+  ? RAW_FROM_EMAIL
+  : "BookingTours <noreply@bookingtours.co.za>";
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -41,7 +48,7 @@ function isValidEmail(email: string): boolean {
 // See: https://resend.com/docs/dashboard/webhooks/introduction
 // This lets you mark bad emails in the database and stop future sends to them.
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
+async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
   // Validate email format before attempting to send
   if (!to || !isValidEmail(to)) {
     console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
@@ -53,6 +60,15 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
+  // RFC 8058 one-click List-Unsubscribe — mailbox providers (Gmail, Apple Mail,
+  // Yahoo) now require this for bulk mail to land in the inbox. Only set when
+  // the caller passed a token URL so transactional sends stay clean.
+  if (unsubscribeUrl) {
+    payload.headers = {
+      "List-Unsubscribe": "<" + unsubscribeUrl + ">",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    };
+  }
   let res: Response;
   try {
     res = await fetch("https://api.resend.com/emails", {
@@ -1738,6 +1754,14 @@ function toBase64(str: string): string {
 function broadcastHtml(d: Record<string, unknown>) {
   let phtml = String(d.message || "Message").replace(/\n/g, '<br>');
   phtml = phtml.replace(/\{name\}/gi, String(d.customer_name || "Guest").split(" ")[0]);
+  const unsubUrl = String(d.unsubscribe_url || "");
+  // POPIA / CAN-SPAM / GDPR: every mass commercial email must carry a
+  // one-click unsubscribe. broadcastHtml previously hid this fact behind a
+  // "reply to this email" line. We now ALWAYS render an unsubscribe link
+  // when the caller passed a token URL.
+  const unsubBlock = unsubUrl
+    ? `<p style="color: #A8C2B8; font-size: 11px; line-height: 1.5; margin: 12px 0 0;">Don't want updates like this? <a href="${unsubUrl}" style="color: #fff; text-decoration: underline;">Unsubscribe</a>.</p>`
+    : "";
   return `
     <!DOCTYPE html>
     <html>
@@ -1765,6 +1789,7 @@ function broadcastHtml(d: Record<string, unknown>) {
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
             <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
             If you have any questions, reply to this email or contact us on WhatsApp.</p>
+            ${unsubBlock}
           </td>
         </tr>
       </table>
@@ -1977,6 +2002,16 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
         html = tripPhotosHtml(d);
         break;
+      case "MARKETING_TEST":
+        // Admin preview of a marketing template. We do NOT touch the queue or
+        // generate per-recipient unsubscribe tokens here — the body is rendered
+        // verbatim with a [TEST] prefix and a static admin-facing unsubscribe
+        // placeholder so the rendered preview matches what real recipients see.
+        subject = String(d.subject_line || "[TEST] Marketing preview");
+        html = String(d.html_content || "<p>No content</p>")
+          .replace(/\{first_name\}/g, String(d.first_name || "Admin"))
+          .replace(/\{\{unsubscribe_url\}\}/g, "https://bookingtours.co.za/preview-unsubscribe");
+        break;
       case "POPIA_CONFIRM_REQUEST":
         subject = "Confirm Your Data Request";
         html = popiaConfirmRequestHtml(d);
@@ -2021,7 +2056,15 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
 
     console.log("BRANDING_URLS type=" + type + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
     const branded = applyBranding(subject, html, branding);
-    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
+    // Marketing-class email types get a List-Unsubscribe header so mailbox
+    // providers don't dump them in spam. The header URL is the same as the
+    // footer link the caller already passed in (no per-recipient token
+    // generation here — broadcast/marketing-dispatch generate that upstream).
+    const isMarketingClass = type === "BROADCAST" || type === "MARKETING_TEST";
+    const unsubForHeader = isMarketingClass && typeof d.unsubscribe_url === "string" && d.unsubscribe_url
+      ? String(d.unsubscribe_url)
+      : undefined;
+    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail, unsubForHeader);
     if (!result.ok) {
       // Surface the upstream failure to the caller so broadcast / chain
       // callers can count delivered-vs-attempted correctly instead of

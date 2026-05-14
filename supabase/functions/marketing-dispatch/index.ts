@@ -5,7 +5,12 @@ import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
+// Refuse to ever use the Resend dev sandbox as the platform fallback — it
+// kills deliverability on bulk mail. See send-email/index.ts for context.
+const FROM_EMAIL = RAW_FROM_EMAIL && !/onboarding@resend\.dev|@resend\.dev/i.test(RAW_FROM_EMAIL)
+  ? RAW_FROM_EMAIL
+  : "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
@@ -81,13 +86,15 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
       };
     }
 
-    // ── 2b. Load per-business subdomain for sender address ──
+    // ── 2b. Load per-business subdomain + brand name for sender + brand replacement ──
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
+    const bizBrandMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, subdomain").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name, subdomain").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
-        const name = b.business_name || "Marketing";
+        const name = b.business_name || b.name || "Marketing";
+        bizBrandMap[b.id] = name;
         if (b.subdomain) {
           bizFromMap[b.id] = name + " <noreply@" + b.subdomain + ".bookingtours.co.za>";
         }
@@ -100,7 +107,7 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const businessCounts: Record<string, number> = {};
     const trackingBaseUrl = SUPABASE_URL + "/functions/v1/marketing-track";
 
-    const emailPayloads: Array<{ from: string; to: string[]; subject: string; html: string; queueId: string; contactId: string; campaignId: string; businessId: string }> = [];
+    const emailPayloads: Array<{ from: string; to: string[]; subject: string; html: string; queueId: string; contactId: string; campaignId: string; businessId: string; unsubscribeUrl: string }> = [];
 
     for (const item of items as any[]) {
       const camp = campaignMap[item.campaign_id];
@@ -129,12 +136,22 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
 
       const unsubscribeUrl = SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=" + unsubToken;
 
-      // Variable replacement
+      // Variable replacement — including brand tokens. Older templates that
+      // were seeded with a literal "Cape Kayak" string get rewritten to the
+      // tenant's actual business_name so multi-tenant tenants don't leak the
+      // origin tenant's brand to their own customers (U-7 / U-12).
+      const brand = bizBrandMap[item.business_id] || "Our Team";
       let html = camp.html
         .replace(/\{first_name\}/g, item.first_name || "there")
+        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+        .replace(/Cape Kayak Adventures/g, brand)
+        .replace(/Cape Kayak/g, brand)
         .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
 
-      const subject = camp.subject.replace(/\{first_name\}/g, item.first_name || "there");
+      const subject = camp.subject
+        .replace(/\{first_name\}/g, item.first_name || "there")
+        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+        .replace(/Cape Kayak/g, brand);
 
       // Inject open-tracking pixel before </body>
       const openPixelUrl = trackingBaseUrl + "?t=open&q=" + item.id + "&c=" + item.campaign_id + "&k=" + item.contact_id;
@@ -156,16 +173,23 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
         contactId: item.contact_id,
         campaignId: item.campaign_id,
         businessId: item.business_id,
+        unsubscribeUrl,
       });
     }
 
     // ── 4. Send via Resend batch API ──
     if (emailPayloads.length > 0) {
+      // RFC 8058 one-click unsubscribe header — mailbox providers require it
+      // for bulk mail. Without it Gmail / Yahoo route most of these to spam.
       const batchBody = emailPayloads.map((p) => ({
         from: p.from,
         to: p.to,
         subject: p.subject,
         html: p.html,
+        headers: {
+          "List-Unsubscribe": "<" + p.unsubscribeUrl + ">",
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       }));
 
       const res = await fetch("https://api.resend.com/emails/batch", {

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { notify } from "../../lib/app-notify";
+import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Plus, MagnifyingGlass, UploadSimple, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
 import * as XLSX from "xlsx";
@@ -490,8 +490,20 @@ export default function ContactsPage() {
   }
 
   async function deleteContact(id: string) {
-    await supabase.from("marketing_contacts").delete().eq("id", id);
-    setContacts(contacts.filter((c) => c.id !== id));
+    const c = contacts.find((row) => row.id === id);
+    const label = c ? (c.first_name || c.last_name ? `${c.first_name || ""} ${c.last_name || ""}`.trim() : c.email) : "this contact";
+    if (!await confirmAction({
+      title: "Delete contact",
+      message: `Delete ${label} from your marketing list? Their open/click history and any pending queue rows will also be removed.`,
+      tone: "warning",
+      confirmLabel: "Delete contact",
+    })) return;
+    const { error } = await supabase.from("marketing_contacts").delete().eq("id", id);
+    if (error) {
+      notify({ title: "Delete failed", message: error.message, tone: "error" });
+      return;
+    }
+    setContacts(contacts.filter((row) => row.id !== id));
     notify({ message: "Contact removed.", tone: "success" });
   }
 
