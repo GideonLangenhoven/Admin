@@ -166,9 +166,32 @@ export default function PeakPricingPage() {
       }
     }
 
-    setResult("Applied peak pricing to " + updated + " slots (" + startDate + " to " + endDate + ", priority " + priorityVal + ")");
+    if (updated === 0) {
+      notify({
+        title: "Peak period saved — but 0 slots existed",
+        message: "No slots existed in " + startDate + " to " + endDate + " yet. The pricing rule is stored and will apply automatically when slots are created for these dates.",
+        tone: "warning",
+        duration: 7000,
+      });
+      setResult("Peak period saved. 0 existing slots updated (will apply on slot creation in " + startDate + " to " + endDate + ").");
+    } else {
+      notify({
+        title: "Peak pricing applied",
+        message: "Updated " + updated + " slot" + (updated === 1 ? "" : "s") + " between " + startDate + " and " + endDate + " (priority " + priorityVal + ").",
+        tone: "success",
+        duration: 5000,
+      });
+      setResult("Applied peak pricing to " + updated + " slots (" + startDate + " to " + endDate + ", priority " + priorityVal + ")");
+    }
     setPeriodLabel("");
     setPriority("0");
+    // T-4: Reset per-tour peak prices so the next submission starts from the
+    // configured tour defaults rather than the last-applied values.
+    const resetPeak: Record<string, string> = {};
+    for (const tour of tours) {
+      resetPeak[tour.id] = String(tour.peak_price_per_person ?? tour.base_price_per_person ?? "");
+    }
+    setPeakPrices(resetPeak);
     setSaving(false);
     load();
   }
