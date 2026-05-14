@@ -81,12 +81,23 @@ export default function ContactsPage() {
   }
 
   async function checkAutoEnroll(contactId: string, event: string, eventData?: any) {
-    const { data: automations } = await supabase
+    // V-3: surface auto-enrollment failures. Previously this silently
+    // attempted the insert; if RLS blocked it or the counter RPC failed, the
+    // operator saw "Active" automations with 0 enrolled and no diagnostic.
+    const { data: automations, error: autoErr } = await supabase
       .from("marketing_automations")
-      .select("id, trigger_type, trigger_config")
+      .select("id, name, trigger_type, trigger_config")
       .eq("business_id", businessId)
       .eq("status", "active")
       .eq("trigger_type", event);
+
+    if (autoErr) {
+      console.warn("checkAutoEnroll lookup failed:", autoErr.message);
+      return;
+    }
+
+    let enrolledCount = 0;
+    const failures: string[] = [];
 
     for (const automation of (automations || []) as any[]) {
       if (event === "tag_added" && automation.trigger_config?.tag) {
@@ -102,20 +113,47 @@ export default function ContactsPage() {
         .maybeSingle();
 
       if (!existing) {
-        await supabase.from("marketing_automation_enrollments").insert({
+        const { error: insertErr } = await supabase.from("marketing_automation_enrollments").insert({
           automation_id: automation.id,
           contact_id: contactId,
           business_id: businessId,
           status: "active",
           next_action_at: new Date().toISOString(),
         });
+        if (insertErr) {
+          console.warn("Auto-enrollment failed for " + (automation.name || automation.id) + ":", insertErr.message);
+          failures.push((automation.name || automation.id.slice(0, 8)) + " (" + insertErr.message + ")");
+          continue;
+        }
 
-        await supabase.rpc("increment_automation_counter", {
+        const { error: counterErr } = await supabase.rpc("increment_automation_counter", {
           p_automation_id: automation.id,
           p_column: "enrolled_count",
           p_amount: 1,
         });
+        if (counterErr) {
+          console.warn("Counter bump failed for " + (automation.name || automation.id) + ":", counterErr.message);
+          // Enrollment row was created successfully — don't treat counter
+          // bump failure as user-facing error.
+        }
+        enrolledCount++;
       }
+    }
+
+    if (enrolledCount > 0) {
+      notify({
+        title: "Auto-enrolled in " + enrolledCount + " automation" + (enrolledCount === 1 ? "" : "s"),
+        message: "Trigger \"" + event + "\" fired. Check the automation detail page to see the enrollment.",
+        tone: "success",
+        duration: 4500,
+      });
+    } else if (failures.length > 0) {
+      notify({
+        title: "Auto-enrollment failed",
+        message: failures.slice(0, 2).join(" · "),
+        tone: "error",
+        duration: 8000,
+      });
     }
   }
 

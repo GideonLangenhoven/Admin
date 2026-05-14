@@ -35,6 +35,17 @@ interface Contact {
   last_name: string | null;
 }
 
+interface Enrollment {
+  id: string;
+  contact_id: string;
+  current_step: number;
+  status: string;
+  next_action_at: string | null;
+  enrolled_at: string;
+  completed_at: string | null;
+  marketing_contacts?: { email: string; first_name: string | null; last_name: string | null } | null;
+}
+
 const stepTypeInfo: Record<string, { label: string }> = {
   send_email: { label: "Send Email" },
   delay: { label: "Delay" },
@@ -60,12 +71,37 @@ export default function AutomationBuilderPage() {
   const [enrollResults, setEnrollResults] = useState<Contact[]>([]);
   const [enrolling, setEnrolling] = useState(false);
 
+  // Enrollments list state (V-2)
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [enrolledTotal, setEnrolledTotal] = useState(0);
+  const [completedTotal, setCompletedTotal] = useState(0);
+  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
+
   useEffect(() => {
     if (businessId && automationId) {
       loadAutomation();
       loadTemplates();
+      loadEnrollments();
     }
   }, [businessId, automationId]);
+
+  async function loadEnrollments() {
+    setEnrollmentsLoading(true);
+    const { data, count } = await supabase
+      .from("marketing_automation_enrollments")
+      .select("id, contact_id, current_step, status, next_action_at, enrolled_at, completed_at, marketing_contacts(email, first_name, last_name)", { count: "exact" })
+      .eq("automation_id", automationId)
+      .order("enrolled_at", { ascending: false })
+      .limit(50);
+    const rows = ((data || []) as any[]).map((r) => ({
+      ...r,
+      marketing_contacts: Array.isArray(r.marketing_contacts) ? r.marketing_contacts[0] || null : r.marketing_contacts,
+    })) as Enrollment[];
+    setEnrollments(rows);
+    setEnrolledTotal(count || 0);
+    setCompletedTotal(rows.filter((r) => r.status === "completed").length);
+    setEnrollmentsLoading(false);
+  }
 
   async function loadAutomation() {
     setLoading(true);
@@ -102,13 +138,17 @@ export default function AutomationBuilderPage() {
 
   async function saveAutomation() {
     if (!automation) return;
+    if (!String(automation.name || "").trim()) {
+      notify({ title: "Name required", message: "Give the automation a descriptive name before saving.", tone: "warning" });
+      return;
+    }
     setSaving(true);
 
     // Save automation metadata
     const { error: autoErr } = await supabase
       .from("marketing_automations")
       .update({
-        name: automation.name,
+        name: automation.name.trim(),
         description: automation.description,
         trigger_type: automation.trigger_type,
         trigger_config: automation.trigger_config,
@@ -148,10 +188,42 @@ export default function AutomationBuilderPage() {
     if (!automation) return;
     const newStatus = automation.status === "active" ? "paused" : "active";
 
-    // Require at least one step to activate
-    if (newStatus === "active" && steps.length === 0) {
-      notify({ message: "Add at least one step before activating.", tone: "warning" });
-      return;
+    // V-1: Pre-activation validation — block before flipping status to active
+    // if the automation isn't actually runnable. Without this the operator
+    // sees "Active" and waits for emails that can't ever fire.
+    if (newStatus === "active") {
+      if (steps.length === 0) {
+        notify({ title: "Cannot activate", message: "Add at least one step before activating.", tone: "warning" });
+        return;
+      }
+      const issues: string[] = [];
+      steps.forEach((s, i) => {
+        const label = "Step " + (i + 1);
+        if (s.step_type === "send_email") {
+          if (!s.config?.template_id) issues.push(label + ": Send Email has no template selected");
+        } else if (s.step_type === "delay") {
+          const dur = Number(s.config?.duration);
+          if (!Number.isFinite(dur) || dur <= 0) issues.push(label + ": Delay duration must be > 0");
+        } else if (s.step_type === "generate_voucher") {
+          if (!Number(s.config?.amount)) issues.push(label + ": Voucher amount must be > 0");
+          if (!String(s.config?.code_prefix || "").trim()) issues.push(label + ": Voucher code prefix is required");
+        } else if (s.step_type === "generate_promo") {
+          if (!Number(s.config?.discount_value)) issues.push(label + ": Promo discount value must be > 0");
+          if (!String(s.config?.code_prefix || "").trim()) issues.push(label + ": Promo code prefix is required");
+        }
+      });
+      if (automation.trigger_type === "tag_added" && !String(automation.trigger_config?.tag || "").trim()) {
+        issues.push("Trigger: tag_added requires a tag value in trigger_config");
+      }
+      if (issues.length > 0) {
+        notify({
+          title: "Cannot activate — fix " + issues.length + " issue" + (issues.length === 1 ? "" : "s"),
+          message: issues.slice(0, 4).join(" · ") + (issues.length > 4 ? " · …" : ""),
+          tone: "warning",
+          duration: 8000,
+        });
+        return;
+      }
     }
 
     // Save first, then toggle
@@ -821,6 +893,79 @@ export default function AutomationBuilderPage() {
           )}
         </div>
       )}
+
+      {/* V-2: Enrollments panel — gives operators visibility into who has been
+          enrolled, where they are in the workflow, and when the next action
+          fires. Previously the only signal was the row-level Enrolled
+          counter; failures were invisible. */}
+      <div
+        className="rounded-xl border p-5 space-y-3"
+        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recent enrollments</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+              {enrolledTotal} total · {completedTotal} completed
+            </p>
+          </div>
+          <button
+            onClick={loadEnrollments}
+            disabled={enrollmentsLoading}
+            className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-50"
+            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+          >
+            {enrollmentsLoading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
+        {enrollments.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+            No enrollments yet. When the trigger fires for a matching contact, they will appear here.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border)" }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: "var(--ck-bg)" }}>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
+                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
+                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Next action</th>
+                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Enrolled</th>
+                </tr>
+              </thead>
+              <tbody>
+                {enrollments.map((e) => {
+                  const c = e.marketing_contacts;
+                  const next = e.next_action_at ? new Date(e.next_action_at) : null;
+                  const enrolled = new Date(e.enrolled_at);
+                  return (
+                    <tr key={e.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                      <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
+                        {c?.email || e.contact_id.slice(0, 8)}
+                        {c?.first_name ? <span className="ml-1.5 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>({c.first_name}{c.last_name ? " " + c.last_name : ""})</span> : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{
+                          background: e.status === "active" ? "rgba(59,130,246,0.1)" : e.status === "completed" ? "rgba(16,185,129,0.1)" : e.status === "paused" ? "rgba(234,179,8,0.1)" : "rgba(107,114,128,0.1)",
+                          color: e.status === "active" ? "#2563eb" : e.status === "completed" ? "#059669" : e.status === "paused" ? "#ca8a04" : "#6b7280",
+                        }}>{e.status}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{e.current_step + 1}/{steps.length}</td>
+                      <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
+                        {e.status === "completed" ? "—" : next ? next.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
+                        {enrolled.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

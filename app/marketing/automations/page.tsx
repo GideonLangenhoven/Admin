@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import { notify } from "../../lib/app-notify";
+import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import {
   Plus, Trash, Play, Pause, Sparkle, CaretRight, X, ArrowRight,
@@ -310,10 +310,16 @@ export default function AutomationsPage() {
   const [showGallery, setShowGallery] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
   const [creating, setCreating] = useState(false);
+  // V-4: archived automations hide from the default list to stop cluttering
+  // the active view, while preserving their enrollment history.
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (businessId) load();
   }, [businessId]);
+
+  const visibleAutomations = showArchived ? automations : automations.filter((a) => a.status !== "archived");
+  const archivedCount = automations.filter((a) => a.status === "archived").length;
 
   async function load() {
     setLoading(true);
@@ -327,11 +333,15 @@ export default function AutomationsPage() {
   }
 
   async function createBlankAutomation() {
+    // V-8: stop persisting "Untitled Automation" — operators end up with five
+    // copies of the same name and no way to tell them apart. Auto-name with a
+    // creation timestamp; the operator can rename in the builder.
+    const stamp = new Date().toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
     const { data, error } = await supabase
       .from("marketing_automations")
       .insert({
         business_id: businessId,
-        name: "Untitled Automation",
+        name: "New automation · " + stamp,
         trigger_type: "manual",
         status: "draft",
       })
@@ -405,14 +415,45 @@ export default function AutomationsPage() {
     notify({ message: newStatus === "active" ? "Automation activated." : "Automation paused.", tone: "success" });
   }
 
-  async function deleteAutomation(id: string) {
-    if (!confirm("Delete this automation? This cannot be undone.")) return;
-    const { error } = await supabase.from("marketing_automations").delete().eq("id", id);
+  async function archiveAutomation(a: Automation) {
+    if (!await confirmAction({
+      title: "Archive automation",
+      message: "Archive \"" + (a.name || "this automation") + "\"? It will stop firing for new triggers and be hidden from the active list. Enrollment history is preserved and you can unarchive later.",
+      tone: "warning",
+      confirmLabel: "Archive",
+    })) return;
+    const { error } = await supabase
+      .from("marketing_automations")
+      .update({ status: "archived", updated_at: new Date().toISOString() })
+      .eq("id", a.id);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
+    setAutomations(automations.map((x) => (x.id === a.id ? { ...x, status: "archived" } : x)));
+    notify({ message: "Automation archived.", tone: "success" });
+  }
+
+  async function unarchiveAutomation(a: Automation) {
+    const { error } = await supabase
+      .from("marketing_automations")
+      .update({ status: "draft", updated_at: new Date().toISOString() })
+      .eq("id", a.id);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
+    setAutomations(automations.map((x) => (x.id === a.id ? { ...x, status: "draft" } : x)));
+    notify({ message: "Automation unarchived (set to draft).", tone: "success" });
+  }
+
+  async function deleteAutomation(a: Automation) {
+    if (!await confirmAction({
+      title: "Delete automation",
+      message: "Delete \"" + (a.name || "this automation") + "\" permanently? Enrollment history and analytics will be destroyed. If you might want this back later, Archive instead.",
+      tone: "warning",
+      confirmLabel: "Delete permanently",
+    })) return;
+    const { error } = await supabase.from("marketing_automations").delete().eq("id", a.id);
     if (error) {
       notify({ message: error.message, tone: "error" });
       return;
     }
-    setAutomations(automations.filter((a) => a.id !== id));
+    setAutomations(automations.filter((x) => x.id !== a.id));
     notify({ message: "Automation deleted.", tone: "success" });
   }
 
@@ -832,6 +873,21 @@ export default function AutomationsPage() {
         </div>
       ) : (
         /* ─── AUTOMATIONS TABLE ─── */
+        <div className="space-y-3">
+          {archivedCount > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: "var(--ck-text-muted)" }}>
+                {archivedCount} archived automation{archivedCount === 1 ? "" : "s"}{showArchived ? " visible below" : " hidden"}
+              </span>
+              <button
+                onClick={() => setShowArchived((v) => !v)}
+                className="rounded-md border px-2.5 py-1 text-xs font-medium"
+                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+              >
+                {showArchived ? "Hide archived" : "Show archived"}
+              </button>
+            </div>
+          )}
         <div
           className="rounded-xl border overflow-x-auto"
           style={{ borderColor: "var(--ck-border)" }}
@@ -849,7 +905,7 @@ export default function AutomationsPage() {
               </tr>
             </thead>
             <tbody>
-              {automations.map((a) => {
+              {visibleAutomations.map((a) => {
                 const tb = triggerBadge[a.trigger_type] || triggerBadge.manual;
                 const sb = statusBadge[a.status] || statusBadge.draft;
                 return (
@@ -899,10 +955,29 @@ export default function AutomationsPage() {
                             {a.status === "active" ? <Pause size={13} /> : <Play size={13} />}
                           </button>
                         )}
+                        {a.status === "archived" ? (
+                          <button
+                            onClick={() => unarchiveAutomation(a)}
+                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
+                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                            title="Restore to draft"
+                          >
+                            Unarchive
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => archiveAutomation(a)}
+                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
+                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                            title="Hide from active list, preserve history"
+                          >
+                            Archive
+                          </button>
+                        )}
                         <button
-                          onClick={() => deleteAutomation(a.id)}
+                          onClick={() => deleteAutomation(a)}
                           className="p-1.5 text-red-500 hover:text-red-700"
-                          title="Delete"
+                          title="Delete permanently"
                         >
                           <Trash size={13} />
                         </button>
@@ -913,6 +988,7 @@ export default function AutomationsPage() {
               })}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>
