@@ -30,6 +30,23 @@ function monthStartStr(timezone: string) {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone }).format(d);
 }
 
+function formatSource(raw: string | null | undefined): string {
+  const key = String(raw || "").trim().toUpperCase();
+  switch (key) {
+    case "WEB": return "Customer Site";
+    case "WEB_CHAT": return "Web Chat";
+    case "ADMIN": return "Manual (Admin)";
+    case "WHATSAPP":
+    case "WA_WEBHOOK": return "WhatsApp";
+    case "VIATOR": return "Viator";
+    case "GETYOURGUIDE": return "GetYourGuide";
+    case "EXTERNAL": return "Other / External";
+    case "":
+    case "UNKNOWN": return "Unknown";
+    default: return key;
+  }
+}
+
 const STATUS_COLORS: Record<string, string> = {
   PAID: "bg-emerald-100 text-emerald-700",
   COMPLETED: "bg-emerald-100 text-emerald-700",
@@ -43,6 +60,7 @@ export default function Reports() {
   const { businessId, businessName, timezone } = useBusinessContext();
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
+  const [signedInPeriod, setSignedInPeriod] = useState(0);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => monthStartStr(activeTimezone));
   const [endDate, setEndDate] = useState(() => todayStr(activeTimezone));
@@ -97,6 +115,20 @@ export default function Reports() {
       tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
       slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
     })));
+
+    // Separately count waivers SIGNED in the period (by signing date, not trip
+    // date). The default query above filters by slot.start_time, so a waiver
+    // signed in May for a trip in March wouldn't appear. This independent
+    // count answers "did we sign any waivers in this window?" honestly.
+    const { count: signedCount } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .eq("waiver_status", "SIGNED")
+      .gte("waiver_signed_at", startIso)
+      .lte("waiver_signed_at", endIso);
+    setSignedInPeriod(signedCount || 0);
+
     setLoading(false);
   }
 
@@ -141,7 +173,7 @@ export default function Reports() {
     if (activeTab === "marketing") {
       const grouped = Object.values(
         filtered.reduce((acc: Record<string, { label: string; value: number }>, booking) => {
-          const source = booking.source || "UNKNOWN";
+          const source = formatSource(booking.source);
           if (!acc[source]) acc[source] = { label: source, value: 0 };
           acc[source].value += 1;
           return acc;
@@ -151,9 +183,16 @@ export default function Reports() {
     }
 
     if (activeTab === "attendance") {
+      // Three buckets so the visual reconciles with the top "Pax" stat tile.
+      // Previously: Checked + Not-checked excluded cancelled entirely, so
+      // 6 + 88 = 94 against a 99-pax total looked like a math bug.
+      const checkedIn = filtered.filter((b) => b.checked_in && b.status !== "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
+      const notCheckedIn = filtered.filter((b) => !b.checked_in && b.status !== "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
+      const cancelled = filtered.filter((b) => b.status === "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
       return [
-        { label: "Checked in", value: filtered.filter((booking) => booking.checked_in).reduce((sum, booking) => sum + Number(booking.qty || 0), 0) },
-        { label: "Not checked in", value: filtered.filter((booking) => !booking.checked_in && booking.status !== "CANCELLED").reduce((sum, booking) => sum + Number(booking.qty || 0), 0) },
+        { label: "Checked in", value: checkedIn },
+        { label: "Not checked in", value: notCheckedIn },
+        { label: "Cancelled", value: cancelled },
       ];
     }
 
@@ -263,7 +302,7 @@ export default function Reports() {
     if (activeTab === "marketing") {
       const marketingData = Object.values(
         filtered.reduce((acc: any, b: any) => {
-          const src = b.source || "UNKNOWN";
+          const src = formatSource(b.source);
           if (!acc[src]) acc[src] = { source: src, count: 0, pax: 0, revenue: 0 };
           acc[src].count++;
           acc[src].pax += b.qty;
@@ -377,7 +416,7 @@ export default function Reports() {
 
       const marketingData = Object.values(
         filtered.reduce((acc: any, b: any) => {
-          const src = b.source || "UNKNOWN";
+          const src = formatSource(b.source);
           if (!acc[src]) acc[src] = { source: src, count: 0, pax: 0, revenue: 0 };
           acc[src].count++;
           acc[src].pax += b.qty;
@@ -546,14 +585,15 @@ export default function Reports() {
 
       {/* Summary cards */}
       {activeTab === "waivers" ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
-            { label: "Active Bookings", value: summary.total - summary.cancelled },
-            { label: "Waivers Signed", value: summary.waiverSigned, color: "text-emerald-600" },
-            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "text-amber-600" : "text-gray-800" },
+            { label: "Active Bookings", value: summary.total - summary.cancelled, hint: "trip date in range" },
+            { label: "Signed (trip in range)", value: summary.waiverSigned, color: "text-emerald-600", hint: "signed waivers for trips in this period" },
+            { label: "Signed in this period", value: signedInPeriod, color: "text-emerald-600", hint: "by signing date — independent of trip date" },
+            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "text-amber-600" : "text-gray-800", hint: "trips in range, no waiver yet" },
             { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—" },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
+            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center" title={c.hint || c.label}>
               <p className="text-xs text-gray-500">{c.label}</p>
               <p className={`text-xl font-bold ${c.color || "text-gray-800"}`}>{c.value}</p>
             </div>

@@ -77,6 +77,9 @@ export default function Dashboard() {
     const [tomorrowManifest, setTomorrowManifest] = useState<ManifestBooking[]>([]);
     const [manifestDate, setManifestDate] = useState<"TODAY" | "TOMORROW">("TODAY");
     const [tomorrowPax, setTomorrowPax] = useState(0);
+    const [revToday, setRevToday] = useState(0);
+    const [revWeek, setRevWeek] = useState(0);
+    const [revMonth, setRevMonth] = useState(0);
     const [loading, setLoading] = useState(true);
 
     // Roll call state
@@ -324,8 +327,31 @@ export default function Dashboard() {
             })).filter((b: any) => b.slots?.start_time);
         }
 
+        // Revenue window: pull all paid/confirmed bookings whose slot is in the
+        // current month, then bucket today / past 7d / this month client-side.
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        async function fetchMonthRevenueRows() {
+            const { data: slotRows } = await supabase.from("slots")
+                .select("id, start_time")
+                .eq("business_id", businessId)
+                .gte("start_time", monthStart.toISOString())
+                .lt("start_time", dayAfter.toISOString());
+            const slotIds = (slotRows || []).map((s: any) => s.id);
+            if (slotIds.length === 0) return [] as Array<{ total_amount: number; start_time: string }>;
+            const slotById = new Map((slotRows || []).map((s: any) => [s.id, s.start_time as string]));
+            const { data: bks } = await supabase.from("bookings")
+                .select("total_amount, status, slot_id")
+                .eq("business_id", businessId)
+                .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
+                .in("slot_id", slotIds);
+            return (bks || []).map((b: any) => ({
+                total_amount: Number(b.total_amount || 0),
+                start_time: slotById.get(b.slot_id) || "",
+            })).filter(r => r.start_time);
+        }
+
         // Run ALL independent queries in parallel
-        const [todayManifest, tomorrowData, refundsData, inboxData, photosData] = await Promise.all([
+        const [todayManifest, tomorrowData, refundsData, inboxData, photosData, revRows] = await Promise.all([
             fetchManifest(today, tomorrow),
             fetchManifest(tomorrow, dayAfter),
             supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "ACTION_REQUIRED"]),
@@ -334,6 +360,7 @@ export default function Dashboard() {
                 supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
                 supabase.from("trip_photos").select("slot_id").eq("business_id", businessId).gt("uploaded_at", weekAgo),
             ]),
+            fetchMonthRevenueRows(),
         ]);
 
         // Today
@@ -358,6 +385,22 @@ export default function Dashboard() {
         const sentSlotIds = new Set((sentPhotosRes.data || []).map((p: any) => p.slot_id));
         const outstanding = (completedSlotsRes.data || []).filter((s: any) => !sentSlotIds.has(s.id));
         setPhotosOutstanding(outstanding.length);
+
+        // Revenue buckets — by trip date (matches "Today's Pax" semantics).
+        const todayMs = today.getTime();
+        const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const tomorrowMs = tomorrow.getTime();
+        let revT = 0, revW = 0, revM = 0;
+        for (const row of revRows) {
+            const t = new Date(row.start_time).getTime();
+            if (!Number.isFinite(t)) continue;
+            revM += row.total_amount;
+            if (t >= todayMs && t < tomorrowMs) revT += row.total_amount;
+            if (t >= weekAgoMs) revW += row.total_amount;
+        }
+        setRevToday(revT);
+        setRevWeek(revW);
+        setRevMonth(revM);
 
         setLoading(false);
     }
@@ -418,6 +461,28 @@ export default function Dashboard() {
                     </Link>
                 </div>
             </div>
+
+            {/* Revenue at a glance — today, last 7 days, this month (PAID/CONFIRMED/COMPLETED, by trip date) */}
+            <Link href="/reports" className="block rounded-[24px] bg-white border border-gray-100 shadow-sm p-5 hover:-translate-y-0.5 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[14px] font-semibold text-gray-700">Revenue</h3>
+                    <span className="text-[11px] text-gray-400">trip-date based · PAID/CONFIRMED/COMPLETED</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div>
+                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Today</p>
+                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Last 7 days</p>
+                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">This month</p>
+                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                    </div>
+                </div>
+            </Link>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Today Pax */}
@@ -805,11 +870,12 @@ export default function Dashboard() {
                             {location ? (
                                 <iframe
                                     key={`windy-${location.lat}-${location.lon}-${windyRefreshKey}`}
-                                    src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=11&overlay=wind&product=ecmwf&level=surface&lat=${location.lat}&lon=${location.lon}&detailLat=${location.lat}&detailLon=${location.lon}&marker=true&message=true`}
+                                    src={`https://embed.windy.com/embed2.html?lat=${location.lat}&lon=${location.lon}&detailLat=${location.lat}&detailLon=${location.lon}&width=650&height=350&zoom=11&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`}
                                     width="100%"
                                     height="350"
                                     frameBorder="0"
                                     className="w-full block"
+                                    title="Windy.com forecast"
                                 />
                             ) : (
                                 <div className="flex items-center justify-center p-6 text-center h-[350px]">
