@@ -41,11 +41,11 @@ function isValidEmail(email: string): boolean {
 // See: https://resend.com/docs/dashboard/webhooks/introduction
 // This lets you mark bad emails in the database and stop future sends to them.
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string) {
+async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
   // Validate email format before attempting to send
   if (!to || !isValidEmail(to)) {
     console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
-    return { error: "invalid_email_format", message: "Email address '" + to + "' has an invalid format" };
+    return { ok: false, error: "invalid_email_format", message: "Email address '" + to + "' has an invalid format" };
   }
   // Always send FROM a platform-controlled domain to pass DMARC/SPF.
   // The tenant's email goes in Reply-To so customers reply to the right place.
@@ -53,25 +53,35 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (netErr) {
+    console.error("RESEND_NETWORK_ERR to=" + to + ":", netErr);
+    return { ok: false, error: "network_error", message: String(netErr) };
+  }
+  const data = await res.json().catch(() => ({} as Record<string, unknown>));
   if (!res.ok) {
     console.error("RESEND_ERR status=" + res.status + " from=" + (fromEmail || FROM_EMAIL) + " to=" + to + " subject=" + subject + ":", JSON.stringify(data));
-    // Log specific failure reasons for operational visibility
-    if (data?.name === "validation_error") {
-      console.warn("RESEND_VALIDATION_FAIL to=" + to + ": " + (data?.message || "unknown validation error"));
+    if ((data as any)?.name === "validation_error") {
+      console.warn("RESEND_VALIDATION_FAIL to=" + to + ": " + ((data as any)?.message || "unknown validation error"));
     }
     if (res.status === 422) {
       console.warn("RESEND_BOUNCE_LIKELY to=" + to + " — address may be invalid or previously bounced");
     }
-  } else {
-    console.log("RESEND_OK id=" + data?.id + " to=" + to + " subject=" + subject);
+    return {
+      ok: false,
+      status: res.status,
+      error: (data as any)?.name || "resend_error",
+      message: (data as any)?.message || ("HTTP " + res.status),
+    };
   }
-  return data;
+  console.log("RESEND_OK id=" + (data as any)?.id + " to=" + to + " subject=" + subject);
+  return { ok: true, id: (data as any)?.id };
 }
 
 // Default email images — empty means no image shown unless business uploads one via Settings
@@ -1991,10 +2001,13 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     console.log("BRANDING_URLS type=" + type + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
     const branded = applyBranding(subject, html, branding);
     const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail);
-    if (result?.statusCode && result.statusCode >= 400) {
-      return new Response(JSON.stringify({ ok: false, error: result.message || "Resend API error", result }), { status: 200, headers: getCors(req) });
+    if (!result.ok) {
+      // Surface the upstream failure to the caller so broadcast / chain
+      // callers can count delivered-vs-attempted correctly instead of
+      // trusting an optimistic 200.
+      return new Response(JSON.stringify({ ok: false, error: result.error || "send_failed", message: result.message, status: result.status }), { status: 200, headers: getCors(req) });
     }
-    return new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: getCors(req) });
+    return new Response(JSON.stringify({ ok: true, id: result.id }), { status: 200, headers: getCors(req) });
   } catch (err: unknown) {
     console.error("SEND_EMAIL_ERR:", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: getCors(req) });

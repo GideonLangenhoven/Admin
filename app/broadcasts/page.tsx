@@ -443,7 +443,14 @@ export default function BroadcastsPage() {
                         <td className="hidden py-2 text-gray-500 sm:table-cell">{(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</td>
                         <td className="py-2 text-center">{b.qty}</td>
                         <td className="py-2 text-center">
-                          {b.phone && <span className="text-emerald-600 mr-1 text-xs font-medium" title="WhatsApp">WA</span>}
+                          {b.phone && (
+                            <span
+                              className="text-emerald-600 mr-1 text-xs font-medium"
+                              title="WhatsApp will be attempted. Actual delivery depends on whether this number is registered with WhatsApp and within the 24h service window."
+                            >
+                              WA?
+                            </span>
+                          )}
                           {b.email && <span className="text-blue-600 text-xs font-medium" title="Email">Email</span>}
                         </td>
                       </tr>
@@ -466,7 +473,11 @@ export default function BroadcastsPage() {
               </div>
               <button onClick={sendWeatherCancel} disabled={cancellingWeather || selectedSlotIds.length === 0}
                 className="w-full bg-red-600 text-white py-3 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
-                {cancellingWeather ? "Cancelling..." : "Cancel & Notify " + bookings.length + " Customers"}
+                {cancellingWeather
+                  ? "Cancelling..."
+                  : bookings.length === 0
+                    ? "Close " + selectedSlotIds.length + " Empty Slot" + (selectedSlotIds.length === 1 ? "" : "s")
+                    : "Cancel & Notify " + bookings.length + " Customer" + (bookings.length === 1 ? "" : "s")}
               </button>
               {weatherResult && (
                 <div className={"text-sm p-3 rounded-lg mt-3 " + (weatherResult.error ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
@@ -492,13 +503,35 @@ export default function BroadcastsPage() {
                 </div>
                 <button onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
                   className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers (WhatsApp + Email)"}
+                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers — email + WhatsApp where possible"}
                 </button>
-                {result && (
-                  <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
-                    {result.error ? "Error: " + result.error : (result.wa_sent || 0) + " WhatsApp + " + (result.email_sent || 0) + " emails sent"}
-                  </div>
-                )}
+                {result && (() => {
+                  if (result.error) {
+                    return <div className="text-sm p-3 rounded-lg bg-red-50 text-red-700">Error: {result.error}</div>;
+                  }
+                  const waSent = result.wa_sent || 0;
+                  const waAtt = result.wa_attempted ?? waSent;
+                  const emSent = result.email_sent || 0;
+                  const emAtt = result.email_attempted ?? emSent;
+                  const anyFailed = (waAtt > 0 && waSent < waAtt) || (emAtt > 0 && emSent < emAtt);
+                  const tone = anyFailed ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-emerald-50 text-emerald-700";
+                  return (
+                    <div className={"text-sm p-3 rounded-lg " + tone}>
+                      <p>
+                        WhatsApp: {waSent} of {waAtt} delivered · Email: {emSent} of {emAtt} delivered
+                      </p>
+                      {anyFailed && Array.isArray(result.errors) && result.errors.length > 0 && (
+                        <details className="mt-2 text-xs">
+                          <summary className="cursor-pointer font-semibold">Why some failed ({result.errors.length})</summary>
+                          <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                            {result.errors.slice(0, 5).map((e: string, i: number) => <li key={i} className="break-all">{e}</li>)}
+                            {result.errors.length > 5 && <li>… and {result.errors.length - 5} more.</li>}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

@@ -54,7 +54,9 @@ Deno.serve(async (req: Request) => {
     }
 
     let waSent = 0;
+    let waAttempted = 0;
     let emailSent = 0;
+    let emailAttempted = 0;
     let totalSent = 0;
     const errors: string[] = [];
 
@@ -63,22 +65,32 @@ Deno.serve(async (req: Request) => {
       const firstName = (b.customer_name || "Guest").split(" ")[0];
       const parsedMessage = message.replace(/\{name\}/gi, firstName);
 
-      // WhatsApp
+      // WhatsApp — send-whatsapp-text returns {ok: true/false}. Don't trust
+      // HTTP-200 alone; check the body.
       if (send_whatsapp && b.phone) {
+        waAttempted++;
         try {
           const waRes = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
             body: JSON.stringify({ to: b.phone, message: parsedMessage, business_id })
           });
-          if (waRes.ok) { waSent++; sentToCustomer = true; }
+          const waBody = await waRes.json().catch(() => ({} as any));
+          if (waRes.ok && waBody?.ok !== false) {
+            waSent++;
+            sentToCustomer = true;
+          } else {
+            errors.push(`WA to ${b.phone}: ${waBody?.error || ("HTTP " + waRes.status)}`);
+          }
         } catch (e) {
           errors.push(`WA to ${b.phone}: ${e}`);
         }
       }
 
-      // Email
+      // Email — send-email now returns {ok: true/false} reflecting Resend's
+      // actual outcome rather than an optimistic 200. Only count true deliveries.
       if (send_email && b.email) {
+        emailAttempted++;
         try {
           const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
             method: "POST",
@@ -93,12 +105,12 @@ Deno.serve(async (req: Request) => {
               }
             })
           });
-          if (emailRes.ok) {
+          const emailBody = await emailRes.json().catch(() => ({} as any));
+          if (emailRes.ok && emailBody?.ok === true) {
             emailSent++;
             sentToCustomer = true;
           } else {
-            const errText = await emailRes.text();
-            errors.push(`Email err [${emailRes.status}]: ${errText}`);
+            errors.push(`Email to ${b.email}: ${emailBody?.error || emailBody?.message || ("HTTP " + emailRes.status)}`);
           }
         } catch (e) {
           errors.push(`Email to ${b.email}: ${e}`);
@@ -121,7 +133,9 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({
       ok: true,
       wa_sent: waSent,
+      wa_attempted: waAttempted,
       email_sent: emailSent,
+      email_attempted: emailAttempted,
       total_customers: totalSent,
       errors: errors.length > 0 ? errors : undefined
     }), { status: 200, headers: getCors(req) });
