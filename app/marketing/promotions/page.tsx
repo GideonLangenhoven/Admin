@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { notify } from "../../lib/app-notify";
+import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Plus, Trash, Copy, ArrowsClockwise } from "@phosphor-icons/react";
 
@@ -93,6 +93,20 @@ export default function PromotionsPage() {
     if (discountValue <= 0) { notify({ message: "Discount value must be positive.", tone: "error" }); return; }
     if (discountType === "PERCENT" && discountValue > 100) { notify({ message: "Percentage cannot exceed 100.", tone: "error" }); return; }
 
+    // W-1: warn before persisting a permanent promo. Catching this at save
+    // time stops a "this promo expires 2 May" mental model from quietly
+    // landing as valid_until = NULL in the DB.
+    if (!validUntil) {
+      const ok = await confirmAction({
+        title: "No expiry set",
+        message: "This promo has no end date — it will keep applying forever unless you set max_uses or deactivate it. Continue?",
+        tone: "warning",
+        confirmLabel: "Save without expiry",
+        cancelLabel: "Go back",
+      });
+      if (!ok) return;
+    }
+
     setSaving(true);
     const row = {
       business_id: businessId,
@@ -129,13 +143,35 @@ export default function PromotionsPage() {
   }
 
   async function toggleActive(p: Promotion) {
-    await supabase.from("promotions").update({ active: !p.active }).eq("id", p.id);
-    setPromos(promos.map(x => x.id === p.id ? { ...x, active: !x.active } : x));
+    // W-3: make the toggle robust — use a functional setter so concurrent
+    // clicks don't clobber each other on a stale `promos` closure, verify
+    // the DB write before committing local state, surface notify on
+    // outcome so the operator knows it persisted.
+    const nextActive = !p.active;
+    const { error } = await supabase
+      .from("promotions")
+      .update({ active: nextActive })
+      .eq("id", p.id);
+    if (error) {
+      notify({ title: "Toggle failed", message: error.message, tone: "error" });
+      return;
+    }
+    setPromos((prev) => prev.map((x) => (x.id === p.id ? { ...x, active: nextActive } : x)));
+    notify({ message: "Promo " + p.code + " " + (nextActive ? "activated" : "paused") + ".", tone: "success", duration: 2500 });
   }
 
   async function deletePromo(p: Promotion) {
-    if (!confirm("Delete promo code \"" + p.code + "\"? This cannot be undone.")) return;
-    await supabase.from("promotions").delete().eq("id", p.id);
+    // W-5: replace the bare window.confirm() with the app's amber dialog so
+    // accidental trash-icon clicks can't destroy a promo and its history.
+    const usesNote = p.used_count > 0 ? " It has " + p.used_count + " recorded use" + (p.used_count === 1 ? "" : "s") + "; that history will be lost." : "";
+    if (!await confirmAction({
+      title: "Delete promo code",
+      message: "Delete \"" + p.code + "\"? This cannot be undone." + usesNote + " If you want to stop new uses but keep history, toggle the status to Paused instead.",
+      tone: "warning",
+      confirmLabel: "Delete promo",
+    })) return;
+    const { error } = await supabase.from("promotions").delete().eq("id", p.id);
+    if (error) { notify({ title: "Delete failed", message: error.message, tone: "error" }); return; }
     setPromos(promos.filter(x => x.id !== p.id));
     notify({ message: "Promo deleted.", tone: "success" });
   }
@@ -342,7 +378,11 @@ export default function PromotionsPage() {
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                         {p.valid_from ? new Date(p.valid_from).toLocaleDateString() : "—"}
-                        {p.valid_until ? " → " + new Date(p.valid_until).toLocaleDateString() : ""}
+                        {p.valid_until ? (
+                          " → " + new Date(p.valid_until).toLocaleDateString()
+                        ) : (
+                          <span className="ml-1 inline-flex items-center rounded-full bg-amber-50 text-amber-700 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide" title="This promo has no end date — it will keep applying unless deactivated or capped by max_uses">→ No expiry</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
                         {p.used_count}{p.max_uses != null ? " / " + p.max_uses : ""}
