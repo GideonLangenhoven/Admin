@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
       .limit(100);
 
     if (!enrollments || enrollments.length === 0) {
-      return jsonRes({ ok: true, ...results }, 200);
+      return new Response(JSON.stringify({ ok: true, ...results }), { status: 200, headers: cors });
     }
 
     // ── 3. Process each enrollment ──
