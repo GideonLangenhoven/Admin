@@ -1190,10 +1190,13 @@ export default function AutomationBuilderPage() {
                   const meta = log.metadata as Record<string, unknown> | null;
                   const detailBits: string[] = [];
                   if (meta) {
-                    if (meta.subject) detailBits.push(String(meta.subject));
+                    // Failures lead with the error so it's not buried behind the subject.
+                    if (meta.error) detailBits.push("error: " + String(meta.error) + (meta.status ? " (HTTP " + meta.status + ")" : ""));
+                    if (meta.subject && !meta.error) detailBits.push(String(meta.subject));
+                    if (meta.subject && meta.error) detailBits.push("subject: " + String(meta.subject));
                     if (meta.code) detailBits.push("code: " + String(meta.code));
+                    if (meta.resend_id) detailBits.push("resend: " + String(meta.resend_id).slice(0, 12));
                     if (meta.template_id && !meta.subject) detailBits.push("template: " + String(meta.template_id).slice(0, 8));
-                    if (meta.error) detailBits.push("error: " + String(meta.error));
                     if (meta.delay_until) detailBits.push("until " + new Date(String(meta.delay_until)).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
                   }
                   return (

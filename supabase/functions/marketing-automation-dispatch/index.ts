@@ -1,14 +1,37 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient } from "../_shared/tenant.ts";
+import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
+const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
+// Refuse to use the Resend developer sandbox even if it's pasted into the env
+// — that domain rate-limits hard and routes to spam (U-6 / V-12).
+const FROM_EMAIL = RAW_FROM_EMAIL && !/onboarding@resend\.dev|@resend\.dev/i.test(RAW_FROM_EMAIL)
+  ? RAW_FROM_EMAIL
+  : "BookingTours <noreply@bookingtours.co.za>";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const supabase = createServiceClient();
 
-Deno.serve(async (_req: Request) => {
+function buildCors(req: Request) {
+  const allowed = getAdminAppOrigins();
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin, allowed) ? origin : allowed[0],
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Content-Type": "application/json",
+  };
+}
+
+Deno.serve(async (req: Request) => {
+  // V-DISP: browser preflight + POST CORS. Without these the admin "Run
+  // dispatch now" button got Failed to fetch from the browser even though
+  // the function ran fine. pg_cron / curl callers don't care, but the UI
+  // does.
+  const cors = buildCors(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
   try {
     const results = { date_enrolled: 0, processed: 0, sent: 0, delayed: 0, conditions: 0, vouchers: 0, promos: 0, completed: 0, errors: 0 };
 
@@ -251,7 +274,18 @@ Deno.serve(async (_req: Request) => {
               }),
             });
 
-            // Log the attempt
+            // V-17a: capture the actual Resend error body when sending fails
+            // so the Step Execution Log can show *why* — previously the only
+            // signal was a red "email_failed" chip with no diagnostic.
+            const sendBody = await res.json().catch(() => ({} as any));
+            const logMeta: Record<string, unknown> = { template_id: templateId, subject, from: bizFromEmail };
+            if (!res.ok) {
+              logMeta.error = sendBody?.message || sendBody?.error || ("HTTP " + res.status);
+              logMeta.error_name = sendBody?.name;
+              logMeta.status = res.status;
+            } else {
+              logMeta.resend_id = sendBody?.id;
+            }
             await supabase.from("marketing_automation_logs").insert({
               enrollment_id: enrollment.id,
               automation_id: enrollment.automation_id,
@@ -260,7 +294,7 @@ Deno.serve(async (_req: Request) => {
               step_position: currentStep.position,
               step_type: "send_email",
               action: res.ok ? "email_sent" : "email_failed",
-              metadata: { template_id: templateId, subject },
+              metadata: logMeta,
             });
 
             if (res.ok) {
@@ -301,7 +335,7 @@ Deno.serve(async (_req: Request) => {
                 results.completed++;
               }
             } else {
-              console.error("AUTOMATION_SEND_FAIL:", enrollment.id, await res.text());
+              console.error("AUTOMATION_SEND_FAIL:", enrollment.id, JSON.stringify(sendBody));
               results.errors++;
               // Email failed — do NOT advance. Enrollment stays on current step for retry on next dispatch cycle.
             }
@@ -559,13 +593,9 @@ Deno.serve(async (_req: Request) => {
     }
 
     console.log("AUTOMATION_DISPATCH:", JSON.stringify(results));
-    return jsonRes({ ok: true, ...results }, 200);
+    return new Response(JSON.stringify({ ok: true, ...results }), { status: 200, headers: cors });
   } catch (err: any) {
     console.error("AUTOMATION_DISPATCH_ERROR:", err);
-    return jsonRes({ error: err.message || "Internal error" }, 500);
+    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: cors });
   }
 });
-
-function jsonRes(body: Record<string, unknown>, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
