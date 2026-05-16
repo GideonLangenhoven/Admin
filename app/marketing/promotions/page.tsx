@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
@@ -37,6 +37,12 @@ export default function PromotionsPage() {
   const [maxUses, setMaxUses] = useState<string>("");
   const [minOrderAmount, setMinOrderAmount] = useState<number>(0);
   const [active, setActive] = useState(true);
+  // Ref-based read at save time. Tools like form_input / Playwright / scripted
+  // QA harness set .checked via DOM property without dispatching the synthetic
+  // React change event, so the controlled `active` state never updates and the
+  // DB write looks like a no-op (W-3). Reading the real DOM value at save
+  // time is the standard escape hatch for that quirk.
+  const activeRef = useRef<HTMLInputElement | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,6 +114,11 @@ export default function PromotionsPage() {
     }
 
     setSaving(true);
+    // Authoritative read from the DOM — bypasses React's controlled-input
+    // override when callers set .checked programmatically. Falls back to the
+    // React state if the ref hasn't mounted yet for any reason.
+    const effectiveActive = activeRef.current ? activeRef.current.checked : active;
+    if (effectiveActive !== active) setActive(effectiveActive);
     const row = {
       business_id: businessId,
       code: code.toUpperCase().trim(),
@@ -118,7 +129,7 @@ export default function PromotionsPage() {
       valid_until: validUntil ? new Date(validUntil + "T23:59:59").toISOString() : null,
       max_uses: maxUses ? parseInt(maxUses) : null,
       min_order_amount: minOrderAmount,
-      active,
+      active: effectiveActive,
     };
 
     if (editId) {
@@ -313,7 +324,7 @@ export default function PromotionsPage() {
             </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="w-4 h-4 rounded" />
+            <input ref={activeRef} type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="w-4 h-4 rounded" />
             <span className="text-sm" style={{ color: "var(--ck-text)" }}>Active</span>
           </label>
           <div className="flex gap-2 pt-2">

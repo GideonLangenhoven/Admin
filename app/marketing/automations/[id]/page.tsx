@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import { notify } from "../../../lib/app-notify";
+import { confirmAction, notify } from "../../../lib/app-notify";
 import { useBusinessContext } from "../../../../components/BusinessContext";
 import { ArrowLeft, Plus, Trash, CaretUp, CaretDown, MagnifyingGlass, Play, Pause } from "@phosphor-icons/react";
 
@@ -41,8 +41,8 @@ interface Enrollment {
   current_step: number;
   status: string;
   next_action_at: string | null;
-  enrolled_at: string;
-  completed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
   marketing_contacts?: { email: string; first_name: string | null; last_name: string | null } | null;
 }
 
@@ -87,12 +87,23 @@ export default function AutomationBuilderPage() {
 
   async function loadEnrollments() {
     setEnrollmentsLoading(true);
-    const { data, count } = await supabase
+    // Columns confirmed via information_schema: id, automation_id, contact_id,
+    // business_id, current_step, status, next_action_at, metadata, created_at,
+    // updated_at. No enrolled_at / completed_at columns — completion is
+    // derived from status. Previously the query referenced enrolled_at and
+    // failed silently with an empty result (V-2b).
+    const { data, count, error } = await supabase
       .from("marketing_automation_enrollments")
-      .select("id, contact_id, current_step, status, next_action_at, enrolled_at, completed_at, marketing_contacts(email, first_name, last_name)", { count: "exact" })
+      .select("id, contact_id, current_step, status, next_action_at, created_at, updated_at, marketing_contacts(email, first_name, last_name)", { count: "exact" })
       .eq("automation_id", automationId)
-      .order("enrolled_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(50);
+    if (error) {
+      console.warn("loadEnrollments failed:", error.message);
+      notify({ title: "Could not load enrollments", message: error.message, tone: "error" });
+      setEnrollmentsLoading(false);
+      return;
+    }
     const rows = ((data || []) as any[]).map((r) => ({
       ...r,
       marketing_contacts: Array.isArray(r.marketing_contacts) ? r.marketing_contacts[0] || null : r.marketing_contacts,
@@ -182,6 +193,48 @@ export default function AutomationBuilderPage() {
 
     notify({ message: "Automation saved.", tone: "success" });
     setSaving(false);
+  }
+
+  async function archiveAutomation() {
+    if (!automation) return;
+    if (!await confirmAction({
+      title: "Archive automation",
+      message: "Archive \"" + (automation.name || "this automation") + "\"? It will stop firing for new triggers and be hidden from the active list. Enrollment history is preserved and you can unarchive later.",
+      tone: "warning",
+      confirmLabel: "Archive",
+    })) return;
+    const { error } = await supabase
+      .from("marketing_automations")
+      .update({ status: "archived", updated_at: new Date().toISOString() })
+      .eq("id", automationId);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
+    notify({ message: "Automation archived.", tone: "success" });
+    router.push("/marketing/automations");
+  }
+
+  async function unarchiveAutomation() {
+    if (!automation) return;
+    const { error } = await supabase
+      .from("marketing_automations")
+      .update({ status: "draft", updated_at: new Date().toISOString() })
+      .eq("id", automationId);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
+    setAutomation({ ...automation, status: "draft" });
+    notify({ message: "Automation unarchived (set to draft).", tone: "success" });
+  }
+
+  async function deleteAutomation() {
+    if (!automation) return;
+    if (!await confirmAction({
+      title: "Delete automation",
+      message: "Delete \"" + (automation.name || "this automation") + "\" permanently? Enrollment history and analytics will be destroyed. If you might want this back later, Archive instead.",
+      tone: "warning",
+      confirmLabel: "Delete permanently",
+    })) return;
+    const { error } = await supabase.from("marketing_automations").delete().eq("id", automationId);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
+    notify({ message: "Automation deleted.", tone: "success" });
+    router.push("/marketing/automations");
   }
 
   async function toggleAutomationStatus() {
@@ -477,7 +530,7 @@ export default function AutomationBuilderPage() {
         </div>
 
         {/* Status + Save */}
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
             onClick={saveAutomation}
             disabled={saving}
@@ -486,29 +539,64 @@ export default function AutomationBuilderPage() {
           >
             {saving ? "Saving..." : "Save"}
           </button>
-          <button
-            onClick={toggleAutomationStatus}
-            className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-              automation.status === "active" ? "bg-yellow-500" : "bg-emerald-600"
-            }`}
-          >
-            {automation.status === "active" ? (
-              <><Pause size={14} /> Pause</>
-            ) : (
-              <><Play size={14} /> Activate</>
-            )}
-          </button>
+          {automation.status !== "archived" && (
+            <button
+              onClick={toggleAutomationStatus}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                automation.status === "active" ? "bg-yellow-500" : "bg-emerald-600"
+              }`}
+            >
+              {automation.status === "active" ? (
+                <><Pause size={14} /> Pause</>
+              ) : (
+                <><Play size={14} /> Activate</>
+              )}
+            </button>
+          )}
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
               automation.status === "active"
                 ? "bg-emerald-100 text-emerald-700"
                 : automation.status === "paused"
                 ? "bg-yellow-100 text-yellow-700"
+                : automation.status === "archived"
+                ? "bg-red-100 text-red-600"
                 : "bg-gray-100 text-gray-500"
             }`}
           >
             {automation.status}
           </span>
+          {/* V-6: Archive + Delete on the detail page — operators were stuck
+              with paused / abandoned automations because the list-page
+              Actions column wasn't discoverable on narrow viewports. */}
+          <div className="ml-auto flex items-center gap-2">
+            {automation.status === "archived" ? (
+              <button
+                onClick={unarchiveAutomation}
+                className="rounded-lg border px-3 py-2 text-sm font-medium"
+                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                title="Restore to draft"
+              >
+                Unarchive
+              </button>
+            ) : (
+              <button
+                onClick={archiveAutomation}
+                className="rounded-lg border px-3 py-2 text-sm font-medium"
+                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                title="Hide from active list, preserve history"
+              >
+                Archive
+              </button>
+            )}
+            <button
+              onClick={deleteAutomation}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+              title="Delete permanently"
+            >
+              <Trash size={14} /> Delete
+            </button>
+          </div>
         </div>
       </div>
 
@@ -938,7 +1026,7 @@ export default function AutomationBuilderPage() {
                 {enrollments.map((e) => {
                   const c = e.marketing_contacts;
                   const next = e.next_action_at ? new Date(e.next_action_at) : null;
-                  const enrolled = new Date(e.enrolled_at);
+                  const enrolled = new Date(e.created_at);
                   return (
                     <tr key={e.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
                       <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
