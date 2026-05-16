@@ -46,6 +46,18 @@ interface Enrollment {
   marketing_contacts?: { email: string; first_name: string | null; last_name: string | null } | null;
 }
 
+interface AutomationLog {
+  id: string;
+  enrollment_id: string;
+  contact_id: string;
+  step_position: number;
+  step_type: string;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  marketing_contacts?: { email: string; first_name: string | null } | null;
+}
+
 const stepTypeInfo: Record<string, { label: string }> = {
   send_email: { label: "Send Email" },
   delay: { label: "Delay" },
@@ -76,14 +88,75 @@ export default function AutomationBuilderPage() {
   const [enrolledTotal, setEnrolledTotal] = useState(0);
   const [completedTotal, setCompletedTotal] = useState(0);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
+  // V-17: per-step audit log so operators can reconstruct exactly which
+  // step ran for which contact and what happened (email sent/failed,
+  // voucher code issued, condition outcome).
+  const [logs, setLogs] = useState<AutomationLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
 
   useEffect(() => {
     if (businessId && automationId) {
       loadAutomation();
       loadTemplates();
       loadEnrollments();
+      loadLogs();
     }
   }, [businessId, automationId]);
+
+  async function loadLogs() {
+    setLogsLoading(true);
+    const { data, error } = await supabase
+      .from("marketing_automation_logs")
+      .select("id, enrollment_id, contact_id, step_position, step_type, action, metadata, created_at, marketing_contacts(email, first_name)")
+      .eq("automation_id", automationId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      console.warn("loadLogs failed:", error.message);
+      // RLS missing on logs would surface here; surface to the operator
+      // rather than silently rendering "no logs".
+      notify({ title: "Could not load logs", message: error.message, tone: "error" });
+      setLogsLoading(false);
+      return;
+    }
+    const rows = ((data || []) as any[]).map((r) => ({
+      ...r,
+      marketing_contacts: Array.isArray(r.marketing_contacts) ? r.marketing_contacts[0] || null : r.marketing_contacts,
+    })) as AutomationLog[];
+    setLogs(rows);
+    setLogsLoading(false);
+  }
+
+  async function runDispatchNow() {
+    // V-10 / V-12: give operators a manual way to fire the dispatch
+    // function on demand. Without it the only way to verify a date_field
+    // trigger or kick a stalled enrollment is to wait for the cron.
+    setDispatching(true);
+    try {
+      const res = await supabase.functions.invoke("marketing-automation-dispatch", { body: {} });
+      const data = res.data as any;
+      if (res.error || data?.error) {
+        notify({ title: "Dispatch failed", message: res.error?.message || data?.error || "Unknown error", tone: "error", duration: 8000 });
+      } else {
+        const sent = data?.sent || 0;
+        const processed = data?.processed || 0;
+        const errors = data?.errors || 0;
+        notify({
+          title: "Dispatch run",
+          message: "Processed " + processed + " step" + (processed === 1 ? "" : "s") + " · " + sent + " email" + (sent === 1 ? "" : "s") + " sent" + (errors > 0 ? " · " + errors + " error" + (errors === 1 ? "" : "s") : "") + ". Refresh logs to see detail.",
+          tone: errors > 0 ? "warning" : "success",
+          duration: 5500,
+        });
+        await loadEnrollments();
+        await loadLogs();
+      }
+    } catch (e: unknown) {
+      notify({ title: "Dispatch failed", message: (e as Error)?.message || String(e), tone: "error" });
+    } finally {
+      setDispatching(false);
+    }
+  }
 
   async function loadEnrollments() {
     setEnrollmentsLoading(true);
@@ -570,6 +643,17 @@ export default function AutomationBuilderPage() {
               with paused / abandoned automations because the list-page
               Actions column wasn't discoverable on narrow viewports. */}
           <div className="ml-auto flex items-center gap-2">
+            {automation.status === "active" && (
+              <button
+                onClick={runDispatchNow}
+                disabled={dispatching}
+                className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ borderColor: "var(--ck-border)", color: "var(--ck-accent)" }}
+                title="Manually fire the dispatch worker — useful for date_field triggers and stalled enrollments"
+              >
+                {dispatching ? "Dispatching…" : "Run dispatch now"}
+              </button>
+            )}
             {automation.status === "archived" ? (
               <button
                 onClick={unarchiveAutomation}
@@ -1045,6 +1129,92 @@ export default function AutomationBuilderPage() {
                       </td>
                       <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
                         {enrolled.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* V-17: Step execution audit log. Without this the operator has no
+          way to answer "did this customer actually get the voucher email?"
+          short of asking the customer to check their inbox. The dispatcher
+          already writes one row per step it tries to execute — we just
+          need to render them. */}
+      <div
+        className="rounded-xl border p-5 space-y-3"
+        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Step execution log</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+              Latest 200 events from the automation dispatcher. New events appear after each cron run or manual dispatch.
+            </p>
+          </div>
+          <button
+            onClick={loadLogs}
+            disabled={logsLoading}
+            className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-50"
+            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+          >
+            {logsLoading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
+        {logs.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+            No events yet. Activate the automation and trigger an enrollment — the dispatcher will populate this log on its next run.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border)" }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: "var(--ck-bg)" }}>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>When</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
+                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Type</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Outcome</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => {
+                  const c = log.marketing_contacts;
+                  const when = new Date(log.created_at);
+                  const isFailure = /fail|error|skipped/i.test(log.action);
+                  const isSuccess = /sent|generated|completed|advanced/i.test(log.action);
+                  const meta = log.metadata as Record<string, unknown> | null;
+                  const detailBits: string[] = [];
+                  if (meta) {
+                    if (meta.subject) detailBits.push(String(meta.subject));
+                    if (meta.code) detailBits.push("code: " + String(meta.code));
+                    if (meta.template_id && !meta.subject) detailBits.push("template: " + String(meta.template_id).slice(0, 8));
+                    if (meta.error) detailBits.push("error: " + String(meta.error));
+                    if (meta.delay_until) detailBits.push("until " + new Date(String(meta.delay_until)).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
+                  }
+                  return (
+                    <tr key={log.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--ck-text-muted)" }}>
+                        {when.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
+                        {c?.email || log.contact_id.slice(0, 8)}
+                        {c?.first_name ? <span className="ml-1.5 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>({c.first_name})</span> : null}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{log.step_position + 1}</td>
+                      <td className="px-3 py-2" style={{ color: "var(--ck-text-muted)" }}>{log.step_type}</td>
+                      <td className="px-3 py-2">
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{
+                          background: isFailure ? "rgba(239,68,68,0.1)" : isSuccess ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)",
+                          color: isFailure ? "#dc2626" : isSuccess ? "#059669" : "#6b7280",
+                        }}>{log.action}</span>
+                      </td>
+                      <td className="px-3 py-2 text-[11px]" style={{ color: "var(--ck-text-muted)" }} title={meta ? JSON.stringify(meta) : ""}>
+                        {detailBits.length > 0 ? detailBits.join(" · ") : "—"}
                       </td>
                     </tr>
                   );
