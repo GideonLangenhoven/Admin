@@ -15,6 +15,9 @@ interface BusinessContextValue {
         logoUrl?: string;
     }>;
     switchOperator?: (businessId: string) => void;
+    // Z1: re-fetch the active business row and update name/logo state so the
+    // sidebar reflects a Settings edit without a hard page reload.
+    refreshBusiness?: () => Promise<void> | void;
 }
 
 const BusinessContext = createContext<BusinessContextValue | null>(null);

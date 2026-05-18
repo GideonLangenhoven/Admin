@@ -74,10 +74,14 @@ export default function PromotionsPage() {
   }
 
   function generateCode() {
+    // W4: prefix auto-generated codes with PROMO- so operators can scan a list
+    // and tell hand-typed campaign codes (SUMMER20, WINTER15) apart from
+    // platform-generated ones. Random body stays 6 chars from the
+    // unambiguous alphabet, giving 32^6 ≈ 1B candidates per prefix.
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let result = "";
-    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    setCode(result);
+    let body = "";
+    for (let i = 0; i < 6; i++) body += chars.charAt(Math.floor(Math.random() * chars.length));
+    setCode("PROMO-" + body);
   }
 
   function startEdit(p: Promotion) {

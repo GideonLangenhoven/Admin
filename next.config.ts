@@ -42,6 +42,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/super-admin/data-requests", destination: "/privacy/data-requests", permanent: false },
       { source: "/peak-pricing", destination: "/pricing", permanent: false },
+      { source: "/marketing/promos", destination: "/marketing/promotions", permanent: false },
+      { source: "/marketing/promos/:rest*", destination: "/marketing/promotions/:rest*", permanent: false },
     ];
   },
 };

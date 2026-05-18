@@ -139,7 +139,7 @@ interface AddOn {
 }
 
 export default function SettingsPage() {
-    const { businessId } = useBusinessContext();
+    const { businessId, refreshBusiness } = useBusinessContext();
     const [admins, setAdmins] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
@@ -1041,6 +1041,10 @@ export default function SettingsPage() {
             setAdminTimezone(siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone);
             setSiteMessage({ type: "success", text: "Site settings saved successfully!" });
             setTimeout(() => setSiteMessage({ type: "", text: "" }), 3000);
+            // Z1: business_name / logo_url are read by the sidebar via
+            // BusinessContext; re-fetch so the change appears without a
+            // hard page reload.
+            if (refreshBusiness) await refreshBusiness();
         }
         setSiteSaving(false);
     }

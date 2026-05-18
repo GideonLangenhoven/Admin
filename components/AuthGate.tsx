@@ -445,8 +445,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  async function refreshBusiness() {
+    // Z1: settings save updates businesses.business_name / logo_url, but the
+    // sidebar reads from this provider's state and won't pick the change up
+    // until a hard reload. Re-running loadBusinessContext (without any role
+    // change) reseeds the active operator and the sidebar updates in place.
+    if (!businessId) return;
+    try {
+      const context = await loadBusinessContext(role, businessId);
+      setBusinessId(context.businessId);
+      setBusinessName(context.businessName);
+      setLogoUrl(context.logoUrl);
+      setTimezone(context.timezone);
+      setOperators(context.operators);
+      setSubscriptionStatus(context.subscriptionStatus);
+      setYocoTestMode(context.yocoTestMode || false);
+    } catch (e) {
+      console.warn("refreshBusiness failed:", e);
+    }
+  }
+
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, operators, switchOperator }}>
+    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, operators, switchOperator, refreshBusiness }}>
       {children}
     </BusinessProvider>
   );
