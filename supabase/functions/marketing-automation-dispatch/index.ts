@@ -454,26 +454,37 @@ Deno.serve(async (req: Request) => {
           case "generate_voucher": {
             const config = currentStep.config as any;
             const prefix = config?.code_prefix || "GIFT";
-            const amount = config?.amount || 100;
+            const amount = Number(config?.amount) || 100;
             const voucherType = config?.voucher_type || "fixed_amount";
-            const validDays = config?.valid_days || 30;
+            const validDays = Number(config?.valid_days) || 30;
 
             // Generate code
             const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
             const code = prefix + "-" + randomPart;
 
-            // Insert voucher into existing vouchers table
+            // Insert voucher into the existing vouchers table. V-13a fix:
+            // earlier shape used `original_value` and `source` columns that
+            // don't exist, so PostgREST silently rejected the row and the
+            // BDAY-/AUTO- codes never appeared in /vouchers. Match the
+            // canonical shape used by rebook-booking (value / current_balance
+            // / type ∈ existing enum), and capture insert errors in the
+            // log so future regressions surface in the Step Execution Log.
             const expiresAt = new Date(Date.now() + validDays * 86400000).toISOString();
-            await supabase.from("vouchers").insert({
+            const voucherRow: Record<string, unknown> = {
               business_id: enrollment.business_id,
               code,
-              type: voucherType === "percentage" ? "PERCENTAGE" : "FIXED",
-              original_value: amount,
+              type: "MONETARY",
+              value: amount,
               current_balance: amount,
               status: "ACTIVE",
               expires_at: expiresAt,
-              source: "automation",
-            });
+              recipient_email: contact.email || null,
+              recipient_name: [contact.first_name, contact.last_name].filter(Boolean).join(" ").trim() || null,
+            };
+            const { error: voucherInsertErr } = await supabase.from("vouchers").insert(voucherRow);
+            if (voucherInsertErr) {
+              console.error("AUTOMATION_VOUCHER_INSERT_ERR:", voucherInsertErr.message);
+            }
 
             // Store in enrollment metadata for next email step
             const updatedMetadata = {
@@ -500,7 +511,9 @@ Deno.serve(async (req: Request) => {
               results.completed++;
             }
 
-            // Log
+            // Log — surface insert failure in the Step Execution Log so the
+            // operator can tell "voucher created" apart from "voucher attempted
+            // but rejected by DB".
             await supabase.from("marketing_automation_logs").insert({
               enrollment_id: enrollment.id,
               automation_id: enrollment.automation_id,
@@ -508,11 +521,14 @@ Deno.serve(async (req: Request) => {
               business_id: enrollment.business_id,
               step_position: currentStep.position,
               step_type: "generate_voucher",
-              action: "voucher_created",
-              metadata: { code, amount, voucher_type: voucherType, valid_days: validDays },
+              action: voucherInsertErr ? "voucher_failed" : "voucher_created",
+              metadata: voucherInsertErr
+                ? { code, amount, voucher_type: voucherType, valid_days: validDays, error: voucherInsertErr.message }
+                : { code, amount, voucher_type: voucherType, valid_days: validDays },
             });
 
-            results.vouchers++;
+            if (voucherInsertErr) results.errors++;
+            else results.vouchers++;
             break;
           }
 
