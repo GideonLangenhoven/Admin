@@ -1,0 +1,15 @@
+-- ════════════════════════════════════════════════════════════════════
+-- 2026-05-18 — AC2: external-booking create_booking returned 500
+-- UNHANDLED_ERROR for every payload that didn't include a phone. The
+-- bookings table required phone NOT NULL, but ck_external_create_booking
+-- does `nullif(btrim(p_phone), '')` and partner channels (Viator,
+-- GetYourGuide) routinely send no phone. The RPC's insert then raised
+-- 23502 inside its body, the edge function's catch surfaced it as
+-- UNHANDLED_ERROR with no actionable detail.
+--
+-- Customer-facing flows still require phone at the form layer (see
+-- booking site / admin new-booking). This change just makes the column
+-- structurally optional so B2B partner inserts don't fail at the DB.
+-- Applied directly to ukdsrndqhsatjkmxijuj before this commit.
+-- ════════════════════════════════════════════════════════════════════
+ALTER TABLE public.bookings ALTER COLUMN phone DROP NOT NULL;

@@ -754,7 +754,20 @@ Deno.serve(async (req: Request) => {
         p_supplier_commission_amount: normalizeMoney(body.supplier_commission_amount),
         p_external_source_details: buildExternalDetails(body, requestId, auth.authMode, eventId, auth.credentialId),
       });
-      if (error) throw error;
+      if (error) {
+        // AC2 / V-13a-pattern: never surface the RPC failure as a generic
+        // UNHANDLED_ERROR — map known Postgres SQLSTATE codes to actionable
+        // partner-facing error codes so callers can distinguish a bad
+        // payload from a server outage.
+        console.error("ck_external_create_booking error:", error);
+        const pgCode = String((error as any).code || "");
+        const detail = String((error as any).message || (error as any).details || "RPC error");
+        if (pgCode === "23502") return await send(400, "BOOKING_FIELD_REQUIRED", detail, { hint: "A required booking field is missing — check customer_name, email, or total_amount." }, "REJECTED");
+        if (pgCode === "23505") return await send(409, "DUPLICATE_BOOKING", detail, { hint: "A booking with this external_ref already exists for this source." }, "REJECTED");
+        if (pgCode === "23503") return await send(400, "INVALID_REFERENCE", detail, { hint: "A referenced business_id, tour_id, or slot_id is invalid for this source." }, "REJECTED");
+        if (pgCode === "23514") return await send(400, "INVALID_VALUE", detail, { hint: "One of the supplied values violates a DB check constraint (status, qty, amount)." }, "REJECTED");
+        return await send(500, "BOOKING_RPC_ERROR", detail, { hint: "Partner: retry; if persistent, contact support with the request_id." });
+      }
       const result = successFromRpc(data);
       const code = String(result.code || "BOOKING_CREATE_FAILED");
       if (code === "SLOT_NOT_FOUND") return await send(404, code, "Slot not found");

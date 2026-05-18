@@ -36,11 +36,20 @@ type LineItem = {
   created_at: string;
 };
 
+type EmailUsage = {
+  sent: number;
+  included: number;
+  overage_emails: number;
+  overage_rate_zar: number;
+  overage_charge_zar: number;
+};
+
 export default function BillingPage() {
   const { businessId } = useBusinessContext();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [usedSeats, setUsedSeats] = useState(0);
   const [monthly, setMonthly] = useState(0);
+  const [emailUsage, setEmailUsage] = useState<EmailUsage | null>(null);
   const [history, setHistory] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -61,6 +70,7 @@ export default function BillingPage() {
       setSub(data.subscription);
       setUsedSeats(data.used_seats);
       setMonthly(data.monthly_total_zar);
+      setEmailUsage(data.email_usage ?? null);
     }
     if (histRes.ok) {
       const data = await histRes.json();
@@ -245,6 +255,46 @@ export default function BillingPage() {
 
         {error && <p className="mt-3 text-sm text-red-600 font-medium">{error}</p>}
       </section>
+
+      {/* Marketing Email Usage (AB1) — was previously only in super-admin */}
+      {emailUsage && (
+        <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Marketing email usage</h2>
+            <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>this billing period</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Sent / Included</div>
+              <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>
+                {emailUsage.sent.toLocaleString()} / {emailUsage.included.toLocaleString()}
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full" style={{ background: "var(--ck-border)" }}>
+                <div
+                  className="h-2 rounded-full"
+                  style={{
+                    width: emailUsage.included > 0 ? Math.min(100, (emailUsage.sent / emailUsage.included) * 100) + "%" : "0%",
+                    background: emailUsage.overage_emails > 0 ? "#f59e0b" : "var(--ck-accent, #059669)",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
+              <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Overage</div>
+              <div className="text-2xl font-bold mt-0.5" style={{ color: emailUsage.overage_charge_zar > 0 ? "#b45309" : "var(--ck-text-strong)" }}>
+                {emailUsage.overage_emails > 0
+                  ? "R" + emailUsage.overage_charge_zar.toLocaleString()
+                  : "R0"}
+              </div>
+              <div className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                {emailUsage.overage_emails > 0
+                  ? emailUsage.overage_emails.toLocaleString() + " over @ R" + emailUsage.overage_rate_zar.toFixed(2) + "/email"
+                  : "Under quota — no overage charge"}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Payment Method */}
       <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
