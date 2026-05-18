@@ -77,6 +77,15 @@ export default function OtaSettingsPage() {
     if (businessId) refreshChannel(activeTab);
   }, [activeTab]);
 
+  // AG1 fix: /api/ota's getCallerAdmin() decodes the Bearer access_token to
+  // resolve the admin_users row. Without this header every call landed in
+  // the "MAIN_ADMIN or SUPER_ADMIN required" 403 branch even for a valid
+  // SUPER_ADMIN session. Same pattern as /api/billing/*.
+  async function authHeaders(): Promise<HeadersInit> {
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    return { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) };
+  }
+
   async function refreshAll() {
     const [toursRes] = await Promise.all([
       supabase.from("tours").select("id, name").eq("business_id", businessId).order("name"),
@@ -88,8 +97,9 @@ export default function OtaSettingsPage() {
   }
 
   async function refreshChannel(channel: string) {
+    const headers = await authHeaders();
     const [statusRes, mappingsRes] = await Promise.all([
-      fetch("/api/ota?business_id=" + businessId + "&channel=" + channel).then(r => r.json()),
+      fetch("/api/ota?business_id=" + businessId + "&channel=" + channel, { headers }).then(r => r.json()),
       supabase.from("ota_product_mappings").select("*").eq("business_id", businessId).eq("channel", channel).order("created_at"),
     ]);
     setStatuses(prev => ({ ...prev, [channel]: statusRes }));
@@ -111,7 +121,7 @@ export default function OtaSettingsPage() {
     setMsg("");
     const res = await fetch("/api/ota", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify({
         business_id: businessId, action: "save_credentials", channel: activeTab,
         api_key: apiKey, api_secret: apiSecret || null, webhook_secret: webhookSecret, test_mode: testMode,
@@ -127,7 +137,7 @@ export default function OtaSettingsPage() {
     const newVal = !status?.enabled;
     await fetch("/api/ota", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify({ business_id: businessId, action: "toggle_enabled", channel: activeTab, enabled: newVal }),
     });
     refreshChannel(activeTab);
@@ -137,7 +147,7 @@ export default function OtaSettingsPage() {
     const newVal = !status?.test_mode;
     await fetch("/api/ota", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify({ business_id: businessId, action: "toggle_test_mode", channel: activeTab, test_mode: newVal }),
     });
     setTestMode(newVal);
@@ -342,11 +352,15 @@ export default function OtaSettingsPage() {
       {status && (
         <div className="flex flex-wrap gap-2 text-xs">
           <span className={"px-2 py-1 rounded-full border " + (status.configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
-            {ch.primaryCredLabel.split(" ")[0]}: {status.configured ? "configured" : "not set"}
+            {/* AG8 fix: previously .split(" ")[0] which produced "Client: not set"
+                for both pills on the GYG tab (since both labels start with "Client").
+                Strip just the parenthetical so "API Key (exp-api-key)" trims to
+                "API Key" while "Client ID" and "Client Secret" stay distinct. */}
+            {ch.primaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.configured ? "configured" : "not set"}
           </span>
           {ch.secondaryCredLabel && (
             <span className={"px-2 py-1 rounded-full border " + (status.secret_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
-              {ch.secondaryCredLabel.split(" ")[0]}: {status.secret_configured ? "configured" : "not set"}
+              {ch.secondaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.secret_configured ? "configured" : "not set"}
             </span>
           )}
           <span className={"px-2 py-1 rounded-full border " + (status.webhook_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
