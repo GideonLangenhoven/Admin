@@ -86,18 +86,20 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
       };
     }
 
-    // ── 2b. Load per-business subdomain + brand name for sender + brand replacement ──
+    // ── 2b. Load per-business brand name for sender + brand replacement ──
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
     const bizBrandMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name, subdomain").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
         const name = b.business_name || b.name || "Marketing";
         bizBrandMap[b.id] = name;
-        if (b.subdomain) {
-          bizFromMap[b.id] = name + " <noreply@" + b.subdomain + ".bookingtours.co.za>";
-        }
+        // V-12: send from the verified ROOT domain bookingtours.co.za with the
+        // tenant's brand name as the display label. Per-subdomain From would
+        // need each tenant subdomain DNS-verified in Resend, which isn't done,
+        // and Resend returned HTTP 403 "domain not verified" for them.
+        bizFromMap[b.id] = name + " <noreply@bookingtours.co.za>";
       }
     }
 

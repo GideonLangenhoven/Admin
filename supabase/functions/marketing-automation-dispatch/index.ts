@@ -155,9 +155,14 @@ Deno.serve(async (req: Request) => {
 
         const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain").eq("id", enrollment.business_id).maybeSingle();
         const bizName = bizRow?.business_name || "Marketing";
-        const bizFromEmail = bizRow?.subdomain
-          ? bizName + " <noreply@" + bizRow.subdomain + ".bookingtours.co.za>"
-          : FROM_EMAIL;
+        // V-12 fix: send from the verified ROOT domain with the tenant name as
+        // the display label. Per-subdomain From requires each tenant's
+        // subdomain (e.g. aonyx.bookingtours.co.za) to be added + DNS-verified
+        // in Resend, which isn't done per tenant — so until each subdomain is
+        // verified, sending from there returns HTTP 403 "domain not verified"
+        // and the email never goes out. send-email already follows this
+        // pattern; marketing-dispatch and the broadcast path do too now.
+        const bizFromEmail = bizName + " <noreply@bookingtours.co.za>";
 
         // Load steps
         const { data: steps } = await supabase
