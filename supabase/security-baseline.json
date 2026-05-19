@@ -4701,6 +4701,41 @@
       "grantee": "service_role",
       "table_name": "webchat_sessions",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "api_rate_limits",
+      "privilege_type": "UPDATE"
     }
   ],
   "rls_status": [
@@ -5027,6 +5062,11 @@
     {
       "schema": "public",
       "table_name": "webchat_sessions",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "api_rate_limits",
       "rls_enabled": true
     }
   ],
