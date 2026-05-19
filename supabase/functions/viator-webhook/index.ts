@@ -26,7 +26,7 @@ async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret
   const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
   const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
   if (receivedHex.length !== expectedHex.length) return false;
-  const mismatch = 0;
+  let mismatch = 0;
   for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
@@ -37,15 +37,25 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
 
   const rawBody = await req.text();
-  const event: any;
-  try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
+  let event: any;
+  try { event = JSON.parse(rawBody); } catch { return respond(401, { error: "Unauthorized" }, origin); }
 
-  // Business ID from query param (?b=<uuid>) — set when registering webhook URL with Viator
+  // AN5: every rejected request returns the same 401 + body so an attacker
+  // can't probe which businesses are mapped / enabled / signed by looking at
+  // response codes or messages. The actual reason is logged server-side.
   const url = new URL(req.url);
   const businessId = url.searchParams.get("b");
-  if (!businessId) return respond(400, { error: "Missing business_id (?b= param)" }, origin);
+  const sigHeader = req.headers.get("x-viator-signature") || req.headers.get("viator-signature") || "";
+  const denied = respond(401, { error: "Unauthorized" }, origin);
 
-  // Look up integration
+  if (!businessId || !sigHeader || !SETTINGS_ENCRYPTION_KEY) {
+    console.error("VIATOR_WEBHOOK_REJECT reason=missing_inputs businessId=" + !!businessId + " sig=" + !!sigHeader + " key=" + !!SETTINGS_ENCRYPTION_KEY);
+    return denied;
+  }
+
+  // Always perform integration lookup + HMAC compute so a missing/disabled
+  // integration looks the same as a bad signature on the wire (equalised
+  // timing + uniform rejection body).
   const { data: integration } = await db
     .from("ota_integrations")
     .select("id, enabled, test_mode, webhook_secret_encrypted")
@@ -53,26 +63,24 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
     .eq("channel", "VIATOR")
     .maybeSingle();
 
-  if (!integration) return respond(401, { error: "No Viator integration for this business" }, origin);
-  if (!integration.enabled) return respond(200, { ok: true, skipped: "integration disabled" }, origin);
-
-  // HMAC signature verification
-  if (integration.webhook_secret_encrypted && SETTINGS_ENCRYPTION_KEY) {
+  let webhookSecret = "";
+  if (integration?.enabled && integration.webhook_secret_encrypted) {
     const { data: creds } = await db.rpc("get_ota_credentials", {
       p_business_id: businessId,
       p_key: SETTINGS_ENCRYPTION_KEY,
       p_channel: "VIATOR",
     });
     const credRow = Array.isArray(creds) ? creds[0] : creds;
-    const webhookSecret = credRow?.webhook_secret || "";
-    if (webhookSecret) {
-      const sigHeader = req.headers.get("x-viator-signature") || req.headers.get("viator-signature") || "";
-      const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
-      if (!sigValid) {
-        console.error("VIATOR_WEBHOOK_SIG_INVALID business=" + businessId);
-        return respond(401, { error: "Invalid signature" }, origin);
-      }
-    }
+    webhookSecret = credRow?.webhook_secret || "";
+  }
+
+  // Use a fixed dummy secret on miss so the HMAC computation still runs and
+  // costs the same as the success path. The result will never match a
+  // legitimate signature so this stays fail-closed.
+  const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret || "viator-webhook-no-secret-placeholder");
+  if (!integration || !integration.enabled || !webhookSecret || !sigValid) {
+    console.error("VIATOR_WEBHOOK_REJECT business=" + businessId + " hasIntegration=" + !!integration + " enabled=" + (integration?.enabled ?? false) + " hasSecret=" + !!webhookSecret + " sigValid=" + sigValid);
+    return denied;
   }
 
   const externalRef = String(event?.bookingRef || event?.bookingReference || event?.data?.bookingRef || event?.id || "");
