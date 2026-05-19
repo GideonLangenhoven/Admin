@@ -5037,7 +5037,7 @@
       "policyname": "add_ons_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "(active = true)",
+      "qual": "((active = true) AND ((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text)))",
       "with_check": null
     },
     {
@@ -6351,7 +6351,7 @@
       "policyname": "promotions_anon_select",
       "cmd": "SELECT",
       "roles": "{anon}",
-      "qual": "true",
+      "qual": "((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text))",
       "with_check": null
     },
     {
