@@ -10,7 +10,7 @@ import {
   hardenSystemPrompt,
   KB_REFUSAL_REPLY,
 } from "../_shared/bot-guards.ts";
-import { classifyIntent, priorityForIntent, findFaqMatch } from "../_shared/intent.ts";
+import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } from "../_shared/intent.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 const GK = Deno.env.get("GEMINI_API_KEY");
@@ -224,6 +224,16 @@ async function gemChat(hist, msg, toursList, businessId) {
   const brandName = getBusinessDisplayName(tenant?.business);
   const tsText = (toursList || []).map(function (t) { const lbl = (t && (t as any).priceLabel) || ("R" + t.base_price_per_person); return "- " + t.name + ": " + lbl + "/pp, " + t.duration_minutes + " min" + ((t as any).priceNote || ""); }).join("\n");
   const faq = tenant?.business?.faq_json;
+  // AJ5/AJ6: Quick Answers (chat_faq_entries) are the operator's
+  // authoritative replies. Inject the top scoring entries for this
+  // message into the system prompt so the LLM can't drop facts (e.g.
+  // dropping "Amex" from the payment-methods answer).
+  const quickAnswers = businessId
+    ? await loadFaqCandidates(db, businessId, String(msg || ""), 5).catch(() => [])
+    : [];
+  const quickAnswersText = quickAnswers.length > 0
+    ? quickAnswers.map((q) => "Q: " + q.question + "\nA: " + q.answer).join("\n\n")
+    : "";
   try {
     // Pre-LLM injection check.
     const gate = gateInbound(String(msg || ""));
@@ -243,6 +253,12 @@ async function gemChat(hist, msg, toursList, businessId) {
     const sysBase = PLATFORM_INVARIANTS + "\n\n"
       + (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human."))
       + "\n\nCurrent available tours:\n" + tsText
+      // Quick Answers are the operator's verified facts. The model must
+      // prefer them verbatim where they match — paraphrasing has been
+      // observed to drop details (e.g. "Amex" from the payment list).
+      + (quickAnswersText
+          ? "\n\nQuick Answers (operator-verified facts — use verbatim where they answer the question, never contradict or omit details from these):\n" + quickAnswersText
+          : "")
       + (faq ? "\n\nFAQ:\n" + JSON.stringify(faq) : "")
       + (tenant?.business?.terminology ? "\n\nTerminology:\n" + JSON.stringify(tenant.business.terminology) : "");
     const sysText = hardenSystemPrompt(sysBase);
@@ -1253,23 +1269,26 @@ Deno.serve(withSentry("web-chat", async (req) => {
       return new Response(JSON.stringify({ reply, state: ns, intent: classification.intent }), { status: 200, headers: gCors(req) });
     }
 
-    // Auto-reply: FAQ-type intents with high confidence
-    if (["BOOKING_QUESTION", "LOGISTICS", "BOOKING_MODIFY"].includes(classification.intent) && classification.confidence >= 0.75) {
-      const faqAnswer = await findFaqMatch(db, requestedBusinessId, classification.intent, msg);
-      if (faqAnswer) {
-        // Log the auto-reply
-        db.from("chat_messages").insert({
-          business_id: requestedBusinessId,
-          phone: state.phone || body.phone || "web",
-          direction: "OUT",
-          body: faqAnswer,
-          sender: "Bot",
-          sender_type: "BOT",
-          auto_replied: true,
-          intent: classification.intent,
-        }).then(() => {});
-        return new Response(JSON.stringify({ reply: faqAnswer, state: { step: "IDLE" }, intent: classification.intent, autoReplied: true }), { status: 200, headers: gCors(req) });
-      }
+    // AJ5/AJ6: try a verbatim Quick Answer match regardless of classifier
+    // intent / confidence. The previous gate required intent in
+    // [BOOKING_QUESTION, LOGISTICS, BOOKING_MODIFY] AND confidence >= 0.75,
+    // which routinely sent obvious FAQ questions to the LLM where they
+    // were paraphrased or apologised about. findFaqMatch now requires a
+    // keyword score of 2+ to fire, so single-word coincidences don't
+    // hijack the conversation.
+    const faqAnswer = await findFaqMatch(db, requestedBusinessId, classification.intent, msg);
+    if (faqAnswer) {
+      db.from("chat_messages").insert({
+        business_id: requestedBusinessId,
+        phone: state.phone || body.phone || "web",
+        direction: "OUT",
+        body: faqAnswer,
+        sender: "Bot",
+        sender_type: "BOT",
+        auto_replied: true,
+        intent: classification.intent,
+      }).then(() => {});
+      return new Response(JSON.stringify({ reply: faqAnswer, state: { step: "IDLE" }, intent: classification.intent, autoReplied: true }), { status: 200, headers: gCors(req) });
     }
 
     // Standard Gemini fallback

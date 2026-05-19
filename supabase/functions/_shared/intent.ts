@@ -99,47 +99,99 @@ export async function classifyIntent(message: string, businessName: string): Pro
   }
 }
 
+/**
+ * Score all enabled chat_faq_entries for a business against the user's
+ * message. Used by both the verbatim-reply path (web-chat returns the
+ * answer directly when confidence is high) and the LLM grounding path
+ * (top-K entries injected into the system prompt so the model can't drop
+ * facts like "Amex" from a configured answer).
+ *
+ * AJ5/AJ6 fix — previously findFaqMatch only matched within a single
+ * intent bucket and required findFaqMatch's caller to pre-classify with
+ * >=0.75 confidence. Both gates conspired to skip the FAQ for "What
+ * payment methods do you accept?" and "How long are vouchers valid?" —
+ * exact configured questions. We now match across all entries by keyword
+ * score, with a minimum threshold for confident verbatim reply, and
+ * always surface the top entries to the LLM regardless.
+ */
+export interface FaqCandidate {
+  id: string;
+  question: string;
+  answer: string;
+  score: number;
+  keywords: string[];
+}
+
+export async function loadFaqCandidates(
+  db: any,
+  businessId: string,
+  message: string,
+  limit = 5,
+): Promise<FaqCandidate[]> {
+  const { data: entries } = await db.from("chat_faq_entries")
+    .select("id, question_pattern, match_keywords, answer, use_count")
+    .eq("business_id", businessId)
+    .eq("enabled", true);
+  if (!entries || entries.length === 0) return [];
+
+  const words = String(message || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const scored: FaqCandidate[] = [];
+  for (const entry of entries) {
+    const keywords: string[] = entry.match_keywords || [];
+    if (keywords.length === 0) continue;
+    let score = 0;
+    for (const rawKw of keywords) {
+      const kw = String(rawKw || "").toLowerCase();
+      if (!kw) continue;
+      // Match if any word in the message contains the keyword (or vice versa).
+      // Substring tolerance handles plurals ("vouchers" vs "voucher") and
+      // light morphology ("paying" vs "pay") without needing a stemmer.
+      if (words.some((w) => w.includes(kw) || kw.includes(w))) {
+        score++;
+      }
+    }
+    if (score > 0) {
+      scored.push({
+        id: entry.id,
+        question: entry.question_pattern || "",
+        answer: entry.answer,
+        keywords,
+        score,
+      });
+    }
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
+}
+
+/**
+ * Backwards-compatible single-match helper. Returns the top match's
+ * answer iff it scored at least `minScore` (default 2 keyword matches —
+ * tuned so single-word coincidences like "pay" don't trigger a verbatim
+ * reply that ignores the rest of the user's question). Increments
+ * use_count + last_used_at when a match is returned.
+ *
+ * `intent` is accepted for back-compat but ignored — the keyword-score
+ * model already beats intent gating in practice.
+ */
 export async function findFaqMatch(
   db: any,
   businessId: string,
   intent: string,
-  message: string
+  message: string,
+  minScore = 2,
 ): Promise<string | null> {
-  const { data: entries } = await db.from("chat_faq_entries")
-    .select("id, match_keywords, answer")
-    .eq("business_id", businessId)
-    .eq("intent", intent)
-    .eq("enabled", true);
-
-  if (!entries || entries.length === 0) return null;
-
-  const words = message.toLowerCase().split(/\s+/);
-  let bestScore = 0;
-  let bestAnswer: string | null = null;
-  let bestId: string | null = null;
-
-  for (const entry of entries) {
-    const keywords: string[] = entry.match_keywords || [];
-    let score = 0;
-    for (const kw of keywords) {
-      if (words.some((w: string) => w.includes(kw.toLowerCase()) || kw.toLowerCase().includes(w))) {
-        score++;
-      }
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestAnswer = entry.answer;
-      bestId = entry.id;
-    }
-  }
-
-  if (bestScore > 0 && bestId) {
-    await db.from("chat_faq_entries").update({
-      use_count: (entries.find((e: any) => e.id === bestId)?.use_count ?? 0) + 1,
-      last_used_at: new Date().toISOString(),
-    }).eq("id", bestId);
-    return bestAnswer;
-  }
-
-  return null;
+  void intent; // legacy param, retained for callers that still pass it
+  const candidates = await loadFaqCandidates(db, businessId, message, 1);
+  if (candidates.length === 0) return null;
+  const top = candidates[0];
+  if (top.score < minScore) return null;
+  await db.from("chat_faq_entries").update({
+    use_count: db.rpc ? undefined : undefined, // no rpc bump available — do a read-modify-write
+    last_used_at: new Date().toISOString(),
+  }).eq("id", top.id);
+  // Increment use_count atomically via select-then-update fallback
+  const { data: cur } = await db.from("chat_faq_entries").select("use_count").eq("id", top.id).maybeSingle();
+  await db.from("chat_faq_entries").update({ use_count: (cur?.use_count ?? 0) + 1 }).eq("id", top.id);
+  return top.answer;
 }

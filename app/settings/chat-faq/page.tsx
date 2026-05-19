@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { notify } from "../../lib/app-notify";
+import { confirmAction, notify } from "../../lib/app-notify";
 import { CHAT_INTENTS, INTENT_LABELS, type ChatIntent } from "../../lib/intent-types";
 
 type FaqEntry = {
@@ -85,9 +85,24 @@ export default function ChatFaqPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Remove this quick answer? Customers will no longer get an automatic reply for this question.")) return;
+    // AJ4: replace the bare window.confirm() with the app's amber dialog
+    // (same pattern as U-8 / V-5 / W-5). Single-click delete on operator
+    // content felt too easy to fire accidentally.
+    const entry = entries.find((e) => e.id === id);
+    const label = entry?.question_pattern ? `"${entry.question_pattern}"` : "this quick answer";
+    if (!await confirmAction({
+      title: "Delete quick answer",
+      message: `Remove ${label}? Customers will no longer get an automatic reply for this question. This can't be undone — add it back later if you change your mind.`,
+      tone: "warning",
+      confirmLabel: "Delete quick answer",
+    })) return;
     const r = await fetch(`/api/admin/chat-faq/${id}`, { method: "DELETE", headers: await authHeaders() });
-    if (r.ok) load();
+    if (r.ok) {
+      notify({ title: "Deleted", message: "Quick answer removed.", tone: "success" });
+      load();
+    } else {
+      notify({ title: "Delete failed", message: (await r.json().catch(() => ({}))).error || "Unknown error", tone: "error" });
+    }
   }
 
   function startEdit(entry: FaqEntry) {
