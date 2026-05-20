@@ -177,6 +177,7 @@ export default function SettingsPage() {
 
     // Site Settings State
     const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
+    const [subdomain, setSubdomain] = useState<string | null>(null);
     const [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
     const [siteSaving, setSiteSaving] = useState(false);
     const [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
@@ -739,6 +740,7 @@ export default function SettingsPage() {
                 footer_line_two: data.footer_line_two || DEFAULT_SITE_SETTINGS.footer_line_two,
                 timezone: data.timezone || DEFAULT_SITE_SETTINGS.timezone,
             });
+            setSubdomain(data.subdomain || null);
             setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
             setRefundTiers(Array.isArray(data.refund_policy_tiers) ? data.refund_policy_tiers : []);
             setRefundPolicyText(data.refund_policy_text || "");
@@ -2581,6 +2583,43 @@ export default function SettingsPage() {
                             </span>
                         )}
                     </div>
+                </div>
+            </CollapsibleSection>}
+
+            {canAccess("site") && <CollapsibleSection id="embed-widget" title="Embed Widget Snippet" subtitle="Paste this into your existing website to embed the booking flow" openSections={openSections} toggle={toggleSection}>
+                <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-4">
+                    {subdomain ? (
+                        <>
+                            <p className="text-sm text-[var(--ck-text)]">
+                                Drop this snippet into any HTML page on your site. The widget loads in an iframe and auto-resizes to its content.
+                            </p>
+                            <div className="relative">
+                                <pre className="bg-[var(--ck-bg-subtle)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const snippet = `<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`;
+                                        try {
+                                            await navigator.clipboard.writeText(snippet);
+                                            notify({ title: "Copied", message: "Embed snippet copied to clipboard.", tone: "success" });
+                                        } catch {
+                                            notify({ title: "Copy failed", message: "Select and copy the snippet manually.", tone: "error" });
+                                        }
+                                    }}
+                                    className="absolute top-2 right-2 px-2.5 py-1 rounded text-xs font-medium bg-[var(--ck-text-strong)] text-[var(--ck-btn-primary-text)] hover:opacity-90"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                            <p className="text-xs text-[var(--ck-text-muted)]">
+                                Optional attributes: <code>data-tour=&quot;&lt;tour-id&gt;&quot;</code> preselects a tour, <code>data-bg=&quot;#fff&quot;</code> sets the background, <code>data-min-height=&quot;800&quot;</code> sets the initial height (default 600).
+                            </p>
+                        </>
+                    ) : (
+                        <p className="text-sm text-[var(--ck-text-muted)]">
+                            Your booking subdomain is not provisioned yet. Contact support to set one up before embedding the widget.
+                        </p>
+                    )}
                 </div>
             </CollapsibleSection>}
 

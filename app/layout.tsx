@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 const nav = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
+  { href: "/bookings/pending-reschedules", label: "Pending Reschedules", icon: "Clock" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
   { href: "/guide", label: "Guide", icon: "Users" },

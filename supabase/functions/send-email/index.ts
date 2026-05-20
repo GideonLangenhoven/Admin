@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { Webhook } from "npm:standardwebhooks";
 import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
@@ -11,6 +12,12 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+// Auth Hook secret — set in Supabase Auth → Hooks → Send Email Hook. When this
+// is set, send-email accepts inbound Auth Hook payloads (magic-link / signup /
+// recovery) signed via Supabase's standard-webhooks scheme. Inbound requests
+// without a valid signature are rejected 401 to prevent arbitrary magic-link
+// emails. Standard internal callers (with {type, data}) ignore this entirely.
+const SEND_EMAIL_HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "";
 // Platform-wide default sender — uses bookingtours.co.za which is verified in Resend.
 // Per-tenant emails auto-derive from subdomain: noreply@{slug}.bookingtours.co.za
 // Safety: refuse to send from the Resend developer sandbox even if the env
@@ -1871,6 +1878,46 @@ function popiaExportReadyHtml(d: Record<string, unknown>) {
   </div>`;
 }
 
+function magicLinkHtml(d: Record<string, unknown>) {
+  const action = String(d.action_type || "magiclink");
+  const isSignup = action === "signup";
+  const isRecovery = action === "recovery";
+  const heading = isSignup ? "Confirm your email" : isRecovery ? "Reset your password" : "Sign in to your bookings";
+  const cta = isSignup ? "Confirm Email" : isRecovery ? "Reset Password" : "Sign In";
+  const intro = isSignup
+    ? "Click the button below to confirm your email and finish signing up. This link expires in 1 hour."
+    : isRecovery
+      ? "Click the button below to choose a new password. This link expires in 1 hour."
+      : "Click the button below to sign in to manage your bookings. This link expires in 1 hour.";
+  const otp = String(d.otp_code || "");
+  return `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <h2 style="color: #1b3b36; margin-bottom: 20px;">${heading}</h2>
+    <p style="font-size: 15px; color: #333; line-height: 1.6;">${intro}</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${d.magic_link_url}" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">${cta}</a>
+    </div>
+    ${otp ? `<p style="font-size: 14px; color: #555; text-align: center;">Or enter this 6-digit code on the sign-in page:</p>
+    <p style="font-size: 28px; letter-spacing: 6px; font-weight: bold; color: #1b3b36; text-align: center; margin: 12px 0;">${escHtml(otp)}</p>` : ""}
+    <p style="font-size: 13px; color: #888;">If you didn&rsquo;t request this, you can safely ignore this email.</p>
+  </div>`;
+}
+
+// Resolve tenant business_id from a Supabase Auth redirect URL — the tenant is
+// the leftmost subdomain (e.g. `aonyx` in `aonyx.booking.bookingtours.co.za`).
+// Returns null when no business matches or the URL is unparseable.
+async function resolveTenantFromRedirect(redirectUrl: string): Promise<string | null> {
+  if (!redirectUrl || !supabase) return null;
+  try {
+    const u = new URL(redirectUrl);
+    const sub = u.hostname.split(".")[0];
+    if (!sub || sub === "booking" || sub === "www") return null;
+    const { data } = await supabase.from("businesses").select("id").eq("subdomain", sub).maybeSingle();
+    return data?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(withSentry("send-email", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
@@ -1880,9 +1927,62 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       return new Response(JSON.stringify({ error: "Email service not configured" }), { status: 503, headers: getCors(req) });
     }
 
-    const body = await req.json();
-    const type = body.type as string;
-    const d = body.data as Record<string, unknown>;
+    // Read raw body once so we can both JSON-parse it and HMAC-verify it (the
+    // Supabase Auth Send Email Hook signs the request via standard-webhooks).
+    const rawBody = await req.text();
+    let parsedBody: Record<string, unknown>;
+    try { parsedBody = JSON.parse(rawBody); }
+    catch { return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: getCors(req) }); }
+
+    // Supabase Auth Hook payload shape: { user, email_data }. When this is
+    // present we verify the standard-webhooks signature and convert to the
+    // internal { type, data } shape that the switch below already knows.
+    const isAuthHook = parsedBody && typeof parsedBody === "object" && (parsedBody as Record<string, unknown>).user && (parsedBody as Record<string, unknown>).email_data && !(parsedBody as Record<string, unknown>).type;
+    if (isAuthHook) {
+      if (!SEND_EMAIL_HOOK_SECRET) {
+        console.error("SEND_EMAIL_AUTH_HOOK: SEND_EMAIL_HOOK_SECRET not configured — rejecting to avoid arbitrary magic-link sends");
+        return new Response(JSON.stringify({ error: "Auth hook not configured on this function" }), { status: 503, headers: getCors(req) });
+      }
+      try {
+        const wh = new Webhook(SEND_EMAIL_HOOK_SECRET);
+        await wh.verify(rawBody, {
+          "webhook-id": req.headers.get("webhook-id") || "",
+          "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
+          "webhook-signature": req.headers.get("webhook-signature") || "",
+        });
+      } catch (sigErr) {
+        console.error("SEND_EMAIL_AUTH_HOOK_BAD_SIG:", sigErr);
+        return new Response(JSON.stringify({ error: "Invalid hook signature" }), { status: 401, headers: getCors(req) });
+      }
+      const user = (parsedBody as { user: Record<string, unknown> }).user;
+      const ed = (parsedBody as { email_data: Record<string, unknown> }).email_data;
+      const action = String(ed.email_action_type || "magiclink");
+      if (action !== "magiclink" && action !== "signup" && action !== "recovery") {
+        return new Response(JSON.stringify({ ok: true, skipped: true, reason: "unsupported action " + action }), { status: 200, headers: getCors(req) });
+      }
+      const redirectTo = String(ed.redirect_to || "");
+      const siteUrl = String(ed.site_url || "");
+      const tokenHash = String(ed.token_hash || "");
+      const verifyUrl = (siteUrl ? siteUrl.replace(/\/+$/, "") : "")
+        + "/auth/v1/verify?token=" + encodeURIComponent(tokenHash)
+        + "&type=" + encodeURIComponent(action)
+        + "&redirect_to=" + encodeURIComponent(redirectTo);
+      const tenantId = await resolveTenantFromRedirect(redirectTo);
+      parsedBody = {
+        type: "MAGIC_LINK",
+        data: {
+          business_id: tenantId,
+          email: user.email,
+          customer_name: (user.user_metadata as Record<string, unknown> | undefined)?.name || "",
+          magic_link_url: verifyUrl,
+          otp_code: String(ed.token || ""),
+          action_type: action,
+        },
+      };
+    }
+
+    const type = (parsedBody as { type?: string }).type as string;
+    const d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
 
     // Escape user-controlled fields to prevent HTML injection in email templates
     const fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
@@ -2032,6 +2132,16 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = "Your Data Export Is Ready";
         html = popiaExportReadyHtml(d);
         break;
+      case "MAGIC_LINK": {
+        const action = String(d.action_type || "magiclink");
+        subject = action === "signup"
+          ? "Confirm your email · " + branding.brandName
+          : action === "recovery"
+            ? "Reset your password · " + branding.brandName
+            : "Sign in to " + branding.brandName;
+        html = magicLinkHtml(d);
+        break;
+      }
       default:
         return new Response(JSON.stringify({ error: "Unknown email type: " + type }), { status: 400, headers: getCors(req) });
     }
