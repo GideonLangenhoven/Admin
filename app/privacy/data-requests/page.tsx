@@ -184,6 +184,14 @@ export default function DataRequestsPage() {
         ))}
       </div>
 
+      {/* Tab help text — explains why Pending rows don't show actions */}
+      {tab === "PENDING_CONFIRMATION" && filtered.length > 0 && (
+        <p className="text-xs rounded-md border bg-slate-50 text-slate-700 px-3 py-2" style={{ borderColor: "var(--ck-border)" }}>
+          These customers haven&rsquo;t clicked the confirmation link yet. Pending requests auto-expire 24h
+          after submission. Export / Fulfill / Reject buttons appear once the request moves to <strong>Action Required</strong>.
+        </p>
+      )}
+
       {/* List */}
       {filtered.length === 0 ? (
         <p className="text-sm py-8 text-center" style={{ color: "var(--ck-text-muted)" }}>No requests in this category.</p>

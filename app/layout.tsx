@@ -22,6 +22,7 @@ const nav = [
   { href: "/guide", label: "Guide", icon: "Users" },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },
+  { href: "/notifications", label: "Notifications", icon: "Warning", privilegedOnly: true },
   { href: "/vouchers", label: "Vouchers", icon: "Ticket" },
   { href: "/invoices", label: "Invoices", icon: "Receipt" },
   { href: "/weather", label: "Weather", icon: "CloudSun" },
