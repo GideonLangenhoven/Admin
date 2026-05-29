@@ -8,6 +8,7 @@ import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { CaretDown, Check } from "@phosphor-icons/react";
+import * as Sentry from "@sentry/nextjs";
 
 interface Tour {
   id: string;
@@ -566,6 +567,7 @@ export default function NewBookingPage() {
       if (discountType === "manual") {
         insertPayload.original_total = grandTotal;
         insertPayload.discount_type = "MANUAL";
+        insertPayload.discount_amount = Math.max(0, grandTotal - totalAmount);
         insertPayload.discount_notes = discountReason.trim();
       } else if (discountType === "promo" && promoResult?.valid) {
         insertPayload.promo_code = promoResult.code;
@@ -702,14 +704,23 @@ export default function NewBookingPage() {
                   },
                 },
               });
-              if (emailRes.error) {
-                console.error("Payment link email error:", emailRes.error);
-                notify({ title: "Payment email failed", message: "Email could not be sent: " + (emailRes.error.message || "unknown error") + ". Resend from bookings page.", tone: "error", duration: 8000 });
+              // send-email returns HTTP 200 even when Resend rejects the send
+              // (body carries { ok:false }). Treat that as a failure too, else
+              // staff see "Payment link emailed" while the customer gets nothing.
+              const sendFailed = emailRes.error || emailRes.data?.ok === false;
+              if (sendFailed) {
+                const detail = emailRes.error?.message || emailRes.data?.message || emailRes.data?.error || "unknown error";
+                console.error("Payment link email error:", detail, emailRes.data);
+                Sentry.captureException(new Error("Payment link email failed: " + detail), {
+                  extra: { booking_id: createdBooking.id, ref, email: email.trim().toLowerCase(), resend: emailRes.data },
+                });
+                notify({ title: "Payment email failed", message: "Email could not be sent: " + detail + ". Resend from bookings page.", tone: "error", duration: 8000 });
               } else {
                 paymentLinkSent = true;
               }
             } catch (emailErr) {
               console.error("Payment link email failed:", emailErr);
+              Sentry.captureException(emailErr, { extra: { booking_id: createdBooking.id, ref, stage: "payment_link_email" } });
               notify({ title: "Payment email failed", message: "Email send threw an error. Resend from bookings page.", tone: "error", duration: 8000 });
             }
 
@@ -768,12 +779,18 @@ export default function NewBookingPage() {
                 },
               },
             });
-            if (confirmRes.error) {
-              console.error("Confirmation email error:", confirmRes.error);
-              notify({ title: "Confirmation email failed", message: "Error: " + (confirmRes.error.message || "unknown") + ". Resend from bookings page.", tone: "error", duration: 8000 });
+            const confirmFailed = confirmRes.error || confirmRes.data?.ok === false;
+            if (confirmFailed) {
+              const detail = confirmRes.error?.message || confirmRes.data?.message || confirmRes.data?.error || "unknown";
+              console.error("Confirmation email error:", detail, confirmRes.data);
+              Sentry.captureException(new Error("Confirmation email failed: " + detail), {
+                extra: { booking_id: createdBooking.id, ref, email: email.trim().toLowerCase(), resend: confirmRes.data },
+              });
+              notify({ title: "Confirmation email failed", message: "Error: " + detail + ". Resend from bookings page.", tone: "error", duration: 8000 });
             }
           } catch (e) {
             console.error("Confirmation email failed:", e);
+            Sentry.captureException(e, { extra: { booking_id: createdBooking.id, ref, stage: "confirmation_email" } });
             notify({ title: "Confirmation email failed", message: "Could not send confirmation email. Resend from bookings page.", tone: "error", duration: 8000 });
           }
 
@@ -800,11 +817,17 @@ export default function NewBookingPage() {
                 },
               },
             });
-            if (invoiceRes.error) {
-              console.error("Invoice email error:", invoiceRes.error);
+            const invoiceFailed = invoiceRes.error || invoiceRes.data?.ok === false;
+            if (invoiceFailed) {
+              const detail = invoiceRes.error?.message || invoiceRes.data?.message || invoiceRes.data?.error || "unknown";
+              console.error("Invoice email error:", detail, invoiceRes.data);
+              Sentry.captureException(new Error("Invoice email failed: " + detail), {
+                extra: { booking_id: createdBooking.id, ref, invoice_number: invoiceNumber, email: email.trim().toLowerCase(), resend: invoiceRes.data },
+              });
             }
           } catch (e) {
             console.error("Invoice email failed:", e);
+            Sentry.captureException(e, { extra: { booking_id: createdBooking.id, ref, invoice_number: invoiceNumber, stage: "invoice_email" } });
           }
         }
 

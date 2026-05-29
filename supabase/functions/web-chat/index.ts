@@ -145,7 +145,7 @@ function fmtDate(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return 
 function fmtTime(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
 function dateKey(iso) { const d = new Date(iso); return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: _requestTimezone }).format(d); }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
-function normP(p) { if (!p) return ""; let c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c; }
+function normP(p) { if (!p) return ""; let c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c ? "+" + c : ""; }
 function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any): string | null {
   if (faq) {
     if (Array.isArray(faq)) {

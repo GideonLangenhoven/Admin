@@ -2176,10 +2176,12 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       : undefined;
     const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail, unsubForHeader);
     if (!result.ok) {
-      // Surface the upstream failure to the caller so broadcast / chain
-      // callers can count delivered-vs-attempted correctly instead of
-      // trusting an optimistic 200.
-      return new Response(JSON.stringify({ ok: false, error: result.error || "send_failed", message: result.message, status: result.status }), { status: 200, headers: getCors(req) });
+      // Surface the upstream failure to the caller as a non-2xx so that
+      // supabase.functions.invoke sets `.error` and callers can't mistake a
+      // failed send for success. Body keeps the original Resend status for
+      // diagnostics. (Auth-hook "skipped" and invalid_email stay 200 — those
+      // are not Resend send failures.)
+      return new Response(JSON.stringify({ ok: false, error: result.error || "send_failed", message: result.message, status: result.status }), { status: 502, headers: getCors(req) });
     }
     return new Response(JSON.stringify({ ok: true, id: result.id }), { status: 200, headers: getCors(req) });
   } catch (err: unknown) {
