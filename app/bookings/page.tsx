@@ -1693,7 +1693,15 @@ export default function Bookings() {
                   type="number"
                   min={1}
                   value={editForm.qty}
-                  onChange={(e) => setEditForm((p) => ({ ...p, qty: e.target.value }))}
+                  onChange={(e) => setEditForm((p) => {
+                    // Rescale Total by the original per-person rate so reducing/
+                    // raising guests can't leave a stale amount (financial bug).
+                    // Admin can still override Total manually afterwards.
+                    const baseQty = editBooking?.qty || 1;
+                    const perPerson = baseQty > 0 ? Number(editBooking?.total_amount || 0) / baseQty : 0;
+                    const q = Math.max(1, Number(e.target.value) || 1);
+                    return { ...p, qty: e.target.value, total_amount: (perPerson * q).toFixed(2) };
+                  })}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
