@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const upd = await supabase.from("bookings")
-      .update({ status: "PAID" })
+      .update({ status: "PAID", payment_status: "CAPTURED" })
       .eq("id", booking.id)
       .neq("status", "PAID")
       .select("id")

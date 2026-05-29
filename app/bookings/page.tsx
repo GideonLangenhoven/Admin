@@ -745,6 +745,47 @@ export default function Bookings() {
       return;
     }
 
+    // Notify the customer their details changed (spec: BOOKING_UPDATED email).
+    // Skipped on a PAID transition — manual-mark-paid already sends a confirmation.
+    const detailsChanged =
+      updateData.customer_name !== (editBooking.customer_name || "") ||
+      updateData.phone !== (editBooking.phone || "") ||
+      updateData.email !== (editBooking.email || "").toLowerCase() ||
+      qty !== editBooking.qty;
+    if (detailsChanged && !isChangingToPaid && editForm.email.trim()) {
+      const changed: string[] = [];
+      if (updateData.customer_name !== (editBooking.customer_name || "")) changed.push("name");
+      if (updateData.email !== (editBooking.email || "").toLowerCase()) changed.push("email");
+      if (updateData.phone !== (editBooking.phone || "")) changed.push("contact number");
+      if (qty !== editBooking.qty) changed.push("guest count");
+      const startIso = editBooking.slots?.start_time;
+      try {
+        const updRes = await supabase.functions.invoke("send-email", {
+          body: {
+            type: "BOOKING_UPDATED",
+            data: {
+              business_id: businessId,
+              email: editForm.email.trim().toLowerCase(),
+              customer_name: editForm.customer_name.trim() || "Customer",
+              ref: editBooking.id.substring(0, 8).toUpperCase(),
+              tour_name: editBooking.tours?.name || "Booking",
+              start_time: startIso ? fmtDate(startIso) + ", " + fmtTime(startIso) : "See your confirmation",
+              event: "updated",
+              message: "Your booking details have been updated (" + changed.join(", ") + ").",
+            },
+          },
+        });
+        if (updRes.error || updRes.data?.ok === false) {
+          const detail = updRes.error?.message || updRes.data?.message || updRes.data?.error || "unknown";
+          console.error("Booking updated email error:", detail, updRes.data);
+          notify({ title: "Update email not sent", message: "Saved, but the customer notification failed: " + detail, tone: "warning", duration: 8000 });
+        }
+      } catch (e) {
+        console.error("Booking updated email failed:", e);
+        notify({ title: "Update email not sent", message: "Saved, but the customer notification could not be sent.", tone: "warning", duration: 8000 });
+      }
+    }
+
     if (shouldInvalidatePaymentLink) {
       // Note: Yoco Checkout API does not currently support cancelling an existing checkout.
       // The old checkout link will simply expire or fail if the customer tries to use it.

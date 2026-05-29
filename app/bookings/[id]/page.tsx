@@ -411,13 +411,45 @@ export default function BookingDetailPage() {
       })
       .eq("id", booking.id);
     if (!updateError) {
-      setBooking({
-        ...booking,
-        customer_name: customerDraft.name.trim(),
-        phone: customerDraft.phone.trim(),
-        email: customerDraft.email.trim().toLowerCase(),
-      });
+      const newName = customerDraft.name.trim();
+      const newPhone = customerDraft.phone.trim();
+      const newEmail = customerDraft.email.trim().toLowerCase();
+      const changed: string[] = [];
+      if (newName !== (booking.customer_name || "")) changed.push("name");
+      if (newEmail !== (booking.email || "").toLowerCase()) changed.push("email");
+      if (newPhone !== (booking.phone || "")) changed.push("contact number");
+      setBooking({ ...booking, customer_name: newName, phone: newPhone, email: newEmail });
       setEditingCustomer(false);
+
+      // Spec: notify the customer when their details change (BOOKING_UPDATED).
+      if (changed.length && newEmail) {
+        const startIso = booking.slots?.start_time;
+        try {
+          const updRes = await supabase.functions.invoke("send-email", {
+            body: {
+              type: "BOOKING_UPDATED",
+              data: {
+                business_id: booking.business_id,
+                email: newEmail,
+                customer_name: newName || "Customer",
+                ref: booking.id.substring(0, 8).toUpperCase(),
+                tour_name: booking.tours?.name || "Booking",
+                start_time: startIso ? fmtDate(startIso) + ", " + fmtTime(startIso) : "See your confirmation",
+                event: "updated",
+                message: "Your booking details have been updated (" + changed.join(", ") + ").",
+              },
+            },
+          });
+          if (updRes.error || updRes.data?.ok === false) {
+            const detail = updRes.error?.message || updRes.data?.message || updRes.data?.error || "unknown";
+            console.error("Booking updated email error:", detail, updRes.data);
+            notify({ title: "Update email not sent", message: "Saved, but the customer notification failed: " + detail, tone: "warning", duration: 8000 });
+          }
+        } catch (e) {
+          console.error("Booking updated email failed:", e);
+          notify({ title: "Update email not sent", message: "Saved, but the customer notification could not be sent.", tone: "warning", duration: 8000 });
+        }
+      }
     }
     setSavingCustomer(false);
   }
