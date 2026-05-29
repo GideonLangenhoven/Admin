@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guide-v1';
+const CACHE_NAME = 'guide-v2';
 const PRECACHE = ['/guide', '/guide/manifest.webmanifest'];
 
 self.addEventListener('install', function(event) {
@@ -43,13 +43,18 @@ function syncCheckIns() {
     let chain = Promise.resolve();
     all.forEach(function(item) {
       chain = chain.then(function() {
+        var headers = { 'Content-Type': 'application/json' };
+        if (item.token) headers['Authorization'] = 'Bearer ' + item.token;
         return fetch('/api/guide/check-in', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify(item.payload),
           credentials: 'include',
         }).then(function(r) {
-          if (r.ok) return openDb().then(function(db) { return idbDelete(db, item.id); });
+          // Drop on success or non-retryable client error (e.g. expired token) so we don't loop forever.
+          if (r.ok || (r.status >= 400 && r.status < 500)) {
+            return openDb().then(function(db) { return idbDelete(db, item.id); });
+          }
         }).catch(function() {});
       });
     });
