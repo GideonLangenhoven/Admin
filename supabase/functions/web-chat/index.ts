@@ -112,6 +112,7 @@ async function getBusinessSiteUrls(businessId) {
     bookingSuccessUrl: data?.booking_success_url || (bookingSiteUrl ? bookingSiteUrl + "/success" : BOOKING_SUCCESS_URL),
     bookingCancelUrl: data?.booking_cancel_url || (bookingSiteUrl ? bookingSiteUrl + "/cancelled" : BOOKING_CANCEL_URL),
     voucherSuccessUrl: data?.voucher_success_url || (bookingSiteUrl ? bookingSiteUrl + "/voucher-confirmed" : VOUCHER_SUCCESS_URL),
+    termsUrl: bookingSiteUrl ? bookingSiteUrl + "/terms" : "",
   };
 }
 async function getBusinessWaiverLink(businessId, bookingId, waiverToken) {
@@ -811,7 +812,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
         ft = serverTotal;
 
         // L18: Store group discount fields; L20: Store total_captured/total_refunded
-        const { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "GROUP_5PCT" : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", custom_fields: ns.custom_fields || {} }).select().single();
+        const { data: bk } = await db.from("bookings").insert({ business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "GROUP_5PCT" : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", terms_accepted_at: new Date().toISOString(), custom_fields: ns.custom_fields || {} }).select().single();
+        // Tacit Terms acceptance for conversational checkout: the timestamp above
+        // records consent; this notice (shown with the confirmation/payment step)
+        // is the displayed evidence that the customer was told before paying.
+        const ckSiteUrls = bk ? await getBusinessSiteUrls(businessId) : null;
+        const termsNotice = ckSiteUrls?.termsUrl ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + ckSiteUrls.termsUrl : "";
         if (!bk) { reply = "Something went wrong — try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {
           // H1 (MVP fix): capacity check MUST run BEFORE voucher deduction.
@@ -847,7 +853,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           // L1: Use dynamic meeting point instead of hardcoded address
           const wcLoc = requestTenant?.business?.location_phrase; const wcWtb = requestTenant?.business?.what_to_bring;
           if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
-          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!"); ns = { step: "IDLE" };
+          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + termsNotice; ns = { step: "IDLE" };
         } else {
           // Atomic capacity check + hold creation to prevent overbooking
           const holdRes = await db.rpc("create_hold_with_capacity_check", {
@@ -871,7 +877,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
             pay = yd.redirectUrl;
             // M9: Generate waiver link for paid bookings
             const paidWaiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
-            reply = "🙌 Spots held for 15 minutes!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nClick below to complete payment." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "");
+            reply = "🙌 Spots held for 15 minutes!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nClick below to complete payment." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "") + termsNotice;
           }
           else {
             // Surface the real reason from create-checkout instead of the

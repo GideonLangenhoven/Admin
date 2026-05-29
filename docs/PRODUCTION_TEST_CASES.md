@@ -1,8 +1,10 @@
 # Cape Kayak — Production Readiness Test Cases
 
-> **310 test cases across 42 sections.**
-> Work through in order: A–E (core booking flows), F–M (booking lifecycle), N–Z (admin features & platform), AA–AP (new features, edge cases & sign-off).
+> **389 test cases across 53 sections.**
+> Work through in order: A–E (core booking flows), F–M (booking lifecycle), N–Z (admin features & platform), AA–AP (new features, edge cases & functional sign-off), AQ–BA (non-functional / operational readiness).
 > When all pass, the app is production-ready and can be sold with confidence.
+>
+> **Sections A–AP prove the features work. Sections AQ–BA prove the app survives production:** performance, backups, monitoring, deploys, compatibility, accessibility, deliverability, infrastructure, failure handling, financial integrity, and legal compliance. An MVP that passes only A–AP is demo-ready, not sale-ready.
 
 ---
 
@@ -669,6 +671,164 @@
 
 ---
 
+## SECTION AQ: PERFORMANCE & LOAD
+
+> Functional tests prove a feature works once. These prove it works under real traffic and data volume.
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AQ1 | Booking site cold load | Open booking site on throttled 4G (DevTools) | LCP < 2.5s, interactive < 3.5s, no layout shift on hero | |
+| AQ2 | Slot calendar at volume | Generate 90 days of slots → open customer date picker | Calendar renders < 1s, scrolling smooth, no jank | |
+| AQ3 | Admin bookings list at scale | Seed 1,000+ bookings → open /bookings | Paginates/virtualizes, first paint < 2s, filters responsive | |
+| AQ4 | Concurrent checkout | Fire 50 simultaneous create-checkout calls for same tour | All resolve correctly, holds atomic, no 5xx, no double-allocation | |
+| AQ5 | Marketing dispatch throughput | Queue 500 emails → let marketing-dispatch cron run | Processed within function timeout, no partial-send corruption | |
+| AQ6 | Availability sync window | Trigger Viator/GYG availability sync for 90-day range | Completes within Deno function timeout, no truncated push | |
+| AQ7 | Image proxy caching | Load same /api/img URL repeatedly | Subsequent loads served from cache, low latency, allowlist still enforced | |
+| AQ8 | Manifest query speed | Open dashboard on a day with a full slate of bookings | Daily manifest loads < 1s, pax counts correct | |
+
+---
+
+## SECTION AR: RELIABILITY, BACKUPS & DISASTER RECOVERY
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AR1 | Automated backups enabled | Check Supabase project backup / PITR settings | Daily backups + point-in-time recovery enabled and recent | |
+| AR2 | Restore drill | Restore latest backup into a staging project | Data restores intact, app boots against it, row counts match | |
+| AR3 | Encryption key stored separately | Confirm SETTINGS_ENCRYPTION_KEY location | Key stored outside DB backups (not recoverable from backup alone) | |
+| AR4 | Encrypted columns survive restore | After AR2 restore, decrypt Paysafe / OTA api_key_encrypted | Decrypts correctly with the key, no corruption | |
+| AR5 | Webhook replay after outage | Replay payment webhooks queued during a simulated outage | idempotency_keys prevent duplicate bookings / charges | |
+| AR6 | Cron catch-up | Block cron-tasks for 20 min → re-enable | Expired holds released, deadlines processed; no permanently-lost work | |
+| AR7 | RPO/RTO documented | Review recovery objectives for the business | Max acceptable data loss + downtime defined and met by AR1–AR2 | |
+
+---
+
+## SECTION AS: MONITORING, LOGGING & ALERTING
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AS1 | Error tracking live | Throw a test error in an edge function + frontend | Captured in error tracker with stack + tenant context | |
+| AS2 | Uptime monitoring | Configure uptime checks on booking site, admin, key APIs | Monitors green; downtime would alert | |
+| AS3 | Payment webhook failure alert | Force a payment webhook to 5xx | Alert fires to ops channel/email | |
+| AS4 | Cron failure / miss alert | Make a cron function fail | Failure (and missed run) raises an alert | |
+| AS5 | Failed-notification surfacing | Trigger an email + WhatsApp send failure | Logged in failed_notifications and visible to admin (see AM) | |
+| AS6 | Log retention & query | Inspect edge function logs for a past event | Logs retained long enough and queryable for debugging | |
+| AS7 | Settlement mismatch alert | Simulate Yoco/Paysafe amount ≠ booking total | Reconciliation flags mismatch for review | |
+| AS8 | No secrets/PII in logs | Grep recent logs for keys, tokens, full card/PII | None present; sensitive values masked or omitted | |
+
+---
+
+## SECTION AT: DEPLOYMENT, CI/CD & ROLLBACK
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AT1 | Production build | Run npm run build for admin + booking apps | Both build with no errors | |
+| AT2 | Type check & lint | Run type check + lint | Pass clean (no errors blocking deploy) | |
+| AT3 | Security drift gate | Run npm run check-security-drift against prod DB | Exits 0 — live RLS matches security-baseline.json | |
+| AT4 | Migrations on fresh DB | Apply all migrations to an empty database | Apply cleanly in order, no failures, schema correct | |
+| AT5 | Env vars complete | Verify required env vars in admin, booking, and edge fn environments | All present; secrets only in edge fn env, never client bundle | |
+| AT6 | Rollback | Redeploy the previous release | Prior version restores, no data migration breakage | |
+| AT7 | verify_jwt config correct | Audit config.toml against intended public endpoints | Only cron/public endpoints have verify_jwt = false | |
+| AT8 | Zero-downtime deploy | Deploy while a checkout is in flight | In-flight booking + webhook complete without error | |
+
+---
+
+## SECTION AU: BROWSER & DEVICE COMPATIBILITY
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AU1 | Chrome (desktop) | Run core booking flow in Chrome | Full flow works, no console errors | |
+| AU2 | Safari (desktop) | Run core booking flow in Safari | Full flow works (dates, payment redirect, modals) | |
+| AU3 | Firefox (desktop) | Run core booking flow in Firefox | Full flow works | |
+| AU4 | iOS Safari | Run booking flow on iPhone Safari | Layout, date picker, Yoco redirect all work | |
+| AU5 | Android Chrome | Run booking flow on Android Chrome | Full flow works | |
+| AU6 | Payment redirect on mobile | Complete Yoco checkout on a phone | Redirect back to /success works (no broken deep link) | |
+| AU7 | WhatsApp links on mobile | Tap a wa.me / booking link from WhatsApp on a phone | Opens correct page, session intact | |
+
+---
+
+## SECTION AV: ACCESSIBILITY (WCAG AA)
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AV1 | Keyboard-only booking | Complete a booking using only the keyboard | All steps reachable, logical tab order, no traps | |
+| AV2 | Form labels & ARIA | Inspect booking + waiver inputs | Every input has an associated label / aria-label | |
+| AV3 | Color contrast | Check text vs brand colors with a contrast tool | Meets WCAG AA (4.5:1 body, 3:1 large) — incl. tenant brand colors | |
+| AV4 | Screen reader summary | Navigate checkout + success with a screen reader | Price summary and confirmation read out meaningfully | |
+| AV5 | Visible focus states | Tab through interactive elements | Focus indicator visible on all controls | |
+| AV6 | Error announcement | Submit an invalid form | Errors announced to assistive tech, not color-only | |
+
+---
+
+## SECTION AW: SEO, METADATA & EMAIL DELIVERABILITY
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AW1 | Per-tenant page metadata | View source of a tenant booking site | Title + meta description reflect that business | |
+| AW2 | Open Graph / share preview | Paste booking URL into a link-preview tool | OG title, description, image render correctly | |
+| AW3 | Favicon & branding | Load booking site | Tenant favicon/logo present, no broken default | |
+| AW4 | robots & sitemap | Fetch /robots.txt and /sitemap.xml | Sensible robots policy; sitemap valid (or intentionally absent) | |
+| AW5 | SPF record | Check DNS SPF for sending domain | Resend/sending IPs authorized | |
+| AW6 | DKIM signing | Inspect a received email's headers | DKIM present and passes | |
+| AW7 | DMARC policy | Check DNS DMARC record | Policy published (at least p=none with reporting) | |
+| AW8 | Inbox placement | Send confirmation to Gmail + Outlook test accounts | Lands in inbox, not spam; from-name correct | |
+
+---
+
+## SECTION AX: DOMAIN, SSL & INFRASTRUCTURE
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AX1 | HTTPS enforced | Request http:// version of booking + admin | Redirects to https://, HSTS sent | |
+| AX2 | Valid TLS cert | Check cert on apex domain | Valid, not expiring soon, correct chain | |
+| AX3 | Wildcard subdomain cert | Load two different tenant subdomains over HTTPS | Both serve valid cert (*.bookingtours.co.za) | |
+| AX4 | Subdomain → tenant routing | Hit subdomain + flattened subdomain forms | Correct business resolved (see AD6/AD7) | |
+| AX5 | Custom from_email domain verified | Configure a tenant custom from_email | Domain verified at provider; sends succeed | |
+| AX6 | Static asset caching | Inspect cache headers on JS/CSS/images | Long-cache + fingerprinting on immutable assets | |
+| AX7 | Custom 404 / 500 pages | Visit a missing route + force a server error | Branded 404 and 500 pages, no framework default | |
+
+---
+
+## SECTION AY: ERROR HANDLING & GRACEFUL DEGRADATION
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AY1 | Payment provider down | Simulate Yoco API failure during create-checkout | Friendly error shown, no booking lost, hold preserved/released cleanly | |
+| AY2 | Resend down | Simulate email provider failure on confirmation | Booking still confirms (PAID); notification queued/logged for retry | |
+| AY3 | WhatsApp API down | Simulate Meta API failure on send | Logged in failed_notifications; email path unaffected | |
+| AY4 | DB transient error | Simulate a brief DB error mid-request | Retried or surfaced cleanly; no corrupt partial state | |
+| AY5 | Network drop mid-checkout | Kill network after pay, before redirect | Webhook still confirms; no double-charge; success reachable later | |
+| AY6 | 404 UX | Hit a bad customer URL | Branded page with a path back to booking | |
+| AY7 | 500 UX & no leak | Force a server error | Branded error page; no stack trace / secrets exposed to client | |
+
+---
+
+## SECTION AZ: FINANCIAL INTEGRITY & RECONCILIATION
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| AZ1 | Currency unit consistency | Audit how ZAR amounts are stored across tables | Consistent (cents vs decimal) — no mixed units in calculations | |
+| AZ2 | VAT rounding | Verify 15% VAT breakdown on several invoices | Rounds to the cent; line items + VAT = grand total exactly | |
+| AZ3 | Discount stack reconciles | Book with add-ons + promo + voucher | Charged amount = base + add-ons − promo − voucher, to the cent | |
+| AZ4 | Combo split exactness | Inspect a Paysafe combo settlement | split_a + split_b = combo_price exactly, no rounding leak | |
+| AZ5 | Refund cap | Attempt refund > amount paid | Blocked; refund can never exceed captured amount | |
+| AZ6 | Voucher non-negative | Drain a voucher to zero, then attempt reuse | Balance never goes negative; over-spend prevented (see AA15) | |
+| AZ7 | Invoice vs settlement | Compare a day's invoice totals to provider settlement report | Totals reconcile; discrepancies flagged | |
+
+---
+
+## SECTION BA: LEGAL & COMPLIANCE OPERATIONS
+
+| # | Test | Steps | Expected Result | Pass? |
+|---|------|-------|-----------------|-------|
+| BA1 | Cookie consent | Load booking site as a new visitor | Cookie/consent notice shown per POPIA; choice persisted | |
+| BA2 | Terms acceptance captured | Complete a booking | Acceptance of terms recorded on the booking | |
+| BA3 | Legal pages live | Visit /privacy, /terms, /cookies on a tenant site | All render with tenant-specific, current content | |
+| BA4 | POPIA request end-to-end | Run access + delete request through full flow | Confirmed → fulfilled/anonymized (see Section AK) | |
+| BA5 | Data retention | Verify old PII anonymization policy + cron | Stale personal data anonymized per defined retention window | |
+| BA6 | Marketing consent honored | Unsubscribe a contact → run a campaign | Unsubscribed contact excluded from all future sends | |
+
+---
+
 ## ROUTE REFERENCE — MANUAL TESTING URLs
 
 ### Admin Dashboard (localhost:3000)
@@ -754,7 +914,7 @@
 |---|---|
 | **Tested by** | _________________________ |
 | **Date** | _________________________ |
-| **Total passed** | ______ / 310 |
+| **Total passed** | ______ / 389 |
 | **Blockers found** | _________________________ |
 | **Notes** | _________________________ |
 | **Production ready** | Yes / No |

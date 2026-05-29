@@ -2004,9 +2004,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
         marketing_opt_in: null, total_captured: 0, total_refunded: 0,
+        terms_accepted_at: new Date().toISOString(),
       }).select().single();
       if (br2.error || !br2.data) { console.error("Err:", JSON.stringify(br2.error)); await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
       const booking = br2.data;
+      // Tacit Terms acceptance for conversational checkout: the timestamp above
+      // records consent; this notice (sent with the confirmation/payment step)
+      // is the displayed evidence that the customer was told before paying.
+      const waTermsBase = String(tenant.business.booking_site_url || "").replace(/\/+$/, "");
+      const termsNotice = waTermsBase ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + waTermsBase + "/terms" : "";
 
       // VOUCHER BOOKING — skip payment
       if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
@@ -2071,7 +2077,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           (waiverLink ? "\u{1F4DD} Waiver: " + waiverLink + "\n\n" : "") +
           "\u{1F4CD} *Meeting Point:* " + (tenant.business.directions || "Check your confirmation details from " + businessName(tenant) + " for arrival instructions.") + "\n\n" +
           ((tenant.business as any).what_to_bring ? "\u{1F392} *Bring:* " + (tenant.business as any).what_to_bring + "\n\n" : "") +
-          (tenant.business.location_phrase ? "See you " + tenant.business.location_phrase + "!" : "See you soon!")
+          (tenant.business.location_phrase ? "See you " + tenant.business.location_phrase + "!" : "See you soon!") +
+          termsNotice
         );
         // Send confirmation email
         try {
@@ -2115,7 +2122,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable \u2014 type *speak to us* for help"; }
       const ref = booking.id.substring(0, 8).toUpperCase();
-      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
+      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
     }
