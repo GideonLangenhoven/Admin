@@ -5303,7 +5303,7 @@
       "cmd": "UPDATE",
       "roles": "{anon}",
       "qual": "(status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))",
-      "with_check": "true"
+      "with_check": "(status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text]))"
     },
     {
       "schemaname": "public",
