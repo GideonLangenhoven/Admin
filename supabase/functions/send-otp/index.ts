@@ -71,7 +71,7 @@ async function issueOtpAttempt(input: {
   const code = generateOtpCode();
   const expiresTs = Date.now() + OTP_TTL_MS;
   const token = createOpaqueOtpToken();
-  await insertOtpAttempt(supabase, OTP_SECRET, {
+  const tokenHash = await insertOtpAttempt(supabase, OTP_SECRET, {
     token,
     businessId: input.businessId,
     email: input.email,
@@ -81,7 +81,7 @@ async function issueOtpAttempt(input: {
     ipAddress: input.ipAddress,
     purpose: input.purpose,
   });
-  return { token, code };
+  return { token, code, tokenHash };
 }
 
 /* ── Email template ── */
@@ -153,13 +153,20 @@ Deno.serve(async (req) => {
       });
 
       // Always issue an opaque token and return 200. Only matched customers get emailed.
-      const { token, code } = await issueOtpAttempt({
+      const { token, code, tokenHash } = await issueOtpAttempt({
         businessId: business.id,
         email,
         phoneTail,
         ipAddress: clientIp,
         purpose: "my_bookings",
       });
+
+      // Record the send outcome on the attempt row so a swallowed Resend failure is
+      // diagnosable server-side (see migration 20260530130000). The client still always
+      // gets 200 below — send_error never leaks match-vs-no-match to the caller.
+      async function recordSendOutcome(outcome: string) {
+        await supabase.from("otp_attempts").update({ send_error: outcome }).eq("token_hash", tokenHash);
+      }
 
       // Only send the email if bookings matched — but always return 200
       if (matched.length > 0) {
@@ -175,10 +182,15 @@ Deno.serve(async (req) => {
         });
 
         if (!res.ok) {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
+          await recordSendOutcome(res.status + ":" + JSON.stringify(errData).slice(0, 500));
           // Still return 200 with token — don't leak send failure vs no-match
+        } else {
+          await recordSendOutcome("SENT_OK");
         }
+      } else {
+        await recordSendOutcome("NO_RECIPIENT_MATCH");
       }
 
       return respond(200, { success: true, token });
