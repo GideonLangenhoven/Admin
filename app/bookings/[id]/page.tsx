@@ -60,6 +60,7 @@ interface BookingDetail {
   waiver_status: string;
   waiver_signed_at: string | null;
   waiver_signed_name: string | null;
+  waiver_payload: Record<string, unknown> | null;
   invoice_id: string | null;
   created_by_admin_name: string | null;
   created_by_admin_email: string | null;
@@ -1111,6 +1112,39 @@ export default function BookingDetailPage() {
           />
           <InfoRow label="Signed by" value={booking.waiver_signed_name || "Not signed yet"} />
           <InfoRow label="Signed at" value={booking.waiver_signed_at ? fmtDateTime(booking.waiver_signed_at) : "Not signed yet"} />
+          {(() => {
+            const wp = booking.waiver_payload;
+            if (!wp || booking.waiver_status !== "SIGNED") return null;
+            const calcAge = (dob: string) => {
+              const b = new Date(dob);
+              if (!dob || isNaN(b.getTime())) return -1;
+              const t = new Date();
+              let a = t.getFullYear() - b.getFullYear();
+              const m = t.getMonth() - b.getMonth();
+              if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
+              return a;
+            };
+            const dobs = Array.isArray(wp.participant_dobs) ? (wp.participant_dobs as string[]) : [];
+            const minors = dobs.map(calcAge).filter((a) => a >= 0 && a < 18);
+            return (
+              <>
+                {wp.id_number ? <InfoRow label="Signer ID / Passport" value={String(wp.id_number)} /> : null}
+                {minors.length > 0 ? (
+                  <InfoRow
+                    label="Minors on booking"
+                    value={
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                        {minors.length} minor{minors.length === 1 ? "" : "s"} ({minors.join(", ")}y)
+                      </Badge>
+                    }
+                  />
+                ) : null}
+                {wp.guardian_name ? <InfoRow label="Guardian" value={String(wp.guardian_name)} /> : null}
+                {wp.guardian_id_number ? <InfoRow label="Guardian ID / Passport" value={String(wp.guardian_id_number)} /> : null}
+                {wp.guardian_signature ? <InfoRow label="Guardian signature" value={String(wp.guardian_signature)} /> : null}
+              </>
+            );
+          })()}
           {booking.custom_fields && Object.keys(booking.custom_fields).length > 0 ? (
             <div className="mt-3 space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
               {Object.entries(booking.custom_fields).map(([key, value]) => (
