@@ -117,6 +117,18 @@ Deno.serve(async (req: any) => {
         }
         let serverTotal = basePrice * Number(bk.qty || 1);
 
+        // Include add-on line items (priced at booking time) so the server total
+        // matches what the customer selected. Omitting these undercharges the booking.
+        const addOnRows = await supabase
+          .from("booking_add_ons")
+          .select("unit_price, qty")
+          .eq("booking_id", bookingId);
+        if (addOnRows.data?.length) {
+          for (const ao of addOnRows.data) {
+            serverTotal += Number(ao.unit_price || 0) * Number(ao.qty || 0);
+          }
+        }
+
         // Apply promo code if provided (before other discounts)
         if (promoCode) {
           const promoResult = await supabase.rpc("validate_promo_code", {

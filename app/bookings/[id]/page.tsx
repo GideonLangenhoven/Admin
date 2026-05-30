@@ -494,8 +494,9 @@ export default function BookingDetailPage() {
         // Deduct voucher balance atomically
         const { data: rpcRes } = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: deduction });
         if (!rpcRes?.success) {
-          // Fallback: mark as redeemed
-          await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_booking_id: booking.id }).eq("id", voucher.id);
+          // Redemption failed (expired / not active / no balance). Do NOT mark
+          // REDEEMED — that strands the remaining balance and hides the failure.
+          console.error("VOUCHER_DEDUCT_FAILED:", voucher.id, rpcRes?.error);
         } else {
           await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
         }

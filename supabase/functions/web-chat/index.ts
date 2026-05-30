@@ -842,7 +842,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
             if (chatRpcRes.data?.success) {
               await db.from("vouchers").update({ redeemed_booking_id: bk.id }).eq("id", ns.vid);
             } else {
-              await db.from("vouchers").update({ status: "REDEEMED", redeemed_at: now.toISOString(), redeemed_booking_id: bk.id }).eq("id", ns.vid);
+              // Redemption failed — do NOT mark REDEEMED (strands balance + hides failure).
+              console.error("VOUCHER_DEDUCT_FAILED:", ns.vid, chatRpcRes.data?.error);
             }
           }
           const waiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);

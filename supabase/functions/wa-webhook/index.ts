@@ -2048,8 +2048,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
               try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + (waVCode.data?.code || allVIds[vi]) + "* has *R" + waNewBal + "* remaining. Use it on your next booking!"); } catch (e) { }
             }
           } else {
-            // Fallback: mark as redeemed if RPC fails (voucher may not exist)
-            await supabase.from("vouchers").update({ status: "REDEEMED", redeemed_at: new Date().toISOString(), redeemed_by_phone: phone, redeemed_booking_id: booking.id }).eq("id", allVIds[vi]);
+            // Redemption failed — do NOT mark REDEEMED (strands balance + hides failure).
+            console.error("VOUCHER_DEDUCT_FAILED:", allVIds[vi], waRpcRes.data?.error);
           }
         }
         const vref = booking.id.substring(0, 8).toUpperCase();
