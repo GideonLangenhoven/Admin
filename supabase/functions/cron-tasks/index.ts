@@ -250,6 +250,63 @@ async function cleanupAbandonedVouchers() {
   return results;
 }
 
+// ─── COMPLETE PAST BOOKINGS: PAID/CONFIRMED -> COMPLETED once the tour has ended ───
+// A booking is "completed" when its slot start + tour duration + a grace buffer is
+// in the past. We stamp completed_at with the historical tour-end time (not now), so
+// review auto-messages fire relative to when the tour actually finished. Backfilled
+// past bookings therefore land outside the review window and won't trigger late sends.
+async function completePastBookings() {
+  const results = { completed: 0 };
+  const DEFAULT_DURATION_MIN = 120;
+  const GRACE_MS = 2 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const { data: candidates } = await supabase
+    .from("bookings")
+    .select("id, business_id, slots!inner(start_time), tours(duration_minutes)")
+    .in("status", ["PAID", "CONFIRMED"])
+    .lt("slots.start_time", new Date(now).toISOString())
+    .order("created_at", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
+
+  for (const b of (candidates || [])) {
+    const slot = Array.isArray((b as any).slots) ? (b as any).slots[0] : (b as any).slots;
+    const tour = Array.isArray((b as any).tours) ? (b as any).tours[0] : (b as any).tours;
+    const startIso = slot?.start_time;
+    if (!startIso) continue;
+
+    const durationMin = Number(tour?.duration_minutes) > 0 ? Number(tour.duration_minutes) : DEFAULT_DURATION_MIN;
+    const endMs = new Date(startIso).getTime() + durationMin * 60 * 1000;
+    if (endMs + GRACE_MS > now) continue;
+
+    const completedAtIso = new Date(endMs).toISOString();
+    const { error: updErr } = await supabase
+      .from("bookings")
+      .update({ status: "COMPLETED", completed_at: completedAtIso })
+      .eq("id", b.id)
+      .eq("business_id", b.business_id);
+
+    // A per-row failure (e.g. a chat booking that fails the pricing guard) must
+    // not stall the rest of the batch — log and move on.
+    if (updErr) {
+      console.warn("BOOKING_COMPLETE_SKIP booking=" + b.id + " err=" + updErr.message);
+      continue;
+    }
+
+    await supabase.from("logs").insert({
+      business_id: b.business_id,
+      booking_id: b.id,
+      event: "booking_completed",
+      payload: { completed_at: completedAtIso, duration_min: durationMin, slot_start: startIso },
+    });
+
+    results.completed += 1;
+  }
+
+  if (results.completed > 0) console.log("BOOKING_COMPLETE: marked " + results.completed + " bookings COMPLETED");
+  return results;
+}
+
 // ─── AUTO-TAGGING: Sync booking behaviour to marketing contact tags ───
 // Runs daily via cron. Assigns tags that power automations:
 //   completed-tour   — booking slot has passed, status PAID/CONFIRMED
@@ -470,7 +527,7 @@ async function autoTagContacts() {
 }
 
 Deno.serve(withSentry("cron-tasks", async (_req) => {
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, auto_tags: null, errors: [] };
+  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   try {
     const reminderRes = await fetch(SUPABASE_URL + "/functions/v1/auto-messages", {
@@ -505,6 +562,14 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const completed = await completePastBookings();
+    results.bookings_completed = completed.completed;
+  } catch (error) {
+    console.error("BOOKING_COMPLETE_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

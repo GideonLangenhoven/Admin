@@ -203,7 +203,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
     if (endTime > twoHoursAgo || endTime < sixHoursAgo) continue;
     if (await alreadySent(booking.id, "REVIEW_REQUEST")) continue;
 
-    await db.from("bookings").update({ status: "COMPLETED" }).eq("id", booking.id).in("status", ["PAID", "CONFIRMED"]);
+    await db.from("bookings").update({ status: "COMPLETED", completed_at: new Date(endTime).toISOString() }).eq("id", booking.id).in("status", ["PAID", "CONFIRMED"]);
 
     const firstName = String(booking.customer_name || "").split(" ")[0] || "there";
     const customerName = String(booking.customer_name || "").trim() || null;
