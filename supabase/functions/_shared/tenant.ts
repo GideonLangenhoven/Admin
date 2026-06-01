@@ -409,6 +409,42 @@ export function formatTenantDate(business: TenantBusiness | null | undefined, is
   });
 }
 
+// L3 audit: record every outbound WhatsApp attempt so delivery is provable.
+// Must never throw — a failed audit write must not break the actual send.
+export async function recordWaMessage(
+  businessId: string | null | undefined,
+  entry: {
+    to: string;
+    kind: "text" | "template" | "image";
+    templateName?: string | null;
+    body?: string | null;
+    status: "SENT" | "FAILED";
+    providerMessageId?: string | null;
+    error?: string | null;
+    bookingId?: string | null;
+  },
+) {
+  if (!businessId) return;
+  try {
+    let normalizedTo = String(entry.to || "").replace(/\D/g, "");
+    if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
+    const sb = createServiceClient();
+    await sb.from("wa_messages").insert({
+      business_id: businessId,
+      booking_id: entry.bookingId || null,
+      to_phone: normalizedTo,
+      kind: entry.kind,
+      template_name: entry.templateName || null,
+      body: entry.body || null,
+      status: entry.status,
+      provider_message_id: entry.providerMessageId || null,
+      error: entry.error || null,
+    });
+  } catch (e) {
+    console.error("WA_AUDIT_ERR", e);
+  }
+}
+
 // Send a pre-approved WhatsApp message template.
 // bodyParams maps to {{1}}, {{2}}, ... in the template body in order.
 export async function sendWhatsappTemplate(
@@ -439,7 +475,12 @@ export async function sendWhatsappTemplate(
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(data?.error?.message || "WhatsApp template send failed: " + templateName));
+  if (!res.ok) {
+    const errMsg = String(data?.error?.message || "WhatsApp template send failed: " + templateName);
+    await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "FAILED", error: errMsg });
+    throw new Error(errMsg);
+  }
+  await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
   return data;
 }
 
@@ -473,9 +514,12 @@ export async function sendWhatsappFreeformOrSignal(
     if (!res.ok) {
       const errCode = data?.error?.code;
       const windowClosed = errCode === 131047 || errCode === 131026;
-      return { ok: false, windowClosed: windowClosed, error: String(data?.error?.message || data?.message || "send failed") };
+      const errMsg = String(data?.error?.message || data?.message || "send failed");
+      await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
+      return { ok: false, windowClosed: windowClosed, error: errMsg };
     }
     const messageId = data?.messages?.[0]?.id || undefined;
+    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: messageId || null });
     return { ok: true, windowClosed: false, error: "", messageId };
   } catch (e: any) {
     return { ok: false, windowClosed: false, error: String(e?.message || e) };
@@ -580,9 +624,13 @@ export async function sendWhatsappTextForTenant(
     // 131026 = recipient hasn't messaged this number before
     if ((errCode === 131047 || errCode === 131026) && templateFallback) {
       console.log("WA 24h window closed — sending template fallback: " + templateFallback.name + " to " + normalizedTo);
+      // The template send records its own audit row.
       return await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
     }
-    throw new Error(String(data?.error?.message || data?.message || "WhatsApp send failed"));
+    const errMsg = String(data?.error?.message || data?.message || "WhatsApp send failed");
+    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
+    throw new Error(errMsg);
   }
+  await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
   return data;
 }

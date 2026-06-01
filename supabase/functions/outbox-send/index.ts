@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { recordWaMessage } from "../_shared/tenant.ts";
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const WA_TOKEN = Deno.env.get("WA_ACCESS_TOKEN")!;
@@ -29,12 +30,15 @@ Deno.serve(async () => {
         const result = await sendText(msg.phone, msg.message_body);
         if (result.messages && result.messages[0] && result.messages[0].id) {
           await supabase.from("outbox").update({ status: "SENT", sent_at: new Date().toISOString(), attempts: msg.attempts + 1 }).eq("id", msg.id);
+          await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "SENT", providerMessageId: result.messages[0].id, bookingId: msg.booking_id });
           sent++;
         } else {
           await supabase.from("outbox").update({ status: msg.attempts >= 2 ? "FAILED" : "PENDING", attempts: msg.attempts + 1 }).eq("id", msg.id);
+          await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "FAILED", error: String(result?.error?.message || "WhatsApp send failed"), bookingId: msg.booking_id });
         }
       } catch (e) {
         await supabase.from("outbox").update({ status: msg.attempts >= 2 ? "FAILED" : "PENDING", attempts: msg.attempts + 1 }).eq("id", msg.id);
+        await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "FAILED", error: String((e as Error)?.message || e), bookingId: msg.booking_id });
       }
     }
     return new Response(JSON.stringify({ processed: messages.length, sent: sent }), { status: 200 });

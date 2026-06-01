@@ -6,6 +6,7 @@ import {
   resolveBusinessSiteUrls,
   resolveTenantByWhatsappPayload,
   sendWhatsappFreeformOrSignal,
+  recordWaMessage,
   type TenantContext,
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
@@ -188,7 +189,9 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
   const data = await res.json();
   console.log("WA:" + JSON.stringify(data));
 
-  // If we get an error about outside the 24 hour window (code 131047 or similar), 
+  const auditBody = body?.text?.body || body?.interactive?.body?.text || null;
+
+  // If we get an error about outside the 24 hour window (code 131047 or similar),
   // we fallback to sending a generic template message to wake the user up.
   if (!res.ok && data.error && (data.error.code === 131047 || (data.error.message && data.error.message.includes("24")))) {
     console.log("Outside 24h window, sending template fallback...");
@@ -206,8 +209,12 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
         }
       })
     });
-    return await templateRes.json();
+    const templateData = await templateRes.json().catch(() => ({}));
+    await recordWaMessage(tenant.business.id, { to: to, kind: "template", templateName: "hello_world", body: auditBody, status: templateRes.ok ? "SENT" : "FAILED", providerMessageId: templateData?.messages?.[0]?.id || null, error: templateRes.ok ? null : String(templateData?.error?.message || "hello_world template failed") });
+    return templateData;
   }
+
+  await recordWaMessage(tenant.business.id, { to: to, kind: "text", body: auditBody, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed") });
 
   return data;
 }

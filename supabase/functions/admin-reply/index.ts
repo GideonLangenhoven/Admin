@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getTenantByBusinessId, getAdminAppOrigins } from "../_shared/tenant.ts";
+import { getTenantByBusinessId, getAdminAppOrigins, recordWaMessage } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -130,6 +130,7 @@ Deno.serve(async (req: Request) => {
                     }),
                 });
                 const templateData = await templateRes.json().catch(() => ({}));
+                await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "template", templateName: "admin_outreach", body: message, status: templateRes.ok ? "SENT" : "FAILED", providerMessageId: templateData?.messages?.[0]?.id || null, error: templateRes.ok ? null : String(templateData?.error?.message || "admin_outreach template failed") });
                 if (templateRes.ok) {
                     // Log the message so it appears in the chat thread
                     await supabase.from("chat_messages").insert({
@@ -152,8 +153,11 @@ Deno.serve(async (req: Request) => {
             }
 
             console.error("WhatsApp Error:", waData);
+            await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "FAILED", error: String(waData?.error?.message || "WhatsApp API Error") });
             return new Response(JSON.stringify({ ok: false, error: "WhatsApp API Error", details: waData }), { status: 200, headers: getCors(req) });
         }
+
+        await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "SENT", providerMessageId: waData?.messages?.[0]?.id || null });
 
         // Insert into chat_messages
         const { error: insertErr } = await supabase.from("chat_messages").insert({

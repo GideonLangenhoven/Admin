@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { recordWaMessage } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,12 +13,14 @@ const BUSINESS_ID = Deno.env.get("BUSINESS_ID")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function sendText(to: any, text: any) {
-  await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
+async function sendText(to: any, text: any, bookingId?: any) {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, type: "text", text: { body: text } }),
   });
+  const data = await res.json().catch(() => ({}));
+  await recordWaMessage(BUSINESS_ID, { to: to, kind: "text", body: text, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed"), bookingId: bookingId || null });
 }
 
 function verifySignature(params: any, receivedSig: any) {
@@ -133,7 +136,7 @@ Deno.serve(async (req: any) => {
         if (cancelSlot.data) {
           await supabase.from("slots").update({ held: Math.max(0, cancelSlot.data.held - booking.qty) }).eq("id", booking.slot_id);
         }
-        await sendText(booking.phone, "Your payment was cancelled. Your hold has been released.\n\nReply *menu* to start again.");
+        await sendText(booking.phone, "Your payment was cancelled. Your hold has been released.\n\nReply *menu* to start again.", bookingId);
       }
       await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: bookingId, event: "itn_status_" + paymentStatus, payload: params });
       return new Response("OK", { status: 200 });
@@ -188,7 +191,8 @@ Deno.serve(async (req: any) => {
       "\u{1F4CD} *Meeting Point:*\nThree Anchor Bay, Beach Road, Sea Point\nArrive 15 min early\n\n" +
       "\u{1F392} *Remember to bring:*\nSunscreen, hat, towel, water bottle\n\n" +
       "See you on the water! \u{1F30A}\n\n" +
-      "Need to change plans? Reply *menu* anytime."
+      "Need to change plans? Reply *menu* anytime.",
+      bookingId
     );
 
     // 6. Reset conversation state

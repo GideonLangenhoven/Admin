@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { recordWaMessage } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -9,20 +10,24 @@ const WA_TOKEN = Deno.env.get("WA_ACCESS_TOKEN")!;
 const WA_PHONE_ID = Deno.env.get("WA_PHONE_NUMBER_ID")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function sendText(to: any, t: any) {
-  await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
+async function sendText(businessId: any, to: any, t: any) {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, type: "text", text: { body: t } }),
   });
+  const data = await res.json().catch(() => ({}));
+  await recordWaMessage(businessId, { to: to, kind: "text", body: t, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed") });
 }
 
-async function sendImage(to: any, url: any, caption: any) {
-  await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
+async function sendImage(businessId: any, to: any, url: any, caption: any) {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, type: "image", image: { link: url, caption: caption } }),
   });
+  const data = await res.json().catch(() => ({}));
+  await recordWaMessage(businessId, { to: to, kind: "image", body: caption, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp image send failed") });
 }
 
 
@@ -56,9 +61,9 @@ Deno.serve(async (req: any) => {
       const firstName = (c.customer_name || "").split(" ")[0] || "there";
 
       if (photoUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-        await sendImage(c.phone, photoUrl, "Hey " + firstName + "! " + caption);
+        await sendImage(businessId, c.phone, photoUrl, "Hey " + firstName + "! " + caption);
       } else {
-        await sendText(c.phone,
+        await sendText(businessId, c.phone,
           "*Your trip photos are ready, " + firstName + "!*\n\n" +
           caption + "\n\n" + photoUrl + "\n\n" +
           "Loved it? Leave us a review: https://g.page/r/CWabH9a6u5DbEB0/review\n\n" +

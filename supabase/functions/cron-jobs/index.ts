@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { recordWaMessage } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -11,12 +12,14 @@ const BUSINESS_ID = Deno.env.get("BUSINESS_ID")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function sendText(to: any, text: any) {
-  await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
+async function sendText(to: any, text: any, bookingId?: any) {
+  const res = await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, type: "text", text: { body: text } }),
   });
+  const data = await res.json().catch(() => ({}));
+  await recordWaMessage(BUSINESS_ID, { to: to, kind: "text", body: text, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed"), bookingId: bookingId || null });
 }
 
 function fmtTime(iso: any) {
@@ -59,7 +62,7 @@ async function releaseExpiredHolds() {
     }
 
     // Notify customer
-    await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment wasn\u2019t received within 15 minutes.\n\nNo worries \u2014 reply *menu* to book again!");
+    await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment wasn\u2019t received within 15 minutes.\n\nNo worries \u2014 reply *menu* to book again!", h.booking_id);
 
     await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: h.booking_id, event: "hold_expired", payload: { hold_id: h.id } });
     console.log("CRON: Released hold " + h.id + " for booking " + h.booking_id);
@@ -103,7 +106,8 @@ async function sendReminders() {
       "\u{1F465} " + b.qty + " people\n\n" +
       "\u{1F4CD} *Meeting Point:*\nThree Anchor Bay, Beach Road, Sea Point\n\u2192 Arrive 15 min early\n\n" +
       "\u{1F392} *Don\u2019t forget:*\nSunscreen, hat, towel, water\n\n" +
-      "Need to change plans? Reply *reschedule* or *cancel*.\n\nSee you tomorrow! \u{1F30A}"
+      "Need to change plans? Reply *reschedule* or *cancel*.\n\nSee you tomorrow! \u{1F30A}",
+      b.id
     );
 
     await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: b.id, event: "reminder_sent", payload: { phone: b.phone } });
@@ -146,7 +150,8 @@ async function sendThankYous() {
       "\u{1F6F6} *Thanks for paddling with us, " + (b.customer_name || "").split(" ")[0] + "!*\n\n" +
       "We hope you had an amazing time on the water! \u{1F30A}\n\n" +
       "\u2B50 *Loved it?* We\u2019d really appreciate a review:\nhttps://g.page/r/capekayakadventures/review\n\n" +
-      "Book again anytime \u2014 reply *menu*!\n\nRemember: loyal paddlers get 10% off after 2 trips in a month! \u{1F31F}"
+      "Book again anytime \u2014 reply *menu*!\n\nRemember: loyal paddlers get 10% off after 2 trips in a month! \u{1F31F}",
+      b.id
     );
 
     await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: b.id, event: "thankyou_sent", payload: { phone: b.phone } });
