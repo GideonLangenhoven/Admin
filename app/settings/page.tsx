@@ -94,6 +94,9 @@ const DEFAULT_SITE_SETTINGS = {
     chat_widget_label: "Book here",
     footer_line_one: "",
     footer_line_two: "",
+    public_email: "",
+    public_phone: "",
+    public_whatsapp: "",
     timezone: "Africa/Johannesburg",
 };
 
@@ -738,6 +741,9 @@ export default function SettingsPage() {
                 chat_widget_label: data.chat_widget_label || DEFAULT_SITE_SETTINGS.chat_widget_label,
                 footer_line_one: data.footer_line_one || DEFAULT_SITE_SETTINGS.footer_line_one,
                 footer_line_two: data.footer_line_two || DEFAULT_SITE_SETTINGS.footer_line_two,
+                public_email: data.public_email || DEFAULT_SITE_SETTINGS.public_email,
+                public_phone: data.public_phone || DEFAULT_SITE_SETTINGS.public_phone,
+                public_whatsapp: data.public_whatsapp || DEFAULT_SITE_SETTINGS.public_whatsapp,
                 timezone: data.timezone || DEFAULT_SITE_SETTINGS.timezone,
             });
             setSubdomain(data.subdomain || null);
@@ -1033,6 +1039,9 @@ export default function SettingsPage() {
             chat_widget_label: siteSettings.chat_widget_label || null,
             footer_line_one: siteSettings.footer_line_one || null,
             footer_line_two: siteSettings.footer_line_two || null,
+            public_email: siteSettings.public_email || null,
+            public_phone: siteSettings.public_phone || null,
+            public_whatsapp: siteSettings.public_whatsapp || null,
             timezone: siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone,
             booking_custom_fields: parsedBookingFields,
         }).eq("id", biz.id);
@@ -2244,6 +2253,24 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line Two</label>
                                 <input type="text" value={siteSettings.footer_line_two} onChange={e => setSiteSettings({ ...siteSettings, footer_line_two: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Established: 1994 · BookingTours Platform" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Email</label>
+                                <input type="email" value={siteSettings.public_email} onChange={e => setSiteSettings({ ...siteSettings, public_email: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="hello@yourbusiness.co.za" />
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Shown to customers on the Contact Us panel. Leave blank to hide.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Phone</label>
+                                <input type="tel" value={siteSettings.public_phone} onChange={e => setSiteSettings({ ...siteSettings, public_phone: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include the country code. Leave blank to hide.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public WhatsApp Number</label>
+                                <input type="tel" value={siteSettings.public_whatsapp} onChange={e => setSiteSettings({ ...siteSettings, public_whatsapp: e.target.value })}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include the country code. Leave blank to hide.</p>
                             </div>
                         </div>
                     </div>
