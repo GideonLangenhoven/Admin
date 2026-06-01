@@ -210,7 +210,24 @@ export default function Weather() {
                 )}
                 {wgState === "error" && (
                   <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    Windguru could not be loaded for this location right now. Retry the widget or open the source forecast directly.
+                    <p>Windguru could not be loaded for this location right now.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setWgRefreshKey((k) => k + 1)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        <ArrowsClockwise size={14} />
+                        Retry widget
+                      </button>
+                      <a
+                        href={`https://www.windguru.cz/${location.wgSpot}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        Open forecast on Windguru &#8599;
+                      </a>
+                    </div>
                   </div>
                 )}
               </>

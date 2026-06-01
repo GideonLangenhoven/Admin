@@ -74,13 +74,14 @@ Deno.serve(async (req: any) => {
 
     // ── Phase 1: Cancel all bookings and compute per-slot capacity deltas ──
     const slotDeltas: Record<string, { booked: number; held: number }> = {};
+    const failedCancels: { id: string; error: string }[] = [];
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
       const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
 
       // Cancel the booking
-      await supabase.from("bookings").update({
+      const { error: cancelErr } = await supabase.from("bookings").update({
         status: "CANCELLED",
         cancellation_reason: "Weather cancellation: " + cancelReason,
         cancelled_at: nowIso,
@@ -91,6 +92,15 @@ Deno.serve(async (req: any) => {
         } : {}),
       }).eq("business_id", business_id).eq("id", b.id);
 
+      // If the cancel did not persist (e.g. a DB trigger rejected it), the booking
+      // is still active — do NOT release its capacity or notify, and surface it so
+      // a PAID booking never silently survives on a CLOSED slot.
+      if (cancelErr) {
+        console.error("WEATHER_CANCEL_BOOKING_ERR", b.id, cancelErr.message);
+        failedCancels.push({ id: b.id, error: cancelErr.message });
+        continue;
+      }
+
       // Accumulate capacity deltas per slot (avoids read-then-write race)
       if (!slotDeltas[b.slot_id]) slotDeltas[b.slot_id] = { booked: 0, held: 0 };
       slotDeltas[b.slot_id].booked += Number(b.qty || 0);
@@ -99,6 +109,8 @@ Deno.serve(async (req: any) => {
       // Cancel any active holds
       await supabase.from("holds").update({ status: "CANCELLED" }).eq("business_id", business_id).eq("booking_id", b.id).eq("status", "ACTIVE");
     }
+
+    const failedIds = new Set(failedCancels.map((f) => f.id));
 
     // ── Phase 2: Release slot capacity in one atomic update per slot ──
     for (const slotId of Object.keys(slotDeltas)) {
@@ -123,6 +135,7 @@ Deno.serve(async (req: any) => {
     // ── Phase 3: Send notifications (after all DB state is consistent) ──
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
+      if (failedIds.has(b.id)) continue;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
       const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
       const ref = b.id.substring(0, 8).toUpperCase();
@@ -193,15 +206,17 @@ Deno.serve(async (req: any) => {
       payload: {
         slot_ids,
         reason: cancelReason,
-        bookings_cancelled: affected.length,
-        paid_action_required: affected.filter((b: any) => ["PAID", "CONFIRMED"].includes(b.status)).length,
+        bookings_cancelled: affected.length - failedCancels.length,
+        paid_action_required: affected.filter((b: any) => ["PAID", "CONFIRMED"].includes(b.status) && !failedIds.has(b.id)).length,
+        failed_cancels: failedCancels,
       },
     });
 
     return new Response(JSON.stringify({
       ok: true,
       slots_closed: slot_ids.length,
-      bookings_cancelled: affected.length,
+      bookings_cancelled: affected.length - failedCancels.length,
+      failed_cancels: failedCancels,
     }), { status: 200, headers: getCors(req) });
   } catch (err: any) {
     console.error("WEATHER_CANCEL_ERROR:", err);
