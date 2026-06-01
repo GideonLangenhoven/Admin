@@ -19,7 +19,25 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@bookingtours.co.za>";
+const DEFAULT_FROM_EMAIL = "BookingTours <noreply@bookingtours.co.za>";
+
+// A malformed RESEND_FROM_EMAIL secret makes every Resend send fail with a 422
+// "Invalid from field", which the customer-login path swallows (always returns 200).
+// Validate the address here so a bad env var falls back to the known-good default
+// instead of silently breaking OTP delivery.
+function resolveFromEmail(): string {
+  const configured = (Deno.env.get("RESEND_FROM_EMAIL") || "").trim();
+  if (!configured) return DEFAULT_FROM_EMAIL;
+  const angle = configured.match(/<([^>]+)>/);
+  const addr = (angle ? angle[1] : configured).trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) {
+    console.error("RESEND_FROM_INVALID", JSON.stringify({ configured }));
+    return DEFAULT_FROM_EMAIL;
+  }
+  return configured;
+}
+
+const FROM_EMAIL = resolveFromEmail();
 const OTP_SECRET = Deno.env.get("OTP_HMAC_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
