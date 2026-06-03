@@ -211,6 +211,8 @@ async function handleReschedule(req: any, booking: any, body: any) {
       },
     });
 
+    let rebookNotifyMsg = "Your booking has been moved to a new date/time.";
+
     if (diff < 0 && body.excess_action === "REFUND") {
       // If paid via voucher, block cash refund — must use voucher credit
       if (isVoucherPayment(booking)) {
@@ -254,10 +256,19 @@ async function handleReschedule(req: any, booking: any, body: any) {
       if (vResult.error) return fail(req, "Voucher creation failed: " + vResult.error.message, 500);
       result.voucher_amount = voucherAmount;
       result.voucher_code = vResult.data.code;
+
+      await supabase.from("logs").insert({
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        event: "reschedule_downgrade_voucher",
+        payload: { diff: diff, voucher_amount: voucherAmount, voucher_code: vResult.data.code, voucher_id: vResult.data.id, old_total: booking.total_amount, new_total: newTotalAmount },
+      });
+
+      rebookNotifyMsg = "Your booking has been moved to a new date/time. Since the new slot costs less, we've issued you a credit voucher for the difference. Voucher code: " + vResult.data.code + " (valid for 3 years).";
     }
 
     // Send notifications only for immediate swaps
-    await sendRebookNotification(booking, "rescheduled", "Your booking has been moved to a new date/time.");
+    await sendRebookNotification(booking, "rescheduled", rebookNotifyMsg);
   }
 
   return ok(req, result);
@@ -511,13 +522,8 @@ async function handleCancelRefund(req: any, booking: any) {
     return await handleCancelRefundVoucher(req, booking, totalAmount);
   }
 
-  // If paid via split tender (voucher + Yoco), pro-rata the refund
-  if (isSplitTenderPayment(booking)) {
-    return await handleCancelRefundSplitTender(req, booking, totalAmount, policyPercent);
-  }
-
   // Calculate refund percent from policy tiers
-  const policyPercent = 95;
+  let policyPercent = 95;
   const tourStart = booking.slots?.start_time;
   if (tourStart && booking.business_id) {
     const { data: pctData } = await supabase.rpc("calculate_refund_percent", {
@@ -527,6 +533,11 @@ async function handleCancelRefund(req: any, booking: any) {
     if (typeof pctData === "number") policyPercent = pctData;
   }
   const policyFraction = policyPercent / 100;
+
+  // If paid via split tender (voucher + Yoco), pro-rata the refund
+  if (isSplitTenderPayment(booking)) {
+    return await handleCancelRefundSplitTender(req, booking, totalAmount, policyPercent);
+  }
 
   // If paid via manual method (cash/EFT), skip Yoco and flag for manual refund
   if (isManualPayment(booking)) {
