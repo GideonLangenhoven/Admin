@@ -216,6 +216,10 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
 
   await recordWaMessage(tenant.business.id, { to: to, kind: "text", body: auditBody, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed") });
 
+  if (res.ok && auditBody) {
+    await supabase.from("chat_messages").insert({ business_id: tenant.business.id, phone: to, direction: "OUT", body: auditBody, sender: "Bot", auto_replied: true });
+  }
+
   return data;
 }
 async function sendText(tenant: TenantContext, to: any, t: any) { return sendWA(tenant, to, { type: "text", text: { body: t } }); }
@@ -677,9 +681,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // Log incoming message before HUMAN check
     const _rt = (text || "").trim();
     const _ri = (msgType === "interactive" && interactive) ? ((interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "") : "";
+    let inboundMsgId: string | null = null;
     try {
-      const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone });
+      const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone }).select("id").single();
       if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
+      else inboundMsgId = cmRes.data?.id || null;
     } catch (e: any) {
       await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
     }
@@ -896,6 +902,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Check intent (skip if rid already set from button click)
       const intent = rid ? null : await detectIntent(tenant, input, phone);
+      if (intent && inboundMsgId) {
+        await supabase.from("chat_messages").update({ intent: intent, auto_replied: true }).eq("id", inboundMsgId);
+      }
       if (intent === "THANKS" && !rid) {
         await sendText(tenant, phone, "You\u2019re welcome! \u{1F60A} Feel free to ask anything else or type *menu* to see your options.");
         await setConvo(convo.id, { current_state: "MENU" });
