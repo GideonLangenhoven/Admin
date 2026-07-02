@@ -203,14 +203,16 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
         to: to,
         type: "template",
         template: {
-          // TODO: Replace "hello_world" with an approved WhatsApp template name from Meta Business Suite
-          name: "hello_world",
+          // Set WA_REOPEN_TEMPLATE to an approved WhatsApp template name from
+          // Meta Business Suite; hello_world is only a dev fallback.
+          name: Deno.env.get("WA_REOPEN_TEMPLATE") || "hello_world",
           language: { code: "en_US" }
         }
       })
     });
+    const reopenTemplateName = Deno.env.get("WA_REOPEN_TEMPLATE") || "hello_world";
     const templateData = await templateRes.json().catch(() => ({}));
-    await recordWaMessage(tenant.business.id, { to: to, kind: "template", templateName: "hello_world", body: auditBody, status: templateRes.ok ? "SENT" : "FAILED", providerMessageId: templateData?.messages?.[0]?.id || null, error: templateRes.ok ? null : String(templateData?.error?.message || "hello_world template failed") });
+    await recordWaMessage(tenant.business.id, { to: to, kind: "template", templateName: reopenTemplateName, body: auditBody, status: templateRes.ok ? "SENT" : "FAILED", providerMessageId: templateData?.messages?.[0]?.id || null, error: templateRes.ok ? null : String(templateData?.error?.message || reopenTemplateName + " template failed") });
     return templateData;
   }
 
@@ -623,6 +625,17 @@ function matchFAQ(input: any) {
   // Tours overview
   if ((i.includes("what tour") || i.includes("which tour") || i.includes("tour") && i.includes("offer") || i.includes("options") || i.includes("what do you do")) && !i.includes("book")) return "tours_overview";
   return null;
+}
+
+// Release/claim booked capacity atomically via adjust_slot_capacity; falls
+// back to a read-modify-write only if the RPC fails.
+async function adjustSlotBooked(businessId: string, slotId: string, delta: number) {
+  if (!slotId || !delta) return;
+  const rpcRes = await supabase.rpc("adjust_slot_capacity", { p_slot_id: slotId, p_business_id: businessId, p_booked_delta: delta, p_held_delta: 0 });
+  if (rpcRes.error) {
+    const sr = await supabase.from("slots").select("booked").eq("business_id", businessId).eq("id", slotId).single();
+    if (sr.data) await supabase.from("slots").update({ booked: Math.max(0, (sr.data.booked || 0) + delta) }).eq("business_id", businessId).eq("id", slotId);
+  }
 }
 
 // Detect intent from natural language
@@ -1211,12 +1224,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             { id: "ACT_CANCEL_" + bk.id, title: "\u274C Cancel Booking", description: "Get refund or voucher" },
           ];
         }
-        // 12-24h: limited changes
+        // 12-24h: limited changes (cancel stays available — the tenant's refund
+        // policy tiers decide what refund, if any, applies in this window)
         else if (bkhrs >= 12) {
           actRows = [
             { id: "ACT_GUESTS_" + bk.id, title: "\u{1F465} Add Guests", description: "Add more people" },
             { id: "ACT_REQUEST_" + bk.id, title: "\u{1F4DD} Special Request", description: "Dietary, celebrations, etc" },
             { id: "ACT_CONTACT_" + bk.id, title: "\u{1F4F1} Contact Details", description: "Update name, email, phone" },
+            { id: "ACT_CANCEL_" + bk.id, title: "❌ Cancel Booking", description: "Per cancellation policy" },
             { id: "ACT_TEAM_" + bk.id, title: "\u{1F4AC} Contact Our Team", description: "Request other changes" },
           ];
         }
@@ -1243,17 +1258,29 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // ── CANCEL ──
       if (action.startsWith("ACT_CANCEL_")) {
-        if (sd.hours_before >= 24) {
-          const rAmt = Math.round(Number(sd.total) * 0.95 * 100) / 100;
-          await sendText(tenant, phone, "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + sd.total + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + rAmt + " (5% processing fee) \u2022 5-7 business days");
+        // Refund percent comes from the tenant's refund policy tiers (same
+        // source as rebook-booking). The RPC returns 0 when no refund is due;
+        // if the lookup fails, fall back to the legacy 95%-when->=24h rule.
+        let cancelPct = sd.hours_before >= 24 ? 95 : 0;
+        try {
+          const cpSlot = sd.slot_id ? await supabase.from("slots").select("start_time").eq("id", sd.slot_id).single() : null;
+          if (cpSlot?.data?.start_time) {
+            const cpRes = await supabase.rpc("calculate_refund_percent", { p_business_id: tenant.business.id, p_tour_start: cpSlot.data.start_time });
+            if (typeof cpRes.data === "number") cancelPct = cpRes.data;
+          }
+        } catch { /* keep fallback */ }
+        if (cancelPct > 0) {
+          const cancelFeePct = Math.max(0, 100 - cancelPct);
+          const rAmt = Math.round(Number(sd.total) * (cancelPct / 100) * 100) / 100;
+          await sendText(tenant, phone, "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + sd.total + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + rAmt + (cancelFeePct > 0 ? " (" + cancelFeePct + "% processing fee)" : " (full refund)") + " \u2022 5-7 business days");
           await sendButtons(tenant, phone, "Choose an option:", [
             { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
             { id: "CANCEL_REFUND", title: "\u{1F4B8} Refund" },
             { id: "IDLE", title: "\u274C Keep Booking" },
           ]);
-          await setConvo(convo.id, { current_state: "CANCEL_CHOICE" });
+          await setConvo(convo.id, { current_state: "CANCEL_CHOICE", state_data: { ...sd, cancel_pct: cancelPct } });
         } else {
-          await sendButtons(tenant, phone, "Are you sure? This booking is within 24 hours, so unfortunately *no refund* is available.", [{ id: "CONFIRM_CANCEL_NOREFUND", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
+          await sendButtons(tenant, phone, "Are you sure? Under the cancellation policy this booking is in the *no refund* window.", [{ id: "CONFIRM_CANCEL_NOREFUND", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
           await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION" });
         }
       }
@@ -1331,7 +1358,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const cvr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: cvcode, status: "ACTIVE", type: "CREDIT", value: cvTotal, current_balance: cvTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (cvr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + cvcode, converted_to_voucher_id: cvr.data.id }).eq("id", sd.booking_id);
-        if (sd.slot_id) { const svr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr2.data) await supabase.from("slots").update({ booked: Math.max(0, svr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
         await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
         await logE(tenant, "booking_cancelled_voucher", { booking_id: sd.booking_id, code: cvcode, amount: cvTotal }, sd.booking_id);
         // Email voucher
@@ -1362,7 +1389,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
           if (crVResult.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
           await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
-          if (sd.slot_id) { const slrV = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slrV.data) await supabase.from("slots").update({ booked: Math.max(0, slrV.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_voucher_refund", { booking_id: sd.booking_id, code: crVCode, amount: crTotal }, sd.booking_id);
           await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
@@ -1370,26 +1397,28 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         } else {
           // M7: Split-tender refund math — check if booking has voucher_deduction > 0
           const crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
+          // Policy percent computed at quote time (ACT_CANCEL_); fallback 95%.
+          const crPct = sd.cancel_pct != null && Number(sd.cancel_pct) >= 0 ? Number(sd.cancel_pct) : 95;
+          const crFrac = crPct / 100;
           let crRefund: number;
           let crRefundMsg: string;
           if (crVoucherDeduction > 0) {
             // Restore full voucher amount
             const crSplitVCode = genVoucherCode();
             const crSplitVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crSplitVCode, status: "ACTIVE", type: "CREDIT", value: crVoucherDeduction, current_balance: crVoucherDeduction, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
-            // Calculate 5% fee on total, subtract from cash portion only
+            // Policy fee applies to the cash portion only
             const crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
-            crRefund = Math.round(crCashPaid * 0.95 * 100) / 100;
+            crRefund = Math.round(crCashPaid * crFrac * 100) / 100;
             crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
             if (crSplitVResult.data) {
               crRefundMsg += "\n\n\u{1F39F} Your voucher credit of *R" + crVoucherDeduction + "* has been restored: *" + crSplitVCode + "*";
             }
           } else {
-            crRefund = Math.round(crTotal * 0.95 * 100) / 100;
+            crRefund = Math.round(crTotal * crFrac * 100) / 100;
             crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
           }
-          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: "95% refund via WhatsApp" }).eq("id", sd.booking_id);
-          // TODO: Replace with atomic increment RPC for slot decrement
-          if (sd.slot_id) { const slr2 = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr2.data) await supabase.from("slots").update({ booked: Math.max(0, slr2.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: crPct + "% refund via WhatsApp (refund policy)" }).eq("id", sd.booking_id);
+          if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_refund", { booking_id: sd.booking_id, amount: crRefund }, sd.booking_id);
           // Email cancellation
@@ -1414,7 +1443,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "CONFIRM_CANCEL_ACTION") {
       if (rid === "CONFIRM_CANCEL_NOREFUND" || rid === "CONFIRM_CANCEL" || input === "yes") {
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled (no refund)" }).eq("id", sd.booking_id);
-        if (sd.slot_id) { const slr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (slr.data) await supabase.from("slots").update({ booked: Math.max(0, slr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
         await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
         await logE(tenant, "booking_cancelled_no_refund", { booking_id: sd.booking_id }, sd.booking_id);
         // Email
@@ -1455,7 +1484,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const vr = await insertVoucherWithRetry({ business_id: tenant.business.id, code: vcode, status: "ACTIVE", type: "CREDIT", value: vTotal, current_balance: vTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
         if (vr.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
         await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Converted to voucher " + vcode, converted_to_voucher_id: vr.data.id }).eq("id", sd.booking_id);
-        if (sd.slot_id) { const svr = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single(); if (svr.data) await supabase.from("slots").update({ booked: Math.max(0, svr.data.booked - sd.qty) }).eq("id", sd.slot_id); }
+        if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
         await logE(tenant, "voucher_from_booking", { booking_id: sd.booking_id, code: vcode, amount: vTotal }, sd.booking_id);
         // Email voucher
         try {
@@ -1541,8 +1570,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const gvNewTotal = sd.new_qty * Number(sd.unit_price);
         await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: gvNewTotal }).eq("id", sd.booking_id);
         // Release slot capacity
-        const gvSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-        if (gvSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (gvSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
+        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
         // Create voucher
         let gvCode = genVoucherCode();
         const gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
@@ -1553,12 +1581,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       else if (rid === "GUEST_REFUND" || input === "refund") {
         const grNewTotal = sd.new_qty * Number(sd.unit_price);
-        const grRefund = Math.round(sd.rm_amount * 0.95 * 100) / 100;
-        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund (95%)" }).eq("id", sd.booking_id);
-        const grSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-        if (grSlot.data) await supabase.from("slots").update({ booked: Math.max(0, (grSlot.data.booked || 0) - sd.rm_count) }).eq("id", sd.slot_id);
+        // Full removed-guest excess, matching the web rebook-booking path (no fee)
+        const grRefund = Math.round(Number(sd.rm_amount) * 100) / 100;
+        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund" }).eq("id", sd.booking_id);
+        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
         await logE(tenant, "guests_removed_refund_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, refund: grRefund }, sd.booking_id);
-        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted (5% processing fee). Expect it within 5\u20137 business days.");
+        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted. Expect it within 5\u20137 business days.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else { await sendText(tenant, phone, "No changes made. Your booking stays at " + sd.qty + " people. \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
@@ -2040,7 +2068,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
         });
         if (vHoldRes.error || !vHoldRes.data?.success) {
-          await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id);
+          // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
+          await supabase.from("bookings").delete().eq("id", booking.id);
           await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
@@ -2115,7 +2144,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         p_qty: verifiedSd.qty,
         p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       });
-      if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", booking.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+      if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").delete().eq("id", booking.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
@@ -2858,10 +2887,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       } else {
         // Reduced people — update booking and release slot capacity
-        // TODO: Replace with atomic increment RPC for slot decrement
         await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        const mqSlot = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-        if (mqSlot.data) await supabase.from("slots").update({ booked: Math.max(0, mqSlot.data.booked + qtyDiff) }).eq("id", sd.slot_id);
+        await adjustSlotBooked(tenant.business.id, sd.slot_id, qtyDiff);
         if (sd.hours_before >= 24) {
           await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
           await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted \u2014 expect it within 5-7 business days.");
@@ -2910,13 +2937,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "CHANGE_TOUR_SLOT") {
       const ctSlotId = rid ? rid.replace("CTSLOT_", "") : "";
       if (!ctSlotId) { await sendText(tenant, phone, "Please pick a slot."); return; }
-      // TODO: Replace with atomic increment RPC for slot decrement/increment
       // Release old slot
-      const oldSlotR = await supabase.from("slots").select("booked").eq("id", sd.slot_id).single();
-      if (oldSlotR.data) await supabase.from("slots").update({ booked: Math.max(0, oldSlotR.data.booked - sd.qty) }).eq("id", sd.slot_id);
+      await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
       // Book new slot
-      const newSlotR = await supabase.from("slots").select("booked, start_time").eq("id", ctSlotId).single();
-      if (newSlotR.data) await supabase.from("slots").update({ booked: newSlotR.data.booked + sd.qty }).eq("id", ctSlotId);
+      const newSlotR = await supabase.from("slots").select("start_time").eq("id", ctSlotId).single();
+      await adjustSlotBooked(tenant.business.id, ctSlotId, sd.qty);
       const newTotal2 = sd.qty * Number(sd.new_price);
       await supabase.from("bookings").update({ tour_id: sd.new_tour_id, slot_id: ctSlotId, unit_price: sd.new_price, total_amount: newTotal2 }).eq("id", sd.booking_id);
       const tsLoc = tenant.business.location_phrase;
@@ -3014,10 +3039,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const wrBk = await supabase.from("bookings").select("id, total_amount, slot_id, qty").eq("id", wrBkId).single();
       if (wrBk.data) {
         await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Weather cancellation", refund_status: "ACTION_REQUIRED", refund_amount: wrBk.data.total_amount }).eq("id", wrBkId);
-        if (wrBk.data.slot_id) {
-          const wrSl = await supabase.from("slots").select("booked").eq("id", wrBk.data.slot_id).single();
-          if (wrSl.data) await supabase.from("slots").update({ booked: Math.max(0, wrSl.data.booked - wrBk.data.qty) }).eq("id", wrBk.data.slot_id);
-        }
+        if (wrBk.data.slot_id) await adjustSlotBooked(tenant.business.id, wrBk.data.slot_id, -wrBk.data.qty);
         await sendText(tenant, phone, "Full refund of R" + wrBk.data.total_amount + " submitted \u2705 Expect it back on your card within 5-7 business days.\n\nWe\u2019d love to have you back when the weather plays along! Type *book* anytime \u{1F30A}");
       }
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });

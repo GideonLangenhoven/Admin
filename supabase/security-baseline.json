@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-05-02T18:30:00Z",
-  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking",
+  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking; 2026-07-02 S3: reviews authenticated RLS tenant-scoped, vouchers anon insert forced PENDING+tenant, vouchers anon update dropped",
   "grants": [
     {
       "grantee": "anon",
@@ -6899,7 +6899,7 @@
       "cmd": "INSERT",
       "roles": "{anon}",
       "qual": null,
-      "with_check": "true"
+      "with_check": "((status = 'PENDING'::text) AND ((business_id)::text = bt_request_header('x-tenant-business-id'::text)))"
     },
     {
       "schemaname": "public",
@@ -6990,6 +6990,51 @@
       "roles": "{authenticated}",
       "qual": "(business_id = ANY (current_business_ids()))",
       "with_check": "(business_id = ANY (current_business_ids()))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reviews",
+      "policyname": "reviews_anon_read",
+      "cmd": "SELECT",
+      "roles": "{anon}",
+      "qual": "(status = 'APPROVED'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reviews",
+      "policyname": "reviews_authenticated_read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (current_business_ids()))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reviews",
+      "policyname": "reviews_authenticated_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (current_business_ids()))",
+      "with_check": "(business_id = ANY (current_business_ids()))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reviews",
+      "policyname": "reviews_service_insert",
+      "cmd": "INSERT",
+      "roles": "{service_role}",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "reviews",
+      "policyname": "reviews_service_update",
+      "cmd": "UPDATE",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": null
     }
   ]
 }

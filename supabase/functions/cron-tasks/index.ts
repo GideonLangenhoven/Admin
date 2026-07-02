@@ -107,7 +107,25 @@ async function cleanupExpiredHolds() {
     }
 
     // ── Regular booking hold expiry ──
-    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string } | null;
+    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; qty?: number } | null;
+    // Release held capacity on the slot (mirrors the reschedule branch above)
+    const heldQty = Number(holdBooking?.qty || 0);
+    if (heldQty > 0 && hold.slot_id && hold.business_id) {
+      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
+        p_slot_id: hold.slot_id,
+        p_business_id: hold.business_id,
+        p_booked_delta: 0,
+        p_held_delta: -heldQty,
+      });
+      if (rpcRes.error) {
+        const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", hold.business_id).eq("id", hold.slot_id).maybeSingle();
+        if (slotHeldData) {
+          await supabase.from("slots").update({
+            held: Math.max(0, (slotHeldData.held || 0) - heldQty),
+          }).eq("business_id", hold.business_id).eq("id", hold.slot_id);
+        }
+      }
+    }
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
     const holdTour = Array.isArray(hold.tours) ? hold.tours[0] : hold.tours as { name?: string } | null;
     if (holdBooking?.phone && hold.business_id) {
@@ -526,21 +544,33 @@ async function autoTagContacts() {
   return results;
 }
 
-Deno.serve(withSentry("cron-tasks", async (_req) => {
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
-
-  try {
-    const reminderRes = await fetch(SUPABASE_URL + "/functions/v1/auto-messages", {
-      method: "POST",
-      headers: { ...headers(), Authorization: "Bearer " + SUPABASE_KEY },
-      body: JSON.stringify({ action: "all" }),
-    });
-    results.reminders = await reminderRes.json().catch(() => null);
-  } catch (error) {
-    console.error("AUTO_MESSAGES_INVOKE_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+// J10: abandoned pre-checkout drafts are never referenced again — delete them
+// after 24h so customer PII does not linger indefinitely. DRAFT bookings have
+// no holds, add-ons or capacity (those only exist once the booking is PENDING).
+async function cleanupStaleDraftBookings() {
+  const results = { drafts_cleaned: 0 };
+  const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: staleDrafts, error } = await supabase
+    .from("bookings")
+    .delete()
+    .eq("status", "DRAFT")
+    .lt("created_at", cutoffIso)
+    .select("id");
+  if (error) {
+    console.error("DRAFT_CLEANUP_ERR", error.message);
+    return results;
   }
+  results.drafts_cleaned = (staleDrafts || []).length;
+  if (results.drafts_cleaned > 0) console.log("DRAFT_CLEANUP removed=" + results.drafts_cleaned);
+  return results;
+}
 
+Deno.serve(withSentry("cron-tasks", async (_req) => {
+  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
+
+  // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
+  // cancels past-deadline PENDING bookings without releasing slot capacity,
+  // which would shadow cleanupExpiredManualBookings' release + admin notification (J6).
   try {
     const cleanup = await cleanupExpiredHolds();
     results.hold_cleanup = cleanup.hold_cleanup;
@@ -554,6 +584,18 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.expired_manual = manualCleanup.expired_manual;
   } catch (error) {
     console.error("MANUAL_BOOKING_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const reminderRes = await fetch(SUPABASE_URL + "/functions/v1/auto-messages", {
+      method: "POST",
+      headers: { ...headers(), Authorization: "Bearer " + SUPABASE_KEY },
+      body: JSON.stringify({ action: "all" }),
+    });
+    results.reminders = await reminderRes.json().catch(() => null);
+  } catch (error) {
+    console.error("AUTO_MESSAGES_INVOKE_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
@@ -578,6 +620,14 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.otp_attempts_cleaned = otpCleanup.otp_attempts_cleaned;
   } catch (error) {
     console.error("OTP_ATTEMPT_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const draftCleanup = await cleanupStaleDraftBookings();
+    results.drafts_cleaned = draftCleanup.drafts_cleaned;
+  } catch (error) {
+    console.error("DRAFT_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

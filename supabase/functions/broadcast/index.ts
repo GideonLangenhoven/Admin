@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -21,8 +22,22 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
 
   try {
+    // Mass-messaging a tenant's customers: only that tenant's admins (or the
+    // platform SUPER_ADMIN / internal service calls) may trigger it, and the
+    // target business is derived from the caller — never trusted from the body.
+    let auth;
+    try {
+      auth = await requireAuth(req);
+    } catch (_e) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) });
+    }
+
     const body = await req.json();
-    const { action, message, target_group, slot_ids, send_email, send_whatsapp, business_id } = body;
+    const { action, message, target_group, slot_ids, send_email, send_whatsapp } = body;
+
+    const business_id = (auth.isServiceRole || auth.role === "SUPER_ADMIN")
+      ? String(body.business_id || "")
+      : auth.businessId;
 
     if (!business_id) {
       return new Response(JSON.stringify({ error: "business_id is required" }), { status: 400, headers: getCors(req) });

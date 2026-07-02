@@ -38,7 +38,8 @@ function periodBounds(rawStart: string | null, rawEnd: string | null) {
 }
 
 export async function GET(req: NextRequest) {
-  const caller = await getCallerAdmin(req);
+  // A suspended tenant must still see their billing status to reactivate.
+  const caller = await getCallerAdmin(req, { skipSubscriptionCheck: true });
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = adminClient();

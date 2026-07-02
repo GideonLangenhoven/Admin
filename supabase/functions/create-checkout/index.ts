@@ -194,6 +194,25 @@ Deno.serve(async (req: any) => {
       }
     }
 
+    // Gift-voucher charge must equal the voucher's face value read from the DB —
+    // never the client-supplied amount. The webhook activates current_balance to
+    // this same value on payment, so trusting the client would let a buyer pay R1
+    // for an arbitrarily large voucher.
+    if (type === "GIFT_VOUCHER" && voucherId) {
+      const gvRow = await supabase.from("vouchers").select("value, purchase_amount, status").eq("id", voucherId).maybeSingle();
+      if (!gvRow.data) {
+        return new Response(JSON.stringify({ error: "VOUCHER_NOT_FOUND" }), { status: 404, headers: buildCors(req?.headers?.get("origin") || "*") });
+      }
+      const faceValue = Number(gvRow.data.value ?? gvRow.data.purchase_amount ?? 0);
+      if (!(faceValue > 0)) {
+        return new Response(JSON.stringify({ error: "VOUCHER_VALUE_INVALID" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+      }
+      if (Math.abs(Number(amount) - faceValue) > 0.01) {
+        console.warn("VOUCHER_PRICE_MISMATCH: frontend=" + amount + " server=" + faceValue + " voucher=" + voucherId);
+      }
+      amount = faceValue;
+    }
+
     const resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
     const tenant = resolved.tenant;
     const businessUrls = resolved.businessUrls;

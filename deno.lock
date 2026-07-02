@@ -27,6 +27,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@next/bundle-analyzer@^16.2.4",
         "npm:@phosphor-icons/react@^2.1.10",
         "npm:@playwright/test@^1.59.1",
         "npm:@sentry/nextjs@^10.51.0",
@@ -47,6 +48,7 @@
         "npm:postcss@^8.5.6",
         "npm:react-day-picker@^9.13.2",
         "npm:react-dom@^19.2.4",
+        "npm:react-virtuoso@^4.18.6",
         "npm:react@^19.2.4",
         "npm:recharts@^3.8.1",
         "npm:tailwindcss@^3.4.19",

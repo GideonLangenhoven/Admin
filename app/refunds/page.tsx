@@ -40,7 +40,7 @@ export default function Refunds() {
     const { data: done } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancelled_at, slots(start_time), tours(name)")
       .eq("business_id", businessId)
-      .in("refund_status", ["PROCESSED", "FAILED"])
+      .in("refund_status", ["PROCESSED", "FAILED", "DECLINED"])
       .order("cancelled_at", { ascending: false })
       .limit(20);
     setProcessed(done || []);
@@ -143,6 +143,49 @@ export default function Refunds() {
     });
   }
 
+  async function executeDeclineRefund(id: string) {
+    const booking = refunds.find(b => b.id === id);
+    await supabase.from("bookings").update({
+      refund_status: "DECLINED",
+      refund_notes: "Refund declined by admin",
+    }).eq("id", id);
+    if (booking?.email) {
+      try {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            type: "BOOKING_UPDATED",
+            data: {
+              business_id: businessId,
+              email: booking.email,
+              customer_name: booking.customer_name,
+              ref: booking.id.substring(0, 8).toUpperCase(),
+              tour_name: booking.tours?.name || "Booking",
+              start_time: booking.slots?.start_time || "",
+              message: "Your refund request for booking " + booking.id.substring(0, 8).toUpperCase() +
+                " has been declined. Please contact us if you have any questions.",
+              event: "refund_declined",
+            },
+          },
+        });
+      } catch (e) {
+        console.error("DECLINE_REFUND_EMAIL_ERR:", e);
+      }
+    }
+    load();
+  }
+
+  function declineRefund(id: string) {
+    setConfirmState({
+      title: "Decline refund request",
+      message: "Decline this refund request? The customer will be notified by email and no refund will be paid.",
+      tone: "danger",
+      onConfirm: async () => {
+        setConfirmState(null);
+        await executeDeclineRefund(id);
+      },
+    });
+  }
+
   function refundAll() {
     setConfirmState({
       title: "Process all refunds",
@@ -227,6 +270,10 @@ export default function Refunds() {
                         className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 whitespace-nowrap">
                         Manual
                       </button>
+                      <button onClick={() => declineRefund(b.id)} disabled={isProcessing}
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 whitespace-nowrap">
+                        Decline
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -255,8 +302,8 @@ export default function Refunds() {
                   <p className="font-medium text-sm">{b.customer_name} <span className="text-gray-400 font-mono text-xs">({b.id.substring(0, 8).toUpperCase()})</span></p>
                   <p className="text-xs text-gray-400">{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"}</p>
                 </div>
-                <span className={"text-xs font-medium px-2 py-1 rounded-full " + (b.refund_status === "PROCESSED" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
-                  {b.refund_status === "PROCESSED" ? "Refunded" : "Failed"}
+                <span className={"text-xs font-medium px-2 py-1 rounded-full " + (b.refund_status === "PROCESSED" ? "bg-emerald-100 text-emerald-700" : b.refund_status === "DECLINED" ? "bg-gray-200 text-gray-600" : "bg-red-100 text-red-700")}>
+                  {b.refund_status === "PROCESSED" ? "Refunded" : b.refund_status === "DECLINED" ? "Declined" : "Failed"}
                 </span>
                 <p className="text-sm font-semibold text-gray-600">R{b.refund_amount}</p>
               </div>

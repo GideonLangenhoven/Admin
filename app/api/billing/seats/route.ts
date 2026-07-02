@@ -10,7 +10,8 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const caller = await getCallerAdmin(req);
+  // Billing management stays reachable regardless of subscription state.
+  const caller = await getCallerAdmin(req, { skipSubscriptionCheck: true });
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isPrivilegedRole(caller.role)) return NextResponse.json({ error: "MAIN_ADMIN required" }, { status: 403 });
 

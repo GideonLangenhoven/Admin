@@ -14,7 +14,7 @@ The site is significantly above average for an early-stage SaaS product. Credit 
 "Booking software built for the wild side of tourism." This is memorable, niche-specific, and has personality. It immediately tells the visitor: this isn't generic software — it's for YOU.
 
 **2. The one-liner under the hero is elite.**
-"R 1,500/month · pause for off-season at no charge · live in 48 hours." This answers the three questions every SaaS prospect has — price, risk, and timeline — in 13 words. Keep this exactly as is.
+"R 2,500/month · pause for off-season at no charge · live in 48 hours." This answers the three questions every SaaS prospect has — price, risk, and timeline — in 13 words. Keep this exactly as is.
 
 **3. The competitive framing is bold and effective.**
 "Built for the things FareHarbor & Bokun ignore." Naming the enemy is a high-confidence move. It validates the prospect's frustration with incumbents and positions BookingTours as the answer.

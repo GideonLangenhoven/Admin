@@ -114,7 +114,9 @@ OUTPUT: Use the contract from the shared context.
 STEP 3: Row-Level Security on every public table
 
 WHAT TO TEST:
-1. Run: npm run check-security-drift (requires DATABASE_URL env var). Expect exit code 0.
+1. Run: npm run check-securit
+
+y-drift (requires DATABASE_URL env var). Expect exit code 0.
 2. Execute SQL: SELECT tablename FROM pg_tables WHERE schemaname='public' AND rowsecurity=false; — expect zero rows.
 3. For 5 randomly-chosen business-scoped tables, execute as anon role: SELECT count(*) FROM <table>; — each should return 0 (or only public-readable rows like a "businesses" row marked public).
 4. Inspect supabase/security-baseline.json for the canonical RLS state.
@@ -131,40 +133,8 @@ OUTPUT: Use the contract from the shared context.
 
 ---
 
-# PROMPT 4 — Booking happy path (Yoco) 🔴 BLOCKER
+#
 
-```
-[Shared system context block goes above.]
-
-STEP 4: Booking happy path on Yoco
-
-This step is HUMAN-ASSISTED — you (the test AI) guide the human through five real bookings, then verify each in the database.
-
-WHAT TO TEST:
-1. Instruct the user to complete 5 consecutive bookings on a tenant subdomain (e.g., capekayak.booking.bookingtours.co.za in staging), alternating mobile and desktop:
-   - Pick tour, pick date, pick slot, qty=2, fill name/email/phone, no promo, no voucher.
-   - Click "Book Now" → land on Yoco hosted checkout.
-   - Pay with Yoco sandbox success card (user gets card from Yoco docs).
-   - Land on /success?ref=<booking_id>.
-2. After each booking, query the database:
-   - SELECT id, status, total, paid_at FROM bookings WHERE id = <id>;
-   - SELECT count(*) FROM idempotency_keys WHERE booking_id = <id>;
-3. Check that confirmation email arrived (Resend dashboard) and WhatsApp message arrived (test phone).
-4. Inspect yoco-webhook logs in Supabase for the matching event.
-
-PASS CRITERIA:
-- All 5 bookings transition to status=PAID within 30 seconds of Yoco return.
-- paid_at is recent (≤30s after webhook).
-- Each booking has exactly one idempotency_keys row.
-- Each customer receives exactly one confirmation email and one WhatsApp message.
-- Time from "Book Now" click to /success render is ≤30s on a 4G connection.
-- Zero 5xx errors in yoco-webhook logs.
-- Zero console errors in browser dev tools.
-
-OUTPUT: Use the contract from the shared context.
-```
-
----
 
 # PROMPT 5 — Combo booking happy path (Paysafe) 🔴 BLOCKER
 

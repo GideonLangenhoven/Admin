@@ -106,6 +106,7 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     // ── 3. Generate unsubscribe tokens + prepare emails ──
     const sentIds: string[] = [];
     const failedIds: { id: string; error: string; retryable: boolean }[] = [];
+    const deferredIds: string[] = [];
     const businessCounts: Record<string, number> = {};
     const trackingBaseUrl = SUPABASE_URL + "/functions/v1/marketing-track";
 
@@ -120,6 +121,12 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
 
       // Skip items for campaigns that are NOT in "sending" status (cancelled, paused, etc.)
       if (camp.status !== "sending") {
+        // U9: scheduled/paused campaigns become "sending" later — release the
+        // claim so these rows return to "pending" instead of stranding in
+        // "processing", and send when the campaign's scheduled time arrives.
+        if (camp.status === "scheduled" || camp.status === "paused") {
+          deferredIds.push(item.id);
+        }
         continue;
       }
 
@@ -177,6 +184,13 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
         businessId: item.business_id,
         unsubscribeUrl,
       });
+    }
+
+    // Release claims on not-yet-due campaign items (see U9 note above)
+    if (deferredIds.length > 0) {
+      await supabase.from("marketing_queue")
+        .update({ status: "pending", updated_at: new Date().toISOString() })
+        .in("id", deferredIds).eq("status", "processing");
     }
 
     // ── 4. Send via Resend batch API ──

@@ -67,3 +67,11 @@ verify_jwt = false
 
 [functions.send-whatsapp-text]
 verify_jwt = false
+
+# rebook-booking is called cross-function by wa-webhook and web-chat with the
+# sb_secret_* SERVICE_ROLE_KEY (not a JWT — see note above). The function does
+# its own caller authorization (service-role key, customer_session token, or
+# admin JWT + business ownership), which is stronger than the gateway's
+# anyone-with-the-anon-key JWT check.
+[functions.rebook-booking]
+verify_jwt = false

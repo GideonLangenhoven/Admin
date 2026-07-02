@@ -159,9 +159,12 @@ export default function BroadcastsPage() {
     })) return;
     setSending(true); setResult(null);
     try {
+      // broadcast requires the admin's JWT — it derives the target business
+      // from the caller's admin row, not the request body.
+      const token = (await supabase.auth.getSession()).data.session?.access_token || SK;
       const r = await fetch(SU + "/functions/v1/broadcast", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, apikey: SK },
         body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, send_email: true, send_whatsapp: true, business_id: businessId }),
       });
       const d = await r.json();

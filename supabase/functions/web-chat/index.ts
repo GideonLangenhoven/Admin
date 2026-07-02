@@ -305,8 +305,39 @@ async function getSlots(tourId, now) {
     .filter(function (s) { return Number(s.available_capacity || 0) > 0; })
     .map(function (s) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0 }; });
 }
+
+// Release/claim booked capacity atomically via adjust_slot_capacity; falls
+// back to a read-modify-write only if the RPC fails.
+async function adjustSlotBooked(businessId: string, slotId: string, delta: number) {
+  if (!slotId || !delta) return;
+  const rpcRes = await db.rpc("adjust_slot_capacity", { p_slot_id: slotId, p_business_id: businessId, p_booked_delta: delta, p_held_delta: 0 });
+  if (rpcRes.error) {
+    const { data: sr } = await db.from("slots").select("booked").eq("business_id", businessId).eq("id", slotId).single();
+    if (sr) await db.from("slots").update({ booked: Math.max(0, (sr.booked || 0) + delta) }).eq("business_id", businessId).eq("id", slotId);
+  }
+}
+
+// Basic per-client rate limit for this open endpoint (per-instance, sliding
+// window). Keeps abuse from spamming bookings/Gemini; legit chats never hit it.
+const RATE_LIMIT_MAX = 20;
+const RATE_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, number[]>();
+function rateLimited(clientKey: string): boolean {
+  const nowMs = Date.now();
+  const hits = (rateBuckets.get(clientKey) || []).filter((t) => t > nowMs - RATE_WINDOW_MS);
+  if (hits.length >= RATE_LIMIT_MAX) { rateBuckets.set(clientKey, hits); return true; }
+  hits.push(nowMs);
+  if (rateBuckets.size > 5000) rateBuckets.clear();
+  rateBuckets.set(clientKey, hits);
+  return false;
+}
+
 Deno.serve(withSentry("web-chat", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (rateLimited(clientIp)) {
+    return new Response(JSON.stringify({ reply: "You\u2019re sending messages a little fast \u2014 give me a few seconds and try again." }), { status: 429, headers: gCors(req) });
+  }
   const url = new URL(req.url);
   if (url.searchParams.get("__sentry_test") === "1") {
     throw new Error("Sentry test error from web-chat (intentional)");
@@ -618,7 +649,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         // L22: Verify slot belongs to the selected tour to prevent slot ownership tampering.
         // Also pull price_per_person_override so peak-priced slots quote the right total
         // immediately rather than springing a "price has changed" message at Confirm.
-        const { data: sl } = await db.from("slots").select("id,start_time,tour_id,price_per_person_override").eq("id", btnVal).single();
+        const { data: sl } = await db.from("slots").select("id,start_time,tour_id,price_per_person_override").eq("business_id", requestedBusinessId).eq("id", btnVal).single();
         if (sl && sl.tour_id === ns.tid) {
           slotId = sl.id;
           slotTime = sl.start_time;
@@ -829,7 +860,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
             p_expires_at: new Date(now.getTime() + 2 * 60 * 1000).toISOString(),
           });
           if (voucherHoldRes.error || !voucherHoldRes.data?.success) {
-            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", bk.id);
+            // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
+            await db.from("bookings").delete().eq("id", bk.id);
             reply = voucherHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.";
             ns = { step: "IDLE" };
             return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
@@ -864,7 +896,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
             p_expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
           });
           if (holdRes.error || !holdRes.data?.success) {
-            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "No capacity" }).eq("id", bk.id);
+            // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
+            await db.from("bookings").delete().eq("id", bk.id);
             reply = holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.";
             ns = { step: "IDLE" };
             return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, paymentUrl: pay }), { status: 200, headers: gCors(req) });
@@ -974,15 +1007,25 @@ Deno.serve(withSentry("web-chat", async (req) => {
           return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
         }
       } else if (act.includes("cancel") || act.includes("refund")) {
-        if (hrs < 24) {
-          reply = "Since your trip is in less than 24 hours, a refund isn't automatically available. Would you like me to ask our team to review this for you?";
-          buttons = [{ label: "✅ Send Review Request", value: "btn:req_cancel" }, { label: "No, nevermind", value: "btn:cancel_action" }];
-          ns = { ...ns, step: "REVIEW_REQUEST", booking: b, action: "cancel/refund" };
-        } else {
-          const refAmt = Math.round(b.total_amount * 0.95 * 100) / 100;
-          reply = "Cancel your booking for " + b.qty + " people? You'll receive a 95% refund (R" + refAmt + ").";
+        // Refund percent comes from the tenant's refund policy tiers (same
+        // source as rebook-booking). RPC returns 0 when no refund is due; if
+        // the lookup fails, fall back to the legacy 95%-when->=24h rule.
+        let cnPct = hrs >= 24 ? 95 : 0;
+        try {
+          if (b.slots?.start_time) {
+            const { data: cnPctData } = await db.rpc("calculate_refund_percent", { p_business_id: requestedBusinessId, p_tour_start: b.slots.start_time });
+            if (typeof cnPctData === "number") cnPct = cnPctData;
+          }
+        } catch { /* keep fallback */ }
+        if (cnPct > 0) {
+          const refAmt = Math.round(b.total_amount * (cnPct / 100) * 100) / 100;
+          reply = "Cancel your booking for " + b.qty + " people? You'll receive a " + cnPct + "% refund (R" + refAmt + ").";
           buttons = [{ label: "✅ Yes, Cancel", value: "btn:confirm_cancel" }, { label: "No, keep it", value: "btn:cancel_action" }];
           ns = { ...ns, step: "CONFIRM_CANCEL", booking_id: b.id, qty: b.qty, refund: refAmt, hours: hrs, slot_id: b.slot_id };
+        } else {
+          reply = "Under the cancellation policy, a refund isn't automatically available for this booking. Would you like me to ask our team to review this for you?";
+          buttons = [{ label: "✅ Send Review Request", value: "btn:req_cancel" }, { label: "No, nevermind", value: "btn:cancel_action" }];
+          ns = { ...ns, step: "REVIEW_REQUEST", booking: b, action: "cancel/refund" };
         }
       }
       // M2: Handle all unreachable states — Edit Guests, Update Name, Resend Confirmation, Change Tour
@@ -1080,12 +1123,11 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // ===== CONFIRM CANCEL =====
     if (step === "CONFIRM_CANCEL") {
       if (btnVal === "confirm_cancel" || lo.includes("yes") || lo.includes("cancel")) {
-        await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Customer request via web chat", cancelled_at: new Date().toISOString(), refund_status: ns.hours >= 24 ? "REQUESTED" : "NONE", refund_amount: ns.refund || 0 }).eq("id", ns.booking_id);
+        await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Customer request via web chat", cancelled_at: new Date().toISOString(), refund_status: (ns.refund || 0) > 0 ? "REQUESTED" : "NONE", refund_amount: ns.refund || 0 }).eq("id", ns.booking_id);
         // L14: Release capacity immediately on cancellation so the slot is available for others.
         // The refund processor handles payment reversal separately from capacity management.
-        const { data: cSl } = await db.from("slots").select("booked").eq("id", ns.slot_id).single();
-        if (cSl) await db.from("slots").update({ booked: Math.max(0, cSl.booked - ns.qty) }).eq("id", ns.slot_id);
-        reply = ns.hours >= 24 ? "Booking cancelled. A refund request of R" + ns.refund + " has been sent to our team for approval \u2705 Once approved, you can expect it in 5-7 business days." : "Booking cancelled. As this was within 24 hours, no refund applies.";
+        await adjustSlotBooked(requestedBusinessId, ns.slot_id, -ns.qty);
+        reply = (ns.refund || 0) > 0 ? "Booking cancelled. A refund request of R" + ns.refund + " has been sent to our team for approval \u2705 Once approved, you can expect it in 5-7 business days." : "Booking cancelled. No refund applies under the cancellation policy.";
         reply += "\n\nWe\u2019d love to have you back! Type *book* anytime \u{1F30A}";
       } else { reply = "No problem, your booking is safe! \u{1F44D}"; }
       ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
@@ -1107,8 +1149,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         mqUpdateFields.waiver_token = crypto.randomUUID();
       }
       await db.from("bookings").update(mqUpdateFields).eq("id", ns.booking_id);
-      const { data: mqSl } = await db.from("slots").select("booked").eq("id", ns.slot_id).single();
-      if (mqSl) await db.from("slots").update({ booked: Math.max(0, mqSl.booked + qDiff) }).eq("id", ns.slot_id);
+      await adjustSlotBooked(requestedBusinessId, ns.slot_id, qDiff);
       if (qDiff > 0) {
         try {
           const bookingMeta = await db.from("bookings").select("business_id").eq("id", ns.booking_id).maybeSingle();

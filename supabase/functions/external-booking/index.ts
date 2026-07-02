@@ -642,6 +642,21 @@ Deno.serve(async (req: Request) => {
       return await send(401, auth.code, auth.message, {}, "REJECTED");
     }
 
+    // Mutating actions must be HMAC-signed. An api-key-only credential (no
+    // hmac_secret configured) authenticates read-only availability, but may
+    // not create/cancel/modify bookings — otherwise a leaked api key alone
+    // could move money. Read-only check_availability stays api-key-friendly.
+    const MUTATING_ACTIONS = new Set(["create_booking", "cancel_booking", "modify_booking"]);
+    if (MUTATING_ACTIONS.has(action) && auth.authMode !== "api_key+hmac") {
+      return await send(
+        401,
+        "SIGNATURE_REQUIRED",
+        "This action requires a signed request (x-timestamp + x-signature). Configure an HMAC secret for your API credential.",
+        {},
+        "REJECTED",
+      );
+    }
+
     const businessId = auth.businessId;
     const businessTimezone = await getBusinessTimezone(businessId);
 

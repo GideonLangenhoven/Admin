@@ -6,7 +6,10 @@ export type CallerAdmin = {
   business_id: string;
 };
 
-export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> {
+export async function getCallerAdmin(
+  req: Request,
+  opts?: { skipSubscriptionCheck?: boolean },
+): Promise<CallerAdmin | null> {
   const auth = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
@@ -29,6 +32,18 @@ export async function getCallerAdmin(req: Request): Promise<CallerAdmin | null> 
     .maybeSingle();
 
   if (!adminRow || adminRow.suspended) return null;
+
+  // A8: a tenant whose subscription is suspended/cancelled loses privileged API
+  // access — enforced server-side here so it can't be bypassed by hitting the
+  // API directly (the client-side gate alone was security-theatre). SUPER_ADMIN
+  // is platform staff and exempt; billing routes pass skipSubscriptionCheck so a
+  // suspended tenant can still reach the billing surface to reactivate. Tenants
+  // with no subscription row are treated as active (see requireActiveSubscription).
+  if (!opts?.skipSubscriptionCheck && adminRow.role !== "SUPER_ADMIN") {
+    const sub = await requireActiveSubscription(adminRow.business_id);
+    if (!sub.active) return null;
+  }
+
   return { id: adminRow.id, role: adminRow.role, business_id: adminRow.business_id };
 }
 

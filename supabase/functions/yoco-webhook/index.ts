@@ -500,12 +500,19 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       const rBooking = prBooking.data;
 
+      // Credit-claim reschedule (weather/admin-cancelled booking): the old slot's
+      // capacity was already released at cancellation — don't release it again,
+      // and reactivate the booking now that the uplift is paid.
+      const wasCancelled = rBooking.status === "CANCELLED";
+
       // 1. Release old slot capacity (decrement booked)
-      const oldSlotData = await supabase.from("slots").select("booked").eq("id", pr.old_slot_id).single();
-      if (oldSlotData.data) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (oldSlotData.data.booked || 0) - rBooking.qty),
-        }).eq("id", pr.old_slot_id);
+      if (!wasCancelled) {
+        const oldSlotData = await supabase.from("slots").select("booked").eq("id", pr.old_slot_id).single();
+        if (oldSlotData.data) {
+          await supabase.from("slots").update({
+            booked: Math.max(0, (oldSlotData.data.booked || 0) - rBooking.qty),
+          }).eq("id", pr.old_slot_id);
+        }
       }
 
       // 2. Convert hold on new slot: held -> booked
@@ -523,6 +530,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         tour_id: pr.new_tour_id,
         unit_price: pr.new_unit_price,
         total_amount: pr.new_total_amount,
+        ...(wasCancelled ? {
+          status: "PAID",
+          refund_status: null,
+          refund_amount: 0,
+          cancellation_reason: null,
+          cancelled_at: null,
+        } : {}),
       }).eq("id", pr.booking_id);
 
       // 4. Mark hold as CONVERTED
@@ -1047,7 +1061,11 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     if (metaVoucherIds || metaVoucherCodes) {
       const voucherIdList = metaVoucherIds ? metaVoucherIds.split(",").filter(Boolean) : [];
       const voucherCodeList = metaVoucherCodes ? metaVoucherCodes.split(",").filter(Boolean) : [];
-      const voucherDiscount = Number(booking.original_total || 0) - Number(booking.total_amount || 0);
+      // Prefer the voucher amount recorded on the booking — original_total minus
+      // total_amount also includes any promo discount, which must not drain the voucher.
+      const voucherDiscount = Number(booking.voucher_amount_paid || 0) > 0
+        ? Number(booking.voucher_amount_paid)
+        : Number(booking.original_total || 0) - Number(booking.total_amount || 0);
       if (voucherDiscount > 0) {
         let vouchersToDeduct: any[] = [];
         if (voucherIdList.length > 0) {

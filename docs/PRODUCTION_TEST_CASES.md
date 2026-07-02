@@ -1,6 +1,6 @@
 # Cape Kayak — Production Readiness Test Cases
 
-> **389 test cases across 53 sections.**
+> **446 test cases across 53 sections.**
 > Work through in order: A–E (core booking flows), F–M (booking lifecycle), N–Z (admin features & platform), AA–AP (new features, edge cases & functional sign-off), AQ–BA (non-functional / operational readiness).
 > When all pass, the app is production-ready and can be sold with confidence.
 >
@@ -914,7 +914,7 @@
 |---|---|
 | **Tested by** | _________________________ |
 | **Date** | _________________________ |
-| **Total passed** | ______ / 389 |
+| **Total passed** | ______ / 446 |
 | **Blockers found** | _________________________ |
 | **Notes** | _________________________ |
 | **Production ready** | Yes / No |

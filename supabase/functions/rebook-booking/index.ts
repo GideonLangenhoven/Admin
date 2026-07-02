@@ -10,6 +10,7 @@ import {
   normalizePhone,
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
+import { verifyCustomerSession } from "../_shared/customer-session.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -52,6 +53,62 @@ function ok(req: any, data: any) {
 
 function fail(req: any, msg: string, status: number) {
   return new Response(JSON.stringify({ error: msg }), { status: status, headers: getCors(req) });
+}
+
+// ───── Caller authorization ─────
+// This function performs money-moving operations (refunds, cancellations,
+// guest changes) as service_role, so every caller must prove they own the
+// booking. Three legitimate caller classes:
+//   1. Internal cross-function calls (wa-webhook, web-chat) — authenticate
+//      the customer themselves and call with the service-role key as Bearer.
+//   2. Customers on /my-bookings — send the HMAC-signed customer_session
+//      token issued by my-bookings-lookup after OTP verification.
+//   3. Admin dashboard / magic-link customers — Supabase Auth JWT. Admins
+//      must belong to the booking's business (SUPER_ADMIN exempt); other
+//      authenticated users must match the booking's email.
+type CallerAuthz = { ok: true } | { ok: false; status: number; message: string };
+
+async function authorizeCaller(req: any, body: any, booking: any): Promise<CallerAuthz> {
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+  if (token && token === SUPABASE_KEY) return { ok: true };
+
+  const bookingEmail = String(booking.email || "").toLowerCase();
+
+  const sessionToken = typeof body.customer_session === "string" ? body.customer_session : "";
+  if (sessionToken) {
+    const session = await verifyCustomerSession(sessionToken);
+    if (!session.valid) {
+      return { ok: false, status: 401, message: "Your session has expired. Please sign in again." };
+    }
+    const emailMatches = !!bookingEmail && String(session.email || "").toLowerCase() === bookingEmail;
+    if (!emailMatches || session.businessId !== booking.business_id) {
+      return { ok: false, status: 403, message: "This booking does not belong to your account." };
+    }
+    return { ok: true };
+  }
+
+  if (token) {
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    const user = userData?.user;
+    if (!userErr && user) {
+      const { data: admin } = await supabase
+        .from("admin_users")
+        .select("business_id, role, suspended")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (admin && !admin.suspended) {
+        if (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id) return { ok: true };
+        return { ok: false, status: 403, message: "This booking belongs to a different business." };
+      }
+      const userEmail = String(user.email || "").toLowerCase();
+      if (userEmail && bookingEmail && userEmail === bookingEmail) return { ok: true };
+      return { ok: false, status: 403, message: "This booking does not belong to your account." };
+    }
+  }
+
+  return { ok: false, status: 401, message: "Please sign in to manage this booking." };
 }
 
 // ───── RESCHEDULE ─────
@@ -179,11 +236,17 @@ async function handleReschedule(req: any, booking: any, body: any) {
     result.hold_expires_at = holdExpiry;
   } else {
     // ── SAME PRICE OR DOWNGRADE: immediate swap ──
+    // Credit-claim reschedule (weather/admin-cancelled booking): the old slot's
+    // capacity was already released at cancellation, so don't release it again;
+    // reactivate the booking and consume the credit.
+    const isCreditClaim = booking.status === "CANCELLED";
 
     // Decrement old slot booked count
-    const oldSlotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
-    if (oldSlotRes.data) {
-      await supabase.from("slots").update({ booked: Math.max(0, oldSlotRes.data.booked - booking.qty) }).eq("id", booking.slot_id);
+    if (!isCreditClaim) {
+      const oldSlotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
+      if (oldSlotRes.data) {
+        await supabase.from("slots").update({ booked: Math.max(0, oldSlotRes.data.booked - booking.qty) }).eq("id", booking.slot_id);
+      }
     }
 
     // Increment new slot booked count
@@ -196,6 +259,13 @@ async function handleReschedule(req: any, booking: any, body: any) {
       unit_price: newUnitPrice,
       total_amount: newTotalAmount,
     };
+    if (isCreditClaim) {
+      updateData.status = "CONFIRMED";
+      updateData.refund_status = null;
+      updateData.refund_amount = 0;
+      updateData.cancellation_reason = null;
+      updateData.cancelled_at = null;
+    }
     await supabase.from("bookings").update(updateData).eq("id", booking.id);
 
     await supabase.from("logs").insert({
@@ -1022,6 +1092,129 @@ async function sendRebookNotification(booking: any, event: string, message: stri
   }
 }
 
+// ───── CLAIM_CREDIT (weather/admin-cancelled booking — customer chooses voucher or refund) ─────
+// The booking is already CANCELLED and its slot capacity already released, so this
+// only resolves the outstanding credit (refund_amount) — no capacity changes here.
+async function handleClaimCredit(req: any, booking: any, body: any) {
+  const creditAction = String(body.credit_action || "");
+  if (creditAction !== "VOUCHER" && creditAction !== "REFUND") {
+    return fail(req, "credit_action must be VOUCHER or REFUND", 400);
+  }
+  const creditAmount = Number(booking.refund_amount || 0);
+
+  const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+  const ref = booking.id.substring(0, 8).toUpperCase();
+  const tourName = (booking.tours && booking.tours.name) ? booking.tours.name : "Booking";
+  const brandName = getBusinessDisplayName(tenant.business);
+  const currency = tenant.business.currency || "ZAR";
+
+  // Cash refunds are impossible on voucher-paid bookings — issue a voucher instead.
+  if (creditAction === "VOUCHER" || (creditAction === "REFUND" && isVoucherPayment(booking))) {
+    const vcode = genVoucherCode();
+    const vr = await insertVoucherWithRetry({
+      business_id: booking.business_id,
+      code: vcode,
+      status: "ACTIVE",
+      type: "CREDIT",
+      value: creditAmount,
+      current_balance: creditAmount,
+      source_booking_id: booking.id,
+      expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    if (vr.error) return fail(req, "Voucher creation failed: " + vr.error.message, 500);
+    const voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
+
+    await supabase.from("bookings").update({
+      refund_status: null,
+      converted_to_voucher_id: voucherId,
+      refund_notes: "Credit claimed as voucher " + vcode,
+    }).eq("id", booking.id);
+
+    await supabase.from("logs").insert({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      event: "credit_claimed_voucher",
+      payload: { voucher_code: vcode, voucher_amount: creditAmount, voucher_id: voucherId },
+    });
+
+    if (booking.phone) {
+      try {
+        await sendWhatsappTextForTenant(tenant, booking.phone,
+          "Voucher issued\n\n" +
+          "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") + ", the credit for your cancelled booking " +
+          tourName + " (Ref: " + ref + ") has been converted to a voucher:\n" +
+          "Voucher code: " + vcode + "\n" +
+          "Value: " + currency + " " + creditAmount.toFixed(2) + "\n\n" +
+          "Use this code when making your next booking with " + brandName + "."
+        );
+      } catch (e) { console.error("CLAIM_CREDIT_VOUCHER_WA_ERR:", e); }
+    }
+    if (booking.email) {
+      try {
+        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({
+            type: "CANCELLATION",
+            data: {
+              business_id: booking.business_id,
+              email: booking.email,
+              customer_name: booking.customer_name,
+              ref: ref,
+              tour_name: tourName,
+              start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+              reason: "Credit claimed — voucher issued",
+              voucher_code: vcode,
+              voucher_amount: creditAmount.toFixed(2),
+              total_amount: String(creditAmount.toFixed(2)),
+              is_partial: false,
+            },
+          }),
+        });
+      } catch (e) { console.error("CLAIM_CREDIT_VOUCHER_EMAIL_ERR:", e); }
+    }
+
+    return ok(req, { ok: true, action: "CLAIM_CREDIT", voucher_code: vcode, voucher_amount: creditAmount });
+  }
+
+  // REFUND — request against the amount set at cancellation time (weather = 100%)
+  const totalCaptured = Number(booking.total_captured || booking.total_amount || 0);
+  const totalRefunded = Number(booking.total_refunded || 0);
+  const refundAmount = isManualPayment(booking)
+    ? creditAmount
+    : Math.min(creditAmount, Math.max(0, totalCaptured - totalRefunded));
+  if (refundAmount <= 0) return fail(req, "No refundable amount remaining on this booking", 400);
+  const refundStatus = isManualPayment(booking) ? "MANUAL_EFT_REQUIRED" : "REQUESTED";
+
+  await supabase.from("bookings").update({
+    refund_status: refundStatus,
+    refund_amount: refundAmount,
+    total_refunded: totalRefunded + refundAmount,
+  }).eq("id", booking.id);
+
+  await supabase.from("logs").insert({
+    business_id: booking.business_id,
+    booking_id: booking.id,
+    event: "credit_claimed_refund",
+    payload: { refund_amount: refundAmount, refund_status: refundStatus, payment_method: booking.payment_method || null },
+  });
+
+  if (booking.phone) {
+    try {
+      await sendWhatsappTextForTenant(tenant, booking.phone,
+        "Refund requested\n\n" +
+        "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") + ", a refund of " +
+        currency + " " + refundAmount.toFixed(2) + " has been requested for your cancelled booking " +
+        tourName + " (Ref: " + ref + ").\n" +
+        "Please allow 5 to 10 business days for it to reflect.\n\n" +
+        "Thanks for choosing " + brandName + "."
+      );
+    } catch (e) { console.error("CLAIM_CREDIT_REFUND_WA_ERR:", e); }
+  }
+
+  return ok(req, { ok: true, action: "CLAIM_CREDIT", refund_status: refundStatus, refund_amount: refundAmount });
+}
+
 // ───── Main handler ─────
 Deno.serve(async function (req: any) {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
@@ -1034,7 +1227,7 @@ Deno.serve(async function (req: any) {
     if (!bookingId) return fail(req, "booking_id required", 400);
     if (!action) return fail(req, "action required", 400);
 
-    const validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "CANCEL_REFUND", "CANCEL_VOUCHER"];
+    const validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "CANCEL_REFUND", "CANCEL_VOUCHER", "CLAIM_CREDIT"];
     if (validActions.indexOf(action) === -1) {
       return fail(req, "Invalid action. Must be one of: " + validActions.join(", "), 400);
     }
@@ -1048,9 +1241,25 @@ Deno.serve(async function (req: any) {
     if (br.error || !br.data) return fail(req, "Booking not found", 404);
     const booking = br.data;
 
+    const authz = await authorizeCaller(req, body, booking);
+    if (!authz.ok) return fail(req, authz.message, authz.status);
+
+    // Weather/admin-cancelled bookings awaiting a customer decision may claim
+    // their credit (voucher/refund) or pick a new date with it.
+    const claimEligible = booking.status === "CANCELLED"
+      && String(booking.refund_status || "") === "ACTION_REQUIRED"
+      && Number(booking.refund_amount || 0) > 0
+      && !booking.converted_to_voucher_id;
+
+    if (action === "CLAIM_CREDIT") {
+      if (!claimEligible) return fail(req, "No claimable credit on this booking", 400);
+      return await handleClaimCredit(req, booking, body);
+    }
+
     // For modification actions, booking must be in a modifiable state
     if (action !== "UPDATE_CONTACT" && action !== "SPECIAL_REQUEST") {
-      if (!["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)) {
+      if (!["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
+        && !(action === "RESCHEDULE" && claimEligible)) {
         return fail(req, "Booking is not in a modifiable state (status: " + booking.status + ")", 400);
       }
     }

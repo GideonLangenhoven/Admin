@@ -170,9 +170,28 @@ const PAGE_GATES: Array<{ pattern: RegExp; requirement: RoleRequirement }> = [
   { pattern: /^\/super-admin(\/|$)/, requirement: "SUPER_ADMIN_ONLY" },
   { pattern: /^\/ota-drift(\/|$)/, requirement: "SUPER_ADMIN_ONLY" },
   { pattern: /^\/billing(\/|$)/, requirement: "PRIVILEGED" },
-  { pattern: /^\/settings(\/|$)/, requirement: "PRIVILEGED" },
+  // NOTE: /settings is deliberately NOT gated here. Regular ADMINs can be
+  // granted per-section settings_permissions (stored in DB/localStorage, not
+  // readable from this cookie), and AppShell shows them the Settings link.
+  // The page renders its own "no permission" state for everyone else.
   { pattern: /^\/privacy\/data-requests(\/|$)/, requirement: "PRIVILEGED" },
 ];
+
+// MVP: temporarily hidden routes. Direct URL access redirects to `/`.
+// To re-enable: remove the entry here AND uncomment the matching nav line
+// in app/layout.tsx.
+const HIDDEN_FOR_MVP: RegExp[] = [
+  /^\/settings\/ota(\/|$)/,
+  /^\/ota-drift(\/|$)/,
+];
+
+function checkMvpHidden(req: NextRequest): NextResponse | null {
+  if (!HIDDEN_FOR_MVP.some((p) => p.test(req.nextUrl.pathname))) return null;
+  const url = req.nextUrl.clone();
+  url.pathname = "/";
+  url.search = "";
+  return NextResponse.redirect(url);
+}
 
 function checkPageRoleGate(req: NextRequest): NextResponse | null {
   const pathname = req.nextUrl.pathname;
@@ -196,6 +215,9 @@ function checkPageRoleGate(req: NextRequest): NextResponse | null {
 }
 
 export async function proxy(req: NextRequest) {
+  const mvpHidden = checkMvpHidden(req);
+  if (mvpHidden) return mvpHidden;
+
   const pageGate = checkPageRoleGate(req);
   if (pageGate) return pageGate;
 
