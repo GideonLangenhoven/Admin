@@ -451,54 +451,58 @@ export default function Dashboard() {
     return (
         <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
             {/* Dashboard Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pt-2">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h2>
+                    <p className="ui-section-title mb-1.5">
+                        {new Date(now).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: getAdminTimezone() })}
+                    </p>
+                    <h2 className="font-display text-[2.1rem] md:text-[2.4rem] font-semibold leading-none text-gray-900">Dashboard</h2>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link href="/new-booking" className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all hover:opacity-90 bg-donezo-gradient shadow-sm">
+                    <Link href="/new-booking" className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 bg-bt-gradient shadow-sm">
                         <Plus size={16} weight="bold" /> Add Booking
                     </Link>
                 </div>
             </div>
 
             {/* Revenue at a glance — today, last 7 days, this month (PAID/CONFIRMED/COMPLETED, by trip date) */}
-            <Link href="/reports" className="block rounded-[24px] bg-white border border-gray-100 shadow-sm p-5 hover:-translate-y-0.5 transition-all">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-[14px] font-semibold text-gray-700">Revenue</h3>
+            <Link href="/reports" className="block rounded-2xl bg-white border shadow-sm p-6 hover:-translate-y-0.5 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="ui-section-title">Revenue</h3>
                     <span className="text-[11px] text-gray-400">trip-date based · PAID/CONFIRMED/COMPLETED</span>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4 divide-x divide-gray-100">
                     <div>
                         <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Today</p>
-                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
                     </div>
-                    <div>
+                    <div className="pl-4">
                         <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Last 7 days</p>
-                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
                     </div>
-                    <div>
+                    <div className="pl-4">
                         <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">This month</p>
-                        <p className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
                     </div>
                 </div>
             </Link>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Today Pax */}
-                <Link href="/bookings" className="block p-6 transition-all hover:-translate-y-1 relative group rounded-[24px] shadow-sm bg-donezo-gradient text-white">
+                <Link href="/bookings" className="block p-6 transition-all hover:-translate-y-1 relative group rounded-2xl shadow-sm bg-bt-gradient text-white">
                     <div className="flex justify-between items-start mb-6">
-                        <span className="text-[16px] font-medium text-white/90">Today's Pax</span>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:scale-110">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/80">Today&apos;s Pax</span>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition-transform group-hover:scale-110">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
                         </div>
                     </div>
                     <div>
-                        <div className="text-[46px] font-bold tracking-tight text-white mb-4 leading-none">
+                        <div className="font-display text-[44px] font-semibold text-white mb-4 leading-none">
                             {todayPax}
                         </div>
-                        <div className="flex items-center gap-2 text-[13px] text-white/90 font-medium">
-                            <span className="flex items-center gap-1 border border-white/30 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10">
+                        <div className="flex items-center gap-2 text-[13px] text-white/85 font-medium">
+                            <span className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10 border border-white/20">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#D9822F]" aria-hidden="true" />
                                 {todayBookings} trips
                             </span>
                             <span>booked vs {tomorrowPax} tmrw</span>
@@ -507,15 +511,15 @@ export default function Dashboard() {
                 </Link>
 
                 {/* Refunds */}
-                <Link href="/refunds" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                <Link href="/refunds" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
                     <div className="flex justify-between items-start mb-6">
-                        <span className="text-[16px] font-medium text-gray-900">Pending Refunds</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Pending Refunds</span>
                         <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
                         </div>
                     </div>
                     <div>
-                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900">
+                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900">
                             {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
                         </div>
                         <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
@@ -529,16 +533,16 @@ export default function Dashboard() {
                 </Link>
 
                 {/* Inbox */}
-                <Link href="/inbox" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                <Link href="/inbox" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
                     <div className="flex justify-between items-start mb-6">
-                        <span className="text-[16px] font-medium text-gray-900">Inbox Action</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Inbox Action</span>
                         <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
                         </div>
                     </div>
                     <div>
-                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900 flex items-baseline gap-1">
-                            {inboxCount} <span className="text-[20px] text-gray-400 font-medium">msgs</span>
+                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900 flex items-baseline gap-1.5">
+                            {inboxCount} <span className="text-[18px] text-gray-400 font-medium">msgs</span>
                         </div>
                         <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
                             <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
@@ -550,16 +554,16 @@ export default function Dashboard() {
                 </Link>
 
                 {/* Photos */}
-                <Link href="/photos" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-[24px] shadow-sm border border-gray-100">
+                <Link href="/photos" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
                     <div className="flex justify-between items-start mb-6">
-                        <span className="text-[16px] font-medium text-gray-900">Photos Out</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Photos Out</span>
                         <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
                         </div>
                     </div>
                     <div>
-                        <div className="text-[46px] font-bold tracking-tight mb-4 leading-none text-gray-900 flex items-baseline gap-1">
-                            {photosOutstanding} <span className="text-[20px] text-gray-400 font-medium">trips</span>
+                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900 flex items-baseline gap-1.5">
+                            {photosOutstanding} <span className="text-[18px] text-gray-400 font-medium">trips</span>
                         </div>
                         <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
                             <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
@@ -574,7 +578,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* ── Today's Manifest (pax per slot) ── */}
-                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <div>
@@ -583,15 +587,15 @@ export default function Dashboard() {
                                         {manifestDate === "TODAY" ? "Today's Manifest" : "Tomorrow's Manifest"}
                                     </h3>
                                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-                                        <button 
+                                        <button
                                             onClick={() => { setManifestDate("TODAY"); setActiveSlotIdx(0); }}
-                                            className={`p-1 rounded transition-colors ${manifestDate === "TODAY" ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+                                            className={`p-1 rounded transition-colors ${manifestDate === "TODAY" ? "bg-white dark:bg-gray-700 shadow-sm text-[var(--ck-accent)]" : "text-gray-400 hover:text-gray-600"}`}
                                         >
                                             <CaretLeft size={16} />
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => { setManifestDate("TOMORROW"); setActiveSlotIdx(0); }}
-                                            className={`p-1 rounded transition-colors ${manifestDate === "TOMORROW" ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+                                            className={`p-1 rounded transition-colors ${manifestDate === "TOMORROW" ? "bg-white dark:bg-gray-700 shadow-sm text-[var(--ck-accent)]" : "text-gray-400 hover:text-gray-600"}`}
                                         >
                                             <CaretRight size={16} />
                                         </button>
@@ -600,7 +604,7 @@ export default function Dashboard() {
                                 <p className="text-[12px] font-medium" style={{ color: "var(--ck-text-muted)" }}>Pax breakdown per slot</p>
                             </div>
                         </div>
-                        <Link href="/new-booking" className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors shadow-sm hover:-translate-y-0.5" style={{ background: "var(--ck-accent)", color: "#fff" }}>
+                        <Link href="/new-booking" className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors shadow-sm hover:-translate-y-0.5" style={{ background: "var(--ck-accent)", color: "#fff" }}>
                             <Plus size={14} /> Add Booking
                         </Link>
                     </div>
@@ -675,7 +679,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Roll Call ── */}
-                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <div>
@@ -709,7 +713,7 @@ export default function Dashboard() {
                                 {manualSlotNav && (
                                     <button
                                         onClick={() => setManualSlotNav(false)}
-                                        className="ml-1 px-3 py-1.5 rounded-full text-[11px] font-bold text-white transition-all hover:opacity-90 shadow-sm bg-donezo-gradient"
+                                        className="ml-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shadow-sm bg-bt-gradient"
                                         title="Resume auto-advance"
                                     >
                                         Auto
@@ -759,7 +763,7 @@ export default function Dashboard() {
                                                     {b.add_ons && b.add_ons.length > 0 && (
                                                         <div className="mt-1 flex flex-wrap gap-1">
                                                             {b.add_ons.map((ao, idx) => (
-                                                                <span key={idx} className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                                                                <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                                                                     {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                                                                 </span>
                                                             ))}
@@ -775,7 +779,7 @@ export default function Dashboard() {
                                                 <td className="px-4 py-3.5 text-right">
                                                     <span className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${
                                                         b.checked_in ? "bg-emerald-50 text-emerald-700"
-                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "bg-blue-50 text-blue-700"
+                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "bg-[var(--ck-accent-soft)] text-[var(--ck-accent)]"
                                                         : "bg-amber-50 text-amber-700"
                                                     }`}>
                                                         {b.checked_in ? "Present" : b.status}
@@ -803,12 +807,12 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 gap-6">
                 {/* ── Weather Block ── */}
-                <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div className="flex items-center gap-3">
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
                         </div>
-                        <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-bold rounded-full transition-all text-white shadow-sm hover:opacity-90 bg-donezo-gradient">
+                        <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold rounded-lg border transition-all hover:-translate-y-0.5" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)", background: "var(--ck-surface)" }}>
                             Manage Locations <GearSix size={14} weight="bold" />
                         </button>
                     </div>

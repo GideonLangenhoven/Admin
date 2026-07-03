@@ -21,7 +21,7 @@ interface Automation {
 
 const triggerBadge: Record<string, { bg: string; text: string; label: string }> = {
   contact_added: { bg: "bg-blue-100", text: "text-blue-700", label: "Contact Added" },
-  tag_added: { bg: "bg-purple-100", text: "text-purple-700", label: "Tag Added" },
+  tag_added: { bg: "bg-teal-100", text: "text-teal-700", label: "Tag Added" },
   post_booking: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Post Booking" },
   date_field: { bg: "bg-orange-100", text: "text-orange-700", label: "Date Field" },
   manual: { bg: "bg-gray-100", text: "text-gray-500", label: "Manual" },
@@ -750,7 +750,7 @@ export default function AutomationsPage() {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {["completed-tour", "lapsed-90-days", "vip", "new-booker", "voucher-expiring"].map(tag => (
-                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700">
                     {tag}
                   </span>
                 ))}

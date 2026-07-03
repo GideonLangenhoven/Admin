@@ -19,21 +19,25 @@
 :root,
 html.light {
   color-scheme: light;
-  --ck-bg: #f8fafc;
-  /* Subtle gray background, Donezo style */
+  --ck-bg: #f7f5f0;
+  /* Warm paper — BookingTours brand canvas */
   --ck-surface: #ffffff;
   --ck-surface-elevated: #ffffff;
-  --ck-border-subtle: #e2e5e9;
-  --ck-border-strong: #d1d5db;
+  --ck-border-subtle: #e7e3d8;
+  --ck-border-strong: #d6d1c2;
 
   --ck-text-strong: #111827;
   --ck-text: #374151;
   --ck-text-muted: #6b7280;
 
   --ck-accent: #125e40;
-  /* Forest Green */
+  /* Pine 700 */
   --ck-accent-hover: #0e4831;
-  --ck-accent-soft: #d1fae5;
+  --ck-accent-soft: #dcefe4;
+
+  --ck-amber: #b4641c;
+  /* Sunset amber — decorative accent, AA on white */
+  --ck-amber-soft: #f7e8d8;
 
   --ck-success: #10b981;
   --ck-success-soft: #d1fae5;
@@ -42,13 +46,13 @@ html.light {
   --ck-warning: #f59e0b;
   --ck-warning-soft: #fef3c7;
 
-  --ck-sidebar: #f9fafb;
-  --ck-sidebar-border: #e5e7eb;
-  --ck-sidebar-text: #4b5563;
-  --ck-sidebar-muted: #9ca3af;
-  --ck-sidebar-hover: #f3f4f6;
+  --ck-sidebar: #f1eee6;
+  --ck-sidebar-border: #e4e0d3;
+  --ck-sidebar-text: #4e5449;
+  --ck-sidebar-muted: #98978a;
+  --ck-sidebar-hover: #eae6da;
   --ck-sidebar-active-bg: #ffffff;
-  --ck-sidebar-active-border: #f3f4f6;
+  --ck-sidebar-active-border: #eae6da;
   --ck-sidebar-active-text: #111827;
 
   --ck-radius-sm: 6px;
@@ -68,19 +72,22 @@ html.light {
 
 html.dark {
   color-scheme: dark;
-  --ck-bg: #161616;
-  --ck-surface: #222222;
-  --ck-surface-elevated: #2a2a2a;
-  --ck-border-subtle: #303030;
-  --ck-border-strong: #383838;
+  --ck-bg: #131614;
+  --ck-surface: #1b201c;
+  --ck-surface-elevated: #232923;
+  --ck-border-subtle: #2a302b;
+  --ck-border-strong: #363e37;
 
-  --ck-text-strong: #f0f0f0;
-  --ck-text: #b8b8b8;
-  --ck-text-muted: #787878;
+  --ck-text-strong: #f0f0ec;
+  --ck-text: #b8bab2;
+  --ck-text-muted: #7c7f76;
 
   --ck-accent: #00d98b;
   --ck-accent-hover: #33e4a4;
   --ck-accent-soft: rgba(0, 217, 139, 0.10);
+
+  --ck-amber: #e89b4b;
+  --ck-amber-soft: rgba(232, 155, 75, 0.14);
 
   --ck-success: #00d98b;
   --ck-success-soft: rgba(0, 217, 139, 0.10);
@@ -89,14 +96,14 @@ html.dark {
   --ck-warning: #f5a623;
   --ck-warning-soft: rgba(245, 166, 35, 0.10);
 
-  --ck-sidebar: #161616;
-  --ck-sidebar-border: #303030;
-  --ck-sidebar-text: #999999;
-  --ck-sidebar-muted: #666666;
-  --ck-sidebar-hover: #222222;
-  --ck-sidebar-active-bg: #222222;
-  --ck-sidebar-active-border: #383838;
-  --ck-sidebar-active-text: #f0f0f0;
+  --ck-sidebar: #131614;
+  --ck-sidebar-border: #2a302b;
+  --ck-sidebar-text: #9a9d93;
+  --ck-sidebar-muted: #666a61;
+  --ck-sidebar-hover: #1b201c;
+  --ck-sidebar-active-bg: #1b201c;
+  --ck-sidebar-active-border: #363e37;
+  --ck-sidebar-active-text: #f0f0ec;
 
   --ck-shadow-sm: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.30);
   --ck-shadow-md: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 4px 12px -2px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.25);
@@ -274,9 +281,56 @@ body {
     scrollbar-width: none;
   }
 
-  .bg-donezo-gradient {
-    background: linear-gradient(135deg, #10422c 0%, #176e44 100%);
+  /* Brand gradient — deep pine. Reserved for the single primary action on a screen. */
+  .bg-bt-gradient {
+    background: linear-gradient(135deg, #0f2b1f 0%, #125e40 100%);
   }
+
+  /* Display face — Fraunces. Page titles and hero stat numbers only. */
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ── Light mode: warm the stock gray hairlines & washes to match the paper canvas ── */
+html.light .border-gray-100,
+html.light .border-gray-200 {
+  border-color: var(--ck-border-subtle);
+}
+
+html.light .border-gray-300 {
+  border-color: var(--ck-border-strong);
+}
+
+html.light .divide-gray-100> :not([hidden])~ :not([hidden]),
+html.light .divide-gray-200> :not([hidden])~ :not([hidden]) {
+  border-color: var(--ck-border-subtle);
+}
+
+html.light .bg-gray-50,
+html.light .bg-slate-50 {
+  background-color: #f4f2ea;
+}
+
+html.light .bg-gray-100 {
+  background-color: #edeae0;
+}
+
+html.light .hover\:bg-gray-50:hover {
+  background-color: #f4f2ea;
+}
+
+html.light .hover\:bg-gray-100:hover {
+  background-color: #edeae0;
+}
+
+html.light .bg-\[\#f9fafb\] {
+  background-color: #f4f2ea;
+}
+
+html.light .bg-\[\#fbfcfc\] {
+  background-color: #f7f5f0;
 }
 
 /* ── Sidebar icon: disappear → line-redraw → fill back on hover ── */
@@ -781,15 +835,16 @@ html.dark .hover\:text-red-500:hover {
   color: #f87171;
 }
 
-/* Purple */
-html.dark .text-purple-700 {
-  color: #c084fc;
+/* Teal (categorical badges — OTA sources, tags) */
+html.dark .text-teal-600,
+html.dark .text-teal-700 {
+  color: #2dd4bf;
 }
 
-html.dark .bg-purple-50 {
-  background-color: rgba(192, 132, 252, 0.10);
+html.dark .bg-teal-50 {
+  background-color: rgba(45, 212, 191, 0.10);
 }
 
-html.dark .bg-purple-100 {
-  background-color: rgba(192, 132, 252, 0.15);
+html.dark .bg-teal-100 {
+  background-color: rgba(45, 212, 191, 0.15);
 }

@@ -10,12 +10,13 @@ import SignOutButton from "./SignOutButton";
 import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
+import { BrandMark, BrandWordmark } from "./BrandLogo";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
   ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
-  UsersThree, Clock,
+  UsersThree, Clock, CaretDoubleLeft, CaretDoubleRight,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
@@ -107,23 +108,18 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             {logoUrl ? (
               <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded object-contain" unoptimized />
             ) : (
-              <div className="grid grid-cols-2 gap-[2px] h-6 w-6 shrink-0">
-                <div className="bg-[var(--ck-accent)] rounded-tl-full"></div>
-                <div className="bg-[var(--ck-accent)] rounded-tr-full"></div>
-                <div className="bg-[var(--ck-accent)] rounded-bl-full"></div>
-                <div className="bg-[var(--ck-accent)] rounded-br-full opacity-50"></div>
-              </div>
+              <BrandMark size={26} className="shrink-0" />
             )}
-            {!collapsed && <h1 className="text-xl font-bold tracking-tight truncate" style={{ color: "var(--ck-accent)" }}>{displayName}</h1>}
+            {!collapsed && <h1 className="text-lg font-bold tracking-tight truncate" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>}
             </Link>
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="rounded-lg border px-2 py-1 text-xs font-semibold transition-colors hover:bg-white/10"
+              className="rounded-lg border p-1.5 transition-colors"
               style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {collapsed ? "→" : "←"}
+              {collapsed ? <CaretDoubleRight size={13} /> : <CaretDoubleLeft size={13} />}
             </button>
           </div>
         </div>
@@ -182,12 +178,8 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   onMouseEnter={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = "var(--ck-sidebar-hover)"; e.currentTarget.style.color = "var(--ck-sidebar-active-text)"; } }}
                   onMouseLeave={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "var(--ck-sidebar-text)"; } }}
                 >
-                  <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-success)" : "var(--ck-sidebar-muted)" }}>
-                    {isActive && n.href === "/" ? (
-                      <Icon size={20} weight="fill" className="text-emerald-500" />
-                    ) : (
-                      <Icon size={20} weight={isActive ? "fill" : "regular"} className={isActive ? "text-emerald-500" : ""} />
-                    )}
+                  <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-sidebar-muted)" }}>
+                    <Icon size={20} weight={isActive ? "fill" : "regular"} />
                   </span>
                   {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
                   {n.href === "/inbox" && <NotificationBadge />}
@@ -208,15 +200,11 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
           title="Powered by BookingTours"
         >
-          <span className="grid grid-cols-2 gap-[2px] h-3 w-3 shrink-0" aria-hidden="true">
-            <span className="rounded-tl-full" style={{ background: "var(--ck-accent)" }} />
-            <span className="rounded-tr-full" style={{ background: "var(--ck-accent)" }} />
-            <span className="rounded-bl-full" style={{ background: "var(--ck-accent)" }} />
-            <span className="rounded-br-full opacity-50" style={{ background: "var(--ck-accent)" }} />
-          </span>
+          <BrandMark size={14} className="shrink-0" />
           {!collapsed && (
-            <span className="text-[10px] font-medium uppercase" style={{ letterSpacing: "0.08em" }}>
-              Powered by BookingTours
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-[9px] font-medium uppercase" style={{ letterSpacing: "0.1em" }}>Powered by</span>
+              <BrandWordmark className="text-[12px]" />
             </span>
           )}
         </div>
@@ -225,7 +213,11 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         <header className="md:hidden flex items-center justify-between border-b px-4 py-3 backdrop-blur" style={{ background: "color-mix(in srgb, var(--ck-surface) 85%, transparent)", borderColor: "var(--ck-border-strong)" }}>
           <MobileMenuDrawer nav={visibleNav} />
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            {logoUrl && <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />}
+            {logoUrl ? (
+              <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
+            ) : (
+              <BrandMark size={22} className="shrink-0" />
+            )}
             <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
           </Link>
           <div className="flex items-center gap-3">

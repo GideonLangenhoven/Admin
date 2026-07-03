@@ -116,7 +116,7 @@ export default function OtaDriftPage() {
                     <p className="text-[color:var(--textMuted)]">Missing on OTA</p>
                   </div>
                   <div className="bg-white rounded-lg p-2 text-center border border-[color:var(--border)]">
-                    <p className="font-bold text-purple-600">{run.amount_mismatches}</p>
+                    <p className="font-bold text-teal-600">{run.amount_mismatches}</p>
                     <p className="text-[color:var(--textMuted)]">Amount diffs</p>
                   </div>
                   <div className="bg-white rounded-lg p-2 text-center border border-[color:var(--border)]">
@@ -131,7 +131,7 @@ export default function OtaDriftPage() {
                         <span className={"font-mono px-1.5 py-0.5 rounded shrink-0 " + ({
                           missing_locally: "bg-red-100 text-red-700",
                           missing_on_ota: "bg-orange-100 text-orange-700",
-                          amount_mismatch: "bg-purple-100 text-purple-700",
+                          amount_mismatch: "bg-teal-100 text-teal-700",
                           status_mismatch: "bg-blue-100 text-blue-700",
                         }[d.type as string] || "bg-gray-100 text-gray-700")}>{d.type}</span>
                         <span className="text-[color:var(--textMuted)] font-mono">{d.external_ref}</span>

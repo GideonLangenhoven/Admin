@@ -161,7 +161,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                 {b.add_ons.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {b.add_ons.map((ao, idx) => (
-                      <span key={idx} className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
+                      <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                         {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                       </span>
                     ))}

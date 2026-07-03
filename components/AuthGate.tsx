@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
+import { BrandMark, BrandWordmark } from "./BrandLogo";
 
 const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
@@ -368,8 +369,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (!authed) return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
       <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-[var(--ck-text-strong)] mb-1">Admin Dashboard</h1>
-        <p className="mb-6 text-sm ui-text-muted">Enter your email and password</p>
+        <div className="mb-6 flex flex-col items-center">
+          <BrandMark size={44} className="mb-4" />
+          <h1 className="text-2xl text-[var(--ck-text-strong)]">
+            <BrandWordmark />
+          </h1>
+          <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
+        </div>
 
         {locked ? (
           <div className="text-center">
@@ -405,7 +411,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             {error && <p className="mb-3 text-xs text-[var(--ck-danger)]">{error}</p>}
             {notice && <p className="mb-3 text-xs text-emerald-700">{notice}</p>}
 
-            <button onClick={login} disabled={loading} className="w-full rounded-xl bg-[var(--ck-text-strong)] py-3 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50">
+            <button onClick={login} disabled={loading} className="w-full rounded-xl bg-bt-gradient py-3 text-sm font-semibold text-white hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50">
               {loading ? "Signing in..." : "Sign In"}
             </button>
 
@@ -423,7 +429,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
         <div className="ui-surface-elevated w-full max-w-md p-8 text-center space-y-4">
-          <div className="text-4xl">⏸️</div>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "var(--ck-warning-soft)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--ck-warning)" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
+          </div>
           <h1 className="text-xl font-semibold text-[var(--ck-text-strong)]">
             {subscriptionStatus === "PAUSED" ? "Your account is paused" : "Your account has been suspended"}
           </h1>

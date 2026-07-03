@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import AppShell from "../components/AppShell";
@@ -7,11 +7,11 @@ import AppNotifications from "../components/AppNotifications";
 import ThemeProvider from "../components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display" });
 
 export const metadata: Metadata = {
   title: "BookingTours Admin",
   description: "BookingTours Admin Dashboard — Built for adventure operators",
-  icons: { icon: "/favicon.ico" },
 };
 
 const nav = [
@@ -48,7 +48,7 @@ const nav = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`light ${inter.className}`} suppressHydrationWarning>
+    <html lang="en" className={`light ${inter.className} ${fraunces.variable}`} suppressHydrationWarning>
       <body className="bg-[var(--ck-bg)] text-[var(--ck-text)] antialiased transition-colors duration-200">
         <ThemeProvider>
           <AppNotifications />

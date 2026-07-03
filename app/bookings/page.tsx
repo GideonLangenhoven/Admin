@@ -2058,7 +2058,7 @@ function SlotRows({
                   {b.add_ons && b.add_ons.length > 0 && (
                     <div className="flex flex-wrap gap-1 pl-[18px] lg:pl-0">
                       {b.add_ons.map((ao, idx) => (
-                        <span key={idx} className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                        <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                           {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                         </span>
                       ))}
@@ -2237,7 +2237,7 @@ function RefundBadge({ status }: { status: string | null }) {
 function SourceBadge({ source }: { source: string }) {
   if (!source || source === "WEB") return null;
   const colors: Record<string, string> = {
-    VIATOR: "bg-violet-100 text-violet-700",
+    VIATOR: "bg-teal-100 text-teal-700",
     GETYOURGUIDE: "bg-orange-100 text-orange-700",
     WHATSAPP: "bg-green-100 text-green-700",
     ADMIN: "bg-blue-100 text-blue-700",
