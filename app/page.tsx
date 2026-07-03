@@ -633,11 +633,9 @@ export default function Dashboard() {
                                         return (
                                             <tr
                                                 key={slot.timeRaw}
-                                                className="transition-colors cursor-pointer"
+                                                className="transition-colors cursor-pointer hover:bg-[var(--ck-surface-elevated)]"
                                                 style={{ opacity: isPast ? 0.5 : 1 }}
                                                 onClick={() => { setActiveSlotIdx(i); setManualSlotNav(true); }}
-                                                onMouseEnter={(e) => e.currentTarget.style.background = "var(--ck-surface-elevated)"}
-                                                onMouseLeave={(e) => e.currentTarget.style.background = ""}
                                             >
                                                 <td className="px-5 py-4">
                                                     <div className="font-semibold text-[14px]" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</div>
@@ -744,10 +742,8 @@ export default function Dashboard() {
                                         {activeSlot.bookings.map((b) => (
                                             <tr
                                                 key={b.id}
-                                                className="transition-colors"
+                                                className="transition-colors hover:bg-[var(--ck-surface-elevated)]"
                                                 style={{ background: b.checked_in ? "var(--ck-success-soft)" : "" }}
-                                                onMouseEnter={(e) => { if (!b.checked_in) e.currentTarget.style.background = "var(--ck-surface-elevated)"; }}
-                                                onMouseLeave={(e) => { if (!b.checked_in) e.currentTarget.style.background = ""; }}
                                             >
                                                 <td className="px-3 py-3.5 text-center">
                                                     <input

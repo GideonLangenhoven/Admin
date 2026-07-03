@@ -167,16 +167,10 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                 <Link key={n.href} href={navBlocked ? pathname : n.href}
                   className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
                       ? "ui-nav-active font-semibold"
-                      : "font-medium"
+                      : "font-medium text-[var(--ck-sidebar-text)] hover:bg-[var(--ck-sidebar-hover)] hover:text-[var(--ck-sidebar-active-text)]"
                     } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
-                  style={isActive
-                    ? undefined
-                    : { color: "var(--ck-sidebar-text)" }
-                  }
                   aria-disabled={navBlocked}
                   tabIndex={navBlocked ? -1 : undefined}
-                  onMouseEnter={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = "var(--ck-sidebar-hover)"; e.currentTarget.style.color = "var(--ck-sidebar-active-text)"; } }}
-                  onMouseLeave={(e) => { if (!isActive && !navBlocked) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "var(--ck-sidebar-text)"; } }}
                 >
                   <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-sidebar-muted)" }}>
                     <Icon size={20} weight={isActive ? "fill" : "regular"} />
