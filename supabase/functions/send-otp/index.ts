@@ -186,23 +186,22 @@ Deno.serve(async (req) => {
         await supabase.from("otp_attempts").update({ send_error: outcome }).eq("token_hash", tokenHash);
       }
 
-      // Only send the email if bookings matched — but always return 200
+      // Only send the email if bookings matched — but always return 200.
+      // Route through send-email so the code lands in the tenant's branded
+      // template (logo, brand colour, footer) instead of the plain green default.
       if (matched.length > 0) {
-        const res = await fetch("https://api.resend.com/emails", {
+        const res = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
           method: "POST",
-          headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+          headers: { Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({
-            from: FROM_EMAIL,
-            to: [email],
-            subject: "Your verification code",
-            html: otpEmailHtml(code),
+            type: "MY_BOOKINGS_OTP",
+            data: { business_id: business.id, email, otp_code: code },
           }),
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
-          await recordSendOutcome(res.status + ":" + JSON.stringify(errData).slice(0, 500));
+        const emailData = await res.json().catch(() => ({}));
+        if (!res.ok || emailData?.error) {
+          console.error("SEND_EMAIL_OTP_ERR", res.status, JSON.stringify(emailData).slice(0, 500));
+          await recordSendOutcome(res.status + ":" + JSON.stringify(emailData).slice(0, 500));
           // Still return 200 with token — don't leak send failure vs no-match
         } else {
           await recordSendOutcome("SENT_OK");

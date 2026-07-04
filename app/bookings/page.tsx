@@ -6,7 +6,7 @@ import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/b
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
+import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap, CheckCircle, XCircle, Spinner, CalendarBlank, Timer } from "@phosphor-icons/react";
 import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
@@ -14,6 +14,17 @@ import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+// Build a hover tooltip from any details the customer added (special requests,
+// dietary notes, etc.) stored on bookings.custom_fields. Returns undefined when
+// there's nothing to show, so the name renders plainly.
+function customerNotesTooltip(cf: Record<string, string> | null | undefined): string | undefined {
+  if (!cf) return undefined;
+  const parts = Object.entries(cf)
+    .filter(([, v]) => v && String(v).trim())
+    .map(([k, v]) => k.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase()) + ": " + String(v).trim());
+  return parts.length ? parts.join("\n") : undefined;
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", {
@@ -1317,12 +1328,15 @@ export default function Bookings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Bookings</h2>
+      <div className="anim-fade-up flex items-center justify-between gap-4">
+        <div>
+          <p className="ui-mono-label mb-2">Operations</p>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Bookings</h2>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => exportCsv(false)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]"
             title="Export CSV (special requests masked)"
           >
             <DownloadSimple className="h-4 w-4" /> Export CSV
@@ -1330,7 +1344,8 @@ export default function Bookings() {
           {isPrivilegedRole && (
             <button
               onClick={() => exportCsv(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+              className="ui-btn !h-8 !px-3 !text-[12.5px]"
+              style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}
               title="Export with sensitive data (special requests visible)"
             >
               <DownloadSimple className="h-4 w-4" /> Export with Sensitive Data
@@ -1342,9 +1357,9 @@ export default function Bookings() {
       {/* WhatsApp compose dialog */}
       {waDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-base font-semibold text-gray-900">WhatsApp {waDialog.name}</h3>
-            <p className="mb-4 text-xs text-gray-500">{waDialog.phone}</p>
+          <div className="ui-card w-full max-w-md p-6">
+            <h3 className="ui-title-md mb-1">WhatsApp {waDialog.name}</h3>
+            <p className="ui-mono-label mb-4">{waDialog.phone}</p>
             <textarea
               autoFocus
               rows={4}
@@ -1352,20 +1367,20 @@ export default function Bookings() {
               onChange={e => setWaMessage(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendWhatsAppGreeting(); } }}
               placeholder="Type your greeting… (Enter to send, Shift+Enter for new line)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none mb-3"
+              className="ui-control w-full resize-none mb-3"
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setWaDialog(null)}
                 disabled={waSending}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                className="ui-btn ui-btn-ghost disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={sendWhatsAppGreeting}
                 disabled={waSending || !waMessage.trim()}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {waSending ? "Sending…" : "Send & Open Inbox"}
               </button>
@@ -1377,11 +1392,11 @@ export default function Bookings() {
       {/* Refund dialog */}
       {refundDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-base font-semibold text-gray-900">Refund Booking</h3>
-            <p className="mb-1 text-xs text-gray-500">{refundDialog.booking.customer_name} · {refundDialog.booking.id.substring(0, 8).toUpperCase()}</p>
-            <p className="mb-4 text-xs text-gray-400">Booking total: {fmtCurrency(Number(refundDialog.booking.total_amount || 0))}</p>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Refund amount (R)</label>
+          <div className="ui-card w-full max-w-sm p-6">
+            <h3 className="ui-title-md mb-1">Refund Booking</h3>
+            <p className="mb-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{refundDialog.booking.customer_name} · {refundDialog.booking.id.substring(0, 8).toUpperCase()}</p>
+            <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking total: {fmtCurrency(Number(refundDialog.booking.total_amount || 0))}</p>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ck-text)" }}>Refund amount (R)</label>
             <input
               autoFocus
               type="number"
@@ -1391,13 +1406,13 @@ export default function Bookings() {
               value={refundDialog.amount}
               onChange={e => setRefundDialog(d => d ? { ...d, amount: e.target.value } : null)}
               onKeyDown={e => e.key === "Enter" && processRefund()}
-              className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="ui-control mb-4 w-full tabular-nums"
             />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setRefundDialog(null)} disabled={refunding} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+              <button onClick={() => setRefundDialog(null)} disabled={refunding} className="ui-btn ui-btn-ghost disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={processRefund} disabled={refunding || !refundDialog.amount} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+              <button onClick={processRefund} disabled={refunding || !refundDialog.amount} className="ui-btn ui-btn-danger disabled:opacity-50">
                 {refunding ? "Processing…" : "Refund & Cancel Booking"}
               </button>
             </div>
@@ -1405,15 +1420,15 @@ export default function Bookings() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <button onClick={() => shiftRange(-7)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50">
+      <div className="anim-fade-up anim-d1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <button onClick={() => shiftRange(-7)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
           ← Prev Week
         </button>
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>
           {rangeStart.toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} —{" "}
           {rangeEnd.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
         </span>
-        <button onClick={() => shiftRange(7)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50">
+        <button onClick={() => shiftRange(7)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
           Next Week →
         </button>
         <button
@@ -1426,7 +1441,7 @@ export default function Bookings() {
             e.setHours(23, 59, 59, 999);
             setRangeEnd(e);
           }}
-          className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
+          className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px]"
         >
           Today
         </button>
@@ -1443,85 +1458,99 @@ export default function Bookings() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-1.5">
-        {[
-          { key: "ALL", label: "All" },
-          { key: "PENDING", label: "Pending" },
-          { key: "PAID", label: "Paid" },
-          { key: "CONFIRMED", label: "Confirmed" },
-          { key: "COMPLETED", label: "Completed" },
-          { key: "CANCELLED", label: "Cancelled" },
-        ].map((tab) => {
-          const isActive = statusFilter === tab.key;
-          const count = tab.key === "ALL"
-            ? bookings.length
-            : bookings.filter((b) => (STATUS_FILTER_MAP[tab.key] || []).includes(b.status)).length;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setStatusFilter(tab.key)}
-              className={
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
-                (isActive
-                  ? "bg-gray-900 text-white"
-                  : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50")
-              }
-            >
-              {tab.label} ({count})
-            </button>
-          );
-        })}
+      <div className="anim-fade-up anim-d2 overflow-x-auto no-scrollbar">
+        <div className="ui-seg w-max">
+          {[
+            { key: "ALL", label: "All" },
+            { key: "PENDING", label: "Pending" },
+            { key: "PAID", label: "Paid" },
+            { key: "CONFIRMED", label: "Confirmed" },
+            { key: "COMPLETED", label: "Completed" },
+            { key: "CANCELLED", label: "Cancelled" },
+          ].map((tab) => {
+            const isActive = statusFilter === tab.key;
+            const count = tab.key === "ALL"
+              ? bookings.length
+              : bookings.filter((b) => (STATUS_FILTER_MAP[tab.key] || []).includes(b.status)).length;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setStatusFilter(tab.key)}
+                data-active={isActive}
+                className="ui-seg-item !px-3 whitespace-nowrap"
+              >
+                {tab.label}
+                <span className="font-display tabular-nums text-[11px] opacity-70">{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+        <div className="anim-fade-up anim-d3 space-y-6">
+          <div className="space-y-2">
+            <div className="ui-skeleton h-6 w-40" />
+            <div className="ui-skeleton h-52 w-full !rounded-xl" />
+          </div>
+          <div className="space-y-2">
+            <div className="ui-skeleton h-6 w-40" />
+            <div className="ui-skeleton h-52 w-full !rounded-xl" />
+          </div>
         </div>
       ) : dayGroups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          {statusFilter !== "ALL" ? "No " + statusFilter.toLowerCase() + " bookings in this date range." : "No bookings in this date range."}
+        <div className="ui-card anim-fade-up anim-d3">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings found</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
+              {statusFilter !== "ALL" ? `No ${statusFilter.toLowerCase()} bookings in this date range.` : "No bookings in this date range."}
+            </p>
+          </div>
         </div>
       ) : (
         <>
         {selected.size > 0 && (
-          <div className="sticky top-0 z-20 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3 shadow-sm">
-            <span className="text-sm font-semibold text-blue-900">{selected.size} selected</span>
+          <div className="sticky top-0 z-20 rounded-xl border px-4 py-3 mb-4 flex items-center gap-3 shadow-sm" style={{ background: "var(--ck-ocean-soft)", borderColor: "color-mix(in srgb, var(--ck-ocean) 30%, transparent)" }}>
+            <span className="text-sm font-semibold" style={{ color: "var(--ck-ocean)" }}>
+              <span className="font-display tabular-nums">{selected.size}</span> selected
+            </span>
             <div className="flex-1" />
             {selectionAllPaid && (
-              <button onClick={() => runBulk("checkin")} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors">
+              <button onClick={() => runBulk("checkin")} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs">
                 Check in
               </button>
             )}
             {selectionAllUnpaid && (
-              <button onClick={() => runBulk("markpaid")} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors">
+              <button onClick={() => runBulk("markpaid")} className="ui-btn !h-8 !px-3 !text-xs" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                 Mark paid (EFT)
               </button>
             )}
             {selectionNoneCancelled && (
-              <button onClick={() => runBulk("cancel")} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors">
+              <button onClick={() => runBulk("cancel")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
                 Cancel
               </button>
             )}
             {selectionAllPaid && (
-              <button onClick={() => runBulk("refund")} className="px-3 py-1.5 rounded-lg bg-red-700 text-white text-xs font-semibold hover:bg-red-800 transition-colors">
+              <button onClick={() => runBulk("refund")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
                 Refund
               </button>
             )}
-            <button onClick={clearSelection} className="px-3 py-1.5 text-xs text-blue-700 underline hover:text-blue-900">
+            <button onClick={clearSelection} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
               Clear
             </button>
           </div>
         )}
 
-        <div className="space-y-6 pb-48">
+        <div className="anim-fade-up anim-d3 space-y-6 pb-48">
           {dayGroups.map((day) => {
             const slotKeys = day.slots.map((_, i) => `${day.sortKey}-${i}`);
             const allExpanded = expandAllDays.has(day.sortKey);
             return (
               <div key={day.sortKey}>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-gray-800">{day.dateLabel}</h3>
-                  <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-gray-500">
+                  <h3 className="text-xl font-semibold" style={{ color: "var(--ck-text-strong)" }}>{day.dateLabel}</h3>
+                  <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                     <input
                       type="checkbox"
                       checked={allExpanded}
@@ -1532,10 +1561,10 @@ export default function Bookings() {
                   </label>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto no-scrollbar lg:overflow-visible">
+                <div className="ui-card overflow-x-auto no-scrollbar lg:overflow-visible">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50">
+                      <tr className="border-b" style={{ background: "var(--ck-surface-sunken)" }}>
                         <th className="w-8 p-1.5 lg:p-3 text-center">
                           <input type="checkbox"
                             checked={allVisibleIds.length > 0 && allVisibleIds.every(id => selected.has(id))}
@@ -1587,15 +1616,15 @@ export default function Bookings() {
                         );
                       })}
 
-                      <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold text-gray-700">
+                      <tr className="border-t-2 font-semibold text-gray-700" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
                         <td className="p-3"></td>
-                        <td className="p-3 text-xs text-gray-500">Totals:</td>
-                        <td className="p-3">{day.totalPax}</td>
+                        <td className="p-3"><span className="ui-mono-label">Totals</span></td>
+                        <td className="p-3 font-display tabular-nums">{day.totalPax}</td>
                         <td className="hidden p-3 md:table-cell"></td>
                         <td className="hidden p-3 md:table-cell"></td>
-                        <td className="hidden p-3 text-right sm:table-cell">{fmtCurrency(day.totalPrice)}</td>
-                        <td className="hidden p-3 text-right sm:table-cell">{fmtCurrency(day.totalPaid)}</td>
-                        <td className={`p-3 text-right ${day.totalDue > 0 ? "text-red-600" : "text-gray-700"}`}>{fmtCurrency(day.totalDue)}</td>
+                        <td className="hidden p-3 text-right font-display tabular-nums sm:table-cell">{fmtCurrency(day.totalPrice)}</td>
+                        <td className="hidden p-3 text-right font-display tabular-nums sm:table-cell">{fmtCurrency(day.totalPaid)}</td>
+                        <td className={`p-3 text-right font-display tabular-nums ${day.totalDue > 0 ? "text-red-600" : "text-gray-700"}`}>{fmtCurrency(day.totalDue)}</td>
                         <td className="hidden p-3 lg:table-cell"></td>
                       </tr>
                     </tbody>
@@ -1609,7 +1638,7 @@ export default function Bookings() {
           <div className="flex justify-center py-4">
             <button
               onClick={() => setPage(p => p + 1)}
-              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="ui-btn ui-btn-ghost"
             >
               Load more bookings
             </button>
@@ -1621,16 +1650,16 @@ export default function Bookings() {
       {/* Bulk progress dialog */}
       {bulkProgress && (
         <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-            <h2 className="font-bold text-lg text-gray-900">
+          <div className="ui-card max-w-lg w-full p-6">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               {bulkActionInFlight ? "Running " + bulkActionInFlight + "..." : "Done"}
             </h2>
             <div className="mt-3 space-y-1.5 max-h-80 overflow-auto">
               {bulkProgress.map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
-                  {p.status === "ok" && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" weight="fill" />}
-                  {p.status === "error" && <XCircle className="w-4 h-4 text-red-600 shrink-0" weight="fill" />}
-                  {p.status === "pending" && <Spinner className="w-4 h-4 text-gray-400 shrink-0 animate-spin" />}
+                  {p.status === "ok" && <CheckCircle className="w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-success)" }} />}
+                  {p.status === "error" && <XCircle className="w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-danger)" }} />}
+                  {p.status === "pending" && <Spinner className="w-4 h-4 shrink-0 animate-spin" style={{ color: "var(--ck-text-muted)" }} />}
                   <span className="font-medium text-gray-800 truncate">{p.name}</span>
                   <span className="font-mono text-[10px] text-gray-400">{p.id.slice(0, 8)}</span>
                   {p.error && <span className="text-[11px] text-red-700 truncate ml-auto">— {p.error}</span>}
@@ -1641,15 +1670,15 @@ export default function Bookings() {
               const ok = bulkProgress.filter(p => p.status === "ok").length;
               const err = bulkProgress.filter(p => p.status === "error").length;
               return (
-                <p className="mt-3 text-xs text-gray-600">
-                  {ok} succeeded · {err} failed
+                <p className="mt-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                  <span className="font-display tabular-nums">{ok}</span> succeeded · <span className="font-display tabular-nums">{err}</span> failed
                 </p>
               );
             })()}
             <div className="mt-4 flex gap-2 justify-end">
               {!bulkActionInFlight && (
                 <button onClick={() => { setBulkProgress(null); clearSelection(); }}
-                  className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900 transition-colors">
+                  className="ui-btn ui-btn-primary">
                   Close
                 </button>
               )}
@@ -1660,15 +1689,15 @@ export default function Bookings() {
 
       {editBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-lg rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-xl">
-            <h3 className="mb-4 text-lg font-semibold">Edit Booking</h3>
+          <div className="ui-card w-full max-w-lg p-5">
+            <h3 className="mb-4 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Edit Booking</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="text-sm text-gray-600 md:col-span-2">
                 Name
                 <input
                   value={editForm.customer_name}
                   onChange={(e) => setEditForm((p) => ({ ...p, customer_name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
               <label className="text-sm text-gray-600">
@@ -1676,7 +1705,7 @@ export default function Bookings() {
                 <input
                   value={editForm.phone}
                   onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
               <label className="text-sm text-gray-600">
@@ -1684,7 +1713,7 @@ export default function Bookings() {
                 <input
                   value={editForm.email}
                   onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
               <label className="text-sm text-gray-600">
@@ -1702,7 +1731,7 @@ export default function Bookings() {
                     const q = Math.max(1, Number(e.target.value) || 1);
                     return { ...p, qty: e.target.value, total_amount: (perPerson * q).toFixed(2) };
                   })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
               <label className="text-sm text-gray-600">
@@ -1713,7 +1742,7 @@ export default function Bookings() {
                   min={0}
                   value={editForm.total_amount}
                   onChange={(e) => setEditForm((p) => ({ ...p, total_amount: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
               <label className="text-sm text-gray-600 md:col-span-2">
@@ -1721,7 +1750,7 @@ export default function Bookings() {
                 <select
                   value={editForm.status}
                   onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -1732,13 +1761,13 @@ export default function Bookings() {
               </label>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
-              <button onClick={() => setEditBooking(null)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50">
+              <button onClick={() => setEditBooking(null)} className="ui-btn ui-btn-ghost">
                 Close
               </button>
               <button
                 onClick={saveEditBooking}
                 disabled={actionBookingId === editBooking.id}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {actionBookingId === editBooking.id ? "Saving..." : "Save"}
               </button>
@@ -1749,9 +1778,9 @@ export default function Bookings() {
 
       {rebookBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-lg rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-xl">
-            <h3 className="mb-1 text-lg font-semibold">Rebook Booking</h3>
-            <p className="mb-4 text-xs text-gray-500">
+          <div className="ui-card w-full max-w-lg p-5">
+            <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Rebook Booking</h3>
+            <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               {rebookBooking.customer_name} · {rebookBooking.tours?.name || "Tour"}
             </p>
             <label className="text-sm text-gray-600">
@@ -1765,7 +1794,7 @@ export default function Bookings() {
               <select
                 value={rebookSlotId}
                 onChange={(e) => setRebookSlotId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="ui-control mt-1 w-full"
               >
                 <option value="">Select slot</option>
                 {rebookSlots
@@ -1806,14 +1835,14 @@ export default function Bookings() {
               const diff = newUnitPrice - currentUnitPrice;
               const totalDiff = diff * rebookBooking.qty;
               return (
-                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                <div className="mt-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Current</span>
-                    <span className="font-medium">{fmtCurrency(currentUnitPrice)}/pp</span>
+                    <span className="font-medium tabular-nums">{fmtCurrency(currentUnitPrice)}/pp</span>
                   </div>
                   <div className="mt-1 flex justify-between">
                     <span className="text-gray-600">New</span>
-                    <span className="font-medium">{fmtCurrency(newUnitPrice)}/pp</span>
+                    <span className="font-medium tabular-nums">{fmtCurrency(newUnitPrice)}/pp</span>
                   </div>
                   {diff !== 0 && (
                     <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
@@ -1856,7 +1885,7 @@ export default function Bookings() {
                   <select
                     value={rebookExcessAction}
                     onChange={(e) => setRebookExcessAction(e.target.value as "REFUND" | "VOUCHER")}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className="ui-control mt-1 w-full"
                   >
                     <option value="REFUND">Request Refund</option>
                     <option value="VOUCHER">Issue Gift Voucher (Store Credit)</option>
@@ -1865,13 +1894,13 @@ export default function Bookings() {
               );
             })()}
             <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
-              <button onClick={() => setRebookBooking(null)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50">
+              <button onClick={() => setRebookBooking(null)} className="ui-btn ui-btn-ghost">
                 Close
               </button>
               <button
                 onClick={saveRebook}
                 disabled={!rebookSlotId || actionBookingId === rebookBooking.id}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {actionBookingId === rebookBooking.id ? "Saving..." : "Rebook"}
               </button>
@@ -1882,19 +1911,19 @@ export default function Bookings() {
 
       {paymentLinkUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-lg rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-xl">
-            <h3 className="mb-1 text-lg font-semibold">Payment Link Sent</h3>
-            <p className="mb-4 text-xs text-gray-500">Booking ref: {paymentLinkRef}</p>
-            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          <div className="ui-card w-full max-w-lg p-5">
+            <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Payment Link Sent</h3>
+            <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking ref: {paymentLinkRef}</p>
+            <div className="mb-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", borderColor: "color-mix(in srgb, var(--ck-success) 28%, transparent)", color: "var(--ck-success)" }}>
               Payment link has been emailed to the customer.
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="mb-2 text-xs font-medium text-gray-500">You can also copy the link:</p>
+            <div className="rounded-lg border p-3" style={{ background: "var(--ck-surface-sunken)" }}>
+              <p className="mb-2 text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>You can also copy the link:</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   readOnly
                   value={paymentLinkUrl}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+                  className="ui-control w-full"
                   onClick={(e) => (e.target as HTMLInputElement).select()}
                 />
                 <button
@@ -1902,19 +1931,19 @@ export default function Bookings() {
                     navigator.clipboard.writeText(paymentLinkUrl);
                     notify({ title: "Copied", message: "Payment link copied to clipboard.", tone: "success" });
                   }}
-                  className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="ui-btn ui-btn-primary shrink-0"
                 >
                   Copy
                 </button>
               </div>
             </div>
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               Once the customer pays, the booking will automatically update to PAID on this page.
             </p>
             <div className="mt-4 grid grid-cols-1 sm:flex sm:justify-end">
               <button
                 onClick={() => setPaymentLinkUrl(null)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Close
               </button>
@@ -1983,9 +2012,9 @@ function SlotRows({
 
   return (
     <>
-      <tr className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-blue-50/40" onClick={onToggle}>
+      <tr className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)]" onClick={onToggle}>
         <td className="w-8 p-1.5 lg:p-3 text-center" onClick={e => e.stopPropagation()}></td>
-        <td className="p-1.5 lg:p-3 font-medium text-blue-700 text-[12px] lg:text-sm">
+        <td className="p-1.5 lg:p-3 font-medium text-[12px] lg:text-sm" style={{ color: "var(--ck-ocean)" }}>
           <span className="mr-0.5 inline-block w-3 text-gray-400 transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>
             ›
           </span>
@@ -2021,7 +2050,7 @@ function SlotRows({
           const hasPaymentLink = Boolean(b.yoco_checkout_id);
           const actionsOpen = openActions === b.id;
           return (
-            <tr key={b.id} className={"border-t border-gray-100 text-[11px] lg:text-xs text-gray-600 " + (selected.has(b.id) ? "bg-blue-50/80" : "bg-gray-50/60")}>
+            <tr key={b.id} className={"border-t border-gray-100 text-[11px] lg:text-xs text-gray-600 " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
               <td className="w-8 p-1.5 lg:p-3 text-center align-top" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2035,10 +2064,16 @@ function SlotRows({
                     onClick={(e) => { e.stopPropagation(); setOpenActions(actionsOpen ? null : b.id); }}
                   >
                     <span className="inline-block w-2 text-gray-400 transition-transform lg:hidden" style={{ transform: actionsOpen ? "rotate(90deg)" : "none" }}>›</span>
-                    <span className="font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none">{b.customer_name}</span>
+                    <span
+                      title={customerNotesTooltip(b.custom_fields)}
+                      className={"font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
+                    >{b.customer_name}</span>
+                    {customerNotesTooltip(b.custom_fields) && (
+                      <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help" aria-label="Customer added notes">📝</span>
+                    )}
                     {b.waiver_status === "SIGNED"
-                      ? <span title="Waiver signed" className="text-emerald-500 shrink-0">✓</span>
-                      : <span title="Waiver not signed" className="text-amber-400 shrink-0 text-[10px]">W</span>}
+                      ? <span title="Waiver signed" className="shrink-0" style={{ color: "var(--ck-success)" }}>✓</span>
+                      : <span title="Waiver not signed" className="shrink-0 text-[10px]" style={{ color: "var(--ck-amber)" }}>W</span>}
                     <StatusBadge status={b.status} />
                     {["PENDING", "PENDING PAYMENT"].includes(b.status) && !b.yoco_checkout_id && (
                       <button
@@ -2075,7 +2110,7 @@ function SlotRows({
                         title={label + " — customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
                         className={`mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold pl-[18px] lg:pl-2 ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
                       >
-                        ⏳ {label}
+                        <Timer size={11} weight="bold" className="shrink-0" /> {label}
                       </span>
                     );
                   })()}
@@ -2136,12 +2171,12 @@ function SlotRows({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setOpenActions(actionsOpen ? null : b.id); }}
-                      className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
+                      className="rounded-md border border-gray-200 bg-[var(--ck-surface)] px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
                     >
                       Actions ▾
                     </button>
                     {actionsOpen && (
-                      <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg origin-top-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 py-1 shadow-lg origin-top-right" style={{ background: "var(--ck-surface-elevated)" }} onClick={(e) => e.stopPropagation()}>
                         <ActionMenuItem label="View" onClick={() => { onView(b); setOpenActions(null); }} tone="blue" />
                         <ActionMenuItem label="Edit" onClick={() => { onEdit(b); setOpenActions(null); }} disabled={isLoading} />
                         <ActionMenuItem label="WhatsApp" onClick={() => { onWhatsApp(b); setOpenActions(null); }} disabled={!b.phone} tone="green" />
@@ -2185,7 +2220,7 @@ function ActionButton({
   tone?: "gray" | "blue" | "green" | "red" | "amber";
 }) {
   const tones: Record<string, string> = {
-    gray: "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
+    gray: "border-gray-200 bg-[var(--ck-surface)] text-gray-700 hover:bg-gray-50",
     blue: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
     green: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
     red: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
@@ -2211,39 +2246,39 @@ function ActionButton({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    PENDING: "bg-amber-100 text-amber-700",
-    "PENDING PAYMENT": "bg-red-100 text-red-700",
-    HELD: "bg-orange-100 text-orange-700",
-    CONFIRMED: "bg-blue-100 text-blue-700",
-    PAID: "bg-emerald-100 text-emerald-700",
-    COMPLETED: "bg-emerald-100 text-emerald-700",
-    CANCELLED: "bg-gray-200 text-gray-700",
+  const tones: Record<string, string> = {
+    PENDING: "ui-pill-warning",
+    "PENDING PAYMENT": "ui-pill-danger",
+    HELD: "ui-pill-amber",
+    CONFIRMED: "ui-pill-ocean",
+    PAID: "ui-pill-success",
+    COMPLETED: "ui-pill-success",
+    CANCELLED: "ui-pill-neutral",
   };
-  return <span className={`inline-block rounded px-1 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-medium ${colors[status] || "bg-gray-100 text-gray-700"}`}>{status}</span>;
+  return <span className={`ui-status ${tones[status] || "ui-pill-neutral"}`}>{status}</span>;
 }
 
 function RefundBadge({ status }: { status: string | null }) {
   if (!status) return null;
-  const colors: Record<string, string> = {
-    REQUESTED: "bg-amber-100 text-amber-700",
-    PROCESSED: "bg-emerald-100 text-emerald-700",
-    FAILED: "bg-red-100 text-red-700",
-    TRANSFERRED: "bg-emerald-100 text-emerald-700",
+  const tones: Record<string, string> = {
+    REQUESTED: "ui-pill-warning",
+    PROCESSED: "ui-pill-success",
+    FAILED: "ui-pill-danger",
+    TRANSFERRED: "ui-pill-success",
   };
-  return <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-medium ${colors[status] || "bg-gray-100 text-gray-700"}`}>Refund {status}</span>;
+  return <span className={`ui-status ${tones[status] || "ui-pill-neutral"}`}>Refund {status}</span>;
 }
 
 function SourceBadge({ source }: { source: string }) {
   if (!source || source === "WEB") return null;
-  const colors: Record<string, string> = {
-    VIATOR: "bg-teal-100 text-teal-700",
-    GETYOURGUIDE: "bg-orange-100 text-orange-700",
-    WHATSAPP: "bg-green-100 text-green-700",
-    ADMIN: "bg-blue-100 text-blue-700",
+  const tones: Record<string, string> = {
+    VIATOR: "ui-pill-ocean",
+    GETYOURGUIDE: "ui-pill-amber",
+    WHATSAPP: "ui-pill-success",
+    ADMIN: "ui-pill-accent",
   };
   return (
-    <span className={`inline-block rounded px-1 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-semibold tracking-wide ${colors[source] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`ui-status ${tones[source] || "ui-pill-neutral"}`}>
       {source}
     </span>
   );
@@ -2296,7 +2331,7 @@ function PaymentExpiryBadge({ deadline }: { deadline: string }) {
 
   if (diffMs <= 0) {
     return (
-      <span className="inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold bg-red-100 text-red-700 lg:ml-0 ml-[10px]">
+      <span className="ui-status ui-pill-danger lg:ml-0 ml-[10px]">
         Expired
       </span>
     );
@@ -2310,13 +2345,13 @@ function PaymentExpiryBadge({ deadline }: { deadline: string }) {
   // Red if within 2 hours, amber if within 6 hours, otherwise gray
   const urgency =
     diffMs <= 2 * 60 * 60_000
-      ? "bg-red-100 text-red-700"
+      ? "ui-pill-danger"
       : diffMs <= 6 * 60 * 60_000
-        ? "bg-amber-100 text-amber-700"
-        : "bg-gray-100 text-gray-500";
+        ? "ui-pill-warning"
+        : "ui-pill-neutral";
 
   return (
-    <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold lg:ml-0 ml-[10px] ${urgency}`}>
+    <span className={`ui-status ${urgency} lg:ml-0 ml-[10px]`}>
       {label}
     </span>
   );

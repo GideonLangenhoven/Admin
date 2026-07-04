@@ -283,6 +283,7 @@ type InvoiceContext = {
   addressLines: string[];
   reg: string;
   vat: string;
+  logoUrl: string;
   bank: {
     account_owner: string | null;
     account_number: string | null;
@@ -298,13 +299,14 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
     addressLines: [],
     reg: "",
     vat: "",
+    logoUrl: "",
     bank: { account_owner: null, account_number: null, account_type: null, bank_name: null, branch_code: null },
   };
   if (!businessId || !supabase) return empty;
 
   const { data: biz } = await supabase
     .from("businesses")
-    .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number")
+    .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number, logo_url")
     .eq("id", businessId)
     .maybeSingle();
 
@@ -312,6 +314,7 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
   const addressLines = [biz?.invoice_address_line1, biz?.invoice_address_line2, biz?.invoice_address_line3].filter(Boolean) as string[];
   const reg = String(biz?.invoice_reg_number || "");
   const vat = String(biz?.invoice_vat_number || "");
+  const logoUrl = String(biz?.logo_url || "");
 
   let bank = empty.bank;
   if (SETTINGS_ENCRYPTION_KEY) {
@@ -337,7 +340,7 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
     console.warn("INVOICE_CONTEXT: SETTINGS_ENCRYPTION_KEY not set, skipping bank details");
   }
 
-  return { companyName, addressLines, reg, vat, bank };
+  return { companyName, addressLines, reg, vat, logoUrl, bank };
 }
 
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
@@ -742,6 +745,41 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function myBookingsOtpHtml(d: Record<string, unknown>) {
+  const code = String(d.otp_code || "");
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Your Login Code</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 40px 10px; text-align: center;">
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 24px 0;">Use this code to access and manage your bookings:</p>
+            <div style="text-align: center; margin: 0 0 24px 0;">
+              <span style="display: inline-block; font-family: 'Courier New', monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1b3b36; background: #F7F7F6; padding: 16px 28px; border-radius: 10px; border: 2px dashed #1b3b36;">${code}</span>
+            </div>
+            <p style="font-size: 13px; color: #888; margin: 0 0 4px 0;">This code expires in 15 minutes.</p>
+            <p style="font-size: 13px; color: #888; margin: 0;">If you didn't request this, you can safely ignore this email.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+            <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Manage your bookings anytime.<br>If you have any questions, reply to this email.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 function reschedulePaymentLinkHtml(d: Record<string, unknown>) {
   return `
     <!DOCTYPE html>
@@ -876,7 +914,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-function invoiceHtml(d: Record<string, unknown>) {
+function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
   // Always compute the VAT breakdown locally so the email is a compliant
   // SA tax invoice regardless of what the caller passed for `subtotal`.
   // Some callers (admin /bookings page) pass `subtotal = total` which would
@@ -901,7 +939,8 @@ function invoiceHtml(d: Record<string, unknown>) {
         <!-- Hero Banner -->
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
-            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            ${invCtx?.logoUrl ? `<img src="${invCtx.logoUrl}" alt="" style="max-height: 48px; margin: 0 auto 12px; display: block;" />` : ""}
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${invCtx?.companyName || "Tax Invoice"}</p>
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Tax Invoice ${d.invoice_number}</h1>
           </td>
         </tr>
@@ -911,7 +950,7 @@ function invoiceHtml(d: Record<string, unknown>) {
           <td style="padding: 30px 40px 20px;">
             <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #E5E5E5; padding-bottom: 20px; margin-bottom: 20px; font-size: 14px; color: #555; line-height: 1.6;">
               <tr>
-                <td style="vertical-align: top;"><strong style="color: #1b3b36;">Billed To:</strong><br>${d.customer_name}<br>${d.customer_email}</td>
+                <td style="vertical-align: top;"><strong style="color: #1b3b36;">Billed To:</strong><br>${d.customer_company_name ? `${d.customer_company_name}<br>` : ""}${d.customer_name}<br>${d.customer_email}${d.customer_vat_number ? `<br>VAT: ${d.customer_vat_number}` : ""}</td>
                 <td style="vertical-align: top; text-align: right;"><strong style="color: #1b3b36;">Date:</strong> ${d.invoice_date}</td>
               </tr>
             </table>
@@ -1620,6 +1659,8 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const toName = String(d.customer_name || "Customer");
   const toEmail = String(d.customer_email || "");
   const toPhone = String(d.phone || "");
+  const toCompany = String(d.customer_company_name || "");
+  const toVat = String(d.customer_vat_number || "");
   const tourName = String(d.tour_name || "Booking");
   const tourDate = String(d.tour_date || d.invoice_date || "-");
   const qty = Number(d.qty) || 1;
@@ -1629,6 +1670,27 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const vatAmt = total - subtotal;
   const invDate = String(d.invoice_date || "-");
   function m(n: number) { return "R" + n.toFixed(2); }
+
+  // ── Optional operator logo (top-left) ──
+  if (invCtx.logoUrl) {
+    try {
+      const resp = await fetch(invCtx.logoUrl);
+      if (resp.ok) {
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const ct = (resp.headers.get("content-type") || "").toLowerCase();
+        const url = invCtx.logoUrl.toLowerCase();
+        let img: any = null;
+        if (ct.includes("png") || url.endsWith(".png")) img = await doc.embedPng(bytes);
+        else if (ct.includes("jpg") || ct.includes("jpeg") || /\.jpe?g(\?|$)/.test(url)) img = await doc.embedJpg(bytes);
+        if (img) {
+          const h = 42;
+          const w = (img.width / img.height) * h;
+          page.drawImage(img, { x: margin, y: y - h, width: w, height: h });
+          y -= (h + 12);
+        }
+      }
+    } catch (_e) { /* logo is optional — skip on any failure (e.g. webp/svg unsupported) */ }
+  }
 
   // ── Header ──
   page.drawText(invCtx.companyName || "Tax Invoice", { x: margin, y, font: fontBold, size: 18, color: black });
@@ -1652,13 +1714,18 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
     y -= 12;
   }
   let toY = y + 12 + fromLines.length * 12 - 14;
-  const toLines = [toName];
+  const toLines: string[] = [];
+  if (toCompany) toLines.push(toCompany);
+  toLines.push(toName);
   if (toPhone) toLines.push(toPhone);
   toLines.push(toEmail);
+  if (toVat) toLines.push("VAT: " + toVat);
   for (const tl of toLines) {
     page.drawText(tl, { x: margin + usable * 0.5, y: toY, font, size: 9, color: black });
     toY -= 12;
   }
+  // Continue below whichever of From/To is taller so neither overlaps the next row.
+  y = Math.min(y, toY);
   y -= 10;
 
   // ── Invoice details ──
@@ -1982,7 +2049,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     const type = (parsedBody as { type?: string }).type as string;
-    const d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
+    let d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
 
     // Escape user-controlled fields to prevent HTML injection in email templates
     const fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
@@ -1997,7 +2064,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {
@@ -2039,6 +2106,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     let bcc: string | undefined;
 
     switch (type) {
+      case "MY_BOOKINGS_OTP":
+        subject = "Your verification code";
+        html = myBookingsOtpHtml(d);
+        break;
       case "PAYMENT_LINK":
         subject = "Cape Kayak - Payment Link (Ref: " + d.ref + ")";
         html = paymentLinkHtml(d);
@@ -2059,11 +2130,13 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = "Cape Kayak - Booking Updated (Ref: " + d.ref + ")";
         html = bookingUpdatedHtml(d);
         break;
-      case "INVOICE":
-        subject = "Cape Kayak - Tax Invoice " + d.invoice_number;
-        html = invoiceHtml(d);
+      case "INVOICE": {
+        const invCtxHtml = await getInvoiceContext(branding.businessId);
+        subject = (invCtxHtml.companyName || "Tax Invoice") + " - Tax Invoice " + d.invoice_number;
+        html = invoiceHtml(d, invCtxHtml);
         bcc = d.admin_email as string;
         break;
+      }
       case "GIFT_VOUCHER":
         subject = "Cape Kayak - Gift Voucher for " + d.recipient_name;
         html = giftVoucherHtml(d);
