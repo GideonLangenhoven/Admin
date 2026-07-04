@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import GuideServiceWorker from "@/components/GuideServiceWorker";
+import GuideShell from "./GuideShell";
 
 export const metadata: Metadata = {
   title: "Guide — BookingTours",
@@ -18,7 +19,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
   return (
     <>
       <GuideServiceWorker />
-      {children}
+      <GuideShell>{children}</GuideShell>
     </>
   );
 }
