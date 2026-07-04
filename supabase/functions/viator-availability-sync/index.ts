@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 import { createViatorClient, viatorPushAvailability } from "../_shared/viator.ts";
 
@@ -15,17 +15,20 @@ Deno.serve(withSentry("viator-availability-sync", async () => {
     return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
   }
 
-  const { data: integrations } = await db.from("ota_integrations")
-    .select("business_id, test_mode, api_key_encrypted")
-    .eq("channel", "VIATOR")
-    .eq("enabled", true);
+  const integrations = await fetchAllRows<any>((from, to) =>
+    db.from("ota_integrations")
+      .select("business_id, test_mode, api_key_encrypted")
+      .eq("channel", "VIATOR")
+      .eq("enabled", true)
+      .range(from, to)
+  );
 
   const results: any[] = [];
   const now = new Date();
   const ninetyDaysOut = new Date(now.getTime() + 90 * 24 * 60 * 60_000).toISOString();
 
-  for (let i = 0; i < (integrations || []).length; i++) {
-    const integ: any = integrations![i];
+  for (let i = 0; i < integrations.length; i++) {
+    const integ: any = integrations[i];
     try {
       const { data: creds } = await db.rpc("get_ota_credentials", {
         p_business_id: integ.business_id,

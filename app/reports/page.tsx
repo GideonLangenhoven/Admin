@@ -3,6 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell, LabelList,
+} from "recharts";
+import {
+  DownloadSimple, FilePdf, ArrowsClockwise, ChartLineUp, ChartBar, Table as TableIcon,
+} from "@phosphor-icons/react";
 
 function fmtCurrency(n: number) {
   return "R" + Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -47,19 +54,73 @@ function formatSource(raw: string | null | undefined): string {
   }
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PAID: "bg-emerald-100 text-emerald-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  CONFIRMED: "bg-blue-100 text-blue-700",
-  PENDING: "bg-amber-100 text-amber-700",
-  HELD: "bg-orange-100 text-orange-700",
-  CANCELLED: "bg-gray-200 text-gray-600",
+// Status vocabulary → the shared pill classes (mono, uppercase, soft wash).
+const STATUS_PILL: Record<string, string> = {
+  PAID: "ui-pill-success",
+  COMPLETED: "ui-pill-success",
+  CONFIRMED: "ui-pill-ocean",
+  PENDING: "ui-pill-warning",
+  HELD: "ui-pill-amber",
+  CANCELLED: "ui-pill-neutral",
 };
+function statusPill(status: string) {
+  return `ui-status ${STATUS_PILL[status] || "ui-pill-neutral"}`;
+}
+
+// Standardized select chevron (muted ink) — matches the Dashboard's controls.
+const selectChevronStyle: React.CSSProperties = {
+  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2366736B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 0.75rem top 50%",
+  backgroundSize: "0.6rem auto",
+};
+
+// Compact ZAR for chart value axes (exact figures stay in the tooltip).
+function compactZar(n: number) {
+  if (n >= 1_000_000) return "R" + (n / 1_000_000).toFixed(1) + "m";
+  if (n >= 1_000) return "R" + (n / 1_000).toFixed(n >= 10_000 ? 0 : 1) + "k";
+  return "R" + Math.round(n);
+}
+
+// Mono-label + Inter-value tooltip, styled like a ui-card.
+function ChartTooltip({ active, payload, label, valueFormat }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const v = payload[0].value;
+  return (
+    <div style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", borderRadius: 12, boxShadow: "var(--ck-shadow-md)", padding: "8px 11px" }}>
+      <div className="ui-mono-label !text-[9.5px]" style={{ marginBottom: 3 }}>{label}</div>
+      <div className="text-[13px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+        {valueFormat ? valueFormat(Number(v)) : v}
+      </div>
+    </div>
+  );
+}
+
+// Table header cell — mono instrument voice, hairline underline.
+function Th({ children, className = "", onClick }: { children?: React.ReactNode; className?: string; onClick?: () => void }) {
+  return (
+    <th
+      onClick={onClick}
+      className={`px-4 py-3 text-[10.5px] font-medium uppercase tracking-[0.1em] border-b ${onClick ? "cursor-pointer select-none" : ""} ${className}`}
+      style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}
+    >
+      {children}
+    </th>
+  );
+}
+
+// Iterate calendar days as strings (noon-UTC anchor avoids DST/boundary drift).
+function addDaysStr(ymd: string, n: number) {
+  const d = new Date(ymd + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function Reports() {
   const { businessId, businessName, timezone } = useBusinessContext();
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
+  const [reportTruncated, setReportTruncated] = useState(false);
   const [signedInPeriod, setSignedInPeriod] = useState(0);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => monthStartStr(activeTimezone));
@@ -97,20 +158,35 @@ export default function Reports() {
       }
     }
 
-    let query = supabase
-      .from("bookings")
-      .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, tours(name), slots(start_time)")
-      .eq("business_id", businessId);
-
-    if (filterBy === "slot" && slotIds) {
-      query = query.in("slot_id", slotIds);
-    } else {
-      query = query.gte("created_at", startIso).lte("created_at", endIso);
+    // Page through the full result set so revenue/attendance/CSV totals cover
+    // every booking in range. A single `.limit(2000)` silently understated
+    // revenue for any tenant with >2000 bookings in the period. Downstream
+    // revenue logic is unchanged — it just now sees the complete set. A high
+    // safety ceiling caps browser memory for pathological ranges; if hit, the
+    // report is flagged as truncated rather than silently wrong.
+    const PAGE = 1000;
+    const CEILING = 20000;
+    const rows: any[] = [];
+    let truncated = false;
+    for (let from = 0; from < CEILING; from += PAGE) {
+      let query = supabase
+        .from("bookings")
+        .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, tours(name), slots(start_time)")
+        .eq("business_id", businessId);
+      if (filterBy === "slot" && slotIds) {
+        query = query.in("slot_id", slotIds);
+      } else {
+        query = query.gte("created_at", startIso).lte("created_at", endIso);
+      }
+      const { data, error } = await query.order("created_at", { ascending: false }).range(from, from + PAGE - 1);
+      if (error) { console.error("Report load error:", error); break; }
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < PAGE) break;
+      if (from + PAGE >= CEILING) truncated = true;
     }
-
-    const { data, error } = await query.order("created_at", { ascending: false }).limit(2000);
-    if (error) console.error("Report load error:", error);
-    setBookings((data || []).map((b: any) => ({
+    setReportTruncated(truncated);
+    setBookings(rows.map((b: any) => ({
       ...b,
       tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
       slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
@@ -227,14 +303,66 @@ export default function Reports() {
     return grouped.sort((a, b) => b.value - a.value).slice(0, 5);
   }, [activeTab, filtered]);
 
+  // Revenue-over-time series — pure derivation from existing state (no query).
+  // Same paid-status set as summary.revenue, bucketed by the date field the
+  // page is already filtering on (tour date vs booking date). Buckets are
+  // pre-seeded across the range so the area stays continuous; a wide span
+  // (> ~3 months) rolls up to monthly so the axis stays readable.
+  const revenueSeries = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return [];
+    const paidStatuses = new Set(["PAID", "COMPLETED", "CONFIRMED"]);
+    const dayOf = (iso: string) =>
+      new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: activeTimezone }).format(new Date(iso));
+
+    const spanDays = Math.round((new Date(endDate + "T12:00:00Z").getTime() - new Date(startDate + "T12:00:00Z").getTime()) / 86_400_000) + 1;
+    const byMonth = spanDays > 92;
+
+    const buckets = new Map<string, number>();
+    let cursor = startDate;
+    let guard = 0;
+    while (cursor <= endDate && guard < 800) {
+      buckets.set(byMonth ? cursor.slice(0, 7) : cursor, 0);
+      cursor = addDaysStr(cursor, 1);
+      guard++;
+    }
+
+    for (const b of filtered) {
+      if (!paidStatuses.has(b.status)) continue;
+      const iso = filterBy === "slot" ? (b.slots?.start_time || b.created_at) : b.created_at;
+      if (!iso) continue;
+      const day = dayOf(iso);
+      const key = byMonth ? day.slice(0, 7) : day;
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + Number(b.total_amount || 0));
+    }
+
+    const labelOf = (key: string) => {
+      if (byMonth) {
+        const [y, m] = key.split("-").map(Number);
+        return new Date(y, m - 1, 1).toLocaleDateString("en-ZA", { month: "short", year: "2-digit" });
+      }
+      const [y, m, d] = key.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+    };
+
+    return Array.from(buckets, ([key, revenue]) => ({ key, label: labelOf(key), revenue }));
+  }, [filtered, filterBy, startDate, endDate, activeTimezone]);
+
+  const hasRevenue = revenueSeries.some(d => d.revenue > 0);
+  const breakdownCaption =
+    activeTab === "financials" ? "Revenue by status"
+      : activeTab === "marketing" ? "Bookings by source"
+        : activeTab === "attendance" ? "Attendance by pax"
+          : activeTab === "waivers" ? "Signed vs pending"
+            : "Pax by activity";
+
   function toggleSort(col: typeof sortCol) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(col); setSortDir("asc"); }
   }
 
   function sortIcon(col: typeof sortCol) {
-    if (sortCol !== col) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="text-blue-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    if (sortCol !== col) return <span className="ml-1" style={{ color: "var(--ck-text-muted)", opacity: 0.5 }}>↕</span>;
+    return <span className="ml-1" style={{ color: "var(--ck-accent)" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   const reportGenDate = new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: activeTimezone });
@@ -251,7 +379,7 @@ export default function Reports() {
     const csv = [...meta, headers, ...rows]
       .map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    return "\uFEFF" + csv;
+    return "﻿" + csv;
   }
 
   function triggerDownload(content: string, filename: string) {
@@ -488,87 +616,82 @@ export default function Reports() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="space-y-5 max-w-[1400px] mx-auto pb-10">
+      {reportTruncated && (
+        <div className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-warn-soft, #fef3c7)", color: "var(--ck-warn-strong, #92400e)" }}>
+          This period has more than 20,000 bookings — totals and CSV cover the first 20,000. Narrow the date range for exact figures.
+        </div>
+      )}
+      {/* ── Header ── */}
+      <div className="anim-fade-up flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{businessName} Reports</h2>
-          <p className="text-sm text-gray-500">Filter by tour date or booking date, download as CSV or PDF.</p>
+          <p className="ui-mono-label mb-2">Reports · {businessName}</p>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reports</h2>
+          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Filter by tour date or booking date, download as CSV or PDF.</p>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <button
-            onClick={downloadCSV}
-            disabled={filtered.length === 0}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
-          >
-            CSV ({filtered.length})
+          <button onClick={downloadCSV} disabled={filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
+            <DownloadSimple size={15} weight="bold" /> CSV ({filtered.length})
           </button>
-          <button
-            onClick={downloadPDF}
-            disabled={filtered.length === 0}
-            className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
-          >
-            PDF
+          <button onClick={downloadPDF} disabled={filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
+            <FilePdf size={15} weight="bold" /> PDF
           </button>
         </div>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex min-w-max border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("bookings")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "bookings" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Bookings
-          </button>
-          <button
-            onClick={() => setActiveTab("financials")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "financials" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Financials
-          </button>
-          <button
-            onClick={() => setActiveTab("marketing")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "marketing" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Marketing
-          </button>
-          <button
-            onClick={() => setActiveTab("attendance")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "attendance" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Attendance
-          </button>
-          <button
-            onClick={() => setActiveTab("waivers")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "waivers" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Waivers
-          </button>
+      {/* ── Tabs — segmented control ── */}
+      <div className="anim-fade-up anim-d1 -mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
+        <div className="ui-seg w-max">
+          {([
+            ["bookings", "Bookings"],
+            ["financials", "Financials"],
+            ["marketing", "Marketing"],
+            ["attendance", "Attendance"],
+            ["waivers", "Waivers"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className="ui-seg-item"
+              data-active={activeTab === key}
+              onClick={() => setActiveTab(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="text-sm text-gray-600 sm:min-w-[150px]">
-          Filter by
-          <select value={filterBy} onChange={e => setFilterBy(e.target.value as "slot" | "created")}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+      {/* ── Filters ── */}
+      <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">Filter by</span>
+          <select
+            value={filterBy}
+            onChange={e => setFilterBy(e.target.value as "slot" | "created")}
+            className="ui-control w-full appearance-none pr-9"
+            style={selectChevronStyle}
+          >
             <option value="slot">Tour date</option>
             <option value="created">Booking date</option>
           </select>
         </label>
-        <label className="text-sm text-gray-600 flex flex-col gap-1 sm:min-w-[150px]">
-          From
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">From</span>
           <DatePicker value={startDate} onChange={setStartDate} />
         </label>
-        <label className="text-sm text-gray-600 flex flex-col gap-1 sm:min-w-[150px]">
-          To
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">To</span>
           <DatePicker alignRight={true} value={endDate} onChange={setEndDate} />
         </label>
-        <label className="text-sm text-gray-600 sm:min-w-[160px]">
-          Status
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+        <label className="flex flex-col gap-1.5 sm:min-w-[160px]">
+          <span className="ui-mono-label !text-[10px]">Status</span>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="ui-control w-full appearance-none pr-9"
+            style={selectChevronStyle}
+          >
             <option value="ALL">All Statuses</option>
             <option value="PAID">PAID</option>
             <option value="COMPLETED">COMPLETED</option>
@@ -578,24 +701,24 @@ export default function Reports() {
             <option value="CANCELLED">CANCELLED</option>
           </select>
         </label>
-        <button onClick={loadReport} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 sm:py-1.5">
-          Refresh
+        <button onClick={loadReport} className="ui-btn ui-btn-ghost sm:ml-auto">
+          <ArrowsClockwise size={14} weight="bold" /> Refresh
         </button>
       </div>
 
-      {/* Summary cards */}
+      {/* ── Summary tiles ── */}
       {activeTab === "waivers" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
-            { label: "Active Bookings", value: summary.total - summary.cancelled, hint: "trip date in range" },
-            { label: "Signed (trip in range)", value: summary.waiverSigned, color: "text-emerald-600", hint: "signed waivers for trips in this period" },
-            { label: "Signed in this period", value: signedInPeriod, color: "text-emerald-600", hint: "by signing date — independent of trip date" },
-            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "text-amber-600" : "text-gray-800", hint: "trips in range, no waiver yet" },
-            { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—" },
+            { label: "Active Bookings", value: summary.total - summary.cancelled, color: "var(--ck-text-strong)", hint: "trip date in range" },
+            { label: "Signed (trip in range)", value: summary.waiverSigned, color: "var(--ck-success)", hint: "signed waivers for trips in this period" },
+            { label: "Signed in this period", value: signedInPeriod, color: "var(--ck-success)", hint: "by signing date — independent of trip date" },
+            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "trips in range, no waiver yet" },
+            { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—", color: "var(--ck-text-strong)" },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center" title={c.hint || c.label}>
-              <p className="text-xs text-gray-500">{c.label}</p>
-              <p className={`text-xl font-bold ${c.color || "text-gray-800"}`}>{c.value}</p>
+            <div key={c.label} className="ui-card p-4" title={c.hint || c.label}>
+              <p className="ui-mono-label !text-[10px]">{c.label}</p>
+              <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
         </div>
@@ -608,78 +731,136 @@ export default function Reports() {
             { label: "Pending", value: summary.pending },
             { label: "Cancelled", value: summary.cancelled },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-              <p className="text-xs text-gray-500">{c.label}</p>
-              <p className="text-xl font-bold text-gray-800">{c.value}</p>
+            <div key={c.label} className="ui-card p-4">
+              <p className="ui-mono-label !text-[10px]">{c.label}</p>
+              <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{c.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-gray-800">Visual breakdown</h3>
-            <span className="text-xs text-gray-500">
-              {activeTab === "financials" ? "Revenue by status" : activeTab === "marketing" ? "Bookings by source" : activeTab === "attendance" ? "Attendance by pax" : activeTab === "waivers" ? "Signed vs pending" : "Pax by activity"}
-            </span>
+      {/* ── Revenue over time — area chart ── */}
+      <div className="ui-card p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Revenue over time</h3>
+            <p className="ui-mono-label mt-1 !text-[10px]">Paid revenue · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
+          </div>
+          <span className="font-display text-[22px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(summary.revenue)}</span>
+        </div>
+        {hasRevenue ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={revenueSeries} margin={{ top: 6, right: 12, left: -6, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rev-area-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" style={{ stopColor: "var(--ck-chart-1)", stopOpacity: 0.18 }} />
+                  <stop offset="100%" style={{ stopColor: "var(--ck-chart-1)", stopOpacity: 0 }} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--ck-chart-grid)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10.5, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={24}
+              />
+              <YAxis
+                tickFormatter={compactZar}
+                tick={{ fontSize: 10.5, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                axisLine={false}
+                tickLine={false}
+                width={48}
+              />
+              <Tooltip cursor={{ stroke: "var(--ck-border-strong)", strokeDasharray: "3 3" }} content={<ChartTooltip valueFormat={fmtCurrency} />} />
+              <Area type="monotone" dataKey="revenue" stroke="var(--ck-chart-1)" strokeWidth={2} fill="url(#rev-area-grad)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><ChartLineUp size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No revenue in this period</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Paid bookings will chart here once they fall in range.</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Breakdown bar chart + date-range context ── */}
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="ui-card p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Visual breakdown</h3>
+            <span className="ui-mono-label !text-[10px]">{breakdownCaption}</span>
           </div>
           {visualSeries.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-              No chart data available for this filter.
+            <div className="ui-empty">
+              <span className="ui-icon-chip"><ChartBar size={19} /></span>
+              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No chart data</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing to break down for this filter yet.</p>
             </div>
           ) : (
-            <div className="mt-4 space-y-3">
-              {visualSeries.map((item) => {
-                const max = Math.max(...visualSeries.map((entry) => entry.value), 1);
-                const width = Math.max((item.value / max) * 100, 8);
-                return (
-                  <div key={item.label}>
-                    <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate font-medium text-gray-700">{item.label}</span>
-                      <span className="font-semibold text-gray-900">{activeTab === "financials" ? fmtCurrency(item.value) : item.value}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-gray-100">
-                      <div className="h-2.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={Math.max(170, visualSeries.length * 46)}>
+              <BarChart data={visualSeries} layout="vertical" margin={{ top: 0, right: 88, left: 0, bottom: 0 }} barCategoryGap={14}>
+                <CartesianGrid stroke="var(--ck-chart-grid)" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  width={112}
+                  tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: any) => (String(v).length > 17 ? String(v).slice(0, 16) + "…" : String(v))}
+                />
+                <Tooltip cursor={{ fill: "var(--ck-surface-sunken)" }} content={<ChartTooltip valueFormat={activeTab === "financials" ? fmtCurrency : undefined} />} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26}>
+                  {visualSeries.map((_, i) => <Cell key={i} fill={`var(--ck-chart-${(i % 6) + 1})`} />)}
+                  <LabelList
+                    dataKey="value"
+                    position="right"
+                    formatter={(v: any) => (activeTab === "financials" ? fmtCurrency(Number(v)) : `${v}`)}
+                    fill="var(--ck-text-muted)"
+                    fontSize={10.5}
+                    fontFamily="var(--font-mono)"
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-800">Date range context</h3>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">From</p>
-              <p className="mt-2 font-semibold text-gray-900">{startDate || "Not set"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">To</p>
-              <p className="mt-2 font-semibold text-gray-900">{endDate || "Not set"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtered by</p>
-              <p className="mt-2 font-semibold text-gray-900">{filterBy === "slot" ? "Tour date" : "Booking date"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status scope</p>
-              <p className="mt-2 font-semibold text-gray-900">{filterStatus}</p>
-            </div>
+        <div className="ui-card p-5">
+          <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Date range context</h3>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[
+              { label: "From", value: startDate || "Not set" },
+              { label: "To", value: endDate || "Not set" },
+              { label: "Filtered by", value: filterBy === "slot" ? "Tour date" : "Booking date" },
+              { label: "Status scope", value: filterStatus },
+            ].map(cell => (
+              <div key={cell.label} className="rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)" }}>
+                <p className="ui-mono-label !text-[9.5px]">{cell.label}</p>
+                <p className="mt-2 text-[14px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{cell.value}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       {loading ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-gray-200 bg-white">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+        <div className="ui-card space-y-2.5 p-4">
+          <div className="ui-skeleton h-9 w-full" />
+          {Array.from({ length: 7 }).map((_, i) => <div key={i} className="ui-skeleton h-11 w-full" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          No records found for this period.
+        <div className="ui-card">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><TableIcon size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No records found</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing matches this period and filter.</p>
+          </div>
         </div>
       ) : activeTab === "financials" ? (
         <>
@@ -689,73 +870,67 @@ export default function Reports() {
             const tot = Number(b.total_amount || 0);
             const disc = sub - tot;
             return (
-              <div key={b.id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                    <p className="text-xs text-gray-500">{fmtDateTime(b.created_at, activeTimezone)}</p>
-                    <p className="mt-1 font-mono text-[11px] text-gray-400">{b.id.substring(0, 8).toUpperCase()}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtDateTime(b.created_at, activeTimezone)}</p>
+                    <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</p>
                   </div>
-                  <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                    {b.status}
-                  </span>
+                  <span className={statusPill(b.status)}>{b.status}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Subtotal</p>
-                    <p className="font-semibold">{fmtCurrency(sub)}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Subtotal</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(sub)}</p>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Net Paid</p>
-                    <p className="font-semibold text-emerald-700">{fmtCurrency(tot)}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Net Paid</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(tot)}</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-amber-600">{disc > 0 ? `Discount ${fmtCurrency(disc)}` : "No discount"}</p>
+                <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>{disc > 0 ? `Discount ${fmtCurrency(disc)}` : "No discount"}</p>
               </div>
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="p-3">Transaction Date</th>
-                <th className="p-3">Booking Ref</th>
-                <th className="p-3">Gateway Ref</th>
-                <th className="p-3">Customer</th>
-                <th className="p-3 text-right">Subtotal</th>
-                <th className="p-3 text-right text-amber-600">Discounts</th>
-                <th className="p-3 text-right text-emerald-700">Net Paid</th>
-                <th className="p-3 text-center">Status</th>
+              <tr>
+                <Th>Transaction Date</Th>
+                <Th>Booking Ref</Th>
+                <Th>Gateway Ref</Th>
+                <Th>Customer</Th>
+                <Th className="text-right">Subtotal</Th>
+                <Th className="text-right">Discounts</Th>
+                <Th className="text-right">Net Paid</Th>
+                <Th className="text-center">Status</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(b => {
                 const sub = Number(b.original_total || b.total_amount || 0);
                 const tot = Number(b.total_amount || 0);
                 const disc = sub - tot;
                 return (
-                  <tr key={b.id} className="hover:bg-gray-50/60">
-                    <td className="p-3 font-medium text-gray-700 whitespace-nowrap">{fmtDateTime(b.created_at, activeTimezone)}</td>
-                    <td className="p-3 font-mono text-xs text-gray-500">{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="p-3 font-mono text-xs text-gray-400">{b.yoco_payment_id || "—"}</td>
-                    <td className="p-3 min-w-[150px]">{b.customer_name || "—"}</td>
-                    <td className="p-3 text-right text-gray-500">{fmtCurrency(sub)}</td>
-                    <td className="p-3 text-right text-amber-600">{disc > 0 ? "-" + fmtCurrency(disc) : "—"}</td>
-                    <td className="p-3 text-right font-bold text-emerald-700">{fmtCurrency(tot)}</td>
-                    <td className="p-3 text-center">
-                      <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                        {b.status}
-                      </span>
-                    </td>
+                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                    <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text)" }}>{fmtDateTime(b.created_at, activeTimezone)}</td>
+                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.yoco_payment_id || "—"}</td>
+                    <td className="min-w-[150px] p-3" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(sub)}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-warning)" }}>{disc > 0 ? "-" + fmtCurrency(disc) : "—"}</td>
+                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(tot)}</td>
+                    <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td colSpan={6} className="p-3 text-right text-gray-500">Total Net Revenue</td>
-                <td className="p-3 text-right text-emerald-700 font-bold">{fmtCurrency(summary.revenue)}</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td colSpan={6} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Total Net Revenue</td>
+                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -771,82 +946,77 @@ export default function Reports() {
           return (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Total Pax</p>
-                  <p className="text-xl font-bold text-gray-800">{totalPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Checked In</p>
-                  <p className="text-xl font-bold text-emerald-700">{checkedInPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">No Show</p>
-                  <p className="text-xl font-bold text-red-600">{noShowPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Attendance Rate</p>
-                  <p className="text-xl font-bold text-gray-800">{totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%</p>
-                </div>
+                {[
+                  { label: "Total Pax", value: totalPax, color: "var(--ck-text-strong)" },
+                  { label: "Checked In", value: checkedInPax, color: "var(--ck-success)" },
+                  { label: "No Show", value: noShowPax, color: "var(--ck-danger)" },
+                  { label: "Attendance Rate", value: `${totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%`, color: "var(--ck-text-strong)" },
+                ].map(c => (
+                  <div key={c.label} className="ui-card p-4">
+                    <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                    <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
+                  </div>
+                ))}
               </div>
               <div className="space-y-3 md:hidden">
                 {activeBookings.map(b => (
-                  <div key={b.id} className={`rounded-xl border border-gray-200 bg-white p-4 ${b.checked_in ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
+                  <div key={b.id} className="ui-card p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : undefined}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                        <p className="text-xs text-gray-500">{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
-                        <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
+                        <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.checked_in ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
                         {b.checked_in ? "Present" : "No Show"}
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
-                      <span className="text-gray-500">Pax</span>
-                      <span className="font-semibold">{b.qty}</span>
+                    <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                      <span style={{ color: "var(--ck-text-muted)" }}>Pax</span>
+                      <span className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                      <th className="p-3">Tour Date</th>
-                      <th className="p-3">Time</th>
-                      <th className="p-3">Tour</th>
-                      <th className="p-3">Customer</th>
-                      <th className="hidden p-3 md:table-cell">Phone</th>
-                      <th className="p-3 text-right">Pax</th>
-                      <th className="p-3 text-center">Checked In</th>
-                      <th className="hidden p-3 lg:table-cell">Check-in Time</th>
+                    <tr>
+                      <Th>Tour Date</Th>
+                      <Th>Time</Th>
+                      <Th>Tour</Th>
+                      <Th>Customer</Th>
+                      <Th className="hidden md:table-cell">Phone</Th>
+                      <Th className="text-right">Pax</Th>
+                      <Th className="text-center">Checked In</Th>
+                      <Th className="hidden lg:table-cell">Check-in Time</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {activeBookings.map(b => (
-                      <tr key={b.id} className={`hover:bg-gray-50/60 ${b.checked_in ? "bg-emerald-50/40" : ""}`}>
-                        <td className="p-3 whitespace-nowrap font-medium">{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 whitespace-nowrap">{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 text-gray-600">{b.tours?.name || "—"}</td>
-                        <td className="p-3 font-medium">{b.customer_name || "—"}</td>
-                        <td className="hidden p-3 md:table-cell text-xs text-gray-500">{b.phone || "—"}</td>
-                        <td className="p-3 text-right font-semibold">{b.qty}</td>
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.checked_in ? { background: "var(--ck-success-soft)" } : undefined}>
+                        <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="whitespace-nowrap p-3 tabular-nums" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                        <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                        <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</td>
+                        <td className="p-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.checked_in ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
                             {b.checked_in ? "Present" : "No Show"}
                           </span>
                         </td>
-                        <td className="hidden p-3 lg:table-cell text-xs text-gray-400 whitespace-nowrap">
+                        <td className="hidden whitespace-nowrap p-3 text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                           {b.checked_in_at ? fmtDateTime(b.checked_in_at, activeTimezone) : "—"}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                      <td colSpan={5} className="p-3 text-gray-500 text-xs">Totals ({activeBookings.length} bookings)</td>
-                      <td className="p-3 text-right">{totalPax}</td>
-                      <td className="p-3 text-center text-emerald-700">{checkedInPax} present</td>
+                    <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({activeBookings.length} bookings)</td>
+                      <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{totalPax}</td>
+                      <td className="p-3 text-center" style={{ color: "var(--ck-success)" }}>{checkedInPax} present</td>
                       <td className="hidden p-3 lg:table-cell"></td>
                     </tr>
                   </tfoot>
@@ -868,36 +1038,36 @@ export default function Reports() {
             }
             return acc;
           }, {})).map((d: any) => (
-            <div key={d.source} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={d.source} className="ui-card p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-gray-800">{d.source}</p>
-                <p className="text-sm font-semibold text-emerald-700">{fmtCurrency(d.revenue)}</p>
+                <p className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>{d.source}</p>
+                <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(d.revenue)}</p>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-lg bg-gray-50 p-2">
-                  <p className="text-[11px] text-gray-500">Bookings</p>
-                  <p className="font-semibold">{d.count}</p>
+                <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <p className="ui-mono-label !text-[9.5px]">Bookings</p>
+                  <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{d.count}</p>
                 </div>
-                <div className="rounded-lg bg-gray-50 p-2">
-                  <p className="text-[11px] text-gray-500">Pax</p>
-                  <p className="font-semibold">{d.pax}</p>
+                <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <p className="ui-mono-label !text-[9.5px]">Pax</p>
+                  <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{d.pax}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="p-3">Source Name</th>
-                <th className="p-3 text-right">Bookings</th>
-                <th className="p-3 text-right">Total Pax</th>
-                <th className="p-3 text-right">Revenue</th>
-                <th className="p-3 text-right">Avg Order Value</th>
+              <tr>
+                <Th>Source Name</Th>
+                <Th className="text-right">Bookings</Th>
+                <Th className="text-right">Total Pax</Th>
+                <Th className="text-right">Revenue</Th>
+                <Th className="text-right">Avg Order Value</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {Object.values(filtered.reduce((acc: any, b: any) => {
                 const src = b.source || "UNKNOWN";
                 if (!acc[src]) acc[src] = { source: src, count: 0, pax: 0, revenue: 0 };
@@ -908,22 +1078,22 @@ export default function Reports() {
                 }
                 return acc;
               }, {})).map((d: any) => (
-                <tr key={d.source} className="hover:bg-gray-50/60">
-                  <td className="p-3 font-medium text-gray-700">{d.source}</td>
-                  <td className="p-3 text-right">{d.count}</td>
-                  <td className="p-3 text-right">{d.pax} pax</td>
-                  <td className="p-3 text-right font-bold text-emerald-700">{fmtCurrency(d.revenue)}</td>
-                  <td className="p-3 text-right text-gray-500">{fmtCurrency(d.count > 0 ? d.revenue / d.count : 0)}</td>
+                <tr key={d.source} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                  <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{d.source}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{d.count}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{d.pax} pax</td>
+                  <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(d.revenue)}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(d.count > 0 ? d.revenue / d.count : 0)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td className="p-3 text-gray-500">Totals</td>
-                <td className="p-3 text-right">{summary.total}</td>
-                <td className="p-3 text-right">{summary.pax} pax</td>
-                <td className="p-3 text-right text-emerald-700 font-bold">{fmtCurrency(summary.revenue)}</td>
-                <td className="p-3 text-right text-gray-500">{fmtCurrency(summary.total > 0 ? summary.revenue / summary.total : 0)}</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td className="p-3" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.total}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.pax} pax</td>
+                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(summary.total > 0 ? summary.revenue / summary.total : 0)}</td>
               </tr>
             </tfoot>
           </table>
@@ -939,64 +1109,62 @@ export default function Reports() {
               {/* Mobile cards */}
               <div className="space-y-3 md:hidden">
                 {active.map(b => (
-                  <div key={b.id} className={`rounded-xl border bg-white p-4 ${b.waiver_status === "SIGNED" ? "border-emerald-200 bg-emerald-50/30" : "border-amber-200 bg-amber-50/20"}`}>
+                  <div key={b.id} className="ui-card p-4" style={b.waiver_status === "SIGNED" ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                        <p className="text-xs text-gray-500">{b.tours?.name || "—"} · {b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</p>
-                        <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</p>
+                        <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`inline-block shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      <span className={`ui-status shrink-0 ${b.waiver_status === "SIGNED" ? "ui-pill-success" : "ui-pill-warning"}`}>
                         {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
                       </span>
                     </div>
                     {b.waiver_status === "SIGNED" && (
-                      <p className="mt-2 text-xs text-emerald-600">Signed by {b.waiver_signed_name || "guest"} · {b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</p>
+                      <p className="mt-2 text-xs" style={{ color: "var(--ck-success)" }}>Signed by {b.waiver_signed_name || "guest"} · {b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</p>
                     )}
                   </div>
                 ))}
               </div>
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                      <th className="p-3">Ref</th>
-                      <th className="p-3">Tour Date</th>
-                      <th className="p-3">Customer</th>
-                      <th className="p-3">Tour</th>
-                      <th className="p-3 text-center">Pax</th>
-                      <th className="p-3 text-center">Waiver</th>
-                      <th className="p-3">Signed By</th>
-                      <th className="p-3">Signed At</th>
-                      <th className="p-3 text-center">Booking</th>
+                    <tr>
+                      <Th>Ref</Th>
+                      <Th>Tour Date</Th>
+                      <Th>Customer</Th>
+                      <Th>Tour</Th>
+                      <Th className="text-center">Pax</Th>
+                      <Th className="text-center">Waiver</Th>
+                      <Th>Signed By</Th>
+                      <Th>Signed At</Th>
+                      <Th className="text-center">Booking</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {active.map(b => (
-                      <tr key={b.id} className={`hover:bg-gray-50/60 ${b.waiver_status === "SIGNED" ? "" : "bg-amber-50/20"}`}>
-                        <td className="p-3 font-mono text-xs text-gray-400">{b.id.substring(0, 8).toUpperCase()}</td>
-                        <td className="p-3 text-gray-700 whitespace-nowrap">{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 font-medium text-gray-800">{b.customer_name || "—"}</td>
-                        <td className="p-3 text-gray-600">{b.tours?.name || "—"}</td>
-                        <td className="p-3 text-center text-gray-700">{b.qty}</td>
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.waiver_status === "SIGNED" ? undefined : { background: "var(--ck-amber-soft)" }}>
+                        <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="whitespace-nowrap p-3" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                        <td className="p-3 text-center tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                          <span className={`ui-status ${b.waiver_status === "SIGNED" ? "ui-pill-success" : "ui-pill-warning"}`}>
                             {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
                           </span>
                         </td>
-                        <td className="p-3 text-gray-600">{b.waiver_signed_name || "—"}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap text-xs">{b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</td>
-                        <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>{b.status}</span>
-                        </td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.waiver_signed_name || "—"}</td>
+                        <td className="whitespace-nowrap p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</td>
+                        <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm font-semibold">
-                      <td colSpan={5} className="p-3 text-right text-gray-500">{signed.length} signed / {pending.length} pending</td>
-                      <td colSpan={4} className="p-3 text-center text-emerald-700">
+                    <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                      <td colSpan={5} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>{signed.length} signed / {pending.length} pending</td>
+                      <td colSpan={4} className="p-3 text-center" style={{ color: "var(--ck-success)" }}>
                         {active.length > 0 ? Math.round((signed.length / active.length) * 100) : 0}% compliance
                       </td>
                     </tr>
@@ -1012,30 +1180,28 @@ export default function Reports() {
           {filtered.map(b => {
             const hasDiscount = b.discount_type && b.discount_type !== "none";
             return (
-              <div key={b.id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                    <p className="text-xs text-gray-500">{b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} · ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
-                    <p className="mt-1 text-xs text-gray-400">{b.tours?.name || "—"}</p>
-                    <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}{b.email ? ` · ${b.email}` : ""}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} · ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"}</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}{b.email ? ` · ${b.email}` : ""}</p>
                   </div>
-                  <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                    {b.status}
-                  </span>
+                  <span className={statusPill(b.status)}>{b.status}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Qty</p>
-                    <p className="font-semibold">{b.qty}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Qty</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</p>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Total</p>
-                    <p className="font-semibold text-emerald-700">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Total</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                   </div>
                 </div>
                 {hasDiscount && (
-                  <p className="mt-2 text-xs text-amber-600">
+                  <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>
                     {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
                       b.discount_type === "FIXED" ? "Fixed discount" :
                         b.discount_type === "MANUAL" ? "Manual price" : b.discount_type}
@@ -1045,76 +1211,66 @@ export default function Reports() {
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="hidden p-3 md:table-cell">Ref</th>
-                <th className="p-3 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("slot_time")}>
-                  Tour Date {sortIcon("slot_time")}
-                </th>
-                <th className="p-3">Customer</th>
-                <th className="hidden p-3 md:table-cell">Contact</th>
-                <th className="hidden p-3 lg:table-cell">Tour</th>
-                <th className="p-3 text-right">Qty</th>
-                <th className="p-3 cursor-pointer text-right hover:text-blue-600" onClick={() => toggleSort("total_amount")}>
-                  Total {sortIcon("total_amount")}
-                </th>
-                <th className="hidden p-3 lg:table-cell">Discount</th>
-                <th className="p-3">Status</th>
-                <th className="hidden p-3 xl:table-cell cursor-pointer hover:text-blue-600" onClick={() => toggleSort("created_at")}>
-                  Booked {sortIcon("created_at")}
-                </th>
+              <tr>
+                <Th className="hidden md:table-cell">Ref</Th>
+                <Th onClick={() => toggleSort("slot_time")}>Tour Date {sortIcon("slot_time")}</Th>
+                <Th>Customer</Th>
+                <Th className="hidden md:table-cell">Contact</Th>
+                <Th className="hidden lg:table-cell">Tour</Th>
+                <Th className="text-right">Qty</Th>
+                <Th className="text-right" onClick={() => toggleSort("total_amount")}>Total {sortIcon("total_amount")}</Th>
+                <Th className="hidden lg:table-cell">Discount</Th>
+                <Th>Status</Th>
+                <Th className="hidden xl:table-cell" onClick={() => toggleSort("created_at")}>Booked {sortIcon("created_at")}</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(b => {
                 const hasDiscount = b.discount_type && b.discount_type !== "none";
                 return (
-                  <tr key={b.id} className="hover:bg-gray-50/60">
-                    <td className="hidden p-3 font-mono text-xs text-gray-500 md:table-cell">{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="p-3 whitespace-nowrap">
+                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                    <td className="hidden p-3 font-mono text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="whitespace-nowrap p-3">
                       {b.slots?.start_time ? (
                         <span>
-                          <span className="font-medium">{fmtDate(b.slots.start_time, activeTimezone)}</span>
-                          <span className="ml-1 text-gray-400 text-xs">{fmtTime(b.slots.start_time, activeTimezone)}</span>
+                          <span className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{fmtDate(b.slots.start_time, activeTimezone)}</span>
+                          <span className="ml-1 text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(b.slots.start_time, activeTimezone)}</span>
                         </span>
-                      ) : <span className="text-gray-400">—</span>}
+                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
                     </td>
                     <td className="p-3">
-                      <p className="font-medium">{b.customer_name || "—"}</p>
+                      <p className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
                     </td>
                     <td className="hidden p-3 md:table-cell">
-                      <p className="text-xs text-gray-500">{b.phone || "—"}</p>
-                      <p className="text-xs text-gray-400">{b.email || "—"}</p>
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</p>
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.email || "—"}</p>
                     </td>
-                    <td className="hidden p-3 lg:table-cell text-gray-600">{b.tours?.name || "—"}</td>
-                    <td className="p-3 text-right">{b.qty}</td>
+                    <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
                     <td className="p-3 text-right">
                       {hasDiscount && b.original_total ? (
                         <div>
-                          <p className="line-through text-xs text-gray-400">{fmtCurrency(Number(b.original_total))}</p>
-                          <p className="font-semibold text-emerald-700">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                          <p className="text-xs line-through tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(Number(b.original_total))}</p>
+                          <p className="font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                         </div>
                       ) : (
-                        <p className="font-semibold">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                        <p className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                       )}
                     </td>
-                    <td className="hidden p-3 lg:table-cell text-xs text-gray-500">
+                    <td className="hidden p-3 text-xs lg:table-cell">
                       {hasDiscount ? (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 font-medium">
+                        <span className="ui-status ui-pill-amber">
                           {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
                             b.discount_type === "FIXED" ? "Fixed" :
                               b.discount_type === "MANUAL" ? "Manual" : b.discount_type}
                         </span>
-                      ) : <span className="text-gray-300">—</span>}
+                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
                     </td>
-                    <td className="p-3">
-                      <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="hidden p-3 xl:table-cell text-xs text-gray-400 whitespace-nowrap">
+                    <td className="p-3"><span className={statusPill(b.status)}>{b.status}</span></td>
+                    <td className="hidden whitespace-nowrap p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                       {fmtDateTime(b.created_at, activeTimezone)}
                     </td>
                   </tr>
@@ -1122,14 +1278,14 @@ export default function Reports() {
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td className="hidden md:table-cell p-3"></td>
-                <td className="p-3 text-gray-500 text-xs">Totals ({filtered.length})</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td className="hidden p-3 md:table-cell"></td>
+                <td className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({filtered.length})</td>
                 <td className="p-3"></td>
                 <td className="hidden p-3 md:table-cell"></td>
                 <td className="hidden p-3 lg:table-cell"></td>
-                <td className="p-3 text-right">{summary.pax}</td>
-                <td className="p-3 text-right text-emerald-700">{fmtCurrency(summary.revenue)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.pax}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
                 <td className="hidden p-3 lg:table-cell"></td>
                 <td className="p-3"></td>
                 <td className="hidden p-3 xl:table-cell"></td>

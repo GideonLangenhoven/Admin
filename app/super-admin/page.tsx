@@ -5,6 +5,7 @@ import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { EnvelopeSimple, WarningCircle, Receipt, Buildings, Robot } from "@phosphor-icons/react";
 
 type OnboardForm = {
   businessName: string;
@@ -81,30 +82,40 @@ export default function SuperAdminPage() {
 
   async function loadBusinesses() {
     setLoadingBiz(true);
-    // Anon role has SELECT on businesses (RLS allows it)
-    const { data, error } = await supabase
-      .from("businesses")
-      .select("id, business_name, subdomain, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
-      .order("business_name");
-    if (error) {
-      console.error("LOAD_BIZ_ERR:", error.message);
-      notify({ title: "Failed to load businesses", message: error.message, tone: "error" });
-      setLoadingBiz(false);
-      return;
+    const PAGE = 1000;
+    // Page past the 1000-row cap so all tenants show at scale (SUPER_ADMIN can
+    // read every business via the super-admin RLS policy).
+    const bizRows: any[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("businesses")
+        .select("id, business_name, subdomain, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
+        .order("business_name")
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error("LOAD_BIZ_ERR:", error.message);
+        notify({ title: "Failed to load businesses", message: error.message, tone: "error" });
+        setLoadingBiz(false);
+        return;
+      }
+      const page = data || [];
+      bizRows.push(...page);
+      if (page.length < PAGE) break;
     }
-    if (data) {
-      // Get admin counts per business in parallel
-      const withCounts = await Promise.all(
-        (data as any[]).map(async (b: any) => {
-          const { count } = await supabase
-            .from("admin_users")
-            .select("id", { count: "exact", head: true })
-            .eq("business_id", b.id);
-          return { ...b, admin_count: count || 0 };
-        })
-      );
-      setBusinesses(withCounts);
+    // Admin counts in a single paged pass instead of one count query per
+    // business (which was N concurrent round-trips — pool exhaustion at scale).
+    const counts: Record<string, number> = {};
+    for (let from = 0; ; from += PAGE) {
+      const { data: admins, error } = await supabase
+        .from("admin_users")
+        .select("business_id")
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const page = (admins || []) as { business_id: string }[];
+      for (const a of page) counts[a.business_id] = (counts[a.business_id] || 0) + 1;
+      if (page.length < PAGE) break;
     }
+    setBusinesses(bizRows.map((b: any) => ({ ...b, admin_count: counts[b.id] || 0 })));
     setLoadingBiz(false);
   }
 
@@ -407,7 +418,7 @@ export default function SuperAdminPage() {
   if (!/super/i.test(role || "")) {
     return (
       <div className="max-w-2xl">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-[var(--ck-text-strong)]">Super Admin</h1>
+        <h1 className="font-display mb-6 text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 text-center">
           <p className="ui-text-muted">This route is restricted to super admin accounts.</p>
         </div>
@@ -417,20 +428,21 @@ export default function SuperAdminPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)]">Super Admin</h1>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Platform Control</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
         <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Hidden onboarding workspace for creating new client tenants without touching SQL manually.</p>
       </div>
 
       {createdClient && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+        <div className="anim-fade-up rounded-2xl border p-4 text-sm" style={{ borderColor: "var(--ck-success)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
           <div className="font-semibold">{createdClient.businessName} created</div>
           <div className="mt-1">Business ID: {createdClient.businessId}</div>
           <div className="mt-1">Admin invite target: {createdClient.adminEmail}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="ui-card anim-fade-up anim-d1 p-6 space-y-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
@@ -516,14 +528,14 @@ export default function SuperAdminPage() {
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" disabled={submitting} className="rounded-xl bg-[var(--ck-text-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+          <button type="submit" disabled={submitting} className="ui-btn ui-btn-primary disabled:opacity-50">
             {submitting ? "Creating client..." : "Add New Client"}
           </button>
         </div>
       </form>
 
       {/* ── Business Management ── */}
-      <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+      <div className="ui-card anim-fade-up anim-d2 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Management</h2>
@@ -535,13 +547,17 @@ export default function SuperAdminPage() {
         </div>
 
         {businesses.length === 0 && !loadingBiz && (
-          <p className="text-sm text-[var(--ck-text-muted)]">No businesses found.</p>
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><Buildings size={19} /></span>
+            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No businesses yet</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">New tenants you onboard will appear here.</p>
+          </div>
         )}
 
         {businesses.length > 0 && (
           <div className="space-y-3">
             {businesses.map((b) => (
-              <div key={b.id} className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-4">
                   {/* Left: Name + ID */}
                   <div>
@@ -555,10 +571,8 @@ export default function SuperAdminPage() {
                       onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
                       disabled={togglingStatusId === b.id}
                       title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
-                      className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold cursor-pointer transition-colors " +
-                        (b.subscription_status === "SUSPENDED"
-                          ? "bg-red-100 text-red-700 hover:bg-red-200"
-                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200")}
+                      className={"ui-status cursor-pointer transition-opacity hover:opacity-80 " +
+                        (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : "ui-pill-success")}
                     >
                       {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
                     </button>
@@ -566,12 +580,12 @@ export default function SuperAdminPage() {
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
                       <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">−</button>
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">−</button>
                       <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
                       <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">+</button>
-                      <span className={"ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold " +
-                        ((b.admin_count || 0) >= b.max_admin_seats ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">+</button>
+                      <span className={"ml-1 ui-status " +
+                        ((b.admin_count || 0) >= b.max_admin_seats ? "ui-pill-danger" : "ui-pill-success")}>
                         {b.admin_count || 0}/{b.max_admin_seats}
                       </span>
                     </div>
@@ -592,7 +606,7 @@ export default function SuperAdminPage() {
                       />
                       <span className="inline-flex items-center border border-l-0 rounded-r-lg px-2 py-1 text-[10px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
                       <button onClick={() => saveSubdomain(b.id, editingSubdomain.value)} disabled={savingSubdomain}
-                        className="ml-2 rounded-lg px-3 py-1 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+                        className="ui-btn ui-btn-primary ml-2 !h-7 !px-3 !text-xs">
                         {savingSubdomain ? "..." : "Save"}
                       </button>
                       <button onClick={() => setEditingSubdomain(null)} className="ml-1 text-xs text-[var(--ck-text-muted)]">Cancel</button>
@@ -623,7 +637,7 @@ export default function SuperAdminPage() {
                 {expandedBiz === b.id && (
                   <div className="mt-3 border-t pt-4 space-y-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     {bizDetailLoading ? (
-                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" /></div>
+                      <div className="space-y-2 py-2"><div className="ui-skeleton h-4 w-3/4" /><div className="ui-skeleton h-4 w-1/2" /></div>
                     ) : bizDetail ? (
                       <>
                         {/* ── Business Info ── */}
@@ -841,7 +855,7 @@ export default function SuperAdminPage() {
                                   <input value={faq.a} onChange={(e) => { const next = [...bizFaqs]; next[i].a = e.target.value; setBizFaqs(next); }}
                                     className="ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="Answer" />
                                 </div>
-                                <button onClick={() => setBizFaqs(bizFaqs.filter((_, j) => j !== i))} className="text-red-500 text-xs mt-1">✕</button>
+                                <button onClick={() => setBizFaqs(bizFaqs.filter((_, j) => j !== i))} className="text-[var(--ck-danger)] text-xs mt-1">✕</button>
                               </div>
                             ))}
                             <button onClick={() => setBizFaqs([...bizFaqs, { q: "", a: "" }])}
@@ -883,7 +897,7 @@ export default function SuperAdminPage() {
                                     <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">{t.name}</div>
                                     <div className="text-[10px] text-[var(--ck-text-muted)]">
                                       R{t.base_price_per_person} · {t.duration_minutes}min · Cap {t.default_capacity}
-                                      {t.hidden && <span className="ml-1 text-amber-500">(Hidden)</span>}
+                                      {t.hidden && <span className="ml-1 text-[var(--ck-amber)]">(Hidden)</span>}
                                     </div>
                                   </div>
                                 </div>
@@ -906,7 +920,7 @@ export default function SuperAdminPage() {
                                   <div className="min-w-0">
                                     <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
                                       {admin.name || admin.email}
-                                      {admin.suspended && <span className="ml-1.5 text-red-500 text-[10px] font-bold">(Suspended)</span>}
+                                      {admin.suspended && <span className="ml-1.5 text-[var(--ck-danger)] text-[10px] font-bold">(Suspended)</span>}
                                     </div>
                                     <div className="text-[10px] text-[var(--ck-text-muted)]">
                                       {admin.email} · {admin.role}
@@ -915,8 +929,7 @@ export default function SuperAdminPage() {
                                   <button
                                     onClick={() => resetAdminPassword(admin.id, admin.email)}
                                     disabled={resettingPasswordId === admin.id}
-                                    className="shrink-0 ml-3 rounded-lg border px-3 py-1 text-xs font-semibold transition-colors hover:bg-[var(--ck-bg-subtle)] disabled:opacity-50"
-                                    style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}
+                                    className="ui-btn ui-btn-ghost shrink-0 ml-3 !h-8 !px-3 !text-xs disabled:opacity-50"
                                   >
                                     {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
                                   </button>
@@ -929,7 +942,7 @@ export default function SuperAdminPage() {
                         {/* ── Save ── */}
                         <div className="flex justify-end pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           <button onClick={saveBizDetail} disabled={bizDetailSaving}
-                            className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                            className="ui-btn ui-btn-primary disabled:opacity-50">
                             {bizDetailSaving ? "Saving..." : "Save All Changes"}
                           </button>
                         </div>
@@ -1103,7 +1116,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
   }
 
   return (
-    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Landing Pages</h2>
         <p className="text-xs text-[var(--ck-text-muted)] mt-1">Generate polished landing pages for each business. Choose a template, preview, and deploy to Firebase.</p>
@@ -1142,7 +1155,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
 
       {/* Generate button */}
       <button onClick={generateLandingPage} disabled={generating || !selectedBiz}
-        className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 w-full" style={{ background: "var(--ck-accent)" }}>
+        className="ui-btn ui-btn-primary w-full disabled:opacity-50">
         {generating ? "Generating..." : "Generate Landing Page"}
       </button>
 
@@ -1151,7 +1164,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         <div className="mt-4 space-y-3">
           {/* Preview iframe */}
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
-            <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-bg-subtle)", color: "var(--ck-text-muted)" }}>
+            <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>
               <span>Preview — {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
               <div className="flex gap-2">
                 <button onClick={() => setShowPreview(!showPreview)} className="hover:underline">{showPreview ? "Hide" : "Show"}</button>
@@ -1162,22 +1175,22 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
 
           {/* Actions */}
           <div className="grid grid-cols-3 gap-2">
-            <button onClick={downloadHtml} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            <button onClick={downloadHtml} className="ui-btn ui-btn-ghost !text-xs">
               Download HTML
             </button>
-            <button onClick={downloadProject} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            <button onClick={downloadProject} className="ui-btn ui-btn-ghost !text-xs">
               Download for IDE
             </button>
             <button onClick={() => {
               const w = window.open("", "_blank");
               if (w) { w.document.write(generatedHtml); w.document.close(); }
-            }} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            }} className="ui-btn ui-btn-ghost !text-xs">
               Open Full Page
             </button>
           </div>
 
           {/* Deployment guide */}
-          <div className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg-subtle)" }}>
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-2">Deploy to Firebase</h3>
             <div className="space-y-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               <div className="flex items-start gap-2">
@@ -1201,7 +1214,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
                   <div className="mt-1">
                     <label className="text-[10px] font-medium">Custom domain for this site:</label>
                     <input value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="e.g. www.clientbusiness.co.za"
-                      className="mt-0.5 w-full rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)" }} />
+                      className="mt-0.5 w-full ui-control !px-2 !py-1 !text-[11px]" />
                   </div>
                   {customDomain && (
                     <div className="mt-1 p-2 rounded text-[10px]" style={{ background: "var(--ck-surface)" }}>
@@ -1365,7 +1378,7 @@ function EmailUsageBilling() {
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
 
   return (
-    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Usage & Billing</h2>
@@ -1386,24 +1399,36 @@ function EmailUsageBilling() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{totalSent.toLocaleString()}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Emails sent in {periodLabel}</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">
+            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}><EnvelopeSimple size={19} /></span>
+            <span className="ui-mono-label">Emails Sent</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{totalSent.toLocaleString()}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">in {periodLabel}</div>
         </div>
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{rows.filter((r) => r.overage > 0).length}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Businesses over limit</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">
+            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><WarningCircle size={19} /></span>
+            <span className="ui-mono-label">Over Limit</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{rows.filter((r) => r.overage > 0).length}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">businesses over their plan</div>
         </div>
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className={"text-2xl font-bold " + (totalOverageCost > 0 ? "text-amber-600" : "text-[var(--ck-text-strong)]")}>R{totalOverageCost.toFixed(2)}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Total overage charges</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">
+            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><Receipt size={19} /></span>
+            <span className="ui-mono-label">Overage Owed</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: totalOverageCost > 0 ? "var(--ck-amber)" : "var(--ck-text-strong)" }}>R{totalOverageCost.toFixed(2)}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">total for {periodLabel}</div>
         </div>
       </div>
 
       {rows.length > 0 && (
         <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--ck-bg-subtle)] text-xs font-medium text-[var(--ck-text-muted)]">
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
             <div className="col-span-3">Business</div>
             <div className="col-span-2 text-center">Emails Sent</div>
             <div className="col-span-1 text-center">Included</div>
@@ -1431,9 +1456,9 @@ function EmailUsageBilling() {
               {/* Overage */}
               <div className="col-span-1 text-center">
                 {r.overage > 0 ? (
-                  <span className="text-amber-600 font-semibold">{r.overage}</span>
+                  <span className="text-[var(--ck-amber)] font-semibold">{r.overage}</span>
                 ) : (
-                  <span className="text-emerald-600">0</span>
+                  <span className="text-[var(--ck-success)]">0</span>
                 )}
               </div>
 
@@ -1448,13 +1473,13 @@ function EmailUsageBilling() {
                       min="0"
                       value={editingRate.value}
                       onChange={(e) => setEditingRate({ id: r.business_id, value: e.target.value })}
-                      className="w-16 rounded border border-[var(--ck-border-subtle)] px-1.5 py-0.5 text-xs text-center outline-none"
+                      className="w-16 ui-control !px-1.5 !py-0.5 !text-xs text-center"
                       autoFocus
                     />
                     <button
                       onClick={() => saveRate(r.business_id, Number(editingRate.value))}
                       disabled={savingRate}
-                      className="text-xs text-emerald-600 font-semibold hover:underline"
+                      className="text-xs text-[var(--ck-accent)] font-semibold hover:underline"
                     >Save</button>
                     <button onClick={() => setEditingRate(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline">Cancel</button>
                   </div>
@@ -1472,9 +1497,9 @@ function EmailUsageBilling() {
               {/* Owed */}
               <div className="col-span-1 text-center">
                 {r.overage_cost > 0 ? (
-                  <span className="font-bold text-amber-600">R{r.overage_cost.toFixed(2)}</span>
+                  <span className="font-bold text-[var(--ck-amber)]">R{r.overage_cost.toFixed(2)}</span>
                 ) : (
-                  <span className="text-emerald-600 text-xs">R0</span>
+                  <span className="text-[var(--ck-success)] text-xs">R0</span>
                 )}
               </div>
 
@@ -1483,7 +1508,7 @@ function EmailUsageBilling() {
                 <button
                   onClick={() => generateInvoice(r)}
                   disabled={r.overage_cost <= 0 || generatingInvoice === r.business_id}
-                  className="rounded-lg bg-[var(--ck-text-strong)] px-3 py-1 text-xs font-medium text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-30 transition-opacity"
+                  className="ui-btn ui-btn-primary !h-7 !px-3 !text-xs disabled:opacity-30"
                 >
                   {generatingInvoice === r.business_id ? "..." : r.overage_cost > 0 ? "Generate Invoice" : "No charge"}
                 </button>
@@ -1598,7 +1623,7 @@ function ChatbotAvatarManager() {
   }
 
   return (
-    <section className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-4">
+    <section className="ui-card anim-fade-up anim-d3 p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Avatars</h2>
         <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Global catalog. Every tenant sees the active avatars in their booking-site settings. Only super admins can add, edit, or remove entries.</p>
@@ -1617,7 +1642,7 @@ function ChatbotAvatarManager() {
           <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Sort</label>
           <input type="number" value={newSortOrder} onChange={(e) => setNewSortOrder(parseInt(e.target.value || "0", 10))} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" />
         </div>
-        <button type="submit" disabled={adding || !newUrl.trim()} className="rounded-lg bg-[var(--ck-text-strong)] px-4 py-2 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+        <button type="submit" disabled={adding || !newUrl.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
           {adding ? "Adding..." : "Add Avatar"}
         </button>
       </form>

@@ -126,11 +126,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 2. Fetch ready enrollments ──
+    const runStart = new Date().toISOString();
     const { data: enrollments } = await supabase
       .from("marketing_automation_enrollments")
       .select("id, automation_id, contact_id, business_id, current_step, metadata")
       .eq("status", "active")
-      .lte("next_action_at", new Date().toISOString())
+      .lte("next_action_at", runStart)
       .order("next_action_at", { ascending: true })
       .limit(100);
 
@@ -141,6 +142,21 @@ Deno.serve(async (req: Request) => {
     // ── 3. Process each enrollment ──
     for (const enrollment of enrollments as any[]) {
       try {
+        // Atomic claim: push next_action_at into the future, guarded on the row
+        // still being due (next_action_at <= runStart). Only one concurrent
+        // dispatch run wins the update; the loser skips. Prevents overlapping
+        // runs from both sending this enrollment's email (send has no idempotency
+        // key). The normal flow below overwrites next_action_at on success; a
+        // failure leaves the 15-min claim as a natural retry backoff.
+        const { data: claimed } = await supabase
+          .from("marketing_automation_enrollments")
+          .update({ next_action_at: new Date(Date.now() + 15 * 60_000).toISOString() })
+          .eq("id", enrollment.id)
+          .eq("status", "active")
+          .lte("next_action_at", runStart)
+          .select("id");
+        if (!claimed || claimed.length === 0) continue;
+
         // Load automation
         const { data: automation } = await supabase
           .from("marketing_automations")

@@ -1,7 +1,7 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -336,10 +336,12 @@ async function autoTagContacts() {
   const results = { synced: 0, tagged: 0, errors: 0 };
   const now = new Date();
 
-  // Get all businesses with their automation config
-  const { data: businesses } = await supabase.from("businesses").select("id, automation_config");
+  // Get all businesses with their automation config (paged past the 1000-row cap)
+  const businesses = await fetchAllRows<{ id: string; automation_config: any }>((from, to) =>
+    supabase.from("businesses").select("id, automation_config").range(from, to)
+  );
 
-  for (const biz of (businesses || [])) {
+  for (const biz of businesses) {
     try {
       // Load configurable thresholds (admin can change these in Settings → Automation Tag Rules)
       const ac = (biz as any).automation_config || {};
@@ -352,12 +354,15 @@ async function autoTagContacts() {
       const COMPLETED_TOUR_ENABLED = ac.completed_tour_enabled ?? true;
       const VOUCHER_EXPIRY_DAYS = ac.voucher_expiry_days ?? 30;
 
-      // Get all marketing contacts for this business
-      const { data: contacts } = await supabase
-        .from("marketing_contacts")
-        .select("id, email, phone, tags")
-        .eq("business_id", biz.id)
-        .eq("status", "active");
+      // Get all marketing contacts for this business (paged past the 1000-row cap)
+      const contacts = await fetchAllRows<{ id: string; email: string; phone: string; tags: any }>((from, to) =>
+        supabase
+          .from("marketing_contacts")
+          .select("id, email, phone, tags")
+          .eq("business_id", biz.id)
+          .eq("status", "active")
+          .range(from, to)
+      );
 
       if (!contacts || contacts.length === 0) continue;
 

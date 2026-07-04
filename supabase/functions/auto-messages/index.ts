@@ -65,9 +65,32 @@ async function logSent(businessId: string, bookingId: string, phone: string, typ
 }
 
 async function getBusinesses() {
-  const { data, error } = await db.from("businesses").select("id");
-  if (error) throw error;
-  return data || [];
+  // Paginate past the PostgREST 1000-row cap so tenants beyond #1000 are not
+  // silently skipped.
+  const pageSize = 1000;
+  const all: Array<{ id: string }> = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await db.from("businesses").select("id").range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows as Array<{ id: string }>);
+    if (rows.length < pageSize) break;
+  }
+  return all;
+}
+
+// Run async tasks with a bounded concurrency pool. Every send in this function is
+// idempotent (auto_messages upsert on booking_id,type), so processing tenants in
+// parallel is safe and keeps the whole sweep inside the edge wall-clock at scale.
+async function mapWithConcurrency<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      await worker(items[idx]);
+    }
+  });
+  await Promise.all(runners);
 }
 
 async function sendRemindersForBusiness(businessId: string) {
@@ -448,17 +471,22 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       human_timeout: 0,
     };
 
-    for (let i = 0; i < businesses.length; i++) {
-      const businessId = String(businesses[i].id || "");
-      if (!businessId) continue;
-      if (action === "all" || action === "reminders") results.reminders += await sendRemindersForBusiness(businessId);
-      if (action === "all" || action === "indemnity") results.indemnity += await sendIndemnityEmailsForBusiness(businessId);
-      if (action === "all" || action === "reviews") results.reviews += await sendReviewRequestsForBusiness(businessId);
-      if (action === "all" || action === "review_reminders") results.review_reminders += await sendReviewRemindersForBusiness(businessId);
-      if (action === "all" || action === "re_engage") results.re_engage += await sendReEngagementForBusiness(businessId);
-      if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
-      if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
-    }
+    await mapWithConcurrency(businesses, 8, async (biz) => {
+      const businessId = String(biz.id || "");
+      if (!businessId) return;
+      try {
+        if (action === "all" || action === "reminders") results.reminders += await sendRemindersForBusiness(businessId);
+        if (action === "all" || action === "indemnity") results.indemnity += await sendIndemnityEmailsForBusiness(businessId);
+        if (action === "all" || action === "reviews") results.reviews += await sendReviewRequestsForBusiness(businessId);
+        if (action === "all" || action === "review_reminders") results.review_reminders += await sendReviewRemindersForBusiness(businessId);
+        if (action === "all" || action === "re_engage") results.re_engage += await sendReEngagementForBusiness(businessId);
+        if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
+        if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
+      } catch (err) {
+        // Per-tenant failure must not abort the whole sweep.
+        console.error("AUTO_MESSAGES_TENANT_ERR", businessId, err instanceof Error ? err.message : String(err));
+      }
+    });
 
     return new Response(JSON.stringify({ ok: true, results }), { status: 200, headers: getHeaders(req.headers.get("origin")) });
   } catch (error) {

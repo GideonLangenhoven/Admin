@@ -194,56 +194,71 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
     throw new Error("WhatsApp metadata.phone_number_id is missing");
   }
 
-  const { data, error } = await supabase
+  const cols = [
+    "id",
+    "name",
+    "business_name",
+    "business_tagline",
+    "timezone",
+    "currency",
+    "logo_url",
+    "ai_system_prompt",
+    "faq_json",
+    "terminology",
+    "weather_widget_locations",
+    "waiver_url",
+    "booking_site_url",
+    "manage_bookings_url",
+    "gift_voucher_url",
+    "booking_success_url",
+    "booking_cancel_url",
+    "voucher_success_url",
+    "directions",
+    "footer_line_one",
+    "footer_line_two",
+    "meeting_point_address",
+    "arrival_instructions",
+    "business_address",
+    "social_google_reviews",
+    "what_to_bring",
+    "activity_verb_past",
+    "location_phrase",
+  ].join(",");
+
+  // Fast path: indexed single-row lookup on the plaintext phone-id column.
+  const { data: fast } = await supabase
     .from("businesses")
-    .select([
-      "id",
-      "name",
-      "business_name",
-      "business_tagline",
-      "timezone",
-      "currency",
-      "logo_url",
-      "ai_system_prompt",
-      "faq_json",
-      "terminology",
-      "weather_widget_locations",
-      "waiver_url",
-      "booking_site_url",
-      "manage_bookings_url",
-      "gift_voucher_url",
-      "booking_success_url",
-      "booking_cancel_url",
-      "voucher_success_url",
-      "directions",
-      "footer_line_one",
-      "footer_line_two",
-      "meeting_point_address",
-      "arrival_instructions",
-      "business_address",
-      "social_google_reviews",
-      "what_to_bring",
-      "activity_verb_past",
-      "location_phrase",
-    ].join(","))
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw new Error("Business scan failed: " + error.message);
-  }
-
-  const businesses = data || [];
-  for (let i = 0; i < businesses.length; i++) {
-    const business = businesses[i] as TenantBusiness;
-    const credentials = await getBusinessCredentials(supabase, business.id);
+    .select(cols)
+    .eq("wa_phone_id_lookup", incomingPhoneId)
+    .maybeSingle();
+  if (fast) {
+    const credentials = await getBusinessCredentials(supabase, (fast as any).id);
     if (normalizePhoneLookup(credentials.waPhoneId) === incomingPhoneId) {
-      return {
-        business,
-        credentials,
-        resolvedBy: "wa_phone_id",
-      };
+      return { business: fast as TenantBusiness, credentials, resolvedBy: "wa_phone_id" };
     }
   }
+
+  // Fallback: paged scan (no 1000-row truncation) that decrypts each tenant's
+  // wa_phone_id and lazily backfills wa_phone_id_lookup, so once any tenant sends
+  // a message the whole platform is populated and future inbound hits the fast
+  // path above. Only runs while a tenant is not yet backfilled.
+  const businesses = await fetchAllRows<any>((from, to) =>
+    supabase.from("businesses").select(cols + ",wa_phone_id_lookup").order("created_at", { ascending: true }).range(from, to)
+  );
+  let match: TenantContext | null = null;
+  for (const business of businesses) {
+    const credentials = await getBusinessCredentials(supabase, business.id);
+    const normalized = normalizePhoneLookup(credentials.waPhoneId);
+    if (normalized && business.wa_phone_id_lookup !== normalized) {
+      try {
+        await supabase.from("businesses").update({ wa_phone_id_lookup: normalized }).eq("id", business.id);
+      } catch (_e) { /* best-effort backfill */ }
+    }
+    if (!match && normalized === incomingPhoneId) {
+      match = { business: business as TenantBusiness, credentials, resolvedBy: "wa_phone_id" };
+    }
+  }
+  if (match) return match;
 
   throw new Error("No business matched WhatsApp phone_number_id " + incomingPhoneId);
 }
@@ -377,6 +392,27 @@ export function createServiceClient() {
   }
 
   return createClient(supabaseUrl, supabaseKey);
+}
+
+/**
+ * Fetch every row of a query, paging past the PostgREST 1000-row cap.
+ * `build(from, to)` must return a supabase query with `.range(from, to)` applied,
+ * awaitable to `{ data, error }`. Use for cron/sweep queries that iterate all
+ * tenants (or all rows) and would otherwise silently stop at 1000 rows.
+ */
+export async function fetchAllRows<T = any>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+): Promise<T[]> {
+  const pageSize = 1000;
+  const all: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+  }
+  return all;
 }
 
 export function getBusinessDisplayName(business?: TenantBusiness | null) {

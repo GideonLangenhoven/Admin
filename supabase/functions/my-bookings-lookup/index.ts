@@ -8,6 +8,7 @@ import {
   resolveBusinessFromOrigin,
   type LookupBusinessRow,
 } from "../_shared/my-bookings-lookup.ts";
+import { fetchAllRows } from "../_shared/tenant.ts";
 import { normalizeOtpCode, verifyTrackedOtp } from "../_shared/otp-attempts.ts";
 import { issueCustomerSession, verifyCustomerSession } from "../_shared/customer-session.ts";
 
@@ -39,19 +40,54 @@ async function getAuthenticatedEmail(req: Request) {
   return data.user.email.toLowerCase();
 }
 
-async function resolveBusiness(req: Request, body: Record<string, unknown>) {
-  const { data, error } = await supabase
-    .from("businesses")
-    .select("id, subdomain, booking_site_url, manage_bookings_url")
-    .order("created_at", { ascending: true });
-  if (error) throw new Error("Business lookup failed: " + error.message);
+const BUSINESS_LOOKUP_COLS = "id, subdomain, booking_site_url, manage_bookings_url";
 
+async function resolveBusiness(req: Request, body: Record<string, unknown>) {
   const origin = req.headers.get("origin") || "";
-  return resolveBusinessFromOrigin(
-    (data || []) as LookupBusinessRow[],
-    origin,
-    typeof body.business_id === "string" ? body.business_id : "",
+  const localhostBusinessId = typeof body.business_id === "string" ? body.business_id : "";
+
+  // Narrow the candidate set with a targeted query so we don't scan every tenant
+  // on each lookup. resolveBusinessFromOrigin remains the authoritative matcher;
+  // if the narrowed set misses (unexpected URL shape), fall back to a full scan
+  // so behaviour is never worse than the previous all-rows version.
+  let normOrigin = "";
+  try {
+    normOrigin = origin ? new URL(origin.trim().replace(/\/+$/, "")).origin.toLowerCase() : "";
+  } catch { normOrigin = ""; }
+  const host = normOrigin ? new URL(normOrigin).hostname.toLowerCase() : "";
+  const subMatch = host.match(/^([a-z0-9-]+)\.booking\.bookingtours\.co\.za$/i);
+  const subdomain = subMatch ? subMatch[1].toLowerCase() : "";
+
+  const orFilters: string[] = [];
+  if (subdomain) orFilters.push(`subdomain.eq.${subdomain}`);
+  if (normOrigin && !normOrigin.includes(",") && !normOrigin.includes("(")) {
+    orFilters.push(`booking_site_url.ilike.${normOrigin}%`);
+    orFilters.push(`manage_bookings_url.ilike.${normOrigin}%`);
+  }
+
+  let candidates: LookupBusinessRow[] = [];
+  if (orFilters.length) {
+    const { data, error } = await supabase
+      .from("businesses")
+      .select(BUSINESS_LOOKUP_COLS)
+      .or(orFilters.join(","))
+      .limit(50);
+    if (error) throw new Error("Business lookup failed: " + error.message);
+    candidates = (data || []) as LookupBusinessRow[];
+  }
+  if ((host === "localhost" || host === "127.0.0.1") && localhostBusinessId) {
+    const { data } = await supabase.from("businesses").select(BUSINESS_LOOKUP_COLS).eq("id", localhostBusinessId).limit(1);
+    candidates = candidates.concat((data || []) as LookupBusinessRow[]);
+  }
+
+  const hit = resolveBusinessFromOrigin(candidates, origin, localhostBusinessId);
+  if (hit) return hit;
+
+  // Fallback (rare): the narrowed query didn't match — scan all tenants, paged.
+  const all = await fetchAllRows<LookupBusinessRow>((from, to) =>
+    supabase.from("businesses").select(BUSINESS_LOOKUP_COLS).order("created_at", { ascending: true }).range(from, to)
   );
+  return resolveBusinessFromOrigin(all, origin, localhostBusinessId);
 }
 
 const BOOKING_SELECT = [

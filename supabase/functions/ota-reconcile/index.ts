@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 import { createViatorClient } from "../_shared/viator.ts";
 import { createGygClient, gygFetchBookings } from "../_shared/getyourguide.ts";
@@ -23,16 +23,19 @@ Deno.serve(withSentry("ota-reconcile", async () => {
     return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
   }
 
-  const { data: integrations } = await db.from("ota_integrations")
-    .select("business_id, channel, test_mode")
-    .eq("enabled", true);
+  const integrations = await fetchAllRows<any>((from, to) =>
+    db.from("ota_integrations")
+      .select("business_id, channel, test_mode")
+      .eq("enabled", true)
+      .range(from, to)
+  );
 
   const now = new Date();
   const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60_000);
   const results: any[] = [];
 
-  for (let i = 0; i < (integrations || []).length; i++) {
-    const integ: any = integrations![i];
+  for (let i = 0; i < integrations.length; i++) {
+    const integ: any = integrations[i];
     try {
       const { data: creds } = await db.rpc("get_ota_credentials", {
         p_business_id: integ.business_id,
