@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
+import { Star } from "@phosphor-icons/react";
 
 type Review = {
     id: string;
@@ -59,51 +60,56 @@ export default function ReviewsPage() {
         setUpdating(null);
     }
 
-    function stars(n: number | null) {
-        if (!n) return "—";
-        return "★".repeat(n) + "☆".repeat(5 - n);
-    }
-
     return (
         <div className="p-6 max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-[var(--ck-text-strong)]">Reviews</h1>
-                <div className="flex gap-2">
-                    {STATUSES.map(s => (
-                        <button key={s} onClick={() => setFilter(s)}
-                            className={"px-3 py-1.5 rounded-full text-xs font-semibold transition-colors " +
-                                (filter === s ? "bg-[var(--ck-text-strong)] text-[var(--ck-btn-primary-text)]" : "bg-[var(--ck-bg-subtle)] text-[var(--ck-text-muted)] hover:bg-[var(--ck-border-subtle)]")}>
-                            {s}
-                        </button>
-                    ))}
+            <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="ui-mono-label mb-2">Customers · Reviews</p>
+                    <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reviews</h1>
+                </div>
+                <div className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:overflow-visible sm:px-0">
+                    <div className="ui-seg w-max">
+                        {STATUSES.map(s => (
+                            <button key={s} type="button" className="ui-seg-item" data-active={filter === s} onClick={() => setFilter(s)}>
+                                {s}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {loading ? (
-                <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-24 bg-[var(--ck-bg-subtle)] rounded-xl animate-pulse" />)}</div>
+                <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="ui-skeleton h-24" />)}</div>
             ) : reviews.length === 0 ? (
-                <div className="text-center py-16 text-[var(--ck-text-muted)]">
-                    <p className="text-lg font-semibold">No {filter.toLowerCase()} reviews</p>
-                    <p className="text-sm mt-1">{filter === "PENDING" ? "Submitted reviews awaiting moderation will appear here." : "Reviews with this status will appear here."}</p>
+                <div className="ui-card">
+                    <div className="ui-empty">
+                        <span className="ui-icon-chip"><Star size={19} /></span>
+                        <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No {filter.toLowerCase()} reviews</p>
+                        <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{filter === "PENDING" ? "Submitted reviews awaiting moderation will appear here." : "Reviews with this status will appear here."}</p>
+                    </div>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="anim-fade-up anim-d1 space-y-4">
                     {reviews.map(r => (
-                        <div key={r.id} className="bg-[var(--ck-bg)] border border-[var(--ck-border-subtle)] rounded-xl p-5">
+                        <div key={r.id} className="ui-card p-5">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-2">
                                         {r.reviewer_avatar_url && (
                                             <img src={r.reviewer_avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
                                         )}
-                                        <div>
-                                            <span className="font-semibold text-[var(--ck-text-strong)] text-sm">{r.reviewer_name || "Anonymous"}</span>
-                                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-[var(--ck-bg-subtle)] text-[var(--ck-text-muted)]">{r.source}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{r.reviewer_name || "Anonymous"}</span>
+                                            <span className="ui-status ui-pill-neutral">{r.source}</span>
                                         </div>
                                     </div>
-                                    <div className="text-amber-500 text-sm mb-1">{stars(r.rating)}</div>
-                                    {r.comment && <p className="text-sm text-[var(--ck-text)] leading-relaxed">{r.comment}</p>}
-                                    <div className="flex items-center gap-3 mt-2 text-xs text-[var(--ck-text-muted)]">
+                                    <div className="mb-1 flex items-center gap-0.5">
+                                        {r.rating ? Array.from({ length: 5 }).map((_, i) => (
+                                            <Star key={i} size={14} weight={i < r.rating! ? "fill" : "regular"} style={{ color: i < r.rating! ? "var(--ck-amber)" : "var(--ck-border-strong)" }} />
+                                        )) : <span className="text-sm" style={{ color: "var(--ck-text-muted)" }}>—</span>}
+                                    </div>
+                                    {r.comment && <p className="text-sm leading-relaxed" style={{ color: "var(--ck-text)" }}>{r.comment}</p>}
+                                    <div className="mt-2 flex items-center gap-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                                         {r.tours?.name && <span>Tour: {r.tours.name}</span>}
                                         {r.submitted_at && <span>{new Date(r.submitted_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</span>}
                                     </div>
@@ -111,19 +117,19 @@ export default function ReviewsPage() {
                                 <div className="flex gap-2 shrink-0">
                                     {filter !== "APPROVED" && (
                                         <button onClick={() => updateStatus(r.id, "APPROVED")} disabled={updating === r.id}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition-colors">
+                                            className="ui-btn h-8 px-3 text-xs disabled:opacity-40" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
                                             Approve
                                         </button>
                                     )}
                                     {filter !== "HIDDEN" && (
                                         <button onClick={() => updateStatus(r.id, "HIDDEN")} disabled={updating === r.id}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors">
+                                            className="ui-btn ui-btn-ghost h-8 px-3 text-xs disabled:opacity-40">
                                             Hide
                                         </button>
                                     )}
                                     {filter !== "SPAM" && (
                                         <button onClick={() => updateStatus(r.id, "SPAM")} disabled={updating === r.id}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 transition-colors">
+                                            className="ui-btn ui-btn-danger h-8 px-3 text-xs disabled:opacity-40">
                                             Spam
                                         </button>
                                     )}

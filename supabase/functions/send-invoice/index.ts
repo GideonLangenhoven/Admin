@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getAdminAppOrigins } from "../_shared/tenant.ts";
+import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -13,7 +13,7 @@ const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "BookingTours <noreply@b
 function getCors(req?: Request) {
   const origins = getAdminAppOrigins();
   const origin = req?.headers?.get("origin") || "";
-  const allowed = origins.includes(origin) ? origin : origins[0];
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
@@ -118,14 +118,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // Try to fetch invoice data if invoice_id is provided
-    const invoiceRow: Record<string, unknown> | null = null;
+    let invoiceRow: Record<string, unknown> | null = null;
     if (invoiceId) {
       const { data: inv } = await supabase.from("invoices").select("*").eq("id", invoiceId).single();
       if (inv) invoiceRow = inv;
     }
 
     // Fetch booking data
-    const bookingRow: Record<string, unknown> | null = null;
+    let bookingRow: Record<string, unknown> | null = null;
     const resolvedBookingId = bookingId || (invoiceRow?.booking_id as string | null);
     if (resolvedBookingId) {
       const { data: bk } = await supabase
@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
     const tourDate = fmtDate(startTime as string | null, businessTimezone);
 
     // Determine invoice number
-    const invNumber = body.invoice_number
+    let invNumber = body.invoice_number
       || String(invoiceRow?.invoice_number || "")
       || ref;
     if (!invNumber) invNumber = ref;

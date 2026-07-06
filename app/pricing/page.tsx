@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/app-notify";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { FloppyDisk, TrendUp, Trash, Warning, Tag, CheckCircle } from "@phosphor-icons/react";
 
 export default function PeakPricingPage() {
   const { businessId } = useBusinessContext();
@@ -267,34 +268,35 @@ export default function PeakPricingPage() {
     load();
   }
 
-  if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
+  if (loading) return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Pricing Management</h1>
-        <p className="text-sm text-gray-500">Manage base rates per activity and apply date-range seasonal overrides for peak periods.</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Revenue</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pricing Management</h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Manage base rates per activity and apply date-range seasonal overrides for peak periods.</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="anim-fade-up anim-d1 ui-card p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-lg text-gray-900">Tour rate table</h2>
-            <p className="text-sm text-gray-500">Base pricing is your always-on rate. Peak pricing is used when you apply a seasonal range below.</p>
+            <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Tour rate table</h2>
+            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Base pricing is your always-on rate. Peak pricing is used when you apply a seasonal range below.</p>
           </div>
-          <button onClick={saveTourPricing} disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-            {saving ? "Saving..." : "Save tour prices"}
+          <button onClick={saveTourPricing} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+            <FloppyDisk size={15} /> {saving ? "Saving..." : "Save tour prices"}
           </button>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+        <div className="mt-4 overflow-x-auto rounded-xl border" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead style={{ background: "var(--ck-surface-sunken)" }}>
               <tr>
-                <th className="p-3 text-left font-medium text-gray-600">Tour</th>
-                <th className="p-3 text-left font-medium text-gray-600">Base price</th>
-                <th className="p-3 text-left font-medium text-gray-600">Peak price</th>
-                <th className="p-3 text-left font-medium text-gray-600">Current spread</th>
+                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Tour</th>
+                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Base price</th>
+                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-amber)" }}>Peak price</th>
+                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Current spread</th>
               </tr>
             </thead>
             <tbody>
@@ -302,16 +304,16 @@ export default function PeakPricingPage() {
                 const base = basePrices[tour.id] !== undefined ? basePrices[tour.id] : String(tour.base_price_per_person || "");
                 const peak = peakPrices[tour.id] !== undefined ? peakPrices[tour.id] : String(tour.peak_price_per_person || tour.base_price_per_person || "");
                 return (
-                  <tr key={tour.id} className="border-t border-gray-100">
-                    <td className="p-3 font-medium text-gray-900">{tour.name}</td>
+                  <tr key={tour.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{tour.name}</td>
                     <td className="p-3">
-                      <input type="number" value={base} onChange={(e) => setBasePrices({ ...basePrices, [tour.id]: e.target.value })} className="w-32 rounded-lg border border-gray-300 px-3 py-2" />
+                      <input type="number" value={base} onChange={(e) => setBasePrices({ ...basePrices, [tour.id]: e.target.value })} className="ui-control w-32 tabular-nums" />
                     </td>
                     <td className="p-3">
-                      <input type="number" value={peak} onChange={(e) => setPeakPrices({ ...peakPrices, [tour.id]: e.target.value })} className="w-32 rounded-lg border border-gray-300 px-3 py-2" />
+                      <input type="number" value={peak} onChange={(e) => setPeakPrices({ ...peakPrices, [tour.id]: e.target.value })} className="ui-control w-32 tabular-nums" />
                     </td>
-                    <td className="p-3 text-gray-500">
-                      R{Math.max(Number(peak || 0) - Number(base || 0), 0).toFixed(2)} uplift during peak dates
+                    <td className="p-3" style={{ color: "var(--ck-text-muted)" }}>
+                      <span className="font-mono tabular-nums" style={{ color: "var(--ck-amber)" }}>R{Math.max(Number(peak || 0) - Number(base || 0), 0).toFixed(2)}</span> uplift during peak dates
                     </td>
                   </tr>
                 );
@@ -322,86 +324,87 @@ export default function PeakPricingPage() {
       </div>
 
       {/* Set Peak Period */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-        <h2 className="font-semibold text-lg mb-4">Set Peak Period</h2>
+      <div className="anim-fade-up anim-d2 ui-card p-5 mb-6">
+        <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>Set Peak Period</h2>
         <div className="grid gap-4 md:grid-cols-2 mb-4">
           <div>
-            <label className="text-xs text-gray-500 font-medium block mb-1">Start Date</label>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>Start Date</label>
             <DatePicker value={startDate} onChange={setStartDate} className="py-2.5" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-medium block mb-1">End Date</label>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>End Date</label>
             <DatePicker alignRight={true} value={endDate} onChange={setEndDate} className="py-2.5" />
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 mb-4">
           <div>
-            <label className="text-xs text-gray-500 font-medium block mb-1">Label (optional)</label>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>Label (optional)</label>
             <input type="text" value={periodLabel} onChange={e => setPeriodLabel(e.target.value)}
               placeholder="e.g. Christmas Peak, Easter Weekend"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              className="ui-control w-full" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-medium block mb-1">Priority (higher = takes precedence)</label>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>Priority (higher = takes precedence)</label>
             <input type="number" value={priority} onChange={e => setPriority(e.target.value)}
               min="0" step="1"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
-            <p className="text-xs text-gray-400 mt-1">If date ranges overlap, the rule with the highest priority wins.</p>
+              className="ui-control w-full tabular-nums" />
+            <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>If date ranges overlap, the rule with the highest priority wins.</p>
           </div>
         </div>
 
         {overlapWarning && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm text-amber-800 font-medium">Date range overlap detected</p>
-            <p className="text-xs text-amber-700 mt-1">{overlapWarning}</p>
+          <div className="mb-4 flex items-start gap-2 rounded-lg border p-3" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 25%, transparent)" }}>
+            <span className="mt-0.5 shrink-0" style={{ color: "var(--ck-amber)" }}><Warning size={16} weight="fill" /></span>
+            <div>
+              <p className="text-sm font-medium" style={{ color: "var(--ck-amber)" }}>Date range overlap detected</p>
+              <p className="text-xs mt-1" style={{ color: "var(--ck-amber)" }}>{overlapWarning}</p>
+            </div>
           </div>
         )}
 
         <div className="space-y-3 mb-4">
           {tours.map(t => (
-            <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center">
+            <div key={t.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 20%, transparent)" }}>
               <div className="flex-1">
-                <p className="font-semibold text-sm">{t.name}</p>
-                <p className="text-xs text-gray-400">Normal: R{t.base_price_per_person}</p>
+                <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{t.name}</p>
+                <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Normal: R{t.base_price_per_person}</p>
               </div>
               <div className="w-full sm:w-32">
-                <label className="text-xs text-gray-500 block mb-1">Peak Price</label>
+                <label className="text-xs block mb-1 font-medium" style={{ color: "var(--ck-amber)" }}>Peak Price</label>
                 <input type="number" value={peakPrices[t.id] || t.peak_price_per_person || ""}
                   onChange={e => setPeakPrices({ ...peakPrices, [t.id]: e.target.value })}
                   placeholder={"R" + t.base_price_per_person}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+                  className="ui-control w-full tabular-nums" />
               </div>
             </div>
           ))}
         </div>
 
         <button onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
-          className="w-full bg-gray-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-          {saving ? "Applying..." : "Apply Peak Pricing"}
+          className="ui-btn ui-btn-primary w-full disabled:opacity-50">
+          <TrendUp size={15} /> {saving ? "Applying..." : "Apply Peak Pricing"}
         </button>
-        {result && <p className="text-sm text-emerald-600 mt-3">{result}</p>}
+        {result && <p className="mt-3 flex items-center gap-1.5 text-sm" style={{ color: "var(--ck-success)" }}><CheckCircle size={15} weight="fill" /> {result}</p>}
       </div>
 
       {/* Active Peak Periods (from peak_periods table) */}
       {peakPeriods.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="font-semibold text-lg mb-4">Peak Period Rules</h2>
+        <div className="anim-fade-up anim-d3 ui-card p-5">
+          <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>Peak Period Rules</h2>
           <div className="space-y-2">
             {peakPeriods.map((p: any) => (
-              <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={p.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 22%, transparent)" }}>
                 <div>
-                  <p className="font-semibold text-sm">
-                    {p.label || "Peak Period"}{" "}
-                    <span className="text-xs font-normal text-gray-400">
-                      (Priority: {p.priority})
-                    </span>
+                  <p className="flex items-center gap-2 font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>
+                    {p.label || "Peak Period"}
+                    <span className="ui-status ui-pill-amber">Priority {p.priority}</span>
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
                     {new Date(p.start_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} — {new Date(p.end_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   {(p.peak_period_prices || []).length > 0 && (
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
                       {(p.peak_period_prices || []).map((pp: any) => {
                         const tour = tours.find(t => t.id === pp.tour_id);
                         return tour ? tour.name + ": R" + pp.price_per_person : null;
@@ -410,8 +413,8 @@ export default function PeakPricingPage() {
                   )}
                 </div>
                 <button onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1 border border-red-200 rounded-lg hover:bg-red-50">
-                  Remove
+                  className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
+                  <Trash size={14} /> Remove
                 </button>
               </div>
             ))}
@@ -420,23 +423,27 @@ export default function PeakPricingPage() {
       )}
 
       {/* Active Peak Slots (legacy view from slot flags) */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h2 className="font-semibold text-lg mb-4">Active Peak Slots</h2>
+      <div className="anim-fade-up anim-d3 ui-card p-5">
+        <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>Active Peak Slots</h2>
         {peakRanges.length === 0 ? (
-          <p className="text-sm text-gray-400">No peak pricing set.</p>
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><Tag size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No peak pricing set</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Apply a seasonal range above to mark slots as peak.</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {peakRanges.map((r, i) => (
-              <div key={i} className="flex flex-col gap-3 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={i} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 22%, transparent)" }}>
                 <div>
-                  <p className="font-semibold text-sm">
+                  <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>
                     {new Date(r.startDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} — {new Date(r.endDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
-                  <p className="text-xs text-gray-400">{r.count} slots {r.price ? "@ R" + r.price : ""}</p>
+                  <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{r.count} slots {r.price ? "@ R" + r.price : ""}</p>
                 </div>
                 <button onClick={() => removePeakRange(r.startDate, r.endDate)}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium px-3 py-1 border border-red-200 rounded-lg hover:bg-red-50">
-                  Remove
+                  className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
+                  <Trash size={14} /> Remove
                 </button>
               </div>
             ))}

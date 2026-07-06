@@ -26,7 +26,7 @@ async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret
   const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
   const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
   if (receivedHex.length !== expectedHex.length) return false;
-  const mismatch = 0;
+  let mismatch = 0;
   for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
@@ -37,7 +37,7 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
 
   const rawBody = await req.text();
-  const event: any;
+  let event: any;
   try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
 
   const url = new URL(req.url);
@@ -211,6 +211,11 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
   }
 
   await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
+
+  // Refresh customer lifetime stats now that the PAID booking is linked
+  if (customerId) {
+    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
+  }
 
   await db.from("logs").insert({
     business_id: businessId,

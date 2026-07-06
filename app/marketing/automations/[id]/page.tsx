@@ -470,8 +470,10 @@ export default function AutomationBuilderPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="space-y-4 py-2">
+        <div className="ui-skeleton h-8 w-48" />
+        <div className="ui-skeleton h-[140px] !rounded-2xl" />
+        <div className="ui-skeleton h-[320px] !rounded-2xl" />
       </div>
     );
   }
@@ -483,17 +485,14 @@ export default function AutomationBuilderPage() {
       {/* Header */}
       <button
         onClick={() => router.push("/marketing/automations")}
-        className="flex items-center gap-1.5 text-sm font-medium"
+        className="anim-fade-up flex items-center gap-1.5 text-sm font-medium"
         style={{ color: "var(--ck-text-muted)" }}
       >
         <ArrowLeft size={14} /> Back to automations
       </button>
 
       {/* Automation metadata */}
-      <div
-        className="rounded-xl border p-5 space-y-4"
-        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-      >
+      <div className="anim-fade-up anim-d1 ui-card p-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
@@ -502,8 +501,7 @@ export default function AutomationBuilderPage() {
             <input
               value={automation.name}
               onChange={(e) => setAutomation({ ...automation!, name: e.target.value })}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+              className="ui-control w-full"
             />
           </div>
           <div>
@@ -513,8 +511,7 @@ export default function AutomationBuilderPage() {
             <input
               value={automation.description || ""}
               onChange={(e) => setAutomation({ ...automation!, description: e.target.value || null })}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+              className="ui-control w-full"
               placeholder="What does this automation do?"
             />
           </div>
@@ -528,8 +525,7 @@ export default function AutomationBuilderPage() {
             <select
               value={automation.trigger_type}
               onChange={(e) => setAutomation({ ...automation!, trigger_type: e.target.value, trigger_config: {} })}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+              className="ui-control w-full"
             >
               <option value="contact_added">Contact Added</option>
               <option value="tag_added">Tag Added</option>
@@ -553,8 +549,7 @@ export default function AutomationBuilderPage() {
                     trigger_config: { ...automation!.trigger_config, tag: e.target.value },
                   })
                 }
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
                 placeholder="e.g. vip"
               />
             </div>
@@ -574,8 +569,7 @@ export default function AutomationBuilderPage() {
                       trigger_config: { ...automation!.trigger_config, field: e.target.value },
                     })
                   }
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  className="ui-control w-full"
                 >
                   <option value="date_of_birth">Date of Birth</option>
                 </select>
@@ -594,8 +588,7 @@ export default function AutomationBuilderPage() {
                       trigger_config: { ...automation!.trigger_config, days_before: parseInt(e.target.value) || 0 },
                     })
                   }
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  className="ui-control w-full"
                 />
               </div>
             </>
@@ -607,17 +600,14 @@ export default function AutomationBuilderPage() {
           <button
             onClick={saveAutomation}
             disabled={saving}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: "var(--ck-accent)" }}
+            className="ui-btn ui-btn-primary disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save"}
           </button>
           {automation.status !== "archived" && (
             <button
               onClick={toggleAutomationStatus}
-              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                automation.status === "active" ? "bg-yellow-500" : "bg-emerald-600"
-              }`}
+              className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"}`}
             >
               {automation.status === "active" ? (
                 <><Pause size={14} /> Pause</>
@@ -627,14 +617,14 @@ export default function AutomationBuilderPage() {
             </button>
           )}
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            className={`ui-status ${
               automation.status === "active"
-                ? "bg-emerald-100 text-emerald-700"
+                ? "ui-pill-success"
                 : automation.status === "paused"
-                ? "bg-yellow-100 text-yellow-700"
+                ? "ui-pill-warning"
                 : automation.status === "archived"
-                ? "bg-red-100 text-red-600"
-                : "bg-gray-100 text-gray-500"
+                ? "ui-pill-danger"
+                : "ui-pill-neutral"
             }`}
           >
             {automation.status}
@@ -647,8 +637,7 @@ export default function AutomationBuilderPage() {
               <button
                 onClick={runDispatchNow}
                 disabled={dispatching}
-                className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-accent)" }}
+                className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
                 title="Manually fire the dispatch worker — useful for date_field triggers and stalled enrollments"
               >
                 {dispatching ? "Dispatching…" : "Run dispatch now"}
@@ -657,8 +646,7 @@ export default function AutomationBuilderPage() {
             {automation.status === "archived" ? (
               <button
                 onClick={unarchiveAutomation}
-                className="rounded-lg border px-3 py-2 text-sm font-medium"
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                className="ui-btn ui-btn-ghost !h-9"
                 title="Restore to draft"
               >
                 Unarchive
@@ -666,8 +654,7 @@ export default function AutomationBuilderPage() {
             ) : (
               <button
                 onClick={archiveAutomation}
-                className="rounded-lg border px-3 py-2 text-sm font-medium"
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                className="ui-btn ui-btn-ghost !h-9"
                 title="Hide from active list, preserve history"
               >
                 Archive
@@ -675,7 +662,7 @@ export default function AutomationBuilderPage() {
             )}
             <button
               onClick={deleteAutomation}
-              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+              className="ui-btn ui-btn-danger !h-9"
               title="Delete permanently"
             >
               <Trash size={14} /> Delete
@@ -685,7 +672,7 @@ export default function AutomationBuilderPage() {
       </div>
 
       {/* Step builder */}
-      <div className="space-y-2">
+      <div className="anim-fade-up anim-d2 space-y-2">
         <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
           Workflow Steps
         </h2>
@@ -693,8 +680,7 @@ export default function AutomationBuilderPage() {
         {/* Trigger card */}
         <div className="flex items-center gap-3">
           <div
-            className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium"
-            style={{ borderColor: "var(--ck-accent)", background: "var(--ck-surface)", color: "var(--ck-accent)" }}
+            className="ui-status ui-pill-accent !text-[12px] !py-1.5 !px-3"
           >
             Trigger: {automation.trigger_type.replace(/_/g, " ")}
           </div>
@@ -710,13 +696,10 @@ export default function AutomationBuilderPage() {
             <div key={step.id ?? `step-${idx}`}>
               {/* Connecting line */}
               <div className="flex items-center pl-6 mb-2">
-                <div className="w-px h-4" style={{ background: "var(--ck-border)" }} />
+                <div className="w-px h-4" style={{ background: "var(--ck-border-subtle)" }} />
               </div>
 
-              <div
-                className="rounded-xl border p-4 space-y-3"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-              >
+              <div className="ui-card p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
@@ -734,7 +717,7 @@ export default function AutomationBuilderPage() {
                       onClick={() => moveStep(idx, -1)}
                       disabled={idx === 0}
                       className="p-1 rounded border disabled:opacity-30"
-                      style={{ borderColor: "var(--ck-border)" }}
+                      style={{ borderColor: "var(--ck-border-subtle)" }}
                     >
                       <CaretUp size={14} />
                     </button>
@@ -742,7 +725,7 @@ export default function AutomationBuilderPage() {
                       onClick={() => moveStep(idx, 1)}
                       disabled={idx === steps.length - 1}
                       className="p-1 rounded border disabled:opacity-30"
-                      style={{ borderColor: "var(--ck-border)" }}
+                      style={{ borderColor: "var(--ck-border-subtle)" }}
                     >
                       <CaretDown size={14} />
                     </button>
@@ -765,8 +748,7 @@ export default function AutomationBuilderPage() {
                       <select
                         value={step.config.template_id || ""}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, template_id: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       >
                         <option value="">Select template...</option>
                         {templates.map((t) => (
@@ -783,8 +765,7 @@ export default function AutomationBuilderPage() {
                       <input
                         value={step.config.subject_override || ""}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, subject_override: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                         placeholder="Leave empty to use template subject"
                       />
                     </div>
@@ -802,8 +783,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.duration ?? 1}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, duration: parseInt(e.target.value) || 1 })}
-                        className="w-24 rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-24 tabular-nums"
                       />
                     </div>
                     <div>
@@ -813,8 +793,7 @@ export default function AutomationBuilderPage() {
                       <select
                         value={step.config.unit || "days"}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, unit: e.target.value })}
-                        className="rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control "
                       >
                         <option value="minutes">Minutes</option>
                         <option value="hours">Hours</option>
@@ -833,8 +812,7 @@ export default function AutomationBuilderPage() {
                       <select
                         value={step.config.condition_type || "has_tag"}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, condition_type: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       >
                         <option value="opened_email">Opened Email</option>
                         <option value="clicked_link">Clicked Link</option>
@@ -848,8 +826,7 @@ export default function AutomationBuilderPage() {
                       <input
                         value={step.config.value || ""}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, value: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                         placeholder={step.config.condition_type === "has_tag" ? "tag name" : "identifier"}
                       />
                     </div>
@@ -868,8 +845,7 @@ export default function AutomationBuilderPage() {
                       <select
                         value={step.config.voucher_type || "percentage"}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, voucher_type: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       >
                         <option value="percentage">Percentage</option>
                         <option value="fixed_amount">Fixed Amount</option>
@@ -884,8 +860,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.amount ?? 10}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, amount: parseInt(e.target.value) || 0 })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       />
                     </div>
                     <div>
@@ -895,8 +870,7 @@ export default function AutomationBuilderPage() {
                       <input
                         value={step.config.code_prefix || ""}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, code_prefix: e.target.value.toUpperCase() })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                         placeholder="AUTO"
                       />
                     </div>
@@ -909,8 +883,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.valid_days ?? 30}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, valid_days: parseInt(e.target.value) || 30 })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       />
                     </div>
                   </div>
@@ -925,8 +898,7 @@ export default function AutomationBuilderPage() {
                       <select
                         value={step.config.discount_type || "PERCENT"}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, discount_type: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       >
                         <option value="PERCENT">Percentage (%)</option>
                         <option value="FLAT">Fixed Amount (R)</option>
@@ -941,8 +913,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.discount_value ?? 10}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, discount_value: parseInt(e.target.value) || 0 })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       />
                     </div>
                     <div>
@@ -952,8 +923,7 @@ export default function AutomationBuilderPage() {
                       <input
                         value={step.config.code_prefix || ""}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, code_prefix: e.target.value.toUpperCase() })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                         placeholder="PROMO"
                       />
                     </div>
@@ -966,8 +936,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.valid_days ?? 30}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, valid_days: parseInt(e.target.value) || 30 })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       />
                     </div>
                     <div>
@@ -979,8 +948,7 @@ export default function AutomationBuilderPage() {
                         min={1}
                         value={step.config.max_uses ?? 1}
                         onChange={(e) => updateStepConfig(idx, { ...step.config, max_uses: parseInt(e.target.value) || 1 })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                        className="ui-control w-full "
                       />
                     </div>
                   </div>
@@ -1000,7 +968,7 @@ export default function AutomationBuilderPage() {
         )}
 
         {/* Template variables hint */}
-        <div className="rounded-lg border px-4 py-3 mt-2" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)" }}>
+        <div className="rounded-lg border px-4 py-3 mt-2" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)" }}>
           <p className="text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Available template variables:</p>
           <p className="text-xs font-mono" style={{ color: "var(--ck-text)" }}>
             {"{first_name}"} {"{last_name}"} {"{email}"} {"{voucher_code}"} {"{voucher_amount}"} {"{promo_code}"} {"{promo_discount}"}
@@ -1012,7 +980,7 @@ export default function AutomationBuilderPage() {
       {automation.trigger_type === "manual" && (
         <div
           className="rounded-xl border p-5 space-y-3"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+          style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}
         >
           <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             Manual Enrollment
@@ -1029,13 +997,13 @@ export default function AutomationBuilderPage() {
                 onKeyDown={(e) => e.key === "Enter" && searchContacts()}
                 placeholder="Search by email..."
                 className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
               />
             </div>
             <button
               onClick={searchContacts}
               className="rounded-lg border px-3 py-2 text-sm font-medium"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+              style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}
             >
               Search
             </button>
@@ -1046,7 +1014,7 @@ export default function AutomationBuilderPage() {
                 <div
                   key={c.id}
                   className="flex items-center justify-between rounded-lg border px-3 py-2"
-                  style={{ borderColor: "var(--ck-border)" }}
+                  style={{ borderColor: "var(--ck-border-subtle)" }}
                 >
                   <span className="text-sm" style={{ color: "var(--ck-text)" }}>
                     {c.email} {c.first_name ? `(${c.first_name} ${c.last_name || ""})` : ""}
@@ -1072,7 +1040,7 @@ export default function AutomationBuilderPage() {
           counter; failures were invisible. */}
       <div
         className="rounded-xl border p-5 space-y-3"
-        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+        style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -1085,17 +1053,17 @@ export default function AutomationBuilderPage() {
             onClick={loadEnrollments}
             disabled={enrollmentsLoading}
             className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-50"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}
           >
             {enrollmentsLoading ? "Loading…" : "Refresh"}
           </button>
         </div>
         {enrollments.length === 0 ? (
-          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
             No enrollments yet. When the trigger fires for a matching contact, they will appear here.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ background: "var(--ck-bg)" }}>
@@ -1112,16 +1080,13 @@ export default function AutomationBuilderPage() {
                   const next = e.next_action_at ? new Date(e.next_action_at) : null;
                   const enrolled = new Date(e.created_at);
                   return (
-                    <tr key={e.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                    <tr key={e.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
                         {c?.email || e.contact_id.slice(0, 8)}
                         {c?.first_name ? <span className="ml-1.5 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>({c.first_name}{c.last_name ? " " + c.last_name : ""})</span> : null}
                       </td>
                       <td className="px-3 py-2">
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{
-                          background: e.status === "active" ? "rgba(59,130,246,0.1)" : e.status === "completed" ? "rgba(16,185,129,0.1)" : e.status === "paused" ? "rgba(234,179,8,0.1)" : "rgba(107,114,128,0.1)",
-                          color: e.status === "active" ? "#2563eb" : e.status === "completed" ? "#059669" : e.status === "paused" ? "#ca8a04" : "#6b7280",
-                        }}>{e.status}</span>
+                        <span className={`ui-status ${e.status === "active" ? "ui-pill-ocean" : e.status === "completed" ? "ui-pill-success" : e.status === "paused" ? "ui-pill-warning" : "ui-pill-neutral"}`}>{e.status}</span>
                       </td>
                       <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{e.current_step + 1}/{steps.length}</td>
                       <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
@@ -1146,7 +1111,7 @@ export default function AutomationBuilderPage() {
           need to render them. */}
       <div
         className="rounded-xl border p-5 space-y-3"
-        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+        style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -1159,17 +1124,17 @@ export default function AutomationBuilderPage() {
             onClick={loadLogs}
             disabled={logsLoading}
             className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-50"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}
           >
             {logsLoading ? "Loading…" : "Refresh"}
           </button>
         </div>
         {logs.length === 0 ? (
-          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
             No events yet. Activate the automation and trigger an enrollment — the dispatcher will populate this log on its next run.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ background: "var(--ck-bg)" }}>
@@ -1200,7 +1165,7 @@ export default function AutomationBuilderPage() {
                     if (meta.delay_until) detailBits.push("until " + new Date(String(meta.delay_until)).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
                   }
                   return (
-                    <tr key={log.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                    <tr key={log.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--ck-text-muted)" }}>
                         {when.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </td>
@@ -1211,10 +1176,7 @@ export default function AutomationBuilderPage() {
                       <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{log.step_position + 1}</td>
                       <td className="px-3 py-2" style={{ color: "var(--ck-text-muted)" }}>{log.step_type}</td>
                       <td className="px-3 py-2">
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{
-                          background: isFailure ? "rgba(239,68,68,0.1)" : isSuccess ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)",
-                          color: isFailure ? "#dc2626" : isSuccess ? "#059669" : "#6b7280",
-                        }}>{log.action}</span>
+                        <span className={`ui-status ${isFailure ? "ui-pill-danger" : isSuccess ? "ui-pill-success" : "ui-pill-neutral"}`}>{log.action}</span>
                       </td>
                       <td className="px-3 py-2 text-[11px]" style={{ color: "var(--ck-text-muted)" }} title={meta ? JSON.stringify(meta) : ""}>
                         {detailBits.length > 0 ? detailBits.join(" · ") : "—"}
@@ -1257,11 +1219,11 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
 
   return (
     <div ref={dropdownRef} className="relative flex items-center pl-5 py-1">
-      <div className="w-px h-full absolute left-[1.55rem] top-0" style={{ background: "var(--ck-border)" }} />
+      <div className="w-px h-full absolute left-[1.55rem] top-0" style={{ background: "var(--ck-border-subtle)" }} />
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-center w-6 h-6 rounded-full border text-xs font-bold hover:shadow-sm z-10"
-        style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text-muted)" }}
+        style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)", color: "var(--ck-text-muted)" }}
         title="Add step"
       >
         <Plus size={12} />
@@ -1269,7 +1231,7 @@ function AddStepButton({ onAdd }: { onAdd: (type: string) => void }) {
       {open && (
         <div
           className="absolute left-12 top-0 z-20 rounded-lg border shadow-lg p-1 min-w-[180px]"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+          style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}
         >
           {types.map((t) => {
             return (

@@ -11,6 +11,8 @@ import {
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
+import { llmText } from "../_shared/llm.ts";
+import { retrieveKbContext } from "../_shared/kb.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 
@@ -22,7 +24,6 @@ const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 const supabase = createServiceClient();
-const GK = Deno.env.get("GEMINI_API_KEY") || "";
 
 // ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -122,6 +123,106 @@ function zonedDateTimeToUtcIso(tenant: TenantContext, dateKey: string, hour: num
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const offset = getTimeZoneOffsetMs(guess, tenantTimeZone(tenant));
   return new Date(guess.getTime() - offset).toISOString();
+}
+
+// ── Local natural-language date parsing ───────────────────────────────────
+// The date step must NEVER depend on an LLM call: when Gemini was down the
+// bot rejected every date (including its own suggested "Tomorrow") and
+// customers looped forever. Handles the common phrasings locally, in the
+// tenant's timezone; Gemini remains a fallback for exotic input only.
+const WEEKDAY_INDEX: Record<string, number> = {
+  sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4,
+  friday: 5, fri: 5, saturday: 6, sat: 6,
+};
+const MONTH_INDEX: Record<string, number> = {
+  january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4,
+  may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
+  september: 9, sep: 9, sept: 9, october: 10, oct: 10,
+  november: 11, nov: 11, december: 12, dec: 12,
+};
+
+function tenantTodayKey(tenant: TenantContext): string {
+  // en-CA gives YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tenantTimeZone(tenant), year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
+
+function addDaysToKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12)); // noon UTC avoids DST edges
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().split("T")[0];
+}
+
+function keyFromParts(year: number, month: number, day: number): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const dt = new Date(Date.UTC(year, month - 1, day, 12));
+  // reject overflow like 31 Feb
+  if (dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
+  return dt.toISOString().split("T")[0];
+}
+
+function parseLocalDate(tenant: TenantContext, raw: string): string | null {
+  const todayKey = tenantTodayKey(tenant);
+  let s = String(raw || "").toLowerCase().trim()
+    .replace(/[?!.,]+/g, " ")
+    .replace(/\b(please|pls|plz|on|the|for|of|we|want|would|like|to|go|book|a|an)\b/g, " ")
+    .replace(/(\d+)(st|nd|rd|th)\b/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return null;
+
+  if (/\btoday\b|\btonight\b|\bnow\b/.test(s)) return todayKey;
+  if (/\bday after tomorrow\b|\bovermorrow\b/.test(s)) return addDaysToKey(todayKey, 2);
+  if (/\btom+or+ow\b|\btmrw\b|\btomorow\b|\btommorow\b|\btmr\b/.test(s)) return addDaysToKey(todayKey, 1);
+
+  // ISO YYYY-MM-DD
+  const iso = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) return keyFromParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  // Weekday (optionally "next monday" → the occurrence after the coming one
+  // only when today IS that weekday; otherwise the coming occurrence)
+  const wd = s.match(/\b(?:next\s+|this\s+)?(sunday|sun|monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thurs|thur|thu|friday|fri|saturday|sat)\b/);
+  if (wd) {
+    const target = WEEKDAY_INDEX[wd[1]];
+    const [ty, tm, td] = todayKey.split("-").map(Number);
+    const todayDow = new Date(Date.UTC(ty, tm - 1, td, 12)).getUTCDay();
+    let diff = (target - todayDow + 7) % 7;
+    if (diff === 0) diff = 7; // "monday" said on a Monday → next week's
+    return addDaysToKey(todayKey, diff);
+  }
+
+  const todayYear = Number(todayKey.split("-")[0]);
+  const monthNames = Object.keys(MONTH_INDEX).sort((a, b) => b.length - a.length).join("|");
+
+  // "6 july [2026]" / "6 jul"
+  let m = s.match(new RegExp("\\b(\\d{1,2})\\s+(" + monthNames + ")(?:\\s+(\\d{4}))?\\b"));
+  let day = 0, mon = 0, yr = 0;
+  if (m) { day = Number(m[1]); mon = MONTH_INDEX[m[2]]; yr = m[3] ? Number(m[3]) : 0; }
+  else {
+    // "july 6 [2026]"
+    m = s.match(new RegExp("\\b(" + monthNames + ")\\s+(\\d{1,2})(?:\\s+(\\d{4}))?\\b"));
+    if (m) { mon = MONTH_INDEX[m[1]]; day = Number(m[2]); yr = m[3] ? Number(m[3]) : 0; }
+  }
+  if (!m) {
+    // numeric "6/7[/2026]" or "06-07" — day/month (ZA convention)
+    const n = s.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+    if (n) {
+      day = Number(n[1]); mon = Number(n[2]);
+      yr = n[3] ? (n[3].length === 2 ? 2000 + Number(n[3]) : Number(n[3])) : 0;
+    }
+  }
+  if (day && mon) {
+    let key = keyFromParts(yr || todayYear, mon, day);
+    if (!key) return null;
+    // no explicit year and the date already passed → they mean next year
+    if (!yr && key < todayKey) key = keyFromParts(todayYear + 1, mon, day);
+    return key;
+  }
+
+  return null;
 }
 
 function serializeFaqForPrompt(faqJson: any) {
@@ -234,21 +335,17 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
 async function gemFallback(tenant: TenantContext, msg: string, extraContext?: string): Promise<string | null> {
-  if (!GK) return null;
-  try {
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(8000),
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: buildGeminiInstruction(tenant, extraContext) }] },
-        contents: [{ role: "user", parts: [{ text: msg }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 150 }
-      })
-    });
-    const d = await r.json();
-    if (d.candidates?.[0]?.content?.parts?.[0]) return d.candidates[0].content.parts[0].text;
-    return null;
-  } catch (e) { return null; }
+  // Ground the answer in the tenant's vector KB (returns "" when nothing relevant)
+  const kbCtx = await retrieveKbContext(supabase, tenant.business.id, msg);
+  const ctx = [kbCtx, extraContext].filter(Boolean).join("\n\n") || undefined;
+  return await llmText({
+    system: buildGeminiInstruction(tenant, ctx),
+    user: msg,
+    maxTokens: 150,
+    temperature: 0.7,
+    timeoutMs: 8000,
+    label: "wa-faq",
+  });
 }
 async function getConvo(tenant: TenantContext, phone: any) {
   const r = await supabase.from("conversations").select().eq("business_id", tenant.business.id).eq("phone", phone).single();
@@ -523,7 +620,7 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 
 function detectAvailQuery(input: string): boolean {
   const i = input.toLowerCase();
-  const hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
+  const hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("this week") || i.includes("week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
   const hasIntent = i.includes("available") || i.includes("space") || i.includes("slot") || i.includes("open") || i.includes("spot") || i.includes("can i") || i.includes("do you have") || i.includes("any tour") || i.includes("what time") || i.includes("book for") || i.includes("free") || i.includes("which") || i.includes("what");
   return hasTime && hasIntent;
 }
@@ -649,17 +746,9 @@ async function detectIntent(tenant: TenantContext, input: string, phone: string)
   if (i === "reschedule") return "RESCHEDULE";
   if (i === "cancel") return "CANCEL";
 
-  // Use Gemini for natural language intent classification
-  if (!GK) return null; // Fallback if no API key
-
-  try {
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{
-            text: `You are an intent classifier for a tourism activity booking assistant for ${businessName(tenant)}. Read the user's message and reply with EXACTLY ONE of the following keywords based on their intent, or 'UNKNOWN' if it doesn't match any:
+  // Use the LLM for natural language intent classification
+  const intentOut = await llmText({
+    system: `You are an intent classifier for a tourism activity booking assistant for ${businessName(tenant)}. Read the user's message and reply with EXACTLY ONE of the following keywords based on their intent, or 'UNKNOWN' if it doesn't match any:
 
 BOOK (wants to book a tour)
 AVAIL (asking about times, schedule, or availability)
@@ -668,20 +757,19 @@ VOUCHER (wants to buy or redeem a gift voucher)
 HUMAN (wants to speak to a human, agent, or team member)
 THANKS (saying thank you or goodbye)
 
-Reply ONLY with the keyword, nothing else.`}]
-        },
-        contents: [{ role: "user", parts: [{ text: input }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
-      })
-    });
-    const d = await r.json();
-    if (d.candidates?.[0]?.content?.parts?.[0]) {
-      const intent = d.candidates[0].content.parts[0].text.trim().toUpperCase();
-      if (["BOOK", "AVAIL", "MY_BOOKINGS", "VOUCHER", "HUMAN", "THANKS"].includes(intent)) {
-        return intent;
-      }
+Reply ONLY with the keyword, nothing else.`,
+    user: input,
+    maxTokens: 10,
+    temperature: 0.1,
+    timeoutMs: 5000,
+    label: "wa-intent",
+  });
+  if (intentOut) {
+    const intent = intentOut.trim().toUpperCase();
+    if (["BOOK", "AVAIL", "MY_BOOKINGS", "VOUCHER", "HUMAN", "THANKS"].includes(intent)) {
+      return intent;
     }
-  } catch (e) { console.error("Intent classification failed", e); }
+  }
 
   return null;
 }
@@ -695,12 +783,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     const _rt = (text || "").trim();
     const _ri = (msgType === "interactive" && interactive) ? ((interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "") : "";
     let inboundMsgId: string | null = null;
-    try {
-      const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone }).select("id").single();
-      if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
-      else inboundMsgId = cmRes.data?.id || null;
-    } catch (e: any) {
-      await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
+    // internal_proceed is a state-machine token (auto-advance), not a customer
+    // message — logging it polluted the inbox thread.
+    if (_rt !== "internal_proceed") {
+      try {
+        const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone }).select("id").single();
+        if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
+        else inboundMsgId = cmRes.data?.id || null;
+      } catch (e: any) {
+        await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
+      }
     }
 
     // ── Drain any queued cancellation follow-ups ────────────────────────────
@@ -764,15 +856,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // Stop-words (above) and HUMAN-mode routing (below) still work regardless.
     const botGate = await shouldBotReply(supabase, tenant.business.id);
     if (!botGate.active) {
-      // Tag the message so analytics can track "would have auto-replied but bot was disabled"
+      // Tag the message so analytics can track "would have auto-replied but bot was disabled".
+      // PostgREST ignores order/limit on UPDATE, so fetch the latest row's id first —
+      // the old chained form stamped EVERY inbound message for this phone.
       try {
-        await supabase.from("chat_messages")
-          .update({ bot_skipped_reason: botGate.reason })
+        const { data: lastIn } = await supabase.from("chat_messages")
+          .select("id")
           .eq("business_id", tenant.business.id)
           .eq("phone", phone)
           .eq("direction", "IN")
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
+        if (lastIn?.id) {
+          await supabase.from("chat_messages")
+            .update({ bot_skipped_reason: botGate.reason })
+            .eq("id", lastIn.id);
+        }
       } catch { /* non-critical */ }
       return;
     }
@@ -799,7 +899,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     // Greetings trigger welcome
-    if ((input === "hi" || input === "hello" || input === "hey" || input === "howzit" || input === "hiya" || input === "yo" || input === "sup" || input === "good morning" || input === "good afternoon" || input === "good evening") && state !== "IDLE") {
+    // Prefix match so "hi there" / "hello!" also count; the length guard keeps
+    // real requests like "hi, I want to cancel my booking" flowing to intent routing.
+    const isGreeting = /^(hi|hello|hey|howzit|hiya|yo|sup|good\s+(morning|afternoon|evening))\b/.test(input) && input.length <= 20;
+    if (isGreeting && state !== "IDLE") {
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       state = "IDLE";
     }
@@ -896,21 +999,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const faqKey = matchFAQ(input);
       if (faqKey && !rid) {
         const faqAnswer = getFaqAnswer(tenant, faqKey);
-        if (!faqAnswer) {
-          await sendText(tenant, phone, "I’m not sure about that yet. Let me connect you to our team.");
-          await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
+        if (faqAnswer) {
+          await typingDelay();
+          await sendText(tenant, phone, faqAnswer);
+          await typingDelay();
+          await sendText(tenant, phone, "Anything else I can help with?");
+          await sendButtons(tenant, phone, "Quick actions:", [
+            { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
+            { id: "MORE", title: "\u{1F4AC} More Options" },
+          ]);
+          await setConvo(convo.id, { current_state: "MENU" });
           return;
         }
-        await typingDelay();
-        await sendText(tenant, phone, faqAnswer);
-        await typingDelay();
-        await sendText(tenant, phone, "Anything else I can help with?");
-        await sendButtons(tenant, phone, "Quick actions:", [
-          { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
-          { id: "MORE", title: "\u{1F4AC} More Options" },
-        ]);
-        await setConvo(convo.id, { current_state: "MENU" });
-        return;
+        // FAQ pattern matched but this tenant hasn't configured that answer.
+        // Do NOT dead-end into a silent HUMAN handoff (the bot then ignored
+        // everything until "menu" — customers thought it was broken). Fall
+        // through: intent routing / menu keywords / gemFallback still get a
+        // chance to answer, and the final fallback keeps the bot alive.
       }
 
       // Check intent (skip if rid already set from button click)
@@ -961,8 +1066,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "MENU") {
       const c = rid || input;
 
-      // BOOK
-      if (c === "BOOK" || c.includes("book")) {
+      // BOOK — but never when the customer is talking about an EXISTING booking
+      // ("change/cancel/reschedule my booking" used to start a brand-new booking
+      // because "booking" contains "book"). Manage-phrases fall through to the
+      // MY_BOOKINGS branch below.
+      const cManage = /\b(change|resched\w*|cancel\w*|move|edit|manage|update|view)\b/.test(c);
+      if (c === "BOOK" || (c.includes("book") && !cManage)) {
         const tours = await getActiveTours(tenant);
         if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment \u2014 check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         if (tours.length === 1) {
@@ -980,8 +1089,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
 
-      // AVAILABILITY
-      else if (c === "AVAIL" || c.includes("avail")) {
+      // AVAILABILITY — also catch natural phrasings like "what times do you
+      // have", "what's your schedule", "any open slots this week"
+      else if (c === "AVAIL" || c.includes("avail") || /\b(times?|schedule|slots?|openings?)\b/.test(c)) {
         const tours2 = await getActiveTours(tenant);
         if (tours2.length <= 1) {
           const slots = await getAvailSlots(tenant, 8);
@@ -1013,7 +1123,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // MY BOOKINGS / RESCHEDULE / CANCEL
-      else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel")) {
+      else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel") || (cManage && /\bbooking/.test(c))) {
         const bkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, slots(start_time), tours(name)")
           .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED", "CANCELLED"])
           .order("created_at", { ascending: false }).limit(5);
@@ -1165,7 +1275,31 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK TOUR =====
     else if (state === "PICK_TOUR") {
-      const tourId = rid ? rid.replace("TOUR_", "") : "";
+      let tourId = rid ? rid.replace("TOUR_", "") : "";
+      // Typed fallback — customers often type the tour name or a number instead
+      // of tapping the list (and some WhatsApp clients don't render lists). The
+      // rid-only version trapped them in "Please pick a tour from the list above."
+      if (!tourId && rawText) {
+        const tours = await getActiveTours(tenant);
+        const typed = rawText.toLowerCase().trim();
+        const num = typed.match(/^(\d{1,2})\.?$/);
+        if (num && Number(num[1]) >= 1 && Number(num[1]) <= tours.length) {
+          tourId = tours[Number(num[1]) - 1].id;
+        } else {
+          const matches = tours.filter((tr: any) => {
+            const nm = String(tr.name || "").toLowerCase();
+            return nm === typed || nm.includes(typed) || typed.includes(nm);
+          });
+          if (matches.length === 1) tourId = matches[0].id;
+        }
+        if (!tourId) {
+          const tours2 = tours.slice(0, 10);
+          let opts = "Which tour would you like? Reply with the name or number:\n\n";
+          for (let oi = 0; oi < tours2.length; oi++) opts += (oi + 1) + ". " + tours2[oi].name + "\n";
+          await sendText(tenant, phone, opts);
+          return;
+        }
+      }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list above."); return; }
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
@@ -1666,7 +1800,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK QTY =====
     else if (state === "ASK_QTY") {
-      const qty = parseInt(input);
+      // Accept "We are 2 people" / "2 adults" — extract the first number, not parseInt(raw)
+      const qtyMatch = (input || "").match(/\d{1,3}/);
+      const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : NaN;
       if (isNaN(qty) || qty < 1 || qty > 30) { await sendText(tenant, phone, "Just need a number between 1 and 30 \u{1F60A}"); return; }
 
       // Check if there are ANY valid slots left in general (just to catch waitlist cases)
@@ -1719,30 +1855,31 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "PICK_DATE") {
       let pickedDate = "";
 
-      // Attempt Natural Language Date Parsing if they typed it instead of clicking
+      // Local parsing FIRST — the bot must understand "tomorrow"/"monday"/"6 july"
+      // even when the LLM is down (a silent Gemini outage used to reject every
+      // date and trap customers in a loop here).
       if (rawText) {
-        if (GK) {
-          try {
-            const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              signal: AbortSignal.timeout(5000),
-              body: JSON.stringify({
-                system_instruction: { parts: [{ text: `You are a date extractor. The user is asking for a date. Today is ${new Date().toISOString().split("T")[0]}. Return exactly one YYYY-MM-DD date string based on their input, or "INVALID" if no date is found. Examples: "Tomorrow" -> next date. "1 September" -> 2026-09-01.` }] },
-                contents: [{ role: "user", parts: [{ text: rawText }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 15 }
-              })
-            });
-            const d = await r.json();
-            if (d.candidates?.[0]?.content?.parts?.[0]) {
-              const extracted = d.candidates[0].content.parts[0].text.trim();
-              if (extracted !== "INVALID" && extracted.match(/^\d{4}-\d{2}-\d{2}$/)) pickedDate = extracted;
-            }
-          } catch (e) { }
+        pickedDate = parseLocalDate(tenant, rawText) || "";
+      }
+
+      // LLM fallback for exotic phrasing only
+      if (!pickedDate && rawText) {
+        const dateOut = await llmText({
+          system: `You are a date extractor. The user is asking for a date. Today is ${tenantTodayKey(tenant)}. Return exactly one YYYY-MM-DD date string based on their input, or "INVALID" if no date is found. Examples: "Tomorrow" -> next date. "1 September" -> 2026-09-01.`,
+          user: rawText,
+          maxTokens: 15,
+          temperature: 0.1,
+          timeoutMs: 5000,
+          label: "wa-date",
+        });
+        if (dateOut) {
+          const extracted = dateOut.trim();
+          if (extracted !== "INVALID" && extracted.match(/^\d{4}-\d{2}-\d{2}$/)) pickedDate = extracted;
         }
       }
 
       if (!pickedDate) {
-        await sendText(tenant, phone, "Please type a clear date like 'Tomorrow' or '1 September'.");
+        await sendText(tenant, phone, "Sorry, I didn't catch that date. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
         return;
       }
 
@@ -1770,10 +1907,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const openSlots = [];
       let allClosed = true;
       let hasOpenButFull = false;
+      let hasCutoffOnly = false;
 
+      const bookingCutoffMs = Date.now() + 60 * 60 * 1000;
       for (const ts of dbSlots) {
         if (ts.status === "OPEN") {
           allClosed = false;
+          // Don't offer slots the customer can no longer book (60-min cutoff) —
+          // showing them and rejecting the pick afterwards trapped people in a loop.
+          if (new Date(ts.start_time).getTime() < bookingCutoffMs) {
+            hasCutoffOnly = true;
+            continue;
+          }
           const t_avail = ts.capacity_total - ts.booked - (ts.held || 0);
           if (t_avail >= sd.qty) {
             openSlots.push(ts);
@@ -1789,6 +1934,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (openSlots.length === 0) {
+        if (hasCutoffOnly && !hasOpenButFull) {
+          await sendText(tenant, phone, "The remaining trips on *" + pdFormatted + "* have already closed for booking (bookings close 60 minutes before the start time). Try another date! \u{1F4C5}");
+          return;
+        }
         if (hasOpenButFull) {
           await sendText(tenant, phone, "All trips on *" + pdFormatted + "* are fully booked for " + sd.qty + " people. Try another date or a smaller group! \u{1F4C5}");
         } else {
@@ -1805,9 +1954,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       for (let ti = 0; ti < displayCount; ti++) {
         const os = openSlots[ti];
         const oavl = os.capacity_total - os.booked - (os.held || 0);
-        const opri = os.price_per_person_override || os.tours?.base_price_per_person || 600;
+        // PostgREST types embedded many-to-one relations as arrays; runtime is an object
+        const osTour: any = Array.isArray(os.tours) ? os.tours[0] : os.tours;
+        const opri = os.price_per_person_override || osTour?.base_price_per_person || 600;
         const otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
-        const tName = os.tours?.name ? os.tours.name + " \u2022 " : "";
+        const tName = osTour?.name ? osTour.name + " \u2022 " : "";
         timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, R" + opri + "/pp)\n";
         slotMap[ti + 1] = os.id;
       }
@@ -1834,7 +1985,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date \u2014 type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       // M5: 60-min cutoff check at slot selection
       const slotStartMs = new Date(slot.start_time).getTime();
-      if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time or another date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time from the list (reply with its number), or type *menu* to start over."); return; }
       const slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
       const slotAvail = Number(slotAvailRes.data || 0);
       if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
@@ -1913,6 +2064,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       if (rid === "CONFIRM" || input === "yes") {
+        // Details already collected (e.g. re-confirm after a price update) —
+        // go straight to finalize instead of asking for name/email again.
+        if (sd.customer_name && sd.email) {
+          await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: sd });
+          await handleMsg(tenant, phone, "internal_proceed", "text", null);
+          return;
+        }
         await typingDelay();
         await sendText(tenant, phone, "Brilliant! Just need a couple of details to lock it in.\n\nPlease reply with your:\n- Full Name\n- Email Address\n\n*(You can just send them together in one message!)*");
         await setConvo(convo.id, { current_state: "ASK_DETAILS", state_data: sd });
@@ -1921,17 +2079,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK DETAILS (also handles ASK_NAME_EMAIL) =====
     else if (state === "ASK_DETAILS" || state === "ASK_NAME_EMAIL") {
-      const dParts = rawText.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
+      const dParts = rawText.split(/[,;\n]+/).map(function (p: string) { return p.trim(); }).filter(function (p: string) { return p.length > 0; });
       // Restore any partial data saved from a previous message in this state
       let dName = sd.partial_name || "";
       let dEmail = sd.partial_email || "";
       for (const dp of dParts) {
         const dc = dp.replace(/^(name|email)[:\-\s]*/i, "").trim();
         if (!dc) continue;
-        // Use regex to extract just the email address, handles trailing text like "john@email.com but ..."
+        // Extract the email, then treat the REMAINDER of the same part as the
+        // name — "Gideon Langenhoven gids@gmail.com" in one message used to
+        // capture only the email and re-ask for the name.
         const emailMatch = dc.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
-        if (emailMatch && !dEmail) { dEmail = emailMatch[0].toLowerCase(); }
-        else if (!emailMatch && dc.match(/[a-zA-Z]/) && !dName) { dName = dc; }
+        if (emailMatch) {
+          if (!dEmail) dEmail = emailMatch[0].toLowerCase();
+          const rest = dc.replace(emailMatch[0], "").replace(/[<>()\[\]"',;]/g, " ").replace(/\s+/g, " ").trim();
+          if (rest && !dName && /[a-zA-Z]{2,}/.test(rest) && !rest.includes("?") && rest.split(" ").length <= 5) dName = rest;
+        } else if (dc.match(/[a-zA-Z]/) && !dName && !dc.includes("?") && dc.split(/\s+/).length <= 5) {
+          // Question-looking or essay-length text is not a name — re-prompt instead
+          // of saving "do you provide wetsuits?" as the customer's name.
+          dName = dc;
+        }
       }
 
       if (!dName || !dEmail) {
@@ -2011,6 +2178,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         unitPrice: finalUnitPrice,
         voucherDeduction: sd.voucher_id ? Number(sd.voucher_deduction || 0) : 0,
         groupDiscountPercent: Number(sd.discount_percent || 0),
+        // Loyalty discounts apply at any group size; the default min-qty of 6
+        // silently dropped the quoted 10% and triggered a bogus "price changed".
+        groupDiscountMinQty: sd.discount_type === "LOYALTY" ? 1 : undefined,
       });
       if (!finalPriceCheck.ok && finalPriceCheck.reason !== "PRICE_CHANGED") {
         await sendText(tenant, phone, "I couldn't verify the price for that trip, so I won't create the booking yet. Please type *book* to start again.");
@@ -2200,7 +2370,29 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== GIFT VOUCHER PURCHASE =====
     else if (state === "GV_PICK_TOUR") {
-      const tourId = rid ? rid.replace("GV_", "") : "";
+      let tourId = rid ? rid.replace("GV_", "") : "";
+      // Typed fallback — same as PICK_TOUR: accept a typed tour name or number
+      if (!tourId && rawText) {
+        const gvTours = await getActiveTours(tenant);
+        const gvTyped = rawText.toLowerCase().trim();
+        const gvNum = gvTyped.match(/^(\d{1,2})\.?$/);
+        if (gvNum && Number(gvNum[1]) >= 1 && Number(gvNum[1]) <= gvTours.length) {
+          tourId = gvTours[Number(gvNum[1]) - 1].id;
+        } else {
+          const gvMatches = gvTours.filter((tr: any) => {
+            const nm = String(tr.name || "").toLowerCase();
+            return nm === gvTyped || nm.includes(gvTyped) || gvTyped.includes(nm);
+          });
+          if (gvMatches.length === 1) tourId = gvMatches[0].id;
+        }
+        if (!tourId) {
+          const gvTours2 = gvTours.slice(0, 10);
+          let gvOpts = "Which tour is the voucher for? Reply with the name or number:\n\n";
+          for (let gi = 0; gi < gvTours2.length; gi++) gvOpts += (gi + 1) + ". " + gvTours2[gi].name + "\n";
+          await sendText(tenant, phone, gvOpts);
+          return;
+        }
+      }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list."); return; }
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Can't find that tour. Let's try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
@@ -2801,25 +2993,24 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
 
-      // Call Gemini with full context
-      if (GK) {
-        try {
-          const ctxR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: buildGeminiInstruction(tenant, gemContext) }] },
-              contents: [{ role: "user", parts: [{ text: rawText }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
-            })
-          });
-          const ctxD = await ctxR.json();
-          if (ctxD.candidates?.[0]?.content?.parts?.[0]) {
-            await sendText(tenant, phone, ctxD.candidates[0].content.parts[0].text);
-            await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-            await setConvo(convo.id, { current_state: "MENU" });
-            return;
-          }
-        } catch (e) { console.log("Gem err:", e); }
+      // Call the LLM with full context (bookings + availability + vector KB)
+      {
+        const askKbCtx = await retrieveKbContext(supabase, tenant.business.id, rawText);
+        if (askKbCtx) gemContext = askKbCtx + "\n" + gemContext;
+        const ctxOut = await llmText({
+          system: buildGeminiInstruction(tenant, gemContext),
+          user: rawText,
+          maxTokens: 200,
+          temperature: 0.7,
+          timeoutMs: 8000,
+          label: "wa-ask",
+        });
+        if (ctxOut) {
+          await sendText(tenant, phone, ctxOut);
+          await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
+          await setConvo(convo.id, { current_state: "MENU" });
+          return;
+        }
       }
 
       // Fallback

@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { CaretDown, Check } from "@phosphor-icons/react";
+import { CaretDown, Check, CalendarBlank } from "@phosphor-icons/react";
 import * as Sentry from "@sentry/nextjs";
 
 interface Tour {
@@ -146,26 +146,26 @@ function CustomSelect({ label, value, options, onChange, placeholder, error }: C
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`mt-1.5 flex h-12 w-full items-center justify-between rounded-xl border transition-all px-4 text-sm font-medium ${
-          error 
-            ? "border-red-500 bg-red-50/10 ring-1 ring-red-500" 
-            : open 
-              ? "border-[#0f595e] ring-2 ring-[#0f595e]/10 bg-white" 
-              : "border-gray-200 bg-white hover:border-gray-300"
+        className={`mt-1.5 flex h-12 w-full items-center justify-between rounded-xl border transition-all px-4 text-sm font-medium bg-[var(--ck-surface)] ${
+          error
+            ? "border-[var(--ck-danger)] ring-1 ring-[var(--ck-danger)]"
+            : open
+              ? "border-[var(--ck-accent)] ring-2 ring-[var(--ck-accent)]/15"
+              : "border-[var(--ck-border-strong)] hover:border-[var(--ck-accent)]"
         } ${open ? "z-50" : "z-0"}`}
       >
-        <span className={selected ? "text-[#111827]" : "text-gray-400"}>
+        <span style={{ color: selected ? "var(--ck-text-strong)" : "var(--ck-text-muted)" }}>
           {selected ? selected.name : placeholder}
         </span>
-        <CaretDown size={18} className={`text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <CaretDown size={18} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} style={{ color: "var(--ck-text-muted)" }} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-[70] mt-2 max-h-72 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="ui-card absolute left-0 right-0 top-full z-[70] mt-2 max-h-72 overflow-y-auto p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
             {options.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400 font-medium">No options available</div>
+              <div className="px-4 py-8 text-center text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>No options available</div>
             ) : (
               options.map((opt) => (
                 <button
@@ -176,10 +176,11 @@ function CustomSelect({ label, value, options, onChange, placeholder, error }: C
                     setOpen(false);
                   }}
                   className={`flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-left text-sm transition-all duration-200 ${
-                    value === opt.id 
-                      ? "bg-[#0f595e]/5 text-[#0f595e] font-bold" 
-                      : "text-[#374151] hover:bg-gray-50 font-medium"
+                    value === opt.id
+                      ? "bg-[var(--ck-accent-soft)] text-[var(--ck-accent)] font-bold"
+                      : "font-medium hover:bg-[var(--ck-surface-sunken)]"
                   }`}
+                  style={value === opt.id ? undefined : { color: "var(--ck-text)" }}
                 >
                   <span className="truncate">{opt.name}</span>
                   {value === opt.id && <Check size={16} className="shrink-0" />}
@@ -197,7 +198,7 @@ function CustomNumberInput({ label, value, onChange, error }: { label: string; v
   return (
     <div className="w-full">
       <div className="flex items-center gap-1.5">
-        <span className="text-sm font-semibold text-[#374151]">{label}</span>
+        <span className="text-sm font-semibold" style={{ color: "var(--ck-text)" }}>{label}</span>
       </div>
       <div className="relative mt-1.5">
         <input
@@ -211,13 +212,14 @@ function CustomNumberInput({ label, value, onChange, error }: { label: string; v
           onBlur={(e) => {
             if (value === "") onChange("0");
           }}
-          className={`h-12 w-full rounded-xl border px-4 text-base font-bold transition-all ${
-            error 
-              ? "border-red-500 bg-red-50/10 ring-1 ring-red-500" 
-              : "border-gray-200 bg-white hover:border-gray-300 focus:border-[#0f595e] focus:ring-4 focus:ring-[#0f595e]/10"
+          className={`h-12 w-full rounded-xl border px-4 text-base font-bold transition-all bg-[var(--ck-surface)] ${
+            error
+              ? "border-[var(--ck-danger)] ring-1 ring-[var(--ck-danger)]"
+              : "border-[var(--ck-border-strong)] hover:border-[var(--ck-accent)] focus:border-[var(--ck-accent)] focus:ring-4 focus:ring-[var(--ck-accent)]/15"
           }`}
+          style={{ color: "var(--ck-text-strong)" }}
         />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-xs font-bold text-gray-300">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-xs font-bold" style={{ color: "var(--ck-text-muted)" }}>
           Manual input
         </div>
       </div>
@@ -891,19 +893,20 @@ export default function NewBookingPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">➕ New Booking</h2>
-        <p className="text-sm text-gray-500">Create manual bookings and send confirmation with payment link.</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Operations</p>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>New Booking</h2>
+        <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Create manual bookings and send confirmation with payment link.</p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-4 text-xl font-medium text-gray-700">Activity Details</h3>
+      <div className="ui-card anim-fade-up anim-d1 p-5">
+        <h3 className="mb-4 text-xl font-medium" style={{ color: "var(--ck-text-strong)" }}>Activity Details</h3>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto]">
           {/* Left: tour + pax selectors */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-1">
-              <label className="text-sm font-semibold text-[#374151] flex items-center gap-1.5">
-                To attend <span className="text-red-500">*</span>
+              <label className="text-sm font-semibold text-[var(--ck-text)] flex items-center gap-1.5">
+                To attend <span className="text-[var(--ck-danger)]">*</span>
               </label>
               <CustomSelect
                 placeholder="Choose a service"
@@ -930,8 +933,8 @@ export default function NewBookingPage() {
 
           {/* Right: availability calendar */}
           <div className="flex w-full flex-col items-center lg:max-w-[340px]">
-            <label className={`text-sm mb-1 self-start ${missingField === "date" ? "text-red-500 font-medium" : "text-gray-600"}`}>Select date <span className="text-red-500">*</span></label>
-            <div className={`w-full overflow-x-auto rounded-xl transition-colors ${missingField === "date" ? "ring-2 ring-red-500" : ""}`}>
+            <label className={`text-sm mb-1 self-start ${missingField === "date" ? "text-[var(--ck-danger)] font-medium" : "text-gray-600"}`}>Select date <span className="text-[var(--ck-danger)]">*</span></label>
+            <div className={`w-full overflow-x-auto rounded-xl transition-colors ${missingField === "date" ? "ring-2 ring-[var(--ck-danger)]" : ""}`}>
               <AvailabilityCalendar
                 value={bookingDate}
                 onChange={(v) => { setBookingDate(v); setMatrixStartDate(v); setMissingField(null); }}
@@ -943,16 +946,16 @@ export default function NewBookingPage() {
 
             {/* Slot color legend */}
             {availableSlots.length > 0 && (
-              <div className="mt-4 flex w-full flex-col gap-2 border-t border-gray-100 pt-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Time Slots Available</p>
+              <div className="mt-4 flex w-full flex-col gap-2 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <p className="ui-mono-label mb-1 !text-[10px]">Time Slots Available</p>
                 {availableSlots.slice(0, 4).map((slot, i) => {
                   const available = Math.max((slot.capacity_total || 0) - (slot.booked || 0), 0);
-                  const color = ["#10b981", "#a855f7", "#f59e0b", "#3b82f6"][i] || "#9ca3af";
+                  const color = ["var(--ck-chart-1)", "var(--ck-chart-2)", "var(--ck-chart-3)", "var(--ck-chart-4)"][i] || "var(--ck-text-muted)";
                   return (
-                    <div key={slot.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <div key={slot.id} className="flex items-center gap-2 text-sm" style={{ color: "var(--ck-text)" }}>
                       <span style={{ backgroundColor: color }} className="w-3 h-3 rounded-full shrink-0"></span>
-                      <span className="font-medium">{available} available</span>
-                      <span className="text-gray-500">for the {fmtTime(slot.start_time)} slot</span>
+                      <span className="font-medium tabular-nums">{available} available</span>
+                      <span style={{ color: "var(--ck-text-muted)" }}>for the {fmtTime(slot.start_time)} slot</span>
                     </div>
                   );
                 })}
@@ -964,32 +967,37 @@ export default function NewBookingPage() {
 
         <div className="mt-6">
           {loadingAvailabilityPreview ? (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
-              Loading availability...
+            <div className="space-y-2">
+              <div className="ui-skeleton h-9 w-full" />
+              <div className="ui-skeleton h-[168px] w-full !rounded-2xl" />
             </div>
           ) : availabilityTimeRows.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
-              No open availability found for the next 5 days.
+            <div className="ui-card">
+              <div className="ui-empty">
+                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
+                <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No open availability</p>
+                <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing open for the next 5 days on this activity.</p>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto pb-2 scrollbar-hide">
-              <div className="min-w-[760px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <div className="grid grid-cols-[120px_repeat(5,minmax(120px,1fr))] bg-gray-50/50">
-                  <div className="sticky left-0 z-10 flex items-center bg-gray-50/80 px-4 py-3 backdrop-blur-sm">
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Timeslot</span>
+              <div className="ui-card min-w-[760px] overflow-hidden !rounded-2xl">
+                <div className="grid grid-cols-[120px_repeat(5,minmax(120px,1fr))]" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <div className="sticky left-0 z-10 flex items-center px-4 py-3 backdrop-blur-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <span className="ui-mono-label !text-[10px]">Timeslot</span>
                   </div>
                   {availabilityDays.map((day) => (
-                    <div key={day} className="border-l border-gray-100 px-3 py-3 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-tight text-gray-400">{formatWeekdayLabel(day).substring(0, 3)}</p>
-                      <p className="text-sm font-bold text-gray-800">{formatDayLabel(day)}</p>
+                    <div key={day} className="px-3 py-3 text-center" style={{ borderLeft: "1px solid var(--ck-border-subtle)" }}>
+                      <p className="ui-mono-label !text-[9px]">{formatWeekdayLabel(day).substring(0, 3)}</p>
+                      <p className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{formatDayLabel(day)}</p>
                     </div>
                   ))}
                 </div>
 
                 {availabilityTimeRows.map((row) => (
-                  <div key={row.time} className="grid grid-cols-[120px_repeat(5,minmax(120px,1fr))] border-t border-gray-100">
-                    <div className="sticky left-0 z-10 flex items-center bg-white/90 px-4 py-4 backdrop-blur-sm">
-                      <span className="text-sm font-bold text-gray-700">{row.time}</span>
+                  <div key={row.time} className="grid grid-cols-[120px_repeat(5,minmax(120px,1fr))]" style={{ borderTop: "1px solid var(--ck-border-subtle)" }}>
+                    <div className="sticky left-0 z-10 flex items-center px-4 py-4 backdrop-blur-sm" style={{ background: "color-mix(in srgb, var(--ck-surface) 90%, transparent)" }}>
+                      <span className="text-sm font-bold tabular-nums" style={{ color: "var(--ck-text)" }}>{row.time}</span>
                     </div>
                     {row.days.map((cell) => {
                       const isSelected = selectedSlotId === cell.slotId && bookingDate === cell.day;
@@ -1006,33 +1014,32 @@ export default function NewBookingPage() {
                               // the 5-day grid stays in place when selecting a different column.
                             }
                           }}
-                          className={`group relative flex flex-col items-center justify-center border-l border-gray-100 px-3 py-3 text-center transition-all cursor-pointer ${
+                          className={`group relative flex flex-col items-center justify-center px-3 py-3 text-center transition-all cursor-pointer ${
                             isSelected
-                              ? "bg-[#0f595e] ring-2 ring-inset ring-[#0f595e] z-10"
-                            : cell.isAvailable 
-                                ? "bg-emerald-50/30 hover:bg-emerald-50/60" 
-                                : "bg-red-50/10 cursor-not-allowed overflow-hidden opacity-60"
+                              ? "z-10"
+                              : cell.isAvailable
+                                ? ""
+                                : "cursor-not-allowed overflow-hidden opacity-60"
                           }`}
+                          style={{
+                            borderLeft: "1px solid var(--ck-border-subtle)",
+                            background: isSelected ? "var(--ck-accent)" : cell.isAvailable ? "var(--ck-accent-soft)" : "var(--ck-danger-soft)",
+                            ...(isSelected ? { boxShadow: "inset 0 0 0 2px var(--ck-accent)" } : {}),
+                          }}
                         >
-                          <div className={`text-[10px] font-bold tracking-tighter sm:text-xs ${
-                            isSelected 
-                              ? "text-white" 
-                              : cell.isAvailable 
-                                ? "text-emerald-600" 
-                                : "text-red-400"
-                          }`}>
+                          <div className="text-[10px] font-bold tracking-tighter tabular-nums sm:text-xs" style={{ color: isSelected ? "#fff" : cell.isAvailable ? "var(--ck-accent)" : "var(--ck-danger)" }}>
                             {cell.available} OPEN
                           </div>
-                          
+
                           {!cell.isAvailable && cell.available > 0 && !isSelected && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-red-50/40 backdrop-blur-[0.5px]">
-                              <span className="text-[9px] font-black uppercase text-red-500 tracking-tighter px-1 rounded bg-white/95 shadow-sm">Need {qty}</span>
+                            <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[0.5px]" style={{ background: "var(--ck-danger-soft)" }}>
+                              <span className="rounded px-1 text-[9px] font-black uppercase tracking-tighter shadow-sm" style={{ background: "var(--ck-surface)", color: "var(--ck-danger)" }}>Need {qty}</span>
                             </div>
                           )}
 
                           {isSelected && (
                             <div className="absolute top-1 right-1">
-                              <Check size={10} className="text-white" />
+                              <Check size={10} style={{ color: "#fff" }} />
                             </div>
                           )}
                         </div>
@@ -1047,7 +1054,7 @@ export default function NewBookingPage() {
 
         {customFieldDefinitions.length > 0 && (
           <div className="mt-6 border-t border-gray-100 pt-6">
-            <h4 className="text-sm font-semibold text-[#374151]">Additional Booking Details</h4>
+            <h4 className="text-sm font-semibold text-[var(--ck-text)]">Additional Booking Details</h4>
             <p className="mt-1 text-xs text-gray-500">These fields are configured in Settings and saved on the booking record.</p>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               {customFieldDefinitions.map((field) => {
@@ -1056,8 +1063,8 @@ export default function NewBookingPage() {
                 const isNumber = field.type === "number";
                 const hasError = missingField === `custom_${field.key}`;
                 return (
-                  <label key={field.key} className={`text-sm font-medium text-[#374151] ${isTextArea ? "md:col-span-2" : ""}`}>
-                    {field.label} {field.required ? <span className="text-red-500">*</span> : null}
+                  <label key={field.key} className={`text-sm font-medium text-[var(--ck-text)] ${isTextArea ? "md:col-span-2" : ""}`}>
+                    {field.label} {field.required ? <span className="text-[var(--ck-danger)]">*</span> : null}
                     {isTextArea ? (
                       <textarea
                         value={value}
@@ -1069,8 +1076,8 @@ export default function NewBookingPage() {
                         rows={4}
                         className={`mt-1.5 w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all ${
                           hasError
-                            ? "border-red-500 bg-red-50/10 ring-1 ring-red-500"
-                            : "border-gray-200 bg-white hover:border-gray-300 focus:border-[#0f595e] focus:ring-4 focus:ring-[#0f595e]/10"
+                            ? "border-[var(--ck-danger)] ring-1 ring-[var(--ck-danger)]"
+                            : "border-[var(--ck-border-strong)] bg-[var(--ck-surface)] hover:border-[var(--ck-accent)] focus:border-[var(--ck-accent)] focus:ring-4 focus:ring-[var(--ck-accent)]/15"
                         }`}
                       />
                     ) : (
@@ -1084,8 +1091,8 @@ export default function NewBookingPage() {
                         placeholder={field.placeholder || ""}
                         className={`mt-1.5 h-12 w-full rounded-xl border px-4 text-sm outline-none transition-all ${
                           hasError
-                            ? "border-red-500 bg-red-50/10 ring-1 ring-red-500"
-                            : "border-gray-200 bg-white hover:border-gray-300 focus:border-[#0f595e] focus:ring-4 focus:ring-[#0f595e]/10"
+                            ? "border-[var(--ck-danger)] ring-1 ring-[var(--ck-danger)]"
+                            : "border-[var(--ck-border-strong)] bg-[var(--ck-surface)] hover:border-[var(--ck-accent)] focus:border-[var(--ck-accent)] focus:ring-4 focus:ring-[var(--ck-accent)]/15"
                         }`}
                       />
                     )}
@@ -1097,55 +1104,55 @@ export default function NewBookingPage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-4 text-base font-semibold text-gray-700">Customer Details</h3>
+      <div className="ui-card p-5">
+        <h3 className="mb-4 text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>Customer Details</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <label className="text-sm text-gray-600">
-            Full Name <span className="text-red-500">*</span>
+          <label className="text-sm" style={{ color: "var(--ck-text)" }}>
+            Full Name <span style={{ color: "var(--ck-danger)" }}>*</span>
             <input
               value={customerName}
               onChange={(e) => { setCustomerName(e.target.value); setMissingField(null); }}
               autoComplete="off"
-              className={`mt-1 w-full rounded border ${missingField === "name" ? "border-red-500 ring-1 ring-red-500 bg-red-50/10 placeholder:text-red-300" : "border-gray-300"} px-3 py-2 text-sm transition-colors`}
+              className={"ui-control mt-1 w-full" + (missingField === "name" ? " !border-[var(--ck-danger)]" : "")}
             />
           </label>
-          <label className="text-sm text-gray-600">
-            Mobile Number <span className="text-red-500">*</span>
+          <label className="text-sm" style={{ color: "var(--ck-text)" }}>
+            Mobile Number <span style={{ color: "var(--ck-danger)" }}>*</span>
             <input
               type="tel"
               value={mobile}
               onChange={(e) => { setMobile(e.target.value); setMissingField(null); }}
               autoComplete="off"
-              className={`mt-1 w-full rounded border ${missingField === "mobile" || missingField === "mobile_format" ? "border-red-500 ring-1 ring-red-500 bg-red-50/10 placeholder:text-red-300" : "border-gray-300"} px-3 py-2 text-sm transition-colors`}
+              className={"ui-control mt-1 w-full" + (missingField === "mobile" || missingField === "mobile_format" ? " !border-[var(--ck-danger)]" : "")}
             />
             {(missingField === "mobile_format") && (
-              <p className="text-xs text-red-500 mt-1">International format required (e.g. +27)</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ck-danger)" }}>International format required (e.g. +27)</p>
             )}
           </label>
-          <label className="text-sm text-gray-600">
-            Email <span className="text-red-500">*</span>
+          <label className="text-sm" style={{ color: "var(--ck-text)" }}>
+            Email <span style={{ color: "var(--ck-danger)" }}>*</span>
             <input
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setMissingField(null); }}
               autoComplete="off"
-              className={`mt-1 w-full rounded border ${missingField === "email" ? "border-red-500 ring-1 ring-red-500 bg-red-50/10 placeholder:text-red-300" : "border-gray-300"} px-3 py-2 text-sm transition-colors`}
+              className={"ui-control mt-1 w-full" + (missingField === "email" ? " !border-[var(--ck-danger)]" : "")}
             />
           </label>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="ui-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold text-gray-700">Slot Availability</h3>
-          <p className="text-xs text-gray-500">
-            {loadingSlots ? "Loading slots..." : `${availableSlots.length} slots available · ${availableSeats} seats open`}
+          <h3 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>Slot Availability</h3>
+          <p className="ui-mono-label !text-[10px]">
+            {loadingSlots ? "Loading slots…" : `${availableSlots.length} slots · ${availableSeats} seats open`}
           </p>
         </div>
 
         <div className="mt-1">
-          <label className="text-sm font-semibold text-[#374151] flex items-center gap-1.5 mb-1.5">
-            Select slot time <span className="text-red-500">*</span>
+          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold" style={{ color: "var(--ck-text)" }}>
+            Select slot time <span style={{ color: "var(--ck-danger)" }}>*</span>
           </label>
           <CustomSelect
             placeholder={availableSlots.length > 0 ? "Choose slot" : "No slots available"}
@@ -1163,21 +1170,21 @@ export default function NewBookingPage() {
         </div>
 
         <div className={`mt-4 grid grid-cols-1 gap-3 ${status === "PENDING" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
-          <div className="rounded-lg bg-gray-50 p-3 text-sm">
-            <p className="text-xs text-gray-500">Qty</p>
-            <p className="font-semibold">{qty}</p>
+          <div className="rounded-lg p-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+            <p className="ui-mono-label !text-[9.5px]">Qty</p>
+            <p className="font-display mt-1 text-xl font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{qty}</p>
           </div>
-          <div className="rounded-lg bg-gray-50 p-3 text-sm">
-            <p className="text-xs text-gray-500">Unit Price</p>
-            <p className="font-semibold">{fmtCurrency(unitPrice)}</p>
+          <div className="rounded-lg p-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+            <p className="ui-mono-label !text-[9.5px]">Unit Price</p>
+            <p className="font-display mt-1 text-xl font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(unitPrice)}</p>
           </div>
-          <div className="rounded-lg bg-gray-50 p-3 text-sm">
-            <p className="text-xs text-gray-500">Base Total</p>
-            <p className="font-semibold">{fmtCurrency(baseTotal)}</p>
+          <div className="rounded-lg p-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+            <p className="ui-mono-label !text-[9.5px]">Base Total</p>
+            <p className="font-display mt-1 text-xl font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(baseTotal)}</p>
           </div>
-          <label className="rounded-lg bg-gray-50 p-3 text-sm">
-            <span className="text-xs text-gray-500">Payment status</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm">
+          <label className="rounded-lg p-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+            <span className="ui-mono-label !text-[9.5px]">Payment status</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="ui-control mt-1 w-full !h-9 !px-2 !py-1.5">
               <option value="PENDING">PENDING</option>
               <option value="HELD">HELD</option>
               <option value="CONFIRMED">CONFIRMED</option>
@@ -1185,9 +1192,9 @@ export default function NewBookingPage() {
             </select>
           </label>
           {status === "PENDING" && (
-            <label className="rounded-lg bg-gray-50 p-3 text-sm">
-              <span className="text-xs text-gray-500">Hold booking for</span>
-              <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm">
+            <label className="rounded-lg p-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+              <span className="ui-mono-label !text-[9.5px]">Hold booking for</span>
+              <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} className="ui-control mt-1 w-full !h-9 !px-2 !py-1.5">
                 <option value="2">2 hours</option>
                 <option value="6">6 hours</option>
                 <option value="12">12 hours</option>
@@ -1201,20 +1208,20 @@ export default function NewBookingPage() {
 
       {/* Optional Add-Ons */}
       {availableAddOns.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-4 text-base font-semibold text-gray-700">Optional Add-Ons</h3>
+        <div className="ui-card p-5">
+          <h3 className="mb-4 text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>Optional Add-Ons</h3>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {availableAddOns.map((ao) => {
               const aoQty = selectedAddOns[ao.id] || 0;
               return (
-                <div key={ao.id} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                <div key={ao.id} className="flex items-center gap-3 rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
                   {ao.image_url && (
                     <img src={ao.image_url} alt={ao.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{ao.name}</p>
-                    {ao.description && <p className="text-xs text-gray-500 truncate">{ao.description}</p>}
-                    <p className="text-xs font-semibold text-[#0f595e]">{fmtCurrency(ao.price)} each</p>
+                    <p className="truncate text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{ao.name}</p>
+                    {ao.description && <p className="truncate text-xs" style={{ color: "var(--ck-text-muted)" }}>{ao.description}</p>}
+                    <p className="text-xs font-semibold tabular-nums" style={{ color: "var(--ck-amber)" }}>{fmtCurrency(ao.price)} each</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -1226,13 +1233,15 @@ export default function NewBookingPage() {
                         return next;
                       })}
                       disabled={aoQty === 0}
-                      className="w-7 h-7 rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold disabled:opacity-30"
+                      style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-strong)", color: "var(--ck-text)" }}
                     >-</button>
-                    <span className="w-6 text-center text-sm font-semibold">{aoQty}</span>
+                    <span className="w-6 text-center text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{aoQty}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.id]: (prev[ao.id] || 0) + 1 }))}
-                      className="w-7 h-7 rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold"
+                      style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-strong)", color: "var(--ck-text)" }}
                     >+</button>
                   </div>
                 </div>
@@ -1240,28 +1249,28 @@ export default function NewBookingPage() {
             })}
           </div>
           {addOnsTotal > 0 && (
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-[#0f595e]/5 px-4 py-2 text-sm">
-              <span className="text-gray-600">Add-ons subtotal</span>
-              <span className="font-semibold text-[#0f595e]">{fmtCurrency(addOnsTotal)}</span>
+            <div className="mt-3 flex items-center justify-between rounded-lg px-4 py-2 text-sm" style={{ background: "var(--ck-amber-soft)" }}>
+              <span style={{ color: "var(--ck-text)" }}>Add-ons subtotal</span>
+              <span className="font-semibold tabular-nums" style={{ color: "var(--ck-amber)" }}>{fmtCurrency(addOnsTotal)}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Discount / Price Override */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-4 text-base font-semibold text-gray-700">Price Adjustment</h3>
+      <div className="ui-card p-5">
+        <h3 className="mb-4 text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>Price Adjustment</h3>
 
         {/* Toggle */}
         {/* Promo code input */}
         <div className="flex items-end gap-2 mb-4">
-          <label className="flex-1 text-sm text-gray-600">
+          <label className="flex-1 text-sm" style={{ color: "var(--ck-text)" }}>
             Promo code
             <input
               type="text"
               value={promoCode}
               onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
-              className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm uppercase"
+              className="ui-control mt-1 w-full uppercase"
               placeholder="Enter promo code"
               disabled={discountType === "manual"}
             />
@@ -1281,20 +1290,20 @@ export default function NewBookingPage() {
               if (data?.valid) setDiscountType("promo");
               setPromoChecking(false);
             }}
-            className="rounded bg-[#0f595e] px-4 py-2 text-sm font-medium text-white hover:bg-[#0b4347] disabled:opacity-50"
+            className="ui-btn ui-btn-primary disabled:opacity-50"
           >
-            {promoChecking ? "..." : "Apply"}
+            {promoChecking ? "…" : "Apply"}
           </button>
           {promoResult && !promoResult.valid && (
-            <span className="text-xs text-red-500">{promoResult.error}</span>
+            <span className="text-xs" style={{ color: "var(--ck-danger)" }}>{promoResult.error}</span>
           )}
         </div>
 
         {discountType === "promo" && promoResult?.valid && (
-          <div className="mb-4 flex items-center gap-3 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
+          <div className="mb-4 flex items-center gap-3 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
             <span className="font-semibold">{promoResult.code}</span>
             <span>— {promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : "R" + promoResult.discount_value + " off"}</span>
-            <button type="button" onClick={() => { setDiscountType("none"); setPromoCode(""); setPromoResult(null); }} className="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+            <button type="button" onClick={() => { setDiscountType("none"); setPromoCode(""); setPromoResult(null); }} className="ml-auto text-xs hover:underline" style={{ color: "var(--ck-danger)" }}>Remove</button>
           </div>
         )}
 
@@ -1308,46 +1317,46 @@ export default function NewBookingPage() {
               setDiscountReason("");
               setPromoCode(""); setPromoResult(null);
             }}
-            className="h-4 w-4 rounded border-gray-300 accent-[#0f595e]"
+            className="h-4 w-4 rounded border-gray-300 accent-[var(--ck-accent)]"
           />
-          <span className="text-sm text-gray-700 font-medium">Manual price override</span>
+          <span className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>Manual price override</span>
         </label>
 
         {discountType === "manual" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="text-sm text-gray-600">
-              Override price (R) <span className="text-red-500">*</span>
+            <label className="text-sm" style={{ color: "var(--ck-text)" }}>
+              Override price (R) <span style={{ color: "var(--ck-danger)" }}>*</span>
               <input
                 type="number"
                 min={0}
                 step={0.01}
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="ui-control mt-1 w-full"
                 placeholder="Enter override amount"
               />
             </label>
-            <label className="text-sm text-gray-600">
-              Reason <span className="text-red-500">*</span>
+            <label className="text-sm" style={{ color: "var(--ck-text)" }}>
+              Reason <span style={{ color: "var(--ck-danger)" }}>*</span>
               <input
                 type="text"
                 value={discountReason}
                 onChange={(e) => setDiscountReason(e.target.value)}
-                className={`mt-1 w-full rounded border px-3 py-2 text-sm ${missingField === "discount_reason" ? "border-red-500 ring-1 ring-red-500 bg-red-50/10 placeholder:text-red-300" : "border-gray-300"}`}
+                className={"ui-control mt-1 w-full" + (missingField === "discount_reason" ? " !border-[var(--ck-danger)]" : "")}
                 placeholder="e.g. Staff discount, group deal…"
               />
               {missingField === "discount_reason" && (
-                <span className="mt-1 text-xs text-red-500">A reason is required for manual price overrides.</span>
+                <span className="mt-1 text-xs" style={{ color: "var(--ck-danger)" }}>A reason is required for manual price overrides.</span>
               )}
             </label>
           </div>
         )}
 
         {discountType === "manual" && (
-          <div className="mt-3 flex flex-wrap items-center gap-4 rounded-lg bg-amber-50 px-4 py-3 text-sm">
-            <span className="text-gray-500">Tour: <span className="line-through">{fmtCurrency(baseTotal)}</span> → {fmtCurrency(discountNum)}</span>
-            {addOnsTotal > 0 && <span className="text-gray-500">+ Add-ons {fmtCurrency(addOnsTotal)}</span>}
-            <span className="text-gray-800 font-bold text-base">→ Final: {fmtCurrency(totalAmount)}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-4 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--ck-amber-soft)" }}>
+            <span style={{ color: "var(--ck-text-muted)" }}>Tour: <span className="line-through">{fmtCurrency(baseTotal)}</span> → {fmtCurrency(discountNum)}</span>
+            {addOnsTotal > 0 && <span style={{ color: "var(--ck-text-muted)" }}>+ Add-ons {fmtCurrency(addOnsTotal)}</span>}
+            <span className="font-display text-base font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>→ Final: {fmtCurrency(totalAmount)}</span>
           </div>
         )}
       </div>
@@ -1356,9 +1365,9 @@ export default function NewBookingPage() {
         <button
           onClick={createBooking}
           disabled={submitting || loadingTours || loadingSlots}
-          className="w-full rounded-lg bg-[#0f595e] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b4347] disabled:opacity-50 transition-colors shadow-sm sm:w-auto"
+          className="ui-btn ui-btn-primary w-full !h-11 !px-5 disabled:opacity-50 sm:w-auto"
         >
-          {submitting ? "Processing..." : `Create Booking · ${fmtCurrency(totalAmount)}`}
+          {submitting ? "Processing…" : `Create Booking · ${fmtCurrency(totalAmount)}`}
         </button>
       </div>
     </div>

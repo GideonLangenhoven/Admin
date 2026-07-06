@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask, EnvelopeSimple } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
 import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
 
@@ -386,26 +386,32 @@ export default function TemplatesPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
+    return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{templates.length} templates</p>
-        <button onClick={() => setShowGallery(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+      <div className="anim-fade-up flex items-center justify-between">
+        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+          <span className="font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{templates.length}</span> templates
+        </p>
+        <button onClick={() => setShowGallery(true)} className="ui-btn ui-btn-primary">
           <Plus size={14} /> New Template
         </button>
       </div>
 
       {templates.length === 0 ? (
-        <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No templates yet. Create your first email template.</p>
+        <div className="ui-card anim-fade-up anim-d1">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><EnvelopeSimple size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No templates yet</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first email template.</p>
+          </div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="anim-fade-up anim-d1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((t) => (
-            <div key={t.id} className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+            <div key={t.id} className="ui-card p-4 space-y-3">
               <div>
                 <h3 className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
@@ -413,7 +419,7 @@ export default function TemplatesPage() {
                 </p>
               </div>
               {/* Preview (sandboxed iframe to prevent XSS) */}
-              <div className="rounded-lg border overflow-hidden h-32" style={{ borderColor: "var(--ck-border)" }}>
+              <div className="rounded-lg border overflow-hidden h-32" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <iframe
                   srcDoc={t.html_content || "<p style='padding:20px;color:#999'>Empty template</p>"}
                   sandbox=""
@@ -423,19 +429,19 @@ export default function TemplatesPage() {
                 />
               </div>
               <div className="flex items-center gap-1.5 pt-1">
-                <button onClick={() => setEditing(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+                <button onClick={() => setEditing(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs">
                   <PencilSimple size={12} /> Edit
                 </button>
-                <button onClick={() => openSendModal(t)} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+                <button onClick={() => openSendModal(t)} className="ui-btn ui-btn-primary !h-8 !px-2.5 !text-xs">
                   <PaperPlaneTilt size={12} /> Send
                 </button>
-                <button onClick={() => sendTestEmail(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }} title="Send test to yourself">
+                <button onClick={() => sendTestEmail(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs" title="Send test to yourself">
                   <Flask size={12} /> Test
                 </button>
-                <button onClick={() => duplicateTemplate(t)} className="p-1.5 rounded-lg border" style={{ borderColor: "var(--ck-border)" }} title="Duplicate">
+                <button onClick={() => duplicateTemplate(t)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" title="Duplicate">
                   <Copy size={12} />
                 </button>
-                <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-red-500 hover:text-red-700" title="Delete">
+                <button onClick={() => deleteTemplate(t.id)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
                   <Trash size={12} />
                 </button>
               </div>
@@ -447,13 +453,13 @@ export default function TemplatesPage() {
       {/* Template gallery modal */}
       {showGallery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-4xl max-h-[85vh] rounded-2xl p-6 shadow-2xl overflow-y-auto" style={{ background: "var(--ck-surface)" }}>
+          <div className="ui-card w-full max-w-4xl max-h-[85vh] p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Choose a Template</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>Start with a pre-built template or create from scratch</p>
               </div>
-              <button onClick={() => setShowGallery(false)}><X size={18} /></button>
+              <button onClick={() => setShowGallery(false)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {starterTemplates.map((tmpl, i) => (
@@ -464,12 +470,11 @@ export default function TemplatesPage() {
                     setInitialTemplate(tmpl);
                     setCreating(true);
                   }}
-                  className="text-left rounded-xl border p-4 hover:ring-2 hover:ring-blue-400 transition-all"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)" }}
+                  className="text-left ui-card ui-card-hover p-4"
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{tmpl.name}</h4>
-                    <span className="text-[10px] rounded-full px-2 py-0.5 font-medium bg-blue-100 text-blue-700">{tmpl.category}</span>
+                    <span className="ui-status ui-pill-ocean">{tmpl.category}</span>
                   </div>
                   <p className="text-xs line-clamp-2" style={{ color: "var(--ck-text-muted)" }}>{tmpl.description}</p>
                 </button>
@@ -482,10 +487,10 @@ export default function TemplatesPage() {
       {/* Send campaign modal */}
       {sending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl p-6 shadow-2xl" style={{ background: "var(--ck-surface)" }}>
+          <div className="ui-card w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Send Campaign</h3>
-              <button onClick={() => setSending(null)}><X size={18} /></button>
+              <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-xs mb-4" style={{ color: "var(--ck-text-muted)" }}>
               Template: &quot;{sending.name}&quot;
@@ -496,14 +501,14 @@ export default function TemplatesPage() {
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Campaign name *</label>
                 <input value={sendForm.name} onChange={(e) => setSendForm({ ...sendForm, name: e.target.value })}
                   placeholder="e.g. Summer Sale Newsletter"
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                  className="ui-control w-full" />
               </div>
 
               {/* Subject line */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Subject line</label>
                 <input value={sendForm.subject} onChange={(e) => setSendForm({ ...sendForm, subject: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                  className="ui-control w-full" />
               </div>
 
               {/* Audience filter */}
@@ -511,18 +516,14 @@ export default function TemplatesPage() {
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
                   Audience
                 </label>
-                <div className="flex gap-2 mb-2">
+                <div className="ui-seg mb-2">
                   <button
                     onClick={() => {
                       setSendForm({ ...sendForm, audienceFilter: "all", selectedTags: [] });
                       computeAudienceCount("all", []);
                     }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium border ${sendForm.audienceFilter === "all" ? "text-white" : ""}`}
-                    style={{
-                      background: sendForm.audienceFilter === "all" ? "var(--ck-accent)" : "var(--ck-bg)",
-                      borderColor: "var(--ck-border)",
-                      color: sendForm.audienceFilter === "all" ? "white" : "var(--ck-text)",
-                    }}
+                    data-active={sendForm.audienceFilter === "all"}
+                    className="ui-seg-item !px-3"
                   >
                     All active contacts
                   </button>
@@ -531,12 +532,8 @@ export default function TemplatesPage() {
                       setSendForm({ ...sendForm, audienceFilter: "tagged" });
                       computeAudienceCount("tagged", sendForm.selectedTags);
                     }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium border ${sendForm.audienceFilter === "tagged" ? "text-white" : ""}`}
-                    style={{
-                      background: sendForm.audienceFilter === "tagged" ? "var(--ck-accent)" : "var(--ck-bg)",
-                      borderColor: "var(--ck-border)",
-                      color: sendForm.audienceFilter === "tagged" ? "white" : "var(--ck-text)",
-                    }}
+                    data-active={sendForm.audienceFilter === "tagged"}
+                    className="ui-seg-item !px-3"
                   >
                     Filter by tags
                   </button>
@@ -559,7 +556,7 @@ export default function TemplatesPage() {
                             className="rounded-full px-2.5 py-0.5 text-xs font-medium border"
                             style={{
                               background: selected ? "var(--ck-accent)" : "var(--ck-bg)",
-                              borderColor: selected ? "var(--ck-accent)" : "var(--ck-border)",
+                              borderColor: selected ? "var(--ck-accent)" : "var(--ck-border-subtle)",
                               color: selected ? "white" : "var(--ck-text)",
                             }}
                           >
@@ -572,7 +569,7 @@ export default function TemplatesPage() {
                 )}
                 {audienceCount !== null && (
                   <p className="text-xs mt-2 font-medium" style={{ color: "var(--ck-accent)" }}>
-                    {audienceCount} contact{audienceCount !== 1 ? "s" : ""} will receive this campaign
+                    <span className="font-display tabular-nums">{audienceCount}</span> contact{audienceCount !== 1 ? "s" : ""} will receive this campaign
                   </p>
                 )}
               </div>
@@ -587,8 +584,7 @@ export default function TemplatesPage() {
                   value={sendForm.scheduledAt}
                   onChange={(e) => setSendForm({ ...sendForm, scheduledAt: e.target.value })}
                   min={new Date().toISOString().slice(0, 16)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  className="ui-control w-full"
                 />
                 <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
                   {sendForm.scheduledAt ? "Campaign will start at the scheduled time." : "Leave empty to send immediately."}
@@ -597,12 +593,12 @@ export default function TemplatesPage() {
 
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setSending(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
+                <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                 <button
                   onClick={sendCampaign}
                   disabled={!sendForm.name.trim() || sendingInProgress || (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length === 0)}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ background: sendForm.scheduledAt ? "#7c3aed" : "var(--ck-accent)" }}
+                  className="ui-btn ui-btn-primary disabled:opacity-50"
+                  style={sendForm.scheduledAt ? { background: "var(--ck-amber-bright)", boxShadow: "none" } : undefined}
                 >
                   {sendingInProgress ? "Processing..." : sendForm.scheduledAt ? "Schedule Campaign" : "Send Campaign"}
                 </button>

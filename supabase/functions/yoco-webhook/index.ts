@@ -174,6 +174,25 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
     console.warn("CONFIRM_LOCK_ERR (proceeding anyway):", lockErr);
   }
 
+  // Upsert customer profile (best-effort — never fail the confirmation)
+  if (booking.email) {
+    try {
+      const { data: customerId } = await supabase.rpc("upsert_customer", {
+        p_business_id: booking.business_id,
+        p_email: booking.email,
+        p_name: booking.customer_name || null,
+        p_phone: booking.phone || null,
+        p_marketing_consent: booking.marketing_opt_in || false,
+      });
+      if (customerId) {
+        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
+        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
+      }
+    } catch (custErr) {
+      console.error("CUSTOMER_UPSERT_ERR:", custErr);
+    }
+  }
+
   let tenant: any = null;
   try {
     tenant = await getTenantByBusinessId(supabase, booking.business_id);

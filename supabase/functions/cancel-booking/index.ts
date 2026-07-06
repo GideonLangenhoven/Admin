@@ -214,8 +214,10 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    // Audit log
-    await supabase.from("logs").insert({
+    // Audit log — best-effort; PostgREST builders have no .catch, so await
+    // and inspect the error instead (the old .catch() threw a TypeError that
+    // turned every successful cancellation into a 500 response).
+    const { error: logErr } = await supabase.from("logs").insert({
       business_id: booking.business_id,
       booking_id: booking_id,
       event: "booking_cancelled",
@@ -227,7 +229,8 @@ Deno.serve(async (req: any) => {
         was_paid: isPaid,
         refund_amount_action_required: isPaid ? refundAmount : 0,
       },
-    }).catch(function (e: any) { console.error("LOG_ERR:", e); });
+    });
+    if (logErr) console.error("LOG_ERR:", logErr.message);
 
     return new Response(JSON.stringify({
       ok: true,

@@ -125,3 +125,4 @@ Full enumerated evidence for each is in `data/audit/audit-results.json` (`file:l
 
 ## STARTING INSTRUCTION
 Begin with **S1**. Announce the issue, show your re-verification, write the failing test, apply the fix, run the gates, record the result, then continue to S2 — pausing at each STOP-AND-ASK checkpoint and at the end of each tier.
+/

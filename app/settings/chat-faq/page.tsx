@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { CHAT_INTENTS, INTENT_LABELS, type ChatIntent } from "../../lib/intent-types";
+import { Plus, ChatText } from "@phosphor-icons/react";
 
 type FaqEntry = {
   id: string;
@@ -117,57 +118,70 @@ export default function ChatFaqPage() {
   }, {} as Record<string, FaqEntry[]>);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" /></div>;
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2.5">
+            <div className="ui-skeleton h-3 w-32" />
+            <div className="ui-skeleton h-8 w-56" />
+          </div>
+          <div className="ui-skeleton h-9 w-44 !rounded-[10px]" />
+        </div>
+        <div className="ui-skeleton h-24 w-full !rounded-2xl" />
+        <div className="ui-skeleton h-24 w-full !rounded-2xl" />
+      </div>
+    );
   }
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>
+          <p className="ui-mono-label mb-2">Chat Automation</p>
+          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
+          <p className="text-sm mt-2 max-w-2xl" style={{ color: "var(--ck-text-muted)" }}>
             Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly — no waiting for you to type it.
           </p>
         </div>
         <button
           onClick={() => { setShowAdd(true); setEditId(null); setForm({ intent: "BOOKING_QUESTION", question_pattern: "", keywords: "", answer: "" }); }}
-          className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+          className="ui-btn ui-btn-primary shrink-0"
         >
-          + Add a quick answer
+          <Plus size={15} weight="bold" /> Add a quick answer
         </button>
       </div>
 
       {/* Add/Edit form */}
       {showAdd && (
-        <div className="p-4 rounded-xl border space-y-3" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
-          <h3 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{editId ? "Edit" : "New"} Quick Answer</h3>
+        <div className="ui-card p-4 space-y-3">
+          <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{editId ? "Edit" : "New"} Quick Answer</h3>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>What type of question is this?</span>
               <select value={form.intent} onChange={e => setForm({ ...form, intent: e.target.value })}
-                className="mt-1 w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}>
+                className="ui-control mt-1 w-full text-sm">
                 {CHAT_INTENTS.map(i => <option key={i} value={i}>{INTENT_LABELS[i]}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>The question (how a customer would ask it)</span>
               <input value={form.question_pattern} onChange={e => setForm({ ...form, question_pattern: e.target.value })}
-                placeholder="e.g. What time does the tour start?" className="mt-1 w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                placeholder="e.g. What time does the tour start?" className="ui-control mt-1 w-full text-sm" />
             </label>
           </div>
           <label className="block">
             <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words (separate with commas) — if a message contains these words, this answer is sent</span>
             <input value={form.keywords} onChange={e => setForm({ ...form, keywords: e.target.value })}
-              placeholder="e.g. time, start, when, schedule, what time" className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              placeholder="e.g. time, start, when, schedule, what time" className="ui-control w-full text-sm" />
           </label>
           <label className="block">
             <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Your reply (this is what the customer will receive)</span>
             <textarea value={form.answer} onChange={e => setForm({ ...form, answer: e.target.value.slice(0, 1000) })} rows={3}
-              placeholder="e.g. Our tours depart at 06:00 and 08:30 daily. Please arrive 15 minutes early at the shop." className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              placeholder="e.g. Our tours depart at 06:00 and 08:30 daily. Please arrive 15 minutes early at the shop." className="ui-control w-full text-sm" />
           </label>
           <div className="flex gap-2 justify-end">
-            <button onClick={() => { setShowAdd(false); setEditId(null); }} className="px-3 py-1.5 rounded text-sm" style={{ color: "var(--ck-text)" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium disabled:opacity-50">
+            <button onClick={() => { setShowAdd(false); setEditId(null); }} className="ui-btn ui-btn-ghost">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
               {saving ? "Saving..." : editId ? "Save changes" : "Save"}
             </button>
           </div>
@@ -181,19 +195,19 @@ export default function ChatFaqPage() {
           <div className="space-y-2">
             {grouped[intent].map(entry => (
               <div key={entry.id} className={`p-3 rounded-lg border flex items-start gap-3 ${!entry.enabled ? "opacity-50" : ""}`}
-                style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+                style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-sm)" }}>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: "var(--ck-text-strong)" }}>{entry.question_pattern}</p>
                   <p className="text-xs mt-0.5 truncate" style={{ color: "var(--ck-text-muted)" }}>Trigger words: {entry.match_keywords.join(", ")}</p>
                   <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--ck-text)" }}>{entry.answer}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Sent {entry.use_count} {entry.use_count === 1 ? "time" : "times"}</span>
-                  <button onClick={() => toggleEnabled(entry)} className="text-xs px-2 py-1 rounded border" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em]" style={{ color: "var(--ck-text-muted)" }}>Sent {entry.use_count} {entry.use_count === 1 ? "time" : "times"}</span>
+                  <button onClick={() => toggleEnabled(entry)} className="text-xs px-2 py-1 rounded-md border transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}>
                     {entry.enabled ? "Turn off" : "Turn on"}
                   </button>
-                  <button onClick={() => startEdit(entry)} className="text-xs px-2 py-1 rounded border" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Edit</button>
-                  <button onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded text-red-600">Delete</button>
+                  <button onClick={() => startEdit(entry)} className="text-xs px-2 py-1 rounded-md border transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}>Edit</button>
+                  <button onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded-md transition-colors hover:bg-[var(--ck-danger-soft)]" style={{ color: "var(--ck-danger)" }}>Delete</button>
                 </div>
               </div>
             ))}

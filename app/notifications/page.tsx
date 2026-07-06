@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
+import { ArrowClockwise, BellSlash, Clock, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
 // AM3/AM5: minimal admin surface for inspecting failed outbox messages and
 // retrying them. The outbox table is the project's notification queue —
@@ -68,26 +69,32 @@ export default function NotificationsPage() {
 
   if (!isPrivileged) {
     return (
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-bold mb-4" style={{ color: "var(--ck-text-strong)" }}>Notifications</h1>
-        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-          You need MAIN_ADMIN access to view failed notifications.
-        </p>
+      <div className="anim-fade-up max-w-3xl">
+        <p className="ui-mono-label mb-2">Outbox queue</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none mb-4" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
+        <div className="ui-card p-6">
+          <div className="ui-empty">
+            <span className="ui-icon-chip" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}><WarningCircle size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Restricted area</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>You need MAIN_ADMIN access to view failed notifications.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
+    <div className="anim-fade-up max-w-5xl space-y-6">
+      <div>
+        <p className="ui-mono-label mb-2">Outbox queue</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
         WhatsApp messages in the outbox queue. Failed rows have exhausted their 2-attempt retry budget;
         the Retry button requeues them at PENDING for the next outbox-send cron tick (every 5 min).
       </p>
 
-      <div className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border)" }}>
+      <div className="ui-seg anim-fade-up anim-d1">
         {[
           { key: "failed", label: "Failed" },
           { key: "waiting", label: "Waiting for window" },
@@ -96,10 +103,8 @@ export default function NotificationsPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key as "failed" | "waiting" | "recent")}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key ? "border-emerald-600 text-emerald-700" : "border-transparent"
-            }`}
-            style={tab !== t.key ? { color: "var(--ck-text-muted)" } : undefined}
+            className="ui-seg-item"
+            data-active={tab === t.key}
           >
             {t.label}
           </button>
@@ -107,32 +112,32 @@ export default function NotificationsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center min-h-[20vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-        </div>
+        <div className="space-y-3 py-2"><div className="ui-skeleton h-16 !rounded-xl" /><div className="ui-skeleton h-16 !rounded-xl" /><div className="ui-skeleton h-16 !rounded-xl" /></div>
       ) : rows.length === 0 ? (
-        <p className="text-sm py-8 text-center" style={{ color: "var(--ck-text-muted)" }}>
-          {tab === "failed" ? "No failed messages — nice." : tab === "waiting" ? "No messages waiting for the 24h window to reopen." : "No recent sent messages."}
-        </p>
+        <div className="ui-empty anim-fade-up anim-d2">
+          <span className="ui-icon-chip">{tab === "waiting" ? <Clock size={19} /> : tab === "recent" ? <CheckCircle size={19} /> : <BellSlash size={19} />}</span>
+          <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+            {tab === "failed" ? "No failed messages" : tab === "waiting" ? "Nothing waiting" : "No recent sends"}
+          </p>
+          <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
+            {tab === "failed" ? "Everything in the outbox went through." : tab === "waiting" ? "No messages waiting for the 24h window to reopen." : "No recent sent messages."}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 anim-fade-up anim-d2">
           {rows.map((r) => (
-            <div
-              key={r.id}
-              className="p-4 rounded-xl border"
-              style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}
-            >
+            <div key={r.id} className="ui-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.phone}</span>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{r.message_type}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      r.status === "FAILED" ? "bg-red-50 text-red-700"
-                        : r.status === "EXPIRED" ? "bg-amber-50 text-amber-700"
-                        : r.status === "WAITING_WINDOW" ? "bg-blue-50 text-blue-700"
-                        : r.status === "SENT" ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-700"
+                    <span className="ui-pill ui-pill-neutral">{r.message_type}</span>
+                    <span className={`ui-status ${
+                      r.status === "FAILED" ? "ui-pill-danger"
+                        : r.status === "EXPIRED" ? "ui-pill-warning"
+                        : r.status === "WAITING_WINDOW" ? "ui-pill-ocean"
+                        : r.status === "SENT" ? "ui-pill-success"
+                        : "ui-pill-neutral"
                     }`}>{r.status}</span>
                     <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
                       {r.attempts} attempt{r.attempts === 1 ? "" : "s"}
@@ -143,12 +148,12 @@ export default function NotificationsPage() {
                     {r.booking_id && (
                       <>
                         {" · "}
-                        <a className="underline" href={`/bookings/${r.booking_id}`}>booking</a>
+                        <a className="underline" style={{ color: "var(--ck-accent)" }} href={`/bookings/${r.booking_id}`}>booking</a>
                       </>
                     )}
                   </div>
                   {r.error && (
-                    <p className="mt-1 text-xs text-red-700 break-words"><span className="font-medium">Error:</span> {r.error}</p>
+                    <p className="mt-1 text-xs break-words" style={{ color: "var(--ck-danger)" }}><span className="font-medium">Error:</span> {r.error}</p>
                   )}
                   {r.message_body && (
                     <details className="mt-2">
@@ -165,9 +170,9 @@ export default function NotificationsPage() {
                     <button
                       onClick={() => retryOne(r.id)}
                       disabled={retrying === r.id}
-                      className="px-3 py-1.5 rounded text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="ui-btn ui-btn-primary !h-8 !px-3 text-xs disabled:opacity-50"
                     >
-                      {retrying === r.id ? "Queuing…" : "Retry"}
+                      <ArrowClockwise size={14} /> {retrying === r.id ? "Queuing…" : "Retry"}
                     </button>
                   </div>
                 )}

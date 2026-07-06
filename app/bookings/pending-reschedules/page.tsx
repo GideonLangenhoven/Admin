@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
 import { getAdminTimezone } from "../../lib/admin-timezone";
+import { CheckCircle } from "@phosphor-icons/react";
 
 type PendingRow = {
   id: string;
@@ -92,9 +93,12 @@ export default function PendingReschedulesPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Pending Reschedules</h1>
-        <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 font-medium">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="ui-mono-label mb-2">Operations</p>
+          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pending Reschedules</h1>
+        </div>
+        <span className="ui-status ui-pill-amber">
           {rows.length} awaiting payment
         </span>
       </div>
@@ -106,13 +110,17 @@ export default function PendingReschedulesPage() {
       </p>
 
       {loading ? (
-        <div className="flex items-center justify-center min-h-[20vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="space-y-3">
+          <div className="ui-skeleton h-[92px] w-full" />
+          <div className="ui-skeleton h-[92px] w-full" />
+          <div className="ui-skeleton h-[92px] w-full" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-sm py-8 text-center" style={{ color: "var(--ck-text-muted)" }}>
-          No pending reschedules right now.
-        </p>
+        <div className="ui-empty">
+          <span className="ui-icon-chip"><CheckCircle size={19} /></span>
+          <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No pending reschedules</p>
+          <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Reschedules awaiting an upgrade payment will appear here.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {rows.map((r) => {
@@ -121,11 +129,7 @@ export default function PendingReschedulesPage() {
             const holdExpired = minsLeft !== null && minsLeft <= 0;
             const customerLabel = r.booking?.customer_name || r.booking?.email || "Customer";
             return (
-              <div
-                key={r.id}
-                className="p-4 rounded-xl border"
-                style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}
-              >
+              <div key={r.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -133,10 +137,10 @@ export default function PendingReschedulesPage() {
                       <Link href={`/bookings/${r.booking_id}`} className="text-xs underline" style={{ color: "var(--ck-text-muted)" }}>
                         booking
                       </Link>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${holdExpired ? "bg-gray-100 text-gray-600" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+                      <span className={`ui-status ${holdExpired ? "ui-pill-neutral" : "ui-pill-amber"}`}>
                         {holdExpired ? "hold expired" : minsLeft !== null ? `hold ${minsLeft}m left` : "no hold"}
                       </span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">+R{Number(r.diff || 0).toFixed(0)}</span>
+                      <span className="ui-status ui-pill-accent">+R{Number(r.diff || 0).toFixed(0)}</span>
                     </div>
                     <div className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                       Held {new Date(r.created_at).toLocaleString("en-ZA")}
@@ -151,7 +155,7 @@ export default function PendingReschedulesPage() {
                     <button
                       onClick={() => resend(r)}
                       disabled={resending === r.id}
-                      className="px-3 py-1.5 rounded text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px] disabled:opacity-50"
                     >
                       {resending === r.id ? "Sending…" : "Re-send link"}
                     </button>

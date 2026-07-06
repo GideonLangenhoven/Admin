@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getTenantByBusinessId, getAdminAppOrigins, recordWaMessage } from "../_shared/tenant.ts";
+import { getTenantByBusinessId, getAdminAppOrigins, isAllowedOrigin, recordWaMessage } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -10,7 +10,7 @@ const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 function getCors(req?: Request) {
     const origins = getAdminAppOrigins();
     const origin = req?.headers.get("origin") || "";
-    const allowed = origins.includes(origin) ? origin : origins[0];
+    const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
     return {
         "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
@@ -154,6 +154,15 @@ Deno.serve(async (req: Request) => {
 
             console.error("WhatsApp Error:", waData);
             await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "FAILED", error: String(waData?.error?.message || "WhatsApp API Error") });
+            // OAuth 190 = invalid/expired access token — tell the admin exactly what to do
+            if (waData?.error?.code === 190) {
+                return new Response(JSON.stringify({
+                    ok: false,
+                    error: "WhatsApp access token expired",
+                    message: "Your WhatsApp access token is invalid or has expired. Generate a new token in Meta (WhatsApp → API Setup) and re-save it in Settings → Integration Credentials. " + String(waData?.error?.message || ""),
+                    details: waData,
+                }), { status: 200, headers: getCors(req) });
+            }
             return new Response(JSON.stringify({ ok: false, error: "WhatsApp API Error", details: waData }), { status: 200, headers: getCors(req) });
         }
 

@@ -6,6 +6,7 @@ import {
   completeAdminPasswordSetup,
   validateAdminSetupToken,
 } from "../lib/admin-auth";
+import { BrandMark } from "../../components/BrandLogo";
 
 function ChangePasswordForm() {
   const searchParams = useSearchParams();
@@ -159,20 +160,19 @@ function ChangePasswordForm() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-          <h1 className="mb-3 text-xl font-semibold tracking-tight text-[var(--ck-text-strong)]">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card anim-fade-up relative w-full max-w-sm overflow-hidden p-8 text-center" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-bt-gradient" aria-hidden="true" />
+          <BrandMark size={44} className="mx-auto mb-5" />
+          <h1 className="mb-3 font-display text-[24px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             {setupMode ? "Password Created" : "Password Updated"}
           </h1>
-          <p className="mb-6 text-sm text-[var(--ck-text-muted)]">
+          <p className="mb-6 text-sm" style={{ color: "var(--ck-text-muted)" }}>
             {setupMode
               ? "Your password has been created successfully. You can now sign in."
               : "Your password has been changed successfully. You can now sign in with your new password."}
           </p>
-          <a
-            href="/"
-            className="inline-block w-full rounded-xl bg-[var(--ck-text-strong)] py-3 text-center text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
-          >
+          <a href="/" className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold">
             Go to Dashboard
           </a>
         </div>
@@ -181,13 +181,15 @@ function ChangePasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-      <div className="ui-surface-elevated w-full max-w-sm p-8">
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="ui-card anim-fade-up relative w-full max-w-sm overflow-hidden p-8" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+        <div className="absolute inset-x-0 top-0 h-1.5 bg-bt-gradient" aria-hidden="true" />
         <div className="mb-6 text-center">
-          <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--ck-text-strong)]">
+          <BrandMark size={44} className="mx-auto mb-4" />
+          <h1 className="mb-1 font-display text-[24px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             {setupMode ? "Create Password" : "Change Password"}
           </h1>
-          <p className="text-sm text-[var(--ck-text-muted)]">
+          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
             {setupMode
               ? `Set a password for your admin account${setupName ? `, ${setupName}` : ""}.`
               : "Enter your current password and choose a new one."}
@@ -214,11 +216,11 @@ function ChangePasswordForm() {
                 type="button"
                 onClick={() => requestResetLink(resetEmail)}
                 disabled={loading}
-                className="mt-3 w-full rounded-xl bg-[var(--ck-text-strong)] py-3 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50"
+                className="mt-3 ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Email New Reset Link"}
               </button>
-              {resetSent && <p className="mt-3 text-xs text-emerald-700">A password reset link has been sent.</p>}
+              {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">A password reset link has been sent.</p>}
             </div>
             <p className="text-center text-xs text-[var(--ck-text-muted)]">
               <a href="/" className="hover:underline">Back to sign in</a>
@@ -277,7 +279,7 @@ function ChangePasswordForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-[var(--ck-text-strong)] py-3 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50"
+                className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50"
               >
                 {loading
                   ? (setupMode ? "Creating..." : "Updating...")
@@ -300,11 +302,11 @@ function ChangePasswordForm() {
                   type="button"
                   onClick={() => requestResetLink(resetEmail)}
                   disabled={loading}
-                  className="mt-3 w-full rounded-xl border border-[var(--ck-border-subtle)] py-3 text-sm font-semibold text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg)] disabled:opacity-50"
+                  className="ui-btn ui-btn-ghost mt-3 w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50"
                 >
                   {loading ? "Sending..." : "Email Reset Link"}
                 </button>
-                {resetSent && <p className="mt-3 text-xs text-emerald-700">A password reset link has been sent.</p>}
+                {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">A password reset link has been sent.</p>}
               </div>
             )}
 

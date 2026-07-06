@@ -119,20 +119,20 @@ interface BookingAddOn {
 
 /* ── status helpers ── */
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-800 border-amber-200",
-  "PENDING PAYMENT": "bg-orange-100 text-orange-800 border-orange-200",
-  HELD: "bg-blue-100 text-blue-800 border-blue-200",
-  CONFIRMED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  PAID: "bg-green-100 text-green-800 border-green-200",
-  COMPLETED: "bg-gray-200 text-gray-700 border-gray-300",
-  CANCELLED: "bg-red-100 text-red-700 border-red-200",
+  PENDING: "ui-pill-warning",
+  "PENDING PAYMENT": "ui-pill-amber",
+  HELD: "ui-pill-ocean",
+  CONFIRMED: "ui-pill-success",
+  PAID: "ui-pill-success",
+  COMPLETED: "ui-pill-neutral",
+  CANCELLED: "ui-pill-danger",
 };
 
 const REFUND_COLORS: Record<string, string> = {
-  REQUESTED: "bg-amber-100 text-amber-800 border-amber-200",
-  PROCESSED: "bg-green-100 text-green-800 border-green-200",
-  TRANSFERRED: "bg-blue-100 text-blue-800 border-blue-200",
-  NONE: "bg-gray-100 text-gray-600 border-gray-200",
+  REQUESTED: "ui-pill-warning",
+  PROCESSED: "ui-pill-success",
+  TRANSFERRED: "ui-pill-ocean",
+  NONE: "ui-pill-neutral",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -248,7 +248,7 @@ function buildTimeline(
 /* ── components ── */
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${className}`}>
+    <span className={`ui-status ${className}`}>
       {children}
     </span>
   );
@@ -257,17 +257,17 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-gray-100 last:border-b-0">
-      <span className="text-xs font-medium text-gray-500 shrink-0">{label}</span>
-      <span className={`text-sm text-right text-gray-900 ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</span>
+      <span className="text-xs font-medium shrink-0" style={{ color: "var(--ck-text-muted)" }}>{label}</span>
+      <span className={`text-sm text-right tabular-nums ${mono ? "font-mono text-xs" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{value || "—"}</span>
     </div>
   );
 }
 
 function Card({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white ${className}`}>
+    <div className={`ui-card ${className}`}>
       <div className="border-b border-gray-100 px-5 py-3">
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+        <h3 className="ui-title-md text-sm">{title}</h3>
       </div>
       <div className="px-5 py-3">{children}</div>
     </div>
@@ -373,8 +373,18 @@ export default function BookingDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-sm text-gray-500">Loading booking details...</div>
+      <div className="max-w-4xl space-y-6 pb-12">
+        <div className="flex items-center gap-3">
+          <div className="ui-skeleton h-8 w-24" />
+          <div className="ui-skeleton h-7 w-40" />
+        </div>
+        <div className="ui-skeleton h-4 w-72" />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="ui-skeleton h-48 w-full !rounded-2xl" />
+          ))}
+        </div>
+        <div className="ui-skeleton h-40 w-full !rounded-2xl" />
       </div>
     );
   }
@@ -382,10 +392,10 @@ export default function BookingDetailPage() {
   if (error || !booking) {
     return (
       <div className="max-w-3xl space-y-4 py-10">
-        <button onClick={() => router.push("/bookings")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+        <button onClick={() => router.push("/bookings")} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs w-fit">
           <ArrowLeft size={16} /> Back to bookings
         </button>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+        <div className="rounded-xl border p-6 text-center text-sm" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 28%, transparent)", color: "var(--ck-danger)" }}>
           {error || "Booking not found"}
         </div>
       </div>
@@ -714,31 +724,31 @@ export default function BookingDetailPage() {
   return (
     <div className="max-w-4xl space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="anim-fade-up flex flex-wrap items-center gap-3">
         <button
           onClick={() => router.push("/bookings")}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs"
         >
           <ArrowLeft size={14} /> Bookings
         </button>
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Booking {ref}</h1>
-          <Badge className={STATUS_COLORS[booking.status] || "bg-gray-100 text-gray-600"}>{booking.status}</Badge>
-          <Badge className="bg-gray-100 text-gray-600 border-gray-200">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
+          <h1 className="font-display text-[24px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Booking {ref}</h1>
+          <Badge className={STATUS_COLORS[booking.status] || "ui-pill-neutral"}>{booking.status}</Badge>
+          <Badge className="ui-pill-neutral">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>
         {isPending && Number(booking.total_amount) > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setMarkPaidOpen((v) => !v)}
               disabled={markPaidLoading}
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+              className="ui-btn ui-btn-soft !h-8 !px-3 !text-xs disabled:opacity-50"
             >
               {markPaidOpen ? "Cancel" : "Mark as Paid"}
             </button>
             <button
               onClick={resendPaymentLink}
               disabled={resendingPayment}
-              className="flex items-center gap-1.5 rounded-lg bg-[#0f595e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b4347] disabled:opacity-50 transition-colors"
+              className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
             >
               <PaperPlaneTilt size={14} />
               {resendingPayment ? "Sending..." : "Resend Payment Link"}
@@ -764,7 +774,7 @@ export default function BookingDetailPage() {
                 value={markPaidMethod}
                 onChange={(e) => setMarkPaidMethod(e.target.value as typeof markPaidMethod)}
                 disabled={markPaidLoading}
-                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-gray-900"
+                className="ui-control mt-1 w-full"
               >
                 <option value="Cash">Cash</option>
                 <option value="EFT">EFT / Bank transfer</option>
@@ -780,7 +790,7 @@ export default function BookingDetailPage() {
                 onChange={(e) => setMarkPaidNote(e.target.value.slice(0, 280))}
                 disabled={markPaidLoading}
                 placeholder={markPaidMethod === "EFT" ? "Bank reference, e.g. EFT-1234" : markPaidMethod === "Cash" ? "Receipt number, etc." : "Reference"}
-                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-gray-900"
+                className="ui-control mt-1 w-full"
               />
             </label>
           </div>
@@ -788,14 +798,14 @@ export default function BookingDetailPage() {
             <button
               onClick={() => { setMarkPaidOpen(false); setMarkPaidNote(""); }}
               disabled={markPaidLoading}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={markBookingPaid}
               disabled={markPaidLoading}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
             >
               {markPaidLoading ? "Recording…" : `Mark ${fmtCurrency(Number(booking.total_amount))} as paid`}
             </button>
@@ -811,7 +821,7 @@ export default function BookingDetailPage() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="anim-fade-up anim-d1 grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Customer Details */}
         <Card title="Customer Details">
           <div className="mb-3 flex items-center justify-end gap-2">
@@ -820,15 +830,15 @@ export default function BookingDetailPage() {
                 <button onClick={() => {
                   setCustomerDraft({ name: booking.customer_name || "", phone: booking.phone || "", email: booking.email || "" });
                   setEditingCustomer(false);
-                }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                }} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                   Cancel
                 </button>
-                <button onClick={saveCustomerDetails} disabled={savingCustomer} className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50">
+                <button onClick={saveCustomerDetails} disabled={savingCustomer} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50">
                   {savingCustomer ? "Saving..." : "Save"}
                 </button>
               </>
             ) : (
-              <button onClick={() => setEditingCustomer(true)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+              <button onClick={() => setEditingCustomer(true)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                 Edit
               </button>
             )}
@@ -844,15 +854,15 @@ export default function BookingDetailPage() {
             <div className="space-y-3">
               <label className="block text-xs font-medium text-gray-500">
                 Name
-                <input value={customerDraft.name} onChange={(e) => setCustomerDraft({ ...customerDraft, name: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900" />
+                <input value={customerDraft.name} onChange={(e) => setCustomerDraft({ ...customerDraft, name: e.target.value })} className="ui-control mt-1 w-full" />
               </label>
               <label className="block text-xs font-medium text-gray-500">
                 Phone
-                <input value={customerDraft.phone} onChange={(e) => setCustomerDraft({ ...customerDraft, phone: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900" />
+                <input value={customerDraft.phone} onChange={(e) => setCustomerDraft({ ...customerDraft, phone: e.target.value })} className="ui-control mt-1 w-full" />
               </label>
               <label className="block text-xs font-medium text-gray-500">
                 Email
-                <input value={customerDraft.email} onChange={(e) => setCustomerDraft({ ...customerDraft, email: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900" />
+                <input value={customerDraft.email} onChange={(e) => setCustomerDraft({ ...customerDraft, email: e.target.value })} className="ui-control mt-1 w-full" />
               </label>
             </div>
           ) : (
@@ -916,7 +926,7 @@ export default function BookingDetailPage() {
                     value={reduceGuestsTarget}
                     onChange={(e) => setReduceGuestsTarget(Number(e.target.value))}
                     disabled={reduceGuestsLoading}
-                    className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+                    className="ui-control mt-1 w-full"
                   >
                     {Array.from({ length: booking.qty - 1 }, (_, i) => i + 1).map((n) => (
                       <option key={n} value={n}>{n} guest{n === 1 ? "" : "s"}</option>
@@ -930,7 +940,7 @@ export default function BookingDetailPage() {
                       value={reduceGuestsRefundMode}
                       onChange={(e) => setReduceGuestsRefundMode(e.target.value as typeof reduceGuestsRefundMode)}
                       disabled={reduceGuestsLoading}
-                      className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+                      className="ui-control mt-1 w-full"
                     >
                       <option value="REFUND">Refund (95% to card / EFT)</option>
                       <option value="VOUCHER">Voucher (100% credit)</option>
@@ -943,14 +953,15 @@ export default function BookingDetailPage() {
                 <button
                   onClick={() => setReduceGuestsOpen(false)}
                   disabled={reduceGuestsLoading}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={reduceGuests}
                   disabled={reduceGuestsLoading}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                  className="ui-btn !h-8 !px-3 !text-xs disabled:opacity-50"
+                  style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}
                 >
                   {reduceGuestsLoading ? "Reducing…" : `Reduce to ${reduceGuestsTarget} guest${reduceGuestsTarget === 1 ? "" : "s"}`}
                 </button>
@@ -1046,7 +1057,7 @@ export default function BookingDetailPage() {
           {!isCancelled && (
             <>
               <div className="my-3 border-t border-gray-100" />
-              <p className="text-xs font-medium text-gray-500 mb-2">Apply Voucher or Promo Code</p>
+              <p className="text-xs font-medium mb-2" style={{ color: "var(--ck-text-muted)" }}>Apply Voucher or Promo Code</p>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -1054,12 +1065,12 @@ export default function BookingDetailPage() {
                   onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeResult(null); }}
                   placeholder="Enter code"
                   maxLength={20}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase text-gray-900 placeholder:text-gray-400 placeholder:normal-case"
+                  className="ui-control flex-1 font-mono uppercase placeholder:normal-case"
                 />
                 <button
                   onClick={applyCode}
                   disabled={codeApplying || !codeInput.trim()}
-                  className="rounded-lg bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50 whitespace-nowrap"
+                  className="ui-btn ui-btn-primary whitespace-nowrap disabled:opacity-50"
                 >
                   {codeApplying ? "Applying..." : "Apply"}
                 </button>
@@ -1075,7 +1086,8 @@ export default function BookingDetailPage() {
                 <button
                   onClick={resendPaymentLink}
                   disabled={resendingPayment}
-                  className="mt-3 w-full rounded-lg border border-[#0f595e] bg-[#0f595e]/5 px-4 py-2.5 text-xs font-semibold text-[#0f595e] hover:bg-[#0f595e]/10 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                  className="ui-btn w-full mt-3 disabled:opacity-50"
+                  style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}
                 >
                   <PaperPlaneTilt size={14} />
                   {resendingPayment ? "Sending..." : `Resend Payment Link (${fmtCurrency(Number(booking.total_amount))})`}
@@ -1106,7 +1118,7 @@ export default function BookingDetailPage() {
           <InfoRow
             label="Waiver status"
             value={
-              <Badge className={booking.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"}>
+              <Badge className={booking.waiver_status === "SIGNED" ? "ui-pill-success" : "ui-pill-warning"}>
                 {booking.waiver_status || "PENDING"}
               </Badge>
             }
@@ -1134,7 +1146,7 @@ export default function BookingDetailPage() {
                   <InfoRow
                     label="Minors on booking"
                     value={
-                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                      <Badge className="ui-pill-warning">
                         {minors.length} minor{minors.length === 1 ? "" : "s"} ({minors.join(", ")}y)
                       </Badge>
                     }
@@ -1169,9 +1181,9 @@ export default function BookingDetailPage() {
             label="Payment Status"
             value={
               booking.yoco_payment_id ? (
-                <Badge className="bg-green-100 text-green-800 border-green-200">Paid</Badge>
+                <Badge className="ui-pill-success">Paid</Badge>
               ) : booking.yoco_checkout_id ? (
-                <Badge className="bg-amber-100 text-amber-800 border-amber-200">Checkout created, awaiting payment</Badge>
+                <Badge className="ui-pill-warning">Checkout created, awaiting payment</Badge>
               ) : (
                 <span className="text-gray-400">No Yoco transaction</span>
               )
@@ -1205,14 +1217,14 @@ export default function BookingDetailPage() {
               value={
                 isPending ? (
                   deadlineExpired ? (
-                    <Badge className="bg-red-100 text-red-700 border-red-200">Expired</Badge>
+                    <Badge className="ui-pill-danger">Expired</Badge>
                   ) : (
-                    <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                    <Badge className="ui-pill-warning">
                       Expires {timeAgo(booking.payment_deadline).replace(" ago", "")} remaining
                     </Badge>
                   )
                 ) : (
-                  <Badge className="bg-green-100 text-green-800 border-green-200">Resolved</Badge>
+                  <Badge className="ui-pill-success">Resolved</Badge>
                 )
               }
             />
@@ -1263,20 +1275,23 @@ export default function BookingDetailPage() {
           (admin user who performed the action) displayed alongside each event.
           Query: supabase.from("audit_logs").select("*").eq("booking_id", bookingId).order("created_at")
           Each audit_logs row should include actor_id which maps to admin_users.id. */}
-      <Card title="Activity Timeline" className="mt-2">
+      <Card title="Activity Timeline" className="anim-fade-up anim-d2 mt-2">
         {timeline.length === 0 ? (
-          <p className="text-sm text-gray-400 py-2">No activity recorded</p>
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><ArrowCounterClockwise size={19} /></span>
+            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No activity recorded</p>
+          </div>
         ) : (
           <div className="relative">
             {/* Vertical line */}
-            <div className="absolute left-[11px] top-3 bottom-3 w-px bg-gray-200" />
+            <div className="absolute left-[11px] top-3 bottom-3 w-px" style={{ background: "var(--ck-border-strong)" }} />
 
             <div className="space-y-0">
               {timeline.map((evt, i) => {
                 return (
                   <div key={i} className="relative flex gap-3 py-3">
                     {/* Dot */}
-                    <div className="relative z-10 flex h-3 w-3 shrink-0 mt-1.5 rounded-full bg-gray-400 border border-gray-200">
+                    <div className="relative z-10 flex h-3 w-3 shrink-0 mt-1.5 rounded-full border" style={{ background: "var(--ck-accent)", borderColor: "var(--ck-surface)" }}>
                     </div>
                     {/* Content */}
                     <div className="flex-1 min-w-0">

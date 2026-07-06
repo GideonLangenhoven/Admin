@@ -5,6 +5,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { DatePicker } from "../../components/DatePicker";
+import { Coins, DownloadSimple, Printer, PaperPlaneTilt, CheckCircle, Receipt, Warning, CaretRight } from "@phosphor-icons/react";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -534,41 +535,46 @@ export default function Invoices() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold">Pro Forma Invoices</h2>
-        <p className="text-sm text-gray-500">Download or print the pro forma version sent after successful bookings.</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Billing</p>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pro Forma Invoices</h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Download or print the pro forma version sent after successful bookings.</p>
       </div>
 
       {!loading && !companyInfo.name && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Invoice company details not configured. Go to <strong>Settings &rarr; Invoice &amp; Banking Details</strong> to set your company name, address, and banking info.
+        <div className="anim-fade-up flex items-start gap-2 rounded-xl border p-3 text-sm" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 25%, transparent)", color: "var(--ck-amber)" }}>
+          <span className="mt-0.5 shrink-0"><Warning size={16} weight="fill" /></span>
+          <span>Invoice company details not configured. Go to <strong>Settings &rarr; Invoice &amp; Banking Details</strong> to set your company name, address, and banking info.</span>
         </div>
       )}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm">
-        <span className="font-semibold">Outstanding total:</span>{" "}
-        <span className="font-mono">R{money(totalOutstanding)}</span>
+      <div className="anim-fade-up anim-d1 ui-card ui-card-hover flex items-center gap-3 p-4">
+        <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><Coins size={19} /></span>
+        <div>
+          <p className="ui-mono-label !text-[10px]">Outstanding total</p>
+          <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(totalOutstanding)}</p>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center">
-        <span className="font-medium text-gray-700">Sort by:</span>
+      <div className="anim-fade-up anim-d2 ui-card flex flex-col gap-3 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center">
+        <span className="font-medium" style={{ color: "var(--ck-text)" }}>Sort by:</span>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as "booking_desc" | "booking_asc" | "created_desc" | "created_asc")}
-          className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+          className="ui-control w-full sm:w-auto"
         >
           <option value="booking_desc">Booking date (newest first)</option>
           <option value="booking_asc">Booking date (oldest first)</option>
           <option value="created_desc">Invoice created (newest first)</option>
           <option value="created_asc">Invoice created (oldest first)</option>
         </select>
-        <span className="font-medium text-gray-700 sm:ml-3">Exact date:</span>
+        <span className="font-medium sm:ml-3" style={{ color: "var(--ck-text)" }}>Exact date:</span>
         <DatePicker value={exactDate} onChange={setExactDate} />
         {exactDate && (
           <button
             type="button"
             onClick={() => setExactDate("")}
-            className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50"
+            className="ui-btn ui-btn-ghost !h-8 !px-3 text-xs"
           >
             Clear Date
           </button>
@@ -576,18 +582,26 @@ export default function Invoices() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-gray-500">Loading...</div>
+        <div className="space-y-3">
+          <div className="ui-skeleton h-8 w-56" />
+          <div className="ui-skeleton h-[220px] !rounded-2xl" />
+          <div className="ui-skeleton h-[220px] !rounded-2xl" />
+        </div>
       ) : dayGroups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          No invoices for the selected date/filter.
+        <div className="ui-card">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><Receipt size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No invoices found</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing matches the selected date or filter.</p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="anim-fade-up anim-d3 space-y-6">
           {dayGroups.map((day) => (
             <div key={day.dayKey}>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-gray-800">{day.dayLabel}</h3>
-                <span className="text-xs text-gray-500">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{day.dayLabel}</h3>
+                <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
                   {day.invoices.length} invoices · Total R{money(day.total)} · Due R{money(day.due)}
                 </span>
               </div>
@@ -597,55 +611,55 @@ export default function Invoices() {
                   const pay = payment(inv);
                   const isBusy = busyId === inv.id || resendingId === inv.id;
                   return (
-                    <div key={inv.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div key={inv.id} className="ui-card p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-mono text-sm font-bold text-blue-600">{invoiceNumber(inv)}</p>
-                          <p className="mt-1 text-sm font-semibold text-gray-800">{asText(inv.customer_name, "-")}</p>
-                          <p className="text-xs text-gray-500">{asText(inv.customer_email, "")}</p>
-                          <p className="mt-1 text-xs text-gray-400">{asText(inv.tour_name, "-")}</p>
+                          <p className="font-mono text-sm font-bold" style={{ color: "var(--ck-accent)" }}>{invoiceNumber(inv)}</p>
+                          <p className="mt-1 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{asText(inv.customer_name, "-")}</p>
+                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.customer_email, "")}</p>
+                          <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.tour_name, "-")}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-gray-800">R{money(pay.total)}</p>
-                          <p className={`text-xs font-medium ${pay.balanceDue > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+                          <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(pay.total)}</p>
+                          <p className="text-xs font-medium tabular-nums" style={{ color: pay.balanceDue > 0 ? "var(--ck-amber)" : "var(--ck-success)" }}>
                             Due R{money(pay.balanceDue)}
                           </p>
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                        <div className="rounded-lg bg-gray-50 p-2">
-                          <p className="text-[11px] text-gray-500">Paid</p>
-                          <p className="font-semibold">R{money(pay.amountPaid)}</p>
+                        <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                          <p className="ui-mono-label !text-[10px]">Paid</p>
+                          <p className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(pay.amountPaid)}</p>
                         </div>
-                        <div className="rounded-lg bg-gray-50 p-2">
-                          <p className="text-[11px] text-gray-500">Booking</p>
-                          <p className="font-mono text-xs font-semibold">{bookingRef(inv)}</p>
+                        <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                          <p className="ui-mono-label !text-[10px]">Booking</p>
+                          <p className="font-mono text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>{bookingRef(inv)}</p>
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
-                        <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print</button>
-                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
+                        <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50"><DownloadSimple size={13} /> Download</button>
+                        <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50"><Printer size={13} /> Print</button>
+                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={13} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={13} /> Resend</>)}</button>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead style={{ background: "var(--ck-surface-sunken)" }}>
                     <tr>
-                      <th className="p-3 text-left font-medium text-gray-600">Invoice #</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Booking #</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Customer</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Service</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 xl:table-cell">Booking Date</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Total</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 md:table-cell">Paid</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Due</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 xl:table-cell">Created</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Actions</th>
+                      <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Invoice #</th>
+                      <th className="hidden p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>Booking #</th>
+                      <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Customer</th>
+                      <th className="hidden p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>Service</th>
+                      <th className="hidden p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>Booking Date</th>
+                      <th className="p-3 text-right text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Total</th>
+                      <th className="hidden p-3 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] md:table-cell" style={{ color: "var(--ck-text-muted)" }}>Paid</th>
+                      <th className="p-3 text-right text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Due</th>
+                      <th className="hidden p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>Created</th>
+                      <th className="hidden p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -653,52 +667,52 @@ export default function Invoices() {
                       const pay = payment(inv);
                       const isBusy = busyId === inv.id || resendingId === inv.id;
                       return (
-                        <tr key={inv.id} className="border-t border-gray-100 hover:bg-gray-50">
-                          <td className="p-3 font-mono font-bold text-blue-600">
+                        <tr key={inv.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                          <td className="p-3 font-mono font-bold" style={{ color: "var(--ck-accent)" }}>
                             <button
                               type="button"
                               className="flex items-center gap-1 text-left lg:pointer-events-none"
                               onClick={() => setOpenActions(openActions === inv.id ? null : inv.id)}
                             >
-                              <span className="inline-block w-3 text-gray-400 transition-transform lg:hidden" style={{ transform: openActions === inv.id ? "rotate(90deg)" : "none" }}>›</span>
+                              <span className="inline-block transition-transform lg:hidden" style={{ transform: openActions === inv.id ? "rotate(90deg)" : "none", color: "var(--ck-text-muted)" }}><CaretRight size={12} weight="bold" /></span>
                               <span>{invoiceNumber(inv)}</span>
                             </button>
                             {openActions === inv.id && (
                               <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
-                                <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
-                                <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print / PDF</button>
-                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
+                                <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><DownloadSimple size={14} /> Download</button>
+                                <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><Printer size={14} /> Print / PDF</button>
+                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={14} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={14} /> Resend</>)}</button>
                               </div>
                             )}
                           </td>
-                          <td className="hidden p-3 font-mono text-xs lg:table-cell">{bookingRef(inv)}</td>
-                          <td className="p-3">{asText(inv.customer_name, "-")}<br /><span className="text-xs text-gray-400">{asText(inv.customer_email, "")}</span></td>
-                          <td className="hidden p-3 lg:table-cell">{asText(inv.tour_name, "-")}</td>
-                          <td className="hidden p-3 text-xs xl:table-cell">{formatDate(inv.booking_created_at || inv.tour_date)}</td>
-                          <td className="p-3 font-medium">R{money(pay.total)}</td>
-                          <td className="hidden p-3 md:table-cell">R{money(pay.amountPaid)}</td>
-                          <td className={`p-3 font-semibold ${pay.balanceDue > 0 ? "text-amber-700" : "text-emerald-700"}`}>R{money(pay.balanceDue)}</td>
-                          <td className="hidden p-3 text-xs xl:table-cell">{formatDate(inv.created_at)}</td>
+                          <td className="hidden p-3 font-mono text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>{bookingRef(inv)}</td>
+                          <td className="p-3" style={{ color: "var(--ck-text)" }}>{asText(inv.customer_name, "-")}<br /><span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.customer_email, "")}</span></td>
+                          <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{asText(inv.tour_name, "-")}</td>
+                          <td className="hidden p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>{formatDate(inv.booking_created_at || inv.tour_date)}</td>
+                          <td className="p-3 text-right font-medium tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(pay.total)}</td>
+                          <td className="hidden p-3 text-right tabular-nums md:table-cell" style={{ color: "var(--ck-text)" }}>R{money(pay.amountPaid)}</td>
+                          <td className="p-3 text-right font-semibold tabular-nums" style={{ color: pay.balanceDue > 0 ? "var(--ck-amber)" : "var(--ck-success)" }}>R{money(pay.balanceDue)}</td>
+                          <td className="hidden p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>{formatDate(inv.created_at)}</td>
                           <td className="hidden p-3 lg:table-cell">
                             <div className="flex flex-wrap gap-2">
-                              <button onClick={() => handleDownload(inv)} disabled={isBusy} className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Download</button>
-                              <button onClick={() => handlePrint(inv)} disabled={isBusy} className="rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50">Print / PDF</button>
-                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "✓ Sent" : "Resend"}</button>
+                              <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><DownloadSimple size={14} /> Download</button>
+                              <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><Printer size={14} /> Print / PDF</button>
+                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={14} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={14} /> Resend</>)}</button>
                             </div>
                           </td>
                         </tr>
                       );
                     })}
 
-                    <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold text-gray-700">
-                      <td className="p-3 text-xs text-gray-500">Totals:</td>
+                    <tr className="border-t-2 font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)", color: "var(--ck-text-strong)" }}>
+                      <td className="p-3"><span className="ui-mono-label !text-[10px]">Totals</span></td>
                       <td className="hidden p-3 lg:table-cell"></td>
                       <td className="p-3"></td>
                       <td className="hidden p-3 lg:table-cell"></td>
                       <td className="hidden p-3 xl:table-cell"></td>
-                      <td className="p-3">R{money(day.total)}</td>
-                      <td className="hidden p-3 md:table-cell">R{money(day.paid)}</td>
-                      <td className={`p-3 ${day.due > 0 ? "text-amber-700" : "text-emerald-700"}`}>R{money(day.due)}</td>
+                      <td className="p-3 text-right tabular-nums">R{money(day.total)}</td>
+                      <td className="hidden p-3 text-right tabular-nums md:table-cell">R{money(day.paid)}</td>
+                      <td className="p-3 text-right tabular-nums" style={{ color: day.due > 0 ? "var(--ck-amber)" : "var(--ck-success)" }}>R{money(day.due)}</td>
                       <td className="hidden p-3 xl:table-cell"></td>
                       <td className="hidden p-3 lg:table-cell"></td>
                     </tr>

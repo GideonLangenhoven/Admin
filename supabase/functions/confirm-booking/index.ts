@@ -52,6 +52,25 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, reason: "Booking not paid yet" }), { status: 200, headers: cors() });
     }
 
+    // Upsert customer profile (best-effort — never fail the confirmation).
+    // Runs BEFORE the already-sent check so paid bookings whose webhook path
+    // skipped the customer sync still get linked when the success page calls us.
+    try {
+      const { data: customerId } = await supabase.rpc("upsert_customer", {
+        p_business_id: booking.business_id,
+        p_email: booking.email,
+        p_name: booking.customer_name || null,
+        p_phone: booking.phone || null,
+        p_marketing_consent: booking.marketing_opt_in || false,
+      });
+      if (customerId) {
+        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
+        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
+      }
+    } catch (custErr) {
+      console.error("CUSTOMER_UPSERT_ERR:", custErr);
+    }
+
     // Idempotency: check if confirmation was already sent for this booking.
     const { data: existingClaim } = await supabase
       .from("logs")
@@ -73,23 +92,6 @@ Deno.serve(async (req: any) => {
 
     if (!claimData) {
       return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
-    }
-
-    // Upsert customer profile (best-effort — never fail the confirmation)
-    try {
-      const { data: customerId } = await supabase.rpc("upsert_customer", {
-        p_business_id: booking.business_id,
-        p_email: booking.email,
-        p_name: booking.customer_name || null,
-        p_phone: booking.phone || null,
-        p_marketing_consent: booking.marketing_opt_in || false,
-      });
-      if (customerId) {
-        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
-        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
-      }
-    } catch (custErr) {
-      console.error("CUSTOMER_UPSERT_ERR:", custErr);
     }
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);

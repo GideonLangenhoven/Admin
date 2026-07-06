@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Fraunces, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import AppShell from "../components/AppShell";
 import AppNotifications from "../components/AppNotifications";
 import ThemeProvider from "../components/ThemeProvider";
 
-const inter = Inter({ subsets: ["latin"] });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display" });
+/* Brand type system (docs/BRAND.md + docs/ADMIN_REDESIGN_SPEC.md):
+   Fraunces — editorial display face for page titles and hero numerals.
+   Inter — all UI and data. Geist Mono — the instrument voice (labels, timestamps). */
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", axes: ["opsz"] });
 
 export const metadata: Metadata = {
   title: "BookingTours Admin",
@@ -48,7 +52,7 @@ const nav = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`light ${inter.className} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`light ${inter.className} ${inter.variable} ${geistMono.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <body className="bg-[var(--ck-bg)] text-[var(--ck-text)] antialiased transition-colors duration-200">
         <ThemeProvider>
           <AppNotifications />

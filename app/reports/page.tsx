@@ -125,7 +125,10 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => monthStartStr(activeTimezone));
   const [endDate, setEndDate] = useState(() => todayStr(activeTimezone));
-  const [filterBy, setFilterBy] = useState<"slot" | "created">("slot");
+  // Default to booking date (money received) — the tour-date view hides
+  // future-dated bookings inside the current window and reads as "revenue
+  // missing" (matches the dashboard's payment-date semantics).
+  const [filterBy, setFilterBy] = useState<"slot" | "created">("created");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [sortCol, setSortCol] = useState<"created_at" | "slot_time" | "total_amount">("slot_time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
+import { ShieldCheck } from "@phosphor-icons/react";
 
 type DataRequest = {
   id: string;
@@ -135,49 +136,49 @@ export default function DataRequestsPage() {
   }
 
   const statusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      PENDING_CONFIRMATION: "bg-gray-100 text-gray-700",
-      CONFIRMED: "bg-blue-100 text-blue-800",
-      IN_REVIEW: "bg-amber-100 text-amber-800",
-      FULFILLED: "bg-emerald-100 text-emerald-800",
-      CANCELLED: "bg-gray-100 text-gray-500",
-      REJECTED: "bg-red-100 text-red-700",
+    const pill: Record<string, string> = {
+      PENDING_CONFIRMATION: "ui-pill-neutral",
+      CONFIRMED: "ui-pill-ocean",
+      IN_REVIEW: "ui-pill-warning",
+      FULFILLED: "ui-pill-success",
+      CANCELLED: "ui-pill-neutral",
+      REJECTED: "ui-pill-danger",
     };
-    return <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors[status] || "bg-gray-100"}`}>{status.replace(/_/g, " ")}</span>;
+    return <span className={`ui-status ${pill[status] || "ui-pill-neutral"}`}>{status.replace(/_/g, " ")}</span>;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-      </div>
+      <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>
     );
   }
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>POPIA Data Requests</h1>
-        <span className="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-medium">
+      <div className="anim-fade-up flex items-center justify-between">
+        <div>
+          <p className="ui-mono-label mb-2">Admin · Privacy</p>
+          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>POPIA Data Requests</h1>
+        </div>
+        <span className="ui-status ui-pill-success">
           {requests.filter(r => ["CONFIRMED", "IN_REVIEW"].includes(r.status)).length} actionable
         </span>
       </div>
 
-      <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+      <p className="anim-fade-up anim-d1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
         Under POPIA, data subjects can request access to or deletion of their personal information.
         Deletion requests have a mandatory 30-day cooling-off period before they can be fulfilled.
       </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border)" }}>
+      <div className="anim-fade-up anim-d1 ui-seg">
         {STATUS_TABS.map(t => (
           <button
             key={t.key}
+            type="button"
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key ? "border-emerald-600 text-emerald-700" : "border-transparent"
-            }`}
-            style={tab !== t.key ? { color: "var(--ck-text-muted)" } : undefined}
+            className="ui-seg-item"
+            data-active={tab === t.key}
           >
             {t.label}
           </button>
@@ -186,7 +187,7 @@ export default function DataRequestsPage() {
 
       {/* Tab help text — explains why Pending rows don't show actions */}
       {tab === "PENDING_CONFIRMATION" && filtered.length > 0 && (
-        <p className="text-xs rounded-md border bg-slate-50 text-slate-700 px-3 py-2" style={{ borderColor: "var(--ck-border)" }}>
+        <p className="text-xs rounded-md border px-3 py-2" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>
           These customers haven&rsquo;t clicked the confirmation link yet. Pending requests auto-expire 24h
           after submission. Export / Fulfill / Reject buttons appear once the request moves to <strong>Action Required</strong>.
         </p>
@@ -194,21 +195,27 @@ export default function DataRequestsPage() {
 
       {/* List */}
       {filtered.length === 0 ? (
-        <p className="text-sm py-8 text-center" style={{ color: "var(--ck-text-muted)" }}>No requests in this category.</p>
+        <div className="ui-card">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><ShieldCheck size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No requests in this category</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Data requests will appear here as customers submit them.</p>
+          </div>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="anim-fade-up anim-d2 space-y-3">
           {filtered.map(r => {
             const daysUntilDue = r.scheduled_for
               ? Math.max(0, Math.ceil((new Date(r.scheduled_for).getTime() - now) / 86_400_000))
               : null;
             return (
-              <div key={r.id} className="p-4 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+              <div key={r.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.email}</span>
                       {statusBadge(r.status)}
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${r.request_type === "DELETION" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+                      <span className={`ui-status ${r.request_type === "DELETION" ? "ui-pill-danger" : "ui-pill-ocean"}`}>
                         {r.request_type}
                       </span>
                     </div>
@@ -218,10 +225,10 @@ export default function DataRequestsPage() {
                         <span>{r.customers.total_bookings} bookings · R{r.customers.total_spent}</span>
                       )}
                       {daysUntilDue !== null && r.status === "CONFIRMED" && (
-                        <span className="font-medium text-amber-700">{daysUntilDue} days until due</span>
+                        <span className="font-medium" style={{ color: "var(--ck-amber)" }}>{daysUntilDue} days until due</span>
                       )}
                       {daysUntilDue === 0 && r.status === "IN_REVIEW" && (
-                        <span className="font-medium text-red-700">Overdue — ready to fulfill</span>
+                        <span className="font-medium" style={{ color: "var(--ck-danger)" }}>Overdue — ready to fulfill</span>
                       )}
                     </div>
                     {r.reason && <p className="mt-1 text-xs italic" style={{ color: "var(--ck-text-muted)" }}>"{r.reason}"</p>}
@@ -233,7 +240,7 @@ export default function DataRequestsPage() {
                         <button
                           onClick={() => handleExport(r.id)}
                           disabled={actionLoading}
-                          className="px-2.5 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                          className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px]"
                         >
                           Export
                         </button>
@@ -242,7 +249,7 @@ export default function DataRequestsPage() {
                         <button
                           onClick={() => handleFulfill(r.id)}
                           disabled={actionLoading}
-                          className="px-2.5 py-1.5 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                          className="ui-btn ui-btn-danger !h-8 !px-3 !text-[12.5px]"
                         >
                           Fulfill
                         </button>
@@ -250,8 +257,7 @@ export default function DataRequestsPage() {
                       <button
                         onClick={() => setRejectId(r.id)}
                         disabled={actionLoading}
-                        className="px-2.5 py-1.5 rounded text-xs font-medium border hover:bg-gray-50 disabled:opacity-50"
-                        style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                        className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]"
                       >
                         Reject
                       </button>
@@ -267,20 +273,18 @@ export default function DataRequestsPage() {
                       value={rejectReason}
                       onChange={e => setRejectReason(e.target.value)}
                       placeholder="Reason for rejection (e.g. active refund dispute)"
-                      className="flex-1 text-sm px-3 py-2 rounded border"
-                      style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                      className="ui-control flex-1 text-sm"
                     />
                     <button
                       onClick={() => handleReject(r.id)}
                       disabled={actionLoading || rejectReason.trim().length < 5}
-                      className="px-3 py-2 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                      className="ui-btn ui-btn-danger !px-3 !text-[12.5px]"
                     >
                       Confirm Reject
                     </button>
                     <button
                       onClick={() => { setRejectId(null); setRejectReason(""); }}
-                      className="px-3 py-2 rounded text-xs font-medium border"
-                      style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                      className="ui-btn ui-btn-ghost !px-3 !text-[12.5px]"
                     >
                       Cancel
                     </button>

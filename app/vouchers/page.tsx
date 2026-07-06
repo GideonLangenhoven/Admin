@@ -5,12 +5,13 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { buildAdminVoucherPurchase } from "./voucher-purchase";
+import { Ticket, CheckCircle, Clock, Prohibit, MagnifyingGlass, ArrowsClockwise } from "@phosphor-icons/react";
 
-const STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-green-100 text-green-700",
-  REDEEMED: "bg-blue-100 text-blue-700",
-  PENDING: "bg-yellow-100 text-yellow-700",
-  EXPIRED: "bg-gray-100 text-gray-600",
+const STATUS_PILL: Record<string, string> = {
+  ACTIVE: "ui-pill-success",
+  REDEEMED: "ui-pill-ocean",
+  PENDING: "ui-pill-warning",
+  EXPIRED: "ui-pill-neutral",
 };
 
 interface Voucher {
@@ -220,88 +221,99 @@ export default function Vouchers() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Vouchers</h2>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Customers · Vouchers</p>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h2>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <form onSubmit={createVoucher} className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="anim-fade-up anim-d1 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <form onSubmit={createVoucher} className="ui-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Create voucher</h3>
-              <p className="text-sm text-gray-500">Send the buyer a payment link. The code activates only after payment.</p>
+              <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Create voucher</h3>
+              <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Send the buyer a payment link. The code activates only after payment.</p>
             </div>
-            <button type="button" onClick={() => setForm((current) => ({ ...current, code: generateVoucherCode() }))} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-              Regenerate code
+            <button type="button" onClick={() => setForm((current) => ({ ...current, code: generateVoucherCode() }))} className="ui-btn ui-btn-ghost h-8 shrink-0 px-3 text-xs">
+              <ArrowsClockwise size={13} weight="bold" /> Regenerate
             </button>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Voucher code
-              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
+              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="ui-control mt-1 w-full font-mono" />
             </label>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Expiry
-              <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Auto — 3 years from purchase</p>
+              <p className="mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>Auto — 3 years from purchase</p>
             </div>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Recipient
-              <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Buyer name
-              <input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Buyer email
-              <input type="email" value={form.buyer_email} onChange={(e) => setForm({ ...form, buyer_email: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input type="email" value={form.buyer_email} onChange={(e) => setForm({ ...form, buyer_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Tour / activity
-              <input value={form.tour_name} onChange={(e) => setForm({ ...form, tour_name: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input value={form.tour_name} onChange={(e) => setForm({ ...form, tour_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Voucher type
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="ui-control mt-1 w-full">
                 <option value="FREE_TRIP">Free Trip</option>
                 <option value="CREDIT">Credit</option>
                 <option value="GIFT">Gift Voucher</option>
               </select>
             </label>
-            <label className="text-sm text-gray-600">
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Value (ZAR)
-              <input type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
           </div>
 
-          <label className="mt-3 block text-sm text-gray-600">
+          <label className="mt-3 block text-sm" style={{ color: "var(--ck-text-muted)" }}>
             Gift message
-            <textarea value={form.gift_message} onChange={(e) => setForm({ ...form, gift_message: e.target.value })} rows={3} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            <textarea value={form.gift_message} onChange={(e) => setForm({ ...form, gift_message: e.target.value })} rows={3} className="ui-control mt-1 w-full" />
           </label>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className={`text-sm ${createMessage.includes("sent") ? "text-emerald-700" : "text-red-600"}`}>{createMessage}</p>
-            <button type="submit" disabled={creating || !form.code.trim()} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50">
+            <p className="text-sm" style={{ color: createMessage.includes("sent") ? "var(--ck-success)" : "var(--ck-danger)" }}>{createMessage}</p>
+            <button type="submit" disabled={creating || !form.code.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
               {creating ? "Creating..." : "Send payment link"}
             </button>
           </div>
         </form>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="text-lg font-semibold text-gray-900">Status overview</h3>
+        <div className="ui-card p-4">
+          <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Status overview</h3>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            {["ACTIVE", "REDEEMED", "PENDING", "EXPIRED"].map((status) => (
-              <div key={status} className="rounded-xl bg-gray-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{status}</p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">{statusCounts[status] || 0}</p>
+            {[
+              { key: "ACTIVE", label: "Active", chipBg: "var(--ck-success-soft)", chipColor: "var(--ck-success)", icon: <Ticket size={16} weight="fill" /> },
+              { key: "REDEEMED", label: "Redeemed", chipBg: "var(--ck-ocean-soft)", chipColor: "var(--ck-ocean)", icon: <CheckCircle size={16} weight="fill" /> },
+              { key: "PENDING", label: "Pending", chipBg: "var(--ck-amber-soft)", chipColor: "var(--ck-amber)", icon: <Clock size={16} weight="fill" /> },
+              { key: "EXPIRED", label: "Expired", chipBg: "var(--ck-surface)", chipColor: "var(--ck-text-muted)", icon: <Prohibit size={16} weight="bold" /> },
+            ].map((tile) => (
+              <div key={tile.key} className="rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)" }}>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="ui-icon-chip !h-8 !w-8" style={{ background: tile.chipBg, color: tile.chipColor }}>{tile.icon}</span>
+                  <span className="ui-mono-label !text-[9.5px]">{tile.label}</span>
+                </div>
+                <p className="font-display text-[26px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{statusCounts[tile.key] || 0}</p>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm text-gray-500">Use status filters below to confirm which codes are still redeemable and which have already been used.</p>
+          <p className="mt-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>Use status filters below to confirm which codes are still redeemable and which have already been used.</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <label className="flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:items-center">
+      <div className="anim-fade-up anim-d2 ui-card flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center" style={{ color: "var(--ck-text-muted)" }}>
           Filter by created date
           <DatePicker value={selectedDate} onChange={setSelectedDate} />
         </label>
@@ -309,18 +321,21 @@ export default function Vouchers() {
           <button
             type="button"
             onClick={() => setSelectedDate("")}
-            className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50"
+            className="ui-btn ui-btn-ghost h-8 px-3 text-xs"
           >
             Clear Date
           </button>
         )}
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search vouchers..."
-          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm sm:py-1.5"
-        />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:py-1.5">
+        <div className="relative min-w-0 flex-1">
+          <MagnifyingGlass size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vouchers..."
+            className="ui-control w-full pl-9"
+          />
+        </div>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="ui-control">
           <option value="ALL">All statuses</option>
           <option value="ACTIVE">Active</option>
           <option value="REDEEMED">Redeemed</option>
@@ -330,79 +345,88 @@ export default function Vouchers() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-gray-500">Loading...</div>
+        <div className="ui-card space-y-2.5 p-4">
+          <div className="ui-skeleton h-9 w-full" />
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="ui-skeleton h-14 w-full" />)}
+        </div>
       ) : groups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">No vouchers found for this filter.</div>
+        <div className="ui-card">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><Ticket size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No vouchers found</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No vouchers match this filter. Try clearing the date or status.</p>
+          </div>
+        </div>
       ) : (
-        <div className="space-y-6">
+        <div className="anim-fade-up anim-d3 space-y-6">
           {groups.map((g) => (
             <div key={g.dayKey}>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-gray-800">{g.dayLabel}</h3>
-                <span className="text-xs text-gray-500">{g.items.length} vouchers</span>
+                <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{g.dayLabel}</h3>
+                <span className="ui-mono-label !text-[10px]">{g.items.length} vouchers</span>
               </div>
               <div className="space-y-3 md:hidden">
                 {g.items.map((v) => (
-                  <div key={v.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div key={v.id} className="ui-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-mono text-sm font-bold text-blue-600">{v.code || "-"}</p>
-                        <p className="mt-1 text-sm font-semibold text-gray-800">{v.recipient_name || "-"}</p>
-                        <p className="text-xs text-gray-500">{v.tour_name || "-"}</p>
+                        <p className="font-mono text-sm font-bold" style={{ color: "var(--ck-ocean)" }}>{v.code || "-"}</p>
+                        <p className="mt-1 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{v.recipient_name || "-"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{v.tour_name || "-"}</p>
                       </div>
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status || ""] || "bg-gray-100 text-gray-700"}`}>
+                      <span className={`ui-status ${STATUS_PILL[v.status || ""] || "ui-pill-neutral"}`}>
                         {v.status || "-"}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-lg bg-gray-50 p-2">
-                        <p className="text-[11px] text-gray-500">Value</p>
-                        <p className="font-semibold">{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</p>
+                      <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                        <p className="ui-mono-label !text-[9.5px]">Value</p>
+                        <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 p-2">
-                        <p className="text-[11px] text-gray-500">Buyer</p>
-                        <p className="text-xs font-semibold">{v.buyer_name || "-"}</p>
+                      <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                        <p className="ui-mono-label !text-[9.5px]">Buyer</p>
+                        <p className="mt-0.5 text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>{v.buyer_name || "-"}</p>
                       </div>
                     </div>
-                    <p className="mt-2 text-xs text-gray-400">Expires {v.expires_at ? new Date(v.expires_at).toLocaleDateString("en-ZA") : "-"}</p>
+                    <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Expires {v.expires_at ? new Date(v.expires_at).toLocaleDateString("en-ZA") : "-"}</p>
                   </div>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead>
                     <tr>
-                      <th className="p-3 text-left font-medium text-gray-600">Code</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Status</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 md:table-cell">Type</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Tour</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Value</th>
-                      <th className="p-3 text-left font-medium text-gray-600">Recipient</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 md:table-cell">Buyer</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Expires</th>
-                      <th className="hidden p-3 text-left font-medium text-gray-600 lg:table-cell">Created</th>
+                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Code</th>
+                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Type</th>
+                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Tour</th>
+                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Value</th>
+                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Recipient</th>
+                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Buyer</th>
+                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Expires</th>
+                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Created</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {g.items.map((v) => (
-                      <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
-                        <td className="p-3 font-mono font-bold text-blue-600">{v.code || "-"}</td>
+                      <tr key={v.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                        <td className="p-3 font-mono font-bold" style={{ color: "var(--ck-ocean)" }}>{v.code || "-"}</td>
                         <td className="p-3">
-                          <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status || ""] || "bg-gray-100 text-gray-700"}`}>
+                          <span className={`ui-status ${STATUS_PILL[v.status || ""] || "ui-pill-neutral"}`}>
                             {v.status || "-"}
                           </span>
                         </td>
-                        <td className="hidden p-3 text-xs md:table-cell">{v.type || "-"}</td>
-                        <td className="hidden p-3 lg:table-cell">{v.tour_name || "-"}</td>
-                        <td className="p-3">{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</td>
-                        <td className="p-3">{v.recipient_name || "-"}</td>
-                        <td className="hidden p-3 text-xs md:table-cell">
+                        <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{v.type || "-"}</td>
+                        <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{v.tour_name || "-"}</td>
+                        <td className="p-3 tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{v.recipient_name || "-"}</td>
+                        <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                           {v.buyer_name || "-"}
                           <br />
                           {v.buyer_email || ""}
                         </td>
-                        <td className="hidden p-3 text-xs lg:table-cell">{v.expires_at ? new Date(v.expires_at).toLocaleDateString("en-ZA") : "-"}</td>
-                        <td className="hidden p-3 text-xs lg:table-cell">{v.created_at ? new Date(v.created_at).toLocaleDateString("en-ZA") : "-"}</td>
+                        <td className="hidden p-3 text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>{v.expires_at ? new Date(v.expires_at).toLocaleDateString("en-ZA") : "-"}</td>
+                        <td className="hidden p-3 text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>{v.created_at ? new Date(v.created_at).toLocaleDateString("en-ZA") : "-"}</td>
                       </tr>
                     ))}
                   </tbody>

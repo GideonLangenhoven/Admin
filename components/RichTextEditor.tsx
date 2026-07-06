@@ -108,7 +108,7 @@ export default function RichTextEditor({ value, onChange, rows = 10, placeholder
             type="button"
             onClick={() => exec(t.cmd, t.arg)}
             title={t.title}
-            className="flex h-7 items-center rounded px-2 text-xs font-semibold text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg-subtle)] hover:text-[var(--ck-text-strong)]"
+            className="flex h-7 items-center rounded px-2 text-xs font-semibold text-[var(--ck-text-muted)] hover:bg-[var(--ck-surface-sunken)] hover:text-[var(--ck-text-strong)]"
             style={t.cmd === "italic" ? { fontStyle: "italic" } : t.cmd === "underline" ? { textDecoration: "underline" } : t.cmd === "bold" ? { fontWeight: 700 } : undefined}
           >
             {t.label}

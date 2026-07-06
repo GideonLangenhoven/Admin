@@ -38,9 +38,9 @@ interface AvailabilityCalendarProps {
 const SlotDataCtx = createContext<DaySlotMap>({});
 const MinQtyCtx = createContext<number>(0);
 
-/* ── colour palette per position ── */
-const SLOT_COLORS = ["#10b981", "#a855f7", "#f59e0b", "#3b82f6"]; // brighter: emerald, purple, amber, blue
-const FULL_COLOR = "#9ca3af"; // gray-400
+/* ── colour palette per position (brand chart ramp) ── */
+const SLOT_COLORS = ["var(--ck-chart-1)", "var(--ck-chart-2)", "var(--ck-chart-3)", "var(--ck-chart-4)"]; // pine, ocean, amber, fjord
+const FULL_COLOR = "var(--ck-text-muted)";
 
 /* ── position configs ── */
 function getPositions(count: number): { top?: string; bottom?: string; left?: string; right?: string }[] {
@@ -221,13 +221,13 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                         disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                     />
 
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-xs text-gray-600">
+                    <div className="rounded-xl px-3 py-3 text-xs" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)", color: "var(--ck-text)" }}>
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Open seats</span>
-                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-gray-400" />Fully booked</span>
-                            <span className="inline-flex items-center gap-2"><span className="font-semibold text-gray-800">{availabilitySummary.openDays}</span> days with bookable capacity</span>
+                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--ck-chart-1)" }} />Open seats</span>
+                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--ck-text-muted)" }} />Fully booked</span>
+                            <span className="inline-flex items-center gap-2"><span className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{availabilitySummary.openDays}</span> days with bookable capacity</span>
                             {availabilitySummary.fullDays > 0 && (
-                                <span className="inline-flex items-center gap-2"><span className="font-semibold text-red-600">{availabilitySummary.fullDays}</span> days full for this party size</span>
+                                <span className="inline-flex items-center gap-2"><span className="font-semibold tabular-nums" style={{ color: "var(--ck-danger)" }}>{availabilitySummary.fullDays}</span> days full for this party size</span>
                             )}
                         </div>
                     </div>

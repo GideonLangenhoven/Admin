@@ -8,6 +8,7 @@ import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
+import { ChatCircleDots, ChatsCircle, PaperPlaneTilt, ArrowLeft, Robot, ArrowClockwise, Warning, CheckCircle, X as XIcon } from "@phosphor-icons/react";
 
 function filterHumanConversation(all: any[]): any[] {
   const firstAdminIdx = all.findIndex(m => m.sender === "Admin");
@@ -48,16 +49,16 @@ function MessageList({
           <div key={m.id}>
             {showDate && (
               <div className="text-center my-2">
-                <span className="bg-gray-200 text-gray-500 text-xs px-3 py-1 rounded-full">{fmtDate(m.created_at)}</span>
+                <span className="font-mono text-[11px] px-3 py-1 rounded-full" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>{fmtDate(m.created_at)}</span>
               </div>
             )}
             <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isAdmin
-                ? "bg-blue-600 text-white rounded-br-md"
-                : "bg-white border border-gray-200 text-gray-900 rounded-bl-md"
+                ? "bg-[var(--ck-accent-soft)] text-[var(--ck-text-strong)] rounded-br-md"
+                : "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text)] rounded-bl-md"
                 }`}>
                 <p className="whitespace-pre-wrap">{m.body}</p>
-                <p className={`text-xs mt-1 ${isAdmin ? "text-blue-200" : "text-gray-400"}`}>
+                <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
                   {fmtTime(m.created_at)} · {m.sender || (isAdmin ? "Admin" : "Customer")}
                 </p>
               </div>
@@ -326,27 +327,27 @@ function InboxContent() {
   return (
     <div className="h-full flex flex-col">
       {/* Tab header */}
-      <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="anim-fade-up -mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex min-w-max items-center gap-3">
         <button
           onClick={() => setActiveTab("inbox")}
-          className={`px-1 pb-0.5 text-xl font-bold border-b-2 transition-colors sm:text-2xl ${activeTab === "inbox"
-            ? "border-blue-600 text-gray-900"
-            : "border-transparent text-gray-400 hover:text-gray-600"
+          className={`font-display px-1 pb-1 text-[20px] font-semibold border-b-2 transition-colors sm:text-[24px] ${activeTab === "inbox"
+            ? "border-[var(--ck-accent)] text-[var(--ck-text-strong)]"
+            : "border-transparent text-[var(--ck-text-muted)] hover:text-[var(--ck-text)]"
             }`}
         >
           Inbox
           {convos.length > 0 && (
-            <span className="ml-2 bg-blue-600 text-white text-xs font-bold rounded-full px-2 py-0.5 align-middle">
+            <span className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 align-middle font-mono text-xs font-semibold tabular-nums" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
               {convos.length}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-1 pb-0.5 text-xl font-bold border-b-2 transition-colors whitespace-nowrap sm:text-2xl ${activeTab === "history"
-            ? "border-blue-600 text-gray-900"
-            : "border-transparent text-gray-400 hover:text-gray-600"
+          className={`font-display px-1 pb-1 text-[20px] font-semibold border-b-2 transition-colors whitespace-nowrap sm:text-[24px] ${activeTab === "history"
+            ? "border-[var(--ck-accent)] text-[var(--ck-text-strong)]"
+            : "border-transparent text-[var(--ck-text-muted)] hover:text-[var(--ck-text)]"
             }`}
         >
           Chat History
@@ -356,43 +357,49 @@ function InboxContent() {
 
       {/* ── Inbox Tab ── */}
       {activeTab === "inbox" && (
-        loading ? <p className="text-gray-500">Loading...</p> : (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+        loading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
+          <div className="anim-fade-up anim-d1 flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
           <BotStatusBanner />
           <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
             {/* Conversation list — hidden on mobile when a chat is selected */}
-            <div className={`w-full md:w-72 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
-              <div className="p-3 border-b border-gray-200 bg-gray-50">
-                <p className="text-sm font-medium text-gray-600">{convos.length} waiting</p>
+            <div className={`w-full md:w-72 shrink-0 flex flex-col ui-card overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
+              <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)]">
+                <p className="ui-mono-label !text-[10px]">{convos.length} waiting</p>
               </div>
               <div className="flex-1 overflow-auto">
                 {convos.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 text-center">No conversations waiting ✓</p>
+                  <div className="ui-empty">
+                    <span className="ui-icon-chip"><CheckCircle size={19} /></span>
+                    <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>All caught up</p>
+                    <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No conversations waiting for a reply.</p>
+                  </div>
                 ) : convos.length > 50 ? (
                   <Virtuoso
                     style={{ height: "100%" }}
                     data={convos}
                     itemContent={(_, c: any) => (
                       <div onClick={() => setSelected(c)}
-                        className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
+                        className={`p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[var(--ck-accent-soft)] border-l-4 border-l-[var(--ck-accent)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />
+                          <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
                           <IntentBadge intent={c.current_intent} size="xs" />
                         </div>
-                        <p className="text-xs text-gray-500">{c.phone}</p>
-                        <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
+                        <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
                       </div>
                     )}
                   />
                 ) : convos.map((c: any) => (
                   <div key={c.id} onClick={() => setSelected(c)}
-                    className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
+                    className={`p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[var(--ck-accent-soft)] border-l-4 border-l-[var(--ck-accent)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />
+                      <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
                       <IntentBadge intent={c.current_intent} size="xs" />
                     </div>
-                    <p className="text-xs text-gray-500">{c.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
+                    <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
                   </div>
                 ))}
               </div>
@@ -400,63 +407,71 @@ function InboxContent() {
 
             {/* Chat panel — full width on mobile */}
             {selected ? (
-              <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 p-3">
-                  <button onClick={() => setSelected(null)} className="md:hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium hover:bg-gray-50">
-                    ← Back
+              <div className="flex-1 flex flex-col ui-card overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] p-3">
+                  <button onClick={() => setSelected(null)} className="ui-btn ui-btn-ghost md:hidden shrink-0 !h-8 !px-2.5 text-xs">
+                    <ArrowLeft size={14} /> Back
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{selected.customer_name || selected.phone}</p>
-                    <p className="text-xs text-gray-500 truncate">{selected.phone} · {selected.email || "no email"}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">Showing the active human handoff only. Earlier bot context stays hidden.</p>
+                    <p className="font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>{selected.customer_name || selected.phone}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--ck-text-muted)" }}>{selected.phone} · {selected.email || "no email"}</p>
+                    <p className="mt-1 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Showing the active human handoff only. Earlier bot context stays hidden.</p>
                   </div>
                   <button onClick={() => returnToBot(selected.id, selected.phone)}
-                    className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 sm:w-auto">
-                    Return to Bot
+                    className="ui-btn ui-btn-soft w-full !h-8 text-xs sm:w-auto">
+                    <Robot size={14} /> Return to Bot
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-4 space-y-3 bg-gray-50">
+                <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {messages.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm mt-8">No messages yet. The customer&apos;s next message will appear here.</p>
+                    <div className="ui-empty">
+                      <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
+                      <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No messages yet</p>
+                      <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>The customer&apos;s next message will appear here.</p>
+                    </div>
                   ) : (
                     <MessageList messages={messages} endRef={chatEndRef} fmtTime={fmtTime} fmtDate={fmtDate} />
                   )}
                   {isTyping && (
                     <div className="flex justify-end">
-                      <div className="flex items-center gap-1 rounded-2xl rounded-br-md bg-blue-600 px-3 py-2">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:0ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:150ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:300ms]" />
+                      <div className="flex items-center gap-1 rounded-2xl rounded-br-md px-3 py-2" style={{ background: "var(--ck-accent-soft)" }}>
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:300ms]" />
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="border-t border-gray-200 bg-white">
+                <div className="border-t border-[var(--ck-border-subtle)]" style={{ background: "var(--ck-surface)" }}>
                   {waWarning && (
-                    <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
-                      <span className="shrink-0 text-amber-500 text-sm font-bold">!</span>
-                      <p className="flex-1 text-xs text-amber-800 leading-snug">{waWarning}</p>
-                      <button onClick={() => setWaWarning(null)} className="shrink-0 text-amber-400 hover:text-amber-600 text-xs font-medium">✕</button>
+                    <div className="flex items-start gap-2 border-b px-3 py-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 25%, transparent)" }}>
+                      <span className="shrink-0 mt-0.5" style={{ color: "var(--ck-amber)" }}><Warning size={15} weight="fill" /></span>
+                      <p className="flex-1 text-xs leading-snug" style={{ color: "var(--ck-amber)" }}>{waWarning}</p>
+                      <button onClick={() => setWaWarning(null)} className="shrink-0 hover:opacity-70" style={{ color: "var(--ck-amber)" }} aria-label="Dismiss"><XIcon size={13} /></button>
                     </div>
                   )}
                   <div className="p-3">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
                         rows={2} placeholder="Type your reply... (Enter to send)"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                        className="ui-control flex-1 resize-none outline-none" />
                       <button onClick={sendReply} disabled={sending || !reply.trim()}
-                        className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
-                        {sending ? "..." : "Send"}
+                        className="ui-btn ui-btn-primary self-stretch !h-auto py-2.5 disabled:opacity-50 sm:self-end sm:!h-9 sm:!py-0">
+                        <PaperPlaneTilt size={15} weight="fill" /> {sending ? "..." : "Send"}
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="hidden md:flex flex-1 items-center justify-center bg-white rounded-xl border border-gray-200">
-                <p className="text-gray-400">Select a conversation to start chatting</p>
+              <div className="hidden md:flex flex-1 items-center justify-center ui-card">
+                <div className="ui-empty">
+                  <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
+                  <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No conversation selected</p>
+                  <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation on the left to start chatting.</p>
+                </div>
               </div>
             )}
           </div>
@@ -466,26 +481,30 @@ function InboxContent() {
 
       {/* ── Chat History Tab ── */}
       {activeTab === "history" && (
-        historyLoading ? <p className="text-gray-500">Loading...</p> : (
-          <div className="flex-1 flex gap-4 min-h-0">
+        historyLoading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
+          <div className="anim-fade-up anim-d1 flex-1 flex gap-4 min-h-0">
             {/* Past conversation list — hidden on mobile when a chat is selected */}
-            <div className={`w-full md:w-72 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden ${historySelected ? "hidden md:flex" : "flex"}`}>
-              <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-600">{historyConvos.length} conversations</p>
-                <button onClick={loadHistoryConvos} className="text-xs text-blue-600 hover:underline">Refresh</button>
+            <div className={`w-full md:w-72 shrink-0 flex flex-col ui-card overflow-hidden ${historySelected ? "hidden md:flex" : "flex"}`}>
+              <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] flex items-center justify-between">
+                <p className="ui-mono-label !text-[10px]">{historyConvos.length} conversations</p>
+                <button onClick={loadHistoryConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]"><ArrowClockwise size={13} /> Refresh</button>
               </div>
               <div className="flex-1 overflow-auto">
                 {historyConvos.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 text-center">No chat history yet</p>
+                  <div className="ui-empty">
+                    <span className="ui-icon-chip"><ChatsCircle size={19} /></span>
+                    <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No chat history yet</p>
+                    <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Resolved conversations will show up here.</p>
+                  </div>
                 ) : historyConvos.map((c: any) => (
                   <div key={c.id} onClick={() => { setHistorySelected(c); loadHistoryMessages(c.phone); }}
-                    className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${historySelected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
+                    className={`p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${historySelected?.id === c.id ? "bg-[var(--ck-accent-soft)] border-l-4 border-l-[var(--ck-accent)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
+                      <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
                       <IntentBadge intent={c.current_intent} size="xs" />
                     </div>
-                    <p className="text-xs text-gray-500">{c.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
+                    <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
                   </div>
                 ))}
               </div>
@@ -493,39 +512,47 @@ function InboxContent() {
 
             {/* Read-only transcript — full width on mobile */}
             {historySelected ? (
-              <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                  <button onClick={() => setHistorySelected(null)} className="md:hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium hover:bg-gray-50">
-                    ← Back
+              <div className="flex-1 flex flex-col ui-card overflow-hidden">
+                <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] flex items-center gap-2">
+                  <button onClick={() => setHistorySelected(null)} className="ui-btn ui-btn-ghost md:hidden shrink-0 !h-8 !px-2.5 text-xs">
+                    <ArrowLeft size={14} /> Back
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{historySelected.customer_name || historySelected.phone}</p>
-                    <p className="text-xs text-gray-500 truncate">{historySelected.phone} · {historySelected.email || "no email"} · {historySelected.status}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">Transcript is intentionally trimmed to the human handoff view.</p>
+                    <p className="font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>{historySelected.customer_name || historySelected.phone}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--ck-text-muted)" }}>{historySelected.phone} · {historySelected.email || "no email"} · {historySelected.status}</p>
+                    <p className="mt-1 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Transcript is intentionally trimmed to the human handoff view.</p>
                   </div>
                 </div>
-                <div className="flex-1 overflow-auto p-4 space-y-3 bg-gray-50">
+                <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {historyMessages.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm mt-8">No messages in this conversation</p>
+                    <div className="ui-empty">
+                      <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
+                      <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No messages in this conversation</p>
+                      <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing was exchanged in this thread.</p>
+                    </div>
                   ) : (
                     <MessageList messages={historyMessages} endRef={historyChatEndRef} fmtTime={fmtTime} fmtDate={fmtDate} />
                   )}
                 </div>
 
                 {/* Reply box in history allows taking over */}
-                <div className="p-4 border-t border-gray-200 bg-white">
+                <div className="p-4 border-t border-[var(--ck-border-subtle)]" style={{ background: "var(--ck-surface)" }}>
                   <div className="flex gap-2">
-                    <input type="text" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendReply(historySelected)} placeholder="Reply to take over..." className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-                    <button onClick={() => sendReply(historySelected)} disabled={sending || !reply.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400">
-                      {sending ? "..." : "Reply"}
+                    <input type="text" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendReply(historySelected)} placeholder="Reply to take over..." className="ui-control flex-1 outline-none" />
+                    <button onClick={() => sendReply(historySelected)} disabled={sending || !reply.trim()} className="ui-btn ui-btn-primary !h-9 disabled:opacity-50">
+                      <PaperPlaneTilt size={15} weight="fill" /> {sending ? "..." : "Reply"}
                     </button>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Replying will move this conversation to your active Inbox.</p>
+                  <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>Replying will move this conversation to your active Inbox.</p>
                 </div>
               </div>
             ) : (
-              <div className="hidden md:flex flex-1 items-center justify-center bg-white rounded-xl border border-gray-200">
-                <p className="text-gray-400">Select a conversation to view transcript</p>
+              <div className="hidden md:flex flex-1 items-center justify-center ui-card">
+                <div className="ui-empty">
+                  <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
+                  <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No conversation selected</p>
+                  <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation on the left to view its transcript.</p>
+                </div>
               </div>
             )}
           </div>
@@ -537,7 +564,7 @@ function InboxContent() {
 
 export default function Inbox() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading Inbox...</div>}>
+    <Suspense fallback={<div className="p-8 text-center" style={{ color: "var(--ck-text-muted)" }}>Loading Inbox...</div>}>
       <InboxContent />
     </Suspense>
   );

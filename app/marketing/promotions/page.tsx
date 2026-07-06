@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, Trash, Copy, ArrowsClockwise } from "@phosphor-icons/react";
+import { Plus, Trash, Copy, ArrowsClockwise, Ticket } from "@phosphor-icons/react";
 
 interface Promotion {
   id: string;
@@ -198,23 +198,24 @@ export default function PromotionsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="space-y-4 py-2">
+        <div className="ui-skeleton h-8 w-48" />
+        <div className="ui-skeleton h-[140px] !rounded-2xl" />
+        <div className="ui-skeleton h-[320px] !rounded-2xl" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="anim-fade-up flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Promo Codes</h2>
           <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Create and manage discount codes for customers</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-          style={{ background: "var(--ck-accent)" }}
+          className="ui-btn ui-btn-primary"
         >
           <Plus size={16} /> New Promo
         </button>
@@ -222,8 +223,8 @@ export default function PromotionsPage() {
 
       {/* Create / Edit form */}
       {showForm && (
-        <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-          <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+        <div className="ui-card anim-fade-up p-5 space-y-4">
+          <h3 className="ui-title-md text-sm">
             {editId ? "Edit Promo" : "New Promo Code"}
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -234,13 +235,11 @@ export default function PromotionsPage() {
                   value={code}
                   onChange={e => setCode(e.target.value.toUpperCase())}
                   placeholder="SUMMER20"
-                  className="flex-1 rounded-lg border px-3 py-2 text-sm font-mono uppercase"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  className="ui-control flex-1 font-mono uppercase"
                 />
                 <button
                   onClick={generateCode}
-                  className="rounded-lg border px-3 py-2 text-xs"
-                  style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                  className="ui-btn ui-btn-ghost !px-3"
                   title="Generate random code"
                 >
                   <ArrowsClockwise size={14} />
@@ -253,8 +252,7 @@ export default function PromotionsPage() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Summer sale 20% off"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
             <div>
@@ -262,8 +260,7 @@ export default function PromotionsPage() {
               <select
                 value={discountType}
                 onChange={e => setDiscountType(e.target.value as "FLAT" | "PERCENT")}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               >
                 <option value="PERCENT">Percentage (%)</option>
                 <option value="FLAT">Fixed Amount (R)</option>
@@ -279,8 +276,7 @@ export default function PromotionsPage() {
                 max={discountType === "PERCENT" ? 100 : undefined}
                 value={discountValue}
                 onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
             <div>
@@ -289,8 +285,7 @@ export default function PromotionsPage() {
                 type="date"
                 value={validFrom}
                 onChange={e => setValidFrom(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
             <div>
@@ -299,8 +294,7 @@ export default function PromotionsPage() {
                 type="date"
                 value={validUntil}
                 onChange={e => setValidUntil(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
             <div>
@@ -311,8 +305,7 @@ export default function PromotionsPage() {
                 value={maxUses}
                 onChange={e => setMaxUses(e.target.value)}
                 placeholder="Unlimited"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
             <div>
@@ -322,8 +315,7 @@ export default function PromotionsPage() {
                 min={0}
                 value={minOrderAmount}
                 onChange={e => setMinOrderAmount(parseFloat(e.target.value) || 0)}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                className="ui-control w-full"
               />
             </div>
           </div>
@@ -335,15 +327,13 @@ export default function PromotionsPage() {
             <button
               onClick={savePromo}
               disabled={saving}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "var(--ck-accent)" }}
+              className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               {saving ? "Saving..." : editId ? "Update" : "Create"}
             </button>
             <button
               onClick={() => { setShowForm(false); resetForm(); }}
-              className="rounded-lg border px-4 py-2 text-sm font-medium"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+              className="ui-btn ui-btn-ghost"
             >
               Cancel
             </button>
@@ -353,15 +343,19 @@ export default function PromotionsPage() {
 
       {/* Table */}
       {promos.length === 0 && !showForm ? (
-        <div className="text-center py-12 rounded-xl border" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No promo codes yet. Create your first one!</p>
+        <div className="ui-card anim-fade-up anim-d1">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><Ticket size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No promo codes yet</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first discount code.</p>
+          </div>
         </div>
       ) : promos.length > 0 && (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border)" }}>
+        <div className="ui-card anim-fade-up anim-d1 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr style={{ background: "var(--ck-surface)" }}>
+                <tr style={{ background: "var(--ck-surface-sunken)" }}>
                   <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Code</th>
                   <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Description</th>
                   <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Discount</th>
@@ -376,7 +370,7 @@ export default function PromotionsPage() {
                   const isExpired = p.valid_until && new Date(p.valid_until) < new Date();
                   const isExhausted = p.max_uses != null && p.used_count >= p.max_uses;
                   return (
-                    <tr key={p.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                    <tr key={p.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-semibold" style={{ color: "var(--ck-text-strong)" }}>{p.code}</span>
@@ -387,7 +381,7 @@ export default function PromotionsPage() {
                       </td>
                       <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{p.description || "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={"inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium " + (p.discount_type === "PERCENT" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")}>
+                        <span className={"ui-status " + (p.discount_type === "PERCENT" ? "ui-pill-ocean" : "ui-pill-success")}>
                           {p.discount_type === "PERCENT" ? p.discount_value + "%" : "R" + p.discount_value}
                         </span>
                       </td>
@@ -396,7 +390,7 @@ export default function PromotionsPage() {
                         {p.valid_until ? (
                           " → " + new Date(p.valid_until).toLocaleDateString()
                         ) : (
-                          <span className="ml-1 inline-flex items-center rounded-full bg-amber-50 text-amber-700 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide" title="This promo has no end date — it will keep applying unless deactivated or capped by max_uses">→ No expiry</span>
+                          <span className="ui-status ui-pill-amber ml-1" title="This promo has no end date — it will keep applying unless deactivated or capped by max_uses">→ No expiry</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
@@ -404,10 +398,10 @@ export default function PromotionsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => toggleActive(p)}>
-                          <span className={"inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer " +
-                            (isExpired ? "bg-gray-100 text-gray-500" :
-                             isExhausted ? "bg-red-100 text-red-600" :
-                             p.active ? "bg-emerald-100 text-emerald-700" : "bg-yellow-100 text-yellow-700")}>
+                          <span className={"ui-status cursor-pointer " +
+                            (isExpired ? "ui-pill-danger" :
+                             isExhausted ? "ui-pill-warning" :
+                             p.active ? "ui-pill-success" : "ui-pill-neutral")}>
                             {isExpired ? "Expired" : isExhausted ? "Exhausted" : p.active ? "Active" : "Paused"}
                           </span>
                         </button>
@@ -416,12 +410,11 @@ export default function PromotionsPage() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(p)}
-                            className="rounded-lg border px-2.5 py-1 text-xs font-medium"
-                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                            className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs"
                           >
                             Edit
                           </button>
-                          <button onClick={() => deletePromo(p)} className="p-1 text-red-500 hover:text-red-700">
+                          <button onClick={() => deletePromo(p)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
                             <Trash size={14} />
                           </button>
                         </div>

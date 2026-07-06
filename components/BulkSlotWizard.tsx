@@ -64,8 +64,8 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-[color:var(--ck-bg)] border border-[color:var(--ck-border)] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-        <header className="p-4 border-b border-[color:var(--ck-border)] flex items-center justify-between">
+      <div className="bg-[color:var(--ck-bg)] border border-[color:var(--ck-border-subtle)] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <header className="p-4 border-b border-[color:var(--ck-border-subtle)] flex items-center justify-between">
           <h2 className="font-bold text-[color:var(--ck-text)]">Bulk generate — Step {step}/4</h2>
           <button onClick={onClose} className="text-[color:var(--ck-text-muted)] hover:text-[color:var(--ck-text)]" aria-label="Close">&times;</button>
         </header>
@@ -77,7 +77,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
               <ul className="space-y-1">
                 {tours.map(t => (
                   <li key={t.id}>
-                    <label className="flex items-center gap-2 p-2 hover:bg-[color:var(--ck-bg-subtle)] rounded cursor-pointer">
+                    <label className="flex items-center gap-2 p-2 hover:bg-[color:var(--ck-surface-sunken)] rounded cursor-pointer">
                       <input type="checkbox" checked={selected.has(t.id)}
                         onChange={() => setSelected(prev => {
                           const next = new Set(prev);
@@ -104,12 +104,12 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                 <label>
                   <span className="block text-xs text-[color:var(--ck-text-muted)]">Start date</span>
                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                    className="w-full p-2 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                    className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
                 </label>
                 <label>
                   <span className="block text-xs text-[color:var(--ck-text-muted)]">End date</span>
                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                    className="w-full p-2 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                    className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
                 </label>
               </div>
               <div>
@@ -117,7 +117,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                 <input type="text" value={times.join(", ")}
                   onChange={e => setTimes(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
                   placeholder="06:00, 08:30"
-                  className="w-full p-2 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                  className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
               </div>
               <div>
                 <span className="block text-xs text-[color:var(--ck-text-muted)] mb-1">Days of week</span>
@@ -127,7 +127,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                       <input type="checkbox" className="hidden peer"
                         checked={days.includes(idx)}
                         onChange={() => setDays(prev => prev.includes(idx) ? prev.filter(x => x !== idx) : [...prev, idx])} />
-                      <span className="px-2.5 py-1.5 rounded text-xs font-medium peer-checked:bg-emerald-600 peer-checked:text-white bg-[color:var(--ck-bg-subtle)] text-[color:var(--ck-text)]">{label}</span>
+                      <span className="px-2.5 py-1.5 rounded text-xs font-medium peer-checked:bg-[var(--ck-accent)] peer-checked:text-white bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)]">{label}</span>
                     </label>
                   ))}
                 </div>
@@ -140,7 +140,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
               <label>
                 <span className="block text-xs text-[color:var(--ck-text-muted)]">Default capacity</span>
                 <input type="number" value={defaultCapacity} onChange={e => setDefaultCapacity(Number(e.target.value))}
-                  className="w-full p-2 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" min={1} />
+                  className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" min={1} />
               </label>
             </section>
           )}
@@ -153,21 +153,21 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                 const tour = tours.find(t => t.id === tourId)!;
                 const ov = overrides[tourId] ?? {};
                 return (
-                  <details key={tourId} className="border border-[color:var(--ck-border)] rounded p-2">
+                  <details key={tourId} className="border border-[color:var(--ck-border-subtle)] rounded p-2">
                     <summary className="cursor-pointer text-sm text-[color:var(--ck-text)]">{tour.name}</summary>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       <label>
                         <span className="block text-xs text-[color:var(--ck-text-muted)]">Capacity</span>
                         <input type="number" value={ov.capacity ?? tour.default_capacity ?? defaultCapacity}
                           onChange={e => setOverrides(prev => ({ ...prev, [tourId]: { ...prev[tourId], capacity: Number(e.target.value) } }))}
-                          className="w-full p-1 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                          className="w-full p-1 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
                       </label>
                       <label>
                         <span className="block text-xs text-[color:var(--ck-text-muted)]">Times</span>
                         <input type="text" value={(ov.times ?? times).join(", ")}
                           onChange={e => setOverrides(prev => ({ ...prev, [tourId]: { ...prev[tourId], times: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))}
                           placeholder="06:00, 08:30"
-                          className="w-full p-1 border border-[color:var(--ck-border)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                          className="w-full p-1 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
                       </label>
                     </div>
                   </details>
@@ -189,9 +189,9 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                         <span className={done ? "font-medium" : "text-[color:var(--ck-text-muted)]"}>{tour?.name ?? r.tour_id}</span>
                         {done ? (
                           <>
-                            <span className="font-bold text-emerald-600">{r.slots_created} created</span>
+                            <span className="font-bold text-[var(--ck-success)]">{r.slots_created} created</span>
                             {r.slots_skipped > 0 && <span className="text-[color:var(--ck-text-muted)]">({r.slots_skipped} skipped)</span>}
-                            {r.errors.length > 0 && <span className="text-red-500">{r.errors[0].message}</span>}
+                            {r.errors.length > 0 && <span className="text-[var(--ck-danger)]">{r.errors[0].message}</span>}
                           </>
                         ) : (
                           <span className="text-xs text-[color:var(--ck-text-muted)]">pending...</span>
@@ -205,17 +205,17 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
           )}
         </div>
 
-        <footer className="p-4 border-t border-[color:var(--ck-border)] flex items-center justify-between">
+        <footer className="p-4 border-t border-[color:var(--ck-border-subtle)] flex items-center justify-between">
           <div className="text-sm text-[color:var(--ck-text-muted)]">
             {step <= 3 && selected.size > 0 && (
               <>{previewTotal} slot(s) across {selected.size} tour(s)</>
             )}
           </div>
           <div className="flex gap-2">
-            {step > 1 && step < 4 && <button onClick={() => setStep((s) => (s - 1) as any)} className="px-3 py-1.5 rounded bg-[color:var(--ck-bg-subtle)] text-[color:var(--ck-text)] text-sm">Back</button>}
-            {step < 3 && <button disabled={step === 1 && selected.size === 0} onClick={() => setStep((s) => (s + 1) as any)} className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm disabled:opacity-50">Next</button>}
-            {step === 3 && <button onClick={runGenerate} disabled={running} className="px-3 py-1.5 rounded bg-emerald-700 text-white text-sm disabled:opacity-50">Generate</button>}
-            {step === 4 && !running && <button onClick={onClose} className="px-3 py-1.5 rounded bg-[color:var(--ck-bg-subtle)] text-[color:var(--ck-text)] text-sm">Close</button>}
+            {step > 1 && step < 4 && <button onClick={() => setStep((s) => (s - 1) as any)} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Back</button>}
+            {step < 3 && <button disabled={step === 1 && selected.size === 0} onClick={() => setStep((s) => (s + 1) as any)} className="px-3 py-1.5 rounded bg-[var(--ck-accent)] text-white text-sm disabled:opacity-50">Next</button>}
+            {step === 3 && <button onClick={runGenerate} disabled={running} className="px-3 py-1.5 rounded bg-[var(--ck-accent-hover)] text-white text-sm disabled:opacity-50">Generate</button>}
+            {step === 4 && !running && <button onClick={onClose} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Close</button>}
           </div>
         </footer>
       </div>

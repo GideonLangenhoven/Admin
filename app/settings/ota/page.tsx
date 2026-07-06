@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { Globe, Plus, Trash, ArrowsClockwise, Check, Warning, ToggleLeft, ToggleRight } from "@phosphor-icons/react";
+import { Globe, Plus, Trash, Check, Warning, ToggleLeft, ToggleRight } from "@phosphor-icons/react";
 
 type Mapping = {
   id: string;
@@ -190,190 +190,191 @@ export default function OtaSettingsPage() {
     : "";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Globe size={28} weight="duotone" className="text-[color:var(--accent)]" />
-        <h1 className="text-2xl font-bold text-[color:var(--text)]">OTA Integrations</h1>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="anim-fade-up flex items-center gap-3">
+        <span className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
+          <Globe size={19} weight="fill" />
+        </span>
+        <div>
+          <p className="ui-mono-label mb-1">Admin · Settings</p>
+          <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>OTA Integrations</h1>
+        </div>
       </div>
 
       {/* Channel Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-[color:var(--border)]">
+      <div className="anim-fade-up anim-d1 ui-seg">
         {CHANNELS.map(c => {
           const s = statuses[c.key];
           return (
-            <button key={c.key} onClick={() => setActiveTab(c.key)}
-              className={"px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px " +
-                (activeTab === c.key
-                  ? "border-[color:var(--accent)] text-[color:var(--accent)]"
-                  : "border-transparent text-[color:var(--textMuted)] hover:text-[color:var(--text)]")}>
+            <button key={c.key} type="button" onClick={() => setActiveTab(c.key)} className="ui-seg-item" data-active={activeTab === c.key}>
               {c.label}
-              {s?.enabled && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-emerald-500" />}
+              {s?.enabled && <span className="h-[5px] w-[5px] rounded-full" style={{ background: "var(--ck-success)" }} aria-hidden="true" />}
             </button>
           );
         })}
       </div>
 
-      {/* Credentials */}
-      <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-        <h2 className="font-semibold text-[color:var(--text)] mb-4">{ch.label} Credentials</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.primaryCredLabel}</label>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={status?.configured ? "••••••• (saved)" : "Paste your " + ch.primaryCredLabel}
-              className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-          </div>
-          {ch.secondaryCredLabel && (
+      <div className="anim-fade-up anim-d2 space-y-6">
+        {/* Credentials */}
+        <section className="ui-card p-5">
+          <h2 className="text-[15px] font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>{ch.label} Credentials</h2>
+          <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.secondaryCredLabel}</label>
-              <input type="password" value={apiSecret} onChange={e => setApiSecret(e.target.value)} placeholder={status?.secret_configured ? "••••••• (saved)" : "Paste your " + ch.secondaryCredLabel}
-                className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
+              <label className="text-xs font-medium mb-1 block" style={{ color: "var(--ck-text-muted)" }}>{ch.primaryCredLabel}</label>
+              <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={status?.configured ? "••••••• (saved)" : "Paste your " + ch.primaryCredLabel}
+                className="ui-control w-full" />
             </div>
-          )}
-          <div>
-            <label className="text-xs font-medium text-[color:var(--textMuted)] mb-1 block">{ch.webhookSecretLabel}</label>
-            <input type="password" value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={status?.webhook_configured ? "••••••• (saved)" : "Paste webhook secret"}
-              className="w-full px-3 py-2 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-          </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-[color:var(--text)] cursor-pointer" onClick={toggleTestMode}>
-              {testMode ? <ToggleRight size={24} weight="fill" className="text-amber-500" /> : <ToggleLeft size={24} className="text-[color:var(--textMuted)]" />}
-              {testMode ? "Sandbox mode" : "Production mode"}
-            </label>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={saveCredentials} disabled={saving || !apiKey.trim()}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-[color:var(--accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-              {saving ? "Saving..." : "Save Credentials"}
-            </button>
-            {status?.configured && (
-              <button onClick={toggleEnabled}
-                className={"px-4 py-2 text-sm font-semibold rounded-lg border transition-colors " + (status.enabled ? "border-red-300 text-red-600 hover:bg-red-50" : "border-emerald-300 text-emerald-600 hover:bg-emerald-50")}>
-                {status.enabled ? "Disable Integration" : "Enable Integration"}
-              </button>
-            )}
-          </div>
-          {msg && <p className={"text-sm mt-1 " + (msg.includes("saved") ? "text-emerald-600" : "text-red-500")}>{msg}</p>}
-        </div>
-      </section>
-
-      {/* Webhook URL */}
-      {status?.configured && (
-        <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-          <h2 className="font-semibold text-[color:var(--text)] mb-2">Webhook URL</h2>
-          <p className="text-xs text-[color:var(--textMuted)] mb-2">Paste this into your {ch.label} partner portal webhook settings:</p>
-          <code className="block text-xs bg-[color:var(--surface2)] rounded-lg p-3 break-all text-[color:var(--text)] select-all">{webhookUrl}</code>
-        </section>
-      )}
-
-      {/* Sync Status */}
-      {status?.configured && (
-        <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-          <h2 className="font-semibold text-[color:var(--text)] mb-3">Availability Sync</h2>
-          <div className="flex items-center gap-3 text-sm">
-            {status.last_sync_status === "ok" ? (
-              <span className="flex items-center gap-1.5 text-emerald-600"><Check size={16} weight="bold" /> Last sync succeeded</span>
-            ) : status.last_sync_status === "error" ? (
-              <span className="flex items-center gap-1.5 text-red-500"><Warning size={16} weight="bold" /> Last sync failed</span>
-            ) : (
-              <span className="text-[color:var(--textMuted)]">No sync yet</span>
-            )}
-            {status.last_sync_at && <span className="text-xs text-[color:var(--textMuted)]">{new Date(status.last_sync_at).toLocaleString()}</span>}
-          </div>
-          {status.last_sync_error && <p className="text-xs text-red-500 mt-1">{status.last_sync_error}</p>}
-          <p className="text-xs text-[color:var(--textMuted)] mt-2">{ch.syncNote}</p>
-        </section>
-      )}
-
-      {/* Product Mappings */}
-      <section className="bg-[color:var(--surface)] rounded-xl border border-[color:var(--border)] p-5 mb-6">
-        <h2 className="font-semibold text-[color:var(--text)] mb-4">Tour ↔ {ch.label} Product Mappings</h2>
-
-        {mappings.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {mappings.map(m => (
-              <div key={m.id} className={"flex items-center gap-3 p-3 rounded-lg border transition-colors " + (m.enabled ? "border-[color:var(--border)] bg-[color:var(--surface2)]" : "border-dashed border-[color:var(--border)] opacity-60")}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[color:var(--text)] truncate">{tourMap[m.tour_id] || m.tour_id}</p>
-                  <p className="text-xs text-[color:var(--textMuted)]">
-                    {m.external_product_code}{m.external_option_code ? " / " + m.external_option_code : ""}
-                    {m.default_markup_pct > 0 ? " · +" + m.default_markup_pct + "% markup" : ""}
-                  </p>
-                  {m.notes && <p className="text-xs text-[color:var(--textMuted)] italic mt-0.5">{m.notes}</p>}
-                </div>
-                <button onClick={() => toggleMapping(m.id, !m.enabled)} className="text-xs px-2 py-1 rounded border border-[color:var(--border)] text-[color:var(--textMuted)] hover:text-[color:var(--text)]">
-                  {m.enabled ? "Disable" : "Enable"}
-                </button>
-                <button onClick={() => deleteMapping(m.id)} className="text-red-400 hover:text-red-600"><Trash size={16} /></button>
+            {ch.secondaryCredLabel && (
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: "var(--ck-text-muted)" }}>{ch.secondaryCredLabel}</label>
+                <input type="password" value={apiSecret} onChange={e => setApiSecret(e.target.value)} placeholder={status?.secret_configured ? "••••••• (saved)" : "Paste your " + ch.secondaryCredLabel}
+                  className="ui-control w-full" />
               </div>
-            ))}
+            )}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: "var(--ck-text-muted)" }}>{ch.webhookSecretLabel}</label>
+              <input type="password" value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={status?.webhook_configured ? "••••••• (saved)" : "Paste webhook secret"}
+                className="ui-control w-full" />
+            </div>
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={toggleTestMode} className="flex items-center gap-2 text-sm" style={{ color: "var(--ck-text)" }}>
+                {testMode ? <ToggleRight size={24} weight="fill" style={{ color: "var(--ck-amber)" }} /> : <ToggleLeft size={24} style={{ color: "var(--ck-text-muted)" }} />}
+                {testMode ? "Sandbox mode" : "Production mode"}
+              </button>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={saveCredentials} disabled={saving || !apiKey.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
+                {saving ? "Saving..." : "Save Credentials"}
+              </button>
+              {status?.configured && (
+                <button onClick={toggleEnabled} className={`ui-btn ${status.enabled ? "ui-btn-danger" : "ui-btn-soft"}`}>
+                  {status.enabled ? "Disable Integration" : "Enable Integration"}
+                </button>
+              )}
+            </div>
+            {msg && <p className="text-sm mt-1" style={{ color: msg.includes("saved") ? "var(--ck-success)" : "var(--ck-danger)" }}>{msg}</p>}
           </div>
+        </section>
+
+        {/* Webhook URL */}
+        {status?.configured && (
+          <section className="ui-card p-5">
+            <h2 className="text-[15px] font-semibold mb-2" style={{ color: "var(--ck-text-strong)" }}>Webhook URL</h2>
+            <p className="text-xs mb-2" style={{ color: "var(--ck-text-muted)" }}>Paste this into your {ch.label} partner portal webhook settings:</p>
+            <code className="block text-xs rounded-lg p-3 break-all select-all" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-strong)" }}>{webhookUrl}</code>
+          </section>
         )}
 
-        <div className="border border-dashed border-[color:var(--border)] rounded-lg p-4">
-          <p className="text-xs font-semibold text-[color:var(--textMuted)] mb-3 flex items-center gap-1.5"><Plus size={14} /> Add Mapping</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Tour</label>
-              <select value={addForm.tour_id} onChange={e => setAddForm({ ...addForm, tour_id: e.target.value })}
-                className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]">
-                <option value="">Select tour...</option>
-                {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+        {/* Sync Status */}
+        {status?.configured && (
+          <section className="ui-card p-5">
+            <h2 className="text-[15px] font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Availability Sync</h2>
+            <div className="flex items-center gap-3 text-sm">
+              {status.last_sync_status === "ok" ? (
+                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-success)" }}><Check size={16} weight="bold" /> Last sync succeeded</span>
+              ) : status.last_sync_status === "error" ? (
+                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-danger)" }}><Warning size={16} weight="bold" /> Last sync failed</span>
+              ) : (
+                <span style={{ color: "var(--ck-text-muted)" }}>No sync yet</span>
+              )}
+              {status.last_sync_at && <span className="text-xs font-mono" style={{ color: "var(--ck-text-muted)" }}>{new Date(status.last_sync_at).toLocaleString()}</span>}
             </div>
-            <div>
-              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">{ch.label} Product Code</label>
-              <input value={addForm.external_product_code} onChange={e => setAddForm({ ...addForm, external_product_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. 12345P3" : "e.g. 98765"}
-                className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-            </div>
-            <div>
-              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Option Code (optional)</label>
-              <input value={addForm.external_option_code} onChange={e => setAddForm({ ...addForm, external_option_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. TG1" : "e.g. 12345"}
-                className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-            </div>
-            <div>
-              <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Markup %</label>
-              <input type="number" value={addForm.default_markup_pct} onChange={e => setAddForm({ ...addForm, default_markup_pct: e.target.value })} min="0" max="100" step="0.5"
-                className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <label className="text-xs text-[color:var(--textMuted)] mb-1 block">Notes (optional)</label>
-            <input value={addForm.notes} onChange={e => setAddForm({ ...addForm, notes: e.target.value })} placeholder="e.g. Half-day tour, morning departure"
-              className="w-full px-2 py-1.5 text-sm border border-[color:var(--border)] rounded-lg bg-[color:var(--surface2)] text-[color:var(--text)]" />
-          </div>
-          <button onClick={addMapping} disabled={addSaving || !addForm.tour_id || !addForm.external_product_code.trim()}
-            className="mt-3 px-4 py-2 text-sm font-semibold rounded-lg bg-[color:var(--accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity">
-            {addSaving ? "Adding..." : "Add Mapping"}
-          </button>
-        </div>
-      </section>
+            {status.last_sync_error && <p className="text-xs mt-1" style={{ color: "var(--ck-danger)" }}>{status.last_sync_error}</p>}
+            <p className="text-xs mt-2" style={{ color: "var(--ck-text-muted)" }}>{ch.syncNote}</p>
+          </section>
+        )}
 
-      {/* Status badges */}
-      {status && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className={"px-2 py-1 rounded-full border " + (status.configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
+        {/* Product Mappings */}
+        <section className="ui-card p-5">
+          <h2 className="text-[15px] font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Tour ↔ {ch.label} Product Mappings</h2>
+
+          {mappings.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {mappings.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border transition-colors" style={{ borderColor: "var(--ck-border-subtle)", background: m.enabled ? "var(--ck-surface-sunken)" : "transparent", borderStyle: m.enabled ? "solid" : "dashed", opacity: m.enabled ? 1 : 0.6 }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--ck-text-strong)" }}>{tourMap[m.tour_id] || m.tour_id}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                      {m.external_product_code}{m.external_option_code ? " / " + m.external_option_code : ""}
+                      {m.default_markup_pct > 0 ? " · +" + m.default_markup_pct + "% markup" : ""}
+                    </p>
+                    {m.notes && <p className="text-xs italic mt-0.5" style={{ color: "var(--ck-text-muted)" }}>{m.notes}</p>}
+                  </div>
+                  <button onClick={() => toggleMapping(m.id, !m.enabled)} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-[11px]">
+                    {m.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button onClick={() => deleteMapping(m.id)} className="transition-colors" style={{ color: "var(--ck-text-muted)" }} onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ck-danger)")} onMouseLeave={(e) => (e.currentTarget.style.color = "var(--ck-text-muted)")}>
+                    <Trash size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-lg p-4 border" style={{ borderColor: "var(--ck-border-subtle)", borderStyle: "dashed", background: "var(--ck-surface-sunken)" }}>
+            <p className="text-xs font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--ck-text-muted)" }}><Plus size={14} /> Add Mapping</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>Tour</label>
+                <select value={addForm.tour_id} onChange={e => setAddForm({ ...addForm, tour_id: e.target.value })} className="ui-control w-full">
+                  <option value="">Select tour...</option>
+                  {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>{ch.label} Product Code</label>
+                <input value={addForm.external_product_code} onChange={e => setAddForm({ ...addForm, external_product_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. 12345P3" : "e.g. 98765"}
+                  className="ui-control w-full" />
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>Option Code (optional)</label>
+                <input value={addForm.external_option_code} onChange={e => setAddForm({ ...addForm, external_option_code: e.target.value })} placeholder={activeTab === "VIATOR" ? "e.g. TG1" : "e.g. 12345"}
+                  className="ui-control w-full" />
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>Markup %</label>
+                <input type="number" value={addForm.default_markup_pct} onChange={e => setAddForm({ ...addForm, default_markup_pct: e.target.value })} min="0" max="100" step="0.5"
+                  className="ui-control w-full" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>Notes (optional)</label>
+              <input value={addForm.notes} onChange={e => setAddForm({ ...addForm, notes: e.target.value })} placeholder="e.g. Half-day tour, morning departure"
+                className="ui-control w-full" />
+            </div>
+            <button onClick={addMapping} disabled={addSaving || !addForm.tour_id || !addForm.external_product_code.trim()} className="ui-btn ui-btn-primary mt-3 disabled:opacity-50">
+              {addSaving ? "Adding..." : "Add Mapping"}
+            </button>
+          </div>
+        </section>
+
+        {/* Status badges */}
+        {status && (
+          <div className="flex flex-wrap gap-2">
             {/* AG8 fix: previously .split(" ")[0] which produced "Client: not set"
                 for both pills on the GYG tab (since both labels start with "Client").
                 Strip just the parenthetical so "API Key (exp-api-key)" trims to
                 "API Key" while "Client ID" and "Client Secret" stay distinct. */}
-            {ch.primaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.configured ? "configured" : "not set"}
-          </span>
-          {ch.secondaryCredLabel && (
-            <span className={"px-2 py-1 rounded-full border " + (status.secret_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
-              {ch.secondaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.secret_configured ? "configured" : "not set"}
+            <span className={`ui-status ${status.configured ? "ui-pill-success" : "ui-pill-neutral"}`}>
+              {ch.primaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.configured ? "configured" : "not set"}
             </span>
-          )}
-          <span className={"px-2 py-1 rounded-full border " + (status.webhook_configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500")}>
-            Webhook: {status.webhook_configured ? "configured" : "not set"}
-          </span>
-          <span className={"px-2 py-1 rounded-full border " + (status.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
-            {status.enabled ? "Enabled" : "Disabled"}
-          </span>
-          <span className={"px-2 py-1 rounded-full border " + (status.test_mode ? "border-amber-200 bg-amber-50 text-amber-700" : "border-blue-200 bg-blue-50 text-blue-700")}>
-            {status.test_mode ? "Sandbox" : "Production"}
-          </span>
-        </div>
-      )}
+            {ch.secondaryCredLabel && (
+              <span className={`ui-status ${status.secret_configured ? "ui-pill-success" : "ui-pill-neutral"}`}>
+                {ch.secondaryCredLabel.replace(/\s*\([^)]*\)\s*$/, "")}: {status.secret_configured ? "configured" : "not set"}
+              </span>
+            )}
+            <span className={`ui-status ${status.webhook_configured ? "ui-pill-success" : "ui-pill-neutral"}`}>
+              Webhook: {status.webhook_configured ? "configured" : "not set"}
+            </span>
+            <span className={`ui-status ${status.enabled ? "ui-pill-success" : "ui-pill-warning"}`}>
+              {status.enabled ? "Enabled" : "Disabled"}
+            </span>
+            <span className={`ui-status ${status.test_mode ? "ui-pill-amber" : "ui-pill-ocean"}`}>
+              {status.test_mode ? "Sandbox" : "Production"}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

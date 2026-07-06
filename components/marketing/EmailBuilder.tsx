@@ -145,11 +145,11 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
       {/* Template meta */}
       <div className="grid gap-3 sm:grid-cols-3">
         <input placeholder="Template name *" value={name} onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+          className="ui-control" />
         <input placeholder="Subject line" value={subject} onChange={(e) => setSubject(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+          className="ui-control" />
         <select value={category} onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }}>
+          className="ui-control">
           <option value="general">General</option>
           <option value="promotional">Promotional</option>
           <option value="newsletter">Newsletter</option>
@@ -163,41 +163,26 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Add block:</span>
         {BLOCK_DEFS.map((def) => (
           <button key={def.type} onClick={() => addBlock(def.type)}
-            className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+            className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
             {def.icon} {def.label}
           </button>
         ))}
 
         <div className="ml-auto flex gap-2">
           {preview && (
-            <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--ck-border)" }}>
-              <button
-                onClick={() => setPreviewMode("desktop")}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium"
-                style={{
-                  background: previewMode === "desktop" ? "var(--ck-accent)" : "transparent",
-                  color: previewMode === "desktop" ? "#fff" : "var(--ck-text)",
-                }}
-              >
+            <div className="ui-seg">
+              <button onClick={() => setPreviewMode("desktop")} className="ui-seg-item" data-active={previewMode === "desktop"}>
                 <Monitor size={12} /> Desktop
               </button>
-              <button
-                onClick={() => setPreviewMode("mobile")}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium"
-                style={{
-                  background: previewMode === "mobile" ? "var(--ck-accent)" : "transparent",
-                  color: previewMode === "mobile" ? "#fff" : "var(--ck-text)",
-                }}
-              >
+              <button onClick={() => setPreviewMode("mobile")} className="ui-seg-item" data-active={previewMode === "mobile"}>
                 <DeviceMobile size={12} /> Mobile
               </button>
             </div>
           )}
-          <button onClick={() => setPreview(!preview)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+          <button onClick={() => setPreview(!preview)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
             {preview ? <><Code size={12} /> Editor</> : <><Eye size={12} /> Preview</>}
           </button>
-          <button onClick={handleSave} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+          <button onClick={handleSave} className="ui-btn ui-btn-primary !h-8 !px-3 text-xs gap-1">
             <FloppyDisk size={12} /> Save Template
           </button>
         </div>
@@ -207,15 +192,15 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
       <div className="text-xs flex flex-wrap gap-x-3 gap-y-1" style={{ color: "var(--ck-text-muted)" }}>
         <span>Variables:</span>
         {["{first_name}", "{last_name}", "{email}", "{promo_code}", "{promo_discount}", "{voucher_code}", "{voucher_amount}"].map((v) => (
-          <code key={v} className="rounded bg-gray-100 px-1 py-0.5 text-[11px] cursor-pointer hover:bg-gray-200" onClick={() => navigator.clipboard.writeText(v)}>{v}</code>
+          <code key={v} className="rounded bg-[var(--ck-surface-sunken)] px-1 py-0.5 text-[11px] text-[var(--ck-text)] cursor-pointer transition-colors hover:bg-[var(--ck-accent-soft)]" onClick={() => navigator.clipboard.writeText(v)}>{v}</code>
         ))}
         <span className="text-[10px] opacity-60">(click to copy)</span>
       </div>
 
       {preview ? (
         /* Preview */
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border)", background: "#f3f4f6" }}>
-          <div className="p-2 text-xs font-medium" style={{ background: "var(--ck-surface)", color: "var(--ck-text-muted)", borderBottom: "1px solid var(--ck-border)" }}>
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)", background: "#f3f4f6" }}>
+          <div className="p-2 text-xs font-medium" style={{ background: "var(--ck-surface)", color: "var(--ck-text-muted)", borderBottom: "1px solid var(--ck-border-subtle)" }}>
             Preview ({previewMode === "desktop" ? "Desktop 600px" : "Mobile 375px"}) — Subject: {subject || "(none)"}
           </div>
           <div className="flex justify-center p-4" style={{ background: "#e5e7eb" }}>
@@ -237,7 +222,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         /* Block editor */
         <div className="space-y-2">
           {blocks.length === 0 && (
-            <div className="rounded-xl border border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border)" }}>
+            <div className="rounded-xl border border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
               <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Add a block to start building your email.</p>
             </div>
           )}
@@ -246,8 +231,8 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
             <div
               key={block.id}
               onDragOver={(e) => handleDragOver(e, index)}
-              className={`group rounded-xl border p-3 transition-colors ${dragIndex === index ? "ring-2 ring-blue-400" : ""}`}
-              style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+              className={`group rounded-xl border p-3 transition-colors bg-[var(--ck-surface)] hover:bg-[var(--ck-surface-sunken)] ${dragIndex === index ? "ring-2 ring-[var(--ck-accent)]" : ""}`}
+              style={{ borderColor: "var(--ck-border-subtle)" }}
             >
               <div className="flex items-start gap-2">
                 {/* Drag handle + controls */}
@@ -256,14 +241,15 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
                     draggable
                     onDragStart={() => handleDragStart(index)}
                     onDragEnd={handleDragEnd}
-                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-bg-subtle)]"
+                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-surface-sunken)]"
                     title="Drag to reorder"
+                    style={{ color: "var(--ck-text-muted)" }}
                   >
                     <DotsSixVertical size={14} />
                   </div>
-                  <button onClick={() => moveBlock(index, -1)} disabled={index === 0}><ArrowUp size={12} /></button>
-                  <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}><ArrowDown size={12} /></button>
-                  <button onClick={() => removeBlock(block.id)} className="text-red-500 mt-1"><Trash size={12} /></button>
+                  <button onClick={() => moveBlock(index, -1)} disabled={index === 0} className="rounded p-0.5 transition-colors hover:bg-[var(--ck-surface-sunken)] disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}><ArrowUp size={12} /></button>
+                  <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} className="rounded p-0.5 transition-colors hover:bg-[var(--ck-surface-sunken)] disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}><ArrowDown size={12} /></button>
+                  <button onClick={() => removeBlock(block.id)} className="rounded p-0.5 mt-1 transition-colors hover:bg-[var(--ck-danger-soft)]" style={{ color: "var(--ck-danger)" }}><Trash size={12} /></button>
                 </div>
 
                 {/* Block content */}

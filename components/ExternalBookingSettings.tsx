@@ -389,7 +389,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
               One shared webhook endpoint serves every business. Incoming `x-api-key` resolves the correct business automatically.
             </p>
           </div>
-          <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg-subtle)] px-3 py-2 text-xs text-[var(--ck-text-muted)]">
+          <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] px-3 py-2 text-xs text-[var(--ck-text-muted)]">
             Endpoint: <span className="font-medium text-[var(--ck-text-strong)]">/functions/v1/external-booking</span>
           </div>
         </div>

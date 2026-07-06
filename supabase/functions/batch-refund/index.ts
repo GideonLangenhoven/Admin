@@ -1,7 +1,7 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getAdminAppOrigins } from "../_shared/tenant.ts";
+import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -11,7 +11,7 @@ const supabase = createServiceClient();
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
   const origin = req?.headers?.get("origin") || "";
-  const allowed = origins.includes(origin) ? origin : origins[0];
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 

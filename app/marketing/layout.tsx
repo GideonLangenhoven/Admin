@@ -16,12 +16,13 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="max-w-7xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Marketing</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>Email campaigns, contacts, and templates</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Growth</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Marketing</h1>
+        <p className="text-sm mt-2" style={{ color: "var(--ck-text-muted)" }}>Email campaigns, contacts, and templates</p>
       </div>
 
-      <nav className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border)" }}>
+      <nav className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
         {tabs.map((t) => {
           const isActive = t.exact ? pathname === t.href : pathname.startsWith(t.href);
           const Icon = t.icon;
@@ -32,11 +33,11 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 isActive
                   ? "border-[var(--ck-accent)] text-[var(--ck-accent)]"
-                  : "border-transparent hover:border-gray-300"
+                  : "border-transparent hover:border-[var(--ck-border-strong)]"
               }`}
               style={isActive ? {} : { color: "var(--ck-text-muted)" }}
             >
-              <Icon size={16} />
+              <Icon size={16} weight={isActive ? "fill" : "regular"} />
               {t.label}
             </Link>
           );

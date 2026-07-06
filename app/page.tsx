@@ -7,8 +7,9 @@ import { useBusinessContext } from "../components/BusinessContext";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
-    Plus, CaretLeft, CaretRight,
-    CheckCircle, GearSix, X, Trash, MapPin, ArrowsClockwise
+    Plus, CaretLeft, CaretRight, ArrowUpRight, Check,
+    CheckCircle, GearSix, X, Trash, MapPin, ArrowsClockwise,
+    CurrencyCircleDollar, ChatText, Camera, CalendarBlank,
 } from "@phosphor-icons/react";
 
 /* ── helpers ── */
@@ -19,25 +20,29 @@ function fmtTime(iso: string) {
     });
 }
 
+function localDayKey(d: Date) {
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
 type WeatherLocation = { id: string; name: string; lat: number; lon: number; wgSpot?: number; isDefault?: boolean; };
 
 /* ── preset locations ── */
 const DEFAULT_LOCATIONS: WeatherLocation[] = [
     { id: "1", name: "Three Anchor Bay, Sea Point", lat: -33.908, lon: 18.396, wgSpot: 137629, isDefault: true },
-    { id: "2", name: "Simon's Town", lat: -34.19, lon: 18.45, wgSpot: 20 },
-    { id: "3", name: "Hout Bay", lat: -34.05, lon: 18.35, wgSpot: 12 },
-    { id: "4", name: "Table Bay", lat: -33.90, lon: 18.43, wgSpot: 9 },
-    { id: "5", name: "False Bay (Muizenberg)", lat: -34.10, lon: 18.47, wgSpot: 11 },
-    { id: "6", name: "Kalk Bay", lat: -34.13, lon: 18.45, wgSpot: 20 },
-    { id: "7", name: "Cape Point", lat: -34.35, lon: 18.50, wgSpot: 10 },
-    { id: "8", name: "Camps Bay", lat: -33.95, lon: 18.38, wgSpot: 7 },
-    { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 18 },
+    { id: "2", name: "Simon's Town", lat: -34.19, lon: 18.45, wgSpot: 115767 },
+    { id: "3", name: "Hout Bay", lat: -34.05, lon: 18.35, wgSpot: 51651 },
+    { id: "4", name: "Table Bay", lat: -33.90, lon: 18.43, wgSpot: 32831 },
+    { id: "5", name: "False Bay (Muizenberg)", lat: -34.10, lon: 18.47, wgSpot: 131594 },
+    { id: "6", name: "Kalk Bay", lat: -34.13, lon: 18.45, wgSpot: 551041 },
+    { id: "7", name: "Cape Point", lat: -34.35, lon: 18.50, wgSpot: 128493 },
+    { id: "8", name: "Camps Bay", lat: -33.95, lon: 18.38, wgSpot: 635326 },
+    { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 331265 },
 ];
 
 /* ── Windguru Widget (lazy-loaded to reduce initial bundle) ── */
 const WindguruWidget = dynamic(() => import("../components/WindguruWidget"), {
     ssr: false,
-    loading: () => <div className="w-full min-h-[350px] flex items-center justify-center text-sm text-gray-400">Loading weather...</div>,
+    loading: () => <div className="w-full min-h-[350px] flex items-center justify-center text-sm" style={{ color: "var(--ck-text-muted)" }}>Loading weather...</div>,
 });
 
 /* ── types ── */
@@ -64,6 +69,68 @@ interface SlotSummary {
     bookings: ManifestBooking[];
 }
 
+/* ── decorative: topographic contour lines for the hero card ── */
+function TopoLines({ className = "" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 400 200" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <g stroke="#F4F1E8" strokeOpacity="0.07" strokeWidth="1">
+                <path d="M-20 150 C60 120, 90 170, 170 140 S 320 90, 420 130" />
+                <path d="M-20 165 C70 135, 100 185, 180 155 S 330 105, 420 145" />
+                <path d="M-20 180 C80 150, 110 200, 190 170 S 340 120, 420 160" />
+                <path d="M-20 40 C40 70, 130 10, 200 45 S 340 80, 420 30" />
+                <path d="M-20 25 C50 55, 140 -5, 210 30 S 350 65, 420 15" />
+                <circle cx="330" cy="52" r="26" strokeOpacity="0.09" />
+                <circle cx="330" cy="52" r="14" strokeOpacity="0.11" />
+            </g>
+        </svg>
+    );
+}
+
+/* ── decorative: the brand trail (amber start → destination ring) ── */
+function TrailMotif({ className = "" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M12 50 C30 52, 18 22, 44 18" stroke="#F4F1E8" strokeOpacity="0.35" strokeWidth="2.6" strokeLinecap="round" strokeDasharray="0.1 6.5" />
+            <circle cx="12" cy="50" r="3.2" fill="#D9822F" />
+            <circle cx="48" cy="16" r="4" stroke="#F4F1E8" strokeOpacity="0.55" strokeWidth="2.2" />
+        </svg>
+    );
+}
+
+/* ── hand-rolled revenue sparkline — no chart dependency ── */
+function Sparkline({ data }: { data: number[] }) {
+    const series = data.length === 1 ? [0, ...data] : data;
+    if (series.length < 2) return null;
+    const w = 100, h = 34;
+    const max = Math.max(...series, 1);
+    const pts = series.map((v, i) => [
+        (i / (series.length - 1)) * w,
+        h - 3 - (v / max) * (h - 8),
+    ] as const);
+    const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(" ");
+    const area = `${line} L${w} ${h} L0 ${h} Z`;
+    const last = pts[pts.length - 1];
+    return (
+        <div className="relative w-full">
+            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-14 w-full">
+                <defs>
+                    <linearGradient id="rev-spark" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" style={{ stopColor: "var(--ck-accent)", stopOpacity: 0.20 }} />
+                        <stop offset="100%" style={{ stopColor: "var(--ck-accent)", stopOpacity: 0 }} />
+                    </linearGradient>
+                </defs>
+                <path d={area} fill="url(#rev-spark)" />
+                <path d={line} fill="none" style={{ stroke: "var(--ck-accent)" }} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+            <span
+                className="absolute h-2 w-2 rounded-full translate-x-1/2 -translate-y-1/2"
+                style={{ right: 0, top: `${(last[1] / h) * 100}%`, background: "var(--ck-amber-bright)", boxShadow: "0 0 0 3px var(--ck-amber-soft)" }}
+                aria-hidden="true"
+            />
+        </div>
+    );
+}
+
 /* ── main component ── */
 export default function Dashboard() {
     const { businessId } = useBusinessContext();
@@ -80,6 +147,7 @@ export default function Dashboard() {
     const [revToday, setRevToday] = useState(0);
     const [revWeek, setRevWeek] = useState(0);
     const [revMonth, setRevMonth] = useState(0);
+    const [revSeries, setRevSeries] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Roll call state
@@ -327,27 +395,21 @@ export default function Dashboard() {
             })).filter((b: any) => b.slots?.start_time);
         }
 
-        // Revenue window: pull all paid/confirmed bookings whose slot is in the
-        // current month, then bucket today / past 7d / this month client-side.
+        // Revenue window: pull all paid/confirmed bookings created since the
+        // earlier of month start / 7 days ago, then bucket today / past 7d /
+        // this month by payment (booking) date — money received, not trip date.
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         async function fetchMonthRevenueRows() {
-            const { data: slotRows } = await supabase.from("slots")
-                .select("id, start_time")
-                .eq("business_id", businessId)
-                .gte("start_time", monthStart.toISOString())
-                .lt("start_time", dayAfter.toISOString());
-            const slotIds = (slotRows || []).map((s: any) => s.id);
-            if (slotIds.length === 0) return [] as Array<{ total_amount: number; start_time: string }>;
-            const slotById = new Map((slotRows || []).map((s: any) => [s.id, s.start_time as string]));
+            const since = new Date(Math.min(monthStart.getTime(), Date.now() - 7 * 24 * 60 * 60 * 1000));
             const { data: bks } = await supabase.from("bookings")
-                .select("total_amount, status, slot_id")
+                .select("total_amount, created_at")
                 .eq("business_id", businessId)
                 .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
-                .in("slot_id", slotIds);
+                .gte("created_at", since.toISOString());
             return (bks || []).map((b: any) => ({
                 total_amount: Number(b.total_amount || 0),
-                start_time: slotById.get(b.slot_id) || "",
-            })).filter(r => r.start_time);
+                created_at: b.created_at as string,
+            }));
         }
 
         // Run ALL independent queries in parallel
@@ -386,21 +448,35 @@ export default function Dashboard() {
         const outstanding = (completedSlotsRes.data || []).filter((s: any) => !sentSlotIds.has(s.id));
         setPhotosOutstanding(outstanding.length);
 
-        // Revenue buckets — by trip date (matches "Today's Pax" semantics).
+        // Revenue buckets — by payment (booking) date.
         const todayMs = today.getTime();
         const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const tomorrowMs = tomorrow.getTime();
+        const monthStartMs = monthStart.getTime();
         let revT = 0, revW = 0, revM = 0;
+        const daily = new Map<string, number>();
         for (const row of revRows) {
-            const t = new Date(row.start_time).getTime();
+            const t = new Date(row.created_at).getTime();
             if (!Number.isFinite(t)) continue;
-            revM += row.total_amount;
-            if (t >= todayMs && t < tomorrowMs) revT += row.total_amount;
+            if (t >= todayMs) revT += row.total_amount;
             if (t >= weekAgoMs) revW += row.total_amount;
+            if (t >= monthStartMs) {
+                revM += row.total_amount;
+                const key = localDayKey(new Date(row.created_at));
+                daily.set(key, (daily.get(key) || 0) + row.total_amount);
+            }
         }
         setRevToday(revT);
         setRevWeek(revW);
         setRevMonth(revM);
+
+        // Sparkline series: month start → today, one bucket per local day
+        const series: number[] = [];
+        const cursor = new Date(monthStart);
+        while (cursor <= today && series.length < 62) {
+            series.push(daily.get(localDayKey(cursor)) || 0);
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        setRevSeries(series);
 
         setLoading(false);
     }
@@ -442,217 +518,252 @@ export default function Dashboard() {
 
     const activeSlot = slotGroups[activeSlotIdx] || null;
 
+    /* ── skeleton — mirrors the real layout, no spinners ── */
     if (loading) return (
-        <div className="flex h-64 items-center justify-center">
-            <div className="h-9 w-9 animate-spin rounded-full border-2 border-t-[var(--ck-accent)]" style={{ borderColor: "var(--ck-border-subtle)", borderTopColor: "var(--ck-accent)" }}></div>
+        <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
+            <div className="flex items-end justify-between gap-4 pt-2 mb-8">
+                <div className="space-y-2.5">
+                    <div className="ui-skeleton h-3 w-44" />
+                    <div className="ui-skeleton h-8 w-48" />
+                </div>
+                <div className="ui-skeleton h-9 w-36 !rounded-[10px]" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <div className="ui-skeleton h-[190px] lg:col-span-2 !rounded-2xl" />
+                <div className="ui-skeleton h-[190px] lg:col-span-3 !rounded-2xl" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="ui-skeleton h-[132px] !rounded-2xl" />
+                <div className="ui-skeleton h-[132px] !rounded-2xl" />
+                <div className="ui-skeleton h-[132px] !rounded-2xl" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="ui-skeleton h-[320px] !rounded-2xl" />
+                <div className="ui-skeleton h-[320px] !rounded-2xl" />
+            </div>
         </div>
     );
 
     return (
         <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
             {/* Dashboard Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pt-2">
+            <div className="anim-fade-up flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pt-2">
                 <div>
-                    <p className="ui-section-title mb-1.5">
+                    <p className="ui-mono-label mb-2">
                         {new Date(now).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: getAdminTimezone() })}
                     </p>
-                    <h2 className="font-display text-[2.1rem] md:text-[2.4rem] font-semibold leading-none text-gray-900">Dashboard</h2>
+                    <h2 className="font-display text-[28px] md:text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Dashboard</h2>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link href="/new-booking" className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 bg-bt-gradient shadow-sm">
-                        <Plus size={16} weight="bold" /> Add Booking
+                    <Link href="/new-booking" className="ui-btn ui-btn-primary">
+                        <Plus size={15} weight="bold" /> Add Booking
                     </Link>
                 </div>
             </div>
 
-            {/* Revenue at a glance — today, last 7 days, this month (PAID/CONFIRMED/COMPLETED, by trip date) */}
-            <Link href="/reports" className="block rounded-2xl bg-white border shadow-sm p-6 hover:-translate-y-0.5 transition-all">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="ui-section-title">Revenue</h3>
-                    <span className="text-[11px] text-gray-400">trip-date based · PAID/CONFIRMED/COMPLETED</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4 divide-x divide-gray-100">
-                    <div>
-                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Today</p>
-                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <div className="pl-4">
-                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Last 7 days</p>
-                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <div className="pl-4">
-                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">This month</p>
-                        <p className="font-display text-[30px] font-semibold text-gray-900 leading-tight mt-1">R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
-                    </div>
-                </div>
-            </Link>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Today Pax */}
-                <Link href="/bookings" className="block p-6 transition-all hover:-translate-y-1 relative group rounded-2xl shadow-sm bg-bt-gradient text-white">
-                    <div className="flex justify-between items-start mb-6">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/80">Today&apos;s Pax</span>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition-transform group-hover:scale-110">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div className="font-display text-[44px] font-semibold text-white mb-4 leading-none">
+            {/* ── Hero band: north-star pax + revenue with sparkline ── */}
+            <div className="anim-fade-up anim-d1 grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Today's Pax — the north-star number on the night surface */}
+                <Link href="/bookings" className="bg-bt-dark ui-card-hover group relative block overflow-hidden rounded-2xl p-6 lg:col-span-2 text-white" style={{ border: "1px solid rgba(244, 241, 232, 0.09)", boxShadow: "var(--ck-shadow-hero)" }}>
+                    <TopoLines className="absolute inset-0 h-full w-full" />
+                    <TrailMotif className="absolute right-5 top-5 h-14 w-14" />
+                    <div className="relative">
+                        <span className="ui-mono-label !text-white/60">Today&apos;s Pax</span>
+                        <div className="font-display mt-6 mb-4 text-[56px] font-semibold leading-none tabular-nums text-white">
                             {todayPax}
                         </div>
-                        <div className="flex items-center gap-2 text-[13px] text-white/85 font-medium">
-                            <span className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white bg-white/10 border border-white/20">
-                                <span className="h-1.5 w-1.5 rounded-full bg-[#D9822F]" aria-hidden="true" />
-                                {todayBookings} trips
-                            </span>
-                            <span>booked vs {tomorrowPax} tmrw</span>
+                        <div className="flex items-center gap-2 text-[12.5px] text-white/55">
+                            <span className="h-[5px] w-[5px] rounded-full bg-[#D9822F]" aria-hidden="true" />
+                            <span className="font-mono text-[12px] font-medium text-white/90">{todayBookings}</span>
+                            trips · {tomorrowPax} pax tomorrow
+                            <ArrowUpRight size={14} className="ml-auto text-white/35 transition-all group-hover:text-white/80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                         </div>
                     </div>
                 </Link>
 
-                {/* Refunds */}
-                <Link href="/refunds" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
-                    <div className="flex justify-between items-start mb-6">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Pending Refunds</span>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
+                {/* Revenue at a glance — today, last 7 days, this month + month sparkline */}
+                <Link href="/reports" className="ui-card ui-card-hover group block p-6 lg:col-span-3">
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="ui-mono-label">Revenue</h3>
+                        <span className="ui-mono-label !tracking-[0.06em] flex items-center gap-1.5 transition-colors group-hover:!text-[var(--ck-text-strong)]">
+                            View reports <ArrowUpRight size={12} />
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 divide-x" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                        <div className="pr-4">
+                            <p className="ui-mono-label !text-[10px]">Today</p>
+                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="px-4">
+                            <p className="ui-mono-label !text-[10px]">Last 7 days</p>
+                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="pl-4">
+                            <p className="ui-mono-label !text-[10px]">This month</p>
+                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
                         </div>
                     </div>
-                    <div>
-                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900">
-                            {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
+                    {revSeries.length > 0 && (
+                        <div className="mt-5 pt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                            <Sparkline data={revSeries} />
+                            <p className="ui-mono-label mt-1.5 !text-[9.5px]">This month, daily</p>
                         </div>
-                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
-                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 256 256"><path d="M213.66,165.66a8,8,0,0,1-11.32,0L128,91.31,53.66,165.66a8,8,0,0,1-11.32-11.32l80-80a8,8,0,0,1,11.32,0l80,80A8,8,0,0,1,213.66,165.66Z"></path></svg>
-                                {refundCount}
+                    )}
+                </Link>
+            </div>
+
+            {/* ── KPI row ── */}
+            <div className="anim-fade-up anim-d2 grid grid-cols-1 gap-6 sm:grid-cols-3">
+                {/* Refunds */}
+                <Link href="/refunds" className="ui-card ui-card-hover group block p-5">
+                    <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
+                                <CurrencyCircleDollar size={19} weight="fill" />
                             </span>
-                            <span>awaiting approval</span>
+                            <span className="ui-mono-label">Pending Refunds</span>
                         </div>
+                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
+                    </div>
+                    <div className="font-display mb-3 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                        {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
+                    </div>
+                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
+                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: refundCount > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
+                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{refundCount}</span>
+                        awaiting approval
                     </div>
                 </Link>
 
                 {/* Inbox */}
-                <Link href="/inbox" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
-                    <div className="flex justify-between items-start mb-6">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Inbox Action</span>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900 flex items-baseline gap-1.5">
-                            {inboxCount} <span className="text-[18px] text-gray-400 font-medium">msgs</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
-                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
-                                {inboxCount > 0 ? "Waiting" : "Clear"}
+                <Link href="/inbox" className="ui-card ui-card-hover group block p-5">
+                    <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
+                                <ChatText size={19} weight="fill" />
                             </span>
-                            <span>conversations</span>
+                            <span className="ui-mono-label">Inbox Action</span>
                         </div>
+                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
+                    </div>
+                    <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                        {inboxCount} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>msgs</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
+                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: inboxCount > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
+                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{inboxCount > 0 ? "waiting" : "clear"}</span>
+                        conversations
                     </div>
                 </Link>
 
                 {/* Photos */}
-                <Link href="/photos" className="block bg-white p-6 transition-all hover:-translate-y-1 group rounded-2xl shadow-sm border">
-                    <div className="flex justify-between items-start mb-6">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">Photos Out</span>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-400 group-hover:text-gray-600 group-hover:border-gray-300 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M196,64V168a12,12,0,0,1-24,0V93L76.49,188.49a12,12,0,0,1-17-17L155,76H88a12,12,0,0,1,0-24H184A12,12,0,0,1,196,64Z"></path></svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div className="font-display text-[44px] font-semibold mb-4 leading-none text-gray-900 flex items-baseline gap-1.5">
-                            {photosOutstanding} <span className="text-[18px] text-gray-400 font-medium">trips</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[13px] font-medium text-gray-500">
-                            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 256 256"><path d="M213.66,165.66a8,8,0,0,1-11.32,0L128,91.31,53.66,165.66a8,8,0,0,1-11.32-11.32l80-80a8,8,0,0,1,11.32,0l80,80A8,8,0,0,1,213.66,165.66Z"></path></svg>
-                                {photosOutstanding > 0 ? "Missing" : "Clear"}
+                <Link href="/photos" className="ui-card ui-card-hover group block p-5">
+                    <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <span className="ui-icon-chip" style={{ background: "rgba(62, 124, 166, 0.12)", color: "var(--ck-fjord)" }}>
+                                <Camera size={19} weight="fill" />
                             </span>
-                            <span>photo uploads</span>
+                            <span className="ui-mono-label">Photos Out</span>
                         </div>
+                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
+                    </div>
+                    <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                        {photosOutstanding} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>trips</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
+                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: photosOutstanding > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
+                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{photosOutstanding > 0 ? "missing" : "clear"}</span>
+                        photo uploads
                     </div>
                 </Link>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="anim-fade-up anim-d3 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* ── Today's Manifest (pax per slot) ── */}
-                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                        <div className="flex items-center gap-3">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>
-                                        {manifestDate === "TODAY" ? "Today's Manifest" : "Tomorrow's Manifest"}
-                                    </h3>
-                                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-                                        <button
-                                            onClick={() => { setManifestDate("TODAY"); setActiveSlotIdx(0); }}
-                                            className={`p-1 rounded transition-colors ${manifestDate === "TODAY" ? "bg-white dark:bg-gray-700 shadow-sm text-[var(--ck-accent)]" : "text-gray-400 hover:text-gray-600"}`}
-                                        >
-                                            <CaretLeft size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => { setManifestDate("TOMORROW"); setActiveSlotIdx(0); }}
-                                            className={`p-1 rounded transition-colors ${manifestDate === "TOMORROW" ? "bg-white dark:bg-gray-700 shadow-sm text-[var(--ck-accent)]" : "text-gray-400 hover:text-gray-600"}`}
-                                        >
-                                            <CaretRight size={16} />
-                                        </button>
-                                    </div>
+                <div className="ui-card flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>
+                                    Manifest
+                                </h3>
+                                <div className="ui-seg">
+                                    <button
+                                        type="button"
+                                        className="ui-seg-item"
+                                        data-active={manifestDate === "TODAY"}
+                                        onClick={() => { setManifestDate("TODAY"); setActiveSlotIdx(0); }}
+                                    >
+                                        Today
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ui-seg-item"
+                                        data-active={manifestDate === "TOMORROW"}
+                                        onClick={() => { setManifestDate("TOMORROW"); setActiveSlotIdx(0); }}
+                                    >
+                                        Tomorrow
+                                    </button>
                                 </div>
-                                <p className="text-[12px] font-medium" style={{ color: "var(--ck-text-muted)" }}>Pax breakdown per slot</p>
                             </div>
+                            <p className="ui-mono-label !text-[10px] mt-1">Pax per slot</p>
                         </div>
-                        <Link href="/new-booking" className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors shadow-sm hover:-translate-y-0.5" style={{ background: "var(--ck-accent)", color: "#fff" }}>
-                            <Plus size={14} /> Add Booking
+                        <Link href="/new-booking" className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px] hidden sm:inline-flex">
+                            <Plus size={13} weight="bold" /> Add Booking
                         </Link>
                     </div>
 
                     <div className="flex-1 overflow-x-auto">
                         {slotGroups.length === 0 ? (
-                            <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
-                                    {manifestDate === "TODAY" ? "No bookings today." : "No bookings tomorrow."}
+                            <div className="ui-empty">
+                                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
+                                <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+                                    {manifestDate === "TODAY" ? "No bookings today" : "No bookings tomorrow"}
                                 </p>
+                                <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>New bookings will appear here as they come in.</p>
                             </div>
                         ) : (
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr>
-                                        <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Time</th>
-                                        <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Tour</th>
-                                        <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Bookings</th>
-                                        <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Total Pax</th>
-                                        <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Checked In</th>
+                                        <th className="px-5 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Time</th>
+                                        <th className="px-5 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Tour</th>
+                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Bookings</th>
+                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Pax</th>
+                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Checked In</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                                     {slotGroups.map((slot, i) => {
                                         const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < now);
+                                        const complete = slot.checkedIn === slot.totalPax && slot.totalPax > 0;
+                                        const pct = slot.totalPax > 0 ? Math.round((slot.checkedIn / slot.totalPax) * 100) : 0;
                                         return (
                                             <tr
                                                 key={slot.timeRaw}
-                                                className="transition-colors cursor-pointer hover:bg-[var(--ck-surface-elevated)]"
+                                                className="transition-colors cursor-pointer hover:bg-[var(--ck-surface-sunken)]"
                                                 style={{ opacity: isPast ? 0.5 : 1 }}
                                                 onClick={() => { setActiveSlotIdx(i); setManualSlotNav(true); }}
                                             >
                                                 <td className="px-5 py-4">
-                                                    <div className="font-semibold text-[14px]" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</div>
+                                                    <div className="font-semibold text-[14px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</div>
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <div className="text-[13px] font-medium max-w-[120px] truncate" style={{ color: "var(--ck-text-muted)" }} title={slot.tourName}>{slot.tourName}</div>
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
-                                                    <div className="text-[13px] font-medium" style={{ color: "var(--ck-text)" }}>{slot.bookingCount}</div>
+                                                    <div className="text-[13px] font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>{slot.bookingCount}</div>
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
-                                                    <div className="font-bold text-[16px]" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax}</div>
+                                                    <div className="font-bold text-[16px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax}</div>
                                                 </td>
-                                                <td className="px-5 py-4 text-right">
-                                                    <span className={`inline-block rounded-full px-2.5 py-1 text-[12px] font-bold ${slot.checkedIn === slot.totalPax && slot.totalPax > 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                                                        {slot.checkedIn}/{slot.totalPax}
-                                                    </span>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center justify-end gap-2.5">
+                                                        <div className="ui-progress w-14 hidden sm:block"><div className="ui-progress-fill" style={{ width: `${pct}%` }} /></div>
+                                                        <span className={`ui-status ${complete ? "ui-pill-success" : "ui-pill-amber"}`}>
+                                                            {slot.checkedIn}/{slot.totalPax}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -661,13 +772,15 @@ export default function Dashboard() {
                                 <tfoot>
                                     <tr className="border-t-2" style={{ borderColor: "var(--ck-border-strong)" }}>
                                         <td colSpan={3} className="px-5 py-3 text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
-                                        <td className="px-5 py-3 text-right font-bold text-[16px]" style={{ color: "var(--ck-text-strong)" }}>
+                                        <td className="px-5 py-3 text-right font-bold text-[16px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                                             {manifestDate === "TODAY" ? todayPax : tomorrowPax}
                                         </td>
-                                        <td className="px-5 py-3 text-right">
-                                            <span className="inline-block rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: "var(--ck-surface-elevated)", color: "var(--ck-text-muted)" }}>
-                                                {activeManifest.filter(b => b.checked_in).reduce((s, b) => s + b.qty, 0)}/{manifestDate === "TODAY" ? todayPax : tomorrowPax}
-                                            </span>
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center justify-end">
+                                                <span className="ui-status ui-pill-neutral">
+                                                    {activeManifest.filter(b => b.checked_in).reduce((s, b) => s + b.qty, 0)}/{manifestDate === "TODAY" ? todayPax : tomorrowPax}
+                                                </span>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tfoot>
@@ -677,33 +790,31 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Roll Call ── */}
-                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                        <div className="flex items-center gap-3">
-                            <div>
-                                <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
-                                <p className="text-[12px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
-                                    {activeSlot ? `${activeSlot.time} — ${activeSlot.tourName}` : "No slots today"}
-                                </p>
-                            </div>
+                <div className="ui-card flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                        <div>
+                            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
+                            <p className="text-[12px] font-medium mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+                                {activeSlot ? `${activeSlot.time} — ${activeSlot.tourName}` : "No slots today"}
+                            </p>
                         </div>
                         {slotGroups.length > 1 && (
                             <div className="flex items-center gap-1.5">
                                 <button
                                     onClick={() => { setActiveSlotIdx(Math.max(0, activeSlotIdx - 1)); setManualSlotNav(true); }}
                                     disabled={activeSlotIdx === 0}
-                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30"
+                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
                                     <CaretLeft size={16} />
                                 </button>
-                                <span className="text-[12px] font-semibold px-2" style={{ color: "var(--ck-text-muted)" }}>
+                                <span className="font-mono text-[11.5px] font-semibold px-1.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
                                     {activeSlotIdx + 1} / {slotGroups.length}
                                 </span>
                                 <button
                                     onClick={() => { setActiveSlotIdx(Math.min(slotGroups.length - 1, activeSlotIdx + 1)); setManualSlotNav(true); }}
                                     disabled={activeSlotIdx >= slotGroups.length - 1}
-                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30"
+                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
                                     <CaretRight size={16} />
@@ -711,7 +822,7 @@ export default function Dashboard() {
                                 {manualSlotNav && (
                                     <button
                                         onClick={() => setManualSlotNav(false)}
-                                        className="ml-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shadow-sm bg-bt-gradient"
+                                        className="ui-btn ui-btn-soft ml-1 !h-7 !px-2.5 !text-[11px] font-mono uppercase tracking-[0.08em]"
                                         title="Resume auto-advance"
                                     >
                                         Auto
@@ -723,39 +834,47 @@ export default function Dashboard() {
 
                     <div className="flex-1 overflow-x-auto">
                         {!activeSlot ? (
-                            <div className="p-8 flex flex-col items-center justify-center text-center">
-                                <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>No bookings today.</p>
+                            <div className="ui-empty">
+                                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
+                                <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings today</p>
+                                <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Roll call opens when the first booking lands.</p>
                             </div>
                         ) : (
                             <>
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr>
-                                            <th className="w-10 px-3 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}></th>
-                                            <th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Customer</th>
-                                            <th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider border-b hidden sm:table-cell" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                                            <th className="px-4 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Pax</th>
-                                            <th className="px-4 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                                            <th className="w-12 px-3 py-3.5 text-center text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}></th>
+                                            <th className="px-4 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Customer</th>
+                                            <th className="px-4 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b hidden sm:table-cell" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                                            <th className="px-4 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Pax</th>
+                                            <th className="px-4 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                                         {activeSlot.bookings.map((b) => (
                                             <tr
                                                 key={b.id}
-                                                className="transition-colors hover:bg-[var(--ck-surface-elevated)]"
+                                                className="transition-colors hover:bg-[var(--ck-surface-sunken)]"
                                                 style={{ background: b.checked_in ? "var(--ck-success-soft)" : "" }}
                                             >
                                                 <td className="px-3 py-3.5 text-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={b.checked_in}
-                                                        onChange={() => toggleCheckIn(b.id, b.checked_in)}
-                                                        className="h-5 w-5 rounded border-2 cursor-pointer accent-emerald-600"
-                                                        style={{ borderColor: "var(--ck-border-strong)" }}
-                                                    />
+                                                    <button
+                                                        type="button"
+                                                        role="checkbox"
+                                                        aria-checked={b.checked_in}
+                                                        aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark ${b.customer_name} as present`}
+                                                        onClick={() => toggleCheckIn(b.id, b.checked_in)}
+                                                        className="mx-auto flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 transition-all"
+                                                        style={b.checked_in
+                                                            ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
+                                                            : { background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)" }}
+                                                    >
+                                                        {b.checked_in && <Check size={13} weight="bold" color="#ffffff" />}
+                                                    </button>
                                                 </td>
                                                 <td className="px-4 py-3.5">
-                                                    <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</div>
+                                                    <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</div>
                                                     {b.add_ons && b.add_ons.length > 0 && (
                                                         <div className="mt-1 flex flex-wrap gap-1">
                                                             {b.add_ons.map((ao, idx) => (
@@ -767,16 +886,16 @@ export default function Dashboard() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3.5 hidden sm:table-cell">
-                                                    <div className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</div>
+                                                    <div className="text-[13px] font-medium tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</div>
                                                 </td>
                                                 <td className="px-4 py-3.5 text-right">
-                                                    <div className="font-bold text-[14px]" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</div>
+                                                    <div className="font-bold text-[14px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</div>
                                                 </td>
                                                 <td className="px-4 py-3.5 text-right">
-                                                    <span className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                                                        b.checked_in ? "bg-emerald-50 text-emerald-700"
-                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "bg-[var(--ck-accent-soft)] text-[var(--ck-accent)]"
-                                                        : "bg-amber-50 text-amber-700"
+                                                    <span className={`ui-status ${
+                                                        b.checked_in ? "ui-pill-success"
+                                                        : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent"
+                                                        : "ui-pill-amber"
                                                     }`}>
                                                         {b.checked_in ? "Present" : b.status}
                                                     </span>
@@ -785,15 +904,21 @@ export default function Dashboard() {
                                         ))}
                                     </tbody>
                                 </table>
-                                <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                    <span className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>
-                                        {activeSlot.checkedIn} of {activeSlot.totalPax} pax checked in
-                                    </span>
-                                    {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 && (
-                                        <span className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--ck-success)" }}>
-                                            <CheckCircle size={14} /> All present
+                                <div className="px-5 py-3.5 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-[13px] font-medium shrink-0" style={{ color: "var(--ck-text-muted)" }}>
+                                            {activeSlot.checkedIn} of {activeSlot.totalPax} pax checked in
                                         </span>
-                                    )}
+                                        {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 ? (
+                                            <span className="flex items-center gap-1.5 text-[12px] font-bold shrink-0" style={{ color: "var(--ck-success)" }}>
+                                                <CheckCircle size={15} weight="fill" /> All present
+                                            </span>
+                                        ) : (
+                                            <div className="ui-progress w-28">
+                                                <div className="ui-progress-fill" style={{ width: `${activeSlot.totalPax > 0 ? Math.round((activeSlot.checkedIn / activeSlot.totalPax) * 100) : 0}%` }} />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </>
                         )}
@@ -803,13 +928,14 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 gap-6">
                 {/* ── Weather Block ── */}
-                <div className="bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                        <div className="flex items-center gap-3">
+                <div className="ui-card flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                        <div>
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
+                            <p className="ui-mono-label !text-[10px] mt-0.5">Wind &amp; sea conditions</p>
                         </div>
-                        <button onClick={() => setEditingLocs(!editingLocs)} className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold rounded-lg border transition-all hover:-translate-y-0.5" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)", background: "var(--ck-surface)" }}>
-                            Manage Locations <GearSix size={14} weight="bold" />
+                        <button onClick={() => setEditingLocs(!editingLocs)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
+                            Manage Locations <GearSix size={13} weight="bold" />
                         </button>
                     </div>
 
@@ -821,8 +947,8 @@ export default function Dashboard() {
                                     const loc = locations.find(l => l.id === e.target.value);
                                     if (loc) setLocation(loc);
                                 }}
-                                className="w-full px-4 py-2 text-[14px] font-medium border rounded-xl focus:outline-none transition-all appearance-none"
-                                style={{ color: "var(--ck-text-strong)", background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)", backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239CA3AF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem top 50%", backgroundSize: "0.65rem auto" }}
+                                className="ui-control w-full appearance-none !px-4 !py-2 text-[14px] font-medium"
+                                style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2366736B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem top 50%", backgroundSize: "0.65rem auto" }}
                                 disabled={locations.length === 0}
                             >
                                 {locations.length === 0 && <option value="">No locations available</option>}
@@ -834,7 +960,7 @@ export default function Dashboard() {
 
                         {/* Windguru */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
                                 <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` — ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setWgRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
@@ -860,7 +986,7 @@ export default function Dashboard() {
 
                         {/* Windy */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
                                 <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` — ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setWindyRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
@@ -885,22 +1011,22 @@ export default function Dashboard() {
                         </div>
 
                         {editingLocs && (
-                            <div className="absolute inset-0 z-20 backdrop-blur-sm p-5 flex flex-col rounded-b-xl" style={{ background: "color-mix(in srgb, var(--ck-surface) 95%, transparent)" }}>
+                            <div className="absolute inset-0 z-20 backdrop-blur-sm p-5 flex flex-col rounded-b-2xl" style={{ background: "color-mix(in srgb, var(--ck-surface) 95%, transparent)" }}>
                                 <div className="flex justify-between items-center mb-4">
                                     <h4 className="text-[14px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Manage Locations</h4>
-                                    <button onClick={() => setEditingLocs(false)} className="p-1.5 rounded-md transition-colors" style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
+                                    <button onClick={() => setEditingLocs(false)} className="p-1.5 rounded-md transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto pr-1 mb-4">
                                     <div className="space-y-2">
                                         {locations.map(l => (
-                                            <div key={l.id} className="flex items-center justify-between rounded-lg border p-3 shadow-sm text-sm" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)" }}>
+                                            <div key={l.id} className="flex items-center justify-between rounded-lg border p-3 text-sm" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)", boxShadow: "var(--ck-shadow-sm)" }}>
                                                 <div>
                                                     <span className="font-semibold text-[13px]" style={{ color: "var(--ck-text-strong)" }}>{l.name}</span>
-                                                    <div className="text-[11px] font-medium mt-0.5" style={{ color: "var(--ck-text-muted)" }}>{l.lat}, {l.lon} <span className="ml-2" style={{ color: "var(--ck-text-muted)" }}>WG: {l.wgSpot || "None"}</span></div>
+                                                    <div className="text-[11px] font-medium mt-0.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{l.lat}, {l.lon} <span className="ml-2">WG: {l.wgSpot || "None"}</span></div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    {l.isDefault && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wider uppercase" style={{ color: "var(--ck-success)", background: "var(--ck-success-soft)" }}>Default</span>}
-                                                    <button onClick={() => removeLocation(l.id)} className="transition-colors" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
+                                                    {l.isDefault && <span className="ui-status ui-pill-success">Default</span>}
+                                                    <button onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -909,17 +1035,17 @@ export default function Dashboard() {
                                 </div>
 
                                 <form onSubmit={handleAddLocation} className="border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                    <input required value={newLocName} onChange={e => setNewLocName(e.target.value)} onBlur={() => { if (newLocName.trim() && !newLocLat && !newLocLon) handleGeocode(); }} className="w-full border rounded-lg px-3 py-2 text-[13px] font-medium mb-2 focus:outline-none transition-colors" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Name (e.g. Cape Town)" />
+                                    <input required value={newLocName} onChange={e => setNewLocName(e.target.value)} onBlur={() => { if (newLocName.trim() && !newLocLat && !newLocLon) handleGeocode(); }} className="ui-control w-full text-[13px] font-medium mb-2" placeholder="Name (e.g. Cape Town)" />
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                                        <input required type="number" step="any" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-[13px] font-medium focus:outline-none transition-colors" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Lat (-33.9)" />
-                                        <input required type="number" step="any" value={newLocLon} onChange={e => setNewLocLon(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-[13px] font-medium focus:outline-none transition-colors" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Lon (18.4)" />
-                                        <input type="number" step="any" value={newLocWg} onChange={e => setNewLocWg(e.target.value)} className="w-full lg:col-span-2 border rounded-lg px-3 py-2 text-[13px] font-medium focus:outline-none transition-colors" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Windguru Spot ID (optional)" />
+                                        <input required type="number" step="any" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} className="ui-control w-full text-[13px] font-medium" placeholder="Lat (-33.9)" />
+                                        <input required type="number" step="any" value={newLocLon} onChange={e => setNewLocLon(e.target.value)} className="ui-control w-full text-[13px] font-medium" placeholder="Lon (18.4)" />
+                                        <input type="number" step="any" value={newLocWg} onChange={e => setNewLocWg(e.target.value)} className="ui-control w-full lg:col-span-2 text-[13px] font-medium" placeholder="Windguru Spot ID (optional)" />
                                     </div>
                                     <div className="flex gap-2">
-                                        <button type="button" onClick={handleGeocode} disabled={geocoding || !newLocName} className="px-4 rounded-lg py-2 text-[13px] font-medium transition-colors disabled:opacity-50 flex items-center justify-center" style={{ background: "var(--ck-surface-elevated)", color: "var(--ck-text)" }}>
+                                        <button type="button" onClick={handleGeocode} disabled={geocoding || !newLocName} className="ui-btn ui-btn-ghost !px-4" title="Look up coordinates">
                                             <MapPin size={16} />
                                         </button>
-                                        <button type="submit" className="flex-1 rounded-lg text-white py-2 text-[13px] font-medium transition-colors shadow-sm" style={{ background: "var(--ck-accent)" }}>
+                                        <button type="submit" disabled={savingLocations} className="ui-btn ui-btn-primary flex-1">
                                             Add Location
                                         </button>
                                     </div>

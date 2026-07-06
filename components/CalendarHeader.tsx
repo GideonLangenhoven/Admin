@@ -39,7 +39,7 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+    <div className="ui-card flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
       <div className="w-full md:w-auto">
         <div className="grid w-full grid-cols-2 rounded-lg bg-gray-100 p-1 md:flex md:w-auto">
           <button

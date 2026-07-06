@@ -73,6 +73,26 @@ export async function POST(req: NextRequest) {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {
             return NextResponse.json({ error: "Both WhatsApp Access Token and Phone Number ID are required." }, { status: 400 });
         }
+        // Validate against Meta BEFORE saving — a token that Meta rejects (expired,
+        // revoked, wrong phone id) would otherwise sit "✓ Configured" but fail
+        // every send with an opaque error later.
+        try {
+            const metaRes = await fetch(
+                "https://graph.facebook.com/v19.0/" + encodeURIComponent(wa_phone_id.trim()) + "?fields=display_phone_number",
+                { headers: { Authorization: "Bearer " + wa_token.trim() } },
+            );
+            const metaData: any = await metaRes.json().catch(() => ({}));
+            if (!metaRes.ok) {
+                const metaMsg = metaData?.error?.message || "Meta rejected the credentials.";
+                return NextResponse.json({
+                    error: "WhatsApp credentials rejected by Meta — nothing was saved. " + metaMsg +
+                        " Generate a fresh token in Meta (WhatsApp → API Setup) and check the Phone Number ID.",
+                }, { status: 400 });
+            }
+        } catch {
+            // Meta unreachable (network blip) — don't block the save on our outage.
+            console.warn("WA_CRED_VALIDATE_SKIPPED: Meta Graph unreachable");
+        }
         const { error: waErr } = await supabase.rpc("set_wa_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_wa_token: wa_token.trim(), p_wa_phone_id: wa_phone_id.trim(),
         });

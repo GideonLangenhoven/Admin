@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import { CaretLeft, CaretRight, Check, CloudRain, PaperPlaneTilt } from "@phosphor-icons/react";
 import { confirmAction } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
-const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
+const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="ui-skeleton h-40" /> });
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -306,60 +307,68 @@ export default function BroadcastsPage() {
 
   return (
     <div className="max-w-6xl">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Broadcasts</h1>
+      <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="ui-mono-label mb-2">Customer Messaging</p>
+          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Broadcasts</h1>
+        </div>
         <button onClick={() => { setWeatherMode(!weatherMode); setWeatherResult(null); }}
-          className={"w-full rounded-lg border px-4 py-2 text-sm font-semibold transition-colors sm:w-auto " + (weatherMode ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}>
-          {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
+          className={"ui-btn w-full sm:w-auto " + (weatherMode ? "ui-btn-danger" : "ui-btn-ghost")}>
+          <CloudRain size={15} /> {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="anim-fade-up anim-d1 grid gap-6 lg:grid-cols-12">
         {/* Calendar */}
         <div className="lg:col-span-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+          <div className="ui-card p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => { if (vMonth === 0) { setVMonth(11); setVYear(vYear - 1); } else setVMonth(vMonth - 1); }}
-                disabled={!canPrev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 disabled:opacity-20">◀</button>
-              <span className="text-sm font-semibold">{monthName}</span>
+                disabled={!canPrev} className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--ck-surface-sunken)] disabled:opacity-20" style={{ color: "var(--ck-text)" }} aria-label="Previous month"><CaretLeft size={14} /></button>
+              <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{monthName}</span>
               <button onClick={() => { if (vMonth === 11) { setVMonth(0); setVYear(vYear + 1); } else setVMonth(vMonth + 1); }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">▶</button>
+                className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text)" }} aria-label="Next month"><CaretRight size={14} /></button>
             </div>
             <div className="grid grid-cols-7 gap-1 mb-1">
-              {dayNames.map(d => <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>)}
+              {dayNames.map(d => <div key={d} className="ui-mono-label !text-[10px] text-center py-1">{d}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: firstDay }, (_, i) => <div key={"e" + i} />)}
               {cells.map(c => {
-                if (c.isPast || !c.hasSlots) return <div key={c.date} className="text-center py-2 text-sm text-gray-300 rounded-lg">{c.day}</div>;
+                if (c.isPast || !c.hasSlots) return <div key={c.date} className="text-center py-2 text-sm rounded-lg" style={{ color: "var(--ck-text-muted)", opacity: 0.5 }}>{c.day}</div>;
                 const isSelected = selectedDate === c.date;
                 const hasSelectedSlots = (slotsByDate[c.date] || []).some(s => selectedSlotIds.includes(s.id));
                 return (
                   <button key={c.date} onClick={() => { setSelectedDate(c.date); }}
                     className={"text-center py-2 text-sm font-semibold rounded-lg transition-colors relative " +
-                      (isSelected ? "bg-gray-900 text-white" : hasSelectedSlots ? "bg-blue-100 text-blue-800" : "text-gray-900 hover:bg-gray-100")}>
+                      (!isSelected && !hasSelectedSlots ? "hover:bg-[var(--ck-surface-sunken)]" : "")}
+                    style={
+                      isSelected ? { background: "var(--ck-accent)", color: "var(--ck-btn-primary-text)" }
+                      : hasSelectedSlots ? { background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }
+                      : { color: "var(--ck-text-strong)" }
+                    }>
                     {c.day}
                     {c.bookCount > 0 && !isSelected && (
-                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] text-emerald-600 font-bold">{c.bookCount}</span>
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{c.bookCount}</span>
                     )}
                     {c.bookCount === 0 && !isSelected && (
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gray-300"></span>
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ background: "var(--ck-border-strong)" }}></span>
                     )}
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-gray-400 text-center mt-2">Numbers = booked guests</p>
+            <p className="ui-mono-label !text-[10px] !tracking-[0.06em] text-center mt-2 normal-case">Numbers = booked guests</p>
           </div>
 
           {/* Slots for selected date */}
           {selectedDate && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="ui-card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">
+                <h3 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>
                   {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}
                 </h3>
-                <button onClick={selectAllDate} className="text-xs text-blue-600 font-medium hover:text-blue-800">
+                <button onClick={selectAllDate} className="text-xs font-medium transition-colors hover:opacity-80" style={{ color: "var(--ck-accent)" }}>
                   {dateSlots.every(s => selectedSlotIds.includes(s.id)) ? "Deselect All" : "Select All"}
                 </button>
               </div>
@@ -369,22 +378,26 @@ export default function BroadcastsPage() {
                   const booked = s.booked;
                   return (
                     <button key={s.id} onClick={() => toggleSlot(s.id)}
-                      className={"w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-colors " +
-                        (isSelected ? "border-blue-400 bg-blue-50" : "border-gray-100 hover:border-gray-200")}>
-                      <span className={"w-5 h-5 rounded border-2 flex items-center justify-center text-xs font-bold " +
-                        (isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300")}>
-                        {isSelected ? "✓" : ""}
+                      className="w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-colors"
+                      style={isSelected
+                        ? { borderColor: "var(--ck-ocean)", background: "var(--ck-ocean-soft)" }
+                        : { borderColor: "var(--ck-border-subtle)" }}>
+                      <span className="w-5 h-5 rounded border-2 flex items-center justify-center shrink-0"
+                        style={isSelected
+                          ? { background: "var(--ck-accent)", borderColor: "var(--ck-accent)", color: "var(--ck-btn-primary-text)" }
+                          : { borderColor: "var(--ck-border-strong)" }}>
+                        {isSelected ? <Check size={12} weight="bold" /> : null}
                       </span>
                       <div className="flex-1">
-                        <p className="font-semibold text-sm">{(s as any).tours?.name}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{(s as any).tours?.name}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
                           {fmtTime(s.start_time)}
-                          {s.status !== "OPEN" && <span className="ml-1 text-red-500 font-medium">· {s.status}</span>}
+                          {s.status !== "OPEN" && <span className="ml-1 font-medium" style={{ color: "var(--ck-danger)" }}>· {s.status}</span>}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className={"text-sm font-bold " + (booked > 0 ? "text-emerald-600" : "text-gray-300")}>{booked}</p>
-                        <p className="text-xs text-gray-400">booked</p>
+                        <p className="font-display text-sm font-semibold tabular-nums" style={{ color: booked > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{booked}</p>
+                        <p className="ui-mono-label !text-[9px]">booked</p>
                       </div>
                     </button>
                   );
@@ -397,31 +410,49 @@ export default function BroadcastsPage() {
         {/* Right side: customers + compose */}
         <div className="lg:col-span-8 space-y-4">
           {/* Selected summary */}
-          <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:items-center">
+          <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
+              <PaperPlaneTilt size={19} />
+            </span>
             <div className="flex-1">
-              <p className="font-semibold text-sm">{selectedSlotIds.length} slot{selectedSlotIds.length !== 1 ? "s" : ""} selected</p>
-              <p className="text-xs text-gray-400">{bookings.length} customer{bookings.length !== 1 ? "s" : ""} will be notified</p>
+              <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+                <span className="font-display tabular-nums">{selectedSlotIds.length}</span> slot{selectedSlotIds.length !== 1 ? "s" : ""} selected
+              </p>
+              <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                <span className="font-display tabular-nums" style={{ color: "var(--ck-text)" }}>{bookings.length}</span> customer{bookings.length !== 1 ? "s" : ""} will be notified
+              </p>
             </div>
             {selectedSlotIds.length > 0 && (
-              <button onClick={() => { setSelectedSlotIds([]); setBookings([]); }} className="text-xs text-gray-500 hover:text-gray-800">Clear All</button>
+              <button onClick={() => { setSelectedSlotIds([]); setBookings([]); }} className="text-xs font-medium transition-colors hover:opacity-80" style={{ color: "var(--ck-text-muted)" }}>Clear All</button>
             )}
           </div>
 
+          {/* Affected customers — loading skeleton */}
+          {loadingBookings && bookings.length === 0 && (
+            <div className="ui-card p-4 space-y-2">
+              <div className="ui-skeleton h-4 w-32" />
+              <div className="ui-skeleton h-11" />
+              <div className="ui-skeleton h-11" />
+            </div>
+          )}
+
           {/* Affected customers */}
           {bookings.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="font-semibold text-sm mb-3">Customers ({bookings.length})</h3>
+            <div className="ui-card p-4">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>
+                Customers <span className="font-display tabular-nums">({bookings.length})</span>
+              </h3>
               <div className="space-y-2 sm:hidden">
                 {bookings.map(b => (
-                  <div key={b.id} className="rounded-lg border border-gray-100 p-3">
+                  <div key={b.id} className="rounded-lg border p-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800">{b.customer_name}</p>
-                        <p className="text-xs text-gray-500">{(b as any).tours?.name || "—"} · {(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</p>
+                        <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{(b as any).tours?.name || "—"} · {(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</p>
                       </div>
-                      <p className="text-sm font-semibold text-gray-700">{b.qty} pax</p>
+                      <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty} pax</p>
                     </div>
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                       {b.phone ? "WhatsApp" : ""}{b.phone && b.email ? " · " : ""}{b.email ? "Email" : "No contact"}
                     </p>
                   </div>
@@ -430,31 +461,33 @@ export default function BroadcastsPage() {
               <div className="hidden max-h-48 overflow-auto sm:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-gray-400 border-b border-gray-100">
-                      <th className="text-left py-2 font-medium">Name</th>
-                      <th className="hidden text-left py-2 font-medium md:table-cell">Tour</th>
-                      <th className="hidden text-left py-2 font-medium sm:table-cell">Time</th>
-                      <th className="text-center py-2 font-medium">Pax</th>
-                      <th className="text-center py-2 font-medium">Channels</th>
+                    <tr className="border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                      <th className="text-left py-2 ui-mono-label !text-[10px]">Name</th>
+                      <th className="hidden text-left py-2 ui-mono-label !text-[10px] md:table-cell">Tour</th>
+                      <th className="hidden text-left py-2 ui-mono-label !text-[10px] sm:table-cell">Time</th>
+                      <th className="text-center py-2 ui-mono-label !text-[10px]">Pax</th>
+                      <th className="text-center py-2 ui-mono-label !text-[10px]">Channels</th>
                     </tr>
                   </thead>
                   <tbody>
                     {bookings.map(b => (
-                      <tr key={b.id} className="border-b border-gray-50">
-                        <td className="py-2 font-medium">{b.customer_name}</td>
-                        <td className="hidden py-2 text-gray-500 md:table-cell">{(b as any).tours?.name}</td>
-                        <td className="hidden py-2 text-gray-500 sm:table-cell">{(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</td>
-                        <td className="py-2 text-center">{b.qty}</td>
-                        <td className="py-2 text-center">
-                          {b.phone && (
-                            <span
-                              className="text-emerald-600 mr-1 text-xs font-medium"
-                              title="WhatsApp will be attempted. Actual delivery depends on whether this number is registered with WhatsApp and within the 24h service window."
-                            >
-                              WA?
-                            </span>
-                          )}
-                          {b.email && <span className="text-blue-600 text-xs font-medium" title="Email">Email</span>}
+                      <tr key={b.id} className="border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                        <td className="py-2 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</td>
+                        <td className="hidden py-2 md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{(b as any).tours?.name}</td>
+                        <td className="hidden py-2 sm:table-cell" style={{ color: "var(--ck-text-muted)" }}>{(b as any).slots?.start_time ? fmtTime((b as any).slots.start_time) : "—"}</td>
+                        <td className="py-2 text-center tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
+                        <td className="py-2">
+                          <div className="flex items-center justify-center gap-1">
+                            {b.phone && (
+                              <span
+                                className="ui-status ui-pill-success"
+                                title="WhatsApp will be attempted. Actual delivery depends on whether this number is registered with WhatsApp and within the 24h service window."
+                              >
+                                WA?
+                              </span>
+                            )}
+                            {b.email && <span className="ui-status ui-pill-ocean" title="Email">Email</span>}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -466,16 +499,22 @@ export default function BroadcastsPage() {
 
           {/* Compose */}
           {weatherMode ? (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-5">
-              <h2 className="font-semibold text-lg text-red-800 mb-2">Weather Cancellation</h2>
-              <p className="text-sm text-red-600 mb-4">Cancels selected slots, sends refund/reschedule options via WhatsApp, and a professional cancellation email.</p>
+            <div className="ui-card p-5" style={{ borderColor: "var(--ck-danger-soft)" }}>
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="ui-icon-chip" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
+                  <CloudRain size={19} />
+                </span>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--ck-danger)" }}>Weather Cancellation</h2>
+              </div>
+              <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>Cancels selected slots, sends refund/reschedule options via WhatsApp, and a professional cancellation email.</p>
               <div className="mb-4">
-                <label className="text-xs text-red-700 font-medium block mb-1">Reason</label>
+                <label className="ui-mono-label !text-[10px] block mb-1.5">Reason</label>
                 <input type="text" value={weatherReason} onChange={e => setWeatherReason(e.target.value)}
-                  className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm bg-white" />
+                  className="ui-control w-full" />
               </div>
               <button onClick={sendWeatherCancel} disabled={cancellingWeather || selectedSlotIds.length === 0}
-                className="w-full bg-red-600 text-white py-3 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+                className="ui-btn w-full !h-11 disabled:opacity-50"
+                style={{ background: "var(--ck-danger)", color: "#fff" }}>
                 {cancellingWeather
                   ? "Cancelling..."
                   : bookings.length === 0
@@ -483,44 +522,49 @@ export default function BroadcastsPage() {
                     : "Cancel & Notify " + bookings.length + " Customer" + (bookings.length === 1 ? "" : "s")}
               </button>
               {weatherResult && (
-                <div className={"text-sm p-3 rounded-lg mt-3 " + (weatherResult.error ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
+                <div className="text-sm p-3 rounded-lg mt-3"
+                  style={weatherResult.error
+                    ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
+                    : { background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
                   {weatherResult.error ? "Error: " + weatherResult.error : "Cancelled " + (weatherResult.affected || 0) + " bookings, notified " + (weatherResult.sent || 0)}
                 </div>
               )}
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="font-semibold text-lg mb-3">Compose</h2>
+            <div className="ui-card p-5">
+              <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Compose</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-500 font-medium block mb-1">WhatsApp Message</label>
+                  <label className="ui-mono-label !text-[10px] block mb-1.5">WhatsApp Message</label>
                   <RichTextEditor
                     value={message}
                     onChange={setMessage}
                     rows={6}
                     placeholder="Hi {name}, just a quick message about your upcoming paddle..."
                   />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
                     Use &#123;name&#125; for the customer&apos;s first name. Formatting helps the email version; WhatsApp sends a cleaned text version.
                   </p>
                 </div>
                 <button onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
-                  className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers — email + WhatsApp where possible"}
+                  className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
+                  <PaperPlaneTilt size={15} /> {sending ? "Sending..." : "Send to " + bookings.length + " Customers — email + WhatsApp where possible"}
                 </button>
                 {result && (() => {
                   if (result.error) {
-                    return <div className="text-sm p-3 rounded-lg bg-red-50 text-red-700">Error: {result.error}</div>;
+                    return <div className="text-sm p-3 rounded-lg" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>Error: {result.error}</div>;
                   }
                   const waSent = result.wa_sent || 0;
                   const waAtt = result.wa_attempted ?? waSent;
                   const emSent = result.email_sent || 0;
                   const emAtt = result.email_attempted ?? emSent;
                   const anyFailed = (waAtt > 0 && waSent < waAtt) || (emAtt > 0 && emSent < emAtt);
-                  const tone = anyFailed ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-emerald-50 text-emerald-700";
                   return (
-                    <div className={"text-sm p-3 rounded-lg " + tone}>
-                      <p>
+                    <div className="text-sm p-3 rounded-lg"
+                      style={anyFailed
+                        ? { background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }
+                        : { background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+                      <p className="tabular-nums">
                         WhatsApp: {waSent} of {waAtt} delivered · Email: {emSent} of {emAtt} delivered
                       </p>
                       {anyFailed && Array.isArray(result.errors) && result.errors.length > 0 && (
@@ -540,18 +584,23 @@ export default function BroadcastsPage() {
           )}
 
           {/* History */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold mb-3">Recent Broadcasts</h2>
-            {history.length === 0 ? <p className="text-sm text-gray-400">None yet.</p> : (
+          <div className="ui-card p-5">
+            <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Recent Broadcasts</h2>
+            {history.length === 0 ? (
+              <div className="ui-empty !py-8">
+                <span className="ui-icon-chip"><PaperPlaneTilt size={19} /></span>
+                <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No broadcasts sent yet.</p>
+              </div>
+            ) : (
               <div className="space-y-2 max-h-48 overflow-auto">
                 {history.map(h => (
-                  <div key={h.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:gap-3">
-                    <span className={"text-xs font-medium px-2 py-0.5 rounded-full shrink-0 " + (h.target_group === "AFFECTED_BOOKINGS" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")}>
+                  <div key={h.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    <span className={"ui-status shrink-0 " + (h.target_group === "AFFECTED_BOOKINGS" ? "ui-pill-danger" : "ui-pill-ocean")}>
                       {h.target_group === "AFFECTED_BOOKINGS" ? "WX" : "BC"}
                     </span>
-                    <p className="text-sm text-gray-700 flex-1 line-clamp-1">{h.message}</p>
-                    <span className="text-xs text-gray-400 shrink-0">{h.sent_count} sent</span>
-                    <span className="text-xs text-gray-300 shrink-0">{new Date(h.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</span>
+                    <p className="text-sm flex-1 line-clamp-1" style={{ color: "var(--ck-text)" }}>{h.message}</p>
+                    <span className="text-xs shrink-0 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{h.sent_count} sent</span>
+                    <span className="text-xs shrink-0 tabular-nums" style={{ color: "var(--ck-text-muted)", opacity: 0.7 }}>{new Date(h.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</span>
                   </div>
                 ))}
               </div>

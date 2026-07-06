@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, MagnifyingGlass, UploadSimple, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
+import { Plus, MagnifyingGlass, UploadSimple, Trash, X, PencilSimple, Check, UsersThree } from "@phosphor-icons/react";
 import * as XLSX from "xlsx";
 
 interface Contact {
@@ -21,6 +21,14 @@ interface Contact {
   created_at: string;
   date_of_birth: string | null;
 }
+
+// Contact status → shared pill vocabulary (mono, uppercase, soft wash).
+const CONTACT_PILL: Record<string, string> = {
+  active: "ui-pill-success",
+  unsubscribed: "ui-pill-neutral",
+  bounced: "ui-pill-danger",
+  inactive: "ui-pill-warning",
+};
 
 export default function ContactsPage() {
   const { businessId } = useBusinessContext();
@@ -625,54 +633,52 @@ export default function ContactsPage() {
   const inactiveCount = contacts.filter((c) => c.status === "inactive").length;
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
+    return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
   return (
     <div className="space-y-4">
       {/* Summary + actions */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
           {activeCount} active · {unsubCount} unsubscribed · {bouncedCount} bounced · {inactiveCount} inactive · {contacts.length} total
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {contacts.length > 0 && (
-            <button onClick={() => setShowDeleteAll(true)} className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+            <button onClick={() => setShowDeleteAll(true)} className="ui-btn ui-btn-danger">
               <Trash size={14} /> Delete All
             </button>
           )}
-          <button onClick={() => setShowValidate(true)} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            Validate & Segment
+          <button onClick={() => setShowValidate(true)} className="ui-btn ui-btn-ghost">
+            Validate &amp; Segment
           </button>
-          <button onClick={previewCleanList} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+          <button onClick={previewCleanList} className="ui-btn ui-btn-ghost">
             <Trash size={14} /> Clean List
           </button>
-          <button onClick={() => { setShowImport(true); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
+          <button onClick={() => { setShowImport(true); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="ui-btn ui-btn-ghost">
             <UploadSimple size={14} /> Import CSV
           </button>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+          <button onClick={() => setShowAdd(true)} className="ui-btn ui-btn-primary">
             <Plus size={14} /> Add Contact
           </button>
         </div>
       </div>
 
       {/* Search + filter */}
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="anim-fade-up anim-d1 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+          <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             placeholder="Search contacts..."
-            className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
+            className="ui-control w-full pl-9"
           />
         </div>
         <select
           value={filterStatus}
           onChange={(e) => { setFilterStatus(e.target.value as any); setPage(0); }}
-          className="rounded-lg border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
+          className="ui-control"
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
@@ -684,8 +690,7 @@ export default function ContactsPage() {
           <select
             value={filterTag}
             onChange={(e) => { setFilterTag(e.target.value); setPage(0); }}
-            className="rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
+            className="ui-control"
           >
             <option value="">All tags</option>
             {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -695,79 +700,76 @@ export default function ContactsPage() {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-            {contacts.length === 0 ? "No contacts yet. Add your first contact or import a CSV." : "No contacts match your search."}
-          </p>
+        <div className="ui-card">
+          <div className="ui-empty">
+            <span className="ui-icon-chip"><UsersThree size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{contacts.length === 0 ? "No contacts yet" : "No matching contacts"}</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{contacts.length === 0 ? "Add your first contact or import a CSV." : "Try a different search or filter."}</p>
+          </div>
         </div>
       ) : (
-        <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--ck-border)" }}>
-          <table className="w-full text-sm min-w-[700px]">
+        <div className="anim-fade-up anim-d2 ui-card overflow-x-auto">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
-              <tr style={{ background: "var(--ck-surface)" }}>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Phone</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>DOB</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Tags</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Engagement</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
+              <tr>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>DOB</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Tags</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Engagement</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginated.map((c) => {
                 const isEditing = editingId === c.id;
                 return isEditing ? (
-                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle, var(--ck-bg))" }}>
+                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
                     <td className="px-4 py-2">
                       <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                        className="w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text-strong)" }} placeholder="Email" />
+                        className="ui-control w-full !py-1.5" placeholder="Email" />
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
                         <input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                          className="w-1/2 rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="First" />
+                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="First" />
                         <input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                          className="w-1/2 rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="Last" />
+                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="Last" />
                       </div>
                     </td>
                     <td className="px-4 py-2">
                       <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        className="w-full rounded-lg border px-2 py-1.5 text-xs font-mono" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="Phone" />
+                        className="ui-control w-full !py-1.5 font-mono text-xs" placeholder="Phone" />
                     </td>
                     <td className="px-4 py-2">
                       <input type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
-                        className="rounded-lg border px-2 py-1.5 text-xs w-[120px]" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+                        className="ui-control w-[120px] !py-1.5 text-xs" />
                     </td>
                     <td className="px-4 py-2">
                       <input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                        className="w-full rounded-lg border px-2 py-1.5 text-xs" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} placeholder="tag1, tag2" />
+                        className="ui-control w-full !py-1.5 text-xs" placeholder="tag1, tag2" />
                     </td>
-                    <td className="px-4 py-2 text-center text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    <td className="px-4 py-2 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
                       {c.total_received > 0 ? <span>{c.total_received} / {c.total_opens} / {c.total_clicks}</span> : "—"}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <button onClick={() => toggleStatus(c)} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer ${
-                        c.status === "active" ? "bg-emerald-100 text-emerald-700" :
-                        c.status === "bounced" ? "bg-red-100 text-red-600" :
-                        c.status === "inactive" ? "bg-amber-100 text-amber-600" :
-                        "bg-gray-100 text-gray-500"
-                      }`}>{c.status}</button>
+                      <button onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>{c.status}</button>
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={saveEdit} disabled={editSaving} className="p-1 rounded-lg hover:bg-emerald-50" style={{ color: "var(--ck-success, #059669)" }} title="Save">
+                        <button onClick={saveEdit} disabled={editSaving} className="rounded-lg p-1" style={{ color: "var(--ck-success)" }} title="Save">
                           <Check size={16} weight="bold" />
                         </button>
-                        <button onClick={() => setEditingId(null)} className="p-1 rounded-lg hover:bg-gray-100" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
+                        <button onClick={() => setEditingId(null)} className="rounded-lg p-1" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
                           <X size={14} />
                         </button>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                <tr key={c.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
                   <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.email}</td>
                   <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>
                     {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
@@ -779,11 +781,11 @@ export default function ContactsPage() {
                     {c.date_of_birth || "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1 items-center">
+                    <div className="flex flex-wrap items-center gap-1">
                       {(c.tags || []).map((tag) => (
-                        <span key={tag} className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
+                        <span key={tag} className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
                           {tag}
-                          <button onClick={() => removeTagFromContact(c.id, tag)} className="hover:text-red-500 ml-0.5">&times;</button>
+                          <button onClick={() => removeTagFromContact(c.id, tag)} className="ml-0.5 transition-opacity hover:opacity-70">&times;</button>
                         </span>
                       ))}
                       {tagInput?.contactId === c.id ? (
@@ -796,15 +798,15 @@ export default function ContactsPage() {
                             if (e.key === "Escape") setTagInput(null);
                           }}
                           onBlur={() => { if (tagInput!.value.trim()) addTagToContact(c.id, tagInput!.value); else setTagInput(null); }}
-                          className="rounded-full border px-2 py-0.5 text-xs w-20"
-                          style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                          className="w-20 rounded-full border px-2 py-0.5 text-xs"
+                          style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
                           placeholder="tag..."
                         />
                       ) : (
                         <button
                           onClick={() => setTagInput({ contactId: c.id, value: "" })}
                           className="rounded-full border px-1.5 py-0.5 text-xs"
-                          style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                          style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text-muted)" }}
                           title="Add tag"
                         >
                           +
@@ -812,27 +814,22 @@ export default function ContactsPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                  <td className="px-4 py-3 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
                     {c.total_received > 0 ? (
                       <span>{c.total_received} recv · {c.total_opens} opens · {c.total_clicks} clicks</span>
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => toggleStatus(c)} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer ${
-                      c.status === "active" ? "bg-emerald-100 text-emerald-700" :
-                      c.status === "bounced" ? "bg-red-100 text-red-600" :
-                      c.status === "inactive" ? "bg-amber-100 text-amber-600" :
-                      "bg-gray-100 text-gray-500"
-                    }`}>
+                    <button onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>
                       {c.status}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => startEdit(c)} className="p-1 rounded-lg hover:bg-gray-100" style={{ color: "var(--ck-text-muted)" }} title="Edit">
+                      <button onClick={() => startEdit(c)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-text-muted)" }} title="Edit">
                         <PencilSimple size={14} />
                       </button>
-                      <button onClick={() => deleteContact(c.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete">
+                      <button onClick={() => deleteContact(c.id)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-danger)" }} title="Delete">
                         <Trash size={14} />
                       </button>
                     </div>
@@ -847,17 +844,13 @@ export default function ContactsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="anim-fade-up flex items-center justify-between">
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
             Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()} contacts
           </p>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage(0)} disabled={page === 0}
-              className="rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-30"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>First</button>
-            <button onClick={() => setPage(page - 1)} disabled={page === 0}
-              className="rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-30"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Prev</button>
+            <button onClick={() => setPage(0)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">First</button>
+            <button onClick={() => setPage(page - 1)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Prev</button>
             {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
               let p: number;
               if (totalPages <= 7) p = i;
@@ -866,17 +859,13 @@ export default function ContactsPage() {
               else p = page - 3 + i;
               return (
                 <button key={p} onClick={() => setPage(p)}
-                  className={"rounded-lg px-2.5 py-1.5 text-xs font-medium " + (p === page ? "font-bold" : "")}
-                  style={{ background: p === page ? "var(--ck-accent)" : "transparent", color: p === page ? "#fff" : "var(--ck-text)" }}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium tabular-nums transition-colors"
+                  style={p === page ? { background: "var(--ck-accent-soft)", color: "var(--ck-accent)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}
                 >{p + 1}</button>
               );
             })}
-            <button onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1}
-              className="rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-30"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Next</button>
-            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}
-              className="rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-30"
-              style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Last</button>
+            <button onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Next</button>
+            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Last</button>
           </div>
         </div>
       )}
@@ -884,32 +873,26 @@ export default function ContactsPage() {
       {/* Add contact modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl" style={{ background: "var(--ck-surface)" }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Add Contact</h3>
-              <button onClick={() => setShowAdd(false)}><X size={18} /></button>
+          <div className="ui-card w-full max-w-md p-6" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Add Contact</h3>
+              <button onClick={() => setShowAdd(false)} style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="First name *" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
-                  className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
-                <input placeholder="Last name *" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
-                  className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                <input placeholder="First name *" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })} className="ui-control w-full" />
+                <input placeholder="Last name *" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })} className="ui-control w-full" />
               </div>
-              <input placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
-              <input placeholder="Phone number *" value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
-              <input placeholder="Tags (comma-separated, e.g. vip, customer)" value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+              <input placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} className="ui-control w-full" />
+              <input placeholder="Phone number *" value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })} className="ui-control w-full" />
+              <input placeholder="Tags (comma-separated, e.g. vip, customer)" value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })} className="ui-control w-full" />
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Date of Birth</label>
-                <input type="date" value={addForm.date_of_birth || ""} onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Date of Birth</label>
+                <input type="date" value={addForm.date_of_birth || ""} onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })} className="ui-control w-full" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowAdd(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
-                <button onClick={addContact} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                <button onClick={() => setShowAdd(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                <button onClick={addContact} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
                   {saving ? "Saving..." : "Add Contact"}
                 </button>
               </div>
@@ -921,40 +904,40 @@ export default function ContactsPage() {
       {/* Import modal — 3-step: upload → map columns → preview & import */}
       {showImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style={{ background: "var(--ck-surface)" }}>
-            <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="ui-card flex max-h-[90vh] w-full max-w-3xl flex-col" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+            <div className="flex items-center justify-between border-b px-6 pb-3 pt-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
               <div>
-                <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Import Contacts</h3>
-                <div className="flex items-center gap-4 mt-1">
+                <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Import Contacts</h3>
+                <div className="mt-1 flex items-center gap-4">
                   {["upload", "map", "preview"].map((s, i) => (
-                    <span key={s} className={"text-[10px] font-semibold uppercase " + (csvStep === s ? "text-[var(--ck-accent)]" : "")} style={{ color: csvStep === s ? undefined : "var(--ck-text-muted)" }}>
+                    <span key={s} className="ui-mono-label !text-[10px]" style={{ color: csvStep === s ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                       {i + 1}. {s === "upload" ? "Upload" : s === "map" ? "Map Columns" : "Preview & Import"}
                     </span>
                   ))}
                 </div>
               </div>
-              <button onClick={() => setShowImport(false)}><X size={18} /></button>
+              <button onClick={() => setShowImport(false)} style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {/* STEP 1: Upload */}
               {csvStep === "upload" && (
                 <div className="space-y-4">
-                  <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border)" }}>
-                    <UploadSimple size={32} className="mx-auto mb-3 opacity-40" />
-                    <p className="text-sm font-medium mb-2" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
+                  <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-strong)" }}>
+                    <UploadSimple size={32} className="mx-auto mb-3" style={{ color: "var(--ck-text-muted)" }} />
+                    <p className="mb-2 text-sm font-medium" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
                     <input type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
-                    <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>
+                    <p className="mt-2 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
                       Any columns accepted — you&apos;ll map them in the next step. Gaps in data are fine.
                     </p>
                   </div>
                   <div className="text-center text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>— or paste data —</div>
                   <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6}
                     placeholder={"email, first_name, last_name, phone, company, city\njohn@example.com, John, Doe, 0821234567, Acme, Cape Town\njane@example.com, Jane, , , , Johannesburg"}
-                    className="w-full rounded-lg border px-3 py-2 text-sm font-mono" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                    className="ui-control w-full font-mono" />
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setShowImport(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
-                    <button onClick={handlePasteImport} disabled={!importText.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>Next: Map Columns</button>
+                    <button onClick={() => setShowImport(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                    <button onClick={handlePasteImport} disabled={!importText.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">Next: Map Columns</button>
                   </div>
                 </div>
               )}
@@ -967,20 +950,20 @@ export default function ContactsPage() {
                   </p>
 
                   {/* Sample data preview */}
-                  <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--ck-border)" }}>
+                  <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <table className="w-full text-[11px]">
-                      <thead style={{ background: "var(--ck-bg-subtle)" }}>
+                      <thead style={{ background: "var(--ck-surface-sunken)" }}>
                         <tr>
                           {csvHeaders.map((h) => (
-                            <th key={h} className="px-3 py-1.5 text-left font-medium whitespace-nowrap" style={{ color: "var(--ck-text-muted)" }}>{h}</th>
+                            <th key={h} className="whitespace-nowrap px-3 py-1.5 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {csvRows.slice(0, 3).map((r, i) => (
-                          <tr key={i} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                          <tr key={i} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             {csvHeaders.map((h) => (
-                              <td key={h} className="px-3 py-1 whitespace-nowrap" style={{ color: "var(--ck-text)" }}>{r.data[h] || <span className="opacity-30">—</span>}</td>
+                              <td key={h} className="whitespace-nowrap px-3 py-1" style={{ color: "var(--ck-text)" }}>{r.data[h] || <span style={{ color: "var(--ck-text-muted)" }}>—</span>}</td>
                             ))}
                           </tr>
                         ))}
@@ -994,7 +977,7 @@ export default function ContactsPage() {
                       const mappedField = Object.entries(csvMapping).find(([, v]) => v === h)?.[0] || "";
                       return (
                         <div key={h} className="flex items-center gap-2">
-                          <span className="w-32 text-xs font-mono truncate" style={{ color: "var(--ck-text)" }} title={h}>{h}</span>
+                          <span className="w-32 truncate font-mono text-xs" style={{ color: "var(--ck-text)" }} title={h}>{h}</span>
                           <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>→</span>
                           <select
                             value={mappedField}
@@ -1006,7 +989,7 @@ export default function ContactsPage() {
                               if (e.target.value && e.target.value !== "_skip") newMap[e.target.value] = h;
                               setCsvMapping(newMap);
                             }}
-                            className="flex-1 rounded border px-2 py-1.5 text-xs" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                            className="ui-control flex-1 !py-1.5 text-xs"
                           >
                             <option value="">Notes (auto)</option>
                             {DB_FIELDS.map((f) => (
@@ -1021,14 +1004,14 @@ export default function ContactsPage() {
                   </div>
 
                   {!csvMapping.email && (
-                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                    <div className="rounded-lg p-3 text-xs" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
                       Please map at least one column to <strong>Email</strong> (required).
                     </div>
                   )}
 
                   <div className="flex justify-between gap-2">
-                    <button onClick={() => setCsvStep("upload")} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Back</button>
-                    <button onClick={applyMappingAndValidate} disabled={!csvMapping.email} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                    <button onClick={() => setCsvStep("upload")} className="ui-btn ui-btn-ghost">Back</button>
+                    <button onClick={applyMappingAndValidate} disabled={!csvMapping.email} className="ui-btn ui-btn-primary disabled:opacity-50">
                       Next: Preview
                     </button>
                   </div>
@@ -1039,27 +1022,27 @@ export default function ContactsPage() {
               {csvStep === "preview" && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border)" }}>
+                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <div className="text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{csvRows.length}</div>
                       <div className="text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Total rows</div>
                     </div>
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border)" }}>
+                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <div className="text-xl font-bold text-emerald-600">{csvRows.filter((r) => r.errors.length === 0).length}</div>
                       <div className="text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Valid</div>
                     </div>
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border)" }}>
+                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
                       <div className="text-xl font-bold text-red-500">{csvRows.filter((r) => r.errors.length > 0).length}</div>
                       <div className="text-[10px]" style={{ color: "var(--ck-text-muted)" }}>Invalid (skipped)</div>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border p-3 text-xs space-y-1" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+                  <div className="rounded-lg border p-3 text-xs space-y-1" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
                     <div className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>Auto-cleaned:</div>
                     <div>Emails lowercased · Names capitalized · Phones normalized (0XX→+27XX) · Quotes stripped · Empty gaps preserved as blank</div>
                     <div>Unmapped columns saved to <strong>Notes</strong> field</div>
                   </div>
 
-                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border)" }}>
+                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
                       <table className="w-full text-xs">
                         <thead className="sticky top-0" style={{ background: "var(--ck-bg-subtle)" }}>
@@ -1072,7 +1055,7 @@ export default function ContactsPage() {
                             <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
+                        <tbody className="divide-y" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           {csvRows.slice(0, 100).map((r, i) => (
                             <tr key={i} className={r.errors.length > 0 ? "bg-red-50/50" : ""}>
                               <td className="px-2 py-1.5 font-mono" style={{ color: "var(--ck-text)" }}>{r.data._email || "—"}</td>
@@ -1092,9 +1075,9 @@ export default function ContactsPage() {
                   </div>
 
                   <div className="flex justify-between gap-2">
-                    <button onClick={() => setCsvStep("map")} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Back</button>
+                    <button onClick={() => setCsvStep("map")} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Back</button>
                     <div className="flex gap-2">
-                      <button onClick={() => setShowImport(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
+                      <button onClick={() => setShowImport(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
                       <button onClick={importContacts} disabled={importing || csvRows.filter((r) => r.errors.length === 0).length === 0} className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                         {importing ? "Importing..." : `Import ${csvRows.filter((r) => r.errors.length === 0).length} contacts`}
                       </button>
@@ -1117,7 +1100,7 @@ export default function ContactsPage() {
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--ck-text)" }}>
               <p style={{ color: "var(--ck-text-muted)" }}>This will scan all {contacts.length} contacts and automatically:</p>
-              <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--ck-border)" }}>
+              <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-red-500" />
                   <span><strong>Deactivate</strong> contacts with invalid email addresses</span>
@@ -1140,7 +1123,7 @@ export default function ContactsPage() {
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-4">
-              <button onClick={() => setShowValidate(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
+              <button onClick={() => setShowValidate(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
               <button onClick={runValidation} disabled={validating} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                 {validating ? "Validating..." : "Run Validation"}
               </button>
@@ -1162,12 +1145,12 @@ export default function ContactsPage() {
               Deactivating them improves your deliverability and open rates.
             </p>
             {staleContacts.length === 0 ? (
-              <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--ck-border)" }}>
+              <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No stale contacts found. Your list is clean!</p>
               </div>
             ) : (
               <>
-                <div className="max-h-60 overflow-y-auto rounded-lg border" style={{ borderColor: "var(--ck-border)" }}>
+                <div className="max-h-60 overflow-y-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ background: "var(--ck-surface)" }}>
@@ -1178,7 +1161,7 @@ export default function ContactsPage() {
                     </thead>
                     <tbody>
                       {staleContacts.map((c) => (
-                        <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                        <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>{c.email}</td>
                           <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>{c.total_received}</td>
                           <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>0</td>
@@ -1188,8 +1171,8 @@ export default function ContactsPage() {
                   </table>
                 </div>
                 <div className="flex justify-end gap-2 pt-3">
-                  <button onClick={() => setShowCleanList(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
-                  <button onClick={deactivateStaleContacts} disabled={cleaning} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "#ef4444" }}>
+                  <button onClick={() => setShowCleanList(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                  <button onClick={deactivateStaleContacts} disabled={cleaning} className="ui-btn ui-btn-danger disabled:opacity-50">
                     {cleaning ? "Deactivating..." : `Deactivate ${staleContacts.length} Contacts`}
                   </button>
                 </div>
@@ -1201,12 +1184,12 @@ export default function ContactsPage() {
       {/* Delete All Contacts confirmation */}
       {showDeleteAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900">Delete All Contacts</h3>
-            <p className="mt-2 text-sm text-gray-600">
+          <div className="ui-card w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Delete All Contacts</h3>
+            <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               This will permanently delete <strong>{contacts.length}</strong> contacts from your marketing list. This action cannot be undone.
             </p>
-            <p className="mt-3 text-sm text-gray-600">
+            <p className="mt-3 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Type <strong>DELETE</strong> to confirm:
             </p>
             <input
@@ -1214,19 +1197,19 @@ export default function ContactsPage() {
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder="DELETE"
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase"
+              className="ui-control mt-2 w-full font-mono uppercase"
             />
             <div className="mt-5 flex items-center justify-end gap-3">
               <button
                 onClick={() => { setShowDeleteAll(false); setDeleteConfirmText(""); }}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteAllContacts}
                 disabled={deleteConfirmText !== "DELETE" || deletingAll}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                className="ui-btn ui-btn-danger disabled:opacity-50"
               >
                 {deletingAll ? "Deleting..." : "Delete All Contacts"}
               </button>

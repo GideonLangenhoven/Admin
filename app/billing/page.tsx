@@ -157,56 +157,70 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="max-w-3xl space-y-6">
+        <div className="space-y-2.5">
+          <div className="ui-skeleton h-3 w-24" />
+          <div className="ui-skeleton h-8 w-40" />
+        </div>
+        <div className="ui-skeleton h-[230px] !rounded-2xl" />
+        <div className="ui-skeleton h-[150px] !rounded-2xl" />
+        <div className="ui-skeleton h-[120px] !rounded-2xl" />
       </div>
     );
   }
 
   if (!sub) {
     return (
-      <div className="p-6 max-w-3xl">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
-        <p className="mt-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>No subscription configured. Contact support.</p>
+      <div className="max-w-3xl space-y-4">
+        <div>
+          <p className="ui-mono-label mb-2">Revenue</p>
+          <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
+        </div>
+        <div className="ui-card p-5">
+          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No subscription configured. Contact support.</p>
+        </div>
       </div>
     );
   }
 
   const statusColors: Record<string, string> = {
-    ACTIVE: "bg-emerald-100 text-emerald-800",
-    PAUSED: "bg-amber-100 text-amber-800",
-    CANCELLED: "bg-red-100 text-red-800",
-    SUSPENDED: "bg-red-100 text-red-800",
-    TRIAL: "bg-blue-100 text-blue-800",
+    ACTIVE: "ui-pill-success",
+    PAUSED: "ui-pill-warning",
+    CANCELLED: "ui-pill-danger",
+    SUSPENDED: "ui-pill-danger",
+    TRIAL: "ui-pill-accent",
   };
 
   return (
     <div className="max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
+      <div>
+        <p className="ui-mono-label mb-2">Revenue</p>
+        <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
+      </div>
 
       {/* Current Plan */}
-      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+      <section className="ui-card p-5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Current plan</h2>
-          <span className={`text-xs px-2 py-1 rounded font-medium ${statusColors[sub.status] || "bg-gray-100 text-gray-800"}`}>
+          <h2 className="ui-mono-label">Current plan</h2>
+          <span className={`ui-status ${statusColors[sub.status] || "ui-pill-neutral"}`}>
             {sub.status}
           </span>
         </div>
-        <p className="mt-1 text-3xl font-bold" style={{ color: "var(--ck-text-strong)" }}>{sub.plans?.name ?? "Custom"}</p>
-        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+        <p className="mt-2 font-display text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>{sub.plans?.name ?? "Custom"}</p>
+        <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
           R{sub.plans?.monthly_price_zar ?? 0}/month base · R{sub.plans?.extra_seat_price_zar ?? 0}/extra seat
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
-            <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Seats purchased</div>
-            <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>{sub.seats_purchased}</div>
-            <div className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{usedSeats} active admin{usedSeats !== 1 ? "s" : ""}</div>
+          <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
+            <div className="ui-mono-label !text-[10px]">Seats purchased</div>
+            <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{sub.seats_purchased}</div>
+            <div className="text-xs mt-1.5" style={{ color: "var(--ck-text-muted)" }}>{usedSeats} active admin{usedSeats !== 1 ? "s" : ""}</div>
           </div>
-          <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
-            <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>This month</div>
-            <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>R{monthly.toLocaleString()}</div>
-            <div className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
+          <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
+            <div className="ui-mono-label !text-[10px]">This month</div>
+            <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{monthly.toLocaleString()}</div>
+            <div className="text-xs mt-1.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
           </div>
         </div>
 
@@ -215,22 +229,21 @@ export default function BillingPage() {
             <button
               onClick={() => changeSeats(+1)}
               disabled={actionLoading}
-              className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               + Add seat (R{sub.plans?.extra_seat_price_zar ?? 750})
             </button>
             <button
               onClick={() => changeSeats(-1)}
               disabled={actionLoading || sub.seats_purchased <= 1 || usedSeats >= sub.seats_purchased}
-              className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-              style={{ background: "var(--ck-bg)", color: "var(--ck-text)" }}
+              className="ui-btn ui-btn-ghost disabled:opacity-50"
             >
               – Remove seat
             </button>
             <button
               onClick={pauseSubscription}
               disabled={actionLoading}
-              className="ml-auto px-3 py-2 rounded-lg bg-amber-100 text-amber-900 text-sm font-medium hover:bg-amber-200 disabled:opacity-50 transition-colors"
+              className="ui-btn ui-btn-ghost ml-auto disabled:opacity-50"
             >
               Pause for off-season
             </button>
@@ -246,19 +259,19 @@ export default function BillingPage() {
             <button
               onClick={resumeSubscription}
               disabled={actionLoading}
-              className="ml-auto px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="ui-btn ui-btn-primary ml-auto disabled:opacity-50"
             >
               Resume now
             </button>
           </div>
         )}
 
-        {error && <p className="mt-3 text-sm text-red-600 font-medium">{error}</p>}
+        {error && <p className="mt-3 text-sm font-medium" style={{ color: "var(--ck-danger)" }}>{error}</p>}
       </section>
 
       {/* Marketing Email Usage (AB1) — was previously only in super-admin */}
       {emailUsage && (
-        <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+        <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Marketing email usage</h2>
             <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>this billing period</span>
@@ -269,7 +282,7 @@ export default function BillingPage() {
               <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>
                 {emailUsage.sent.toLocaleString()} / {emailUsage.included.toLocaleString()}
               </div>
-              <div className="mt-2 h-2 w-full rounded-full" style={{ background: "var(--ck-border)" }}>
+              <div className="mt-2 h-2 w-full rounded-full" style={{ background: "var(--ck-border-subtle)" }}>
                 <div
                   className="h-2 rounded-full"
                   style={{
@@ -297,7 +310,7 @@ export default function BillingPage() {
       )}
 
       {/* Payment Method */}
-      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
         <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Payment method</h2>
         <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>
           {sub.payment_method_last4
@@ -307,7 +320,7 @@ export default function BillingPage() {
       </section>
 
       {/* Billing History */}
-      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
         <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Billing history</h2>
         {history.length === 0 ? (
           <p className="text-sm mt-2" style={{ color: "var(--ck-text-muted)" }}>No billing records yet.</p>
@@ -325,7 +338,7 @@ export default function BillingPage() {
               </thead>
               <tbody>
                 {history.map((h) => (
-                  <tr key={h.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                  <tr key={h.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.invoice_period_start || "—"}</td>
                     <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.line_type || "—"}</td>
                     <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.quantity}</td>

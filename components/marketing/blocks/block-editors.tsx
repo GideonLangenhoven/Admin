@@ -22,7 +22,7 @@ import { SOCIAL_PLATFORMS } from "./social-icons";
 /* ── Shared styling helpers ── */
 
 const inputCls = "rounded-lg border px-2 py-1.5 text-xs";
-const inputStyle = { borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" };
+const inputStyle = { borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)", color: "var(--ck-text)" };
 const labelCls = "text-[10px] font-semibold uppercase tracking-wider";
 const labelStyle = { color: "var(--ck-text-muted)" };
 
@@ -134,8 +134,8 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
     }
   }, [block.content]);
 
-  const btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-bg-subtle)] transition-colors";
-  const btnActive = "bg-[var(--ck-bg-subtle)]";
+  const btnCls = "h-7 w-7 flex items-center justify-center rounded hover:bg-[var(--ck-surface-sunken)] transition-colors";
+  const btnActive = "bg-[var(--ck-surface-sunken)]";
   const selectCls = "rounded border px-1.5 py-1 text-[11px] outline-none";
 
   return (
@@ -143,7 +143,7 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
       <Label>Text</Label>
 
       {/* ── Formatting Toolbar ── */}
-      <div className="mt-1 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 px-2 py-1.5" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle)" }}
+      <div className="mt-1 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 px-2 py-1.5" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}
         onMouseDown={(e) => e.preventDefault()} /* prevent toolbar clicks from stealing focus/selection */
       >
         {/* Font family */}
@@ -188,21 +188,21 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
           ))}
         </select>
 
-        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border-subtle)" }} />
 
         {/* Inline formatting */}
         <button type="button" onClick={() => execCmd("bold")} className={btnCls} title="Bold"><TextB size={14} /></button>
         <button type="button" onClick={() => execCmd("italic")} className={btnCls} title="Italic"><TextItalic size={14} /></button>
         <button type="button" onClick={() => execCmd("underline")} className={btnCls} title="Underline"><TextUnderline size={14} /></button>
 
-        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border-subtle)" }} />
 
         {/* Alignment */}
         <button type="button" onClick={() => { onUpdate({ textAlign: "left" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "left" || !block.textAlign ? btnActive : ""}`} title="Align left"><TextAlignLeft size={14} /></button>
         <button type="button" onClick={() => { onUpdate({ textAlign: "center" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "center" ? btnActive : ""}`} title="Align center"><TextAlignCenter size={14} /></button>
         <button type="button" onClick={() => { onUpdate({ textAlign: "right" }); editorRef.current?.focus(); }} className={`${btnCls} ${block.textAlign === "right" ? btnActive : ""}`} title="Align right"><TextAlignRight size={14} /></button>
 
-        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border)" }} />
+        <div className="w-px h-5 mx-0.5" style={{ background: "var(--ck-border-subtle)" }} />
 
         {/* Text color */}
         <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
@@ -258,7 +258,7 @@ function ImageEditor({ block, onUpdate, onUpload }: { block: ImageBlock; onUpdat
         {block.src ? (
           <img src={block.src} alt={block.alt} className="max-h-40 rounded-lg object-contain" />
         ) : (
-          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <button onClick={() => onUpload?.(block.id)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ color: "var(--ck-accent)" }}>
               <ImageIcon size={14} /> Upload Image
             </button>
@@ -296,7 +296,7 @@ function DividerEditor() {
   return (
     <div>
       <Label>Divider</Label>
-      <hr className="mt-2 border-gray-200" />
+      <hr className="mt-2" style={{ borderColor: "var(--ck-border-subtle)" }} />
     </div>
   );
 }
@@ -309,7 +309,7 @@ function SpacerEditor({ block, onUpdate }: { block: SpacerBlock; onUpdate: (u: P
         <input type="number" min={4} max={200} value={block.height} onChange={(e) => onUpdate({ height: parseInt(e.target.value) || 24 })} className={`w-24 ${inputCls}`} style={inputStyle} />
         <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>px height</span>
       </div>
-      <div className="mt-2 rounded border border-dashed" style={{ height: Math.min(block.height, 60), borderColor: "var(--ck-border)" }} />
+      <div className="mt-2 rounded border border-dashed" style={{ height: Math.min(block.height, 60), borderColor: "var(--ck-border-subtle)" }} />
     </div>
   );
 }
@@ -361,7 +361,7 @@ function SocialEditor({ block, onUpdate }: { block: SocialBlock; onUpdate: (u: P
             key={key}
             onClick={() => togglePlatform(key)}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${key in block.platforms ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
-            style={{ borderColor: key in block.platforms ? p.brandColor : "var(--ck-border)", color: "var(--ck-text)", outlineColor: key in block.platforms ? p.brandColor : undefined }}
+            style={{ borderColor: key in block.platforms ? p.brandColor : "var(--ck-border-subtle)", color: "var(--ck-text)", outlineColor: key in block.platforms ? p.brandColor : undefined }}
           >
             <img src={p.icon} alt="" width="18" height="18" className="rounded" />
             {p.label}
@@ -461,10 +461,10 @@ function ColumnsEditor({ block, onUpdate }: { block: ColumnsBlock; onUpdate: (u:
       </div>
       <div className={`grid gap-2 ${block.columnCount === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
         {block.columns.slice(0, block.columnCount).map((col, ci) => (
-          <div key={ci} className="rounded-lg border p-2 space-y-1" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)" }}>
+          <div key={ci} className="rounded-lg border p-2 space-y-1" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)" }}>
             <span className="text-[10px] font-medium" style={{ color: "var(--ck-text-muted)" }}>Col {ci + 1}</span>
             {col.map((sub, si) => (
-              <div key={sub.id} className="flex items-start gap-1 rounded border p-1.5" style={{ borderColor: "var(--ck-border)" }}>
+              <div key={sub.id} className="flex items-start gap-1 rounded border p-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <div className="flex-1 min-w-0">
                   {sub.type === "text" && (
                     <textarea value={(sub as TextBlock).content} onChange={(e) => updateSubBlock(ci, si, { content: e.target.value })} rows={2} className={`w-full ${inputCls} font-mono text-[11px]`} style={inputStyle} />
@@ -484,7 +484,7 @@ function ColumnsEditor({ block, onUpdate }: { block: ColumnsBlock; onUpdate: (u:
             ))}
             <div className="flex gap-1">
               {ALLOWED_TYPES.map((t) => (
-                <button key={t} onClick={() => addSubBlock(ci, t)} className="rounded border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}>
+                <button key={t} onClick={() => addSubBlock(ci, t)} className="rounded border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
                   <Plus size={8} className="inline" /> {t}
                 </button>
               ))}
@@ -519,7 +519,7 @@ function TourCardEditor({ block, onUpdate, onUpload }: { block: TourCardBlock; o
             <button onClick={() => onUpload?.(block.id)} className="mt-1 text-xs font-medium" style={{ color: "var(--ck-accent)" }}>Replace</button>
           </div>
         ) : (
-          <button onClick={() => onUpload?.(block.id)} className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-accent)" }}>
+          <button onClick={() => onUpload?.(block.id)} className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-accent)" }}>
             <ImageIcon size={14} /> Upload Tour Image
           </button>
         )}
@@ -566,7 +566,7 @@ function FooterEditor({ block, onUpdate }: { block: FooterBlock; onUpdate: (u: P
                 key={key}
                 onClick={() => toggleSocial(key)}
                 className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-all ${key in (block.socials || {}) ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
-                style={{ borderColor: key in (block.socials || {}) ? p.brandColor : "var(--ck-border)", color: "var(--ck-text)", outlineColor: key in (block.socials || {}) ? p.brandColor : undefined }}
+                style={{ borderColor: key in (block.socials || {}) ? p.brandColor : "var(--ck-border-subtle)", color: "var(--ck-text)", outlineColor: key in (block.socials || {}) ? p.brandColor : undefined }}
               >
                 <img src={p.icon} alt="" width="16" height="16" className="rounded" />
                 {p.label}

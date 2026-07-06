@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { Camera, CalendarBlank } from "@phosphor-icons/react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -287,33 +288,40 @@ export default function PhotosPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Trip Photos</h1>
-      <p className="text-sm text-gray-500">Send trip photos and a thank-you email to guests. Select a recent trip, add a batch of links, and confirm the gallery preview before sending.</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Operations</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Trip Photos</h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Send trip photos and a thank-you email to guests. Select a recent trip, add a batch of links, and confirm the gallery preview before sending.</p>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="anim-fade-up anim-d1 grid gap-6 lg:grid-cols-2">
         {/* Left: Select Trip */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h2 className="font-semibold mb-3">Select Trip (Last 7 Days)</h2>
+        <div className="ui-card p-4">
+          <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Select Trip (Last 7 Days)</h2>
           {slots.length === 0 ? (
-            <p className="text-sm text-gray-400">No recent trips with bookings.</p>
+            <div className="ui-empty">
+              <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
+              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No recent trips</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Trips with bookings from the last 7 days show up here.</p>
+            </div>
           ) : (
             <div className="space-y-2 max-h-[50vh] overflow-auto">
               {slots.map(group => (
                 <div key={group.date}>
-                  <p className="text-xs font-semibold text-gray-400 mb-1">{group.label}</p>
+                  <p className="ui-mono-label mb-1 !text-[10px]">{group.label}</p>
                   {group.slots.map(s => {
                     const isSelected = selectedSlot?.id === s.id;
                     return (
                       <button key={s.id} onClick={() => setSelectedSlot(s)}
-                        className={"w-full text-left flex items-center gap-3 p-3 rounded-lg border mb-1 transition-colors " +
-                          (isSelected ? "border-blue-400 bg-blue-50" : "border-gray-100 hover:border-gray-200")}>
-                        <span className={"w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs " +
-                          (isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300")}>
+                        className={"mb-1 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all " +
+                          (isSelected ? "border-[var(--ck-accent)] bg-[var(--ck-accent-soft)]" : "hover:border-[var(--ck-border-strong)]")}>
+                        <span className={"flex h-5 w-5 items-center justify-center rounded-full text-xs " +
+                          (isSelected ? "bg-[var(--ck-accent)] text-white" : "border-2 border-[var(--ck-border-strong)]")}>
                           {isSelected ? "✓" : ""}
                         </span>
                         <div>
-                          <p className="font-semibold text-sm">{(s as any).tours?.name}</p>
-                          <p className="text-xs text-gray-400">{fmtTime(s.start_time)} · {s.booked} guests</p>
+                          <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{(s as any).tours?.name}</p>
+                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(s.start_time)} · {s.booked} guests</p>
                         </div>
                       </button>
                     );
@@ -328,10 +336,10 @@ export default function PhotosPage() {
         <div className="space-y-4">
           {/* Google Drive Upload */}
           {gdriveConnected && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="ui-card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold">Upload to Google Drive</h2>
-                <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">{gdriveEmail}</span>
+                <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Upload to Google Drive</h2>
+                <span className="ui-status ui-pill-success">{gdriveEmail}</span>
               </div>
 
               {/* Drop zone */}
@@ -341,36 +349,37 @@ export default function PhotosPage() {
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={"rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors " +
-                  (dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50 hover:border-gray-400")}
+                  (dragOver ? "border-[var(--ck-accent)] bg-[var(--ck-accent-soft)]" : "border-[var(--ck-border-strong)] hover:border-[var(--ck-accent)]")}
+                style={dragOver ? undefined : { background: "var(--ck-surface-sunken)" }}
               >
                 <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>
                   {dragOver ? "Drop files here" : "Drag & drop photos or click to browse"}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">Images and videos accepted</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Images and videos accepted</p>
               </div>
 
               {/* Selected files */}
               {uploadFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected</span>
-                    <span>{(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    <span className="tabular-nums">{uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected</span>
+                    <span className="tabular-nums">{(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-auto">
                     {uploadFiles.map((f, i) => (
                       <div key={f.name + i} className="relative group">
-                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full object-cover rounded-lg border border-gray-200" />
+                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full rounded-lg object-cover" style={{ border: "1px solid var(--ck-border-subtle)" }} />
                         <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                           className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           ✕
                         </button>
-                        <p className="text-[10px] text-gray-400 truncate mt-0.5">{f.name}</p>
+                        <p className="mt-0.5 truncate text-[10px]" style={{ color: "var(--ck-text-muted)" }}>{f.name}</p>
                       </div>
                     ))}
                   </div>
                   <button onClick={uploadToDrive} disabled={uploading || !selectedSlot}
-                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                    className="ui-btn ui-btn-primary w-full disabled:opacity-50">
                     {uploading ? "Uploading..." : !selectedSlot ? "Select a trip first" : "Upload to Google Drive"}
                   </button>
                 </div>
@@ -378,38 +387,38 @@ export default function PhotosPage() {
 
               {/* Upload progress */}
               {uploading && (
-                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
-                  <div className="flex items-center justify-between text-xs font-semibold text-blue-700">
+                <div className="mt-3 rounded-xl p-3" style={{ background: "var(--ck-accent-soft)" }}>
+                  <div className="flex items-center justify-between text-xs font-semibold" style={{ color: "var(--ck-accent)" }}>
                     <span>Uploading to Drive</span>
-                    <span>{uploadProgress}%</span>
+                    <span className="tabular-nums">{uploadProgress}%</span>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-blue-100">
-                    <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: uploadProgress + "%" }} />
+                  <div className="ui-progress mt-2">
+                    <div className="ui-progress-fill" style={{ width: uploadProgress + "%" }} />
                   </div>
                 </div>
               )}
 
               {/* Folder link result */}
               {uploadedFolderUrl && (
-                <div className="mt-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50">
-                  <p className="text-xs font-semibold text-emerald-800 mb-1">Photos uploaded successfully</p>
-                  <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline break-all">{uploadedFolderUrl}</a>
-                  <p className="text-xs text-emerald-600 mt-2">Click &quot;Send Photos&quot; below to share this link with customers.</p>
+                <div className="mt-3 rounded-xl p-3" style={{ background: "var(--ck-success-soft)", border: "1px solid color-mix(in srgb, var(--ck-success) 25%, transparent)" }}>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--ck-success)" }}>Photos uploaded successfully</p>
+                  <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="break-all text-xs underline" style={{ color: "var(--ck-ocean)" }}>{uploadedFolderUrl}</a>
+                  <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Click &quot;Send Photos&quot; below to share this link with customers.</p>
                 </div>
               )}
             </div>
           )}
 
           {/* Manual URL paste (always available) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">{gdriveConnected ? "Photo Link" : "Photo URLs"}</h2>
+          <div className="ui-card p-4">
+            <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{gdriveConnected ? "Photo Link" : "Photo URLs"}</h2>
             {!gdriveConnected && (
               <>
-                <p className="text-xs text-gray-400 mb-3">Paste share links from Google Drive, Dropbox, or any host. Connect Google Drive in Settings for direct uploads.</p>
-                <div className="mb-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3">
+                <p className="mb-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Paste share links from Google Drive, Dropbox, or any host. Connect Google Drive in Settings for direct uploads.</p>
+                <div className="mb-4 rounded-xl border border-dashed p-3" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)" }}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bulk import</p>
-                    <button type="button" onClick={importBulkUrls} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    <p className="ui-mono-label !text-[10px]">Bulk import</p>
+                    <button type="button" onClick={importBulkUrls} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                       Import links
                     </button>
                   </div>
@@ -418,7 +427,7 @@ export default function PhotosPage() {
                     onChange={(e) => setBulkInput(e.target.value)}
                     placeholder="Paste one image URL per line"
                     rows={3}
-                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    className="ui-control mt-2 w-full"
                   />
                 </div>
               </>
@@ -428,37 +437,39 @@ export default function PhotosPage() {
                 <div key={i} className="flex items-start gap-2">
                   <input type="text" value={u} onChange={e => updateUrl(i, e.target.value)}
                     placeholder="https://drive.google.com/drive/folders/..."
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                    className="ui-control flex-1" />
                   {urls.length > 1 && (
-                    <button onClick={() => removeUrl(i)} className="shrink-0 px-2 py-2 text-sm text-gray-400 hover:text-red-500">✕</button>
+                    <button onClick={() => removeUrl(i)} className="shrink-0 px-2 py-2 text-sm transition-colors hover:text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}>✕</button>
                   )}
                 </div>
               ))}
             </div>
             {!gdriveConnected && (
-              <button onClick={addUrl} className="mt-2 text-sm text-blue-600 font-medium hover:text-blue-800">+ Add another link</button>
+              <button onClick={addUrl} className="mt-2 text-sm font-medium" style={{ color: "var(--ck-accent)" }}>+ Add another link</button>
             )}
           </div>
 
           <button onClick={sendPhotos} disabled={sending || !selectedSlot || urls.every(u => !u.trim())}
-            className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+            className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
             {sending ? "Sending..." : "Send Photos to Lead Bookers"}
           </button>
 
           {sending && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-blue-700">
+            <div className="rounded-xl p-3" style={{ background: "var(--ck-accent-soft)" }}>
+              <div className="flex items-center justify-between text-xs font-semibold" style={{ color: "var(--ck-accent)" }}>
                 <span>Sending photo batch</span>
-                <span>{sendProgress}%</span>
+                <span className="tabular-nums">{sendProgress}%</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-blue-100">
-                <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: `${sendProgress}%` }} />
+              <div className="ui-progress mt-2">
+                <div className="ui-progress-fill" style={{ width: `${sendProgress}%` }} />
               </div>
             </div>
           )}
 
           {result && (
-            <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
+            <div className="rounded-lg p-3 text-sm" style={result.error
+              ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
+              : { background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
               {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
             </div>
           )}
@@ -466,14 +477,16 @@ export default function PhotosPage() {
       </div>
 
       {/* History */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="ui-card anim-fade-up anim-d2 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">Recently Sent</h2>
-          <span className="text-xs text-gray-500">{sentHistory.length} items</span>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recently Sent</h2>
+          <span className="ui-mono-label !text-[10px]"><span className="tabular-nums">{sentHistory.length}</span> items</span>
         </div>
         {sentHistory.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-            No photo batches have been sent yet.
+          <div className="ui-empty mt-3">
+            <span className="ui-icon-chip"><Camera size={19} /></span>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing sent yet</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Photo batches you send to guests will appear here.</p>
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -488,20 +501,20 @@ export default function PhotosPage() {
               const driveThumb = driveFileThumb(url);
               const showImg = isImageUrl(url) || Boolean(driveThumb);
               return (
-                <a key={p.id} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 transition-colors hover:border-gray-300">
+                <a key={p.id} href={url} target="_blank" rel="noreferrer" className="ui-card ui-card-hover block overflow-hidden !rounded-xl">
                   {showImg ? (
                     <img src={driveThumb || url} alt="Sent trip photo" loading="lazy" referrerPolicy="no-referrer" className="h-36 w-full object-cover" />
                   ) : (
-                    <div className="flex h-36 w-full items-center justify-center bg-blue-50 text-blue-500">
+                    <div className="flex h-36 w-full items-center justify-center" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
                       <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor" aria-hidden="true">
                         <path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" />
                       </svg>
                     </div>
                   )}
                   <div className="space-y-1 p-3 text-sm">
-                    <p className="truncate font-medium text-gray-900">{(p as any).slots?.tours?.name || "Trip photo"}</p>
-                    <p className="text-xs text-gray-500">{dateLabel}</p>
-                    <p className="truncate text-xs text-blue-600">{url}</p>
+                    <p className="truncate font-medium" style={{ color: "var(--ck-text-strong)" }}>{(p as any).slots?.tours?.name || "Trip photo"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{dateLabel}</p>
+                    <p className="truncate text-xs" style={{ color: "var(--ck-ocean)" }}>{url}</p>
                   </div>
                 </a>
               );

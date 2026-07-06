@@ -90,7 +90,7 @@ Every team member has one of three roles. Your role decides what you can see and
 |---|---|
 | **Operator** | Day-to-day work: bookings, inbox, manifest/check-in, refunds, marketing, photos, weather. Cannot open Settings, Billing, Notifications, or team management. |
 | **Main Admin** | Everything an Operator can do, **plus** Settings, Billing, team management, integrations, invoices, and data requests. Full control of your business. |
-| **Super Admin** | Platform staff at BookingTours (not a tenant role). Covered in the separate Super Admin Manual. |
+
 
 **Important:** Menu items you don't have permission for are hidden, and the system also blocks access if you try to reach them by URL. A Main Admin can grant a regular admin access to **specific Settings sections** without making them a full Main Admin (see Section 36).
 
@@ -113,7 +113,7 @@ If you're setting up a brand-new business, do these in order. Each links to its 
 
 ## 4. Dashboard
 
-**Where:** The home screen (the logo/house icon), available to everyone.
+**Where:** The home screen (the logo/house icon)
 
 Your dashboard is mission control for the day. At the top you'll see quick figures:
 
@@ -309,7 +309,7 @@ All customer conversations from WhatsApp and your website chat land here. Your A
 - WhatsApp only lets you message a customer freely for **24 hours** after their last message (a Meta rule). The system warns you when you're outside that window.
 - The bot automatically escalates sensitive situations to you — medical emergencies, legal threats, accessibility questions, data requests, fraud claims, or an explicit "talk to a human".
 
-## 16. Broadcasts
+## 16. Broadcastsu
 
 **Where:** **Broadcasts** in the menu (Operator and above).
 

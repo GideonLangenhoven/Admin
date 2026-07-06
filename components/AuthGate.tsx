@@ -332,31 +332,42 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (checking) {
     const hasHint = typeof document !== "undefined" && document.cookie.includes("ck_session_hint=1");
     if (hasHint) {
+      // Skeleton of the real shell: pine rail + paper content
       return (
-        <div className="flex min-h-screen bg-[var(--ck-bg)]">
-          <div className="w-56 shrink-0 bg-[var(--ck-surface)] border-r border-[var(--ck-border)]">
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-8 rounded bg-[var(--ck-border-subtle)] animate-pulse" />
-              ))}
+        <div className="flex min-h-screen">
+          <div
+            className="hidden md:block w-64 shrink-0 border-r"
+            style={{
+              background: "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
+              borderColor: "var(--ck-sidebar-border)",
+            }}
+          >
+            <div className="p-5 space-y-3">
+              <div className="h-8 w-3/4 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.08)" }} />
+              <div className="pt-4 space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.05)" }} />
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex-1 p-6">
-            <div className="h-8 w-48 rounded bg-[var(--ck-border-subtle)] animate-pulse mb-6" />
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-16 rounded-lg bg-[var(--ck-border-subtle)] animate-pulse" />
+          <div className="flex-1 p-8">
+            <div className="ui-skeleton h-8 w-48 mb-8" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="ui-skeleton h-[130px] !rounded-2xl" />
               ))}
             </div>
+            <div className="ui-skeleton h-[280px] !rounded-2xl" />
           </div>
         </div>
       );
     }
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-          <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-[var(--ck-border-subtle)]" />
-          <p className="mt-4 text-sm ui-text-muted">Checking admin session...</p>
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card w-full max-w-sm p-8 text-center">
+          <BrandMark size={40} className="mx-auto mb-4 animate-pulse" />
+          <p className="text-sm ui-text-muted">Checking admin session...</p>
         </div>
       </div>
     );
@@ -367,59 +378,64 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!authed) return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-      <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-        <div className="mb-6 flex flex-col items-center">
-          <BrandMark size={44} className="mb-4" />
-          <h1 className="text-2xl text-[var(--ck-text-strong)]">
-            <BrandWordmark />
-          </h1>
-          <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
-        </div>
-
-        {locked ? (
-          <div className="text-center">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-4">
-              <p className="text-sm font-semibold text-red-700 mb-2">Account Locked</p>
-              <p className="text-xs text-red-600 leading-relaxed">
-                Too many failed attempts. Your account has been locked for 30 minutes.
-                {resetSent
-                  ? " A password setup email has been sent."
-                  : " If this is your account, a password setup email will be sent."}
-              </p>
-            </div>
-            <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">
-              Set up or reset password
-            </a>
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="anim-fade-up w-full max-w-sm">
+        <div className="ui-card relative overflow-hidden p-8 text-center" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+          {/* Pine crown with the brand trail — the card wears the badge */}
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-bt-gradient" aria-hidden="true" />
+          <div className="mb-6 mt-1 flex flex-col items-center">
+            <BrandMark size={46} className="mb-4" />
+            <h1 className="font-display text-[26px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+              <BrandWordmark />
+            </h1>
+            <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
           </div>
-        ) : (
-          <>
-            <input type="email" value={email}
-              onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
-              onKeyDown={e => { if (e.key === "Enter") login(); }}
-              placeholder="Email address"
-              autoComplete="email"
-              className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
-            <input type="password" value={pass}
-              onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
-              onKeyDown={e => { if (e.key === "Enter") login(); }}
-              placeholder="Password"
-              autoComplete="current-password"
-              className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
+          {locked ? (
+            <div className="text-center">
+              <div className="rounded-xl border p-5 mb-4" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
+                <p className="text-sm font-semibold mb-2" style={{ color: "var(--ck-danger)" }}>Account Locked</p>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--ck-danger)" }}>
+                  Too many failed attempts. Your account has been locked for 30 minutes.
+                  {resetSent
+                    ? " A password setup email has been sent."
+                    : " If this is your account, a password setup email will be sent."}
+                </p>
+              </div>
+              <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">
+                Set up or reset password
+              </a>
+            </div>
+          ) : (
+            <>
+              <input type="email" value={email}
+                onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
+                onKeyDown={e => { if (e.key === "Enter") login(); }}
+                placeholder="Email address"
+                autoComplete="email"
+                className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
-            {error && <p className="mb-3 text-xs text-[var(--ck-danger)]">{error}</p>}
-            {notice && <p className="mb-3 text-xs text-emerald-700">{notice}</p>}
+              <input type="password" value={pass}
+                onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
+                onKeyDown={e => { if (e.key === "Enter") login(); }}
+                placeholder="Password"
+                autoComplete="current-password"
+                className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
 
-            <button onClick={login} disabled={loading} className="w-full rounded-xl bg-bt-gradient py-3 text-sm font-semibold text-white hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50">
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
+              {error && <p className="mb-3 text-xs" style={{ color: "var(--ck-danger)" }}>{error}</p>}
+              {notice && <p className="mb-3 text-xs" style={{ color: "var(--ck-success)" }}>{notice}</p>}
 
-            <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
-              <a href="/change-password" className="hover:underline">Set up or reset password</a>
-            </p>
-          </>
-        )}
+              <button onClick={login} disabled={loading} className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50">
+                {loading ? "Signing in..." : "Sign In"}
+              </button>
+
+              <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
+                <a href="/change-password" className="hover:underline">Set up or reset password</a>
+              </p>
+            </>
+          )}
+        </div>
+        <p className="ui-mono-label mt-5 text-center !text-[9.5px]">Built for adventure operators</p>
       </div>
     </div>
   );
@@ -427,12 +443,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
   if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-md p-8 text-center space-y-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "var(--ck-warning-soft)" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--ck-warning)" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
+          <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
           </div>
-          <h1 className="text-xl font-semibold text-[var(--ck-text-strong)]">
+          <h1 className="font-display text-[22px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             {subscriptionStatus === "PAUSED" ? "Your account is paused" : "Your account has been suspended"}
           </h1>
           <p className="text-sm text-[var(--ck-text-muted)]">
@@ -441,7 +457,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               : "Your subscription has been suspended. Please contact support or reactivate your subscription to continue."}
           </p>
           {role === "MAIN_ADMIN" && (
-            <a href="/billing" className="inline-block mt-4 px-5 py-3 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
+            <a href="/billing" className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
               Go to Billing
             </a>
           )}

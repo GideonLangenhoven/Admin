@@ -1,7 +1,7 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins } from "../_shared/tenant.ts";
+import { createServiceClient, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -10,8 +10,35 @@ const supabase = createServiceClient();
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
   const origin = req?.headers?.get("origin") || "";
-  const allowed = origins.includes(origin) ? origin : origins[0];
+  const allowed = isAllowedOrigin(origin, origins) ? origin : origins[0];
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
+}
+
+// Caller authorization — this function moves money, so it must never be
+// callable anonymously (verify_jwt is false for internal cross-function
+// calls, which use the service-role key as Bearer). Two caller classes:
+//   1. Internal (yoco-webhook, batch-refund, weather flows) — service key.
+//   2. Admin dashboard — Supabase Auth JWT of an active admin whose
+//      business matches the booking (SUPER_ADMIN exempt).
+async function authorizeRefund(req: any, booking: any): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (token && token === SUPABASE_KEY) return { ok: true };
+  if (!token) return { ok: false, status: 401, message: "Admin session required" };
+  try {
+    const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !userRes?.user) return { ok: false, status: 401, message: "Admin session required" };
+    const { data: admin } = await supabase
+      .from("admin_users")
+      .select("business_id, role, suspended")
+      .eq("user_id", userRes.user.id)
+      .maybeSingle();
+    if (!admin || admin.suspended) return { ok: false, status: 403, message: "Admin access required" };
+    if (/super/i.test(admin.role || "") || admin.business_id === booking.business_id) return { ok: true };
+    return { ok: false, status: 403, message: "You can only refund bookings for your own business" };
+  } catch {
+    return { ok: false, status: 401, message: "Admin session required" };
+  }
 }
 
 Deno.serve(async (req: any) => {
@@ -22,11 +49,19 @@ Deno.serve(async (req: any) => {
     const { booking_id, amount } = body;
     if (!booking_id) return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: getCors(req) });
 
+    // Reject tokenless calls before touching the DB so anonymous callers
+    // can't probe which booking IDs exist.
+    const rawAuth = (req.headers.get("authorization") || req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!rawAuth) return new Response(JSON.stringify({ error: "Admin session required" }), { status: 401, headers: getCors(req) });
+
     const { data: booking, error: bErr } = await supabase.from("bookings")
       .select("*, slots(start_time), tours(name)")
       .eq("id", booking_id)
       .single();
     if (bErr || !booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
+
+    const authz = await authorizeRefund(req, booking);
+    if (!authz.ok) return new Response(JSON.stringify({ error: authz.message }), { status: authz.status, headers: getCors(req) });
 
     // Guard: voucher-paid bookings must not hit Yoco — they should be refunded via voucher
     const pm = (booking.payment_method || "").toUpperCase();
@@ -57,7 +92,7 @@ Deno.serve(async (req: any) => {
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
-    const refundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
+    let refundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
     if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Invalid refund amount" }), { status: 400, headers: getCors(req) });
 
     const totalAmount = Number(booking.total_amount || 0);

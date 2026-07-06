@@ -19,98 +19,158 @@
 :root,
 html.light {
   color-scheme: light;
-  --ck-bg: #f7f5f0;
-  /* Warm paper — BookingTours brand canvas */
-  --ck-surface: #ffffff;
-  --ck-surface-elevated: #ffffff;
-  --ck-border-subtle: #e7e3d8;
-  --ck-border-strong: #d6d1c2;
+  /* ── Design System v3 "Field Console" (docs/ADMIN_REDESIGN_SPEC.md):
+     warm paper canvas under atmospheric light, deep-pine rail, layered
+     pine-tinted elevation. Pine is interactive; amber is the trail marker;
+     ocean/fjord carry data. ── */
+  --ck-bg: #F7F5F0;
+  --ck-surface: #FFFFFF;
+  --ck-surface-warm: #FCFBF7;
+  --ck-surface-sunken: #F1EDE5;
+  --ck-surface-elevated: #FFFFFF;
+  --ck-border-subtle: rgba(16, 44, 32, 0.09);
+  --ck-border-strong: rgba(16, 44, 32, 0.17);
 
-  --ck-text-strong: #111827;
-  --ck-text: #374151;
-  --ck-text-muted: #6b7280;
+  --ck-text-strong: #17221C;
+  --ck-text: #46534B;
+  --ck-text-muted: #66736B;
 
-  --ck-accent: #125e40;
-  /* Pine 700 */
-  --ck-accent-hover: #0e4831;
-  --ck-accent-soft: #dcefe4;
+  --ck-accent: #125E40;
+  /* Pine — primary interactive */
+  --ck-accent-hover: #0E4831;
+  --ck-accent-soft: rgba(18, 94, 64, 0.08);
 
-  --ck-amber: #b4641c;
-  /* Sunset amber — decorative accent, AA on white */
-  --ck-amber-soft: #f7e8d8;
+  --ck-amber: #B4641C;
+  /* Sunset amber, text-safe — add-ons, combo, warm highlights */
+  --ck-amber-bright: #D9822F;
+  /* Decorative amber — trail markers, dots, gradients (not for small text) */
+  --ck-amber-soft: rgba(217, 130, 47, 0.13);
 
-  --ck-success: #10b981;
-  --ck-success-soft: #d1fae5;
-  --ck-danger: #ef4444;
-  --ck-danger-soft: #fee2e2;
-  --ck-warning: #f59e0b;
-  --ck-warning-soft: #fef3c7;
+  --ck-ocean: #0F6773;
+  /* Ocean teal — info accents, chart hue 2 */
+  --ck-ocean-soft: rgba(15, 103, 115, 0.10);
+  --ck-fjord: #3E7CA6;
+  /* Fjord blue — data viz only */
 
-  --ck-sidebar: #f1eee6;
-  --ck-sidebar-border: #e4e0d3;
-  --ck-sidebar-text: #4e5449;
-  --ck-sidebar-muted: #98978a;
-  --ck-sidebar-hover: #eae6da;
-  --ck-sidebar-active-bg: #ffffff;
-  --ck-sidebar-active-border: #eae6da;
-  --ck-sidebar-active-text: #111827;
+  --ck-success: #128A5C;
+  --ck-success-soft: rgba(18, 138, 92, 0.10);
+  --ck-danger: #C6453A;
+  --ck-danger-soft: rgba(198, 69, 58, 0.09);
+  --ck-warning: #B47C15;
+  --ck-warning-soft: rgba(217, 150, 32, 0.12);
+
+  /* Chart ramp — pine → ocean → amber → fjord → clay → moss */
+  --ck-chart-1: #125E40;
+  --ck-chart-2: #0F6773;
+  --ck-chart-3: #D9822F;
+  --ck-chart-4: #3E7CA6;
+  --ck-chart-5: #A34D3F;
+  --ck-chart-6: #6B7F3A;
+  --ck-chart-grid: rgba(16, 44, 32, 0.07);
+
+  /* ── Sidebar: the deep-pine rail (dark in BOTH themes — the signature) ── */
+  --ck-sidebar: #0F2B1F;
+  --ck-sidebar-grad-top: #113022;
+  --ck-sidebar-grad-bottom: #0C2117;
+  --ck-sidebar-border: rgba(244, 241, 232, 0.08);
+  --ck-sidebar-text: #B7C9BD;
+  --ck-sidebar-muted: #85998C;
+  --ck-sidebar-hover: rgba(244, 241, 232, 0.055);
+  --ck-sidebar-active-bg: rgba(244, 241, 232, 0.09);
+  --ck-sidebar-active-border: rgba(244, 241, 232, 0.14);
+  --ck-sidebar-active-text: #F6F3EA;
+  --ck-sidebar-icon: #8FA79A;
+  --ck-sidebar-icon-active: #4FE0A6;
 
   --ck-radius-sm: 6px;
   --ck-radius-md: 10px;
   --ck-radius-lg: 14px;
   --ck-radius-xl: 20px;
-  /* Modern, restrained shadow stack — inspired by Linear / Vercel.
-     Interior shadows use hairline borders instead of heavy drop-shadows. */
-  --ck-shadow-sm: 0 1px 0 0 rgba(17, 24, 39, 0.03), 0 1px 2px -1px rgba(17, 24, 39, 0.04);
-  --ck-shadow-md: 0 1px 0 0 rgba(17, 24, 39, 0.03), 0 4px 12px -2px rgba(17, 24, 39, 0.04), 0 2px 4px -1px rgba(17, 24, 39, 0.03);
-  --ck-shadow-lg: 0 12px 32px -8px rgba(17, 24, 39, 0.10), 0 4px 12px -4px rgba(17, 24, 39, 0.05);
-  --ck-ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Primary button text: white on dark bg in light mode */
+  /* Layered pine-tinted elevation — contact shadow + soft ambient,
+     cards carry an inset top highlight like lifted paper. */
+  --ck-shadow-sm: 0 1px 2px rgba(15, 43, 31, 0.06), 0 1px 3px rgba(15, 43, 31, 0.04);
+  --ck-shadow-md: 0 2px 4px rgba(15, 43, 31, 0.05), 0 10px 24px -8px rgba(15, 43, 31, 0.12);
+  --ck-shadow-lg: 0 4px 10px rgba(15, 43, 31, 0.06), 0 28px 56px -20px rgba(15, 43, 31, 0.20);
+  --ck-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 2px rgba(15, 43, 31, 0.05), 0 10px 28px -14px rgba(15, 43, 31, 0.12);
+  --ck-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 4px rgba(15, 43, 31, 0.06), 0 20px 44px -16px rgba(15, 43, 31, 0.18);
+  --ck-shadow-hero: 0 28px 64px -24px rgba(15, 43, 31, 0.45), 0 4px 12px -4px rgba(15, 43, 31, 0.20);
+  --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --ck-skeleton-highlight: rgba(255, 255, 255, 0.60);
+  --ck-noise-opacity: 0.045;
+
+  /* Primary button text: white on pine in light mode */
   --ck-btn-primary-text: #ffffff;
 }
 
 html.dark {
   color-scheme: dark;
-  --ck-bg: #131614;
-  --ck-surface: #1b201c;
-  --ck-surface-elevated: #232923;
-  --ck-border-subtle: #2a302b;
-  --ck-border-strong: #363e37;
+  /* Pine-black night — mint accent, cream hairlines, deep lush shadows */
+  --ck-bg: #0B0E0C;
+  --ck-surface: #131814;
+  --ck-surface-warm: #151A16;
+  --ck-surface-sunken: #0E120F;
+  --ck-surface-elevated: #1A211B;
+  --ck-border-subtle: rgba(242, 244, 239, 0.09);
+  --ck-border-strong: rgba(242, 244, 239, 0.17);
 
-  --ck-text-strong: #f0f0ec;
-  --ck-text: #b8bab2;
-  --ck-text-muted: #7c7f76;
+  --ck-text-strong: #F1F3EE;
+  --ck-text: #B5BCB3;
+  --ck-text-muted: #7E867C;
 
-  --ck-accent: #00d98b;
-  --ck-accent-hover: #33e4a4;
-  --ck-accent-soft: rgba(0, 217, 139, 0.10);
+  --ck-accent: #00D98B;
+  --ck-accent-hover: #33E4A4;
+  --ck-accent-soft: rgba(0, 217, 139, 0.12);
 
-  --ck-amber: #e89b4b;
+  --ck-amber: #E89B4B;
+  --ck-amber-bright: #F0A65A;
   --ck-amber-soft: rgba(232, 155, 75, 0.14);
 
-  --ck-success: #00d98b;
+  --ck-ocean: #3FC1D1;
+  --ck-ocean-soft: rgba(63, 193, 209, 0.12);
+  --ck-fjord: #6FA8D6;
+
+  --ck-success: #00D98B;
   --ck-success-soft: rgba(0, 217, 139, 0.10);
-  --ck-danger: #f0586a;
+  --ck-danger: #F0586A;
   --ck-danger-soft: rgba(240, 88, 106, 0.10);
-  --ck-warning: #f5a623;
+  --ck-warning: #F5A623;
   --ck-warning-soft: rgba(245, 166, 35, 0.10);
 
-  --ck-sidebar: #131614;
-  --ck-sidebar-border: #2a302b;
-  --ck-sidebar-text: #9a9d93;
-  --ck-sidebar-muted: #666a61;
-  --ck-sidebar-hover: #1b201c;
-  --ck-sidebar-active-bg: #1b201c;
-  --ck-sidebar-active-border: #363e37;
-  --ck-sidebar-active-text: #f0f0ec;
+  --ck-chart-1: #00D98B;
+  --ck-chart-2: #3FC1D1;
+  --ck-chart-3: #E89B4B;
+  --ck-chart-4: #6FA8D6;
+  --ck-chart-5: #D07A6A;
+  --ck-chart-6: #9DB25E;
+  --ck-chart-grid: rgba(242, 244, 239, 0.08);
 
-  --ck-shadow-sm: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.30);
-  --ck-shadow-md: 0 1px 0 0 rgba(0, 0, 0, 0.35), 0 4px 12px -2px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.25);
-  --ck-shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
+  --ck-sidebar: #090D0A;
+  --ck-sidebar-grad-top: #0A0F0B;
+  --ck-sidebar-grad-bottom: #070B08;
+  --ck-sidebar-border: rgba(244, 241, 232, 0.08);
+  --ck-sidebar-text: #A2B0A4;
+  --ck-sidebar-muted: #6F7D72;
+  --ck-sidebar-hover: rgba(244, 241, 232, 0.05);
+  --ck-sidebar-active-bg: rgba(244, 241, 232, 0.07);
+  --ck-sidebar-active-border: rgba(244, 241, 232, 0.12);
+  --ck-sidebar-active-text: #F1F3EE;
+  --ck-sidebar-icon: #7E8E81;
+  --ck-sidebar-icon-active: #00D98B;
 
-  /* Primary button text: dark on light bg in dark mode */
-  --ck-btn-primary-text: #161616;
+  --ck-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ck-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px -10px rgba(0, 0, 0, 0.55);
+  --ck-shadow-lg: 0 24px 48px -20px rgba(0, 0, 0, 0.6), 0 4px 12px -6px rgba(0, 0, 0, 0.4);
+  --ck-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  --ck-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 4px rgba(0, 0, 0, 0.5), 0 22px 48px -14px rgba(0, 0, 0, 0.65);
+  --ck-shadow-hero: 0 28px 64px -24px rgba(0, 0, 0, 0.75), 0 4px 12px -4px rgba(0, 0, 0, 0.5);
+
+  --ck-skeleton-highlight: rgba(255, 255, 255, 0.05);
+  --ck-noise-opacity: 0.06;
+
+  /* Primary button text: ink on mint in dark mode */
+  --ck-btn-primary-text: #06130C;
 }
 
 html,
@@ -120,14 +180,76 @@ body {
 
 body {
   margin: 0;
-  background: var(--ck-bg);
+  /* Warm paper under atmospheric light: a breath of pine top-right,
+     a breath of amber bottom-left. The canvas is alive, never flat. */
+  background:
+    radial-gradient(1100px 700px at 90% -10%, rgba(18, 94, 64, 0.055), transparent 60%),
+    radial-gradient(900px 650px at -8% 108%, rgba(217, 130, 47, 0.05), transparent 55%),
+    var(--ck-bg);
   color: var(--ck-text);
+  font-feature-settings: "cv11", "ss01", "ss03", "cv02", "calt";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  /* Inter OpenType features: alternate 6/9, straight lowercase l, tabular numerals,
-     contextual alternates. Used by Linear, Vercel, GitHub Next. */
-  font-feature-settings: "cv11", "ss01", "ss03", "cv02", "calt";
+}
+
+html.dark body {
+  background:
+    radial-gradient(1100px 700px at 90% -10%, rgba(0, 217, 139, 0.05), transparent 60%),
+    radial-gradient(900px 650px at -8% 108%, rgba(232, 155, 75, 0.04), transparent 55%),
+    var(--ck-bg);
+}
+
+/* Paper grain — sits above the canvas washes, below all content. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: var(--ck-noise-opacity);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ck-accent) 18%, transparent);
+}
+
+/* Thin, quiet scrollbars app-wide */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ck-text-muted) 40%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ck-text-muted) 35%, transparent);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ck-text-muted) 55%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Every table header in the app speaks data: mono, tracked, uppercase.
+   Page-level classes may override size/color; the voice stays. */
+th {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  letter-spacing: 0.1em;
 }
 
 /* Default numeric rendering: proportional for prose, but opt-in tabular via utility */
@@ -164,6 +286,9 @@ body {
 }
 
 @layer components {
+
+  /* ── Surfaces ─────────────────────────────────────────────── */
+
   .ui-surface {
     @apply rounded-xl border;
     background: var(--ck-surface);
@@ -195,15 +320,58 @@ body {
     transform: translateY(-1px);
   }
 
+  /* THE card — lifted paper: warm gradient, inset top highlight, layered
+     ambient shadow. Replaces both .ui-surface and hand-rolled bg-white cards. */
+  .ui-card {
+    border-radius: 16px;
+    border: 1px solid var(--ck-border-subtle);
+    background: linear-gradient(180deg, var(--ck-surface) 0%, var(--ck-surface-warm) 100%);
+    box-shadow: var(--ck-shadow-card);
+  }
+
+  .ui-card-hover {
+    transition: transform 180ms var(--ck-ease),
+                box-shadow 180ms var(--ck-ease),
+                border-color 180ms var(--ck-ease);
+  }
+
+  .ui-card-hover:hover {
+    transform: translateY(-2px);
+    border-color: var(--ck-border-strong);
+    box-shadow: var(--ck-shadow-card-hover);
+  }
+
+  /* Glass chrome — topbar, sticky headers */
+  .ui-glass {
+    background: color-mix(in srgb, var(--ck-bg) 78%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  /* ── Type voices ──────────────────────────────────────────── */
+
   .ui-section-title {
-    @apply text-[11px] font-semibold uppercase;
-    letter-spacing: 0.08em;
+    @apply text-[11px] font-medium uppercase;
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.12em;
+    color: var(--ck-text-muted);
+  }
+
+  /* Mono micro-label — the instrument voice (timestamps, chips, captions) */
+  .ui-mono-label {
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--ck-text-muted);
   }
 
   .ui-title-lg {
-    @apply text-2xl md:text-3xl font-semibold;
-    letter-spacing: -0.02em;
+    @apply text-2xl md:text-3xl;
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
     color: var(--ck-text-strong);
   }
 
@@ -223,6 +391,14 @@ body {
     letter-spacing: -0.02em;
     color: var(--ck-text-strong);
   }
+
+  /* Display face — Fraunces. Page titles and hero numerals only. */
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.015em;
+  }
+
+  /* ── Controls ─────────────────────────────────────────────── */
 
   .ui-control {
     @apply border rounded-lg px-3 py-2 text-sm;
@@ -245,6 +421,25 @@ body {
     @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
   }
 
+  /* Status vocabulary — mono, uppercase, soft wash. One voice for every
+     status badge in the app. Combine: "ui-status ui-pill-success". */
+  .ui-status {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5;
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ui-pill-success { background: var(--ck-success-soft); color: var(--ck-success); }
+  .ui-pill-warning { background: var(--ck-warning-soft); color: var(--ck-warning); }
+  .ui-pill-danger { background: var(--ck-danger-soft); color: var(--ck-danger); }
+  .ui-pill-accent { background: var(--ck-accent-soft); color: var(--ck-accent); }
+  .ui-pill-amber { background: var(--ck-amber-soft); color: var(--ck-amber); }
+  .ui-pill-ocean { background: var(--ck-ocean-soft); color: var(--ck-ocean); }
+  .ui-pill-neutral { background: var(--ck-surface-sunken); color: var(--ck-text); }
+
   /* Keyboard-hint chip. Used near actions that have hotkeys. */
   .ui-kbd {
     @apply inline-flex items-center rounded-md border px-1.5 text-[10px] font-semibold;
@@ -256,7 +451,97 @@ body {
     background: var(--ck-surface);
   }
 
-  /* Signature active-nav bar — gives the sidebar its "branded" feel */
+  /* Segmented control — sunken track, lifted active chip */
+  .ui-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--ck-surface-sunken);
+    border: 1px solid var(--ck-border-subtle);
+  }
+
+  .ui-seg-item {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium;
+    height: 26px;
+    color: var(--ck-text-muted);
+    transition: color 150ms var(--ck-ease), background-color 150ms var(--ck-ease), box-shadow 150ms var(--ck-ease);
+  }
+
+  .ui-seg-item:hover {
+    color: var(--ck-text);
+  }
+
+  .ui-seg-item[data-active="true"],
+  .ui-seg-item.is-active {
+    background: var(--ck-surface);
+    color: var(--ck-text-strong);
+    box-shadow: var(--ck-shadow-sm), inset 0 0 0 1px var(--ck-border-subtle);
+  }
+
+  /* Icon chip — soft-washed icon container for KPI cards and empty states */
+  .ui-icon-chip {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Skeleton — shimmer loading blocks. Replaces spinners. */
+  .ui-skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--ck-surface-sunken);
+  }
+
+  .ui-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--ck-skeleton-highlight), transparent);
+    animation: ck-shimmer 1.6s var(--ck-ease) infinite;
+  }
+
+  /* Progress — check-in ratios, capacity fills */
+  .ui-progress {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--ck-surface-sunken);
+    overflow: hidden;
+  }
+
+  .ui-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--ck-accent), #1B8A5F);
+    transition: width 400ms var(--ck-ease);
+  }
+
+  /* Empty state — quiet, centered, never a bare "No data." */
+  .ui-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 24px;
+    gap: 4px;
+  }
+
+  .ui-empty .ui-icon-chip {
+    margin-bottom: 8px;
+    background: var(--ck-surface-sunken);
+    color: var(--ck-text-muted);
+  }
+
+  /* Signature active-nav treatment — cream pill + amber trail marker,
+     designed for the deep-pine rail. */
   .ui-nav-active {
     position: relative;
     background: var(--ck-sidebar-active-bg);
@@ -266,11 +551,12 @@ body {
     content: "";
     position: absolute;
     left: 0;
-    top: 20%;
-    bottom: 20%;
-    width: 2px;
-    border-radius: 2px;
-    background: var(--ck-accent);
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--ck-amber-bright);
+    box-shadow: 0 0 10px rgba(217, 130, 47, 0.5);
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -283,17 +569,136 @@ body {
 
   /* Brand gradient — deep pine. Reserved for the single primary action on a screen. */
   .bg-bt-gradient {
-    background: linear-gradient(135deg, #0f2b1f 0%, #125e40 100%);
+    background: linear-gradient(150deg, #0c1f16 0%, #125e40 120%);
   }
 
-  /* Display face — Fraunces. Page titles and hero stat numbers only. */
-  .font-display {
-    font-family: var(--font-display), Georgia, "Times New Roman", serif;
-    letter-spacing: -0.02em;
+  /* Night surface — the north-star hero card: pine glow, amber ember, vignette */
+  .bg-bt-dark {
+    background:
+      radial-gradient(120% 150% at 85% -20%, rgba(18, 94, 64, 0.78), transparent 60%),
+      radial-gradient(90% 100% at -10% 115%, rgba(217, 130, 47, 0.14), transparent 55%),
+      linear-gradient(180deg, #10241B 0%, #0A120D 100%);
+  }
+
+  /* ── Buttons — one voice, three volumes ───────────────────── */
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 text-[13.5px] font-medium;
+    height: 36px;
+    transition: background-color 160ms var(--ck-ease), border-color 160ms var(--ck-ease),
+      color 160ms var(--ck-ease), transform 160ms var(--ck-ease), box-shadow 160ms var(--ck-ease);
+  }
+
+  .ui-btn:active {
+    transform: translateY(1px);
+  }
+
+  .ui-btn-primary {
+    background: linear-gradient(180deg, #176B4B 0%, #125E40 55%, #0F5137 100%);
+    color: var(--ck-btn-primary-text);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(15, 43, 31, 0.28), 0 8px 20px -8px rgba(18, 94, 64, 0.50);
+  }
+
+  .ui-btn-primary:hover {
+    background: linear-gradient(180deg, #1B7855 0%, #147049 55%, #115C3F 100%);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 4px rgba(15, 43, 31, 0.28), 0 12px 26px -8px rgba(18, 94, 64, 0.55);
+  }
+
+  .ui-btn-primary:active {
+    transform: translateY(0.5px);
+  }
+
+  .ui-btn-ghost {
+    background: var(--ck-surface);
+    border: 1px solid var(--ck-border-strong);
+    color: var(--ck-text-strong);
+  }
+
+  .ui-btn-ghost:hover {
+    border-color: color-mix(in srgb, var(--ck-text-muted) 60%, transparent);
+    background: color-mix(in srgb, var(--ck-text-strong) 3%, var(--ck-surface));
+  }
+
+  .ui-btn-soft {
+    background: var(--ck-accent-soft);
+    color: var(--ck-accent);
+  }
+
+  .ui-btn-soft:hover {
+    background: color-mix(in srgb, var(--ck-accent) 14%, transparent);
+  }
+
+  .ui-btn-danger {
+    background: var(--ck-danger-soft);
+    color: var(--ck-danger);
+  }
+
+  .ui-btn-danger:hover {
+    background: color-mix(in srgb, var(--ck-danger) 16%, transparent);
+  }
+
+  /* ── Entrance motion — one 420ms rise per page, staggered ─── */
+
+  .anim-fade-up {
+    animation: ck-fade-up 420ms var(--ck-ease) both;
+  }
+
+  .anim-d1 { animation-delay: 60ms; }
+  .anim-d2 { animation-delay: 120ms; }
+  .anim-d3 { animation-delay: 180ms; }
+}
+
+html.dark .ui-btn-primary {
+  background: linear-gradient(180deg, #21E8A6 0%, #00D98B 60%, #00C47E 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -8px rgba(0, 217, 139, 0.40);
+}
+
+html.dark .ui-btn-primary:hover {
+  background: linear-gradient(180deg, #3FEEB2 0%, #21E8A6 60%, #00D98B 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 217, 139, 0.45);
+}
+
+html.dark .ui-pill-amber {
+  color: var(--ck-amber);
+}
+
+html.dark .ui-progress-fill {
+  background: linear-gradient(90deg, #00B876, var(--ck-accent));
+}
+
+@keyframes ck-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-/* ── Light mode: warm the stock gray hairlines & washes to match the paper canvas ── */
+@keyframes ck-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up {
+    animation: none;
+  }
+  .ui-skeleton::after {
+    animation: none;
+  }
+  .ui-card-hover:hover,
+  .ui-surface-hoverable:hover,
+  .ui-btn-primary:hover {
+    transform: none;
+  }
+}
+
+/* ── Light mode: warm the stock gray hairlines & washes to the paper canvas ── */
 html.light .border-gray-100,
 html.light .border-gray-200 {
   border-color: var(--ck-border-subtle);
@@ -310,27 +715,166 @@ html.light .divide-gray-200> :not([hidden])~ :not([hidden]) {
 
 html.light .bg-gray-50,
 html.light .bg-slate-50 {
-  background-color: #f4f2ea;
+  background-color: #F3F0EA;
 }
 
 html.light .bg-gray-100 {
-  background-color: #edeae0;
+  background-color: #EBE7DE;
 }
 
 html.light .hover\:bg-gray-50:hover {
-  background-color: #f4f2ea;
+  background-color: #F3F0EA;
 }
 
 html.light .hover\:bg-gray-100:hover {
-  background-color: #edeae0;
+  background-color: #EBE7DE;
 }
 
 html.light .bg-\[\#f9fafb\] {
-  background-color: #f4f2ea;
+  background-color: #F3F0EA;
 }
 
 html.light .bg-\[\#fbfcfc\] {
-  background-color: #f7f5f0;
+  background-color: #F7F5F0;
+}
+
+/* ── Light mode: warm the stock gray text scale (ink, not blue-grey) ── */
+html.light .text-gray-900,
+html.light .text-gray-800 {
+  color: var(--ck-text-strong);
+}
+
+html.light .text-gray-700,
+html.light .text-gray-600 {
+  color: var(--ck-text);
+}
+
+html.light .text-gray-500 {
+  color: var(--ck-text-muted);
+}
+
+html.light .text-gray-400 {
+  color: #8B958D;
+}
+
+html.light .text-gray-300 {
+  color: #AEB6B0;
+}
+
+/* ── Light mode: pine-tinted depth for the stock shadow utilities.
+   Every un-swept page gains real elevation from day one. ── */
+html.light .shadow-sm {
+  --tw-shadow: 0 1px 2px rgba(15, 43, 31, 0.06), 0 4px 12px -6px rgba(15, 43, 31, 0.08);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+html.light .shadow {
+  --tw-shadow: 0 1px 3px rgba(15, 43, 31, 0.07), 0 8px 20px -8px rgba(15, 43, 31, 0.10);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+html.light .shadow-md {
+  --tw-shadow: 0 2px 4px rgba(15, 43, 31, 0.05), 0 10px 24px -8px rgba(15, 43, 31, 0.12);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+html.light .shadow-lg {
+  --tw-shadow: 0 4px 10px rgba(15, 43, 31, 0.06), 0 28px 56px -20px rgba(15, 43, 31, 0.20);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+html.light .shadow-xl,
+html.light .shadow-2xl {
+  --tw-shadow: 0 6px 14px rgba(15, 43, 31, 0.07), 0 32px 64px -20px rgba(15, 43, 31, 0.28);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+/* ── Light mode: pull stock Tailwind accent utilities onto the brand palette.
+   Blues become ocean, greens become pine-success, ambers/reds join the tokens.
+   (Page sweeps replace these classes with tokens; this covers the interim.) ── */
+html.light .text-blue-600,
+html.light .text-blue-700,
+html.light .text-indigo-600 {
+  color: var(--ck-ocean);
+}
+
+html.light .bg-blue-50 {
+  background-color: var(--ck-ocean-soft);
+}
+
+html.light .bg-blue-100 {
+  background-color: rgba(15, 103, 115, 0.14);
+}
+
+html.light .border-blue-200 {
+  border-color: rgba(15, 103, 115, 0.25);
+}
+
+html.light .bg-blue-600 {
+  background-color: var(--ck-ocean);
+}
+
+html.light .hover\:bg-blue-700:hover {
+  background-color: #0C525C;
+}
+
+html.light .hover\:bg-blue-50\/40:hover {
+  background-color: rgba(15, 103, 115, 0.06);
+}
+
+html.light .hover\:bg-blue-100:hover {
+  background-color: rgba(15, 103, 115, 0.18);
+}
+
+html.light .text-green-600,
+html.light .text-green-700,
+html.light .text-emerald-700 {
+  color: var(--ck-success);
+}
+
+html.light .bg-green-50,
+html.light .bg-emerald-50 {
+  background-color: var(--ck-success-soft);
+}
+
+html.light .bg-green-100,
+html.light .bg-emerald-100 {
+  background-color: rgba(18, 138, 92, 0.15);
+}
+
+html.light .text-red-600,
+html.light .text-red-700 {
+  color: var(--ck-danger);
+}
+
+html.light .bg-red-50 {
+  background-color: var(--ck-danger-soft);
+}
+
+html.light .bg-red-100 {
+  background-color: rgba(198, 69, 58, 0.14);
+}
+
+html.light .text-amber-700,
+html.light .text-amber-800,
+html.light .text-orange-700 {
+  color: var(--ck-amber);
+}
+
+html.light .text-amber-600 {
+  color: var(--ck-warning);
+}
+
+html.light .bg-amber-50 {
+  background-color: var(--ck-amber-soft);
+}
+
+html.light .bg-amber-100 {
+  background-color: rgba(217, 130, 47, 0.18);
+}
+
+html.light .bg-orange-100 {
+  background-color: var(--ck-amber-soft);
 }
 
 /* ── Sidebar icon: disappear → line-redraw → fill back on hover ── */
@@ -664,48 +1208,48 @@ html.dark .hover\:bg-gray-50\/50:hover {
   background-color: var(--ck-surface-elevated);
 }
 
-/* ── Dark mode: colored utility overrides ── */
+/* ── Dark mode: colored utility overrides (brand-aligned: blues → fjord/ocean) ── */
 
-/* Blue */
+/* Blue → fjord */
 html.dark .text-blue-600 {
-  color: #60a5fa;
+  color: #6FA8D6;
 }
 
 html.dark .text-blue-700 {
-  color: #60a5fa;
+  color: #6FA8D6;
 }
 
 html.dark .bg-blue-50 {
-  background-color: rgba(96, 165, 250, 0.10);
+  background-color: rgba(111, 168, 214, 0.10);
 }
 
 html.dark .bg-blue-100 {
-  background-color: rgba(96, 165, 250, 0.15);
+  background-color: rgba(111, 168, 214, 0.15);
 }
 
 html.dark .bg-blue-600 {
-  background-color: #3b82f6;
+  background-color: #3E7CA6;
 }
 
 html.dark .border-blue-200 {
-  border-color: rgba(96, 165, 250, 0.25);
+  border-color: rgba(111, 168, 214, 0.25);
 }
 
 html.dark .hover\:bg-blue-50\/40:hover {
-  background-color: rgba(96, 165, 250, 0.06);
+  background-color: rgba(111, 168, 214, 0.06);
 }
 
 html.dark .hover\:bg-blue-100:hover {
-  background-color: rgba(96, 165, 250, 0.20);
+  background-color: rgba(111, 168, 214, 0.20);
 }
 
 html.dark .hover\:bg-blue-700:hover {
-  background-color: #2563eb;
+  background-color: #316487;
 }
 
-/* Indigo */
+/* Indigo → fjord (violet family is banned) */
 html.dark .text-indigo-600 {
-  color: #818cf8;
+  color: #6FA8D6;
 }
 
 /* Emerald / Green */
@@ -835,16 +1379,16 @@ html.dark .hover\:text-red-500:hover {
   color: #f87171;
 }
 
-/* Teal (categorical badges — OTA sources, tags) */
+/* Teal → ocean (categorical badges — OTA sources, tags) */
 html.dark .text-teal-600,
 html.dark .text-teal-700 {
-  color: #2dd4bf;
+  color: #3FC1D1;
 }
 
 html.dark .bg-teal-50 {
-  background-color: rgba(45, 212, 191, 0.10);
+  background-color: rgba(63, 193, 209, 0.10);
 }
 
 html.dark .bg-teal-100 {
-  background-color: rgba(45, 212, 191, 0.15);
+  background-color: rgba(63, 193, 209, 0.15);
 }

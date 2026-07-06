@@ -94,24 +94,21 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                     }
                                 }}
                                 className={`border-b border-gray-200 p-2 text-center transition-colors md:p-3 ${isPast ? "opacity-50 cursor-not-allowed bg-gray-100" :
-                                        isSelected ? "bg-red-100 border-red-200 hover:bg-red-200 cursor-pointer" :
-                                            isToday ? "bg-blue-50 hover:bg-blue-100 cursor-pointer" :
+                                        isSelected ? "cursor-pointer bg-[var(--ck-danger-soft)] hover:bg-[var(--ck-danger-soft)]" :
+                                            isToday ? "cursor-pointer bg-[var(--ck-accent-soft)] hover:bg-[var(--ck-accent-soft)]" :
                                                 "bg-gray-50 hover:bg-gray-100 cursor-pointer"
                                     }`}>
-                                <div className={`text-xs font-medium uppercase ${isSelected && !isPast ? "text-red-700" : "text-gray-500"}`}>
+                                <div className="text-xs font-medium uppercase" style={{ color: isSelected && !isPast ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>
                                     {day.toLocaleDateString("en-US", { weekday: "short" })}
                                 </div>
-                                <div className={`mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isPast ? "text-gray-400" :
-                                        isSelected ? "bg-red-600 text-white" :
-                                            isToday ? "bg-blue-600 text-white" : "text-gray-900"
-                                    }`}>
+                                <div className="mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold tabular-nums" style={isPast ? { color: "var(--ck-text-muted)" } : isSelected ? { background: "var(--ck-danger)", color: "#fff" } : isToday ? { background: "var(--ck-accent)", color: "#fff" } : { color: "var(--ck-text-strong)" }}>
                                     {day.getDate()}
                                 </div>
                             </div>
 
                             <div className="min-h-[280px] flex-1 space-y-2 bg-white p-2">
                                 {isToday && (
-                                    <div className="rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">
+                                    <div className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
                                         Now {nowLabel}
                                     </div>
                                 )}
@@ -123,26 +120,26 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                         <div
                                             key={slot.id}
                                             onClick={() => onSlotClick(slot)}
-                                            className={`p-2 rounded-lg border text-xs cursor-pointer transition-colors ${isClosed
-                                                ? "bg-red-50 border-red-100 opacity-70"
+                                            className="p-2 rounded-lg border text-xs cursor-pointer transition-colors"
+                                            style={isClosed
+                                                ? { background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 22%, transparent)", opacity: 0.85 }
                                                 : effectiveAvailability <= 0
-                                                    ? "bg-gray-100 border-gray-200"
-                                                    : "bg-blue-50 border-blue-100 hover:border-blue-300"
-                                                }`}
+                                                    ? { background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }
+                                                    : { background: "var(--ck-accent-soft)", borderColor: "color-mix(in srgb, var(--ck-accent) 22%, transparent)" }}
                                         >
                                             <div className="flex justify-between items-start mb-1">
-                                                <span className="font-bold text-gray-900">{fmtTime(slot.start_time)}</span>
-                                                {isClosed && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">Closed</span>}
+                                                <span className="font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtTime(slot.start_time)}</span>
+                                                {isClosed && <span className="rounded px-1 text-[10px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>Closed</span>}
                                             </div>
-                                            <div className="mb-1 truncate font-medium" title={slot.tours?.name}>{slot.tours?.name}</div>
+                                            <div className="mb-1 truncate font-medium" title={slot.tours?.name} style={{ color: "var(--ck-text)" }}>{slot.tours?.name}</div>
                                             {isResourceLimited && !isClosed && (
-                                                <div className="mb-1 rounded bg-amber-50 px-1.5 py-1 text-[10px] font-medium text-amber-700">
+                                                <div className="mb-1 rounded px-1.5 py-1 text-[10px] font-medium" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                                                     Shared resource cap active
                                                 </div>
                                             )}
-                                            <div className="flex justify-between gap-2 text-gray-500">
-                                                <span>{slot.booked}/{slot.capacity_total}</span>
-                                                <span className={effectiveAvailability > 0 ? "text-green-600 font-bold" : "text-gray-400"}>
+                                            <div className="flex justify-between gap-2" style={{ color: "var(--ck-text-muted)" }}>
+                                                <span className="tabular-nums">{slot.booked}/{slot.capacity_total}</span>
+                                                <span className="tabular-nums" style={effectiveAvailability > 0 ? { color: "var(--ck-success)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}>
                                                     {effectiveAvailability} left
                                                 </span>
                                             </div>
@@ -150,7 +147,7 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                     );
                                 })}
                                 {daySlots.length === 0 && (
-                                    <div className="text-center text-xs text-gray-400 mt-4 italic">No slots</div>
+                                    <div className="mt-4 text-center text-xs italic" style={{ color: "var(--ck-text-muted)" }}>No slots</div>
                                 )}
                             </div>
                         </div>

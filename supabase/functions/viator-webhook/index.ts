@@ -230,6 +230,11 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
   // Increment slot booked count
   await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
 
+  // Refresh customer lifetime stats now that the PAID booking is linked
+  if (customerId) {
+    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
+  }
+
   // Audit log
   await db.from("logs").insert({
     business_id: businessId,

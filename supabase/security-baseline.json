@@ -4821,6 +4821,11 @@
     },
     {
       "schema": "public",
+      "table_name": "api_rate_limits",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "audit_logs",
       "rls_enabled": true
     },
@@ -4931,6 +4936,11 @@
     },
     {
       "schema": "public",
+      "table_name": "kb_chunks",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "landing_page_orders",
       "rls_enabled": true
     },
@@ -5011,6 +5021,11 @@
     },
     {
       "schema": "public",
+      "table_name": "otp_attempts",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "outbox",
       "rls_enabled": true
     },
@@ -5022,11 +5037,6 @@
     {
       "schema": "public",
       "table_name": "peak_period_prices",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "otp_attempts",
       "rls_enabled": true
     },
     {
@@ -5047,6 +5057,11 @@
     {
       "schema": "public",
       "table_name": "policies",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "processed_wa_messages",
       "rls_enabled": true
     },
     {
@@ -5126,22 +5141,17 @@
     },
     {
       "schema": "public",
+      "table_name": "wa_messages",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "waitlist",
       "rls_enabled": true
     },
     {
       "schema": "public",
       "table_name": "webchat_sessions",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "api_rate_limits",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "wa_messages",
       "rls_enabled": true
     }
   ],

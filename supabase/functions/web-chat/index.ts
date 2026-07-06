@@ -13,7 +13,8 @@ import {
 import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } from "../_shared/intent.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
-const GK = Deno.env.get("GEMINI_API_KEY");
+import { llmText, llmAvailable } from "../_shared/llm.ts";
+import { retrieveKbContext } from "../_shared/kb.ts";
 const SU = Deno.env.get("SUPABASE_URL");
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const db = createClient(SU, SK);
@@ -242,15 +243,15 @@ async function gemChat(hist, msg, toursList, businessId) {
       console.log("WEBCHAT_GEM_GATED:" + gate.reason);
       return gate.reply || KB_REFUSAL_REPLY;
     }
-    if (!GK) {
-      console.warn("WEBCHAT_NO_GEMINI_KEY — falling back to FAQ search");
+    if (!llmAvailable()) {
+      console.warn("WEBCHAT_NO_LLM_KEY — falling back to FAQ search");
       const lo = String(msg).toLowerCase();
       const faqHit = tryFaqOrToursReply(lo, faq, tsText, tenant?.business);
       if (faqHit) return faqHit;
       return null;
     }
-    const c = []; for (const h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] });
-    c.push({ role: "user", parts: [{ text: gate.cleaned || msg }] });
+    const c: { role: "user" | "assistant"; content: string }[] = []; for (const h of (hist || []).slice(-8)) c.push({ role: h.role === "user" ? "user" : "assistant", content: String(h.text || "") });
+    c.push({ role: "user", content: gate.cleaned || msg });
     const sysBase = PLATFORM_INVARIANTS + "\n\n"
       + (tenant?.business?.ai_system_prompt || ("You are a friendly website chat assistant for " + brandName + ". Keep replies short, clear, and human."))
       + "\n\nCurrent available tours:\n" + tsText
@@ -262,11 +263,12 @@ async function gemChat(hist, msg, toursList, businessId) {
           : "")
       + (faq ? "\n\nFAQ:\n" + JSON.stringify(faq) : "")
       + (tenant?.business?.terminology ? "\n\nTerminology:\n" + JSON.stringify(tenant.business.terminology) : "");
-    const sysText = hardenSystemPrompt(sysBase);
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(8000), body: JSON.stringify({ system_instruction: { parts: [{ text: sysText }] }, contents: c, generationConfig: { temperature: 0.7, maxOutputTokens: 150 } }) });
-    const d = await r.json();
-    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]) {
-      const raw = d.candidates[0].content.parts[0].text;
+    // Ground in the tenant's vector KB (returns "" when nothing relevant)
+    const kbCtx = businessId ? await retrieveKbContext(db, businessId, String(msg || "")) : "";
+    const sysText = hardenSystemPrompt(sysBase + (kbCtx ? "\n\n" + kbCtx : ""));
+    const llmOut = await llmText({ system: sysText, messages: c, maxTokens: 150, temperature: 0.7, timeoutMs: 8000, label: "web-faq" });
+    if (llmOut) {
+      const raw = llmOut;
       const out = gateOutbound(String(raw));
       if (out.leakDetected) console.warn("WEBCHAT_GEM_LEAK:" + out.matches.join(","));
       const gemLo = String(out.reply || "").toLowerCase();
@@ -277,12 +279,12 @@ async function gemChat(hist, msg, toursList, businessId) {
       }
       return out.reply;
     }
-    console.warn("WEBCHAT_GEMINI_EMPTY_RESPONSE");
+    console.warn("WEBCHAT_LLM_EMPTY_RESPONSE");
     const fb = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
     if (fb) return fb;
     return null;
   } catch (e) {
-    console.error("WEBCHAT_GEMINI_ERR:" + String(e));
+    console.error("WEBCHAT_LLM_ERR:" + String(e));
     const fb2 = tryFaqOrToursReply(String(msg).toLowerCase(), faq, tsText, tenant?.business);
     if (fb2) return fb2;
     return null;
@@ -591,24 +593,20 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (isBtnClick && btnVal.match(/^\d{4}-\d{2}-\d{2}$/)) {
         pdSelectedDate = btnVal;
       } else if (!isBtnClick && lo) {
-        // Try to parse natural language date using Gemini
-        if (GK) {
-          try {
-            const pdR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              signal: AbortSignal.timeout(5000),
-              body: JSON.stringify({
-                system_instruction: { parts: [{ text: "You are a date extractor. The user is asking for a date. Today is " + now.toISOString().split("T")[0] + ". Return exactly one YYYY-MM-DD date string based on their input, or \"INVALID\" if no date is found. Examples: \"Tomorrow\" -> next date. \"1 September\" -> 2026-09-01." }] },
-                contents: [{ role: "user", parts: [{ text: msg }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 15 }
-              })
-            });
-            const pdD = await pdR.json();
-            if (pdD.candidates?.[0]?.content?.parts?.[0]) {
-              const pdExt = pdD.candidates[0].content.parts[0].text.trim();
-              if (pdExt !== "INVALID" && pdExt.match(/^\d{4}-\d{2}-\d{2}$/)) pdSelectedDate = pdExt;
-            }
-          } catch (e) { }
+        // Try to parse natural language date using the LLM
+        {
+          const pdOut = await llmText({
+            system: "You are a date extractor. The user is asking for a date. Today is " + now.toISOString().split("T")[0] + ". Return exactly one YYYY-MM-DD date string based on their input, or \"INVALID\" if no date is found. Examples: \"Tomorrow\" -> next date. \"1 September\" -> 2026-09-01.",
+            user: msg,
+            maxTokens: 15,
+            temperature: 0.1,
+            timeoutMs: 5000,
+            label: "web-date",
+          });
+          if (pdOut) {
+            const pdExt = pdOut.trim();
+            if (pdExt !== "INVALID" && pdExt.match(/^\d{4}-\d{2}-\d{2}$/)) pdSelectedDate = pdExt;
+          }
         }
       }
 

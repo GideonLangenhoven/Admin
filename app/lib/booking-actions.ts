@@ -1,7 +1,6 @@
 import { supabase } from "./supabase";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 export type ActionResult = { ok: boolean; error?: string; data?: any };
 
@@ -40,9 +39,12 @@ export async function refundBookingAction(bookingId: string): Promise<ActionResu
     if (amount <= 0) return { ok: false, error: "Nothing to refund" };
 
     if (booking.yoco_checkout_id) {
+      // process-refund authorizes the caller — send the admin's session JWT.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return { ok: false, error: "Session expired" };
       const res = await fetch(SU + "/functions/v1/process-refund", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
         body: JSON.stringify({ booking_id: bookingId, amount }),
       });
       const data = await res.json().catch(() => ({}));

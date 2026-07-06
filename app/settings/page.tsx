@@ -6,7 +6,7 @@ import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { CaretDown, Lock } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
 
@@ -16,23 +16,23 @@ function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false
 }) {
     const isOpen = openSections[id] ?? defaultOpen;
     return (
-        <div className="border border-[var(--ck-border-subtle)] rounded-xl overflow-hidden">
+        <div className="ui-card anim-fade-up overflow-hidden">
             <button
                 type="button"
                 onClick={() => toggle(id)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[var(--ck-bg-subtle)] transition-colors"
+                className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--ck-surface-sunken)]"
             >
-                <div>
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">{title}</h2>
-                    {subtitle && <p className="text-xs text-[var(--ck-text-muted)] mt-0.5">{subtitle}</p>}
+                <div className="min-w-0">
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">{title}</h2>
+                    {subtitle && <p className="text-[12px] text-[var(--ck-text-muted)] mt-0.5 leading-snug">{subtitle}</p>}
                 </div>
-                <ChevronDown size={20} className={"text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
+                <CaretDown size={18} weight="bold" className={"shrink-0 text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
             </button>
-            {isOpen && <div className="px-5 pb-5 pt-2 border-t border-[var(--ck-border-subtle)]">{children}</div>}
+            {isOpen && <div className="px-5 pb-5 pt-3 border-t border-[var(--ck-border-subtle)]">{children}</div>}
         </div>
     );
 }
-const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
+const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 ui-skeleton" /> });
 const ExternalBookingSettings = dynamic(() => import("../../components/ExternalBookingSettings"), { ssr: false });
 import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
 import InlineSlotManager from "../../components/InlineSlotManager";
@@ -51,7 +51,9 @@ const SETTINGS_SECTIONS = [
     { key: "site", label: "Booking Site Config" },
     { key: "email", label: "Email Customisation" },
     { key: "invoice", label: "Invoice Details" },
-    { key: "credentials", label: "Integration Credentials" },
+    // "credentials" (payment + WhatsApp secrets) is intentionally NOT delegatable:
+    // the /api/credentials routes hard-require MAIN_ADMIN/SUPER_ADMIN, so granting
+    // a sub-admin the permission only produced a visible-but-unsaveable section.
 ] as const;
 type SettingsSectionKey = typeof SETTINGS_SECTIONS[number]["key"];
 
@@ -407,13 +409,13 @@ export default function SettingsPage() {
     function adminPasswordStatus(admin: any) {
         if (admin.must_set_password || !admin.password_set_at) {
             const sentLabel = admin.invite_sent_at ? "Setup email sent " + new Date(admin.invite_sent_at).toLocaleDateString() : "Setup email not sent yet";
-            return { label: "Password setup pending", detail: sentLabel, tone: "text-amber-700" };
+            return { label: "Password setup pending", detail: sentLabel, tone: "text-[var(--ck-warning)]" };
         }
 
         return {
             label: "Password created",
             detail: "Created " + new Date(admin.password_set_at).toLocaleDateString(),
-            tone: "text-emerald-700",
+            tone: "text-[var(--ck-success)]",
         };
     }
 
@@ -1437,15 +1439,32 @@ export default function SettingsPage() {
         setEmailImgsSaving(false);
     }
 
-    if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
+    if (loading) return (
+        <div className="max-w-4xl">
+            <div className="mb-6">
+                <div className="ui-skeleton h-3 w-24 mb-3" />
+                <div className="ui-skeleton h-8 w-40" />
+            </div>
+            <div className="space-y-4">
+                {[0, 1, 2, 3].map(i => <div key={i} className="ui-skeleton h-[68px] w-full !rounded-2xl" />)}
+            </div>
+        </div>
+    );
 
     const hasAnyPerm = Object.values(myPerms).some(Boolean);
     if (!isPrivileged(role) && !hasAnyPerm) {
         return (
             <div className="max-w-2xl">
-                <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
-                <div className="ui-surface rounded-2xl p-6 border border-[var(--ck-border-subtle)] text-center">
-                    <p className="ui-text-muted">You do not have permission to view or manage admin settings.</p>
+                <div className="anim-fade-up mb-6">
+                    <p className="ui-mono-label mb-2">Admin Console</p>
+                    <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+                </div>
+                <div className="ui-card anim-fade-up anim-d1">
+                    <div className="ui-empty">
+                        <span className="ui-icon-chip"><Lock size={18} /></span>
+                        <p className="text-[14px] font-medium" style={{ color: "var(--ck-text-strong)" }}>No settings access</p>
+                        <p className="text-[13px] ui-text-muted">You do not have permission to view or manage admin settings.</p>
+                    </div>
                 </div>
             </div>
         );
@@ -1453,7 +1472,10 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-4xl">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
+            <div className="anim-fade-up mb-6">
+                <p className="ui-mono-label mb-2">Admin Console</p>
+                <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+            </div>
 
             <div className="space-y-4">
 
@@ -1461,8 +1483,9 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-[var(--ck-bg-subtle)] text-[var(--ck-text-muted)]">
-                            {admins.length} / {usageSnapshot?.seat_limit || 10} seats
+                        <span className="inline-flex items-center gap-2 rounded-full bg-[var(--ck-surface-sunken)] px-3 py-1">
+                            <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{admins.length}</span>
+                            <span className="ui-mono-label !text-[9.5px]">/ {usageSnapshot?.seat_limit || 10} seats</span>
                         </span>
                     </div>
 
@@ -1475,7 +1498,7 @@ export default function SettingsPage() {
                                 const isExpanded = expandedPermsAdmin === a.id;
                                 return (
                                     <div key={a.id}>
-                                        <div className="p-4 flex items-center justify-between">
+                                        <div className="p-4 flex items-center justify-between transition-colors hover:bg-[var(--ck-surface-warm)]">
                                             <div>
                                                 <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
@@ -1518,7 +1541,7 @@ export default function SettingsPage() {
                                         </div>
                                         {/* Expandable permissions panel */}
                                         {isExpanded && a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
-                                            <div className="px-4 pb-4 pt-1 bg-[var(--ck-bg-subtle)] border-t border-[var(--ck-border-subtle)]">
+                                            <div className="px-4 pb-4 pt-1 bg-[var(--ck-surface-sunken)] border-t border-[var(--ck-border-subtle)]">
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mb-3">Settings page access for {a.name || a.email}</p>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     {SETTINGS_SECTIONS.map(section => (
@@ -1533,7 +1556,7 @@ export default function SettingsPage() {
                                                                     handleSaveAdminPerms(a.id, newPerms);
                                                                 }}
                                                                 disabled={savingPerms === a.id}
-                                                                className="h-4 w-4 rounded border-gray-300 accent-[var(--ck-accent)]"
+                                                                className="h-4 w-4 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
                                                             />
                                                             <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
                                                         </label>
@@ -1555,21 +1578,21 @@ export default function SettingsPage() {
                 {/* Add Admin Form + Subscription */}
                 <div className="space-y-6">
                     <div className="flex items-center justify-between gap-4">
-                        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Add New Admin</h2>
+                        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">Add New Admin</h2>
                         <button
                             onClick={toggleSubscription}
                             disabled={togglingSubscription}
-                            className={"text-xs font-medium px-3 py-1.5 rounded-lg border disabled:opacity-50 whitespace-nowrap " +
+                            className={"text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap " +
                                 (subscriptionStatus === "SUSPENDED"
-                                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                                    : "border-red-300 text-red-700 hover:bg-red-50")}
+                                    ? "border-[var(--ck-success)] text-[var(--ck-success)] hover:bg-[var(--ck-success-soft)]"
+                                    : "border-[var(--ck-danger)] text-[var(--ck-danger)] hover:bg-[var(--ck-danger-soft)]")}
                         >
                             {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
                         </button>
                     </div>
                     <form onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
-                            <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+                            <div className="p-3 rounded-xl text-sm" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)", border: "1px solid color-mix(in srgb, var(--ck-warning) 25%, transparent)" }}>
                                 You have reached the admin seat limit for your plan ({usageSnapshot?.seat_limit || 10}).
                             </div>
                         ) : (
@@ -1591,7 +1614,7 @@ export default function SettingsPage() {
                                 </div>
                                 {error && <div className="text-xs text-[var(--ck-danger)] font-medium">{error}</div>}
                                 {adminMessage && <div className="text-xs text-[var(--ck-success)] font-medium">{adminMessage}</div>}
-                                <button type="submit" disabled={adding} className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                                <button type="submit" disabled={adding} className="ui-btn ui-btn-primary w-full disabled:opacity-50">
                                     {adding ? "Adding..." : "Add Admin and Send Setup Link"}
                                 </button>
                             </>
@@ -1609,7 +1632,7 @@ export default function SettingsPage() {
                             value={marketingTestEmail}
                             onChange={(e) => handleSaveMarketingTestEmail(e.target.value)}
                             disabled={savingTestEmail}
-                            className="flex-1 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-3 py-2 text-sm text-[var(--ck-text)] disabled:opacity-50"
+                            className="ui-control flex-1 disabled:opacity-50"
                         >
                             <option value="">Select an admin...</option>
                             {admins.map(a => (
@@ -1617,7 +1640,7 @@ export default function SettingsPage() {
                             ))}
                         </select>
                         {marketingTestEmail && (
-                            <span className="shrink-0 text-xs text-[var(--ck-success)] font-medium px-2 py-2">
+                            <span className="ui-status ui-pill-success shrink-0 self-center">
                                 Active
                             </span>
                         )}
@@ -1631,7 +1654,7 @@ export default function SettingsPage() {
                     {/* Tour List */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
+                            <span className="ui-mono-label !text-[10px]">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
                             <button onClick={resetTourForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Tour</button>
                         </div>
                         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
@@ -1656,9 +1679,9 @@ export default function SettingsPage() {
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{t.name}</span>
                                                     <div className="flex items-center gap-1.5">
                                                         {t.hidden && (
-                                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Hidden</span>
+                                                            <span className="ui-status ui-pill-amber">Hidden</span>
                                                         )}
-                                                        <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + (t.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                        <span className={"ui-status " + (t.active ? "ui-pill-success" : "ui-pill-neutral")}>
                                                             {t.active ? "Active" : "Inactive"}
                                                         </span>
                                                     </div>
@@ -1714,7 +1737,7 @@ export default function SettingsPage() {
                                         <img src={tourForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
                                     )}
                                     <div className="flex-1">
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "tour_image" ? "Uploading..." : (tourForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
@@ -1756,7 +1779,7 @@ export default function SettingsPage() {
                                 <div className="flex items-end pb-1">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={tourForm.active} onChange={e => setTourForm({ ...tourForm, active: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                            className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                         <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
                                     </label>
                                 </div>
@@ -1815,7 +1838,7 @@ export default function SettingsPage() {
                                     <div className="flex flex-wrap gap-1.5 mt-1">
                                         {DAY_LABELS.map((label, idx) => (
                                             <button key={idx} type="button" onClick={() => toggleDay(idx)}
-                                                className={"px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors " + (tourForm.slotDays.includes(idx) ? "bg-[var(--ck-text-strong)] text-[var(--ck-surface)] border-[var(--ck-text-strong)]" : "bg-white text-[var(--ck-text-muted)] border-[var(--ck-border-subtle)] hover:border-[var(--ck-text-muted)]")}>
+                                                className={"px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors " + (tourForm.slotDays.includes(idx) ? "bg-[var(--ck-text-strong)] text-[var(--ck-surface)] border-[var(--ck-text-strong)]" : "bg-[var(--ck-surface)] text-[var(--ck-text-muted)] border-[var(--ck-border-subtle)] hover:border-[var(--ck-text-muted)]")}>
                                                 {label}
                                             </button>
                                         ))}
@@ -1889,7 +1912,7 @@ export default function SettingsPage() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{a.name}</span>
-                                                    <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + (a.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                    <span className={"ui-status " + (a.active ? "ui-pill-success" : "ui-pill-neutral")}>
                                                         {a.active ? "Active" : "Inactive"}
                                                     </span>
                                                 </div>
@@ -1936,7 +1959,7 @@ export default function SettingsPage() {
                                         <img src={addOnForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
                                     )}
                                     <div className="flex-1">
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "addon_image" ? "Uploading..." : (addOnForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
@@ -1963,7 +1986,7 @@ export default function SettingsPage() {
                                 <div className="flex items-end pb-1">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={addOnForm.active} onChange={e => setAddOnForm({ ...addOnForm, active: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                            className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                         <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
                                     </label>
                                 </div>
@@ -2004,7 +2027,7 @@ export default function SettingsPage() {
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{resource.name}</span>
-                                                    <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full " + (resource.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                    <span className={"ui-status " + (resource.active ? "ui-pill-success" : "ui-pill-neutral")}>
                                                         {resource.active ? "Active" : "Inactive"}
                                                     </span>
                                                 </div>
@@ -2038,7 +2061,7 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={resourceForm.active} onChange={e => setResourceForm({ ...resourceForm, active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                <input type="checkbox" checked={resourceForm.active} onChange={e => setResourceForm({ ...resourceForm, active: e.target.checked })} className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                 <span className="text-sm text-[var(--ck-text-strong)]">Resource is active</span>
                             </label>
                             <div className="flex gap-3">
@@ -2103,7 +2126,7 @@ export default function SettingsPage() {
                                     <input type="number" min="1" value={assignmentForm.units_per_guest} onChange={e => setAssignmentForm({ ...assignmentForm, units_per_guest: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
                                 </div>
                                 <label className="flex items-end gap-2 cursor-pointer pb-2">
-                                    <input type="checkbox" checked={assignmentForm.active} onChange={e => setAssignmentForm({ ...assignmentForm, active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                    <input type="checkbox" checked={assignmentForm.active} onChange={e => setAssignmentForm({ ...assignmentForm, active: e.target.checked })} className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                     <span className="text-sm text-[var(--ck-text-strong)]">Mapping active</span>
                                 </label>
                             </div>
@@ -2185,7 +2208,7 @@ export default function SettingsPage() {
                                         <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
                                     )}
                                     <div>
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
@@ -2621,7 +2644,7 @@ export default function SettingsPage() {
                                 Drop this snippet into any HTML page on your site. The widget loads in an iframe and auto-resizes to its content.
                             </p>
                             <div className="relative">
-                                <pre className="bg-[var(--ck-bg-subtle)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
+                                <pre className="bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
                                 <button
                                     type="button"
                                     onClick={async () => {
@@ -2695,7 +2718,7 @@ export default function SettingsPage() {
                         <div key={key} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
                             <div className="flex gap-5 items-start">
                                 {emailImgs[key] ? (
-                                    <img src={emailImgs[key]} alt={label} className="w-24 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0 bg-gray-100" />
+                                    <img src={emailImgs[key]} alt={label} className="w-24 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" style={{ background: "var(--ck-surface-sunken)" }} />
                                 ) : (
                                     <div className="w-24 h-16 rounded-lg border border-dashed border-[var(--ck-border-subtle)] bg-gray-50 flex items-center justify-center shrink-0">
                                         <span className="text-xs text-[var(--ck-text-muted)]">Default</span>
@@ -2801,12 +2824,12 @@ export default function SettingsPage() {
                         <label className="block">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to bring</span>
                             <textarea value={opsConfig.what_to_bring} onChange={e => setOpsConfig({ ...opsConfig, what_to_bring: e.target.value })}
-                                rows={4} placeholder="e.g. Sunscreen, towel, water bottle, hat..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                rows={4} placeholder="e.g. Sunscreen, towel, water bottle, hat..." className="ui-control mt-1 w-full" />
                         </label>
                         <label className="block">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to wear</span>
                             <textarea value={opsConfig.what_to_wear} onChange={e => setOpsConfig({ ...opsConfig, what_to_wear: e.target.value })}
-                                rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="ui-control mt-1 w-full" />
                         </label>
                     </div>
 
@@ -2814,14 +2837,14 @@ export default function SettingsPage() {
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">Arrival instructions</span>
                         <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
                         <textarea value={opsConfig.arrival_instructions} onChange={e => setOpsConfig({ ...opsConfig, arrival_instructions: e.target.value })}
-                            rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="ui-control mt-1 w-full" />
                     </label>
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
                         <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">This is the system prompt for your AI chatbot on your booking site and WhatsApp. It tells the AI who it is, your business rules, and how to handle questions.</p>
                         <textarea value={opsConfig.ai_system_prompt} onChange={e => setOpsConfig({ ...opsConfig, ai_system_prompt: e.target.value })}
-                            rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)] font-mono text-xs" />
+                            rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="ui-control mt-1 w-full font-mono text-xs" />
                     </label>
 
                     {/* FAQ Repeater */}
@@ -2829,7 +2852,7 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Frequently Asked Questions</span>
                             <button type="button" onClick={() => setFaqEntries([...faqEntries, { q: "", a: "" }])}
-                                className="text-xs font-medium px-2 py-1 rounded-lg border border-[var(--ck-border-subtle)] hover:bg-[var(--ck-bg-subtle)]"
+                                className="text-xs font-medium px-2 py-1 rounded-lg border border-[var(--ck-border-subtle)] hover:bg-[var(--ck-surface-sunken)]"
                                 style={{ color: "var(--ck-accent)" }}>
                                 + Add FAQ
                             </button>
@@ -2846,9 +2869,9 @@ export default function SettingsPage() {
                                             className="text-xs text-red-500 hover:text-red-700">Remove</button>
                                     </div>
                                     <input type="text" value={faq.q} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], q: e.target.value }; setFaqEntries(next); }}
-                                        placeholder="Question" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                        placeholder="Question" className="ui-control w-full" />
                                     <textarea value={faq.a} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], a: e.target.value }; setFaqEntries(next); }}
-                                        rows={2} placeholder="Answer" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                        rows={2} placeholder="Answer" className="ui-control w-full" />
                                 </div>
                             ))}
                         </div>
@@ -2890,22 +2913,22 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bookings required</span>
                                 <input type="number" min={1} max={50} value={autoTagConfig.vip_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_bookings: parseInt(e.target.value) || 3 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Within (days)</span>
                                 <input type="number" min={7} max={365} value={autoTagConfig.vip_window_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_window_days: parseInt(e.target.value) || 90 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">VIP valid for (days)</span>
                                 <input type="number" min={30} max={1825} value={autoTagConfig.vip_valid_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_valid_days: parseInt(e.target.value) || 365 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Renew after (bookings)</span>
                                 <input type="number" min={1} max={50} value={autoTagConfig.vip_renewal_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_renewal_bookings: parseInt(e.target.value) || 3 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                         <p className="text-[11px] text-[var(--ck-text-muted)]">
@@ -2920,10 +2943,10 @@ export default function SettingsPage() {
                         <label className="block max-w-xs">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Days since last booking</span>
                             <input type="number" min={14} max={365} value={autoTagConfig.lapsed_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, lapsed_days: parseInt(e.target.value) || 90 })}
-                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                className="ui-control mt-1 w-full" />
                         </label>
                         <p className="text-[11px] text-[var(--ck-text-muted)]">
-                            Default: 90 days. Tag name: <code className="bg-[var(--ck-bg-subtle)] px-1 rounded">lapsed-{autoTagConfig.lapsed_days}-days</code>
+                            Default: 90 days. Tag name: <code className="bg-[var(--ck-surface-sunken)] px-1 rounded">lapsed-{autoTagConfig.lapsed_days}-days</code>
                         </p>
                     </div>
 
@@ -2945,7 +2968,7 @@ export default function SettingsPage() {
                         <label className="block max-w-xs">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Voucher expiry warning (days before)</span>
                             <input type="number" min={7} max={90} value={autoTagConfig.voucher_expiry_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, voucher_expiry_days: parseInt(e.target.value) || 30 })}
-                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                className="ui-control mt-1 w-full" />
                         </label>
                     </div>
 
@@ -2966,34 +2989,34 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Company name (on invoice)</span>
                                 <input type="text" value={invoiceForm.company_name} onChange={e => setInvoiceForm({ ...invoiceForm, company_name: e.target.value })}
-                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Registration number</span>
                                 <input type="text" value={invoiceForm.reg_number} onChange={e => setInvoiceForm({ ...invoiceForm, reg_number: e.target.value })}
-                                    placeholder="e.g. Reg. 2024/123456/07" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Reg. 2024/123456/07" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">VAT number</span>
                                 <input type="text" value={invoiceForm.vat_number} onChange={e => setInvoiceForm({ ...invoiceForm, vat_number: e.target.value })}
-                                    placeholder="e.g. 4290176926" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 4290176926" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                         <div className="mt-4 space-y-3">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 1</span>
                                 <input type="text" value={invoiceForm.address_line1} onChange={e => setInvoiceForm({ ...invoiceForm, address_line1: e.target.value })}
-                                    placeholder="e.g. 179 Beach Road" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 179 Beach Road" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 2</span>
                                 <input type="text" value={invoiceForm.address_line2} onChange={e => setInvoiceForm({ ...invoiceForm, address_line2: e.target.value })}
-                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 3</span>
                                 <input type="text" value={invoiceForm.address_line3} onChange={e => setInvoiceForm({ ...invoiceForm, address_line3: e.target.value })}
-                                    placeholder="e.g. 8005" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 8005" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                     </div>
@@ -3010,27 +3033,27 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
                                 <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); }}
-                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
                                 <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); }}
-                                    placeholder="e.g. 070631824" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 070631824" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
                                 <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); }}
-                                    placeholder="e.g. Current / Cheque" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Current / Cheque" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bank name</span>
                                 <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); }}
-                                    placeholder="e.g. Standard Bank" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Standard Bank" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
                                 <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); }}
-                                    placeholder="e.g. 020909" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 020909" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
 
@@ -3056,7 +3079,9 @@ export default function SettingsPage() {
                 </form>
             </CollapsibleSection>}
 
-            {canAccess("credentials") && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
+            {/* Privileged-only: credential saves are hard-gated to MAIN_ADMIN/SUPER_ADMIN
+                server-side, so never show this section to a delegated admin. */}
+            {isPrivileged(role) && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
@@ -3067,7 +3092,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">WhatsApp (Meta API)</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.wa ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.wa ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.wa ? "✓ Configured" : "⚠ Not set"}
                                 </span>
                             )}
@@ -3112,7 +3137,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco (Payments)</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.yoco ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.yoco ? "✓ Configured" : "⚠ Not set"}
                                 </span>
                             )}
@@ -3157,7 +3182,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Mode</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test_mode ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600")}>
+                                <span className={"ui-status " + (credStatus.yoco_test_mode ? "ui-pill-amber" : "ui-pill-neutral")}>
                                     {credStatus.yoco_test_mode ? "TEST MODE ON" : "Live mode"}
                                 </span>
                             )}
@@ -3170,7 +3195,7 @@ export default function SettingsPage() {
                             onClick={handleToggleTestMode}
                             disabled={testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
                             className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
-                                ? "border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                                ? "border border-[color-mix(in_srgb,var(--ck-amber-bright)_35%,transparent)] bg-[var(--ck-amber-soft)] text-[var(--ck-amber)] hover:bg-[color-mix(in_srgb,var(--ck-amber-bright)_18%,transparent)]"
                                 : "bg-orange-500 text-white hover:bg-orange-600")}
                         >
                             {testModeToggling ? "Updating..." : credStatus?.yoco_test_mode ? "Disable Test Mode" : "Enable Test Mode"}
@@ -3188,7 +3213,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Credentials</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.yoco_test ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.yoco_test ? "Configured" : "Not set"}
                                 </span>
                             )}
@@ -3232,7 +3257,7 @@ export default function SettingsPage() {
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#4285F4]"><path d="M7.71 3.5L1.15 15l3.43 5.94h6.87L7.71 3.5z" fill="#0066DA"/><path d="M16.29 3.5H7.71l3.74 17.44h6.87l3.43-5.94L16.29 3.5z" fill="#00AC47"/><path d="M1.15 15l3.43 5.94h14.84l3.43-5.94H1.15z" fill="#EA4335"/><path d="M7.71 3.5l3.74 6.48L16.29 3.5H7.71z" fill="#00832D"/><path d="M11.45 9.98L7.71 3.5 1.15 15h7.48l2.82-5.02z" fill="#2684FC"/><path d="M11.45 9.98L16.29 3.5l5.56 11.5h-7.48l-2.92-5.02z" fill="#FFBA00"/></svg>
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Drive (Photos)</h3>
                             </div>
-                            <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (gdriveConnected ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                            <span className={"ui-status " + (gdriveConnected ? "ui-pill-success" : "ui-pill-amber")}>
                                 {gdriveConnected ? "Connected" : "Not connected"}
                             </span>
                         </div>
@@ -3274,7 +3299,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Reviews</h3>
                             </div>
                             {googlePlaceId && (
-                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">✓ Configured</span>
+                                <span className="ui-status ui-pill-success">✓ Configured</span>
                             )}
                         </div>
                         <div>

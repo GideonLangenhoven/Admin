@@ -87,7 +87,7 @@ export default function WhatsAppBotSection() {
 
   if (loading) {
     return (
-      <div className="p-6 rounded-xl border animate-pulse" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+      <div className="p-6 rounded-xl border animate-pulse" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
         <div className="h-5 w-48 rounded bg-[var(--ck-border-subtle)]" />
         <div className="h-4 w-72 mt-2 rounded bg-[var(--ck-border-subtle)]" />
       </div>
@@ -96,7 +96,7 @@ export default function WhatsAppBotSection() {
 
   if (loadError || !state) {
     return (
-      <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+      <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
           {loadError === "sign-in"
             ? "Please sign out and sign back in to manage WhatsApp auto-replies."
@@ -118,7 +118,7 @@ export default function WhatsAppBotSection() {
     : "business hours (not yet configured)";
 
   return (
-    <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border)" }}>
+    <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>WhatsApp auto-reply</h3>
@@ -156,7 +156,7 @@ export default function WhatsAppBotSection() {
         />
       </div>
 
-      <div className="mt-6 rounded-xl border p-4" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg-subtle)" }}>
+      <div className="mt-6 rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>WhatsApp support hours</h4>
@@ -192,7 +192,7 @@ export default function WhatsAppBotSection() {
                     disabled={!isPrivileged || hours.closed}
                     onChange={(e) => updateDay(day, { open: e.target.value })}
                     className="h-9 rounded-lg border px-2 text-sm normal-case"
-                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                    style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
                   />
                 </label>
                 <label className="grid gap-1 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>
@@ -203,7 +203,7 @@ export default function WhatsAppBotSection() {
                     disabled={!isPrivileged || hours.closed}
                     onChange={(e) => updateDay(day, { close: e.target.value })}
                     className="h-9 rounded-lg border px-2 text-sm normal-case"
-                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                    style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
                   />
                 </label>
                 <div className="flex items-end text-xs" style={{ color: "var(--ck-text-muted)" }}>

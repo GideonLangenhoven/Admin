@@ -19,19 +19,19 @@ interface Automation {
   description: string | null;
 }
 
-const triggerBadge: Record<string, { bg: string; text: string; label: string }> = {
-  contact_added: { bg: "bg-blue-100", text: "text-blue-700", label: "Contact Added" },
-  tag_added: { bg: "bg-teal-100", text: "text-teal-700", label: "Tag Added" },
-  post_booking: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Post Booking" },
-  date_field: { bg: "bg-orange-100", text: "text-orange-700", label: "Date Field" },
-  manual: { bg: "bg-gray-100", text: "text-gray-500", label: "Manual" },
+const triggerBadge: Record<string, { pill: string; label: string }> = {
+  contact_added: { pill: "ui-pill-ocean", label: "Contact Added" },
+  tag_added: { pill: "ui-pill-accent", label: "Tag Added" },
+  post_booking: { pill: "ui-pill-success", label: "Post Booking" },
+  date_field: { pill: "ui-pill-amber", label: "Date Field" },
+  manual: { pill: "ui-pill-neutral", label: "Manual" },
 };
 
-const statusBadge: Record<string, { bg: string; text: string }> = {
-  draft: { bg: "bg-gray-100", text: "text-gray-500" },
-  active: { bg: "bg-emerald-100", text: "text-emerald-700" },
-  paused: { bg: "bg-yellow-100", text: "text-yellow-700" },
-  archived: { bg: "bg-red-100", text: "text-red-600" },
+const statusBadge: Record<string, { pill: string }> = {
+  draft: { pill: "ui-pill-neutral" },
+  active: { pill: "ui-pill-success" },
+  paused: { pill: "ui-pill-warning" },
+  archived: { pill: "ui-pill-danger" },
 };
 
 /* ─── AUTOMATION TEMPLATE CATALOG ─── */
@@ -296,10 +296,10 @@ const TEMPLATES: AutomationTemplate[] = [
   },
 ];
 
-const TIER_INFO: Record<string, { label: string; bg: string; text: string; description: string }> = {
-  "must-have": { label: "Must-Have", bg: "bg-red-50", text: "text-red-700", description: "Highest ROI — implement these first" },
-  "high-value": { label: "High-Value", bg: "bg-amber-50", text: "text-amber-700", description: "Strong returns — implement after core" },
-  "growth": { label: "Growth", bg: "bg-blue-50", text: "text-blue-700", description: "Long-term engagement and scale" },
+const TIER_INFO: Record<string, { label: string; pill: string; description: string }> = {
+  "must-have": { label: "Must-Have", pill: "ui-pill-danger", description: "Highest ROI — implement these first" },
+  "high-value": { label: "High-Value", pill: "ui-pill-amber", description: "Strong returns — implement after core" },
+  "growth": { label: "Growth", pill: "ui-pill-ocean", description: "Long-term engagement and scale" },
 };
 
 export default function AutomationsPage() {
@@ -459,8 +459,10 @@ export default function AutomationsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="space-y-4 py-2">
+        <div className="ui-skeleton h-8 w-48" />
+        <div className="ui-skeleton h-[140px] !rounded-2xl" />
+        <div className="ui-skeleton h-[320px] !rounded-2xl" />
       </div>
     );
   }
@@ -479,22 +481,19 @@ export default function AutomationsPage() {
       <div className="space-y-6">
         <button
           onClick={() => setSelectedTemplate(null)}
-          className="flex items-center gap-1.5 text-sm font-medium"
+          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-80"
           style={{ color: "var(--ck-text-muted)" }}
         >
           <X size={14} /> Back to templates
         </button>
 
         {/* Header */}
-        <div
-          className="rounded-xl border p-6"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
+        <div className="ui-card p-6 anim-fade-up">
           <div className="flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h1>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tier.bg} ${tier.text}`}>
+                <h1 className="font-display text-[22px] font-semibold leading-tight" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h1>
+                <span className={"ui-status " + tier.pill}>
                   {tier.label}
                 </span>
               </div>
@@ -505,8 +504,7 @@ export default function AutomationsPage() {
             <button
               onClick={() => createFromTemplate(t)}
               disabled={creating}
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "var(--ck-accent)" }}
+              className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               {creating ? "Creating..." : "Use This Template"}
               {!creating && <ArrowRight size={14} />}
@@ -515,20 +513,14 @@ export default function AutomationsPage() {
         </div>
 
         {/* Why this works */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Why This Works</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d1">
+          <p className="ui-mono-label mb-2">Why This Works</p>
           <p className="text-sm" style={{ color: "var(--ck-text)" }}>{t.benefit}</p>
         </div>
 
         {/* How it works — step by step */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>How It Works</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d2">
+          <p className="ui-mono-label mb-4">How It Works</p>
           <div className="space-y-3">
             {t.howItWorks.map((step, i) => (
               <div key={i} className="flex gap-3">
@@ -545,17 +537,14 @@ export default function AutomationsPage() {
         </div>
 
         {/* Workflow preview */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Workflow Preview</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d3">
+          <p className="ui-mono-label mb-4">Workflow Preview</p>
 
           {/* Trigger */}
           <div className="flex items-center gap-2 mb-2">
             <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
-              style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}
+              className="ui-status ui-pill-accent !px-3 !py-1.5"
+              style={{ borderColor: "var(--ck-accent)" }}
             >
               Trigger: {t.triggerType.replace(/_/g, " ")}
               {t.triggerConfig.tag && <span className="opacity-70">({t.triggerConfig.tag})</span>}
@@ -564,7 +553,7 @@ export default function AutomationsPage() {
           </div>
 
           {/* Steps */}
-          <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border-strong)" }}>
             {t.steps.map((step, i) => {
               let label = stepLabels[step.step_type] || "Send Email";
               if (step.step_type === "delay") {
@@ -595,14 +584,11 @@ export default function AutomationsPage() {
         </div>
 
         {/* Example email */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Example Email Content</h2>
+        <div className="ui-card p-5">
+          <p className="ui-mono-label mb-3">Example Email Content</p>
           <div
             className="rounded-lg border p-4 text-xs whitespace-pre-wrap font-mono leading-relaxed"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+            style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)", color: "var(--ck-text)" }}
           >
             {t.exampleEmail}
           </div>
@@ -616,16 +602,14 @@ export default function AutomationsPage() {
           <button
             onClick={() => createFromTemplate(t)}
             disabled={creating}
-            className="flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: "var(--ck-accent)" }}
+            className="ui-btn ui-btn-primary !px-5 disabled:opacity-50"
           >
             {creating ? "Creating..." : "Use This Template"}
             {!creating && <ArrowRight size={14} />}
           </button>
           <button
             onClick={() => setSelectedTemplate(null)}
-            className="rounded-lg border px-4 py-2.5 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
             Back
           </button>
@@ -639,29 +623,29 @@ export default function AutomationsPage() {
     const tiers: ("must-have" | "high-value" | "growth")[] = ["must-have", "high-value", "growth"];
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between anim-fade-up">
           <div>
-            <h1 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
-            <p className="text-sm mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+            <p className="ui-mono-label mb-2">Growth · Templates</p>
+            <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
+            <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
               Industry-proven workflows designed for tour &amp; activity businesses. Choose a template to get started in seconds.
             </p>
           </div>
           <button
             onClick={() => setShowGallery(false)}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
             <X size={14} /> Close
           </button>
         </div>
 
-        {tiers.map((tier) => {
+        {tiers.map((tier, tierIdx) => {
           const info = TIER_INFO[tier];
           const tierTemplates = TEMPLATES.filter((t) => t.tier === tier);
           return (
-            <div key={tier}>
+            <div key={tier} className={"anim-fade-up anim-d" + (tierIdx + 1)}>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${info.bg} ${info.text}`}>
+                <span className={"ui-status " + info.pill}>
                   {info.label}
                 </span>
                 <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{info.description}</span>
@@ -674,8 +658,7 @@ export default function AutomationsPage() {
                     <button
                       key={t.key}
                       onClick={() => setSelectedTemplate(t)}
-                      className="rounded-xl border p-4 text-left transition-all hover:shadow-md"
-                      style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+                      className="ui-card ui-card-hover p-4 text-left"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -689,13 +672,13 @@ export default function AutomationsPage() {
                             {t.description}
                           </p>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb.bg} ${tb.text}`}>
+                            <span className={"ui-status " + tb.pill}>
                               {tb.label}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            <span className="ui-status ui-pill-neutral">
                               {t.steps.length} steps
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                            <span className="ui-status ui-pill-ocean">
                               {emailSteps} email{emailSteps !== 1 ? "s" : ""}
                             </span>
                           </div>
@@ -710,14 +693,14 @@ export default function AutomationsPage() {
         })}
 
         {/* Blank automation option */}
-        <div className="pt-2 border-t" style={{ borderColor: "var(--ck-border)" }}>
+        <div className="pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <button
             onClick={createBlankAutomation}
-            className="flex items-center gap-2 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:shadow-sm"
-            style={{ borderColor: "var(--ck-border)" }}
+            className="flex items-center gap-3 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:border-[var(--ck-border-strong)] hover:bg-[var(--ck-surface-warm)]"
+            style={{ borderColor: "var(--ck-border-strong)" }}
           >
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-50">
-              <Plus size={20} className="text-gray-400" />
+            <div className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
+              <Plus size={20} />
             </div>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Start From Scratch</h3>
@@ -736,10 +719,7 @@ export default function AutomationsPage() {
     <div className="space-y-4">
       {/* Intro banner — shown when there are few automations */}
       {automations.length > 0 && automations.length <= 5 && (
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
+        <div className="ui-card p-5 anim-fade-up">
           <div className="flex items-start gap-3">
             <div className="min-w-0">
               <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
@@ -748,9 +728,9 @@ export default function AutomationsPage() {
               <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
                 Tags are automatically applied to your contacts based on their booking behaviour — like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {["completed-tour", "lapsed-90-days", "vip", "new-booker", "voucher-expiring"].map(tag => (
-                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700">
+                  <span key={tag} className="ui-status ui-pill-accent">
                     {tag}
                   </span>
                 ))}
@@ -762,22 +742,20 @@ export default function AutomationsPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between anim-fade-up anim-d1">
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-          {automations.length} automation{automations.length !== 1 ? "s" : ""}
+          <span className="font-display text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{automations.length}</span> automation{automations.length !== 1 ? "s" : ""}
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => setShowGallery(true)}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
             <Sparkle size={14} /> Browse Templates
           </button>
           <button
             onClick={createBlankAutomation}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white"
-            style={{ background: "var(--ck-accent)" }}
+            className="ui-btn ui-btn-primary"
           >
             <Plus size={14} /> New Automation
           </button>
@@ -786,21 +764,20 @@ export default function AutomationsPage() {
 
       {/* Empty state with template suggestions */}
       {automations.length === 0 ? (
-        <div className="space-y-6">
-          <div
-            className="rounded-xl border p-8 text-center"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-          >
-            <h2 className="text-base font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
+        <div className="space-y-6 anim-fade-up">
+          <div className="ui-card ui-empty">
+            <div className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
+              <Sparkle size={19} />
+            </div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               No automations yet
             </h2>
-            <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>
+            <p className="text-sm mb-4 max-w-lg" style={{ color: "var(--ck-text-muted)" }}>
               Automations send emails automatically when things happen — a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
             </p>
             <button
               onClick={() => setShowGallery(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-              style={{ background: "var(--ck-accent)" }}
+              className="ui-btn ui-btn-primary"
             >
               <Sparkle size={14} /> Browse Templates to Get Started
             </button>
@@ -817,8 +794,7 @@ export default function AutomationsPage() {
                   <button
                     key={t.key}
                     onClick={() => { setShowGallery(true); setSelectedTemplate(t); }}
-                    className="rounded-xl border p-4 text-left transition-all hover:shadow-md"
-                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+                    className="ui-card ui-card-hover p-4 text-left"
                   >
                     <h4 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
                       {t.name}
@@ -833,13 +809,8 @@ export default function AutomationsPage() {
           </div>
 
           {/* How automations work */}
-          <div
-            className="rounded-xl border p-5"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-          >
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>
-                How Automations Work
-            </h3>
+          <div className="ui-card p-5">
+            <p className="ui-mono-label mb-3">How Automations Work</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
@@ -873,7 +844,7 @@ export default function AutomationsPage() {
         </div>
       ) : (
         /* ─── AUTOMATIONS TABLE ─── */
-        <div className="space-y-3">
+        <div className="space-y-3 anim-fade-up anim-d2">
           {archivedCount > 0 && (
             <div className="flex items-center justify-between text-xs">
               <span style={{ color: "var(--ck-text-muted)" }}>
@@ -881,27 +852,23 @@ export default function AutomationsPage() {
               </span>
               <button
                 onClick={() => setShowArchived((v) => !v)}
-                className="rounded-md border px-2.5 py-1 text-xs font-medium"
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs"
               >
                 {showArchived ? "Hide archived" : "Show archived"}
               </button>
             </div>
           )}
-        <div
-          className="rounded-xl border overflow-x-auto"
-          style={{ borderColor: "var(--ck-border)" }}
-        >
+        <div className="ui-card overflow-x-auto">
           <table className="w-full text-sm min-w-[700px]">
             <thead>
-              <tr style={{ background: "var(--ck-surface)" }}>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Enrolled</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Completed</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Created</th>
-                <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
+              <tr style={{ background: "var(--ck-surface-sunken)" }}>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Name</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Trigger</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Status</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Enrolled</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Completed</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Created</th>
+                <th className="text-right px-4 py-3 ui-mono-label !text-[10px]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -909,7 +876,7 @@ export default function AutomationsPage() {
                 const tb = triggerBadge[a.trigger_type] || triggerBadge.manual;
                 const sb = statusBadge[a.status] || statusBadge.draft;
                 return (
-                  <tr key={a.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                  <tr key={a.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => router.push("/marketing/automations/" + a.id)}
@@ -925,19 +892,19 @@ export default function AutomationsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tb.bg} ${tb.text}`}>
+                      <span className={"ui-status " + tb.pill}>
                         {tb.label}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sb.bg} ${sb.text}`}>
+                      <span className={"ui-status " + sb.pill}>
                         {a.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center" style={{ color: "var(--ck-text)" }}>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                       {a.enrolled_count}
                     </td>
-                    <td className="px-4 py-3 text-center" style={{ color: "var(--ck-text)" }}>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                       {a.completed_count}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
@@ -948,8 +915,8 @@ export default function AutomationsPage() {
                         {a.status !== "archived" && (
                           <button
                             onClick={() => toggleStatus(a)}
-                            className="rounded-lg border p-1.5"
-                            style={{ borderColor: "var(--ck-border)" }}
+                            className="inline-flex items-center justify-center rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-surface-sunken)]"
+                            style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                             title={a.status === "active" ? "Pause" : "Activate"}
                           >
                             {a.status === "active" ? <Pause size={13} /> : <Play size={13} />}
@@ -958,8 +925,7 @@ export default function AutomationsPage() {
                         {a.status === "archived" ? (
                           <button
                             onClick={() => unarchiveAutomation(a)}
-                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
-                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                            className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Restore to draft"
                           >
                             Unarchive
@@ -967,8 +933,7 @@ export default function AutomationsPage() {
                         ) : (
                           <button
                             onClick={() => archiveAutomation(a)}
-                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
-                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                            className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Hide from active list, preserve history"
                           >
                             Archive
@@ -976,7 +941,8 @@ export default function AutomationsPage() {
                         )}
                         <button
                           onClick={() => deleteAutomation(a)}
-                          className="p-1.5 text-red-500 hover:text-red-700"
+                          className="inline-flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--ck-danger-soft)]"
+                          style={{ color: "var(--ck-danger)" }}
                           title="Delete permanently"
                         >
                           <Trash size={13} />

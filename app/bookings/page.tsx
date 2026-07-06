@@ -13,7 +13,6 @@ import { MonthPicker } from "../../components/MonthPicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 // Build a hover tooltip from any details the customer added (special requests,
 // dietary notes, etc.) stored on bookings.custom_fields. Returns undefined when
@@ -885,9 +884,17 @@ export default function Bookings() {
     // Also use this path when admin explicitly chose "issue voucher" for a card-paid booking.
     if ((isVoucherPaid || issueVoucherInstead) && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
       try {
+        // rebook-booking authorizes the caller: admins must send their session
+        // JWT (the anon key gets 401 and the voucher is never issued).
+        const { data: { session: vSession } } = await supabase.auth.getSession();
+        if (!vSession?.access_token) {
+          setActionBookingId(null);
+          notify({ title: "Session expired", message: "Please sign in again and try again.", tone: "error" });
+          return;
+        }
         const res = await fetch(SU + "/functions/v1/rebook-booking", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + vSession.access_token },
           body: JSON.stringify({ booking_id: b.id, action: "CANCEL_VOUCHER" }),
         });
         const data = await res.json();
@@ -1017,11 +1024,17 @@ export default function Bookings() {
     setRefunding(true);
     setActionBookingId(b.id);
     try {
-      if (b.yoco_checkout_id && SU && SK) {
-        // Yoco refund — edge function handles booking update, notifications, and logging
+      if (b.yoco_checkout_id && SU) {
+        // Yoco refund — edge function handles booking update, notifications, and
+        // logging. It authorizes the caller, so send the admin's session JWT.
+        const { data: { session: rSession } } = await supabase.auth.getSession();
+        if (!rSession?.access_token) {
+          notify({ title: "Session expired", message: "Please sign in again and try again.", tone: "error" });
+          return;
+        }
         const r = await fetch(SU + "/functions/v1/process-refund", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + rSession.access_token },
           body: JSON.stringify({ booking_id: b.id, amount }),
         });
         const d = await r.json();

@@ -150,13 +150,13 @@ export default function InlineSlotManager({
              const commonCap = items[0]?.capacity_total || 10;
 
              return (
-               <div key={timeKey} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-[var(--ck-bg-subtle)] border border-[var(--ck-border-subtle)]">
+               <div key={timeKey} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)]">
                  <div className="flex flex-col mb-3 sm:mb-0">
                    <div className="flex items-center gap-2">
                      <span className="text-base font-bold text-[var(--ck-text-strong)]">{timeKey}</span>
                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--ck-surface)] border border-[var(--ck-border-subtle)]">{items.length} upcoming runs</span>
                    </div>
-                   {hasBookings && <span className="text-xs text-amber-600 font-medium mt-1">Has active bookings ({totalBooked} total space reserved)</span>}
+                   {hasBookings && <span className="text-xs text-[var(--ck-amber)] font-medium mt-1">Has active bookings ({totalBooked} total space reserved)</span>}
                  </div>
                  
                  <div className="flex items-center gap-3">

@@ -58,7 +58,7 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
     };
 
     return (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="ui-card overflow-hidden">
             <div
                 onClick={() => {
                     if (!isPast) {
@@ -76,9 +76,9 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
             </div>
 
             {isToday && (
-                <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50 px-4 py-2 text-xs font-medium text-blue-700">
+                <div className="flex items-center justify-between px-4 py-2 text-xs font-medium" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)", borderBottom: "1px solid var(--ck-border-subtle)" }}>
                     <span>Current time marker</span>
-                    <span>Now {nowLabel}</span>
+                    <span className="tabular-nums">Now {nowLabel}</span>
                 </div>
             )}
 
