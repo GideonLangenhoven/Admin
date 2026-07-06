@@ -2835,7 +2835,7 @@ export default function SettingsPage() {
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">Arrival instructions</span>
-                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails and in the day-before waiver reminder, together with &quot;What to bring&quot; above. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
                         <textarea value={opsConfig.arrival_instructions} onChange={e => setOpsConfig({ ...opsConfig, arrival_instructions: e.target.value })}
                             rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="ui-control mt-1 w-full" />
                     </label>

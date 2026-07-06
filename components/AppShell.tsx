@@ -11,10 +11,11 @@ import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
+import { isNavItemActive } from "./nav-active";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
-  ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
   UsersThree, Clock, CaretDoubleLeft, CaretDoubleRight, CaretDown,
 } from "@phosphor-icons/react";
@@ -22,7 +23,7 @@ import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
-  MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  MessageSquareText: ChatText, Ticket, Receipt, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
   ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree, Star, Globe: GlobeSimple, Warning: WarningCircle,
   Clock,
@@ -56,7 +57,7 @@ function isSuspendedAllowed(path: string) {
    rules are unchanged; groups whose items are all hidden don't render. */
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
-  { label: "Operations", hrefs: ["/bookings", "/bookings/pending-reschedules", "/new-booking", "/slots", "/guide", "/weather", "/photos"] },
+  { label: "Operations", hrefs: ["/bookings", "/bookings/pending-reschedules", "/new-booking", "/slots", "/guide", "/photos"] },
   { label: "Customers", hrefs: ["/inbox", "/notifications", "/refunds", "/vouchers", "/reviews"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts"] },
@@ -178,8 +179,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     .sort((a, b) => b.href.length - a.href.length)[0]?.label
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
+  const visibleHrefs = visibleNav.map((n) => n.href);
   function isNavActive(href: string) {
-    return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+    return isNavItemActive(pathname, href, visibleHrefs);
   }
 
   return (
@@ -268,7 +270,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               <nav className="space-y-0.5">
                 {group.items.map((n) => {
                   const Icon = iconMap[n.icon] || Circle;
-                  const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+                  const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
                   const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
                   return (
                     <Link key={n.href} href={navBlocked ? pathname : n.href}
@@ -383,7 +385,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           <div className="flex min-w-max px-2">
           {visibleNav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;
-            const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+            const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
             const mobileBlocked = isSuspended && !isSuspendedAllowed(n.href);
             return (
               <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>

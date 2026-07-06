@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
+  formatTenantDate,
   formatTenantDateTime,
   getBusinessDisplayName,
   getTenantByBusinessId,
@@ -113,7 +114,7 @@ Deno.serve(async (req: any) => {
 
     const invR = await supabase
       .from("invoices")
-      .select("invoice_number, payment_reference")
+      .select("invoice_number, payment_reference, created_at")
       .eq("booking_id", bookingId)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -176,6 +177,7 @@ Deno.serve(async (req: any) => {
               qty: booking.qty,
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
+              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
             },
           },
         });

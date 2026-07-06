@@ -5161,7 +5161,7 @@
       "tablename": "add_ons",
       "policyname": "add_ons_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "((active = true) AND ((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text)))",
       "with_check": null
     },
@@ -5314,7 +5314,7 @@
       "tablename": "booking_add_ons",
       "policyname": "booking_add_ons_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "(booking_id IN ( SELECT bookings.id\n   FROM bookings))"
     },
@@ -5323,7 +5323,7 @@
       "tablename": "booking_add_ons",
       "policyname": "booking_add_ons_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(booking_id IN ( SELECT bookings.id\n   FROM bookings))",
       "with_check": null
     },
@@ -5368,7 +5368,7 @@
       "tablename": "bookings",
       "policyname": "bookings_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "true"
     },
@@ -5377,7 +5377,7 @@
       "tablename": "bookings",
       "policyname": "bookings_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "((COALESCE(current_setting('request.method'::text, true), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (bt_request_header('x-booking-success-token'::text) = (id)::text) OR ((bt_request_header('x-booking-id'::text) = (id)::text) AND (bt_request_header('x-booking-waiver-token'::text) = (waiver_token)::text)))",
       "with_check": null
     },
@@ -5386,7 +5386,7 @@
       "tablename": "bookings",
       "policyname": "bookings_anon_update",
       "cmd": "UPDATE",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))",
       "with_check": "(status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text]))"
     },
@@ -5476,7 +5476,7 @@
       "tablename": "businesses",
       "policyname": "businesses_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(((id)::text = bt_request_header('x-tenant-business-id'::text)) OR (subdomain = bt_request_header('x-tenant-subdomain'::text)) OR (regexp_replace(COALESCE(booking_site_url, ''::text), '/+$'::text, ''::text) = regexp_replace(COALESCE(NULLIF(bt_request_header('origin'::text), ''::text), bt_request_header('x-tenant-origin'::text)), '/+$'::text, ''::text)))",
       "with_check": null
     },
@@ -5575,7 +5575,7 @@
       "tablename": "combo_booking_items",
       "policyname": "combo_booking_items_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "true"
     },
@@ -5602,7 +5602,7 @@
       "tablename": "combo_bookings",
       "policyname": "combo_bookings_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "true"
     },
@@ -5611,7 +5611,7 @@
       "tablename": "combo_offer_items",
       "policyname": "combo_offer_items_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "true",
       "with_check": null
     },
@@ -5629,7 +5629,7 @@
       "tablename": "combo_offers",
       "policyname": "combo_offers_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(active = true)",
       "with_check": null
     },
@@ -6403,7 +6403,7 @@
       "tablename": "plans",
       "policyname": "plans_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "true",
       "with_check": null
     },
@@ -6466,7 +6466,7 @@
       "tablename": "promotion_uses",
       "policyname": "promotion_uses_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "true"
     },
@@ -6475,7 +6475,7 @@
       "tablename": "promotions",
       "policyname": "promotions_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text))",
       "with_check": null
     },
@@ -6637,7 +6637,7 @@
       "tablename": "slots",
       "policyname": "slots_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
       "with_check": null
     },
@@ -6790,7 +6790,7 @@
       "tablename": "tours",
       "policyname": "tours_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (active = true) AND (COALESCE(hidden, false) = false))",
       "with_check": null
     },
@@ -6907,7 +6907,7 @@
       "tablename": "vouchers",
       "policyname": "vouchers_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": null,
       "with_check": "((status = 'PENDING'::text) AND ((business_id)::text = bt_request_header('x-tenant-business-id'::text)))"
     },
@@ -6916,7 +6916,7 @@
       "tablename": "vouchers",
       "policyname": "vouchers_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "((upper(regexp_replace((code)::text, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(bt_request_header('x-voucher-code'::text), '\\s+'::text, ''::text, 'g'::text))) AND (bt_request_header('x-voucher-code'::text) <> ''::text))",
       "with_check": null
     },
@@ -7006,7 +7006,7 @@
       "tablename": "reviews",
       "policyname": "reviews_anon_read",
       "cmd": "SELECT",
-      "roles": "{anon}",
+      "roles": "{anon,authenticated}",
       "qual": "(status = 'APPROVED'::text)",
       "with_check": null
     },

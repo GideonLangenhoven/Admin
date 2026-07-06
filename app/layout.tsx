@@ -30,7 +30,6 @@ const nav = [
   { href: "/notifications", label: "Notifications", icon: "Warning", privilegedOnly: true },
   { href: "/vouchers", label: "Vouchers", icon: "Ticket" },
   { href: "/invoices", label: "Invoices", icon: "Receipt" },
-  { href: "/weather", label: "Weather", icon: "CloudSun" },
   { href: "/photos", label: "Photos", icon: "Camera" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },

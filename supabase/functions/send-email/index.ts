@@ -344,23 +344,26 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
 }
 
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
-  const icons: string[] = [];
-  const iconStyle = "display: inline-block; margin: 0 6px; text-decoration: none;";
-  const svgStyle = "width: 24px; height: 24px;";
-  // Use accent color derived from brand, fallback to light muted
-  const fill = "#A8C2B8";
+  // Text links, not inline <svg> icons — Gmail (web + app), Outlook, and
+  // Yahoo Mail all strip inline SVG from HTML email for security reasons, so
+  // the icon version silently rendered as nothing in most real inboxes even
+  // though the markup was built and injected correctly. Plain text links
+  // work in every email client with no external image hosting required.
+  const links: string[] = [];
+  const linkStyle = "color: #A8C2B8; text-decoration: none; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px;";
 
-  if (branding.socialFacebook) icons.push(`<a href="${branding.socialFacebook}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>`);
-  if (branding.socialInstagram) icons.push(`<a href="${branding.socialInstagram}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>`);
-  if (branding.socialTiktok) icons.push(`<a href="${branding.socialTiktok}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.44v-7.15a8.16 8.16 0 005.58 2.18V11.2a4.85 4.85 0 01-3.59-1.57V6.69h3.59z"/></svg></a>`);
-  if (branding.socialYoutube) icons.push(`<a href="${branding.socialYoutube}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>`);
-  if (branding.socialTwitter) icons.push(`<a href="${branding.socialTwitter}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>`);
-  if (branding.socialLinkedin) icons.push(`<a href="${branding.socialLinkedin}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>`);
-  if (branding.socialTripadvisor) icons.push(`<a href="${branding.socialTripadvisor}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 004.04 10.43 5.976 5.976 0 004.075-1.6L12 19.545l1.922-1.932a5.976 5.976 0 004.075 1.6 5.997 5.997 0 004.04-10.43L24 6.648h-4.35a13.573 13.573 0 00-7.644-2.353zM6.003 17.213a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zm11.994 0a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zM6.003 11.219a2 2 0 100 4 2 2 0 000-4zm11.994 0a2 2 0 100 4 2 2 0 000-4z"/></svg></a>`);
-  if (branding.socialGoogleReviews) icons.push(`<a href="${branding.socialGoogleReviews}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 0C5.372 0 0 5.373 0 12s5.372 12 12 12c6.627 0 12-5.373 12-12S18.627 0 12 0zm.14 19.018c-3.868 0-7-3.14-7-7.018 0-3.878 3.132-7.018 7-7.018 1.89 0 3.47.697 4.682 1.829l-1.974 1.896c-.508-.486-1.394-1.052-2.708-1.052-2.322 0-4.218 1.924-4.218 4.345s1.897 4.345 4.218 4.345c2.703 0 3.718-1.945 3.875-2.951h-3.875v-2.485h6.447c.075.407.134.812.134 1.345 0 4.014-2.686 6.764-6.581 6.764z"/></svg></a>`);
+  if (branding.socialFacebook) links.push(`<a href="${branding.socialFacebook}" style="${linkStyle}" target="_blank">Facebook</a>`);
+  if (branding.socialInstagram) links.push(`<a href="${branding.socialInstagram}" style="${linkStyle}" target="_blank">Instagram</a>`);
+  if (branding.socialTiktok) links.push(`<a href="${branding.socialTiktok}" style="${linkStyle}" target="_blank">TikTok</a>`);
+  if (branding.socialYoutube) links.push(`<a href="${branding.socialYoutube}" style="${linkStyle}" target="_blank">YouTube</a>`);
+  if (branding.socialTwitter) links.push(`<a href="${branding.socialTwitter}" style="${linkStyle}" target="_blank">X / Twitter</a>`);
+  if (branding.socialLinkedin) links.push(`<a href="${branding.socialLinkedin}" style="${linkStyle}" target="_blank">LinkedIn</a>`);
+  if (branding.socialTripadvisor) links.push(`<a href="${branding.socialTripadvisor}" style="${linkStyle}" target="_blank">TripAdvisor</a>`);
+  if (branding.socialGoogleReviews) links.push(`<a href="${branding.socialGoogleReviews}" style="${linkStyle}" target="_blank">Google Reviews</a>`);
 
-  if (icons.length === 0) return "";
-  return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${icons.join("")}</td></tr></table>`;
+  if (links.length === 0) return "";
+  const separator = `<span style="color: #4a625c; font-size: 12px; padding: 0 8px;">&middot;</span>`;
+  return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${links.join(separator)}</td></tr></table>`;
 }
 
 function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>) {
@@ -442,16 +445,27 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     );
   }
 
-  // Inject social media icons inside the dark email footer
+  // Inject the dark-footer extras: social icons (per-operator, optional) and
+  // a "Powered by BookingTours" line. The powered-by line is intentionally
+  // NOT one of the ordinary per-tenant `branding` fields above — it isn't
+  // read from any business setting, so no operator config can omit or
+  // override it, and it must render even when a tenant has zero social links.
   const socialHtml = buildSocialIconsHtml(branding);
-  if (socialHtml) {
+  const poweredByHtml = `<table cellpadding="0" cellspacing="0" style="width:100%;"><tr><td style="text-align:center; padding-top:14px; margin-top:14px; border-top:1px solid rgba(255,255,255,0.14);"><p style="margin:0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:11px; letter-spacing:0.02em; color:#A8C2B8;">Powered by <span style="color:#ffffff; font-weight:600;">BookingTours</span></p></td></tr></table>`;
+  const footerExtras = socialHtml + poweredByHtml;
+  {
     // Find the footer </td> — it's the last </td> before </body>
     const bodyClose = brandedHtml.lastIndexOf("</body>");
     if (bodyClose > -1) {
       const footerTdClose = brandedHtml.lastIndexOf("</td>", bodyClose);
       if (footerTdClose > -1) {
-        brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + socialHtml + "\n          " + brandedHtml.slice(footerTdClose);
+        brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + footerExtras + "\n          " + brandedHtml.slice(footerTdClose);
+      } else {
+        // No table-footer to anchor to — still guarantee the line renders.
+        brandedHtml = brandedHtml.slice(0, bodyClose) + footerExtras + brandedHtml.slice(bodyClose);
       }
+    } else {
+      brandedHtml += footerExtras;
     }
   }
 
@@ -1257,8 +1271,7 @@ function indemnityHtml(d: Record<string, unknown>) {
             <h3 style="font-family: Georgia, serif; color: #1b3b36; font-size: 20px; margin: 0 0 10px 0;">See You Tomorrow</h3>
             <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 0 0 25px 0;">
               <strong>Cape Kayak Adventures, 180 Beach Rd, Three Anchor Bay</strong><br>
-              Please arrive 15 minutes before launch.<br>
-              Bring sunscreen, a hat, a towel, and a water bottle.
+              Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.
             </p>
           </td>
         </tr>
@@ -1669,13 +1682,26 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const subtotal = total / (1 + VAT_RATE);
   const vatAmt = total - subtotal;
   const invDate = String(d.invoice_date || "-");
+  // This system only ever generates invoices for bookings already paid in
+  // full (see confirm_combo_payment_atomic / webhook flows) — there is no
+  // partial-payment/installment invoicing. Kept as its own value (rather than
+  // always literally `total`) so the balance-due math below stays correct if
+  // that ever changes.
+  const amountPaid = total;
   function m(n: number) { return "R" + n.toFixed(2); }
 
   // ── Optional operator logo (top-left) ──
+  // pdf-lib can only embed raster PNG/JPG — SVG and WEBP logos (which render
+  // fine as an <img> on the booking site/admin sidebar) can't be embedded
+  // here without rasterizing first, so they're skipped. That used to fail
+  // completely silently; now it's logged so a missing invoice logo is
+  // diagnosable instead of a mystery.
   if (invCtx.logoUrl) {
     try {
       const resp = await fetch(invCtx.logoUrl);
-      if (resp.ok) {
+      if (!resp.ok) {
+        console.warn("INVOICE_LOGO_FETCH_FAILED url=" + invCtx.logoUrl + " status=" + resp.status);
+      } else {
         const bytes = new Uint8Array(await resp.arrayBuffer());
         const ct = (resp.headers.get("content-type") || "").toLowerCase();
         const url = invCtx.logoUrl.toLowerCase();
@@ -1687,9 +1713,13 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
           const w = (img.width / img.height) * h;
           page.drawImage(img, { x: margin, y: y - h, width: w, height: h });
           y -= (h + 12);
+        } else {
+          console.warn("INVOICE_LOGO_UNSUPPORTED_FORMAT url=" + invCtx.logoUrl + " content-type=" + ct + " — invoice PDFs support PNG/JPG only; re-upload the logo in that format to show it on invoices.");
         }
       }
-    } catch (_e) { /* logo is optional — skip on any failure (e.g. webp/svg unsupported) */ }
+    } catch (logoErr) {
+      console.error("INVOICE_LOGO_ERR url=" + invCtx.logoUrl + ": " + (logoErr instanceof Error ? logoErr.message : String(logoErr)));
+    }
   }
 
   // ── Header ──
@@ -1732,7 +1762,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: lightGrey });
   y -= 20;
   const detailLabels = ["Invoice #:", "Booking Ref:", "Date:", "Amount Due:"];
-  const detailValues = [invNo, ref, invDate, "R0.00"];
+  const detailValues = [invNo, ref, invDate, m(total)];
   for (let di = 0; di < detailLabels.length; di++) {
     page.drawText(detailLabels[di], { x: W - margin - 200, y, font: fontBold, size: 9, color: black });
     page.drawText(detailValues[di], { x: W - margin - 80, y, font: fontMono, size: 9, color: black });
@@ -1780,7 +1810,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
     ["Sub-total (Excl VAT):", m(subtotal)],
     ["VAT - " + (VAT_RATE * 100).toFixed(1) + "%:", m(vatAmt)],
     ["Total:", m(total)],
-    ["Amount Paid:", m(total)],
+    ["Amount Paid:", m(amountPaid)],
   ];
   for (const tr of totalRows) {
     page.drawText(tr[0], { x: totalsX, y, font: tr[0] === "Total:" ? fontBold : font, size: 9, color: black });
@@ -1792,7 +1822,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   y -= 4;
   page.drawRectangle({ x: totalsX - 5, y: y - 4, width: W - margin - totalsX + 5, height: 18, color: lightGrey });
   page.drawText("Balance Due:", { x: totalsX, y, font: fontBold, size: 10, color: black });
-  page.drawText("R0.00", { x: totalsValX, y, font: fontBold, size: 10, color: black });
+  page.drawText(m(Math.max(0, total - amountPaid)), { x: totalsValX, y, font: fontBold, size: 10, color: black });
   y -= 35;
 
   // ── Banking Details (only if business has bank details populated) ──
@@ -1851,6 +1881,8 @@ function broadcastHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 24px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Update About Your Trip</h1>
           </td>
         </tr>
+        <!-- Hero Image (reuses the operator's confirmation-email hero image — broadcast has no dedicated upload of its own) -->
+        ${heroImg("IMG_CONFIRM", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 40px;">

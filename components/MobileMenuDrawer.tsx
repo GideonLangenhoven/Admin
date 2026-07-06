@@ -10,16 +10,17 @@ import SignOutButton from "./SignOutButton";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import { BrandMark } from "./BrandLogo";
+import { isNavItemActive } from "./nav-active";
 import {
   Circle, SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
-  ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
-  MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  MessageSquareText: ChatText, Ticket, Receipt, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck, Circle,
 };
 
@@ -98,7 +99,7 @@ export default function MobileMenuDrawer({ nav }: { nav: NavItem[] }) {
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {nav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;
-            const active = n.href === "/" ? pathname === "/" : pathname === n.href || pathname?.startsWith(n.href + "/");
+            const active = isNavItemActive(pathname || "", n.href, nav.map((x) => x.href));
             return (
               <Link
                 key={n.href}

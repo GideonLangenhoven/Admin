@@ -295,6 +295,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
             qty: booking.qty,
             total_amount: booking.total_amount,
             invoice_number: invoice?.invoice_number || "",
+            invoice_date: tenant ? formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()) : "",
           }
         }),
       });
