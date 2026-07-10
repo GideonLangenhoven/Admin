@@ -33,11 +33,16 @@ Deno.serve(async (req: any) => {
     const templateFallback = body.template_fallback
       ? { name: body.template_fallback.name, params: body.template_fallback.params || [], language: body.template_fallback.language }
       : undefined;
-    await sendWhatsappTextForTenant(tenant, to, message, templateFallback);
-
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
+    const result = await sendWhatsappTextForTenant(tenant, to, message, templateFallback);
+    // Surface which channel actually delivered (free-form text vs the approved
+    // template used when the 24h window was closed) so callers can log routing.
+    const channel = (result && typeof result === "object" && "channel" in result) ? (result as { channel: string }).channel : "text";
+    return new Response(JSON.stringify({ ok: true, channel, via_template: channel === "template" }), { status: 200, headers: getCors(req) });
   } catch (err) {
+    // Return 200 with ok:false (not 500) so callers can read the outcome and
+    // route to an alternative channel (e.g. email) rather than treating a
+    // failed WhatsApp send as a transport error.
     console.error("send-whatsapp-text error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: getCors(req) });
+    return new Response(JSON.stringify({ ok: false, error: String(err instanceof Error ? err.message : err) }), { status: 200, headers: getCors(req) });
   }
 });

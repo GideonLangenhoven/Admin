@@ -208,10 +208,21 @@ Deno.serve(async (req: Request) => {
         // Load contact
         const { data: contact } = await supabase
           .from("marketing_contacts")
-          .select("id, email, first_name, last_name, tags")
+          .select("id, email, first_name, last_name, tags, status")
           .eq("id", enrollment.contact_id)
           .single();
         if (!contact) continue;
+
+        // A contact can unsubscribe mid-sequence — this used to keep firing
+        // every remaining scheduled step regardless. Exit the enrollment
+        // (terminal, same as the existing condition-not-met exit path below)
+        // instead of re-checking this same row every cron tick forever.
+        if (contact.status === "unsubscribed") {
+          await supabase.from("marketing_automation_enrollments")
+            .update({ status: "exited", updated_at: new Date().toISOString() })
+            .eq("id", enrollment.id);
+          continue;
+        }
 
         const metadata = enrollment.metadata || {};
 

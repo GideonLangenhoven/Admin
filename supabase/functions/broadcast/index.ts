@@ -68,32 +68,68 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Could not fetch bookings" }), { status: 500, headers: getCors(req) });
     }
 
+    // Broadcast sourced recipients straight from paid bookings and never once
+    // checked marketing_contacts.status — an unsubscribed customer kept
+    // receiving every broadcast indefinitely. One batch lookup up front avoids
+    // an extra query per recipient.
+    const candidateEmails = Array.from(new Set(bookings.map((b) => String(b.email || "").toLowerCase()).filter(Boolean)));
+    let unsubscribedEmails = new Set<string>();
+    if (candidateEmails.length > 0) {
+      const { data: unsubRows, error: unsubErr } = await supabase.from("marketing_contacts")
+        .select("email")
+        .eq("business_id", business_id)
+        .eq("status", "unsubscribed")
+        .in("email", candidateEmails);
+      if (unsubErr) console.error("BROADCAST_UNSUB_LOOKUP_ERR:", unsubErr.message);
+      else unsubscribedEmails = new Set((unsubRows || []).map((r: any) => String(r.email).toLowerCase()));
+    }
+
     let waSent = 0;
     let waAttempted = 0;
     let emailSent = 0;
     let emailAttempted = 0;
     let totalSent = 0;
     const errors: string[] = [];
+    // Per-recipient channel accounting (item 19). WhatsApp's 24h free-form
+    // window is enforced by Meta: inside the window we can send free-form text;
+    // outside it we must use an approved template. sendWhatsappTextForTenant
+    // handles that routing reactively (free-form → catch 131047/131026 → the
+    // admin_outreach template), and reports back which channel it used.
+    const channelCounts = { wa_freeform: 0, wa_template: 0, email: 0, email_fallback: 0, failed: 0 };
+    const channelLog: Array<{ to: string; channel: string }> = [];
 
     for (const b of bookings) {
       let sentToCustomer = false;
+      let channelUsed = "none";
+      let waOk = false;
       const firstName = (b.customer_name || "Guest").split(" ")[0];
       const parsedMessage = message.replace(/\{name\}/gi, firstName);
+      const emailLowerRaw = String(b.email || "").toLowerCase();
+      const isUnsubscribed = !!emailLowerRaw && unsubscribedEmails.has(emailLowerRaw);
 
-      // WhatsApp — send-whatsapp-text returns {ok: true/false}. Don't trust
-      // HTTP-200 alone; check the body.
+      // WhatsApp — send with an approved-template fallback so out-of-window
+      // recipients still get the message (as a template) rather than silently
+      // dropping. send-whatsapp-text returns {ok, channel}; trust the body.
       if (send_whatsapp && b.phone) {
         waAttempted++;
         try {
           const waRes = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-            body: JSON.stringify({ to: b.phone, message: parsedMessage, business_id })
+            body: JSON.stringify({
+              to: b.phone,
+              message: parsedMessage,
+              business_id,
+              template_fallback: { name: "admin_outreach", params: [firstName, parsedMessage], language: "en" },
+            }),
           });
           const waBody = await waRes.json().catch(() => ({} as any));
-          if (waRes.ok && waBody?.ok !== false) {
+          if (waRes.ok && waBody?.ok === true) {
+            waOk = true;
             waSent++;
             sentToCustomer = true;
+            channelUsed = waBody.channel === "template" ? "wa_template" : "wa_freeform";
+            channelCounts[channelUsed === "wa_template" ? "wa_template" : "wa_freeform"]++;
           } else {
             errors.push(`WA to ${b.phone}: ${waBody?.error || ("HTTP " + waRes.status)}`);
           }
@@ -102,9 +138,16 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Email — send-email now returns {ok: true/false} reflecting Resend's
-      // actual outcome rather than an optimistic 200. Only count true deliveries.
-      if (send_email && b.email) {
+      // Email is sent when the operator explicitly chose email, OR as an
+      // automatic fallback when a requested WhatsApp send failed entirely
+      // (so the customer isn't left with no communication). Deduped so we
+      // never email the same recipient twice.
+      const wantEmailPrimary = send_email && !!b.email;
+      const wantEmailFallback = send_whatsapp && !!b.phone && !waOk && !!b.email;
+      if ((wantEmailPrimary || wantEmailFallback) && b.email && isUnsubscribed) {
+        // Skip silently — an unsubscribed recipient isn't a send failure.
+      } else if ((wantEmailPrimary || wantEmailFallback) && b.email) {
+        const isFallback = wantEmailFallback && !wantEmailPrimary;
         emailAttempted++;
         try {
           // Compliance: generate a one-click unsubscribe token per recipient.
@@ -140,6 +183,14 @@ Deno.serve(async (req: Request) => {
             console.warn("BROADCAST_UNSUB_TOKEN_ERR for", b.email, ":", e);
           }
 
+          // Fail closed: POPIA/CAN-SPAM/GDPR require an opt-out path on every
+          // mass commercial email. This used to send anyway with a blank
+          // unsubscribe link whenever token creation failed above.
+          if (!unsubscribeUrl) {
+            errors.push(`Email to ${b.email}: skipped — could not generate an unsubscribe token`);
+            continue;
+          }
+
           const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
@@ -158,6 +209,8 @@ Deno.serve(async (req: Request) => {
           if (emailRes.ok && emailBody?.ok === true) {
             emailSent++;
             sentToCustomer = true;
+            if (isFallback) { channelCounts.email_fallback++; if (channelUsed === "none") channelUsed = "email_fallback"; }
+            else { channelCounts.email++; if (channelUsed === "none") channelUsed = "email"; }
           } else {
             errors.push(`Email to ${b.email}: ${emailBody?.error || emailBody?.message || ("HTTP " + emailRes.status)}`);
           }
@@ -167,6 +220,23 @@ Deno.serve(async (req: Request) => {
       }
 
       if (sentToCustomer) totalSent++;
+      else channelCounts.failed++;
+      channelLog.push({ to: b.phone || b.email || "unknown", channel: channelUsed });
+    }
+
+    // Per-recipient channel routing summary (item 19): clear record of which
+    // channel actually delivered to each recipient, so out-of-window template
+    // routing and email fallbacks are auditable rather than invisible.
+    console.log("BROADCAST_CHANNELS business=" + business_id + " " + JSON.stringify(channelCounts));
+
+    // Billing: every broadcast email is a real Resend send with a real cost,
+    // but broadcast never fed the same usage counters campaigns/automations
+    // do — a tenant sending everything via Broadcast paid nothing extra
+    // regardless of volume, and the marketing dashboard's tally undercounted.
+    if (emailSent > 0) {
+      const currentPeriod = new Date().toISOString().slice(0, 7); // "2026-03"
+      await supabase.rpc("increment_marketing_email_usage", { p_business_id: business_id, p_amount: emailSent });
+      await supabase.rpc("increment_marketing_monthly_usage", { p_business_id: business_id, p_period: currentPeriod, p_amount: emailSent });
     }
 
     // Log broadcast
@@ -186,6 +256,9 @@ Deno.serve(async (req: Request) => {
       email_sent: emailSent,
       email_attempted: emailAttempted,
       total_customers: totalSent,
+      // Per-channel routing breakdown so operators can see how many went via
+      // free-form WhatsApp vs the out-of-window template vs email fallback.
+      channels: channelCounts,
       errors: errors.length > 0 ? errors : undefined
     }), { status: 200, headers: getCors(req) });
 

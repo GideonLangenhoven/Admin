@@ -307,7 +307,12 @@ Deno.serve(async (req: any) => {
 
     if (yocoData && yocoData.id && yocoData.redirectUrl) {
       if (bookingId) {
-        await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", bookingId);
+        // payment_url only for first-payment checkouts: the cron hold-expiry
+        // sweep re-sends it if the customer abandons. Top-up links (RESCHEDULE/
+        // ADD_GUESTS) must not overwrite the original booking payment link.
+        const bookingUpdate: Record<string, string> = { yoco_checkout_id: yocoData.id };
+        if (type === "BOOKING") bookingUpdate.payment_url = yocoData.redirectUrl;
+        await supabase.from("bookings").update(bookingUpdate).eq("id", bookingId);
       }
       if (voucherId) {
         await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", voucherId);
@@ -459,7 +464,7 @@ Deno.serve(async (req: any) => {
             // just "pay R200".
             let newSlotStart = "";
             let newTourName = "Tour";
-            let newQty = 1;
+            const newQty = 1;
             if (pendingId) {
               const prRes = await supabase.from("pending_reschedules")
                 .select("new_slot_id, new_total_amount, diff")

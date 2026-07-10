@@ -19,6 +19,53 @@ function getCors(req?: Request) {
     };
 }
 
+// Item 21: when a WhatsApp reply can't be delivered (24h window closed AND the
+// approved template failed, or the number is invalid), automatically fall back
+// to email so the customer isn't left with no communication. Resolves an email
+// from the conversation, or the most recent booking on that phone. Returns true
+// if an email was actually queued.
+async function tryEmailFallback(
+    supabase: any,
+    businessId: string,
+    phone: string,
+    convoEmail: string | null | undefined,
+    customerName: string | null | undefined,
+    message: string,
+): Promise<boolean> {
+    let email = String(convoEmail || "").trim();
+    if (!email) {
+        try {
+            const digits = String(phone || "").replace(/\D/g, "");
+            const { data: bk } = await supabase.from("bookings")
+                .select("email, customer_name")
+                .eq("business_id", businessId)
+                .or("phone.eq." + phone + ",phone.eq." + digits)
+                .not("email", "is", null)
+                .order("created_at", { ascending: false })
+                .limit(1).maybeSingle();
+            email = String(bk?.email || "").trim();
+            if (!customerName) customerName = bk?.customer_name || null;
+        } catch (e) { console.error("EMAIL_FALLBACK_LOOKUP_ERR:", e); }
+    }
+    if (!email) return false;
+    try {
+        const res = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({
+                type: "CUSTOMER_MESSAGE",
+                data: { business_id: businessId, email, customer_name: customerName || "there", message },
+            }),
+        });
+        if (!res.ok) { console.error("EMAIL_FALLBACK_SEND_ERR status:" + res.status); return false; }
+        const body = await res.json().catch(() => ({}));
+        return body?.ok === true;
+    } catch (e) {
+        console.error("EMAIL_FALLBACK_SEND_ERR:", e);
+        return false;
+    }
+}
+
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: getCors(req) });
@@ -59,7 +106,7 @@ Deno.serve(async (req: Request) => {
         // Get conversation to ensure correct business ID and state
         let convoQuery = supabase
             .from("conversations")
-            .select("business_id, customer_name")
+            .select("business_id, customer_name, email")
             .eq("phone", to);
         if (reqBusinessId) convoQuery = convoQuery.eq("business_id", reqBusinessId);
         const { data: convo } = await convoQuery.limit(1).single();
@@ -143,17 +190,30 @@ Deno.serve(async (req: Request) => {
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                     return new Response(JSON.stringify({ ok: true, via_template: true }), { status: 200, headers: getCors(req) });
                 }
-                // Template also failed — let admin know
+                // Template also failed — try email so the customer still hears from us.
                 console.error("admin_outreach template failed:", templateData);
+                const emailedA = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
+                if (emailedA) {
+                    await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email — WhatsApp window closed) " + message, sender: "Admin" });
+                    await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
+                    return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp's 24-hour window is closed, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
+                }
                 return new Response(JSON.stringify({
                     ok: false,
                     error: "outside_24h_window",
-                    message: "WhatsApp only allows you to reply within 24 hours of the customer's last message. This customer hasn't messaged your WhatsApp number yet (or their last message was more than 24 hours ago). Ask them to send you a WhatsApp message first, then you can reply here.",
+                    message: "WhatsApp only allows you to reply within 24 hours of the customer's last message, and we couldn't reach them by email either (no email on file). Ask them to send you a WhatsApp message first, then you can reply here.",
                 }), { status: 200, headers: getCors(req) });
             }
 
             console.error("WhatsApp Error:", waData);
             await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "FAILED", error: String(waData?.error?.message || "WhatsApp API Error") });
+            // Guaranteed-communication fallback: try email regardless of the WA error cause.
+            const emailedB = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
+            if (emailedB) {
+                await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email — WhatsApp failed) " + message, sender: "Admin" });
+                await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
+                return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp couldn't deliver this, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
+            }
             // OAuth 190 = invalid/expired access token — tell the admin exactly what to do
             if (waData?.error?.code === 190) {
                 return new Response(JSON.stringify({

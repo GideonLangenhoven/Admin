@@ -116,6 +116,19 @@ async function handleReschedule(req: any, booking: any, body: any) {
   const newSlotId = body.new_slot_id;
   if (!newSlotId) return fail(req, "new_slot_id required for RESCHEDULE", 400);
 
+  // Credit-claim remediation (operator-cancelled booking being revived): the
+  // customer may move to a DIFFERENT tour and/or reduce the party size — the
+  // price difference is settled below (pay uplift / refund or voucher excess),
+  // so a smaller party automatically refunds the no-longer-attending guests.
+  const isCreditClaim = booking.status === "CANCELLED";
+  const newQty = Math.floor(Number(body.new_qty ?? booking.qty));
+  if (!Number.isFinite(newQty) || newQty < 1 || newQty > Number(booking.qty)) {
+    return fail(req, "new_qty must be between 1 and " + booking.qty, 400);
+  }
+  if (!isCreditClaim && newQty !== Number(booking.qty)) {
+    return fail(req, "Use ADD_GUESTS / REMOVE_GUESTS to change party size on an active booking", 400);
+  }
+
   const slotRes = await supabase
     .from("slots")
     .select("id, tour_id, start_time, capacity_total, booked, held, price_per_person_override")
@@ -124,20 +137,21 @@ async function handleReschedule(req: any, booking: any, body: any) {
   if (slotRes.error || !slotRes.data) return fail(req, "New slot not found", 404);
   const newSlot = slotRes.data;
 
-  // Enforce same-activity rescheduling: new slot must be for the same tour
-  if (newSlot.tour_id !== booking.tour_id) {
+  // Enforce same-activity rescheduling on active bookings; credit claims may
+  // rebook onto any tour.
+  if (newSlot.tour_id !== booking.tour_id && !isCreditClaim) {
     return fail(req, "Cannot reschedule to a different activity", 400);
   }
 
   const available = newSlot.capacity_total - (newSlot.booked || 0) - (newSlot.held || 0);
-  if (available < booking.qty) return fail(req, "Not enough capacity on new slot (" + available + " available, need " + booking.qty + ")", 400);
+  if (available < newQty) return fail(req, "Not enough capacity on new slot (" + available + " available, need " + newQty + ")", 400);
 
   // Calculate price diff
   const oldUnitPrice = Number(booking.unit_price || 0);
   const newTourRes = await supabase.from("tours").select("base_price_per_person").eq("id", newSlot.tour_id).single();
   const newBasePrice = (newTourRes.data && newTourRes.data.base_price_per_person) ? Number(newTourRes.data.base_price_per_person) : oldUnitPrice;
   const newUnitPrice = (newSlot.price_per_person_override != null) ? Number(newSlot.price_per_person_override) : newBasePrice;
-  const newTotalAmount = newUnitPrice * booking.qty;
+  const newTotalAmount = newUnitPrice * newQty;
   const diff = newTotalAmount - Number(booking.total_amount || 0);
 
   const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
@@ -172,7 +186,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
     // 2. Increment held count on new slot
     const heldSlotRes = await supabase.from("slots").select("held").eq("id", newSlotId).single();
     if (heldSlotRes.data) {
-      await supabase.from("slots").update({ held: (heldSlotRes.data.held || 0) + booking.qty }).eq("id", newSlotId);
+      await supabase.from("slots").update({ held: (heldSlotRes.data.held || 0) + newQty }).eq("id", newSlotId);
     }
 
     // 3. Create pending_reschedule record
@@ -186,6 +200,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
       new_unit_price: newUnitPrice,
       new_total_amount: newTotalAmount,
       new_tour_id: newSlot.tour_id,
+      new_qty: newQty !== Number(booking.qty) ? newQty : null,
       status: "PENDING",
     }).select().single();
 
@@ -239,7 +254,6 @@ async function handleReschedule(req: any, booking: any, body: any) {
     // Credit-claim reschedule (weather/admin-cancelled booking): the old slot's
     // capacity was already released at cancellation, so don't release it again;
     // reactivate the booking and consume the credit.
-    const isCreditClaim = booking.status === "CANCELLED";
 
     // Decrement old slot booked count
     if (!isCreditClaim) {
@@ -250,7 +264,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
     }
 
     // Increment new slot booked count
-    await supabase.from("slots").update({ booked: (newSlot.booked || 0) + booking.qty }).eq("id", newSlotId);
+    await supabase.from("slots").update({ booked: (newSlot.booked || 0) + newQty }).eq("id", newSlotId);
 
     // Update booking
     const updateData: any = {
@@ -258,6 +272,7 @@ async function handleReschedule(req: any, booking: any, body: any) {
       tour_id: newSlot.tour_id,
       unit_price: newUnitPrice,
       total_amount: newTotalAmount,
+      qty: newQty,
     };
     if (isCreditClaim) {
       updateData.status = "CONFIRMED";
@@ -289,8 +304,11 @@ async function handleReschedule(req: any, booking: any, body: any) {
         return fail(req, "Cannot issue a cash refund on a voucher-paid booking. Use VOUCHER as the excess_action instead.", 400);
       }
       // If paid via manual method, flag for manual refund
+      // Credit-claim excess refunds are fee-free: the operator cancelled the
+      // trip, so the customer never absorbs the 5% processing fee.
+      const diffFeeFactor = isCreditClaim ? 1 : 0.95;
       if (isManualPayment(booking)) {
-        const manualDiffRefund = Math.abs(diff) * 0.95;
+        const manualDiffRefund = Math.abs(diff) * diffFeeFactor;
         await supabase.from("bookings").update({
           refund_status: "MANUAL_EFT_REQUIRED",
           refund_amount: manualDiffRefund,
@@ -302,11 +320,12 @@ async function handleReschedule(req: any, booking: any, body: any) {
         const rescheduleTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
         const rescheduleTotalRefunded = Number(booking.total_refunded || 0);
         const rescheduleRefundable = rescheduleTotalCaptured - rescheduleTotalRefunded;
-        const refundAmount = Math.min(Math.abs(diff) * 0.95, rescheduleRefundable);
+        const refundAmount = Math.min(Math.abs(diff) * diffFeeFactor, rescheduleRefundable);
+        // total_refunded is NOT bumped here — process-refund adds it when the
+        // money actually moves; pre-counting made the queue see 0 refundable.
         await supabase.from("bookings").update({
           refund_status: "REQUESTED",
           refund_amount: refundAmount,
-          total_refunded: rescheduleTotalRefunded + refundAmount,
         }).eq("id", booking.id);
         result.refund_amount = refundAmount;
       }
@@ -475,10 +494,10 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       const guestTotalRefunded = Number(booking.total_refunded || 0);
       const guestRefundable = guestTotalCaptured - guestTotalRefunded;
       const refundAmount = Math.min(excessAmount * 0.95, guestRefundable);
+      // No total_refunded bump at request time — see process-refund
       await supabase.from("bookings").update({
         refund_status: "REQUESTED",
         refund_amount: refundAmount,
-        total_refunded: guestTotalRefunded + refundAmount,
       }).eq("id", booking.id);
       result.refund_amount = refundAmount;
     }
@@ -546,6 +565,114 @@ async function handleSpecialRequest(req: any, booking: any, body: any) {
   });
 
   return ok(req, { ok: true, action: "SPECIAL_REQUEST" });
+}
+
+// ───── REQUEST_CHANGE ─────
+// A customer asking the operator to make a change they can't self-serve
+// (typically inside the 12–24h window). Previously the customer page inserted
+// a chat_messages row directly with the ANON key — but chat_messages has no
+// anon INSERT policy, so RLS silently dropped it while the UI said "Request
+// sent!". Nothing ever reached the operator. This runs as service_role and
+// guarantees three things: the message lands in the inbox thread, the
+// conversation flips to HUMAN (so it shows in the inbox list AND the sidebar
+// badge), and the operator gets an email so it's seen even if nobody's
+// watching the dashboard.
+async function handleRequestChange(req: any, booking: any, body: any) {
+  const note = String(body.note || body.special_requests || "").trim();
+  const requestedAction = String(body.requested_action || "change").trim();
+  const ref = String(booking.id).substring(0, 8).toUpperCase();
+  const phone = booking.phone;
+
+  if (!phone) return fail(req, "This booking has no phone number on file, so we can't route your request. Please contact the operator directly.", 400);
+
+  let hrsLabel = "";
+  if (booking.slots?.start_time) {
+    const hrs = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
+    hrsLabel = hrs >= 0 ? " (trip in ~" + Math.round(hrs) + "h)" : "";
+  }
+  const tourName = booking.tours?.name || "their tour";
+  const messageBody = "\u{1F514} CHANGE REQUEST — " + (booking.customer_name || "Customer")
+    + " has requested to " + requestedAction.toUpperCase() + " booking " + ref
+    + " (" + tourName + ")" + hrsLabel + "."
+    + (note ? "\n\nMessage: “" + note + "”" : "");
+
+  // 1) Thread message so the operator sees it in the inbox conversation.
+  await supabase.from("chat_messages").insert({
+    business_id: booking.business_id,
+    phone,
+    direction: "IN",
+    body: messageBody,
+    sender: (booking.customer_name || "Customer") + " · change request",
+  });
+
+  // 2) Flip/ensure the conversation to HUMAN so it surfaces in the inbox list
+  //    and the sidebar badge (which counts status='HUMAN').
+  const { data: convo } = await supabase.from("conversations")
+    .select("id").eq("business_id", booking.business_id).eq("phone", phone).maybeSingle();
+  if (convo?.id) {
+    await supabase.from("conversations").update({
+      status: "HUMAN",
+      customer_name: booking.customer_name || null,
+      email: booking.email || null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", convo.id);
+  } else {
+    await supabase.from("conversations").insert({
+      business_id: booking.business_id,
+      phone,
+      status: "HUMAN",
+      current_state: "IDLE",
+      state_data: {},
+      customer_name: booking.customer_name || null,
+      email: booking.email || null,
+    });
+  }
+
+  // 3) Email the operator (guaranteed delivery even if the dashboard is closed).
+  let emailQueued = false;
+  try {
+    const { data: biz } = await supabase.from("businesses")
+      .select("notification_email").eq("id", booking.business_id).maybeSingle();
+    const opsEmail = String(biz?.notification_email || "").trim();
+    if (opsEmail) {
+      const emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({
+          type: "OPERATOR_ALERT",
+          data: {
+            business_id: booking.business_id,
+            email: opsEmail,
+            heading: "Booking change request",
+            intro: (booking.customer_name || "A customer") + " has asked to " + requestedAction + " their booking.",
+            ref,
+            tour_name: tourName,
+            customer_name: booking.customer_name || "",
+            customer_phone: phone,
+            customer_email: booking.email || "",
+            note: note || "",
+            cta_label: "Open inbox",
+            cta_path: "/inbox",
+          },
+        }),
+      });
+      emailQueued = emailRes.ok;
+      if (!emailRes.ok) console.error("REQUEST_CHANGE_EMAIL_ERR status:" + emailRes.status);
+    } else {
+      console.warn("REQUEST_CHANGE: no notification_email for business " + booking.business_id);
+    }
+  } catch (e) {
+    console.error("REQUEST_CHANGE_EMAIL_ERR:", e instanceof Error ? e.message : e);
+  }
+
+  await supabase.from("logs").insert({
+    business_id: booking.business_id,
+    booking_id: booking.id,
+    event: "change_request",
+    payload: { requested_action: requestedAction, note, email_queued: emailQueued },
+  });
+
+  return ok(req, { ok: true, action: "REQUEST_CHANGE", email_queued: emailQueued });
 }
 
 // ───── Helper: check if booking was paid via voucher ─────
@@ -651,13 +778,14 @@ async function handleCancelRefund(req: any, booking: any) {
   const refundableAmount = totalCaptured - totalRefunded;
   const refundAmount = refundableAmount * policyFraction;
 
+  // total_refunded is NOT bumped here — process-refund adds it when the money
+  // actually moves; pre-counting made the refund queue see 0 refundable.
   await supabase.from("bookings").update({
     status: "CANCELLED",
     cancellation_reason: "Cancelled via web",
     cancelled_at: new Date().toISOString(),
     refund_status: "REQUESTED",
     refund_amount: refundAmount,
-    total_refunded: totalRefunded + refundAmount,
   }).eq("id", booking.id);
 
   // Release slot capacity
@@ -713,7 +841,7 @@ async function handleCancelRefund(req: any, booking: any) {
             customer_name: booking.customer_name,
             ref: ref,
             tour_name: tourName,
-            start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+            start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
             reason: "Cancelled via web — refund requested",
             refund_amount: refundAmount.toFixed(2),
             total_amount: String(totalAmount.toFixed(2)),
@@ -806,7 +934,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
             customer_name: booking.customer_name,
             ref: ref,
             tour_name: tourName,
-            start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+            start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
             reason: "Cancelled via web — voucher issued (original payment was voucher)",
             voucher_code: vcode,
             voucher_amount: totalAmount.toFixed(2),
@@ -851,13 +979,14 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   const voucherId = (vr.data && vr.data.id) ? vr.data.id : null;
 
   // 2. Update booking status
+  // total_refunded is NOT bumped here — process-refund adds it when the Yoco
+  // refund actually executes; pre-counting made the queue see 0 refundable.
   await supabase.from("bookings").update({
     status: "CANCELLED",
     cancellation_reason: "Cancelled via web — split-tender refund (voucher restored + Yoco refund minus 5% fee)",
     cancelled_at: new Date().toISOString(),
     refund_status: yocoRefundAmount > 0 ? "REQUESTED" : "REFUNDED",
     refund_amount: yocoRefundAmount,
-    total_refunded: totalRefunded + yocoRefundAmount,
     converted_to_voucher_id: voucherId,
   }).eq("id", booking.id);
 
@@ -924,7 +1053,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
             customer_name: booking.customer_name,
             ref: ref,
             tour_name: tourName,
-            start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+            start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
             reason: "Cancelled via web — split-tender refund",
             refund_amount: yocoRefundAmount.toFixed(2),
             voucher_code: vcode,
@@ -1027,7 +1156,7 @@ async function handleCancelVoucher(req: any, booking: any) {
             customer_name: booking.customer_name,
             ref: ref,
             tour_name: tourName,
-            start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+            start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
             reason: "Converted to voucher via web",
             voucher_code: vcode,
             voucher_amount: totalAmount.toFixed(2),
@@ -1079,7 +1208,7 @@ async function sendRebookNotification(booking: any, event: string, message: stri
               customer_name: booking.customer_name,
               ref: ref,
               tour_name: tourName,
-              start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+              start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
               message: message,
               event: event,
             },
@@ -1162,7 +1291,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
               customer_name: booking.customer_name,
               ref: ref,
               tour_name: tourName,
-              start_time: (booking.slots && booking.slots.start_time) ? booking.slots.start_time : "",
+              start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
               reason: "Credit claimed — voucher issued",
               voucher_code: vcode,
               voucher_amount: creditAmount.toFixed(2),
@@ -1186,10 +1315,10 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
   if (refundAmount <= 0) return fail(req, "No refundable amount remaining on this booking", 400);
   const refundStatus = isManualPayment(booking) ? "MANUAL_EFT_REQUIRED" : "REQUESTED";
 
+  // total_refunded is NOT bumped here — process-refund adds it on success
   await supabase.from("bookings").update({
     refund_status: refundStatus,
     refund_amount: refundAmount,
-    total_refunded: totalRefunded + refundAmount,
   }).eq("id", booking.id);
 
   await supabase.from("logs").insert({
@@ -1227,7 +1356,7 @@ Deno.serve(async function (req: any) {
     if (!bookingId) return fail(req, "booking_id required", 400);
     if (!action) return fail(req, "action required", 400);
 
-    const validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "CANCEL_REFUND", "CANCEL_VOUCHER", "CLAIM_CREDIT"];
+    const validActions = ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS", "UPDATE_CONTACT", "SPECIAL_REQUEST", "REQUEST_CHANGE", "CANCEL_REFUND", "CANCEL_VOUCHER", "CLAIM_CREDIT"];
     if (validActions.indexOf(action) === -1) {
       return fail(req, "Invalid action. Must be one of: " + validActions.join(", "), 400);
     }
@@ -1256,8 +1385,10 @@ Deno.serve(async function (req: any) {
       return await handleClaimCredit(req, booking, body);
     }
 
-    // For modification actions, booking must be in a modifiable state
-    if (action !== "UPDATE_CONTACT" && action !== "SPECIAL_REQUEST") {
+    // For modification actions, booking must be in a modifiable state.
+    // UPDATE_CONTACT / SPECIAL_REQUEST / REQUEST_CHANGE are messages/metadata,
+    // not booking mutations, so they're allowed on any active booking.
+    if (action !== "UPDATE_CONTACT" && action !== "SPECIAL_REQUEST" && action !== "REQUEST_CHANGE") {
       if (!["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
         && !(action === "RESCHEDULE" && claimEligible)) {
         return fail(req, "Booking is not in a modifiable state (status: " + booking.status + ")", 400);
@@ -1269,6 +1400,7 @@ Deno.serve(async function (req: any) {
     if (action === "REMOVE_GUESTS") return await handleRemoveGuests(req, booking, body);
     if (action === "UPDATE_CONTACT") return await handleUpdateContact(req, booking, body);
     if (action === "SPECIAL_REQUEST") return await handleSpecialRequest(req, booking, body);
+    if (action === "REQUEST_CHANGE") return await handleRequestChange(req, booking, body);
     if (action === "CANCEL_REFUND") return await handleCancelRefund(req, booking);
     if (action === "CANCEL_VOUCHER") return await handleCancelVoucher(req, booking);
 

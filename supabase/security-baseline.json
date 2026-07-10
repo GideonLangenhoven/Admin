@@ -2044,41 +2044,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "resources",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "slots",
       "privilege_type": "DELETE"
     },
@@ -2215,41 +2180,6 @@
     {
       "grantee": "authenticated",
       "table_name": "topup_orders",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_resources",
       "privilege_type": "UPDATE"
     },
     {
@@ -4284,41 +4214,6 @@
     },
     {
       "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "resources",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "service_role",
       "table_name": "slots",
       "privilege_type": "DELETE"
     },
@@ -4455,41 +4350,6 @@
     {
       "grantee": "service_role",
       "table_name": "topup_orders",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tour_resources",
       "privilege_type": "UPDATE"
     },
     {
@@ -5091,11 +4951,6 @@
     },
     {
       "schema": "public",
-      "table_name": "resources",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
       "table_name": "slots",
       "rls_enabled": true
     },
@@ -5112,11 +4967,6 @@
     {
       "schema": "public",
       "table_name": "topup_orders",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "tour_resources",
       "rls_enabled": true
     },
     {
@@ -6598,42 +6448,6 @@
     },
     {
       "schemaname": "public",
-      "tablename": "resources",
-      "policyname": "resources_tenant_delete",
-      "cmd": "DELETE",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "resources",
-      "policyname": "resources_tenant_insert",
-      "cmd": "INSERT",
-      "roles": "{authenticated}",
-      "qual": null,
-      "with_check": "(business_id = ANY (current_business_ids()))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "resources",
-      "policyname": "resources_tenant_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "resources",
-      "policyname": "resources_tenant_update",
-      "cmd": "UPDATE",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": "(business_id = ANY (current_business_ids()))"
-    },
-    {
-      "schemaname": "public",
       "tablename": "slots",
       "policyname": "slots_anon_select",
       "cmd": "SELECT",
@@ -6744,42 +6558,6 @@
       "schemaname": "public",
       "tablename": "topup_orders",
       "policyname": "topup_orders_tenant_update",
-      "cmd": "UPDATE",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": "(business_id = ANY (current_business_ids()))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tour_resources",
-      "policyname": "tour_resources_tenant_delete",
-      "cmd": "DELETE",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tour_resources",
-      "policyname": "tour_resources_tenant_insert",
-      "cmd": "INSERT",
-      "roles": "{authenticated}",
-      "qual": null,
-      "with_check": "(business_id = ANY (current_business_ids()))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tour_resources",
-      "policyname": "tour_resources_tenant_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tour_resources",
-      "policyname": "tour_resources_tenant_update",
       "cmd": "UPDATE",
       "roles": "{authenticated}",
       "qual": "(business_id = ANY (current_business_ids()))",

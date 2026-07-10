@@ -112,10 +112,30 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
 
     const emailPayloads: Array<{ from: string; to: string[]; subject: string; html: string; queueId: string; contactId: string; campaignId: string; businessId: string; unsubscribeUrl: string }> = [];
 
+    // A contact's status was only ever checked once, at queue-build time
+    // (app/marketing/templates/page.tsx). Anyone who unsubscribed after being
+    // queued — or before this cron tick caught up — still got emailed. One
+    // batch lookup here re-verifies status right before actually sending.
+    const contactIds = Array.from(new Set((items as any[]).map((i) => i.contact_id).filter(Boolean)));
+    let unsubscribedContactIds = new Set<string>();
+    if (contactIds.length > 0) {
+      const { data: unsubContacts, error: unsubErr } = await supabase.from("marketing_contacts")
+        .select("id")
+        .eq("status", "unsubscribed")
+        .in("id", contactIds);
+      if (unsubErr) console.error("MARKETING_DISPATCH_UNSUB_LOOKUP_ERR:", unsubErr.message);
+      else unsubscribedContactIds = new Set((unsubContacts || []).map((c: any) => c.id));
+    }
+
     for (const item of items as any[]) {
       const camp = campaignMap[item.campaign_id];
       if (!camp) {
         failedIds.push({ id: item.id, error: "Campaign/template not found", retryable: false });
+        continue;
+      }
+
+      if (unsubscribedContactIds.has(item.contact_id)) {
+        failedIds.push({ id: item.id, error: "Recipient unsubscribed before send", retryable: false });
         continue;
       }
 

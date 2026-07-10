@@ -431,22 +431,45 @@ Deno.serve(withSentry("web-chat", async (req) => {
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
+    // Real human handoff: land the conversation in the operator inbox
+    // (status HUMAN, same table the WhatsApp bot uses) and record the
+    // exchange in chat_messages so the operator sees what was asked. The
+    // previous conversations.update by state.conversation_id was dead code —
+    // web-chat never set that key, so escalations were invisible to operators.
+    async function flagHumanHandoff(intent: string, customerMsg: string, botReply: string) {
+      try {
+        const phoneKey = state.phone || body.phone || "web";
+        const name = body.name || state.name || "Website visitor";
+        const emailAddr = body.email || state.email || null;
+        const nowIso = new Date().toISOString();
+        const { data: existing } = await db.from("conversations").select("id")
+          .eq("business_id", requestedBusinessId).eq("phone", phoneKey).maybeSingle();
+        if (existing) {
+          await db.from("conversations").update({
+            status: "HUMAN", priority: "HIGH", current_intent: intent,
+            last_classified_at: nowIso, updated_at: nowIso,
+          }).eq("id", existing.id);
+        } else {
+          await db.from("conversations").insert({
+            business_id: requestedBusinessId, phone: phoneKey, customer_name: name,
+            email: emailAddr, status: "HUMAN", current_state: "IDLE",
+            priority: "HIGH", current_intent: intent, updated_at: nowIso,
+          });
+        }
+        await db.from("chat_messages").insert([
+          { business_id: requestedBusinessId, phone: phoneKey, direction: "IN", body: customerMsg, sender: name, sender_type: "CUSTOMER", intent },
+          { business_id: requestedBusinessId, phone: phoneKey, direction: "OUT", body: botReply, sender: "Bot", sender_type: "BOT", auto_replied: true, intent },
+        ]);
+      } catch (e) { console.error("WEBCHAT_HANDOFF_ERR", e); }
+    }
+
     // ===== ESCALATION PRE-CHECK =====
     // Catches medical / legal / data / fraud / press / human-handoff signals
     // regardless of current step. Never swallowed by booking-flow fallbacks.
-    // Sets the conversation priority HIGH so admins see it surface in the inbox.
     if (!isBtnClick) {
       const esc = detectEscalation(lo);
       if (esc) {
-        if (state.conversation_id) {
-          try {
-            await db.from("conversations").update({
-              priority: "HIGH",
-              current_intent: esc.intent,
-              last_classified_at: new Date().toISOString(),
-            }).eq("id", state.conversation_id);
-          } catch (_) { /* best-effort flag */ }
-        }
+        await flagHumanHandoff(esc.intent, msg, esc.reply);
         return new Response(JSON.stringify({
           reply: esc.reply,
           state: { ...state, escalated: true, escalation_intent: esc.intent },
@@ -456,17 +479,10 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     // Handle persistent "Talk to a human" button anywhere in the flow.
     if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
-      if (state.conversation_id) {
-        try {
-          await db.from("conversations").update({
-            priority: "HIGH",
-            current_intent: "ESCALATE_HUMAN",
-            last_classified_at: new Date().toISOString(),
-          }).eq("id", state.conversation_id);
-        } catch (_) { /* best-effort flag */ }
-      }
+      const humanReply = "No problem — I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.";
+      await flagHumanHandoff("ESCALATE_HUMAN", "[Requested a human]", humanReply);
       return new Response(JSON.stringify({
-        reply: "No problem — I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.",
+        reply: humanReply,
         state: { ...state, escalated: true, escalation_intent: "ESCALATE_HUMAN" },
         buttons: null,
       }), { status: 200, headers: gCors(req) });

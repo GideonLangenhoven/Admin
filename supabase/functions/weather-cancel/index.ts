@@ -17,8 +17,10 @@ function getCors(req?: any) {
 
 function canWeatherCancel(auth: AuthResult, businessId: string) {
   if (auth.isServiceRole) return true;
-  if (auth.businessId !== businessId) return false;
-  return auth.role === "MAIN_ADMIN" || auth.role === "SUPER_ADMIN";
+  // SUPER_ADMIN is platform-wide (see roles in .claude/CLAUDE.md) — requiring a
+  // business match first 403'd super-admins acting on any tenant but their own.
+  if (auth.role === "SUPER_ADMIN") return true;
+  return auth.businessId === businessId && auth.role === "MAIN_ADMIN";
 }
 
 Deno.serve(async (req: any) => {
@@ -55,7 +57,13 @@ Deno.serve(async (req: any) => {
 
     const tenant = await getTenantByBusinessId(supabase, business_id);
     const brandName = getBusinessDisplayName(tenant.business);
-    const cancelReason = reason || "weather conditions";
+    // This function is the shared "cancel a slot, notify everyone, start the
+    // refund flow" backend. It began weather-only; item 20 uses it for a
+    // generic operator cancellation too. is_weather defaults to true so every
+    // existing weather caller is unchanged; pass is_weather:false for a plain
+    // operator cancel (different reason text + email framing, same mechanics).
+    const isWeather = body.is_weather !== false;
+    const cancelReason = reason || (isWeather ? "weather conditions" : "an operational change");
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
@@ -64,7 +72,7 @@ Deno.serve(async (req: any) => {
     // 2. Fetch all active bookings on these slots
     const { data: bookings } = await supabase
       .from("bookings")
-      .select("id, customer_name, phone, email, qty, total_amount, status, yoco_checkout_id, tours(name), slots(start_time), slot_id")
+      .select("id, customer_name, phone, email, qty, total_amount, status, yoco_checkout_id, source, tours(name), slots(start_time), slot_id")
       .eq("business_id", business_id)
       .in("slot_id", slot_ids)
       .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
@@ -78,12 +86,16 @@ Deno.serve(async (req: any) => {
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
+      // OTA-sourced bookings (Viator/GetYourGuide): the OTA holds the money,
+      // so we can't offer self-service refund/voucher — the customer must go
+      // through the OTA. Don't mark ACTION_REQUIRED for them.
+      const isOta = String(b.source || "").startsWith("OTA_");
+      const refundAmount = isPaid && !isOta ? Number(b.total_amount || 0) : 0;
 
       // Cancel the booking
       const { error: cancelErr } = await supabase.from("bookings").update({
         status: "CANCELLED",
-        cancellation_reason: "Weather cancellation: " + cancelReason,
+        cancellation_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
         cancelled_at: nowIso,
         ...(isPaid && refundAmount > 0 ? {
           refund_status: "ACTION_REQUIRED",
@@ -137,7 +149,8 @@ Deno.serve(async (req: any) => {
       const b = affected[i] as any;
       if (failedIds.has(b.id)) continue;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
+      const isOta = String(b.source || "").startsWith("OTA_");
+      const refundAmount = isPaid && !isOta ? Number(b.total_amount || 0) : 0;
       const ref = b.id.substring(0, 8).toUpperCase();
       const tourName = b.tours?.name || "Tour";
       const startTime = b.slots?.start_time
@@ -148,7 +161,14 @@ Deno.serve(async (req: any) => {
       if (b.phone) {
         try {
           const firstName = b.customer_name?.split(" ")[0] || "there";
-          const waMessage = isPaid
+          const waMessage = isPaid && isOta
+            ? "Trip Cancelled \u26C5\n\n" +
+              "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
+              " has been cancelled due to " + cancelReason + ".\n\n" +
+              "Ref: " + ref + "\n\n" +
+              "You booked through a travel platform (e.g. Viator/GetYourGuide) \u2014 they will handle your refund or rebooking. Please contact them directly.\n\n" +
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName
+            : isPaid
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
@@ -173,10 +193,11 @@ Deno.serve(async (req: any) => {
         } catch (e) { console.error("WA weather-cancel err:", e); }
       }
 
-      // Email notification
+      // Email notification — always attempted alongside WhatsApp; log the
+      // outcome either way so a missing email is diagnosable from logs.
       if (b.email) {
         try {
-          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          const emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
             body: JSON.stringify({
@@ -190,12 +211,15 @@ Deno.serve(async (req: any) => {
                 start_time: startTime,
                 reason: cancelReason,
                 total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
-                is_weather: true,
+                is_weather: isWeather,
                 is_unpaid: !isPaid,
               },
             }),
           });
+          console.log("CANCEL_EMAIL", b.id, emailRes.status, await emailRes.text().catch(() => ""));
         } catch (e) { console.error("Email weather-cancel err:", e); }
+      } else {
+        console.warn("CANCEL_EMAIL_SKIP no email on booking", b.id);
       }
     }
 

@@ -660,13 +660,17 @@ export async function sendWhatsappTextForTenant(
     // 131026 = recipient hasn't messaged this number before
     if ((errCode === 131047 || errCode === 131026) && templateFallback) {
       console.log("WA 24h window closed — sending template fallback: " + templateFallback.name + " to " + normalizedTo);
-      // The template send records its own audit row.
-      return await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+      // The template send records its own audit row and throws on failure.
+      const templateData = await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+      // Return shape enriched with the channel actually used so callers (e.g.
+      // broadcast) can log per-recipient routing. No existing caller reads the
+      // return value, so this is safe; failures still throw as before.
+      return { channel: "template" as const, data: templateData };
     }
     const errMsg = String(data?.error?.message || data?.message || "WhatsApp send failed");
     await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
     throw new Error(errMsg);
   }
   await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
-  return data;
+  return { channel: "text" as const, data };
 }

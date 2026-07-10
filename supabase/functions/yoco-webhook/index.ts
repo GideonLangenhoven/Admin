@@ -391,7 +391,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
             const failedSlot = await supabase.from("slots").select("held").eq("id", failedPr.data.new_slot_id).single();
             if (failedSlot.data) {
               const failedBooking = await supabase.from("bookings").select("qty").eq("id", failedPr.data.booking_id).single();
-              const failedQty = failedBooking.data?.qty || 0;
+              // Remediation reschedules hold the (possibly reduced) new_qty
+              const failedQty = Number(failedPr.data.new_qty || failedBooking.data?.qty || 0);
               await supabase.from("slots").update({ held: Math.max(0, (failedSlot.data.held || 0) - failedQty) }).eq("id", failedPr.data.new_slot_id);
             }
             await supabase.from("logs").insert({
@@ -527,6 +528,9 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       // capacity was already released at cancellation — don't release it again,
       // and reactivate the booking now that the uplift is paid.
       const wasCancelled = rBooking.status === "CANCELLED";
+      // Remediation reschedules may reduce the party size; the hold was taken
+      // for the reduced qty, so convert exactly that much.
+      const finalQty = Number(pr.new_qty || rBooking.qty);
 
       // 1. Release old slot capacity (decrement booked)
       if (!wasCancelled) {
@@ -542,8 +546,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       const newSlotData = await supabase.from("slots").select("booked, held").eq("id", pr.new_slot_id).single();
       if (newSlotData.data) {
         await supabase.from("slots").update({
-          booked: (newSlotData.data.booked || 0) + rBooking.qty,
-          held: Math.max(0, (newSlotData.data.held || 0) - rBooking.qty),
+          booked: (newSlotData.data.booked || 0) + finalQty,
+          held: Math.max(0, (newSlotData.data.held || 0) - finalQty),
         }).eq("id", pr.new_slot_id);
       }
 
@@ -553,6 +557,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         tour_id: pr.new_tour_id,
         unit_price: pr.new_unit_price,
         total_amount: pr.new_total_amount,
+        qty: finalQty,
         ...(wasCancelled ? {
           status: "PAID",
           refund_status: null,
@@ -789,25 +794,48 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     if (gvr.data && gvr.data.status === "PENDING") {
       const gv = gvr.data;
       await supabase.from("vouchers").update({ status: "ACTIVE", current_balance: gv.value || gv.purchase_amount || 0 }).eq("id", gv.id);
-      // Send voucher email
+      // Send voucher email(s). recipient_email exists on the vouchers table
+      // but no purchase flow ever populated it before now — every gift email
+      // went to the BUYER, addressed to the buyer ("Hi {buyer_name}, your
+      // gift voucher for {recipient_name} is ready"), never delivered as an
+      // actual gift experience to the recipient. When a buyer supplies the
+      // recipient's email, send the gift there directly plus a short receipt
+      // to the buyer; otherwise fall back to one buyer-addressed email
+      // explicitly framed for forwarding, not as a purchase receipt.
       try {
-        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-          body: JSON.stringify({
-            type: "GIFT_VOUCHER", data: {
-              business_id: gv.business_id,
-              email: gv.buyer_email,
-              code: gv.code,
-              recipient_name: gv.recipient_name,
-              gift_message: gv.gift_message,
-              buyer_name: gv.buyer_name,
-              tour_name: gv.tour_name,
-              value: gv.value || gv.purchase_amount,
-              expires_at: formatTenantDate(await getTenantByBusinessId(supabase, gv.business_id).then(function (t) { return t.business; }), gv.expires_at),
-            }
-          }),
-        });
+        const gvTenantCtx = await getTenantByBusinessId(supabase, gv.business_id);
+        const expiresLabel = formatTenantDate(gvTenantCtx.business, gv.expires_at);
+        const baseData = {
+          business_id: gv.business_id,
+          code: gv.code,
+          recipient_name: gv.recipient_name,
+          gift_message: gv.gift_message,
+          buyer_name: gv.buyer_name,
+          tour_name: gv.tour_name,
+          value: gv.value || gv.purchase_amount,
+          expires_at: expiresLabel,
+        };
+        const recipientEmail = String(gv.recipient_email || "").trim().toLowerCase();
+        const buyerEmail = String(gv.buyer_email || "").trim().toLowerCase();
+
+        if (recipientEmail && recipientEmail !== buyerEmail) {
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ type: "GIFT_VOUCHER", data: { ...baseData, email: recipientEmail, gift_recipient_mode: "recipient" } }),
+          });
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ type: "GIFT_VOUCHER", data: { ...baseData, email: buyerEmail, gift_recipient_mode: "buyer_receipt", recipient_email: recipientEmail } }),
+          });
+        } else {
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ type: "GIFT_VOUCHER", data: { ...baseData, email: buyerEmail, gift_recipient_mode: "buyer_forward" } }),
+          });
+        }
       } catch (e) { console.log("gv email err"); }
       // WhatsApp confirmation
       if (gv.buyer_phone) {

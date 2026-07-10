@@ -23,7 +23,7 @@ async function cleanupExpiredHolds() {
   const cutoffIso = new Date(Date.now() - graceMs).toISOString();
   const { data: expiredHolds } = await supabase
     .from("holds")
-    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, qty, status, yoco_payment_id), slots(start_time), tours(name)")
+    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url), slots(start_time), tours(name)")
     .eq("status", "ACTIVE")
     .lt("expires_at", cutoffIso)
     .order("expires_at", { ascending: true })
@@ -62,7 +62,7 @@ async function cleanupExpiredHolds() {
     if ((hold as any).hold_type === "RESCHEDULE") {
       const { data: pendingReschedules } = await supabase
         .from("pending_reschedules")
-        .select("id, booking_id, new_slot_id, business_id")
+        .select("id, booking_id, new_slot_id, business_id, new_qty")
         .eq("hold_id", hold.id)
         .eq("status", "PENDING");
 
@@ -72,8 +72,9 @@ async function cleanupExpiredHolds() {
           expired_at: cutoffIso,
         }).eq("id", pr.id);
 
-        // Release held capacity on the new slot
-        const qty = (hold.bookings as any)?.qty || 0;
+        // Release held capacity on the new slot — remediation reschedules hold
+        // the (possibly reduced) new_qty rather than the booking's qty
+        const qty = Number((pr as any).new_qty || (hold.bookings as any)?.qty || 0);
         if (qty > 0) {
           const rpcRes = await supabase.rpc("adjust_slot_capacity", {
             p_slot_id: pr.new_slot_id,
@@ -107,7 +108,7 @@ async function cleanupExpiredHolds() {
     }
 
     // ── Regular booking hold expiry ──
-    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; qty?: number } | null;
+    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string } | null;
     // Release held capacity on the slot (mirrors the reschedule branch above)
     const heldQty = Number(holdBooking?.qty || 0);
     if (heldQty > 0 && hold.slot_id && hold.business_id) {
@@ -128,16 +129,38 @@ async function cleanupExpiredHolds() {
     }
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
     const holdTour = Array.isArray(hold.tours) ? hold.tours[0] : hold.tours as { name?: string } | null;
-    if (holdBooking?.phone && hold.business_id) {
+    // Abandoned-checkout follow-up: email the ORIGINAL payment link once the
+    // 15-min hold lapses unpaid (this sweep runs at expiry + 5-min grace, so a
+    // payment already in flight lands first and the paid-check above skips it).
+    // Email only — no WhatsApp, per operator request. A late payment is safe:
+    // yoco-webhook re-checks capacity and auto-refunds if the slot filled.
+    const stillUnpaid = holdBooking?.status === "HELD" || holdBooking?.status === "PENDING";
+    if (stillUnpaid && holdBooking?.email && holdBooking?.payment_url && hold.business_id) {
       try {
         const tenant = await getTenantByBusinessId(supabase, hold.business_id);
-        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "your selected slot";
-        const message =
-          "Your held booking for " + (holdTour?.name || "the experience") + " at " + slotLabel + " has expired.\n\n" +
-          "If you still want those spots, start a new booking and we’ll help from there.";
-        await sendWhatsappTextForTenant(tenant, holdBooking.phone, message);
+        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "";
+        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({
+            type: "PAYMENT_LINK",
+            data: {
+              business_id: hold.business_id,
+              email: holdBooking.email,
+              booking_id: hold.booking_id,
+              customer_name: holdBooking.customer_name || "there",
+              ref: String(hold.booking_id || "").slice(0, 8).toUpperCase(),
+              tour_name: holdTour?.name || "your tour",
+              tour_date: slotLabel,
+              qty: Number(holdBooking.qty || 1),
+              total_amount: Number(holdBooking.total_amount || 0).toFixed(2),
+              payment_url: holdBooking.payment_url,
+            },
+          }),
+        });
+        console.log("HOLD_EXPIRY_PAYLINK_SENT hold=" + hold.id + " booking=" + hold.booking_id);
       } catch (error) {
-        console.error("HOLD_EXPIRY_WA_ERR", hold.id, error);
+        console.error("HOLD_EXPIRY_PAYLINK_EMAIL_ERR", hold.id, error);
       }
     }
     results.hold_cleanup += 1;

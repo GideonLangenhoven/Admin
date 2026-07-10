@@ -166,7 +166,7 @@ function keyFromParts(year: number, month: number, day: number): string | null {
 
 function parseLocalDate(tenant: TenantContext, raw: string): string | null {
   const todayKey = tenantTodayKey(tenant);
-  let s = String(raw || "").toLowerCase().trim()
+  const s = String(raw || "").toLowerCase().trim()
     .replace(/[?!.,]+/g, " ")
     .replace(/\b(please|pls|plz|on|the|for|of|we|want|would|like|to|go|book|a|an)\b/g, " ")
     .replace(/(\d+)(st|nd|rd|th)\b/g, "$1")

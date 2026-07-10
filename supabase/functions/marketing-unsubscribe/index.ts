@@ -19,6 +19,16 @@ Deno.serve(async (req: Request) => {
     return htmlRes("<h2>Invalid link</h2><p>This unsubscribe link is invalid or has expired.</p>", 400);
   }
 
+  // Test emails sent from the admin templates page carry token=preview —
+  // there is no real recipient to unsubscribe, so just explain that.
+  if (token === "preview") {
+    return htmlRes(`
+      <h2>This was a test email</h2>
+      <p>The unsubscribe link works in real campaign emails — each recipient gets their own secure link, and clicking it removes them from your marketing list.</p>
+      <p style="margin-top:12px;font-size:13px;color:#6b7280;">No action was taken. Test emails are only sent to you, the admin.</p>
+    `, 200);
+  }
+
   // Look up token
   const { data: tokenRow } = await supabase
     .from("marketing_unsubscribe_tokens")
@@ -90,33 +100,44 @@ Deno.serve(async (req: Request) => {
     try {
       const formData = await req.formData();
       reason = (formData.get("reason") as string) || "";
-    } catch { /* no form data */ }
+    } catch { /* no form data — e.g. a bare RFC 8058 one-click POST */ }
 
-    // Update contact status
-    await supabase.from("marketing_contacts")
+    // Update contact status — this IS the unsubscribe. Every write here used to
+    // discard its .error and still return the success page regardless, so a
+    // transient DB failure looked identical to a real unsubscribe: the user saw
+    // "you've been unsubscribed" while their status never changed.
+    const { error: statusErr } = await supabase.from("marketing_contacts")
       .update({ status: "unsubscribed", updated_at: new Date().toISOString() })
       .eq("id", tokenRow.contact_id);
 
+    if (statusErr) {
+      console.error("UNSUBSCRIBE_STATUS_UPDATE_FAILED contact_id=" + tokenRow.contact_id + " token=" + token + ": " + statusErr.message);
+      return htmlRes("<h2>Something went wrong</h2><p>We couldn't process your unsubscribe request right now. Please try again in a moment, or contact us directly.</p>", 500);
+    }
+
     // Mark token as used
-    await supabase.from("marketing_unsubscribe_tokens")
+    const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens")
       .update({ used_at: new Date().toISOString() })
       .eq("id", tokenRow.id);
+    if (tokenErr) console.error("UNSUBSCRIBE_TOKEN_MARK_FAILED token_id=" + tokenRow.id + ": " + tokenErr.message);
 
     // Record unsubscribe event
-    await supabase.from("marketing_events").insert({
+    const { error: eventErr } = await supabase.from("marketing_events").insert({
       business_id: tokenRow.business_id,
       campaign_id: tokenRow.campaign_id,
       contact_id: tokenRow.contact_id,
       event_type: "unsubscribe",
       metadata: { reason, token },
     });
+    if (eventErr) console.error("UNSUBSCRIBE_EVENT_LOG_FAILED contact_id=" + tokenRow.contact_id + ": " + eventErr.message);
 
     // Atomic increment campaign unsubscribe counter
     if (tokenRow.campaign_id) {
-      await supabase.rpc("increment_campaign_counter", {
+      const { error: counterErr } = await supabase.rpc("increment_campaign_counter", {
         p_campaign_id: tokenRow.campaign_id,
         p_column: "total_unsubscribes",
       });
+      if (counterErr) console.error("UNSUBSCRIBE_COUNTER_FAILED campaign_id=" + tokenRow.campaign_id + ": " + counterErr.message);
     }
 
     return htmlRes(`

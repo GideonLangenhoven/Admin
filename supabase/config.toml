@@ -78,3 +78,12 @@ verify_jwt = false
 # anyone-with-the-anon-key JWT check.
 [functions.rebook-booking]
 verify_jwt = false
+
+# weather-cancel is invoked from the admin app with the operator's session JWT.
+# The gateway's legacy verify_jwt check rejects those tokens (the HS256/ES256
+# issue _shared/auth.ts exists for), so every day/slot cancel died with a
+# non-2xx before the function ran and nothing appeared in its logs. requireAuth
+# inside the function validates the JWT via auth.getUser and enforces
+# MAIN_ADMIN/SUPER_ADMIN on admin_users — the gateway check adds nothing.
+[functions.weather-cancel]
+verify_jwt = false
