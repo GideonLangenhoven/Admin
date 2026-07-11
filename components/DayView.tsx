@@ -2,7 +2,7 @@
 import React from "react";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
 
-import { Slot } from "./WeekView";
+import { Slot, SlotDayEntry, tourSpanDays } from "./WeekView";
 
 interface DayViewProps {
     slots: Slot[];
@@ -13,15 +13,23 @@ interface DayViewProps {
 }
 
 export default function DayView({ slots, currentDate, onSlotClick, selectedCancelDates, onToggleCancelDate }: DayViewProps) {
-    const getSlotsForDay = (date: Date) => {
-        return slots.filter((slot) => {
-            const slotDate = new Date(slot.start_time);
-            return (
-                slotDate.getDate() === date.getDate() &&
-                slotDate.getMonth() === date.getMonth() &&
-                slotDate.getFullYear() === date.getFullYear()
-            );
-        }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    const getSlotsForDay = (date: Date): SlotDayEntry[] => {
+        const entries: SlotDayEntry[] = [];
+        for (const slot of slots) {
+            const totalDays = tourSpanDays(slot);
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(slot.start_time);
+                d.setDate(d.getDate() + i);
+                if (
+                    d.getDate() === date.getDate() &&
+                    d.getMonth() === date.getMonth() &&
+                    d.getFullYear() === date.getFullYear()
+                ) {
+                    entries.push({ slot, dayN: i + 1, totalDays });
+                }
+            }
+        }
+        return entries.sort((a, b) => new Date(a.slot.start_time).getTime() - new Date(b.slot.start_time).getTime());
     };
 
     const daySlots = getSlotsForDay(currentDate);
@@ -83,18 +91,18 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
             ) : (
                 <>
                     <div className="space-y-3 p-4 md:hidden">
-                        {daySlots.map((s) => {
+                        {daySlots.map(({ slot: s, dayN, totalDays }) => {
                             const availability = getAvailability(s);
                             return (
                                 <button
-                                    key={s.id}
+                                    key={s.id + "-d" + dayN}
                                     onClick={() => onSlotClick(s)}
                                     className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-gray-300"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <p className="font-mono text-sm font-semibold text-gray-900">{fmtTime(s.start_time)}</p>
-                                            <p className="mt-1 truncate text-sm font-medium text-gray-800">{s.tours?.name}</p>
+                                            <p className="font-mono text-sm font-semibold text-gray-900">{dayN === 1 ? fmtTime(s.start_time) : `Day ${dayN}/${totalDays}`}</p>
+                                            <p className="mt-1 truncate text-sm font-medium text-gray-800">{s.tours?.name}{dayN === 1 && totalDays > 1 ? ` · ${totalDays}-day tour` : ""}</p>
                                         </div>
                                         <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${s.status === "OPEN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                                             {s.status}
@@ -126,12 +134,12 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
                                 </tr>
                             </thead>
                             <tbody>
-                                {daySlots.map((s) => {
+                                {daySlots.map(({ slot: s, dayN, totalDays }) => {
                                     const availability = getAvailability(s);
                                     return (
-                                        <tr key={s.id} className="border-t border-gray-100 hover:bg-gray-50">
-                                            <td className="p-3 font-mono">{fmtTime(s.start_time)}</td>
-                                            <td className="p-3 font-medium">{s.tours?.name}</td>
+                                        <tr key={s.id + "-d" + dayN} className="border-t border-gray-100 hover:bg-gray-50">
+                                            <td className="p-3 font-mono">{dayN === 1 ? fmtTime(s.start_time) : `Day ${dayN}/${totalDays}`}</td>
+                                            <td className="p-3 font-medium">{s.tours?.name}{dayN === 1 && totalDays > 1 ? ` · ${totalDays}-day tour` : ""}</td>
                                             <td className="p-3">{s.capacity_total}</td>
                                             <td className="p-3">{s.booked}</td>
                                             <td className="p-3">{s.held || 0}</td>

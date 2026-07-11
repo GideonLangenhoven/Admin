@@ -6,13 +6,21 @@ export interface Slot {
     id: string;
     start_time: string;
     tour_id?: string;
-    tours: { name: string };
+    tours: { name: string; duration_minutes?: number | null };
     status: string;
     capacity_total: number;
     price_per_person_override?: number | null;
     booked: number;
     held: number;
 }
+
+// How many calendar days a slot's tour spans (1 for normal tours).
+export function tourSpanDays(slot: Slot): number {
+    return Math.max(1, Math.ceil(Number(slot.tours?.duration_minutes || 0) / 1440));
+}
+
+// A slot's appearance on one calendar day: dayN is 1 on the departure day.
+export interface SlotDayEntry { slot: Slot; dayN: number; totalDays: number }
 
 interface WeekViewProps {
     slots: Slot[];
@@ -37,15 +45,19 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
     }, [currentDate]);
 
     const slotsByDay = useMemo(() => {
-        const map: Record<string, Slot[]> = {};
+        const map: Record<string, SlotDayEntry[]> = {};
         for (const slot of slots) {
-            const d = new Date(slot.start_time);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            if (!map[key]) map[key] = [];
-            map[key].push(slot);
+            const totalDays = tourSpanDays(slot);
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(slot.start_time);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                if (!map[key]) map[key] = [];
+                map[key].push({ slot, dayN: i + 1, totalDays });
+            }
         }
         for (const key of Object.keys(map)) {
-            map[key].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+            map[key].sort((a, b) => new Date(a.slot.start_time).getTime() - new Date(b.slot.start_time).getTime());
         }
         return map;
     }, [slots]);
@@ -108,12 +120,12 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                         Now {nowLabel}
                                     </div>
                                 )}
-                                {daySlots.map((slot) => {
+                                {daySlots.map(({ slot, dayN, totalDays }) => {
                                     const availability = getAvailability(slot);
                                     const isClosed = slot.status !== "OPEN";
                                     return (
                                         <div
-                                            key={slot.id}
+                                            key={slot.id + "-d" + dayN}
                                             onClick={() => onSlotClick(slot)}
                                             className="p-2 rounded-lg border text-xs cursor-pointer transition-colors"
                                             style={isClosed
@@ -123,9 +135,12 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                                     : { background: "var(--ck-accent-soft)", borderColor: "color-mix(in srgb, var(--ck-accent) 22%, transparent)" }}
                                         >
                                             <div className="flex justify-between items-start mb-1">
-                                                <span className="font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtTime(slot.start_time)}</span>
+                                                <span className="font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{dayN === 1 ? fmtTime(slot.start_time) : `Day ${dayN}/${totalDays}`}</span>
                                                 {isClosed && <span className="rounded px-1 text-[10px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>Closed</span>}
                                             </div>
+                                            {dayN === 1 && totalDays > 1 && (
+                                                <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--ck-accent)" }}>{totalDays}-day tour</div>
+                                            )}
                                             <div className="mb-1 truncate font-medium" title={slot.tours?.name} style={{ color: "var(--ck-text)" }}>{slot.tours?.name}</div>
                                             <div className="flex justify-between gap-2" style={{ color: "var(--ck-text-muted)" }}>
                                                 <span className="tabular-nums">{slot.booked}/{slot.capacity_total}</span>

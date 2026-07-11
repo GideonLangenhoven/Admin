@@ -354,10 +354,14 @@ function Slots() {
     }
 
     try {
+      // Look back 7 days so multi-day tours that departed before the visible
+      // window still render on the days they span (covers tours up to 8 days).
+      const fetchStart = new Date(start);
+      fetchStart.setDate(fetchStart.getDate() - 7);
       const slotRes = await supabase.from("slots")
-        .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name)")
+        .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name, duration_minutes)")
         .eq("business_id", businessId)
-        .gte("start_time", start.toISOString())
+        .gte("start_time", fetchStart.toISOString())
         .lte("start_time", end.toISOString())
         .order("start_time", { ascending: true });
 

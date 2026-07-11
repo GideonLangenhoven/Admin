@@ -2313,6 +2313,26 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       d.start_time = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, d.start_time);
     }
 
+    // Multi-day tours: render tour_date as a range ("Mon, 13 Jul, 09:00 – Wed, 15 Jul").
+    // Whole-day durations end ON the last day, matching the booking-site display.
+    if (typeof d.tour_date === "string" && d.tour_date && !d.tour_date.includes("–") && supabase) {
+      try {
+        const rangeBookingId = String(d.booking_id || "").trim();
+        if (rangeBookingId) {
+          const bres = await supabase.from("bookings").select("slots(start_time), tours(duration_minutes)").eq("id", rangeBookingId).maybeSingle();
+          const row = bres.data as { slots?: { start_time?: string }; tours?: { duration_minutes?: number } } | null;
+          const durMin = Number(row?.tours?.duration_minutes || 0);
+          const startIso = row?.slots?.start_time;
+          if (startIso && durMin >= 1440) {
+            const days = Math.ceil(durMin / 1440);
+            const endIso = new Date(new Date(startIso).getTime() + (days - 1) * 86400000).toISOString();
+            const endStr = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, endIso, { hour: undefined, minute: undefined });
+            d.tour_date = d.tour_date + " – " + endStr;
+          }
+        }
+      } catch (e) { console.warn("TOUR_DATE_RANGE_ERR:", e); }
+    }
+
     // Last resort: if URL is still empty, try to construct from business_id lookup
     if (!d._manageUrl && d.business_id && supabase) {
       try {
