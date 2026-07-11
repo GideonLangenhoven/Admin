@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
+import { formatDuration } from "../../lib/duration";
 import { ArrowLeft, ArrowCounterClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
@@ -902,7 +903,7 @@ export default function BookingDetailPage() {
               )}
             </span>
           </div>
-          <InfoRow label="Duration" value={booking.tours?.duration_minutes ? `${booking.tours.duration_minutes} minutes` : "—"} />
+          <InfoRow label="Duration" value={booking.tours?.duration_minutes ? formatDuration(booking.tours.duration_minutes) : "—"} />
           <InfoRow
             label="Slot Status"
             value={

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
+import { formatDuration } from "../lib/duration";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
@@ -147,7 +148,7 @@ export default function SettingsPage() {
     // Tours state
     const [tours, setTours] = useState<Tour[]>([]);
     const [editingTour, setEditingTour] = useState<Tour | null>(null);
-    const [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
     const [tourSaving, setTourSaving] = useState(false);
     const [tourError, setTourError] = useState("");
     const [slotMessage, setSlotMessage] = useState("");
@@ -420,8 +421,17 @@ export default function SettingsPage() {
 
     function resetTourForm() {
         setEditingTour(null);
-        setTourForm({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
+        setTourForm({ name: "", description: "", price: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
         setTourError("");
+    }
+
+    const DURATION_UNIT_MINUTES = { min: 1, hours: 60, days: 1440 } as const;
+
+    function minutesToDurationForm(m: number | null) {
+        const mins = Number(m || 0);
+        if (mins >= 1440 && mins % 1440 === 0) return { duration: String(mins / 1440), durationUnit: "days" as const };
+        if (mins >= 60 && mins % 60 === 0) return { duration: String(mins / 60), durationUnit: "hours" as const };
+        return { duration: String(mins || ""), durationUnit: "min" as const };
     }
 
     function startEditTour(t: Tour) {
@@ -430,7 +440,7 @@ export default function SettingsPage() {
             name: t.name,
             description: t.description || "",
             price: String(t.base_price_per_person || ""),
-            duration: String(t.duration_minutes || ""),
+            ...minutesToDurationForm(t.duration_minutes),
             sort_order: String(t.sort_order || 0),
             active: t.active,
             image_url: t.image_url || "",
@@ -540,7 +550,7 @@ export default function SettingsPage() {
             name: tourForm.name.trim(),
             description: tourForm.description.trim() || null,
             base_price_per_person: Number(tourForm.price),
-            duration_minutes: Number(tourForm.duration),
+            duration_minutes: Number(tourForm.duration) * DURATION_UNIT_MINUTES[tourForm.durationUnit],
             sort_order: Number(tourForm.sort_order) || 0,
             active: tourForm.active,
             image_url: tourForm.image_url.trim() || null,
@@ -1584,7 +1594,7 @@ export default function SettingsPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-xs text-[var(--ck-text-muted)]">
-                                                    R{t.base_price_per_person || 0}/person · {t.duration_minutes || "—"} min · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
+                                                    R{t.base_price_per_person || 0}/person · {t.duration_minutes ? formatDuration(t.duration_minutes) : "—"} · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1659,10 +1669,19 @@ export default function SettingsPage() {
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="600" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Duration (minutes)</label>
-                                    <input type="number" required min="1" step="1" value={tourForm.duration}
-                                        onChange={e => setTourForm({ ...tourForm, duration: e.target.value })}
-                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="90" />
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Duration</label>
+                                    <div className="flex gap-2">
+                                        <input type="number" required min="1" step="1" value={tourForm.duration}
+                                            onChange={e => setTourForm({ ...tourForm, duration: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="90" />
+                                        <select value={tourForm.durationUnit}
+                                            onChange={e => setTourForm({ ...tourForm, durationUnit: e.target.value as "min" | "hours" | "days" })}
+                                            className="ui-control px-2 py-2 text-sm rounded-lg outline-none" aria-label="Duration unit">
+                                            <option value="min">min</option>
+                                            <option value="hours">hours</option>
+                                            <option value="days">days</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

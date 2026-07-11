@@ -10,6 +10,7 @@ import {
   type TenantContext,
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
+import { formatDuration } from "../_shared/duration.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
 import { llmText } from "../_shared/llm.ts";
 import { retrieveKbContext } from "../_shared/kb.ts";
@@ -1081,7 +1082,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const trows: any[] = [];
           for (let ti = 0; ti < tours.length; ti++) {
             const tr = tours[ti];
-            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + tr.duration_minutes + " min" });
+            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + formatDuration(tr.duration_minutes) });
           }
           await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
           await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: trows }]);
@@ -1304,7 +1305,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
-      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + t.duration_minutes + " minutes\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
+      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
       await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tourId } });
     }
 
@@ -2530,7 +2531,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const vtrows: any[] = [];
         for (let vti = 0; vti < tours3.length; vti++) {
           const vtr = tours3[vti];
-          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: vtr.duration_minutes + " min \u2022 normally R" + vtr.base_price_per_person + "/pp" });
+          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: formatDuration(vtr.duration_minutes) + " \u2022 normally R" + vtr.base_price_per_person + "/pp" });
         }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nWhich tour would you like?");
         await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
@@ -2667,7 +2668,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const otherTours = tours.filter(function (t: any) { return t.id !== ctBk.tour_id; });
           if (otherTours.length > 0) {
             await sendText(tenant, phone, "Your booking *" + ctRef + "* is for *" + (ctTour?.name || "Tour") + "* on " + (ctSlot ? fmtTime(tenant, ctSlot.start_time) : "TBC") + ".\n\nWhich tour would you like to switch to?");
-            const ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + t.duration_minutes + " min" }; });
+            const ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + formatDuration(t.duration_minutes) }; });
             await sendList(tenant, phone, "Pick a new tour:", "Choose Tour", [{ title: "Available Tours", rows: ctRows }]);
             await setConvo(convo.id, { current_state: "CHANGE_TOUR_PICK", state_data: { booking_id: ctBk.id, slot_id: ctBk.slot_id, tour_id: ctBk.tour_id, qty: ctBk.qty, current_tour: ctTour?.name } });
           } else {

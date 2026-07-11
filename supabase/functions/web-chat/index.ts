@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withSentry } from "../_shared/sentry.ts";
+import { formatDuration } from "../_shared/duration.ts";
 import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin } from "../_shared/tenant.ts";
 import {
   gateInbound,
@@ -224,7 +225,7 @@ function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any)
 async function gemChat(hist, msg, toursList, businessId) {
   const tenant = businessId ? await getTenantByBusinessId(db, businessId).catch(function () { return null; }) : null;
   const brandName = getBusinessDisplayName(tenant?.business);
-  const tsText = (toursList || []).map(function (t) { const lbl = (t && (t as any).priceLabel) || ("R" + t.base_price_per_person); return "- " + t.name + ": " + lbl + "/pp, " + t.duration_minutes + " min" + ((t as any).priceNote || ""); }).join("\n");
+  const tsText = (toursList || []).map(function (t) { const lbl = (t && (t as any).priceLabel) || ("R" + t.base_price_per_person); return "- " + t.name + ": " + lbl + "/pp, " + formatDuration(t.duration_minutes) + ((t as any).priceNote || ""); }).join("\n");
   const faq = tenant?.business?.faq_json;
   // AJ5/AJ6: Quick Answers (chat_faq_entries) are the operator's
   // authoritative replies. Inject the top scoring entries for this
@@ -935,7 +936,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
             // it in the inbox and can chase the customer manually.
             const errReason = yd?.reason || yd?.error || "unknown error";
             console.error("WEB_CHAT_CHECKOUT_FAILED status=" + yr.status + " booking=" + bk.id + " err=" + errReason);
-            await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Chat checkout failed: " + errReason }).eq("id", bk.id).catch(() => {});
+            const cancelRes = await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Chat checkout failed: " + errReason }).eq("id", bk.id);
+            if (cancelRes.error) console.error("WEB_CHAT_CANCEL_MARK_FAILED booking=" + bk.id + " err=" + cancelRes.error.message);
             const refShort = bk.id.substring(0, 8).toUpperCase();
             reply = "Sorry — something stopped me generating your payment link (" + errReason + ").\n\nYour booking reference is " + refShort + ". I've flagged a human to follow up — they'll send you a payment link within 30 minutes. Or you can use the Book Now page directly to retry.";
             // Set conversation priority HIGH so admin sees the abandoned checkout
