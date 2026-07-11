@@ -539,7 +539,14 @@ Deno.serve(withSentry("web-chat", async (req) => {
       const wLook = wReschedule || wCancel || wMyBooking || lo.includes("look up");
       const wBook = !wLook && (lo.includes("book") || lo.includes("reserve") || lo.includes("interested") || lo.includes("i want") && lo.includes("tour") || lo.includes("id like") && lo.includes("tour") || lo.includes("sign up"));
       const wAvail = !wLook && !wBook && (lo.includes("available") || lo.includes("space") || lo.includes("tomorrow") && lo.includes("free") || lo.includes("weekend") && lo.includes("free"));
-      const wGift = lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get"));
+      // Redeem an EXISTING voucher/gift code — must be checked before the buy
+      // path, because a code like "GIFT-TEST-1234" contains "gift" and used to
+      // route the customer into the *buy a new voucher* flow. Redemption happens
+      // at the checkout voucher step, so start a booking and tell them so.
+      const hasCodeToken = /\b[A-Z0-9]{4,}-[A-Z0-9-]{2,}\b/i.test(msg) || /\bGIFT[-\s]?[A-Z0-9]+/i.test(msg);
+      const wRedeem = lo.includes("redeem") || lo.includes("use my voucher") || lo.includes("use a voucher") || lo.includes("have a voucher") || lo.includes("have a code") || lo.includes("have a gift") || (lo.includes("pay") && lo.includes("voucher")) || (hasCodeToken && (lo.includes("use") || lo.includes("redeem") || lo.includes("pay") || lo.includes("have") || lo.includes("apply")));
+      if (wRedeem) { ns = { step: "PICK_TOUR" }; reply = "You can redeem a voucher or gift code at checkout — I'll ask for it near the end of the booking. Let's get started: which tour would you like?"; buttons = tours.map(function (tr) { return { label: tr.name + " — " + tourPriceLabel(tr), value: tr.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      const wGift = !wRedeem && (lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get")));
       if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       if (wLook) {
         if (wReschedule) ns = { step: "LOOKUP", intent: "reschedule" };
@@ -575,6 +582,25 @@ Deno.serve(withSentry("web-chat", async (req) => {
       }
       else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one — I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
+    }
+    // ===== Mid-booking side-question escape hatch =====
+    // While collecting the tour or party size, a plain informational question
+    // (parking, payment methods, cancellation policy, what to bring…) used to be
+    // railroaded into the current step's prompt with no way out. Answer it in
+    // line via the same knowledge path a fresh chat uses, then re-prompt — the
+    // booking state (ns) is preserved so the customer never loses their place.
+    if (!isBtnClick && (step === "PICK_TOUR" || step === "ASK_QTY")) {
+      const answersCurrentStep =
+        (step === "ASK_QTY" && /\d/.test(lo)) ||
+        (step === "PICK_TOUR" && tours.some(function (t) { const tn = t.name.toLowerCase(); if (lo.includes(tn)) return true; return tn.split(/\s+/).some(function (w) { return w.length > 3 && w !== "tour" && w !== "paddle" && w !== "kayak" && lo.includes(w); }); }));
+      const sideQuestion = /\?|\bpark|\bpayment|\bpay by|\bpay with|\bcard\b|\bcash\b|\beft\b|\bcancel|\brefund|\bpolicy|\bbring\b|\bwear\b|\bmeet|\bmeeting|\bwhere\b|\bhow long|\bhow much|\bweather|\bage\b|\bfit\b|\bfitness|\binclud|\bwhat time|\brefund/.test(lo);
+      if (sideQuestion && !answersCurrentStep) {
+        const ans = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id);
+        const stepPrompt = step === "PICK_TOUR" ? "which tour are you keen on?" : "how many people will be joining?";
+        reply = (ans ? ans + "\n\n" : "") + "Back to your booking — " + stepPrompt;
+        if (step === "PICK_TOUR") buttons = tours.map(function (t) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; });
+        return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+      }
     }
     // ===== PICK_TOUR =====
     if (step === "PICK_TOUR") {
@@ -685,16 +711,19 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // ===== ASK_QTY =====
     if (step === "ASK_QTY") {
       const n = parseInt(lo.replace(/[^0-9]/g, ""));
-      if (n > 0 && n <= 30) {
-        const { data: sc } = await db.rpc("slot_available_capacity", { p_slot_id: ns.slotId });
-        const mx = Number(sc || 10);
-        if (n > mx) { reply = "Only " + mx + " spots left — would " + mx + " work?"; }
-        else {
-          let tot = n * ns.tprice; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
-          if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*";
-          else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*"]);
-        }
-      } else { reply = "How many people will be joining?"; }
+      const { data: sc } = await db.rpc("slot_available_capacity", { p_slot_id: ns.slotId });
+      const mx = Number(sc || 10);
+      if (!(n > 0)) {
+        reply = "How many people will be joining? (Up to " + mx + " on this slot.)";
+      } else if (n > mx) {
+        // Over capacity — always give feedback (previously any number >30 silently
+        // re-asked with no explanation, a confusing dead-end for e.g. "500").
+        reply = "This slot only has " + mx + " spot" + (mx === 1 ? "" : "s") + " left, so " + n + " won't fit. Could you do " + mx + " or fewer? For a bigger group, ask us about a private tour.";
+      } else {
+        let tot = n * ns.tprice; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
+        if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*";
+        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*"]);
+      }
       return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
     }
     // ===== ASK_NAME =====
@@ -1120,7 +1149,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (!rsSlot) { reply = "Couldn\u2019t find that slot. Try again."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
       const { data: rbData, error: rbErr } = await db.functions.invoke("rebook-booking", {
-        body: { booking_id: ns.booking_id, new_slot_id: rsId, excess_action: "VOUCHER" }
+        body: { booking_id: ns.booking_id, action: "RESCHEDULE", new_slot_id: rsId, excess_action: "VOUCHER" }
       });
       if (rbErr || rbData?.error) { reply = "Something went wrong changing your booking. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
@@ -1200,7 +1229,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (!ctsSl) { reply = "Please pick a slot."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 
       const { data: rbData2, error: rbErr2 } = await db.functions.invoke("rebook-booking", {
-        body: { booking_id: ns.booking_id, new_slot_id: ctsId, excess_action: "VOUCHER" }
+        body: { booking_id: ns.booking_id, action: "RESCHEDULE", new_slot_id: ctsId, excess_action: "VOUCHER" }
       });
       if (rbErr2 || rbData2?.error) { reply = "Something went wrong changing your tour. Contact our team."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
 

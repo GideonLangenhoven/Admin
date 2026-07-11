@@ -1994,6 +1994,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const { data: rbData, error: rbErr } = await supabase.functions.invoke("rebook-booking", {
           body: {
             booking_id: sd.booking_id,
+            action: "RESCHEDULE",
             new_slot_id: slotId,
             excess_action: "VOUCHER"
           }
@@ -3209,6 +3210,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const { data: rbkData, error: rbkErr } = await supabase.functions.invoke("rebook-booking", {
         body: {
           booking_id: sd.booking_id,
+          action: "RESCHEDULE",
           new_slot_id: rSlotId,
           excess_action: "VOUCHER"
         }
