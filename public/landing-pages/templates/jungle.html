@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- signature: Parting Foliage - Three depth planes of SVG foliage that slide out to reveal the content as you scroll. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,28 +8,29 @@
 <meta name="description" content="{{hero_subtitle}}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ── Design Tokens & Base CSS ── */
 :root {
-  --bg: #0E1F16; /* DARK theme */
+  --bg: #0E1F16;
   --ink: #DCE8DF;
   --accent: #D65780;
   --surface: #142a1f;
   --text-muted: #9ab3a4;
   --border-alpha: rgba(220, 232, 223, 0.08);
   --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --font-display: 'Young Serif', Georgia, serif;
-  --font-sans: 'Inter', system-ui, sans-serif;
-  
-  --main: {{color_main}};
-  --secondary: {{color_secondary}};
-  --cta: {{color_cta}};
-  --nav: {{color_nav}};
-  --hover: {{color_hover}};
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Manrope', system-ui, sans-serif;
+
+  /* Tenant accent colors configured in system settings */
+  --tenant-main: {{color_main}};
+  --tenant-secondary: {{color_secondary}};
+  --tenant-cta: {{color_cta}};
+  --tenant-nav: {{color_nav}};
+  --tenant-hover: {{color_hover}};
 }
 
-/* Base resets */
+/* Resets */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: var(--font-sans);
@@ -40,7 +42,7 @@ body {
 }
 h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -50,7 +52,7 @@ h1, h2, h3, .editorial-heading {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 /* Mono Micro-Label */
@@ -74,14 +76,8 @@ h1, h2, h3, .editorial-heading {
   line-height: 0;
   margin: 0;
 }
-.section-seam svg {
-  width: 100%;
-  height: 40px;
-  fill: var(--bg);
-  transform: translateY(1px);
-}
 .section-seam.invert svg {
-  transform: scaleY(-1) translateY(1px);
+  transform: scaleY(-1);
 }
 
 /* Whitespace Budget */
@@ -92,184 +88,198 @@ h1, h2, h3, .editorial-heading {
 .anti-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 2rem;
+  gap: 3rem;
   align-items: center;
 }
 .anti-grid-text {
   grid-column: 1 / 6;
-  max-width: 34rem;
 }
 .anti-grid-image {
   grid-column: 7 / 13;
   position: relative;
+  height: 480px;
+  border-radius: 16px;
   overflow: hidden;
-  border-radius: 12px;
-  aspect-ratio: 16/11;
-}
-.anti-grid-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.12);
 }
 
-/* Navigation */
-header.sticky-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  transition: background 0.3s, backdrop-filter 0.3s;
+/* reveal reveals observer styling */
+.reveal-fade-up {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ck-ease), transform 0.5s var(--ck-ease);
 }
-header.sticky-nav.scrolled {
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border-alpha);
-  height: 70px;
-}
-.nav-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-.logo-area h1 {
-  font-size: 1.5rem;
-  color: var(--ink);
-}
-.nav-links {
-  display: flex;
-  gap: 2.5rem;
-  align-items: center;
-}
-.nav-links a {
-  text-decoration: none;
-  font-size: 0.95rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-.nav-links a:hover {
-  color: var(--accent);
-}
-.cta-button {
-  background-color: var(--accent);
-  color: #fff;
-  padding: 0.8rem 1.8rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
-  border: none;
-  cursor: pointer;
-  display: inline-block;
-  text-decoration: none;
-  text-align: center;
+.reveal-fade-up.active {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-/* Audio Toggle Widget */
-.audio-consent-widget {
-  background: rgba(20, 42, 31, 0.5);
-  border: 1px solid var(--border-alpha);
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 500px;
-}
-.audio-btn {
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.8rem;
-}
-
-/* Hero: Layered Foliage Parallax parting on scroll */
+/* Hero Section */
 .hero {
   position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
-  color: #fff;
   overflow: hidden;
-  background-color: #050d09;
 }
-.hero-layer {
+.hero-media {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background-size: cover;
-  background-position: center;
-  transition: transform 0.1s ease-out;
 }
-.layer-bg {
-  background: radial-gradient(ellipse at 50% 35%, #17402c 0%, #0a1c13 55%, #050d09 100%);
-  opacity: 0.6;
+.hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-/* Visual representations of left/right foliage overlay parting */
-.layer-foliage-left {
-  background: linear-gradient(90deg, rgba(5,13,9,0.95) 0%, rgba(5,13,9,0) 100%);
-  width: 50%;
-  right: 50%;
-  z-index: 2;
-}
-.layer-foliage-right {
-  background: linear-gradient(-90deg, rgba(5,13,9,0.95) 0%, rgba(5,13,9,0) 100%);
-  width: 50%;
-  left: 50%;
-  z-index: 2;
-}
-
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(14,31,22,0.9) 0%, rgba(14,31,22,0.2) 100%);
-  z-index: 3;
+  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.4) 100%);
+  z-index: 2;
 }
 .hero-content {
   position: relative;
-  z-index: 4;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  z-index: 3;
+  width: 100%;
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: 1fr 1fr;
   gap: 4rem;
   align-items: center;
-  width: 100%;
+}
+.hero-text {
+  text-align: left;
 }
 .hero-text h2 {
-  font-size: clamp(2.4rem, 6vw, 4.8rem);
+  font-size: clamp(2.6rem, 7vw, 6rem);
   line-height: 1.05;
   margin: 1rem 0;
+  color: var(--ink);
 }
 .hero-text p {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   opacity: 0.9;
-  max-width: 44rem;
+  max-width: 34rem;
   margin-bottom: 2rem;
 }
 .hero-widget-box {
   width: 100%;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+}
+.widget-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
-/* Hover-Reveal Destinations List (Niarra Device - Liana oval) */
+/* Nav */
+.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: padding 0.3s var(--ck-ease), background 0.3s var(--ck-ease);
+  padding: 1.5rem 0;
+}
+.sticky-nav.scrolled {
+  padding: 1rem 0;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo-area h1 {
+  font-size: 1.6rem;
+  color: var(--ink);
+}
+.logo-area img {
+  height: 40px;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+.nav-links a:hover {
+  color: var(--accent);
+}
+.cta-button {
+  display: inline-block;
+  text-decoration: none;
+  background-color: var(--tenant-cta, var(--accent));
+  color: #fff !important;
+  padding: 0.8rem 1.6rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: transform 0.2s var(--ck-ease), background 0.2s ease;
+}
+.cta-button:hover {
+  transform: translateY(-2px);
+}
+
+/* Hamburger mobile nav */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  z-index: 110;
+}
+.hamburger span {
+  display: block;
+  width: 25px;
+  height: 2px;
+  background: var(--ink);
+  margin: 5px 0;
+  transition: 0.3s;
+}
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 105;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.mobile-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-overlay a {
+  font-size: 1.8rem;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+
+/* Flagship Hover-Mask reveal */
 .hover-reveal-section {
-  padding: 15vh 0;
-  background-color: var(--surface);
-  color: #fff;
+  padding: 20vh 0;
+  background-color: var(--ink);
+  color: var(--bg);
   position: relative;
 }
 .hover-list {
@@ -278,7 +288,7 @@ header.sticky-nav.scrolled {
   margin: 4rem auto 0 auto;
 }
 .hover-item {
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   padding: 2rem 0;
   position: relative;
   cursor: pointer;
@@ -287,6 +297,8 @@ header.sticky-nav.scrolled {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: inherit;
+  text-decoration: none;
 }
 .hover-item-title {
   font-size: clamp(1.8rem, 4vw, 3rem);
@@ -299,21 +311,19 @@ header.sticky-nav.scrolled {
 .hover-item-meta {
   font-size: 0.85rem;
   opacity: 0.6;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 .reveal-mask-container {
   pointer-events: none;
   position: fixed;
   width: 320px;
   height: 220px;
+  border-radius: 12px;
   overflow: hidden;
   z-index: 50;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.8);
   transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
-  /* Liana framed oval mask */
-  clip-path: url(#liana-oval-clip);
+  clip-path: url(#organic-mask);
 }
 .reveal-mask-container.active {
   opacity: 1;
@@ -325,35 +335,65 @@ header.sticky-nav.scrolled {
   object-fit: cover;
 }
 
-/* Visual Product Sheet */
+/* Product Sheet Cards */
 .product-sheet {
   background-color: var(--surface);
   border-radius: 16px;
   border: 1px solid var(--border-alpha);
   overflow: hidden;
   margin-top: 4rem;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.04);
 }
-.sheet-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+.gear-section {
+  padding: 2.5rem;
   border-bottom: 1px solid var(--border-alpha);
+}
+.gear-col h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+.gear-copy {
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Reviews */
+.reviews-section {
+  padding: 20vh 0;
   background: var(--bg);
 }
-.stat-chip {
-  padding: 1.8rem;
-  text-align: center;
-  border-right: 1px solid var(--border-alpha);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
+.reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5rem;
+  margin-top: 3rem;
 }
-.stat-chip:last-child { border-right: none; }
-.stat-value {
-  font-size: 1.8rem;
+.review-quote {
+  padding: 2rem;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-alpha);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+}
+.review-quote p {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.4;
   color: var(--ink);
+}
+.review-quote cite {
+  display: block;
+  margin-top: 1.2rem;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /* Persistent Booking Rail */
@@ -365,6 +405,7 @@ header.sticky-nav.scrolled {
   z-index: 90;
   background: color-mix(in srgb, var(--surface) 85%, transparent);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--border-alpha);
   padding: 1.2rem 2.5rem;
   display: flex;
@@ -375,89 +416,69 @@ header.sticky-nav.scrolled {
   display: flex;
   flex-direction: column;
 }
-.rail-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-.rail-price {
-  font-size: 1.6rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-/* Tour cards */
-.tour-image {
-  width: 100%;
-  height: 220px;
-  background-size: cover;
-  background-position: center;
-}
-.skin-fill,
-.tour-image--skin {
-  background:
-    radial-gradient(circle at 30% 25%, rgba(214,87,128,0.14), transparent 45%),
-    linear-gradient(135deg, var(--surface) 0%, #050d09 100%);
-}
-.skin-fill { width: 100%; height: 100%; }
-.tour-body { padding: 2rem 2.5rem 2.5rem; }
-.stat-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-/* Reviews strip */
-.reviews-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-.review-card { padding: 2rem; border-radius: 12px; }
-.review-quote {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  line-height: 1.5;
-  color: var(--ink);
-  margin-bottom: 1.5rem;
-}
-.review-author {
-  font-style: normal;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
 
 /* Footer */
-.site-footer {
-  background: var(--surface);
-  padding: 5rem 0 8rem;
-  border-top: 1px solid var(--border-alpha);
+footer {
+  background-color: var(--ink);
+  color: var(--bg);
+  padding: 6rem 2rem 3rem 2rem;
+  text-align: center;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
-.footer-brand { font-size: 2rem; color: var(--ink); margin-bottom: 1rem; }
-.footer-line { color: var(--text-muted); font-size: 0.95rem; }
-.footer-copyright { color: var(--text-muted); opacity: 0.6; font-size: 0.85rem; margin-top: 2rem; }
 
+/* Fallback SVG styling */
+.fallback-svg {
+  background-color: var(--accent);
+  fill: var(--bg);
+}
+
+/* Responsive */
 @media (max-width: 1024px) {
-  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    text-align: center;
+  }
+  .hero-text { text-align: center; }
+  .hero-text p { margin-left: auto; margin-right: auto; }
   .anti-grid { grid-template-columns: 1fr; }
   .anti-grid-text { grid-column: 1 / -1; }
-  .anti-grid-image { grid-column: 1 / -1; }
-  .tour-body { padding: 1.5rem; }
+  .anti-grid-image { grid-column: 1 / -1; height: 350px; }
 }
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .hamburger { display: block; }
+  .booking-rail { flex-direction: column; gap: 1rem; text-align: center; }
+}
+
+/* prefers-reduced-motion check */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
+  .reveal-fade-up { opacity: 1 !important; }
+}
+
+@keyframes kenBurns {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.06); }
+}
+
+
 </style>
 </head>
 <body>
 
-<!-- SVG Canopy Silhouette Mask and Dividers -->
+<!-- SVG Organic clip-path mask -->
 <svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
   <defs>
-    <!-- Liana oval framed clip path for Niarra reveal -->
-    <clipPath id="liana-oval-clip" clipPathUnits="objectBoundingBox">
-      <path d="M0.15,0.5 C0.15,0.2,0.3,0.05,0.5,0.05 C0.7,0.05,0.85,0.2,0.85,0.5 C0.85,0.8,0.7,0.95,0.5,0.95 C0.3,0.95,0.15,0.8,0.15,0.5 Z" />
+    <clipPath id="organic-mask" clipPathUnits="objectBoundingBox">
+      <path d="M0.1,0.5 C0.05,0.25,0.25,0.05,0.5,0.1 C0.75,0.05,0.95,0.25,0.9,0.5 C0.95,0.75,0.75,0.95,0.5,0.9 C0.25,0.95,0.05,0.75,0.1,0.5 Z" />
     </clipPath>
   </defs>
 </svg>
@@ -473,132 +494,178 @@ header.sticky-nav.scrolled {
       {{/if}}
     </div>
     <nav class="nav-links">
-      <a href="#about">The Moss</a>
-      <a href="#audio">Soundscape</a>
-      <a href="#experiences">Outposts</a>
-      <a class="cta-button" href="{{booking_url}}">Book Drift</a>
+      <a href="#about">Our Story</a>
+      <a href="#experiences">Experiences</a>
+      <a href="#practical">Practical Guide</a>
+      <a class="cta-button" href="{{booking_url}}">Book Now</a>
     </nav>
+    <button class="hamburger" id="ham-toggle" aria-label="Toggle Navigation">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
   </div>
 </header>
 
-<!-- Hero Section with parting foliage layers -->
+<!-- Mobile Navigation Drawer -->
+<div class="mobile-overlay" id="mobile-nav">
+  <a href="#about" id="link-about">Our Story</a>
+  <a href="#experiences" id="link-experiences">Experiences</a>
+  <a href="#practical" id="link-practical">Practical Guide</a>
+  <a class="cta-button" href="{{booking_url}}">Book Now</a>
+</div>
+
+<!-- Hero Section -->
 <section class="hero">
-  <div class="hero-layer layer-bg" id="parallax-bg"{{#if hero_image}} style="background-image:url('{{hero_image}}')"{{/if}}></div>
-  <div class="hero-layer layer-foliage-left" id="parallax-left"></div>
-  <div class="hero-layer layer-foliage-right" id="parallax-right"></div>
+  <div class="hero-media">
+    {{#if hero_image}}
+      <img src="{{hero_image}}" alt="{{business_name}}" style="animation: kenBurns 20s infinite alternate linear;" fetchpriority="high">
+    {{else}}
+      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
+        <rect width="100" height="100" fill="var(--bg)"/>
+        <path d="M0.1,0.5 C0.05,0.25,0.25,0.05,0.5,0.1 C0.75,0.05,0.95,0.25,0.9,0.5 C0.95,0.75,0.75,0.95,0.5,0.9 C0.25,0.95,0.05,0.75,0.1,0.5 Z" fill="var(--ink)" opacity="0.1"/>
+      </svg>
+    {{/if}}
+  </div>
   <div class="hero-overlay"></div>
-  <div class="hero-content">
+  <div class="hero-content container">
     <div class="hero-text reveal-fade-up active">
-      <span class="mono-label" style="background-color:var(--accent);color:#fff;">{{hero_eyebrow}}</span>
-      <h2 style="color:var(--ink);">Listen first. The river explains itself.</h2>
-      <p>{{hero_subtitle}}</p>
-      <a class="cta-button" style="background-color: var(--accent);" href="{{booking_url}}">Book River Drift</a>
+      <span class="mono-label" style="color:var(--bg);">{{hero_eyebrow}}</span>
+      <h2>{{#if hero_title}}{{hero_title}}{{else}}Listen first. The river explains itself.{{/if}}</h2>
+      <p style="color:var(--bg); opacity: 0.8;">{{hero_subtitle}}</p>
+      <a class="cta-button" href="{{booking_url}}">Book Experience</a>
     </div>
-    
     <div class="hero-widget-box glass-panel">
-      <h3 style="color:#fff;font-family:var(--font-display);font-size:1.6rem;margin-bottom:0.75rem;">Find your drift</h3>
-      <p style="color:var(--text-muted);font-size:0.95rem;margin-bottom:1.5rem;">Live dates and open seats are on our booking page. Pick a river, choose a launch window, and we hold your spot.</p>
-      <a class="cta-button" href="{{booking_url}}" style="width:100%;">Check availability</a>
+      <div class="widget-cta">
+        <span class="mono-label">Online bookings</span>
+        <h3 style="font-family: var(--font-display);">Check Real-Time Openings</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Select your route, view verified spaces, and secure checkout instantly.</p>
+        <a class="cta-button" href="{{booking_url}}" style="width: 100%; text-align: center;">Launch Booking Portal</a>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- Canopy Silhouette divider seam -->
+<!-- Section Divider Seam -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
-    <path d="M0,40 Q180,20 360,30 T720,25 T1080,35 T1440,40 L1440,40 L0,40 Z"></path>
-  </svg>
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 C180,30 360,20 540,40 C720,60 900,30 1080,45 C1260,60 1380,55 1440,50 L1440,60 L0,60 Z"/></svg>
 </div>
 
 <!-- Narrative Anti-Grid Section -->
 <section class="narrative-section" id="about">
   <div class="container anti-grid">
     <div class="anti-grid-text reveal-fade-up">
-      <span class="mono-label">The Canopy Layer</span>
-      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A soundscape before sights</h2>
-      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We drift the dark moss watercourses at the river's own pace. This isn't about speed — it's about listening. Light filters thin through the canopy, and the forest floor stays in a green half-dark.</p>
-      <p style="color: var(--text-muted);">Ambient river sound moves with you the whole way down. Turn it on below and listen before you arrive.</p>
+      <span class="mono-label">Narrative</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A deliberate pace of outdoor adventure</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We believe the best experiences are measured by depth, not distance. Our guided outings offer an intentional redirection from the haste of the world. With expert guides and custom gear, we venture into wild spaces with restraint and curiosity.</p>
+      <p style="color: var(--text-muted);">Every details is mapped. You bring the curiosity, we handle the rest.</p>
     </div>
     <div class="anti-grid-image reveal-fade-up">
-      <div class="skin-fill"></div>
+      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
+        <rect width="100" height="100" fill="var(--bg)"/>
+        <path d="M0.1,0.5 C0.05,0.25,0.25,0.05,0.5,0.1 C0.75,0.05,0.95,0.25,0.9,0.5 C0.95,0.75,0.75,0.95,0.5,0.9 C0.25,0.95,0.05,0.75,0.1,0.5 Z" fill="var(--accent)" opacity="0.2"/>
+      </svg>
     </div>
   </div>
 </section>
 
-<!-- Signature Interaction: Sound on Consent -->
-<section class="narrative-section" id="audio" style="background:var(--surface);">
-  <div class="container">
-    <span class="mono-label">Soundscape toggle</span>
-    <h2 style="font-size:2.2rem;margin:1rem 0;">Audio Environment</h2>
-    <p style="color:var(--text-muted);margin-bottom:2rem;">Activate the ambient jungle river sound loop. State is remembered locally for your return.</p>
-    
-    <div class="audio-consent-widget">
-      <div>
-        <div style="font-weight:700;">Jungle River Sounds</div>
-        <div style="font-size:0.8rem;opacity:0.6;" id="audio-status">Audio Muted</div>
-      </div>
-      <button class="audio-btn" id="audio-toggle-btn" onclick="toggleJungleAudio()">Turn On</button>
-    </div>
-  </div>
-</section>
+<!-- Section Divider Seam -->
+<div class="section-seam invert">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 C180,30 360,20 540,40 C720,60 900,30 1080,45 C1260,60 1380,55 1440,50 L1440,60 L0,60 Z"/></svg>
+</div>
 
-<!-- Real tours from tenant context -->
-<section class="narrative-section" id="experiences">
+<!-- Hover-Reveal Experiences List -->
+{{#if has_tours}}
+<section class="hover-reveal-section" id="experiences">
   <div class="container">
-    <span class="mono-label">The Outpost Profile</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Choose your river</h2>
+    <span class="mono-label" style="color: var(--bg); opacity: 0.6;">Curated Routes</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Select Your Excursion</h2>
 
-    {{#if has_tours}}
+    <ul class="hover-list">
       {{#each tours}}
-      <div class="product-sheet">
-        {{#if image_url}}
-        <div class="tour-image" style="background-image:url('{{image_url}}')"></div>
-        {{else}}
-        <div class="tour-image tour-image--skin"></div>
-        {{/if}}
-        <div class="tour-body">
-          <h3 style="font-family:var(--font-display);font-size:1.8rem;color:var(--ink);margin-bottom:0.75rem;">{{name}}</h3>
-          {{#if description}}<p style="color:var(--text-muted);margin-bottom:1.5rem;">{{description}}</p>{{/if}}
-          <div class="sheet-meta-grid" style="grid-template-columns:repeat(3,1fr);border-radius:8px;overflow:hidden;">
-            <div class="stat-chip">
-              <span class="stat-value">{{duration_minutes}} min</span>
-              <span class="stat-label">Duration</span>
-            </div>
-            <div class="stat-chip">
-              <span class="stat-value">{{../currency}}{{base_price_per_person}}</span>
-              <span class="stat-label">Per person</span>
-            </div>
-            <div class="stat-chip">
-              <span class="stat-value">{{default_capacity}} pax</span>
-              <span class="stat-label">Group limit</span>
-            </div>
-          </div>
-          <a class="cta-button" href="{{../booking_url}}" style="margin-top:1.5rem;">Book {{name}}</a>
-        </div>
-      </div>
+      <li class="hover-item" data-image="{{image_url}}">
+        <a href="{{../booking_url}}" class="hover-item-content">
+          <span class="hover-item-title">{{name}}</span>
+          <span class="hover-item-meta mono-label" style="color: inherit;">
+            {{duration_minutes}} min &middot; max {{default_capacity}} &middot; from {{../currency}}{{base_price_per_person}}
+          </span>
+        </a>
+      </li>
       {{/each}}
-    {{else}}
-      <div class="product-sheet">
-        <div class="tour-body">
-          <p style="color:var(--text-muted);font-size:1.05rem;margin-bottom:1.5rem;">Our drift routes are being set for the season. Tell us when you'd like to be on the water and we'll place you on the first open launch.</p>
-          <a class="cta-button" href="{{booking_url}}">Enquire about dates</a>
+    </ul>
+  </div>
+
+  <!-- Float reveal mask -->
+  <div class="reveal-mask-container" id="reveal-mask">
+    <img src="" id="reveal-mask-img" alt="">
+  </div>
+</section>
+{{/if}}
+
+<!-- Section Divider Seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 C180,30 360,20 540,40 C720,60 900,30 1080,45 C1260,60 1380,55 1440,50 L1440,60 L0,60 Z"/></svg>
+</div>
+
+<!-- Practical Guide -->
+<section class="narrative-section" id="practical">
+  <div class="container">
+    <span class="mono-label">Preparation</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Trip Guidelines</h2>
+    <p style="color: var(--text-muted); max-width: 45rem;">Everything you need to know to ensure a comfortable and secure journey.</p>
+
+    <div class="product-sheet">
+      {{#if what_to_bring}}
+      <div class="skin-divider-line" style="border-bottom: 1px solid var(--border-alpha);"></div>
+      <div class="gear-section">
+        <div class="gear-col">
+          <span class="mono-label">What to bring</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_bring}}</p>
         </div>
       </div>
-    {{/if}}
+      {{/if}}
+      {{#if what_to_wear}}
+      <div class="gear-section">
+        <div class="gear-col">
+          <span class="mono-label">What to wear</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_wear}}</p>
+        </div>
+      </div>
+      {{/if}}
+      {{#if directions}}
+      <div class="gear-section" style="border-bottom: none;">
+        <div class="gear-col">
+          <span class="mono-label">Directions</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{directions}}</p>
+        </div>
+      </div>
+      {{/if}}
+    </div>
+    
+    
+      <div id="jungle-leaves" style="position:absolute;inset:0;pointer-events:none;z-index:20;overflow:hidden;height:100vh;">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;left:0;top:0;width:50%;height:100%;fill:#08130d;transition:transform 0.5s ease-out;" id="leaf-left">
+          <path d="M0,0 L100,0 C80,30 80,70 100,100 L0,100 Z"/>
+        </svg>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;right:0;top:0;width:50%;height:100%;fill:#08130d;transition:transform 0.5s ease-out;" id="leaf-right">
+          <path d="M100,0 L0,0 C20,30 20,70 0,100 L100,100 Z"/>
+        </svg>
+      </div>
+    
   </div>
 </section>
 
-<!-- Reviews strip -->
+<!-- Reviews -->
 {{#if has_reviews}}
-<section class="narrative-section" id="reviews">
+<section class="reviews-section">
   <div class="container">
-    <span class="mono-label">From the water</span>
-    <h2 style="font-size:clamp(2rem,4vw,3rem);margin:1rem 0 3rem;">What drifters say</h2>
+    <span class="mono-label">Testimonials</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">From Our Guests</h2>
     <div class="reviews-grid">
       {{#each reviews}}
-      <blockquote class="review-card glass-panel">
-        <p class="review-quote">{{quote}}</p>
-        <cite class="review-author">— {{author}}</cite>
+      <blockquote class="review-quote">
+        <p>"{{quote}}"</p>
+        <cite>{{author}}</cite>
       </blockquote>
       {{/each}}
     </div>
@@ -606,112 +673,113 @@ header.sticky-nav.scrolled {
 </section>
 {{/if}}
 
-<!-- Footer -->
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-brand editorial-heading">{{business_name}}</div>
-    {{#if footer_line_one}}<p class="footer-line">{{footer_line_one}}</p>{{/if}}
-    {{#if footer_line_two}}<p class="footer-line">{{footer_line_two}}</p>{{/if}}
-    <p class="footer-copyright">© {{year}} {{business_name}}</p>
-  </div>
-</footer>
-
 <!-- Persistent Booking Rail -->
 <div class="booking-rail">
   <div class="rail-price-info">
-    <span class="rail-label">Ready when you are</span>
-    <span class="rail-price" style="font-size:1.2rem;">Reserve your drift</span>
+    <span class="mono-label">Instant Booking</span>
+    <span class="rail-price" style="font-size:1.2rem; font-family:var(--font-sans); font-weight:500;">Secure your calendar slot</span>
   </div>
-  <a class="cta-button" href="{{booking_url}}">Book Drift</a>
+  <a class="cta-button" href="{{booking_url}}">Secure My Spot</a>
 </div>
 
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <h3 style="font-size: 2.2rem; margin-bottom: 1rem; font-family: var(--font-display);">Listen first. The river explains itself.</h3>
+    <p style="opacity: 0.8; max-width: 32rem; margin: 0 auto 2rem auto; font-size: 0.95rem;">Join us for an unforgettable outing. Live availability is updated in real-time.</p>
+    <a class="cta-button" href="{{booking_url}}" style="margin-bottom: 3rem;">Launch Calendar</a>
+    <p style="opacity: 0.6; font-size: 0.8rem; margin-top:2rem;">&copy; {{year}} {{business_name}} &middot; {{footer_line_one}}{{#if footer_line_two}} &middot; {{footer_line_two}}{{/if}} &middot; Powered by <a href="https://bookingtours.co.za" style="color: inherit; text-decoration: underline;">BookingTours</a></p>
+  </div>
+</footer>
+
 <script>
-// Layered Foliage Parallax parting scroll behavior
-window.addEventListener("scroll", () => {
-  const scrollVal = window.scrollY;
-  const leftFoliage = document.getElementById("parallax-left");
-  const rightFoliage = document.getElementById("parallax-right");
-  const bg = document.getElementById("parallax-bg");
-  
-  if (leftFoliage && rightFoliage && bg) {
-    // Translate left foliage layer to the left
-    leftFoliage.style.transform = `translateX(${-scrollVal * 0.4}px)`;
-    // Translate right foliage layer to the right
-    rightFoliage.style.transform = `translateX(${scrollVal * 0.4}px)`;
-    // Scale background slightly
-    bg.style.transform = `scale(${1 + scrollVal * 0.0005})`;
-  }
+// Scroll Reveal Observer
+document.addEventListener("DOMContentLoaded", () => {
+  const elements = document.querySelectorAll('.reveal-fade-up');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  elements.forEach(el => observer.observe(el));
 });
 
-// Ambient Audio toggle with localstorage consent caching
-let audioPlaying = false;
-let audioContext = null;
-let oscillator = null; // We can simulate ambient sound using Web Audio API!
-
-function toggleJungleAudio() {
-  if (!audioContext) {
-    // Initialize Web Audio API to produce a simulated soft flowing river sound (white/pink noise)
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    audioContext = new AudioContextClass();
-  }
-  
-  const statusEl = document.getElementById("audio-status");
-  const btnEl = document.getElementById("audio-toggle-btn");
-  
-  if (!audioPlaying) {
-    audioPlaying = true;
-    statusEl.innerText = "Ambient river noise active";
-    btnEl.innerText = "Turn Off";
-    localStorage.setItem("bt_jungle_audio_consent", "true");
-    
-    // Create pink noise buffer for river sound
-    const bufferSize = 4096;
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-    const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
-    node.onaudioprocess = function(e) {
-      const output = e.outputBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-        output[i] *= 0.02; // Very soft volume
-        b6 = white * 0.115926;
-      }
-    };
-    
-    node.connect(audioContext.destination);
-    window.jungleAudioNode = node;
-  } else {
-    audioPlaying = false;
-    statusEl.innerText = "Audio Muted";
-    btnEl.innerText = "Turn On";
-    localStorage.setItem("bt_jungle_audio_consent", "false");
-    
-    if (window.jungleAudioNode) {
-      window.jungleAudioNode.disconnect();
-      window.jungleAudioNode = null;
+// Sticky Header on Scroll
+window.addEventListener("scroll", () => {
+  const header = document.getElementById("main-nav");
+  if (header) {
+    if (window.scrollY > 20) {
+      header.classList.add("scrolled");
+    } else {
+      header.classList.remove("scrolled");
     }
   }
-}
-
-// Restore consent state on mount
-document.addEventListener("DOMContentLoaded", () => {
-  const consent = localStorage.getItem("bt_jungle_audio_consent");
-  if (consent === "true") {
-    // Wait for click interaction to allow audio context start
-    document.body.addEventListener("click", () => {
-      if (!audioPlaying && !window.jungleAudioNode) {
-        toggleJungleAudio();
-      }
-    }, { once: true });
-  }
 });
 
+// Mobile Hamburger Toggle
+const toggleBtn = document.getElementById('ham-toggle');
+const mobNav = document.getElementById('mobile-nav');
+const mobLinks = document.querySelectorAll('.mobile-overlay a');
+
+if (toggleBtn && mobNav) {
+  const toggleMenu = () => {
+    const active = mobNav.classList.toggle('active');
+    toggleBtn.classList.toggle('active');
+    document.body.style.overflow = active ? 'hidden' : 'auto';
+  };
+  toggleBtn.addEventListener('click', toggleMenu);
+  mobLinks.forEach(link => link.addEventListener('click', toggleMenu));
+  
+  // Close on ESC
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mobNav.classList.contains('active')) {
+      toggleMenu();
+    }
+  });
+}
+
+// Niarra Hover-Mask Device
+const hoverItems = document.querySelectorAll('.hover-item');
+const mask = document.getElementById('reveal-mask');
+const maskImg = document.getElementById('reveal-mask-img');
+
+if (hoverItems.length > 0 && mask && maskImg) {
+  hoverItems.forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      const imgUrl = item.getAttribute('data-image');
+      if (imgUrl) {
+        maskImg.src = imgUrl;
+        mask.classList.add('active');
+      }
+    });
+
+    item.addEventListener('mouseleave', () => {
+      mask.classList.remove('active');
+    });
+
+    item.addEventListener('mousemove', (e) => {
+      mask.style.left = e.clientX + 'px';
+      mask.style.top = e.clientY + 'px';
+    });
+  });
+}
+
+
+      const leftLeaf = document.getElementById('leaf-left');
+      const rightLeaf = document.getElementById('leaf-right');
+      if (leftLeaf && rightLeaf) {
+        window.addEventListener('scroll', () => {
+          const scroll = window.scrollY;
+          const pct = Math.min(100, (scroll / 400) * 100);
+          leftLeaf.style.transform = 'translateX(-' + pct + '%)';
+          rightLeaf.style.transform = 'translateX(' + pct + '%)';
+        });
+      }
+    
 </script>
+
 </body>
 </html>

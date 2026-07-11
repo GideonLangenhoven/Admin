@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- signature: Mountain Ascent Profile - An illustrative climbing ascent cross-section showing elevations as you hover/scroll. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,7 +8,7 @@
 <meta name="description" content="{{hero_subtitle}}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Archivo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ── Design Tokens & Base CSS ── */
 :root {
@@ -15,20 +16,21 @@
   --ink: #10151C;
   --accent: #E63B2E;
   --surface: #ffffff;
-  --text-muted: #535d68;
+  --text-muted: #596068;
   --border-alpha: rgba(16, 21, 28, 0.08);
   --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --font-display: 'Lora', Georgia, serif;
-  --font-sans: 'Roboto', system-ui, sans-serif;
-  
-  --main: {{color_main}};
-  --secondary: {{color_secondary}};
-  --cta: {{color_cta}};
-  --nav: {{color_nav}};
-  --hover: {{color_hover}};
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-sans: 'Archivo', system-ui, sans-serif;
+
+  /* Tenant accent colors configured in system settings */
+  --tenant-main: {{color_main}};
+  --tenant-secondary: {{color_secondary}};
+  --tenant-cta: {{color_cta}};
+  --tenant-nav: {{color_nav}};
+  --tenant-hover: {{color_hover}};
 }
 
-/* Base resets */
+/* Resets */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: var(--font-sans);
@@ -40,7 +42,7 @@ body {
 }
 h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -74,14 +76,8 @@ h1, h2, h3, .editorial-heading {
   line-height: 0;
   margin: 0;
 }
-.section-seam svg {
-  width: 100%;
-  height: 40px;
-  fill: var(--bg);
-  transform: translateY(1px);
-}
 .section-seam.invert svg {
-  transform: scaleY(-1) translateY(1px);
+  transform: scaleY(-1);
 }
 
 /* Whitespace Budget */
@@ -92,156 +88,198 @@ h1, h2, h3, .editorial-heading {
 .anti-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 2rem;
+  gap: 3rem;
   align-items: center;
 }
 .anti-grid-text {
   grid-column: 1 / 6;
-  max-width: 34rem;
 }
 .anti-grid-image {
   grid-column: 7 / 13;
   position: relative;
+  height: 480px;
+  border-radius: 16px;
   overflow: hidden;
-  border-radius: 12px;
-  aspect-ratio: 16/11;
-  transform: translate(0, 4vh);
-}
-.anti-grid-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.12);
 }
 
-/* Navigation */
-header.sticky-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  transition: background 0.3s, backdrop-filter 0.3s;
+/* reveal reveals observer styling */
+.reveal-fade-up {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ck-ease), transform 0.5s var(--ck-ease);
 }
-header.sticky-nav.scrolled {
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border-alpha);
-  height: 70px;
-}
-.nav-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-.logo-area h1 {
-  font-size: 1.5rem;
-  color: var(--ink);
-}
-.logo-area img {
-  max-height: 40px;
-}
-.nav-links {
-  display: flex;
-  gap: 2.5rem;
-  align-items: center;
-}
-.nav-links a {
-  text-decoration: none;
-  font-size: 0.95rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-.nav-links a:hover {
-  color: var(--accent);
-}
-.cta-button {
-  background-color: var(--accent);
-  color: #fff;
-  padding: 0.8rem 1.8rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
+.reveal-fade-up.active {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-/* Hero: Vertical Panorama scrolls up mountain face as user scrolls down */
+/* Hero Section */
 .hero {
   position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
-  color: #fff;
   overflow: hidden;
 }
 .hero-media {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background-color: #10151C;
 }
 .hero-media img {
   width: 100%;
-  height: 150%; /* Taller for vertical scroll movement */
+  height: 100%;
   object-fit: cover;
-  opacity: 0.7;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  transition: transform 0.1s ease-out;
 }
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(16,21,28,0.9) 0%, rgba(16,21,28,0.2) 100%);
+  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.4) 100%);
   z-index: 2;
 }
 .hero-content {
   position: relative;
   z-index: 3;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  width: 100%;
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: 1fr 1fr;
   gap: 4rem;
   align-items: center;
-  width: 100%;
 }
 .hero-text {
   text-align: left;
 }
 .hero-text h2 {
-  font-size: clamp(2.6rem, 6vw, 5rem);
+  font-size: clamp(2.6rem, 7vw, 6rem);
   line-height: 1.05;
   margin: 1rem 0;
+  color: var(--ink);
 }
 .hero-text p {
   font-size: 1.15rem;
   opacity: 0.9;
-  max-width: 44rem;
+  max-width: 34rem;
   margin-bottom: 2rem;
 }
 .hero-widget-box {
   width: 100%;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+}
+.widget-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
-/* Hover-Reveal Destinations List (Niarra Device - Sharp Peak) */
+/* Nav */
+.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: padding 0.3s var(--ck-ease), background 0.3s var(--ck-ease);
+  padding: 1.5rem 0;
+}
+.sticky-nav.scrolled {
+  padding: 1rem 0;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo-area h1 {
+  font-size: 1.6rem;
+  color: var(--ink);
+}
+.logo-area img {
+  height: 40px;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+.nav-links a:hover {
+  color: var(--accent);
+}
+.cta-button {
+  display: inline-block;
+  text-decoration: none;
+  background-color: var(--tenant-cta, var(--accent));
+  color: #fff !important;
+  padding: 0.8rem 1.6rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: transform 0.2s var(--ck-ease), background 0.2s ease;
+}
+.cta-button:hover {
+  transform: translateY(-2px);
+}
+
+/* Hamburger mobile nav */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  z-index: 110;
+}
+.hamburger span {
+  display: block;
+  width: 25px;
+  height: 2px;
+  background: var(--ink);
+  margin: 5px 0;
+  transition: 0.3s;
+}
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 105;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.mobile-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-overlay a {
+  font-size: 1.8rem;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+
+/* Flagship Hover-Mask reveal */
 .hover-reveal-section {
-  padding: 15vh 0;
+  padding: 20vh 0;
   background-color: var(--ink);
-  color: #fff;
+  color: var(--bg);
   position: relative;
 }
 .hover-list {
@@ -259,6 +297,8 @@ header.sticky-nav.scrolled {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: inherit;
+  text-decoration: none;
 }
 .hover-item-title {
   font-size: clamp(1.8rem, 4vw, 3rem);
@@ -271,21 +311,19 @@ header.sticky-nav.scrolled {
 .hover-item-meta {
   font-size: 0.85rem;
   opacity: 0.6;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 .reveal-mask-container {
   pointer-events: none;
   position: fixed;
   width: 320px;
   height: 220px;
+  border-radius: 12px;
   overflow: hidden;
   z-index: 50;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.8);
   transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
-  /* Peak triangle mask */
-  clip-path: url(#peak-clip);
+  clip-path: url(#organic-mask);
 }
 .reveal-mask-container.active {
   opacity: 1;
@@ -297,140 +335,65 @@ header.sticky-nav.scrolled {
   object-fit: cover;
 }
 
-/* Signature Interaction: Difficulty Profile Ladder */
-.profile-ladder-box {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid var(--border-alpha);
-  padding: 2.5rem;
-  margin-top: 3rem;
-}
-.ladder-stages {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-.ladder-btn {
-  background: var(--bg);
-  border: 1px solid var(--border-alpha);
-  padding: 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-.ladder-btn.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-/* Visual Product Sheet */
+/* Product Sheet Cards */
 .product-sheet {
-  background-color: #fff;
+  background-color: var(--surface);
   border-radius: 16px;
   border: 1px solid var(--border-alpha);
   overflow: hidden;
   margin-top: 4rem;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.04);
 }
-.product-sheet-header {
+.gear-section {
   padding: 2.5rem;
   border-bottom: 1px solid var(--border-alpha);
 }
-.sheet-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  border-bottom: 1px solid var(--border-alpha);
-  background: var(--bg);
-}
-.stat-chip {
-  padding: 1.8rem;
-  text-align: center;
-  border-right: 1px solid var(--border-alpha);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-}
-.stat-chip:last-child { border-right: none; }
-.stat-value {
-  font-size: 1.8rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--ink);
-}
-.stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+.gear-col h4 {
+  font-size: 0.85rem;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1rem;
   color: var(--text-muted);
 }
+.gear-copy {
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
 
-/* Timeline */
-.timeline-section {
-  padding: 3rem 2.5rem;
+/* Reviews */
+.reviews-section {
+  padding: 20vh 0;
+  background: var(--bg);
+}
+.reviews-grid {
   display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 3rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5rem;
+  margin-top: 3rem;
 }
-.timeline-track {
-  position: relative;
-  padding-left: 2rem;
+.review-quote {
+  padding: 2rem;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-alpha);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.02);
 }
-.timeline-track::before {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  width: 2px;
-  background: var(--border-alpha);
+.review-quote p {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.4;
+  color: var(--ink);
 }
-.timeline-node {
-  position: relative;
-  margin-bottom: 2.5rem;
-}
-.timeline-node:last-child { margin-bottom: 0; }
-.timeline-node::before {
-  content: '';
-  position: absolute;
-  left: -2rem;
-  top: 0.4rem;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--bg);
-}
-.timeline-time {
+.review-quote cite {
+  display: block;
+  margin-top: 1.2rem;
+  font-style: normal;
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-}
-.timeline-node h5 {
-  font-size: 1.15rem;
-  margin: 0.2rem 0 0.5rem 0;
-  font-family: var(--font-display);
-}
-.timeline-img {
-  width: 100%;
-  aspect-ratio: 16/10;
-  object-fit: cover;
-  border-radius: 6px;
-  margin-top: 0.5rem;
-}
-.timeline-map {
-  border-radius: 12px;
-  overflow: hidden;
-  position: sticky;
-  top: 100px;
-  height: 400px;
-  border: 1px solid var(--border-alpha);
-  background: #eef2f5;
+  color: var(--text-muted);
 }
 
 /* Persistent Booking Rail */
@@ -442,6 +405,7 @@ header.sticky-nav.scrolled {
   z-index: 90;
   background: color-mix(in srgb, var(--surface) 85%, transparent);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--border-alpha);
   padding: 1.2rem 2.5rem;
   display: flex;
@@ -452,166 +416,69 @@ header.sticky-nav.scrolled {
   display: flex;
   flex-direction: column;
 }
-.rail-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-.rail-price {
-  font-size: 1.6rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-
-/* Booking Modal Overlay */
-.modal-box {
-  background: var(--bg);
-  width: 100%;
-  max-width: 580px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-  border: 1px solid var(--border-alpha);
-}
-.modal-header {
-  padding: 1.5rem 2rem;
-  background: var(--ink);
-  color: #fff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.modal-progress {
-  height: 6px;
-  background: rgba(255,255,255,0.1);
-  position: relative;
-}
-.modal-progress-bar {
-  height: 100%;
-  background: var(--accent);
-  width: 33.3%;
-  transition: width 0.3s var(--ck-ease);
-}
-.modal-body {
-  padding: 2.5rem;
-}
-.modal-step {
-  display: none;
-}
-.modal-step.active {
-  display: block;
-}
-.step-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 2rem;
-  border-top: 1px solid var(--border-alpha);
-  padding-top: 1.5rem;
-}
-.prev-btn {
-  background: none;
-  border: 1px solid var(--ink);
-  color: var(--ink);
-  padding: 0.8rem 1.8rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.close-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  font-size: 1.2rem;
-}
-
-/* ── Honest content layer additions ── */
-/* Cold-slate ridgeline skin — replaces external stock imagery */
-.skin-ridge {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(165deg, #3a4757 0%, #1b2430 55%, #10151C 100%);
-  position: relative;
-  overflow: hidden;
-}
-.skin-ridge svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-/* Real tours in the Ascent Objectives list */
-.hover-item-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-}
-.hover-item-desc {
-  margin-top: 0.6rem;
-  font-size: 0.95rem;
-  opacity: 0.6;
-  max-width: 46rem;
-}
-
-/* Reviews strip */
-.reviews-section { padding: 12vh 0; }
-.reviews-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
-}
-.review-card {
-  background: #fff;
-  border: 1px solid var(--border-alpha);
-  border-radius: 12px;
-  padding: 2rem;
-}
-.review-quote {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.review-author {
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
 
 /* Footer */
-.site-footer {
-  background: var(--ink);
-  color: #fff;
-  padding: 5rem 0 7rem;
+footer {
+  background-color: var(--ink);
+  color: var(--bg);
+  padding: 6rem 2rem 3rem 2rem;
+  text-align: center;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
-.footer-brand {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  margin-bottom: 0.75rem;
-}
-.site-footer p { opacity: 0.7; font-size: 0.95rem; }
-.footer-legal { margin-top: 1.5rem; opacity: 0.4; font-size: 0.8rem; }
 
+/* Fallback SVG styling */
+.fallback-svg {
+  background-color: var(--accent);
+  fill: var(--bg);
+}
+
+/* Responsive */
 @media (max-width: 1024px) {
-  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    text-align: center;
+  }
+  .hero-text { text-align: center; }
+  .hero-text p { margin-left: auto; margin-right: auto; }
   .anti-grid { grid-template-columns: 1fr; }
   .anti-grid-text { grid-column: 1 / -1; }
-  .anti-grid-image { grid-column: 1 / -1; }
-  .timeline-section { grid-template-columns: 1fr; }
+  .anti-grid-image { grid-column: 1 / -1; height: 350px; }
 }
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .hamburger { display: block; }
+  .booking-rail { flex-direction: column; gap: 1rem; text-align: center; }
+}
+
+/* prefers-reduced-motion check */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
+  .reveal-fade-up { opacity: 1 !important; }
+}
+
+@keyframes kenBurns {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.06); }
+}
+
+
 </style>
 </head>
 <body>
 
-<!-- SVG Peak Mask and Ridges Dividers -->
+<!-- SVG Organic clip-path mask -->
 <svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
   <defs>
-    <!-- Triangular peak clip path for Niarra reveal -->
-    <clipPath id="peak-clip" clipPathUnits="objectBoundingBox">
-      <path d="M0.5,0 L1,0.9 L0.8,1 L0.2,1 L0,0.9 Z" />
+    <clipPath id="organic-mask" clipPathUnits="objectBoundingBox">
+      <path d="M0.5,0.05 L0.95,0.85 L0.05,0.85 Z" />
     </clipPath>
   </defs>
 </svg>
@@ -627,155 +494,181 @@ header.sticky-nav.scrolled {
       {{/if}}
     </div>
     <nav class="nav-links">
-      <a href="#about">Philosophy</a>
-      <a href="#experiences">Ascents</a>
-      <a href="#ladder">Difficulty Ladder</a>
-      <a href="{{booking_url}}" class="cta-button">Book Ascent</a>
+      <a href="#about">Our Story</a>
+      <a href="#experiences">Experiences</a>
+      <a href="#practical">Practical Guide</a>
+      <a class="cta-button" href="{{booking_url}}">Book Now</a>
     </nav>
+    <button class="hamburger" id="ham-toggle" aria-label="Toggle Navigation">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
   </div>
 </header>
 
-<!-- Hero Section with vertical scroll panorama -->
+<!-- Mobile Navigation Drawer -->
+<div class="mobile-overlay" id="mobile-nav">
+  <a href="#about" id="link-about">Our Story</a>
+  <a href="#experiences" id="link-experiences">Experiences</a>
+  <a href="#practical" id="link-practical">Practical Guide</a>
+  <a class="cta-button" href="{{booking_url}}">Book Now</a>
+</div>
+
+<!-- Hero Section -->
 <section class="hero">
   <div class="hero-media">
     {{#if hero_image}}
-      <img src="{{hero_image}}" alt="{{business_name}}" id="hero-img">
+      <img src="{{hero_image}}" alt="{{business_name}}" style="animation: kenBurns 20s infinite alternate linear;" fetchpriority="high">
     {{else}}
-      <div class="skin-ridge" aria-hidden="true">
-        <svg viewBox="0 0 1440 600" preserveAspectRatio="xMidYMax slice">
-          <path d="M0,600 L0,340 L300,220 L540,320 L820,160 L1080,300 L1440,200 L1440,600 Z" fill="#2b3644"/>
-          <path d="M0,600 L0,420 L360,320 L640,400 L920,300 L1200,380 L1440,340 L1440,600 Z" fill="#1b2430"/>
-          <path d="M0,600 L0,500 L340,440 L700,490 L1040,430 L1440,480 L1440,600 Z" fill="#10151C"/>
-        </svg>
-      </div>
+      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
+        <rect width="100" height="100" fill="var(--bg)"/>
+        <path d="M0.5,0.05 L0.95,0.85 L0.05,0.85 Z" fill="var(--ink)" opacity="0.1"/>
+      </svg>
     {{/if}}
   </div>
   <div class="hero-overlay"></div>
-  <div class="hero-content">
+  <div class="hero-content container">
     <div class="hero-text reveal-fade-up active">
-      <span class="mono-label" style="color:#fff;">{{hero_eyebrow}}</span>
+      <span class="mono-label" style="color:var(--bg);">{{hero_eyebrow}}</span>
       <h2>{{#if hero_title}}{{hero_title}}{{else}}Grade 4. Your legs will complain. Your photos won't.{{/if}}</h2>
-      <p>{{hero_subtitle}}</p>
-      <a href="{{booking_url}}" class="cta-button" style="background-color: var(--accent);">Book your ascent</a>
+      <p style="color:var(--bg); opacity: 0.8;">{{hero_subtitle}}</p>
+      <a class="cta-button" href="{{booking_url}}">Book Experience</a>
     </div>
-    
-    <!-- Honest booking CTA card -->
-    <div class="hero-widget-box glass-panel" style="color: var(--ink);">
-      <span class="mono-label">Book direct</span>
-      <h3 style="font-family: var(--font-display); font-size: 1.6rem; margin: 0.4rem 0 0.6rem; color: var(--ink);">Rope in</h3>
-      <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">Grade 4. Your legs will complain. Your photos won't. Pick your date and line — we rig the rest.</p>
-      <a href="{{booking_url}}" class="cta-button" style="width: 100%; text-align: center;">Check availability</a>
-    </div>
-  </div>
-</section>
-
-<!-- Sharp Mountain Ridgeline Divider -->
-<div class="section-seam">
-  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
-    <path d="M0,35 L400,10 L750,30 L1100,5 L1440,35 L1440,40 L0,40 Z"></path>
-  </svg>
-</div>
-
-<!-- Narrative Anti-Grid Section -->
-<section class="narrative-section" id="about">
-  <div class="container anti-grid">
-    <div class="anti-grid-text reveal-fade-up">
-      <span class="mono-label">The Ridgeline Protocol</span>
-      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">Where gravity is the baseline</h2>
-      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We work above the snowline. This isn't sightseeing — it's endurance, one crampon in front of the other before the sun softens the morning crust.</p>
-      <p style="color: var(--text-muted);">Small roped teams. Honest grades. No shortcuts. Your legs will complain. Your photos won't.</p>
-    </div>
-    <div class="anti-grid-image reveal-fade-up">
-      <div class="skin-ridge" aria-hidden="true">
-        <svg viewBox="0 0 800 550" preserveAspectRatio="xMidYMax slice">
-          <path d="M0,550 L0,300 L180,180 L340,270 L500,120 L640,240 L800,160 L800,550 Z" fill="#2b3644"/>
-          <path d="M0,550 L0,380 L200,300 L360,360 L520,290 L680,350 L800,320 L800,550 Z" fill="#1b2430"/>
-          <path d="M0,550 L0,460 L220,410 L440,450 L640,405 L800,440 L800,550 Z" fill="#10151C"/>
-        </svg>
+    <div class="hero-widget-box glass-panel">
+      <div class="widget-cta">
+        <span class="mono-label">Online bookings</span>
+        <h3 style="font-family: var(--font-display);">Check Real-Time Openings</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Select your route, view verified spaces, and secure checkout instantly.</p>
+        <a class="cta-button" href="{{booking_url}}" style="width: 100%; text-align: center;">Launch Booking Portal</a>
       </div>
     </div>
   </div>
 </section>
 
 <!-- Section Divider Seam -->
-<div class="section-seam invert">
-  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
-    <path d="M0,35 L400,10 L750,30 L1100,5 L1440,35 L1440,40 L0,40 Z"></path>
-  </svg>
-</div>
-
-<!-- Hover-Reveal Destinations List (Niarra Device - Peak) -->
-<section class="hover-reveal-section" id="experiences">
-  <div class="container">
-    <span class="mono-label" style="color: rgba(255,255,255,0.6)">The Ascents</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Ascent Objectives</h2>
-    
-    {{#if has_tours}}
-    <ul class="hover-list">
-      {{#each tours}}
-      <li class="hover-item" data-image="{{#if image_url}}{{image_url}}{{/if}}">
-        <a href="{{../booking_url}}" class="hover-item-link">
-          <div class="hover-item-content">
-            <span class="hover-item-title">{{name}}</span>
-            <span class="hover-item-meta">{{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp</span>
-          </div>
-          {{#if description}}<p class="hover-item-desc">{{description}}</p>{{/if}}
-        </a>
-      </li>
-      {{/each}}
-    </ul>
-    {{else}}
-    <p style="opacity: 0.7; max-width: 40rem;">Routes are being plotted. Get in touch to talk lines and dates.</p>
-    {{/if}}
-  </div>
-  
-  <div class="reveal-mask-container" id="reveal-mask">
-    <img src="" id="reveal-mask-img" alt="Reveal image">
-  </div>
-</section>
-
-<!-- Sharp Mountain Ridgeline Divider -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
-    <path d="M0,35 L400,10 L750,30 L1100,5 L1440,35 L1440,40 L0,40 Z"></path>
-  </svg>
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 L360,20 L720,45 L1080,10 L1440,50 L1440,60 L0,60 Z"/></svg>
 </div>
 
-<!-- Signature Interaction: Difficulty Profile Ladder -->
-<section class="narrative-section" id="ladder">
-  <div class="container">
-    <div class="profile-ladder-box">
-      <span class="mono-label">Interactive Climb Matrix</span>
-      <h3 style="font-size: 1.8rem; margin: 0.5rem 0 1rem 0;">Grade Difficulty Profile Cross-Section</h3>
-      <p style="color:var(--text-muted);font-size:0.95rem;">Select a grade to see vertical profiles, crampon rules, and rescue availability limits.</p>
-      
-      <div class="ladder-stages">
-        <button class="ladder-btn" onclick="selectLadderStage(1, this)">Grade 1</button>
-        <button class="ladder-btn" onclick="selectLadderStage(2, this)">Grade 2</button>
-        <button class="ladder-btn active" onclick="selectLadderStage(3, this)">Grade 3</button>
-        <button class="ladder-btn" onclick="selectLadderStage(4, this)">Grade 4</button>
-        <button class="ladder-btn" onclick="selectLadderStage(5, this)">Grade 5</button>
-      </div>
-      
-      <div id="ladder-profile-desc" style="background:var(--bg);padding:1.5rem;border-radius:6px;border:1px solid var(--border-alpha);">
-        <div style="font-weight:700;font-size:1.1rem;color:var(--accent);">Grade 3: Advanced Glacial Traverse</div>
-        <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Requires basic crampon walk and ice rope discipline. Ascent slope reaches up to 45 degrees. Safe zones are located every 400m.</p>
-      </div>
+<!-- Narrative Anti-Grid Section -->
+<section class="narrative-section" id="about">
+  <div class="container anti-grid">
+    <div class="anti-grid-text reveal-fade-up">
+      <span class="mono-label">Narrative</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A deliberate pace of outdoor adventure</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We believe the best experiences are measured by depth, not distance. Our guided outings offer an intentional redirection from the haste of the world. With expert guides and custom gear, we venture into wild spaces with restraint and curiosity.</p>
+      <p style="color: var(--text-muted);">Every details is mapped. You bring the curiosity, we handle the rest.</p>
+    </div>
+    <div class="anti-grid-image reveal-fade-up">
+      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
+        <rect width="100" height="100" fill="var(--bg)"/>
+        <path d="M0.5,0.05 L0.95,0.85 L0.05,0.85 Z" fill="var(--accent)" opacity="0.2"/>
+      </svg>
     </div>
   </div>
 </section>
 
+<!-- Section Divider Seam -->
+<div class="section-seam invert">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 L360,20 L720,45 L1080,10 L1440,50 L1440,60 L0,60 Z"/></svg>
+</div>
+
+<!-- Hover-Reveal Experiences List -->
+{{#if has_tours}}
+<section class="hover-reveal-section" id="experiences">
+  <div class="container">
+    <span class="mono-label" style="color: var(--bg); opacity: 0.6;">Curated Routes</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Select Your Excursion</h2>
+
+    <ul class="hover-list">
+      {{#each tours}}
+      <li class="hover-item" data-image="{{image_url}}">
+        <a href="{{../booking_url}}" class="hover-item-content">
+          <span class="hover-item-title">{{name}}</span>
+          <span class="hover-item-meta mono-label" style="color: inherit;">
+            {{duration_minutes}} min &middot; max {{default_capacity}} &middot; from {{../currency}}{{base_price_per_person}}
+          </span>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+
+  <!-- Float reveal mask -->
+  <div class="reveal-mask-container" id="reveal-mask">
+    <img src="" id="reveal-mask-img" alt="">
+  </div>
+</section>
+{{/if}}
+
+<!-- Section Divider Seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,50 L360,20 L720,45 L1080,10 L1440,50 L1440,60 L0,60 Z"/></svg>
+</div>
+
+<!-- Practical Guide -->
+<section class="narrative-section" id="practical">
+  <div class="container">
+    <span class="mono-label">Preparation</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Trip Guidelines</h2>
+    <p style="color: var(--text-muted); max-width: 45rem;">Everything you need to know to ensure a comfortable and secure journey.</p>
+
+    <div class="product-sheet">
+      {{#if what_to_bring}}
+      <div class="skin-divider-line" style="border-bottom: 1px solid var(--border-alpha);"></div>
+      <div class="gear-section">
+        <div class="gear-col">
+          <span class="mono-label">What to bring</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_bring}}</p>
+        </div>
+      </div>
+      {{/if}}
+      {{#if what_to_wear}}
+      <div class="gear-section">
+        <div class="gear-col">
+          <span class="mono-label">What to wear</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_wear}}</p>
+        </div>
+      </div>
+      {{/if}}
+      {{#if directions}}
+      <div class="gear-section" style="border-bottom: none;">
+        <div class="gear-col">
+          <span class="mono-label">Directions</span>
+          <p class="gear-copy" style="margin-top:0.5rem;">{{directions}}</p>
+        </div>
+      </div>
+      {{/if}}
+    </div>
+    
+    
+      <div class="container" style="margin-top:4rem;text-align:center;">
+        <span class="mono-label">Ascent profile</span>
+        <h3 style="margin:1rem 0;font-size:1.6rem;">Illustrative Elevation Guide</h3>
+        <div style="width:100%;max-width:600px;margin:2rem auto;height:120px;border-bottom:2px solid var(--ink);position:relative;background:rgba(0,0,0,0.02);overflow:hidden;">
+          <svg viewBox="0 0 600 120" preserveAspectRatio="none" style="width:100%;height:100%;">
+            <path d="M0,120 L150,90 L300,50 L450,80 L600,10 L600,120 Z" fill="rgba(230,59,46,0.1)" stroke="var(--accent)" stroke-width="2" />
+          </svg>
+          <div id="elevation-marker" style="position:absolute;width:10px;height:10px;background:var(--accent);border-radius:50%;bottom:30px;left:0;transition:left 0.1s ease;display:none;"></div>
+        </div>
+        <p id="elevation-text" style="font-size:0.95rem;color:var(--text-muted);">Move your cursor across the graph to trace the ascent path elevation.</p>
+      </div>
+    
+  </div>
+</section>
+
+<!-- Reviews -->
 {{#if has_reviews}}
-<!-- Reviews strip -->
 <section class="reviews-section">
   <div class="container">
-    <span class="mono-label">From the rope team</span>
-    <h2 style="font-size: clamp(1.8rem, 4vw, 2.8rem); margin: 0.5rem 0 3rem 0;">What climbers say</h2>
+    <span class="mono-label">Testimonials</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">From Our Guests</h2>
     <div class="reviews-grid">
       {{#each reviews}}
-      <blockquote class="review-card">
-        <p class="review-quote">"{{quote}}"</p>
-        <footer class="review-author">— {{author}}</footer>
+      <blockquote class="review-quote">
+        <p>"{{quote}}"</p>
+        <cite>{{author}}</cite>
       </blockquote>
       {{/each}}
     </div>
@@ -783,72 +676,128 @@ header.sticky-nav.scrolled {
 </section>
 {{/if}}
 
-<!-- Footer -->
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-brand">{{business_name}}</div>
-    {{#if footer_line_one}}<p>{{footer_line_one}}</p>{{/if}}
-    {{#if footer_line_two}}<p>{{footer_line_two}}</p>{{/if}}
-    <p class="footer-legal">© {{year}} {{business_name}}</p>
-  </div>
-</footer>
-
 <!-- Persistent Booking Rail -->
 <div class="booking-rail">
   <div class="rail-price-info">
-    <span class="rail-label">Guided alpine ascents</span>
-    <span class="rail-price">Ready when you are</span>
+    <span class="mono-label">Instant Booking</span>
+    <span class="rail-price" style="font-size:1.2rem; font-family:var(--font-sans); font-weight:500;">Secure your calendar slot</span>
   </div>
-  <a href="{{booking_url}}" class="cta-button">Reserve Ascent</a>
+  <a class="cta-button" href="{{booking_url}}">Secure My Spot</a>
 </div>
 
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <h3 style="font-size: 2.2rem; margin-bottom: 1rem; font-family: var(--font-display);">Grade 4. Your legs will complain. Your photos won't.</h3>
+    <p style="opacity: 0.8; max-width: 32rem; margin: 0 auto 2rem auto; font-size: 0.95rem;">Join us for an unforgettable outing. Live availability is updated in real-time.</p>
+    <a class="cta-button" href="{{booking_url}}" style="margin-bottom: 3rem;">Launch Calendar</a>
+    <p style="opacity: 0.6; font-size: 0.8rem; margin-top:2rem;">&copy; {{year}} {{business_name}} &middot; {{footer_line_one}}{{#if footer_line_two}} &middot; {{footer_line_two}}{{/if}} &middot; Powered by <a href="https://bookingtours.co.za" style="color: inherit; text-decoration: underline;">BookingTours</a></p>
+  </div>
+</footer>
+
 <script>
-// Niarra Hover-Mask — only reveals when a tour has an image
-const hoverItems = document.querySelectorAll('.hover-item');
-const mask = document.getElementById('reveal-mask');
-const maskImg = document.getElementById('reveal-mask-img');
-hoverItems.forEach(item => {
-  const src = item.getAttribute('data-image');
-  if (!src) return;
-  item.addEventListener('mouseenter', () => {
-    maskImg.src = src;
-    mask.classList.add('active');
-  });
-  item.addEventListener('mouseleave', () => mask.classList.remove('active'));
-  item.addEventListener('mousemove', (e) => {
-    mask.style.left = e.clientX + 'px';
-    mask.style.top = e.clientY + 'px';
-  });
+// Scroll Reveal Observer
+document.addEventListener("DOMContentLoaded", () => {
+  const elements = document.querySelectorAll('.reveal-fade-up');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  elements.forEach(el => observer.observe(el));
 });
 
-// Vertical Panorama scroll treatment
+// Sticky Header on Scroll
 window.addEventListener("scroll", () => {
-  const img = document.getElementById("hero-img");
-  if (img) {
-    img.style.transform = `translateY(${-window.scrollY * 0.15}px)`;
+  const header = document.getElementById("main-nav");
+  if (header) {
+    if (window.scrollY > 20) {
+      header.classList.add("scrolled");
+    } else {
+      header.classList.remove("scrolled");
+    }
   }
 });
 
-// Signature Interaction: Difficulty Profile Ladder (illustrative grade reference)
-const LADDER_DATA = {
-  1: { title: "Grade 1: Flat Valley Trail Trek", desc: "No special gear or walk experience needed. Paths are wide, signed, and fully cleared of snow. Altitude does not exceed 1,500m." },
-  2: { title: "Grade 2: Glacier moraine approach walk", desc: "Moderate gradient slopes. Requires solid trekking boots and windproof layers. Altitude reaches 2,800m." },
-  3: { title: "Grade 3: Advanced Glacial Traverse", desc: "Requires basic crampon walk and ice rope discipline. Ascent slope reaches up to 45 degrees. Safe zones are located every 400m." },
-  4: { title: "Grade 4: Technical Peak Outcrop Climb", desc: "Requires front-pointing crampon skill, ice ax anchor use, and active multi-rope protection. Steep cliff slopes up to 60 degrees. Exposure is extreme." },
-  5: { title: "Grade 5: Vertical Ice Outcrop Summit", desc: "Research/Expedition grade. Requires absolute physical readiness, custom active rope setup, and previous high-exposure peaks. Ascent profile: vertical ice walls." }
-};
-function selectLadderStage(stage, btn) {
-  document.querySelectorAll('.ladder-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const data = LADDER_DATA[stage];
-  const box = document.getElementById("ladder-profile-desc");
-  box.innerHTML = `
-    <div style="font-weight:700;font-size:1.1rem;color:var(--accent);">${data.title}</div>
-    <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">${data.desc}</p>
-  `;
+// Mobile Hamburger Toggle
+const toggleBtn = document.getElementById('ham-toggle');
+const mobNav = document.getElementById('mobile-nav');
+const mobLinks = document.querySelectorAll('.mobile-overlay a');
+
+if (toggleBtn && mobNav) {
+  const toggleMenu = () => {
+    const active = mobNav.classList.toggle('active');
+    toggleBtn.classList.toggle('active');
+    document.body.style.overflow = active ? 'hidden' : 'auto';
+  };
+  toggleBtn.addEventListener('click', toggleMenu);
+  mobLinks.forEach(link => link.addEventListener('click', toggleMenu));
+  
+  // Close on ESC
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mobNav.classList.contains('active')) {
+      toggleMenu();
+    }
+  });
+}
+
+// Niarra Hover-Mask Device
+const hoverItems = document.querySelectorAll('.hover-item');
+const mask = document.getElementById('reveal-mask');
+const maskImg = document.getElementById('reveal-mask-img');
+
+if (hoverItems.length > 0 && mask && maskImg) {
+  hoverItems.forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      const imgUrl = item.getAttribute('data-image');
+      if (imgUrl) {
+        maskImg.src = imgUrl;
+        mask.classList.add('active');
+      }
+    });
+
+    item.addEventListener('mouseleave', () => {
+      mask.classList.remove('active');
+    });
+
+    item.addEventListener('mousemove', (e) => {
+      mask.style.left = e.clientX + 'px';
+      mask.style.top = e.clientY + 'px';
+    });
+  });
 }
 
 
+      const container = document.querySelector('[style*="height:120px"]');
+      const marker = document.getElementById('elevation-marker');
+      const elText = document.getElementById('elevation-text');
+      if (container && marker && elText) {
+        container.addEventListener('mousemove', (e) => {
+          const rect = container.getBoundingClientRect();
+          const pct = (e.clientX - rect.left) / rect.width;
+          if (pct >= 0 && pct <= 1) {
+            marker.style.display = 'block';
+            marker.style.left = (pct * 100) + '%';
+            // elevation mapping
+            let elev = 1200;
+            if (pct < 0.25) elev = Math.round(1200 + pct * 4 * 300);
+            else if (pct < 0.5) elev = Math.round(1500 + (pct - 0.25) * 4 * 500);
+            else if (pct < 0.75) elev = Math.round(2000 - (pct - 0.5) * 4 * 300);
+            else elev = Math.round(1700 + (pct - 0.75) * 4 * 1200);
+            
+            elText.innerHTML = "Distance: <strong>" + Math.round(pct * 18) + "km</strong> | Elevation: <strong>" + elev + "m</strong>";
+          }
+        });
+        container.addEventListener('mouseleave', () => {
+          marker.style.display = 'none';
+          elText.innerText = "Move your cursor across the graph to trace the ascent path elevation.";
+        });
+      }
+    
 </script>
+
 </body>
 </html>
