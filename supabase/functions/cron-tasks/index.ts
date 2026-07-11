@@ -191,14 +191,8 @@ async function cleanupExpiredManualBookings() {
       p_booked_delta: -Number(booking.qty || 0),
       p_held_delta: 0,
     });
-    if (rpcRes.error) {
-      const { data: slotData } = await supabase.from("slots").select("booked").eq("business_id", booking.business_id).eq("id", booking.slot_id).single();
-      if (slotData) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotData.booked || 0) - booking.qty),
-        }).eq("business_id", booking.business_id).eq("id", booking.slot_id);
-      }
-    }
+    // S7: no read-modify-write fallback (that reintroduces the race). Log only.
+    if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR (cron-tasks) slot=" + booking.slot_id + " err=" + rpcRes.error.message);
 
     // Log the expiry
     await supabase.from("logs").insert({

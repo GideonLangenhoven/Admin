@@ -112,6 +112,27 @@ async function authorizeCaller(req: any, body: any, booking: any): Promise<Calle
 }
 
 // ───── RESCHEDULE ─────
+// Unpaid bookings hold no money, so amendments never trigger refunds,
+// vouchers, or uplift payment links — just repricing + capacity moves.
+function isUnpaidBooking(booking: any): boolean {
+  return ["PENDING", "PENDING PAYMENT", "HELD"].includes(String(booking.status || ""));
+}
+
+// Release `qtyDelta` seats of an unpaid booking's ACTIVE hold (or move the
+// whole hold to a new slot). Admin-created pending bookings historically have
+// no hold row — then there is nothing reserved and nothing to release.
+async function releaseUnpaidHold(booking: any, qtyDelta: number, newSlotId?: string) {
+  const holdRes = await supabase.from("holds").select("id, qty").eq("booking_id", booking.id).eq("status", "ACTIVE").limit(1).maybeSingle();
+  if (!holdRes.data) return;
+  await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: 0, p_held_delta: -qtyDelta });
+  if (newSlotId) {
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: newSlotId, p_business_id: booking.business_id, p_booked_delta: 0, p_held_delta: qtyDelta });
+    await supabase.from("holds").update({ slot_id: newSlotId }).eq("id", holdRes.data.id);
+  } else {
+    await supabase.from("holds").update({ qty: Math.max(1, Number(holdRes.data.qty || booking.qty) - qtyDelta) }).eq("id", holdRes.data.id);
+  }
+}
+
 async function handleReschedule(req: any, booking: any, body: any, claimEligible: boolean) {
   const newSlotId = body.new_slot_id;
   if (!newSlotId) return fail(req, "new_slot_id required for RESCHEDULE", 400);
@@ -159,6 +180,32 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
   const diff = newTotalAmount - credit;
 
   const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
+
+  if (isUnpaidBooking(booking)) {
+    // Unpaid: immediate swap, reprice at the new slot, no money mechanics.
+    // Any previously-generated payment link is priced at the old slot — clear
+    // it so the admin/cron generates a fresh one for the new total.
+    await releaseUnpaidHold(booking, Number(booking.qty), newSlotId);
+    await supabase.from("bookings").update({
+      slot_id: newSlotId,
+      tour_id: newSlot.tour_id,
+      unit_price: newUnitPrice,
+      total_amount: newTotalAmount,
+      yoco_checkout_id: null,
+      payment_url: null,
+    }).eq("id", booking.id);
+
+    await supabase.from("logs").insert({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      event: "booking_rescheduled",
+      payload: { old_slot_id: booking.slot_id, new_slot_id: newSlotId, old_total: booking.total_amount, new_total: newTotalAmount, unpaid: true },
+    });
+
+    booking.slots = { ...(booking.slots || {}), start_time: newSlot.start_time };
+    await sendRebookNotification(booking, "rescheduled", "Your booking has been moved to a new date/time.");
+    return ok(req, { ...result, diff: 0, new_total: newTotalAmount });
+  }
 
   if (diff > 0) {
     // ── UPGRADE: customer owes more ──
@@ -255,16 +302,13 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
     // capacity was already released at cancellation, so don't release it again;
     // reactivate the booking and consume the credit.
 
-    // Decrement old slot booked count
+    // Decrement old slot booked count (S3: atomic)
     if (!isCreditClaim) {
-      const oldSlotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
-      if (oldSlotRes.data) {
-        await supabase.from("slots").update({ booked: Math.max(0, oldSlotRes.data.booked - booking.qty) }).eq("id", booking.slot_id);
-      }
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
     }
 
-    // Increment new slot booked count
-    await supabase.from("slots").update({ booked: (newSlot.booked || 0) + newQty }).eq("id", newSlotId);
+    // Increment new slot booked count (S3: atomic)
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: newSlotId, p_business_id: booking.business_id, p_booked_delta: Number(newQty), p_held_delta: 0 });
 
     // Update booking
     const updateData: any = {
@@ -379,8 +423,13 @@ async function handleAddGuests(req: any, booking: any, body: any) {
   const additionalCost = additionalGuests * unitPrice;
   const newTotal = Number(booking.total_amount || 0) + additionalCost;
 
-  // Atomic capacity check + hold for the additional guests
-  const holdExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  // Atomic capacity check + hold for the additional guests. Unpaid bookings
+  // keep the hold until their payment deadline (not just 15 minutes) since
+  // no uplift checkout is being started.
+  const deadlineMs = booking.payment_deadline ? new Date(booking.payment_deadline).getTime() : 0;
+  const holdExpiry = (isUnpaidBooking(booking) && deadlineMs > Date.now())
+    ? new Date(deadlineMs).toISOString()
+    : new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const holdResult = await supabase.rpc("create_hold_with_capacity_check", {
     p_booking_id: booking.id,
     p_slot_id: booking.slot_id,
@@ -393,6 +442,24 @@ async function handleAddGuests(req: any, booking: any, body: any) {
   }
 
   const holdId = holdResult.data.hold_id;
+
+  if (isUnpaidBooking(booking)) {
+    // Unpaid: no uplift checkout — the whole (new) total is still unpaid.
+    // Reprice and invalidate the stale payment link.
+    await supabase.from("bookings").update({
+      qty: newQty,
+      total_amount: newTotal,
+      yoco_checkout_id: null,
+      payment_url: null,
+    }).eq("id", booking.id);
+    await supabase.from("logs").insert({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      event: "guests_added",
+      payload: { old_qty: booking.qty, new_qty: newQty, additional_cost: additionalCost, hold_id: holdId, unpaid: true },
+    });
+    return ok(req, { ok: true, action: "ADD_GUESTS", diff: 0, new_total: newTotal, hold_id: holdId });
+  }
 
   await supabase.from("logs").insert({
     business_id: booking.business_id,
@@ -446,18 +513,34 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   const excessAmount = removedGuests * discountedUnitPrice;
   const newTotal = totalAmountPaid - excessAmount;
 
+  if (isUnpaidBooking(booking)) {
+    // Unpaid: reprice, release the removed guests' held seats (if this
+    // booking ever reserved any), invalidate the stale payment link. No
+    // refund/voucher — nothing has been paid.
+    await supabase.from("bookings").update({
+      qty: newQty,
+      total_amount: newTotal,
+      yoco_checkout_id: null,
+      payment_url: null,
+    }).eq("id", booking.id);
+    await releaseUnpaidHold(booking, removedGuests);
+    await supabase.from("logs").insert({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      event: "guests_removed",
+      payload: { old_qty: booking.qty, new_qty: newQty, excess_amount: 0, excess_action: "NONE", unpaid: true },
+    });
+    await sendRebookNotification(booking, "guests_removed", removedGuests + " guest" + (removedGuests === 1 ? "" : "s") + " removed from your booking.");
+    return ok(req, { ok: true, action: "REMOVE_GUESTS", new_total: newTotal });
+  }
+
   await supabase.from("bookings").update({
     qty: newQty,
     total_amount: newTotal,
   }).eq("id", booking.id);
 
-  // Decrement slot booked count
-  const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
-  if (slotRes.data) {
-    await supabase.from("slots").update({
-      booked: Math.max(0, (slotRes.data.booked || 0) - removedGuests),
-    }).eq("id", booking.slot_id);
-  }
+  // Decrement slot booked count (S3: atomic)
+  await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -removedGuests, p_held_delta: 0 });
 
   await supabase.from("logs").insert({
     business_id: booking.business_id,
@@ -761,9 +844,8 @@ async function handleCancelRefund(req: any, booking: any) {
     if (booking.slot_id) {
       const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
       if (slotRes.data) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
-        }).eq("id", booking.slot_id);
+        // S7: atomic booked release (no read-modify-write)
+        await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
       }
     }
 
@@ -798,9 +880,8 @@ async function handleCancelRefund(req: any, booking: any) {
   if (booking.slot_id) {
     const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
-      await supabase.from("slots").update({
-        booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
-      }).eq("id", booking.slot_id);
+      // S7: atomic booked release (no read-modify-write)
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
     }
   }
 
@@ -890,9 +971,8 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
   if (booking.slot_id) {
     const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
-      await supabase.from("slots").update({
-        booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
-      }).eq("id", booking.slot_id);
+      // S7: atomic booked release (no read-modify-write)
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
     }
   }
 
@@ -1000,9 +1080,8 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   if (booking.slot_id) {
     const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
-      await supabase.from("slots").update({
-        booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
-      }).eq("id", booking.slot_id);
+      // S7: atomic booked release (no read-modify-write)
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
     }
   }
 
@@ -1113,9 +1192,8 @@ async function handleCancelVoucher(req: any, booking: any) {
   if (booking.slot_id) {
     const slotRes = await supabase.from("slots").select("booked").eq("id", booking.slot_id).single();
     if (slotRes.data) {
-      await supabase.from("slots").update({
-        booked: Math.max(0, (slotRes.data.booked || 0) - booking.qty),
-      }).eq("id", booking.slot_id);
+      // S7: atomic booked release (no read-modify-write)
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: -Number(booking.qty), p_held_delta: 0 });
     }
   }
 
@@ -1398,8 +1476,12 @@ Deno.serve(async function (req: any) {
       // RESCHEDULE is allowed on any cancelled booking: claim-eligible ones
       // consume their parked credit; settled ones (refund/voucher already
       // issued) pay the full new price via the upgrade payment-link path.
+      // Unpaid bookings (admin-created PENDING etc.) may be rescheduled and
+      // have their party size changed — no money has moved, so those paths
+      // skip all refund/uplift mechanics (see isUnpaidBooking branches).
       if (!["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
-        && !(action === "RESCHEDULE" && booking.status === "CANCELLED")) {
+        && !(action === "RESCHEDULE" && booking.status === "CANCELLED")
+        && !(isUnpaidBooking(booking) && ["RESCHEDULE", "ADD_GUESTS", "REMOVE_GUESTS"].includes(action))) {
         return fail(req, "Booking is not in a modifiable state (status: " + booking.status + ")", 400);
       }
     }

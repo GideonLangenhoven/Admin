@@ -218,7 +218,8 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     return respond(500, { ok: false, error: "DB insert failed: " + insertErr.message, code: insertErr.code }, origin);
   }
 
-  await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
+  // S7: atomic booked increment (OTA always lands; no capacity gate, but no lost update)
+  await db.rpc("adjust_slot_capacity", { p_slot_id: slot.id, p_business_id: businessId, p_booked_delta: Number(qty), p_held_delta: 0 });
 
   // Refresh customer lifetime stats now that the PAID booking is linked
   if (customerId) {
@@ -267,10 +268,8 @@ async function handleAmended(businessId: string, event: any, externalRef: string
   }).eq("id", existing.id);
 
   if (qtyDiff !== 0 && existing.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", existing.slot_id).single();
-    if (sl) {
-      await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) + qtyDiff) }).eq("id", existing.slot_id);
-    }
+    // S7: atomic booked adjustment
+    await db.rpc("adjust_slot_capacity", { p_slot_id: existing.slot_id, p_business_id: businessId, p_booked_delta: Number(qtyDiff), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({
@@ -305,8 +304,8 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
   }).eq("id", bk.id);
 
   if (bk.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
-    if (sl) await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) - (bk.qty || 0)) }).eq("id", bk.slot_id);
+    // S7: atomic booked release
+    await db.rpc("adjust_slot_capacity", { p_slot_id: bk.slot_id, p_business_id: businessId, p_booked_delta: -Number(bk.qty || 0), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({

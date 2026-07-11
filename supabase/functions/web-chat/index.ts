@@ -314,10 +314,8 @@ async function getSlots(tourId, now) {
 async function adjustSlotBooked(businessId: string, slotId: string, delta: number) {
   if (!slotId || !delta) return;
   const rpcRes = await db.rpc("adjust_slot_capacity", { p_slot_id: slotId, p_business_id: businessId, p_booked_delta: delta, p_held_delta: 0 });
-  if (rpcRes.error) {
-    const { data: sr } = await db.from("slots").select("booked").eq("business_id", businessId).eq("id", slotId).single();
-    if (sr) await db.from("slots").update({ booked: Math.max(0, (sr.booked || 0) + delta) }).eq("business_id", businessId).eq("id", slotId);
-  }
+  // S7: no read-modify-write fallback (that reintroduces the race). Log only.
+  if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR slot=" + slotId + " err=" + rpcRes.error.message);
 }
 
 // Basic per-client rate limit for this open endpoint (per-instance, sliding

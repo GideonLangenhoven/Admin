@@ -159,12 +159,26 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingA.id);
   await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingB.id);
 
-  // Hold capacity on both slots (S3: atomic increment, no read-modify-write).
-  // NOTE: combo reserves via slots.held directly (no holds row) and does not use
-  // the capacity-checked create_hold_with_capacity_check — a combo-channel
-  // overbooking guard is a separate follow-up (S8).
-  await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: Number(qty) });
-  await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_booked_delta: 0, p_held_delta: Number(qty) });
+  // S8: reserve capacity on both slots with an atomic capacity CHECK (prevents
+  // combo overbooking under concurrency). If either slot is full, roll back
+  // everything created so far and return 409.
+  const rollbackCombo = async () => {
+    await supabase.from("bookings").delete().eq("id", bookingA.id);
+    await supabase.from("bookings").delete().eq("id", bookingB.id);
+    await supabase.from("combo_bookings").delete().eq("id", comboBooking.id);
+  };
+  const resA = await supabase.rpc("reserve_combo_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_qty: Number(qty) });
+  if (resA.error || resA.data !== true) {
+    await rollbackCombo();
+    return jsonRes({ error: "Those spots were just taken on the first tour. Please pick another time." }, 409, cors);
+  }
+  const resB = await supabase.rpc("reserve_combo_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_qty: Number(qty) });
+  if (resB.error || resB.data !== true) {
+    // release the slot-A reservation we just took, then roll back
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: -Number(qty) });
+    await rollbackCombo();
+    return jsonRes({ error: "Those spots were just taken on the second tour. Please pick another time." }, 409, cors);
+  }
 
   // Load Paysafe account ID (public key for SDK) from business_a
   const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, currency").eq("id", offer.business_a_id).single();
