@@ -22,6 +22,7 @@ const nav = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
+  { href: "/payment-reminders", label: "Payment Reminders", icon: "BellRing" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },

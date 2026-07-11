@@ -441,6 +441,113 @@ async function autoExpireBookingsForBusiness(businessId: string) {
   return cancelled;
 }
 
+// ── PAYMENT REMINDER ──────────────────────────────────────────────────────────
+// Friendly pre-trip nudge for bookings happening soon that are still unpaid, plus
+// an auto-cancel a configurable number of hours before the trip. Admins can set the
+// window (automation_config.payment_reminder_cancel_hours, default 12) and override
+// per booking (bookings.allow_unpaid) to let a trip proceed without payment.
+async function sendPaymentRemindersForBusiness(businessId: string): Promise<number> {
+  const { data: bizRow } = await db.from("businesses").select("automation_config").eq("id", businessId).maybeSingle();
+  const ac = (bizRow as any)?.automation_config || {};
+  // Opt-in: auto-cancel is destructive + customer-facing, so a tenant must enable
+  // it in Admin → Payment Reminders. Default OFF.
+  if (ac.payment_reminder_enabled !== true) return 0;
+  const cancelHours = Math.max(1, Number(ac.payment_reminder_cancel_hours ?? 12));
+
+  const tenant = await getTenantContext(db, businessId);
+  const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const in24hIso = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+  let actioned = 0;
+
+  // Unpaid, upcoming (within 24h), not overridden, with a payment link.
+  const { data: bookings } = await db.from("bookings")
+    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, allow_unpaid, status, slot_id, tours(name), slots!inner(start_time)")
+    .eq("business_id", businessId)
+    .in("status", ["PENDING", "CONFIRMED", "HELD"])
+    .eq("allow_unpaid", false)
+    .not("payment_url", "is", null)
+    .gt("slots.start_time", nowIso)
+    .lt("slots.start_time", in24hIso);
+
+  for (const booking of (bookings || [])) {
+    const b: any = booking;
+    const startTime = b?.slots?.start_time;
+    if (!startTime || !b.payment_url) continue;
+    const firstName = String(b.customer_name || "").split(" ")[0] || "there";
+    const tourName = b?.tours?.name || "your booking";
+    const timeStr = formatTenantDateTime(tenant.business, startTime);
+    const startMs = new Date(startTime).getTime();
+    const cancelPhrase = cancelHours >= 24
+      ? Math.round(cancelHours / 24) + " day" + (Math.round(cancelHours / 24) === 1 ? "" : "s")
+      : cancelHours + " hour" + (cancelHours === 1 ? "" : "s");
+
+    // ── AUTO-CANCEL: the trip is now within the cancel window and still unpaid ──
+    if (startMs - cancelHours * 60 * 60 * 1000 <= now) {
+      if (await alreadySent(b.id, "PAYMENT_CANCEL")) continue;
+      await db.from("bookings").update({
+        status: "CANCELLED",
+        cancellation_reason: "Auto-cancelled: payment not received before the trip",
+        cancelled_at: nowIso,
+      }).eq("id", b.id).eq("business_id", businessId);
+      // Release capacity the same way the canonical cancel path does.
+      if (b.slot_id) {
+        await db.rpc("adjust_slot_capacity", {
+          p_slot_id: b.slot_id, p_business_id: businessId,
+          p_booked_delta: -Number(b.qty || 0),
+          p_held_delta: b.status === "HELD" ? -Number(b.qty || 0) : 0,
+        });
+      }
+      await db.from("holds").update({ status: "EXPIRED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
+      if (b.phone) {
+        try {
+          await sendWhatsappTextForTenant(tenant, b.phone,
+            "Hi " + firstName + ", unfortunately your booking for " + tourName + " on " + timeStr +
+            " has been cancelled because payment wasn't received in time, and the spot has been released.\n\n" +
+            "Would still love to have you — you can rebook anytime here: " + myBookingsUrl);
+        } catch (_e) { /* best effort */ }
+      }
+      await logSent(businessId, b.id, b.phone || "", "PAYMENT_CANCEL");
+      actioned++;
+      continue;
+    }
+
+    // ── FRIENDLY REMINDER: booking is coming up and still unpaid ──
+    if (await alreadySent(b.id, "PAYMENT_REMINDER")) continue;
+    const message =
+      "Hi " + firstName + " \u{1F44B}\n\n" +
+      "Friendly reminder that your " + tourName + " is coming up:\n" +
+      timeStr + "\n" +
+      b.qty + " guest" + (Number(b.qty || 0) === 1 ? "" : "s") + "\n\n" +
+      "We haven't received your payment yet. To lock in your spot, you can pay securely here:\n" +
+      b.payment_url + "\n\n" +
+      "Just so you know: if payment isn't made, the booking will be automatically cancelled about " +
+      cancelPhrase + " before the trip so the spot can be freed up. " +
+      "Having any trouble paying? Reply here and we'll sort it out. \u{1F60A}";
+
+    if (b.phone) {
+      try { await sendWhatsappTextForTenant(tenant, b.phone, message); } catch (_e) { /* best effort */ }
+    }
+    if (b.email) {
+      try {
+        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+          body: JSON.stringify({ type: "PAYMENT_REMINDER", data: {
+            business_id: businessId, email: b.email, customer_name: b.customer_name,
+            tour_name: tourName, start_time: startTime, qty: b.qty,
+            payment_url: b.payment_url, cancel_phrase: cancelPhrase, total_amount: b.total_amount,
+          } }),
+        });
+      } catch (_e) { /* best effort */ }
+    }
+    await logSent(businessId, b.id, b.phone || "", "PAYMENT_REMINDER");
+    actioned++;
+  }
+  return actioned;
+}
+
 Deno.serve(withSentry("auto-messages", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getHeaders(req.headers.get("origin")) });
 
@@ -455,6 +562,7 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       re_engage: 0,
       auto_expire: 0,
       human_timeout: 0,
+      payment_reminders: 0,
     };
 
     await mapWithConcurrency(businesses, 8, async (biz) => {
@@ -469,6 +577,7 @@ Deno.serve(withSentry("auto-messages", async (req) => {
         if (action === "all" || action === "re_engage") results.re_engage += await sendReEngagementForBusiness(businessId);
         if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
         if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
+        if (action === "all" || action === "payment_reminders") results.payment_reminders += await sendPaymentRemindersForBusiness(businessId);
       } catch (err) {
         // Per-tenant failure must not abort the whole sweep.
         console.error("AUTO_MESSAGES_TENANT_ERR", businessId, err instanceof Error ? err.message : String(err));

@@ -538,7 +538,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Complete Your Reservation</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.heading || "Complete Your Reservation"}</h1>
           </td>
         </tr>
         ${heroImg("IMG_PAYMENT", "Cape Kayak")}
@@ -546,7 +546,8 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">You're almost there. Please complete your payment below to secure your spots for the <strong>${d.tour_name}</strong>.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${d.intro || ("You're almost there. Please complete your payment below to secure your spots for the <strong>" + d.tour_name + "</strong>.")}</p>
+            ${d.cancel_phrase ? `<p style="font-size: 14px; line-height: 1.6; color: #B45309; background:#FEF3C7; border-radius:8px; padding:12px 16px; margin: 0 0 20px 0;">Heads up: if payment isn't made, this booking will be automatically cancelled about <strong>${d.cancel_phrase} before the trip</strong> so the spot can be released. Any trouble paying? Just reply to this email.</p>` : ""}
           </td>
         </tr>
         <!-- Details Box -->
@@ -2360,6 +2361,14 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       case "PAYMENT_LINK":
         subject = "Cape Kayak - Payment Link (Ref: " + d.ref + ")";
         html = paymentLinkHtml(d);
+        break;
+      case "PAYMENT_REMINDER":
+        subject = "Reminder: payment outstanding for your upcoming " + (d.tour_name || "booking");
+        html = paymentLinkHtml({
+          ...d,
+          heading: "Your trip is coming up",
+          intro: "Just a friendly reminder — your <strong>" + (d.tour_name || "booking") + "</strong> is coming up soon and we haven't received your payment yet. You can pay securely below to keep your spot.",
+        });
         break;
       case "RESCHEDULE_PAYMENT_LINK":
         subject = "Cape Kayak - Reschedule payment due (Ref: " + d.ref + ")";

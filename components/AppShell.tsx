@@ -58,7 +58,7 @@ function isSuspendedAllowed(path: string) {
    rules are unchanged; groups whose items are all hidden don't render. */
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
-  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
+  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/payment-reminders", "/slots"] },
   { label: "Customers", hrefs: ["/inbox", "/refunds", "/vouchers", "/reviews"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts"] },
