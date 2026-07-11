@@ -52,12 +52,18 @@ pattern); execution is blocked on a stress environment + announced window.
 
 ---
 
-## STATUS: all 5 blockers fixed + deployed (commit ba11a51, tag deploy-2026-07-11-5)
-S1/S2/S3/S5/S6 below are RESOLVED and live. Invariants pack now 5/6 PASS; the one
-remaining is a single suspicious data row (S4) for operator triage. Two new
-follow-ups surfaced while fixing: **S7** (bot/OTA channels still do non-atomic
-`booked` read-modify-write) and **S8** (combo checkout reserves `held` with no
-holds row and no capacity-checked reserve). Neither blocks the fixed paths.
+## STATUS: ALL code/data/security issues RESOLVED + deployed + verified live.
+S1/S2/S3/S5/S6 (tag deploy-2026-07-11-5) + S4/S7/S8 (tag deploy-2026-07-11-6).
+Invariants pack **6/6 PASS live**. S4 data row cleared. S7 (bot/OTA booked RMW)
+and S8 (combo overbooking via new reserve_combo_capacity RPC) both fixed — ZERO
+non-atomic booked/held writes remain anywhere. Live functional proof passed
+(combo guard rejects overbooking; refund clamps 60/40/0). k6 installed.
+
+REMAINING = load EXECUTION only (operational, needs a dedicated stress tenant +
+announced window per this plan's own rules): the k6 concurrency runs (1.2–1.4,
+2.1–2.2), the 1500-tenant fleet + cron sweeps (Phase 3), the 48h soak (Phase 4),
+and abuse drills (Phase 5). Scripts are ready (`webhook-replay.k6.js`,
+`seed-fleet.sql`); nothing here fires load at live prod unannounced.
 
 ## Findings (RESOLVED — kept for history)
 
