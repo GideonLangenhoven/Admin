@@ -73,6 +73,8 @@ non-atomic booked/held writes remain anywhere. Live functional proof passed
 | 5.1 S6 unsigned inject | live attack | GYG unsigned booking → 401 |
 | 5.2 bad-sig payment | live attack | yoco bad-sig → 401 |
 | 5.4 SSRF | live attack | file://, 169.254.169.254, localhost → all blocked |
+| **3.4 read-path load** | **k6, 50 VUs/20s** | **3,496 reqs, p95=330ms (<2s), 0% 5xx** |
+| 5.OTP rate-limit | live attack | 3 accepted then 429 lockout; fail-closed on bad origin; non-leaking on email existence |
 | S8 combo overbook | live SQL proof | reserve_combo_capacity rejects at capacity |
 
 ## GENUINELY NOT completable in one session (not a missing fix)
