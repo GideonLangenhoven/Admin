@@ -65,7 +65,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     const baseQuery = supabase
       .from("businesses")
-      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode")
+      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
       .order("business_name", { ascending: true });
 
     const businessesRes = isMultiOperator
@@ -90,6 +90,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }));
 
     const activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
+
+    // Canonical-host redirect: wildcard DNS serves every *.admin subdomain,
+    // and tenant resolution comes from the profile — so a typo'd subdomain
+    // still logs into the caller's own business. Bounce to the real one so
+    // the URL matches the tenant. Supers roam across operators, so skip them.
+    const canonicalSub = (businessRows.find((biz) => biz.id === (activeOperator?.id || defaultBusinessId)) as any)?.subdomain || "";
+    const hostMatch = window.location.hostname.match(/^([^.]+)\.admin\.bookingtours\.co\.za$/);
+    if (!isMultiOperator && canonicalSub && hostMatch && hostMatch[1] !== canonicalSub) {
+      window.location.replace("https://" + canonicalSub + ".admin.bookingtours.co.za" + window.location.pathname + window.location.search);
+    }
 
     return {
       businessId: activeOperator?.id || defaultBusinessId,

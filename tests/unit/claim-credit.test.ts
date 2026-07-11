@@ -32,3 +32,25 @@ describe("weather-cancellation credit claim (B3)", () => {
     expect(webhook).toContain("wasCancelled");
   });
 });
+
+// Rebooking a SETTLED cancellation (refund/voucher already issued) must not
+// treat the original payment as credit — the customer pays the full new price
+// via the upgrade payment-link path, and the admin modal hides credit math.
+describe("settled-cancelled rebook charges full price", () => {
+  const rebook = readFileSync("supabase/functions/rebook-booking/index.ts", "utf8");
+  const page = readFileSync("app/bookings/page.tsx", "utf8");
+
+  it("RESCHEDULE passes the state guard for any cancelled booking", () => {
+    expect(rebook).toContain('action === "RESCHEDULE" && booking.status === "CANCELLED"');
+  });
+
+  it("credit is zeroed when the payout was already issued", () => {
+    expect(rebook).toContain("handleReschedule(req, booking, body, claimEligible)");
+    expect(rebook).toContain("isCreditClaim && !claimEligible ? 0");
+  });
+
+  it("admin rebook modal hides credit math for settled cancellations", () => {
+    expect(page).toContain("rebookHasNoCredit");
+    expect(page).toContain("no credit remains");
+  });
+});

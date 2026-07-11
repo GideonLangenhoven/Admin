@@ -90,7 +90,7 @@ export default function BillingPage() {
     if (!sub) return;
     setError(null);
 
-    const seatPrice = sub.plans?.extra_seat_price_zar ?? 750;
+    const seatPrice = sub.plans?.extra_seat_price_zar ?? 500;
     const action = delta > 0 ? "add" : "remove";
     const today = new Date();
     const cycleEnd = new Date(sub.billing_cycle_end);
@@ -231,7 +231,7 @@ export default function BillingPage() {
               disabled={actionLoading}
               className="ui-btn ui-btn-primary disabled:opacity-50"
             >
-              + Add seat (R{sub.plans?.extra_seat_price_zar ?? 750})
+              + Add seat (R{sub.plans?.extra_seat_price_zar ?? 500})
             </button>
             <button
               onClick={() => changeSeats(-1)}

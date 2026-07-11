@@ -83,6 +83,7 @@ export default function Vouchers() {
   const [form, setForm] = useState({
     code: generateVoucherCode(),
     recipient_name: "",
+    recipient_email: "",
     buyer_name: "",
     buyer_email: "",
     tour_name: "",
@@ -171,6 +172,7 @@ export default function Vouchers() {
       businessId,
       code: form.code,
       recipientName: form.recipient_name,
+      recipientEmail: form.recipient_email,
       buyerName: form.buyer_name,
       buyerEmail: form.buyer_email,
       tourName: form.tour_name,
@@ -207,6 +209,7 @@ export default function Vouchers() {
       setForm({
         code: generateVoucherCode(),
         recipient_name: "",
+        recipient_email: "",
         buyer_name: "",
         buyer_email: "",
         tour_name: "",
@@ -250,6 +253,10 @@ export default function Vouchers() {
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Recipient
               <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
+            </label>
+            <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+              Recipient's email (optional — sends the gift straight to them instead of the buyer)
+              <input type="email" value={form.recipient_email} onChange={(e) => setForm({ ...form, recipient_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Buyer name

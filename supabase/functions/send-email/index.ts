@@ -6,7 +6,7 @@ import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Webhook } from "npm:standardwebhooks";
 import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -193,6 +193,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     return {
       businessId: "",
       brandName: fallbackBrand,
+      timezone: "UTC",
       shortBrandName: fallbackBrand,
       footerLineOne: "Thanks for choosing our team.",
       footerLineTwo: "Reply to this email if you need anything.",
@@ -214,7 +215,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     const res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, logo_url")
+      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, logo_url")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -225,7 +226,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     try {
       const res2 = await supabase
         .from("businesses")
-        .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+        .select("id, name, business_name, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
         .eq("id", businessId)
         .maybeSingle();
       data = res2.data;
@@ -238,6 +239,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   return {
     businessId,
     brandName,
+    timezone: String((data as Record<string, unknown> | null)?.timezone || "UTC"),
     shortBrandName: brandName,
     footerLineOne: String(data?.footer_line_one || "Thanks for choosing " + brandName + "."),
     footerLineTwo: String(data?.footer_line_two || "Reply to this email if you need anything."),
@@ -2281,7 +2283,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER") {
@@ -2303,6 +2305,13 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     d._manageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : "");
     d._siteUrl = branding.bookingSiteUrl || "";
     d._emailTagline = branding.emailTagline || "";
+
+    // Central guard: senders should pass tenant-formatted date strings, but a
+    // raw ISO timestamp still slips through from older callers — format it
+    // here so no template ever renders "2026-07-11T10:00:00+00:00".
+    if (typeof d.start_time === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(d.start_time) && !Number.isNaN(Date.parse(d.start_time))) {
+      d.start_time = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, d.start_time);
+    }
 
     // Last resort: if URL is still empty, try to construct from business_id lookup
     if (!d._manageUrl && d.business_id && supabase) {

@@ -8,7 +8,10 @@ const TZ_FMT_OPTS: Intl.DateTimeFormatOptions = {
 
 export function getAdminTimezone() {
   if (typeof window === "undefined") return "UTC";
-  return localStorage.getItem("ck_admin_timezone") || "UTC";
+  // Fall back to the browser's timezone, not UTC — a UTC default made every
+  // admin-triggered email/display show shifted times until the operator
+  // explicitly saved a timezone in Settings.
+  return localStorage.getItem("ck_admin_timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 export function setAdminTimezone(tz: string) {

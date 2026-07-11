@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens & Base CSS ── */
+:root {
+  --bg: #F2F4F2;
+  --ink: #42513F;
+  --accent: #3E7CA6;
+  --surface: #ffffff;
+  --text-muted: #5d6d5d;
+  --border-alpha: rgba(66, 81, 63, 0.08);
+  --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-display: 'Newsreader', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
+}
+
+/* Base resets */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+h1, h2, h3, .editorial-heading {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+/* Glass Recipe */
+.glass-panel {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Mono Micro-Label */
+.mono-label {
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Layout System: Anti-Grid */
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+.section-seam {
+  width: 100%;
+  line-height: 0;
+  margin: 0;
+}
+.section-seam svg {
+  width: 100%;
+  height: 40px;
+  fill: var(--bg);
+  transform: translateY(1px);
+}
+.section-seam.invert svg {
+  transform: scaleY(-1) translateY(1px);
+}
+
+/* Whitespace Budget */
+.narrative-section {
+  padding: 20vh 0;
+  position: relative;
+}
+.anti-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2rem;
+  align-items: center;
+}
+.anti-grid-text {
+  grid-column: 1 / 6;
+  max-width: 34rem;
+}
+.anti-grid-image {
+  grid-column: 7 / 13;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 21/9; /* Ultra-wide */
+}
+.anti-grid-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Navigation */
+header.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s, backdrop-filter 0.3s;
+}
+header.sticky-nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+  height: 70px;
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.logo-area h1 {
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.nav-links {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+}
+.nav-links a {
+  text-decoration: none;
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+.nav-links a:hover {
+  color: var(--accent);
+}
+.cta-button {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  border: none;
+  cursor: pointer;
+}
+
+/* Hero: Ultra-Wide 21:9 Stills, Minimal Motion (Stillness) */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+  overflow: hidden;
+  padding: 10vh 0;
+}
+.hero-still-box {
+  position: absolute;
+  inset: 4vh;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 1;
+}
+.hero-still-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
+}
+.hero-overlay {
+  position: absolute;
+  inset: 4vh;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(242,244,242,0) 0%, rgba(242,244,242,0.9) 100%);
+  z-index: 2;
+}
+.hero-content {
+  position: relative;
+  z-index: 3;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 4rem;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 4rem;
+  align-items: flex-end;
+  width: 100%;
+}
+.hero-text h2 {
+  font-size: clamp(2.4rem, 5.5vw, 4.5rem);
+  line-height: 1.1;
+  margin: 1rem 0;
+}
+.hero-text p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  max-width: 44rem;
+  margin-bottom: 2rem;
+}
+.hero-widget-box {
+  width: 100%;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+}
+
+/* Hover-Reveal Destinations List (Niarra Device - Horizontal sliver) */
+.hover-reveal-section {
+  padding: 15vh 0;
+  background-color: var(--ink);
+  color: #fff;
+  position: relative;
+}
+.hover-list {
+  list-style: none;
+  max-width: 900px;
+  margin: 4rem auto 0 auto;
+}
+.hover-item {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 2rem 0;
+  position: relative;
+  cursor: pointer;
+}
+.hover-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hover-item-title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-family: var(--font-display);
+  transition: transform 0.3s var(--ck-ease);
+}
+.hover-item:hover .hover-item-title {
+  transform: translateX(15px);
+}
+.hover-item-meta {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.reveal-mask-container {
+  pointer-events: none;
+  position: fixed;
+  width: 380px;
+  height: 120px; /* Horizontal sliver */
+  overflow: hidden;
+  z-index: 50;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
+}
+.reveal-mask-container.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.reveal-mask-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Weather Truth Cards */
+.weather-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+.weather-card {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--border-alpha);
+  padding: 1.5rem;
+}
+.weather-odds {
+  font-size: 2.2rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Visual Product Sheet */
+.product-sheet {
+  background-color: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--border-alpha);
+  overflow: hidden;
+  margin-top: 4rem;
+}
+.sheet-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--border-alpha);
+  background: var(--bg);
+}
+.stat-chip {
+  padding: 1.8rem;
+  text-align: center;
+  border-right: 1px solid var(--border-alpha);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.stat-chip:last-child { border-right: none; }
+.stat-value {
+  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Persistent Booking Rail */
+.booking-rail {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-alpha);
+  padding: 1.2rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rail-price-info {
+  display: flex;
+  flex-direction: column;
+}
+.rail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.rail-price {
+  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* Booking Modal Overlay */
+.booking-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(66, 81, 63, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 150;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.booking-modal.active {
+  display: flex;
+}
+.modal-box {
+  background: var(--bg);
+  width: 100%;
+  max-width: 580px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+  border: 1px solid var(--border-alpha);
+}
+.modal-header {
+  padding: 1.5rem 2rem;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-progress {
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  position: relative;
+}
+.modal-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 33.3%;
+  transition: width 0.3s var(--ck-ease);
+}
+.modal-body {
+  padding: 2.5rem;
+}
+.modal-step {
+  display: none;
+}
+.modal-step.active {
+  display: block;
+}
+.step-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2rem;
+  border-top: 1px solid var(--border-alpha);
+  padding-top: 1.5rem;
+}
+.prev-btn {
+  background: none;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+@media (max-width: 1024px) {
+  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .anti-grid { grid-template-columns: 1fr; }
+  .anti-grid-text { grid-column: 1 / -1; }
+  .anti-grid-image { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<header class="sticky-nav" id="main-nav">
+  <div class="container nav-inner">
+    <div class="logo-area">
+      {{#if logo_url}}
+        <img src="{{logo_url}}" alt="{{business_name}}">
+      {{else}}
+        <h1>{{business_name}}</h1>
+      {{/if}}
+    </div>
+    <nav class="nav-links">
+      <a href="#about">The Fjord</a>
+      <a href="#weather-truth">Weather Truth</a>
+      <a href="#experiences">Outposts</a>
+      <a href="{{booking_url}}" class="cta-button">Book Hike</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero Section with ultra-wide still image -->
+<section class="hero">
+  <div class="hero-still-box">
+    {{#if hero_image}}
+      <img src="{{hero_image}}" alt="{{business_name}}">
+    {{else}}
+      <div style="width:100%;height:100%;background:linear-gradient(180deg, color-mix(in srgb, var(--ink) 12%, var(--bg)) 0%, var(--bg) 49%, var(--bg) 51%, color-mix(in srgb, var(--ink) 18%, var(--bg)) 100%);"></div>
+    {{/if}}
+  </div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-text reveal-fade-up active">
+      <span class="mono-label" style="background-color:transparent;color:var(--accent);">{{hero_eyebrow}}</span>
+      <h2>Pack for four seasons. Expect all of them before lunch.</h2>
+      <p>{{hero_subtitle}}</p>
+      <a href="{{booking_url}}" class="cta-button" style="background-color: var(--accent);">Book Base camp Slot</a>
+    </div>
+    
+    <!-- Field-notes glass card (honest; real booking CTA) -->
+    <div class="hero-widget-box glass-panel">
+      <h3 style="font-family: var(--font-display); font-size: 1.4rem; margin-bottom: 0.75rem; color: var(--ink);">Before you book</h3>
+      <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.25rem;">Pack for four seasons. Expect all of them before lunch — waterproof shell, warm layers, sturdy boots. The fjord sets the pace.</p>
+      <a href="{{booking_url}}" class="cta-button" style="width: 100%; text-align: center; display: block; background-color: var(--accent);">Check dates &amp; book</a>
+    </div>
+  </div>
+</section>
+
+<!-- Fjord waterline reflection divider seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <!-- Mirrored ridgeline reflection look -->
+    <path d="M0,20 C180,40 360,0 720,20 C1080,40 1260,0 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Narrative Anti-Grid Section -->
+<section class="narrative-section" id="about">
+  <div class="container anti-grid">
+    <div class="anti-grid-text reveal-fade-up">
+      <span class="mono-label">The Lichen Way</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A rhythm matched to stillness</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We trek along the waterline reflection paths. Nordic Hiking isn't about peak elevation; it's about coastal silence. In these isolated fjords, the weather changes in minutes, requiring versatile preparation.</p>
+      <p style="color: var(--text-muted);">We carry waterproof shells, insulated flasks, and GPS beacons.</p>
+    </div>
+    <div class="anti-grid-image reveal-fade-up" style="background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 14%, var(--bg)) 0%, var(--bg) 50%, color-mix(in srgb, var(--ink) 20%, var(--bg)) 100%); display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 600 260" preserveAspectRatio="none" style="width: 100%; height: 100%;" aria-hidden="true">
+        <path d="M0,120 L120,72 L220,110 L330,58 L440,104 L540,74 L600,118 L600,132 L540,186 L440,156 L330,202 L220,150 L120,188 L0,140 Z" fill="var(--ink)" opacity="0.26"></path>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- Section Divider Seam -->
+<div class="section-seam invert">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,20 C180,40 360,0 720,20 C1080,40 1260,0 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Hover-Reveal Destinations List (Niarra Device - Horizontal sliver) -->
+<section class="hover-reveal-section">
+  <div class="container">
+    <span class="mono-label" style="color: rgba(255,255,255,0.6)">Fjord Routes</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">The Waterline Traverses</h2>
+    
+    <ul class="hover-list">
+      {{#if has_tours}}
+      {{#each tours}}
+      <li class="hover-item" data-image="{{image_url}}">
+        <a href="{{../booking_url}}" class="hover-item-content" style="text-decoration: none; color: inherit;">
+          <span class="hover-item-title">{{name}}</span>
+          <span class="hover-item-meta">{{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp</span>
+        </a>
+      </li>
+      {{/each}}
+      {{else}}
+      <li class="hover-item">
+        <a href="{{booking_url}}" class="hover-item-content" style="text-decoration: none; color: inherit;">
+          <span class="hover-item-title">Explore every route</span>
+          <span class="hover-item-meta">Live dates &amp; pricing</span>
+        </a>
+      </li>
+      {{/if}}
+    </ul>
+  </div>
+  
+  <div class="reveal-mask-container" id="reveal-mask" style="border-radius:4px;">
+    <img src="" id="reveal-mask-img" alt="Reveal image">
+  </div>
+</section>
+
+<!-- Fjord waterline reflection divider seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,20 C180,40 360,0 720,20 C1080,40 1260,0 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Weather Truth Cards -->
+<section class="narrative-section" id="weather-truth">
+  <div class="container">
+    <span class="mono-label">Seasonal Guidance</span>
+    <h2 style="font-size:2.2rem;margin:1rem 0;">Weather, honestly</h2>
+    <p style="color:var(--text-muted);max-width:44rem;">We won't promise sunshine. Nordic coastal weather turns in minutes — here's how each part of the season tends to feel, so you can pack for the range rather than the forecast.</p>
+
+    <div class="weather-cards-grid">
+      <div class="weather-card">
+        <span class="mono-label">Early Season</span>
+        <div class="weather-odds">Spring</div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.5rem;">Long light returns and the trails are quiet. Mornings stay cold and mist rolls off the water fast. A waterproof shell and warm layers are non-negotiable.</p>
+      </div>
+      <div class="weather-card">
+        <span class="mono-label">Peak Season</span>
+        <div class="weather-odds">Summer</div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.5rem;">The mildest, longest days of the year and the busiest trails. Bright spells and sudden squalls can share an afternoon, so sun and rain gear both earn their place.</p>
+      </div>
+      <div class="weather-card">
+        <span class="mono-label">Late Season</span>
+        <div class="weather-odds">Autumn</div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.5rem;">Low light, still water and evening fog over the fjord. Cooler and calmer, with the first real bite in the air. Layer up and start earlier.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Visual Product Sheet (66°Nord Core) -->
+<section class="narrative-section" id="experiences">
+  <div class="container">
+    <span class="mono-label">The Outpost Profile</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Routes on offer</h2>
+
+    {{#if has_tours}}
+    {{#each tours}}
+    <div class="product-sheet">
+      {{#if image_url}}
+      <div style="aspect-ratio: 21/9; overflow: hidden;">
+        <img src="{{image_url}}" alt="{{name}}" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+      {{else}}
+      <div style="aspect-ratio: 21/9; background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 14%, var(--bg)) 0%, var(--bg) 50%, color-mix(in srgb, var(--ink) 20%, var(--bg)) 100%);"></div>
+      {{/if}}
+      <div style="padding: 2rem 2rem 0 2rem;">
+        <h3 style="font-size: 1.6rem; margin-bottom: 0.5rem;">{{name}}</h3>
+        {{#if description}}<p style="color: var(--text-muted); font-size: 0.95rem;">{{description}}</p>{{/if}}
+      </div>
+      <div class="sheet-meta-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 1.5rem;">
+        <div class="stat-chip">
+          <span class="stat-value">{{duration_minutes}} min</span>
+          <span class="stat-label">Duration</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-value">{{default_capacity}} pax</span>
+          <span class="stat-label">Group Limit</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-value">{{../currency}}{{base_price_per_person}}</span>
+          <span class="stat-label">Per Person</span>
+        </div>
+      </div>
+    </div>
+    {{/each}}
+    {{else}}
+    <div class="product-sheet">
+      <div style="padding: 2.5rem;">
+        <p style="color: var(--text-muted);">Routes and live dates are listed on our booking page.</p>
+        <a href="{{booking_url}}" class="cta-button" style="margin-top: 1rem; display: inline-block;">View the booking page</a>
+      </div>
+    </div>
+    {{/if}}
+  </div>
+</section>
+
+<!-- Persistent Booking Rail -->
+<div class="booking-rail">
+  <div class="rail-price-info">
+    <span class="rail-label">{{business_name}}</span>
+    <span class="rail-price" style="font-size:1.1rem;">Live dates &amp; pricing on the booking page</span>
+  </div>
+  <a href="{{booking_url}}" class="cta-button">Book Hike</a>
+</div>
+
+<!-- Reviews strip (real, approved reviews only) -->
+{{#if has_reviews}}
+<section class="narrative-section" id="reviews" style="padding: 12vh 0;">
+  <div class="container">
+    <span class="mono-label">From the trail</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0 3rem 0;">What hikers say</h2>
+    <div class="weather-cards-grid">
+      {{#each reviews}}
+      <blockquote class="weather-card" style="margin: 0;">
+        <p style="font-family: var(--font-display); font-size: 1.15rem; line-height: 1.5; color: var(--ink); margin-bottom: 1rem;">&ldquo;{{quote}}&rdquo;</p>
+        <cite style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-style: normal;">&mdash; {{author}}</cite>
+      </blockquote>
+      {{/each}}
+    </div>
+  </div>
+</section>
+{{/if}}
+
+<!-- Footer -->
+<footer style="background-color: var(--ink); color: #fff; padding: 5rem 2rem 2.5rem 2rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
+  <div class="container">
+    <h3 style="font-size: 2rem; margin-bottom: 1rem;">Pack for four seasons.</h3>
+    {{#if footer_line_two}}<p style="opacity: 0.6; font-size: 0.95rem; margin-bottom: 1rem;">{{footer_line_two}}</p>{{/if}}
+    <p style="opacity: 0.4; font-size: 0.8rem;">&copy; {{year}} {{business_name}} &middot; {{footer_line_one}} &middot; Powered by <a href="https://bookingtours.co.za" style="color: #fff; text-decoration: underline;">BookingTours</a></p>
+  </div>
+</footer>
+
+<script>
+// Niarra Hover-Mask — waterline sliver reveal on tours that have an image.
+const hoverItems = document.querySelectorAll('.hover-item');
+const mask = document.getElementById('reveal-mask');
+const maskImg = document.getElementById('reveal-mask-img');
+hoverItems.forEach(item => {
+  const src = item.getAttribute('data-image');
+  if (!src) return; // no image → no reveal, never load a broken src
+  item.addEventListener('mouseenter', () => {
+    maskImg.src = src;
+    mask.classList.add('active');
+  });
+  item.addEventListener('mouseleave', () => mask.classList.remove('active'));
+  item.addEventListener('mousemove', (e) => {
+    mask.style.left = e.clientX + 'px';
+    mask.style.top = e.clientY + 'px';
+  });
+});
+</script>
+</body>
+</html>

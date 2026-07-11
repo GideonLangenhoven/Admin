@@ -17,17 +17,19 @@ export async function POST(req: NextRequest) {
 
   const db = adminClient();
 
-  const { data: sub } = await db.from("subscriptions")
+  const { data: sub, error: subErr } = await db.from("subscriptions")
     .select("id, status")
     .eq("business_id", caller.business_id)
     .maybeSingle();
+  if (subErr) console.error("BILLING_PAUSE_SUB_LOOKUP_ERR business=" + caller.business_id + ": " + subErr.message);
 
   if (!sub) return NextResponse.json({ error: "No subscription found" }, { status: 404 });
   if (sub.status !== "ACTIVE") return NextResponse.json({ error: "Can only pause an active subscription" }, { status: 400 });
 
+  // paused_at doesn't exist on the real subscriptions table (same phantom-
+  // column class as the seats endpoint) — the UPDATE failed on every call.
   const { error } = await db.from("subscriptions").update({
     status: "PAUSED",
-    paused_at: new Date().toISOString(),
   }).eq("id", sub.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

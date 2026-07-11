@@ -46,7 +46,6 @@ function isPrivileged(r: string | null) {
 const SETTINGS_SECTIONS = [
     { key: "tours", label: "Tours & Activities" },
     { key: "addons", label: "Booking Add-Ons" },
-    { key: "resources", label: "Shared Resources" },
     { key: "external", label: "External Booking" },
     { key: "site", label: "Booking Site Config" },
     { key: "email", label: "Email Customisation" },
@@ -114,24 +113,6 @@ interface Tour {
     hidden: boolean;
 }
 
-interface ResourceRecord {
-    id: string;
-    name: string;
-    resource_type: string;
-    capacity_total: number;
-    active: boolean;
-}
-
-interface TourResourceLink {
-    id: string;
-    tour_id: string;
-    resource_id: string;
-    units_per_guest: number;
-    active: boolean;
-    tours?: { id: string; name: string } | null;
-    resources?: ResourceRecord | null;
-}
-
 interface AddOn {
     id: string;
     business_id: string;
@@ -172,18 +153,17 @@ export default function SettingsPage() {
     const [slotMessage, setSlotMessage] = useState("");
     const [slotGenerating, setSlotGenerating] = useState(false);
     const [tourSlotCounts, setTourSlotCounts] = useState<Record<string, number>>({});
-    const [resources, setResources] = useState<ResourceRecord[]>([]);
-    const [tourResourceLinks, setTourResourceLinks] = useState<TourResourceLink[]>([]);
-    const [resourceForm, setResourceForm] = useState({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
-    const [assignmentForm, setAssignmentForm] = useState({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
-    const [resourceSaving, setResourceSaving] = useState(false);
-    const [assignmentSaving, setAssignmentSaving] = useState(false);
-    const [resourceMessage, setResourceMessage] = useState({ type: "", text: "" });
 
     // Site Settings State
     const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
     const [subdomain, setSubdomain] = useState<string | null>(null);
-    const [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
+    // Custom booking questions — edited as a plain form; serialised to the
+    // businesses.booking_custom_fields JSON array on save (same structure the
+    // admin new-booking form and the chat bots already consume).
+    type BookingQuestion = { key: string; label: string; type: "text" | "textarea" | "number"; required: boolean; placeholder: string };
+    const [bookingQuestions, setBookingQuestions] = useState<BookingQuestion[]>([]);
+    const [questionsSaving, setQuestionsSaving] = useState(false);
+    const [questionsMessage, setQuestionsMessage] = useState<{ type: string; text: string }>({ type: "", text: "" });
     const [siteSaving, setSiteSaving] = useState(false);
     const [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
     const [chatbotAvatars, setChatbotAvatars] = useState<Array<{ id: string; lottie_url: string; label: string | null }>>([]);
@@ -196,6 +176,7 @@ export default function SettingsPage() {
     // Email Header Images State
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
+    const [emailTagline, setEmailTagline] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
     const [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
     const [emailColor, setEmailColor] = useState("#1b3b36");
@@ -263,7 +244,6 @@ export default function SettingsPage() {
         if (isPrivileged(r)) {
             fetchAdmins();
             fetchTours();
-            fetchResources();
             fetchSiteSettings();
             fetchPlanUsage();
             fetchCredStatus();
@@ -313,7 +293,6 @@ export default function SettingsPage() {
         if (hasAny) {
             if (perms.tours) fetchTours();
             if (perms.addons) fetchAddOns();
-            if (perms.resources) fetchResources();
             if (perms.site || perms.email || perms.invoice) fetchSiteSettings();
             if (perms.credentials) { fetchCredStatus(); checkGdriveStatus(); }
         }
@@ -749,7 +728,15 @@ export default function SettingsPage() {
                 timezone: data.timezone || DEFAULT_SITE_SETTINGS.timezone,
             });
             setSubdomain(data.subdomain || null);
-            setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
+            setBookingQuestions((Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [])
+                .filter((f: any) => f && (f.key || f.label))
+                .map((f: any) => ({
+                    key: String(f.key || ""),
+                    label: String(f.label || ""),
+                    type: (f.type === "textarea" || f.type === "number") ? f.type : "text",
+                    required: !!f.required,
+                    placeholder: String(f.placeholder || ""),
+                })));
             setRefundTiers(Array.isArray(data.refund_policy_tiers) ? data.refund_policy_tiers : []);
             setRefundPolicyText(data.refund_policy_text || "");
             setEmailImgs({
@@ -766,6 +753,7 @@ export default function SettingsPage() {
             });
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
+            setEmailTagline(data.email_tagline || "");
             setSocialLinks({
                 facebook: data.social_facebook || "",
                 instagram: data.social_instagram || "",
@@ -847,160 +835,36 @@ export default function SettingsPage() {
         setTogglingSubscription(false);
     }
 
-    function resetResourceForm() {
-        setResourceForm({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
-    }
-
-    function resetAssignmentForm() {
-        setAssignmentForm({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
-    }
-
-    async function fetchResources() {
-        try {
-            const [resourcesRes, linksRes] = await Promise.all([
-                supabase.from("resources").select("id, name, resource_type, capacity_total, active").eq("business_id", businessId).order("active", { ascending: false }).order("name"),
-                supabase.from("tour_resources").select("id, tour_id, resource_id, units_per_guest, active, tours(id, name), resources(id, name, resource_type, capacity_total, active)").eq("business_id", businessId).order("created_at", { ascending: true }),
-            ]);
-
-            if (resourcesRes.error) throw resourcesRes.error;
-            if (linksRes.error) throw linksRes.error;
-
-            setResources((resourcesRes.data || []) as ResourceRecord[]);
-            setTourResourceLinks(((linksRes.data || []) as any[]).map((row) => ({
-                ...row,
-                tours: Array.isArray(row.tours) ? row.tours[0] : row.tours,
-                resources: Array.isArray(row.resources) ? row.resources[0] : row.resources,
-            })));
-        } catch (fetchError: any) {
-            console.error("Failed to load resources:", fetchError);
-            setResourceMessage({ type: "error", text: "Failed to load shared resources: " + String(fetchError?.message || fetchError) });
-        }
-    }
-
-    async function handleSaveResource(e: React.FormEvent) {
-        e.preventDefault();
-        if (!resourceForm.name.trim()) {
-            setResourceMessage({ type: "error", text: "Resource name is required." });
-            return;
-        }
-        if (!resourceForm.capacity_total || Number(resourceForm.capacity_total) <= 0) {
-            setResourceMessage({ type: "error", text: "Resource capacity must be greater than 0." });
-            return;
-        }
-
-        setResourceSaving(true);
-        setResourceMessage({ type: "", text: "" });
-
-        const payload = {
-            business_id: businessId,
-            name: resourceForm.name.trim(),
-            resource_type: resourceForm.resource_type.trim() || "GENERAL",
-            capacity_total: Number(resourceForm.capacity_total),
-            active: resourceForm.active,
-        };
-
-        const query = resourceForm.id
-            ? supabase.from("resources").update(payload).eq("id", resourceForm.id)
-            : supabase.from("resources").insert(payload);
-
-        const { error: saveError } = await query;
-        if (saveError) {
-            setResourceMessage({ type: "error", text: "Failed to save resource: " + saveError.message });
+    // Serialise the plain-form questions back into the booking_custom_fields
+    // JSON array (same shape the new-booking form and bots consume). Keys are
+    // stable once assigned — answers in bookings.custom_fields are keyed on
+    // them — so only brand-new questions get a generated key.
+    async function saveBookingQuestions() {
+        setQuestionsSaving(true);
+        const cleaned = bookingQuestions
+            .filter(q => q.label.trim())
+            .map((q, i) => ({
+                key: q.key || (q.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "question") + "_" + Date.now().toString().slice(-4) + i,
+                label: q.label.trim(),
+                type: q.type,
+                required: q.required,
+                ...(q.placeholder.trim() ? { placeholder: q.placeholder.trim() } : {}),
+            }));
+        const { error } = await supabase.from("businesses").update({ booking_custom_fields: cleaned }).eq("id", businessId);
+        if (error) {
+            setQuestionsMessage({ type: "error", text: "Failed to save questions: " + error.message });
         } else {
-            setResourceMessage({ type: "success", text: resourceForm.id ? "Resource updated." : "Resource created." });
-            resetResourceForm();
-            fetchResources();
+            setBookingQuestions(cleaned.map(f => ({ key: f.key, label: f.label, type: f.type, required: f.required, placeholder: (f as any).placeholder || "" })));
+            setQuestionsMessage({ type: "success", text: "Booking questions saved." });
+            setTimeout(() => setQuestionsMessage({ type: "", text: "" }), 3000);
         }
-        setResourceSaving(false);
-    }
-
-    async function handleDeleteResource(resource: ResourceRecord) {
-        if (!await confirmAction({
-            title: "Delete resource",
-            message: "Delete \"" + resource.name + "\"? Any tour mappings to this resource will also be removed.",
-            tone: "warning",
-            confirmLabel: "Delete resource",
-        })) return;
-
-        const { error: deleteError } = await supabase.from("resources").delete().eq("id", resource.id);
-        if (deleteError) {
-            setResourceMessage({ type: "error", text: "Failed to delete resource: " + deleteError.message });
-            return;
-        }
-        if (resourceForm.id === resource.id) resetResourceForm();
-        setResourceMessage({ type: "success", text: "Resource deleted." });
-        fetchResources();
-    }
-
-    async function handleSaveAssignment(e: React.FormEvent) {
-        e.preventDefault();
-        if (!assignmentForm.tour_id || !assignmentForm.resource_id) {
-            setResourceMessage({ type: "error", text: "Choose both a tour and a resource before saving the mapping." });
-            return;
-        }
-        if (!assignmentForm.units_per_guest || Number(assignmentForm.units_per_guest) <= 0) {
-            setResourceMessage({ type: "error", text: "Units per guest must be greater than 0." });
-            return;
-        }
-
-        setAssignmentSaving(true);
-        setResourceMessage({ type: "", text: "" });
-
-        const payload = {
-            business_id: businessId,
-            tour_id: assignmentForm.tour_id,
-            resource_id: assignmentForm.resource_id,
-            units_per_guest: Number(assignmentForm.units_per_guest),
-            active: assignmentForm.active,
-        };
-
-        const query = assignmentForm.id
-            ? supabase.from("tour_resources").update(payload).eq("id", assignmentForm.id)
-            : supabase.from("tour_resources").upsert(payload, { onConflict: "tour_id,resource_id" });
-
-        const { error: saveError } = await query;
-        if (saveError) {
-            setResourceMessage({ type: "error", text: "Failed to save resource mapping: " + saveError.message });
-        } else {
-            setResourceMessage({ type: "success", text: assignmentForm.id ? "Tour mapping updated." : "Tour mapping saved." });
-            resetAssignmentForm();
-            fetchResources();
-        }
-        setAssignmentSaving(false);
-    }
-
-    async function handleDeleteAssignment(link: TourResourceLink) {
-        if (!await confirmAction({
-            title: "Remove resource mapping",
-            message: "Remove the mapping between " + (link.tours?.name || "this tour") + " and " + (link.resources?.name || "this resource") + "?",
-            tone: "warning",
-            confirmLabel: "Remove mapping",
-        })) return;
-
-        const { error: deleteError } = await supabase.from("tour_resources").delete().eq("id", link.id);
-        if (deleteError) {
-            setResourceMessage({ type: "error", text: "Failed to remove mapping: " + deleteError.message });
-            return;
-        }
-        if (assignmentForm.id === link.id) resetAssignmentForm();
-        setResourceMessage({ type: "success", text: "Resource mapping removed." });
-        fetchResources();
+        setQuestionsSaving(false);
     }
 
     async function handleSaveSiteSettings(e: React.FormEvent) {
         e.preventDefault();
         setSiteSaving(true);
         setSiteMessage({ type: "", text: "" });
-
-        let parsedBookingFields: any[] = [];
-        try {
-            parsedBookingFields = JSON.parse(bookingCustomFieldsJson || "[]");
-            if (!Array.isArray(parsedBookingFields)) throw new Error("Custom booking fields must be a JSON array.");
-        } catch (parseError: any) {
-            setSiteMessage({ type: "error", text: "Custom booking fields JSON is invalid: " + String(parseError?.message || parseError) });
-            setSiteSaving(false);
-            return;
-        }
 
         // Get the single business row that exists
         const { data: biz } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
@@ -1045,7 +909,6 @@ export default function SettingsPage() {
             public_phone: siteSettings.public_phone || null,
             public_whatsapp: siteSettings.public_whatsapp || null,
             timezone: siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone,
-            booking_custom_fields: parsedBookingFields,
         }).eq("id", biz.id);
 
         if (error) {
@@ -1411,6 +1274,7 @@ export default function SettingsPage() {
         setEmailImgsMessage({ type: "", text: "" });
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
+            email_tagline: emailTagline.trim() || null,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
             email_img_invoice: emailImgs.invoice || null,
@@ -1480,6 +1344,39 @@ export default function SettingsPage() {
             <div className="space-y-4">
 
             {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
+                {/* Business logo — shown in the dashboard sidebar, the booking
+                    site header, every customer email, and on invoices. Saves
+                    immediately on upload/remove. */}
+                <div className="mb-8 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
+                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Business Logo <span className="text-[var(--ck-accent)]">— appears on the dashboard sidebar, booking site, all emails, and invoices</span></label>
+                    <div className="flex items-center gap-3">
+                        {siteSettings.logo_url && (
+                            <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
+                        )}
+                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
+                            {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingField("logo");
+                                await handleImageUpload(file, "email-images", businessId + "/branding", async (url) => {
+                                    setSiteSettings(prev => ({ ...prev, logo_url: url }));
+                                    const { error } = await supabase.from("businesses").update({ logo_url: url }).eq("id", businessId);
+                                    notify(error ? { message: "Logo upload saved locally but failed to persist: " + error.message, tone: "error" } : { message: "Logo updated everywhere.", tone: "success" });
+                                });
+                                setUploadingField(null);
+                                e.target.value = "";
+                            }} />
+                        </label>
+                        {siteSettings.logo_url && (
+                            <button type="button" onClick={async () => {
+                                setSiteSettings(prev => ({ ...prev, logo_url: "" }));
+                                const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", businessId);
+                                notify(error ? { message: "Failed to remove logo: " + error.message, tone: "error" } : { message: "Logo removed.", tone: "success" });
+                            }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                        )}
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex items-center justify-between mb-4">
@@ -1881,6 +1778,85 @@ export default function SettingsPage() {
                     </div>
 
                 </div>
+
+                {/* Custom Booking Questions — plain form; the JSON the backend
+                    expects is generated on save, never shown to the operator. */}
+                <div className="mt-10 space-y-4">
+                    <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)]">
+                            Extra questions asked when a booking is taken (e.g. allergies, hotel pickup, experience level).
+                            Add your own or start from a template below — no code needed.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Add a common question</label>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { name: "+ Dietary Requirements", q: { label: "Any dietary requirements or allergies?", type: "textarea" as const, required: false, placeholder: "e.g. Vegetarian, nut allergy, none" } },
+                                { name: "+ Hotel / Pickup", q: { label: "Where are you staying? (For pickup routing)", type: "text" as const, required: false, placeholder: "Hotel name or address" } },
+                                { name: "+ Experience Level", q: { label: "Have you done this activity before?", type: "text" as const, required: true, placeholder: "Yes, No, or A little bit" } },
+                                { name: "+ Emergency Contact", q: { label: "Emergency Contact (Name & Phone Number)", type: "text" as const, required: true, placeholder: "John Doe - +27 123 456 789" } },
+                                { name: "+ Medical Conditions", q: { label: "Do you have any medical conditions we should be aware of?", type: "textarea" as const, required: false, placeholder: "List any relevant medical conditions" } },
+                                { name: "+ Referral Source", q: { label: "How did you hear about us?", type: "text" as const, required: false, placeholder: "Google, TripAdvisor, Friend, etc." } },
+                            ].map(t => (
+                                <button key={t.name} type="button"
+                                    onClick={() => setBookingQuestions(prev => [...prev, { key: "", ...t.q }])}
+                                    className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">
+                                    {t.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {bookingQuestions.length === 0 ? (
+                        <p className="text-xs text-[var(--ck-text-muted)]">No custom questions yet. Add one above, or click &quot;Add question&quot;.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {bookingQuestions.map((q, i) => (
+                                <div key={q.key || "new-" + i} className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-3 grid grid-cols-1 md:grid-cols-[1fr_150px_1fr_auto_auto] gap-2 items-center">
+                                    <input type="text" value={q.label}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, label: e.target.value } : p))}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="The question, e.g. Any allergies?" />
+                                    <select value={q.type}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, type: e.target.value as any } : p))}
+                                        className="ui-control px-2 py-2 text-sm rounded-lg outline-none">
+                                        <option value="text">Short answer</option>
+                                        <option value="textarea">Long answer</option>
+                                        <option value="number">Number</option>
+                                    </select>
+                                    <input type="text" value={q.placeholder}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, placeholder: e.target.value } : p))}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Hint text (optional)" />
+                                    <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--ck-text-muted)] cursor-pointer select-none whitespace-nowrap">
+                                        <input type="checkbox" checked={q.required}
+                                            onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, required: e.target.checked } : p))}
+                                            className="h-3.5 w-3.5 rounded border-gray-300 accent-[var(--ck-accent)]" />
+                                        Required
+                                    </label>
+                                    <button type="button" aria-label="Remove question"
+                                        onClick={() => setBookingQuestions(prev => prev.filter((_, j) => j !== i))}
+                                        className="justify-self-end px-2 py-1 text-sm font-bold text-[var(--ck-danger)] hover:opacity-70 transition-opacity">×</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setBookingQuestions(prev => [...prev, { key: "", label: "", type: "text", required: false, placeholder: "" }])}
+                            className="px-4 py-2 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg)]">
+                            Add question
+                        </button>
+                        <button type="button" disabled={questionsSaving} onClick={saveBookingQuestions}
+                            className="px-4 py-2 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity">
+                            {questionsSaving ? "Saving..." : "Save Questions"}
+                        </button>
+                        {questionsMessage.text && (
+                            <span className={"text-xs font-medium " + (questionsMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-emerald-700")}>{questionsMessage.text}</span>
+                        )}
+                    </div>
+                </div>
             </CollapsibleSection>}
 
             {canAccess("addons") && <CollapsibleSection id="addons" title="Booking Add-Ons" subtitle="Optional extras customers can add when booking (e.g. photos, equipment rental)" openSections={openSections} toggle={toggleSection}>
@@ -2012,148 +1988,6 @@ export default function SettingsPage() {
                 </div>
             </CollapsibleSection>}
 
-            {canAccess("resources") && <CollapsibleSection id="resources" title="Shared Resources & Capacity Pools" subtitle="Assets like vans, guides, kayaks that reduce availability across tours" openSections={openSections} toggle={toggleSection}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
-                            <button type="button" onClick={resetResourceForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Resource</button>
-                        </div>
-                        <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
-                            <div className="divide-y divide-[var(--ck-border-subtle)]">
-                                {resources.map((resource) => (
-                                    <div key={resource.id} className={"p-4 " + (resourceForm.id === resource.id ? "bg-blue-50" : "")}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-sm text-[var(--ck-text-strong)]">{resource.name}</span>
-                                                    <span className={"ui-status " + (resource.active ? "ui-pill-success" : "ui-pill-neutral")}>
-                                                        {resource.active ? "Active" : "Inactive"}
-                                                    </span>
-                                                </div>
-                                                <div className="text-xs text-[var(--ck-text-muted)] mt-1">{resource.resource_type} · Total pool {resource.capacity_total}</div>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <button type="button" onClick={() => setResourceForm({ id: resource.id, name: resource.name, resource_type: resource.resource_type, capacity_total: String(resource.capacity_total), active: resource.active })} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">Edit</button>
-                                                <button type="button" onClick={() => handleDeleteResource(resource)} className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {resources.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No shared resources yet.</div>}
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSaveResource} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4 mt-4">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{resourceForm.id ? "Edit Resource" : "Add Resource"}</h3>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Resource Name</label>
-                                <input type="text" value={resourceForm.name} onChange={e => setResourceForm({ ...resourceForm, name: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Safari Van 1" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Resource Type</label>
-                                    <input type="text" value={resourceForm.resource_type} onChange={e => setResourceForm({ ...resourceForm, resource_type: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="VAN / GUIDE / BIKE" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Total Capacity</label>
-                                    <input type="number" min="1" value={resourceForm.capacity_total} onChange={e => setResourceForm({ ...resourceForm, capacity_total: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
-                                </div>
-                            </div>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={resourceForm.active} onChange={e => setResourceForm({ ...resourceForm, active: e.target.checked })} className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
-                                <span className="text-sm text-[var(--ck-text-strong)]">Resource is active</span>
-                            </label>
-                            <div className="flex gap-3">
-                                <button type="submit" disabled={resourceSaving} className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                                    {resourceSaving ? "Saving..." : resourceForm.id ? "Update Resource" : "Add Resource"}
-                                </button>
-                                {resourceForm.id && (
-                                    <button type="button" onClick={resetResourceForm} className="px-4 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg)]">
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{tourResourceLinks.length} shared mapping{tourResourceLinks.length !== 1 ? "s" : ""}</span>
-                            <button type="button" onClick={resetAssignmentForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Mapping</button>
-                        </div>
-                        <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
-                            <div className="divide-y divide-[var(--ck-border-subtle)]">
-                                {tourResourceLinks.map((link) => (
-                                    <div key={link.id} className={"p-4 " + (assignmentForm.id === link.id ? "bg-blue-50" : "")}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="font-medium text-sm text-[var(--ck-text-strong)]">{link.tours?.name || "Tour"} <span className="text-[var(--ck-text-muted)]">→</span> {link.resources?.name || "Resource"}</div>
-                                                <div className="text-xs text-[var(--ck-text-muted)] mt-1">{link.units_per_guest} unit{link.units_per_guest === 1 ? "" : "s"} consumed per guest · {link.resources?.resource_type || "GENERAL"}</div>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <button type="button" onClick={() => setAssignmentForm({ id: link.id, tour_id: link.tour_id, resource_id: link.resource_id, units_per_guest: String(link.units_per_guest), active: link.active })} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">Edit</button>
-                                                <button type="button" onClick={() => handleDeleteAssignment(link)} className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {tourResourceLinks.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No tour-to-resource mappings yet.</div>}
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSaveAssignment} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4 mt-4">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{assignmentForm.id ? "Edit Mapping" : "Add Tour Mapping"}</h3>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour</label>
-                                <select value={assignmentForm.tour_id} onChange={e => setAssignmentForm({ ...assignmentForm, tour_id: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
-                                    <option value="">Select a tour...</option>
-                                    {tours.map((tour) => <option key={tour.id} value={tour.id}>{tour.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Shared Resource</label>
-                                <select value={assignmentForm.resource_id} onChange={e => setAssignmentForm({ ...assignmentForm, resource_id: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
-                                    <option value="">Select a resource...</option>
-                                    {resources.filter((resource) => resource.active).map((resource) => (
-                                        <option key={resource.id} value={resource.id}>{resource.name} · {resource.capacity_total} total</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Units Per Guest</label>
-                                    <input type="number" min="1" value={assignmentForm.units_per_guest} onChange={e => setAssignmentForm({ ...assignmentForm, units_per_guest: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
-                                </div>
-                                <label className="flex items-end gap-2 cursor-pointer pb-2">
-                                    <input type="checkbox" checked={assignmentForm.active} onChange={e => setAssignmentForm({ ...assignmentForm, active: e.target.checked })} className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
-                                    <span className="text-sm text-[var(--ck-text-strong)]">Mapping active</span>
-                                </label>
-                            </div>
-                            <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-3 text-xs text-[var(--ck-text-muted)]">
-                                Example: if a 10-seat van is shared between two tours, and each guest consumes 1 van unit, bookings on either tour will reduce the sellable capacity on the other when their slots overlap.
-                            </div>
-                            <div className="flex gap-3">
-                                <button type="submit" disabled={assignmentSaving} className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                                    {assignmentSaving ? "Saving..." : assignmentForm.id ? "Update Mapping" : "Save Mapping"}
-                                </button>
-                                {assignmentForm.id && (
-                                    <button type="button" onClick={resetAssignmentForm} className="px-4 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg)]">
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {resourceMessage.text && (
-                    <div className={"mt-4 text-sm font-medium " + (resourceMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-[var(--ck-success)]")}>
-                        {resourceMessage.text}
-                    </div>
-                )}
-            </CollapsibleSection>}
-
             {canAccess("external") && (
                 <CollapsibleSection id="external" title="External Booking Integration" subtitle="B2B partner API keys and mappings" openSections={openSections} toggle={toggleSection}>
                     <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
@@ -2174,6 +2008,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Terms &amp; Conditions</label>
                                 <RichTextEditor value={siteSettings.terms_conditions} onChange={v => setSiteSettings({ ...siteSettings, terms_conditions: v })} rows={10} placeholder="Enter T&C's..." />
+                                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Shown on your booking site&apos;s Terms &amp; Conditions page. If this is empty or under 100 characters, the site shows platform-default terms (marked as such) instead.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Privacy Policy</label>
@@ -2200,31 +2035,6 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
                                 <input type="text" value={siteSettings.business_tagline} onChange={e => setSiteSettings({ ...siteSettings, business_tagline: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town's Original Since 1994" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo <span className="text-[var(--ck-accent)]">— appears next to the business name in the dashboard sidebar</span></label>
-                                <div className="flex items-center gap-3">
-                                    {siteSettings.logo_url && (
-                                        <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
-                                    )}
-                                    <div>
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
-                                            {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
-                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                                const file = e.target.files?.[0];
-                                                if (!file) return;
-                                                setUploadingField("logo");
-                                                await handleImageUpload(file, "email-images", businessId + "/branding", (url) => setSiteSettings(prev => ({ ...prev, logo_url: url })));
-                                                setUploadingField(null);
-                                                e.target.value = "";
-                                            }} />
-                                        </label>
-                                        {siteSettings.logo_url && (
-                                            <button type="button" onClick={() => setSiteSettings({ ...siteSettings, logo_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Leave empty to show the default icon.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Eyebrow</label>
@@ -2342,90 +2152,6 @@ export default function SettingsPage() {
                             <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Use full URLs here. Payment links, admin weather broadcasts, and related booking actions can reuse these values instead of hardcoded paths.</p>
                         </div>
                     )}
-
-                    <div className="space-y-4">
-                        <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
-                            <p className="text-xs text-[var(--ck-text-muted)]">
-                                Use this section to ask your customers additional questions during checkout (e.g., allergies, hotel pickups, or experience levels). 
-                                Click the buttons below to instantly add common questions, or write your own using the text box.
-                            </p>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Quick Insert Templates</label>
-                            <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "dietary_" + Date.now().toString().slice(-4), label: "Any dietary requirements or allergies?", type: "textarea", required: false, placeholder: "e.g. Vegetarian, nut allergy, none" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Dietary Requirements</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "hotel_" + Date.now().toString().slice(-4), label: "Where are you staying in Cape Town? (For pickup routing)", type: "text", required: false, placeholder: "Hotel name or address" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Hotel / Pickup</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "experience_" + Date.now().toString().slice(-4), label: "Have you ever kayaked before?", type: "text", required: true, placeholder: "Yes, No, or A little bit" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Kayaking Experience</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "emergency_" + Date.now().toString().slice(-4), label: "Emergency Contact (Name & Phone Number)", type: "text", required: true, placeholder: "John Doe - +27 123 456 789" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Emergency Contact</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "medical_" + Date.now().toString().slice(-4), label: "Do you have any medical conditions we should be aware of?", type: "textarea", required: false, placeholder: "List any relevant medical conditions" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Medical Conditions</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "referral_" + Date.now().toString().slice(-4), label: "How did you hear about us?", type: "text", required: false, placeholder: "Google, TripAdvisor, Friend, etc." });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Referral Source</button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Configuration Code (JSON)</label>
-                            <textarea
-                                value={bookingCustomFieldsJson}
-                                onChange={e => setBookingCustomFieldsJson(e.target.value)}
-                                rows={12}
-                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono tracking-tight"
-                                placeholder={`[\n  {\n    "key": "dietary_1234",\n    "label": "Dietary Requirements",\n    "type": "textarea",\n    "required": false,\n    "placeholder": "List allergies..."\n  }\n]`}
-                            />
-                            <p className="mt-2 text-xs text-[var(--ck-text-muted)] leading-relaxed">
-                                This box stores the questions in a computer-readable format (JSON). It must always start with <code>[</code> and end with <code>]</code>.
-                                Each question has a <code>key</code> (internal ID), <code>label</code> (the public question), <code>type</code> (<code>text</code> or <code>textarea</code>), <code>placeholder</code> (hint text), and <code>required</code> (true/false).
-                            </p>
-                        </div>
-                    </div>
 
                     <div>
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Copy Preview</h3>
@@ -2703,6 +2429,17 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                        <label className="block">
+                            <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
+                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours) — set your own if the guess doesn&apos;t fit your activity.</p>
+                            <input type="text" value={emailTagline} onChange={e => setEmailTagline(e.target.value)}
+                                maxLength={200}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                placeholder="e.g. Get ready to meet the lions up close on an unforgettable safari." />
+                        </label>
+                    </div>
+
                     {([
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
                         { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
@@ -2710,7 +2447,7 @@ export default function SettingsPage() {
                         { key: "gift", label: "Gift Voucher", desc: "Sent to the gift voucher buyer after purchase" },
                         { key: "cancel", label: "Cancellation – General", desc: "Sent when a booking is cancelled for any reason" },
                         { key: "cancel_weather", label: "Cancellation – Weather", desc: "Sent when a booking is cancelled due to weather" },
-                        { key: "indemnity", label: "Waiver Reminder", desc: "Sent the day before the tour as a waiver reminder" },
+                        { key: "indemnity", label: "Trip Reminder / Waiver", desc: "Used by the pre-trip reminder email (sent if WhatsApp fails) and waiver requests" },
                         { key: "admin", label: "Admin Welcome", desc: "Sent to new admin users with their setup link" },
                         { key: "voucher", label: "Voucher Code", desc: "Sent when a customer receives a voucher code" },
                         { key: "photos", label: "Trip Photos", desc: "Sent when trip photos are uploaded and shared" },
@@ -3312,7 +3049,10 @@ export default function SettingsPage() {
                                 placeholder="ChIJ..."
                                 autoComplete="off"
                             />
-                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Find your Place ID at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>. Reviews sync daily at 03:17 UTC.</p>
+                            <div className="mt-2 space-y-2 text-xs leading-relaxed text-[var(--ck-text-muted)]">
+                                <p><strong className="text-[var(--ck-text-strong)]">How reviews work:</strong> guests automatically get a WhatsApp review link a few hours after their trip. Their reviews land on your <a href="/reviews" className="underline">Reviews</a> page as <em>Pending</em> — approve them to publish on your booking site, or hide them. Connecting your Google Place ID also imports your Google reviews overnight; they display alongside your own (they&apos;re already public on Google, so they skip moderation).</p>
+                                <p><strong className="text-[var(--ck-text-strong)]">Find your Place ID:</strong> open <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>, search for your business name exactly as it appears on Google Maps, click your business on the map, and copy the ID shown (it usually starts with &quot;ChIJ&quot;). No Google account needed. Reviews sync daily at 03:17 UTC.</p>
+                            </div>
                         </div>
                         <button
                             type="button"

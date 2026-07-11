@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens & Base CSS ── */
+:root {
+  --bg: #F7F5F0;
+  --ink: #0F2B1F;
+  --accent: #D9822F;
+  --surface: #ffffff;
+  --text-muted: #5e6d64;
+  --border-alpha: rgba(15, 43, 31, 0.08);
+  --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  /* Fallback template variables */
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
+}
+
+/* Base resets */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+h1, h2, h3, .editorial-heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Glass Recipe */
+.glass-panel {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Mono Micro-Label */
+.mono-label {
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Layout System: Anti-Grid */
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+.section-seam {
+  width: 100%;
+  line-height: 0;
+  margin: 0;
+}
+.section-seam svg {
+  width: 100%;
+  height: 40px;
+  fill: var(--bg);
+  transform: translateY(1px);
+}
+.section-seam.invert svg {
+  transform: scaleY(-1) translateY(1px);
+}
+
+/* Whitespace Budget */
+.narrative-section {
+  padding: 20vh 0;
+  position: relative;
+}
+.anti-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2rem;
+  align-items: center;
+}
+.anti-grid-text {
+  grid-column: 1 / 6;
+  max-width: 34rem;
+}
+.anti-grid-image {
+  grid-column: 7 / 13;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 16/11;
+  transform: translate(0, 4vh);
+}
+.anti-grid-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s var(--ck-ease);
+}
+.anti-grid-image:hover img {
+  transform: scale(1.04);
+}
+
+/* Motion System */
+.reveal-fade-up {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ck-ease), transform 0.5s var(--ck-ease);
+}
+.reveal-fade-up.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Navigation */
+header.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s, backdrop-filter 0.3s;
+}
+header.sticky-nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+  height: 70px;
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.logo-area h1 {
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.logo-area img {
+  max-height: 40px;
+}
+.nav-links {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+}
+.nav-links a {
+  text-decoration: none;
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover {
+  color: var(--accent);
+}
+.cta-button {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.cta-button:hover {
+  transform: translateY(-1px);
+  background-color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+/* Hero Section */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  overflow: hidden;
+}
+.hero-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-color: #0b1f16;
+}
+.hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.7;
+  transform: scale(1);
+  animation: kenBurns 20s infinite alternate linear;
+}
+@keyframes kenBurns {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
+}
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15,43,31,0.9) 0%, rgba(15,43,31,0.2) 100%);
+  z-index: 2;
+}
+.hero-content {
+  position: relative;
+  z-index: 3;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  width: 100%;
+}
+.hero-text {
+  text-align: left;
+}
+.hero-text h2 {
+  font-size: clamp(2.6rem, 6vw, 5rem);
+  line-height: 1.05;
+  margin: 1rem 0;
+}
+.hero-text p {
+  font-size: 1.15rem;
+  opacity: 0.9;
+  max-width: 44rem;
+  margin-bottom: 2rem;
+}
+.hero-widget-box {
+  width: 100%;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+}
+
+/* booking widget form + fields removed (now an honest CTA card) */
+
+/* Hover-Mask Reveal List (Niarra Device) */
+.hover-reveal-section {
+  padding: 15vh 0;
+  background-color: var(--ink);
+  color: #fff;
+  position: relative;
+}
+.hover-list {
+  list-style: none;
+  max-width: 900px;
+  margin: 4rem auto 0 auto;
+}
+.hover-item {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 2rem 0;
+  position: relative;
+  cursor: pointer;
+}
+.hover-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hover-item-title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-family: var(--font-display);
+  transition: transform 0.3s var(--ck-ease);
+}
+.hover-item:hover .hover-item-title {
+  transform: translateX(15px);
+}
+.hover-item-meta {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.reveal-mask-container {
+  pointer-events: none;
+  position: fixed;
+  width: 320px;
+  height: 220px;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: 50;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
+  /* Organic swell/wave mask shape */
+  clip-path: url(#wave-blob-clip);
+}
+.reveal-mask-container.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.reveal-mask-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Visual Product Sheet card (reused for the honest prep section) */
+.product-sheet {
+  background-color: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--border-alpha);
+  overflow: hidden;
+  margin-top: 4rem;
+}
+
+/* Gear Strip */
+.gear-section {
+  padding: 2.5rem;
+  border-bottom: 1px solid var(--border-alpha);
+}
+.gear-col h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+
+/* Persistent Booking Rail */
+.booking-rail {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-alpha);
+  padding: 1.2rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rail-price-info {
+  display: flex;
+  flex-direction: column;
+}
+.rail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.rail-price {
+  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+/* rail date pills + for-you cards removed (fake availability data) */
+
+/* booking modal + tide picker removed (mock booking system) */
+
+/* Honest CTA links */
+a.cta-button { display: inline-block; text-decoration: none; }
+a.hover-item-content { color: inherit; text-decoration: none; }
+
+/* Hero widget honest fallback */
+.widget-cta { display: flex; flex-direction: column; gap: 0.8rem; }
+.widget-cta h3 { font-family: var(--font-display); font-size: 1.4rem; color: var(--ink); }
+.widget-cta p { color: var(--text-muted); font-size: 0.95rem; }
+.widget-cta .cta-button { margin-top: 0.5rem; }
+
+/* Decorative ocean panels (replaces stock imagery) */
+.deco-panel { width: 100%; height: 100%; position: relative; }
+.deco-ocean { background: linear-gradient(155deg, #0b1f16, #14402e 55%, #2c6b4f 88%, var(--accent)); }
+
+/* Gear copy */
+.gear-copy { color: var(--text-muted); font-size: 0.95rem; line-height: 1.7; }
+
+/* Reviews strip */
+.reviews-section { padding: 15vh 0; background: var(--bg); }
+.reviews-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 2.5rem; margin-top: 3rem; }
+.review-quote p { font-family: var(--font-display); font-size: 1.3rem; line-height: 1.4; color: var(--ink); font-weight: 400; }
+.review-quote cite { display: block; margin-top: 1.2rem; font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+
+/* Responsive constraints */
+@media (max-width: 1024px) {
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    text-align: center;
+    padding-top: 100px;
+  }
+  .hero-text { text-align: center; }
+  .anti-grid { grid-template-columns: 1fr; }
+  .anti-grid-text { grid-column: 1 / -1; max-width: 100%; }
+  .anti-grid-image { grid-column: 1 / -1; transform: none; }
+}
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .booking-rail { flex-direction: column; gap: 1rem; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- SVG Swell Mask and Divider Motifs -->
+<svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
+  <defs>
+    <!-- Organic swell wave-blob clip path for Niarra reveal -->
+    <clipPath id="wave-blob-clip" clipPathUnits="objectBoundingBox">
+      <path d="M0.12,0.3 C0.23,0.12,0.45,0.02,0.65,0.08 C0.82,0.13,0.95,0.35,0.91,0.58 C0.86,0.85,0.58,0.98,0.35,0.92 C0.18,0.88,0.02,0.68,0.01,0.5 C-0.01,0.38,0.04,0.36,0.12,0.3 Z" />
+    </clipPath>
+  </defs>
+</svg>
+
+<!-- Navigation -->
+<header class="sticky-nav" id="main-nav">
+  <div class="container nav-inner">
+    <div class="logo-area">
+      {{#if logo_url}}
+        <img src="{{logo_url}}" alt="{{business_name}}">
+      {{else}}
+        <h1>{{business_name}}</h1>
+      {{/if}}
+    </div>
+    <nav class="nav-links">
+      <a href="#about">The Swell</a>
+      <a href="#experiences">Experiences</a>
+      <a href="#before-you-go">What to Bring</a>
+      <a class="cta-button" href="{{booking_url}}">Book Now</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero Section -->
+<section class="hero">
+  <div class="hero-media">
+    {{#if hero_image}}
+      <img src="{{hero_image}}" alt="{{business_name}}">
+    {{/if}}
+  </div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-text reveal-fade-up active">
+      <span class="mono-label" style="color: #fff;">{{hero_eyebrow}}</span>
+      <h2>{{#if hero_title}}{{hero_title}}{{else}}Paddle out at first light — we'll have the coffee ready.{{/if}}</h2>
+      <p>{{hero_subtitle}}</p>
+      <a class="cta-button" style="background-color: var(--accent);" href="{{booking_url}}">Reserve your paddle</a>
+    </div>
+
+    <!-- Honest conversion card (links to the live booking site) -->
+    <div class="hero-widget-box glass-panel">
+      <div class="widget-cta">
+        <span class="mono-label">Real-time availability</span>
+        <h3>Ready when you are</h3>
+        <p>See live dates and secure your spot on our booking site — the coffee's on us when you land.</p>
+        <a class="cta-button" href="{{booking_url}}" style="width: 100%; text-align: center;">Book Now</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Low Swell Divider Seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,25 C240,40 480,10 720,25 C960,40 1200,10 1440,25 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Narrative Anti-Grid Section -->
+<section class="narrative-section" id="about">
+  <div class="container anti-grid">
+    <div class="anti-grid-text reveal-fade-up">
+      <span class="mono-label">The coastal flow</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A deliberate disconnection from the speed of the world</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We launch where the land meets the tide. {{business_name}} isn't about covering distance; it's about shifting scale. Sitting just inches above the surface, the water looks different. We watch the swell rise and fall, tracking the kelp and the tide-pools as they pass beneath the boat.</p>
+      <p style="color: var(--text-muted);">No engines. No schedules. Just the rhythmic dip of the paddle blade and the quiet breath of the ocean.</p>
+    </div>
+    <div class="anti-grid-image reveal-fade-up">
+      <div class="deco-panel deco-ocean" aria-hidden="true">
+        <svg viewBox="0 0 400 275" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;">
+          <path d="M0,180 C80,150 160,210 240,180 C320,150 360,190 400,175 L400,275 L0,275 Z" fill="rgba(255,255,255,0.06)"/>
+          <path d="M0,210 C90,185 170,235 260,205 C330,182 370,215 400,205 L400,275 L0,275 Z" fill="rgba(255,255,255,0.05)"/>
+          <path d="M0,120 C100,95 150,140 250,115 C330,95 370,125 400,110" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section Divider Seam -->
+<div class="section-seam invert">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,25 C240,40 480,10 720,25 C960,40 1200,10 1440,25 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Hover-Reveal Destinations List (Niarra Device) -->
+{{#if has_tours}}
+<section class="hover-reveal-section" id="experiences">
+  <div class="container">
+    <span class="mono-label" style="color: rgba(255,255,255,0.6)">Curated Coastal Routes</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Where the Swell Takes Us</h2>
+
+    <ul class="hover-list">
+      {{#each tours}}
+      <li class="hover-item" data-image="{{image_url}}">
+        <a href="{{../booking_url}}" class="hover-item-content">
+          <span class="hover-item-title">{{name}}</span>
+          <span class="hover-item-meta">{{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp</span>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+
+  <!-- Float reveal mask -->
+  <div class="reveal-mask-container" id="reveal-mask">
+    <img src="" id="reveal-mask-img" alt="">
+  </div>
+</section>
+{{/if}}
+
+<!-- Swell Divider Seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,25 C240,40 480,10 720,25 C960,40 1200,10 1440,25 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Before You Paddle (honest prep, built from real keys) -->
+<section class="narrative-section" id="before-you-go">
+  <div class="container">
+    <span class="mono-label">Before you paddle</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Come prepared, leave refreshed</h2>
+    <p style="color: var(--text-muted); max-width: 45rem;">A few notes to make your morning on the water effortless. Paddle out at first light — we'll have the coffee ready.</p>
+
+    <div class="product-sheet">
+      {{#if what_to_bring}}
+      <div class="gear-section">
+        <div class="gear-col">
+          <h4>What to bring</h4>
+          <p class="gear-copy">{{what_to_bring}}</p>
+        </div>
+      </div>
+      {{/if}}
+      {{#if what_to_wear}}
+      <div class="gear-section">
+        <div class="gear-col">
+          <h4>What to wear</h4>
+          <p class="gear-copy">{{what_to_wear}}</p>
+        </div>
+      </div>
+      {{/if}}
+      {{#if directions}}
+      <div class="gear-section" style="border-bottom: none;">
+        <div class="gear-col">
+          <h4>Finding us</h4>
+          <p class="gear-copy">{{directions}}</p>
+        </div>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+</section>
+
+<!-- Reviews strip (honest, real keys) -->
+{{#if has_reviews}}
+<section class="reviews-section">
+  <div class="container">
+    <span class="mono-label">From the water</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">What paddlers say</h2>
+    <div class="reviews-grid">
+      {{#each reviews}}
+      <blockquote class="review-quote">
+        <p>{{quote}}</p>
+        <cite>{{author}}</cite>
+      </blockquote>
+      {{/each}}
+    </div>
+  </div>
+</section>
+{{/if}}
+
+<!-- Persistent Booking Rail (honest CTA to live availability) -->
+<div class="booking-rail">
+  <div class="rail-price-info">
+    <span class="rail-label">Live availability</span>
+    <span class="rail-price" style="font-size: 1.2rem;">Paddle out at first light</span>
+  </div>
+  <a class="cta-button" href="{{booking_url}}">Check dates &amp; book</a>
+</div>
+
+<!-- Footer -->
+<footer style="background-color: var(--ink); color: #fff; padding: 5rem 2rem 2.5rem 2rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05)">
+  <div class="container">
+    <h3 style="font-size: 2rem; margin-bottom: 1rem;">Paddle out at first light.</h3>
+    <p style="opacity: 0.7; max-width: 32rem; margin: 0 auto 2rem auto;">We'll have the coffee ready when you land. See live dates and secure your spot on our booking site.</p>
+    <a class="cta-button" href="{{booking_url}}" style="margin-bottom: 3rem;">Book Now</a>
+    <p style="opacity: 0.4; font-size: 0.8rem;">© {{year}} {{business_name}} · {{footer_line_one}}{{#if footer_line_two}} · {{footer_line_two}}{{/if}} · Powered by <a href="https://bookingtours.co.za" style="color: #fff; text-decoration: underline;">BookingTours</a></p>
+  </div>
+</footer>
+
+<script>
+// Scroll Reveal Observers
+document.addEventListener("DOMContentLoaded", () => {
+  const elements = document.querySelectorAll('.reveal-fade-up');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  elements.forEach(el => observer.observe(el));
+});
+
+// Sticky Header on Scroll
+window.addEventListener("scroll", () => {
+  const header = document.getElementById("main-nav");
+  if (window.scrollY > 20) {
+    header.classList.add("scrolled");
+  } else {
+    header.classList.remove("scrolled");
+  }
+});
+
+// Niarra Hover-Mask Device
+const hoverItems = document.querySelectorAll('.hover-item');
+const mask = document.getElementById('reveal-mask');
+const maskImg = document.getElementById('reveal-mask-img');
+
+hoverItems.forEach(item => {
+  item.addEventListener('mouseenter', () => {
+    const imgUrl = item.getAttribute('data-image');
+    if (!imgUrl) return; // no image → no-op, mask stays hidden
+    maskImg.src = imgUrl;
+    mask.classList.add('active');
+  });
+
+  item.addEventListener('mouseleave', () => {
+    if (mask) mask.classList.remove('active');
+  });
+
+  item.addEventListener('mousemove', (e) => {
+    if (!mask) return;
+    mask.style.left = e.clientX + 'px';
+    mask.style.top = e.clientY + 'px';
+  });
+});
+</script>
+
+</body>
+</html>

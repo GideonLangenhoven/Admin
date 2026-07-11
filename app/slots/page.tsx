@@ -4,7 +4,6 @@ import { useSearchParams } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
-import { listAvailableSlots } from "../lib/slot-availability";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import CalendarHeader from "../../components/CalendarHeader";
@@ -12,7 +11,7 @@ import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
-import { CloudRain, LockKeyOpen, Plus, Stack, PencilSimple } from "@phosphor-icons/react";
+import { CloudRain, LockKeyOpen, Lock, WarningCircle, Plus, Stack, PencilSimple } from "@phosphor-icons/react";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -126,6 +125,87 @@ function Slots() {
     setCancellingWeather(false);
   }
 
+  // ── Item 20: Close and Cancel are two DISTINCT actions ──
+  // Close = stop new bookings only; existing bookings stand, nobody is
+  // notified, no refund. Cancel = cancel everyone's trip, notify them, and
+  // start the refund flow. They used to be conflated (choosing "CLOSED" in a
+  // dropdown silently cancelled every booking).
+  const [slotStatusSaving, setSlotStatusSaving] = useState(false);
+  const [cancellingSlot, setCancellingSlot] = useState(false);
+
+  async function closeSlot(slot: Slot) {
+    const bookedSeats = slot.booked || 0;
+    if (!await confirmAction({
+      title: "Close this slot?",
+      message: bookedSeats > 0
+        ? `This stops NEW bookings only. The ${bookedSeats} seat(s) already booked keep their trip — nobody is notified. To cancel those trips instead, use "Cancel & notify guests".`
+        : "This stops new bookings for this slot. It has no bookings yet, so nothing else changes. You can reopen it any time.",
+      tone: "info",
+      confirmLabel: "Close slot",
+    })) return;
+    setSlotStatusSaving(true);
+    const { error } = await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slot.id).eq("business_id", businessId);
+    setSlotStatusSaving(false);
+    if (error) { notify({ title: "Couldn't close slot", message: error.message, tone: "error" }); return; }
+    notify({ title: "Slot closed", message: "No new bookings will be taken. Existing bookings are unaffected.", tone: "success" });
+    setSelectedSlot(null);
+    load();
+  }
+
+  async function reopenSlot(slot: Slot) {
+    setSlotStatusSaving(true);
+    const { error } = await supabase.from("slots").update({ status: "OPEN" }).eq("id", slot.id).eq("business_id", businessId);
+    setSlotStatusSaving(false);
+    if (error) { notify({ title: "Couldn't reopen slot", message: error.message, tone: "error" }); return; }
+    notify({ title: "Slot reopened", message: "This slot is accepting bookings again.", tone: "success" });
+    setSelectedSlot(null);
+    load();
+  }
+
+  // The generic FunctionsHttpError message ("non-2xx status code") hides the
+  // real cause — pull the response body so the operator sees what failed.
+  async function describeFnError(err: unknown): Promise<string> {
+    const anyErr = err as { context?: Response; message?: string };
+    if (anyErr?.context && typeof anyErr.context.text === "function") {
+      try {
+        const body = await anyErr.context.text();
+        if (body) return `HTTP ${anyErr.context.status}: ${body.slice(0, 300)}`;
+      } catch { /* fall through */ }
+    }
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  async function cancelSlotAndRefund(slot: Slot, isWeather = false) {
+    const bookedSeats = slot.booked || 0;
+    const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
+      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
+    }) + " — " + (slot.tours?.name || "Tour");
+    if (!await confirmAction({
+      title: isWeather ? "Weather-cancel this trip?" : "Cancel this trip for all guests?",
+      message: bookedSeats > 0
+        ? `This CANCELS "${slotLabel}" for all ${bookedSeats} booked seat(s) and notifies every customer${isWeather ? " (weather framing)" : ""}. Each guest then chooses a full refund, a voucher, or a new date on their My Bookings page. This can't be undone. To simply stop new bookings without affecting anyone, use "Close" instead.`
+        : `This will close "${slotLabel}" and mark it cancelled. There are no bookings to cancel.`,
+      tone: "warning",
+      confirmLabel: isWeather ? "Weather cancel" : "Cancel & notify",
+    })) return;
+    setCancellingSlot(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: isWeather
+          ? { slot_ids: [slot.id], business_id: businessId, reason: "weather conditions" }
+          : { slot_ids: [slot.id], business_id: businessId, reason: "operator cancellation", is_weather: false },
+      });
+      if (error) throw error;
+      const cancelled = (data as any)?.bookings_cancelled ?? 0;
+      notify({ title: "Trip cancelled", message: `${cancelled} booking(s) cancelled and customers notified with self-service refund options.`, tone: "success" });
+      setSelectedSlot(null);
+      load();
+    } catch (err) {
+      notify({ title: "Cancellation failed", message: await describeFnError(err), tone: "error" });
+    }
+    setCancellingSlot(false);
+  }
+
   async function handleCancelDay() {
     if (selectedCancelDates.length === 0) return;
     if (!await confirmAction({
@@ -180,7 +260,7 @@ function Slots() {
       setSelectedCancelDates([]);
       load();
     } catch (err: any) {
-      notify({ title: "Day cancellation failed", message: err.message, tone: "error" });
+      notify({ title: "Day cancellation failed", message: await describeFnError(err), tone: "error" });
     }
     setCancellingWeather(false);
   }
@@ -274,31 +354,18 @@ function Slots() {
     }
 
     try {
-      const [slotRes, openAvailability] = await Promise.all([
-        supabase.from("slots")
-          .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name)")
-          .eq("business_id", businessId)
-          .gte("start_time", start.toISOString())
-          .lte("start_time", end.toISOString())
-          .order("start_time", { ascending: true }),
-        listAvailableSlots({
-          businessId,
-          startIso: start.toISOString(),
-          endIso: new Date(end.getTime() + 1).toISOString(),
-          tourId: filterTourId,
-        }),
-      ]);
+      const slotRes = await supabase.from("slots")
+        .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name)")
+        .eq("business_id", businessId)
+        .gte("start_time", start.toISOString())
+        .lte("start_time", end.toISOString())
+        .order("start_time", { ascending: true });
 
       if (slotRes.error) throw slotRes.error;
-
-      const availabilityBySlotId = new Map(
-        openAvailability.map((slot) => [slot.id, Number(slot.available_capacity || 0)]),
-      );
 
       const normalized = (slotRes.data || []).map((d: any) => ({
         ...d,
         tours: Array.isArray(d.tours) ? d.tours[0] : d.tours,
-        available_capacity: availabilityBySlotId.get(d.id),
       }));
 
       setSlots(normalized as Slot[]);
@@ -390,12 +457,15 @@ function Slots() {
         }
       }
 
+      // Note: status is deliberately NOT written here. Open/Close and Cancel
+      // are separate, explicit actions (see closeSlot / reopenSlot /
+      // cancelSlotAndRefund) so "save changes to time/capacity/price" can never
+      // silently close a slot — and closing can never silently cancel bookings.
       const { error: singleUpdateError } = await supabase
         .from("slots")
         .update({
           capacity_total: Number(editForm.capacity) || selectedSlot.capacity_total,
           price_per_person_override: priceVal,
-          status: editForm.status,
           start_time: newUtcTime.toISOString()
         })
         .eq("id", selectedSlot.id);
@@ -434,89 +504,6 @@ function Slots() {
               tone: "success",
             });
           }
-        }
-      }
-
-      // If status was changed to CLOSED, cancel all active bookings and notify customers
-      if (editForm.status === "CLOSED" && selectedSlot.status !== "CLOSED") {
-        const { data: bookings } = await supabase
-          .from("bookings")
-          .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
-          .eq("business_id", businessId)
-          .eq("slot_id", selectedSlot.id)
-          .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
-
-        const affected = bookings || [];
-        for (const b of affected) {
-          const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
-
-          await supabase.from("bookings").update({
-            status: "CANCELLED",
-            cancellation_reason: "Slot closed by operator",
-            cancelled_at: new Date().toISOString(),
-          }).eq("id", b.id);
-
-          const slotData = await supabase.from("slots").select("booked, held").eq("id", selectedSlot.id).single();
-          if (slotData.data) {
-            await supabase.from("slots").update({
-              booked: Math.max(0, slotData.data.booked - b.qty),
-              held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
-            }).eq("id", selectedSlot.id);
-          }
-
-          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-
-          const ref = b.id.substring(0, 8).toUpperCase();
-          const tourName = (b as any).tours?.name || "Tour";
-          const startTime = (b as any).slots?.start_time
-            ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
-            : "";
-
-          if (b.phone) {
-            try {
-              await fetch(SU + "/functions/v1/send-whatsapp-text", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-                body: JSON.stringify({
-                  business_id: businessId,
-                  to: b.phone,
-                  message: "📋 *Trip Cancelled*\n\n" +
-                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                    " has been cancelled.\n\n" +
-                    "📋 Ref: " + ref + "\n\n" +
-                    "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund.",
-                }),
-              });
-            } catch (e) { console.error("WA notify err:", e); }
-          }
-
-          if (b.email) {
-            try {
-              await supabase.functions.invoke("send-email", {
-                body: {
-                  type: "CANCELLATION",
-                  data: {
-                    business_id: businessId,
-                    email: b.email,
-                    customer_name: b.customer_name,
-                    ref,
-                    tour_name: tourName,
-                    start_time: startTime,
-                    reason: "slot closed by operator",
-                    total_amount: isPaidBooking ? b.total_amount : null,
-                  },
-                },
-              });
-            } catch (e) { console.error("Email notify err:", e); }
-          }
-        }
-
-        if (affected.length > 0) {
-          notify({
-            title: "Bookings cancelled",
-            message: `${affected.length} booking(s) on this slot were cancelled and customers notified.`,
-            tone: "success",
-          });
         }
       }
 
@@ -786,9 +773,7 @@ function Slots() {
       </div>
 
       {selectedSlot && (() => {
-        const directAvailability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
-        const effectiveAvailability = typeof selectedSlot.available_capacity === "number" ? selectedSlot.available_capacity : directAvailability;
-        const isResourceLimited = effectiveAvailability < directAvailability;
+        const availability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
         return (
           <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
             <div className="ui-card w-full max-h-[90vh] overflow-auto p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
@@ -799,35 +784,17 @@ function Slots() {
               })} — {selectedSlot.tours?.name}
             </p>
 
-            <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl p-3 text-sm" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
-              <div>
-                <div className="ui-mono-label !text-[10px]">Sellable now</div>
-                <div className="font-display mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: effectiveAvailability > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{effectiveAvailability}</div>
-              </div>
-              <div>
-                <div className="ui-mono-label !text-[10px]">Raw slot space</div>
-                <div className="font-display mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{directAvailability}</div>
-              </div>
-              {isResourceLimited && (
-                <div className="col-span-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
-                  Shared resource limits are reducing capacity for this slot. Increasing the slot max alone will not create more availability unless the linked shared resources also allow it.
-                </div>
-              )}
+            <div className="mb-4 rounded-xl p-3 text-sm" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
+              <div className="ui-mono-label !text-[10px]">Available</div>
+              <div className="font-display mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: availability > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{availability}</div>
+            </div>
+
+            <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ background: selectedSlot.status === "OPEN" ? "var(--ck-success-soft, #e7f5ec)" : "var(--ck-surface-sunken)", color: selectedSlot.status === "OPEN" ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
+              {selectedSlot.status === "OPEN" ? "● Open — accepting bookings" : "○ Closed — not accepting new bookings"}
             </div>
 
             <div className="space-y-4">
-              <label className="block text-sm text-gray-600">
-                Status
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="ui-control mt-1 w-full"
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="CLOSED">CLOSED</option>
-                </select>
-              </label>
-
               <label className="block text-sm text-gray-600">
                 Time
                 <input
@@ -864,27 +831,54 @@ function Slots() {
               </label>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                onClick={() => cancelSlotWeather(selectedSlot)}
-                disabled={cancellingWeather || saving || selectedSlot.status === "CLOSED"}
-                className="ui-btn ui-btn-danger w-full disabled:opacity-50 sm:w-auto"
-              >
-                <CloudRain size={15} weight="bold" /> {cancellingWeather ? "Cancelling..." : "Cancel Weather"}
+            {/* Save time/capacity/price changes — never affects status/bookings */}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button onClick={() => setSelectedSlot(null)} className="ui-btn ui-btn-ghost">Close window</button>
+              <button onClick={saveSlotEdit} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+                {saving ? "Saving..." : "Save Changes"}
               </button>
-              <div className="grid grid-cols-2 gap-2 sm:flex">
+            </div>
+
+            {/* Availability vs Cancellation — two clearly separated actions */}
+            <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <p className="ui-mono-label !text-[10px] mb-2">Manage this slot</p>
+              <div className="space-y-2">
+                {selectedSlot.status === "OPEN" ? (
+                  <button
+                    onClick={() => closeSlot(selectedSlot)}
+                    disabled={slotStatusSaving || cancellingSlot}
+                    className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
+                    style={{ borderColor: "var(--ck-border-strong)" }}
+                  >
+                    <Lock size={15} weight="bold" />
+                    <span className="font-semibold">Close slot</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => reopenSlot(selectedSlot)}
+                    disabled={slotStatusSaving || cancellingSlot}
+                    className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
+                    style={{ borderColor: "var(--ck-border-strong)" }}
+                  >
+                    <LockKeyOpen size={15} weight="bold" />
+                    <span className="font-semibold">Reopen slot</span>
+                  </button>
+                )}
                 <button
-                  onClick={() => setSelectedSlot(null)}
-                  className="ui-btn ui-btn-ghost"
+                  onClick={() => cancelSlotAndRefund(selectedSlot)}
+                  disabled={cancellingSlot || slotStatusSaving}
+                  className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  Cancel
+                  <WarningCircle size={15} weight="bold" />
+                  <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Cancel & notify guests"}</span>
                 </button>
                 <button
-                  onClick={saveSlotEdit}
-                  disabled={saving}
-                  className="ui-btn ui-btn-primary disabled:opacity-50"
+                  onClick={() => cancelSlotAndRefund(selectedSlot, true)}
+                  disabled={cancellingSlot || slotStatusSaving}
+                  className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  <CloudRain size={15} weight="bold" />
+                  <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Weather cancel"}</span>
                 </button>
               </div>
             </div>

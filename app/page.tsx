@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { confirmAction, notify } from "./lib/app-notify";
 import { getAdminTimezone } from "./lib/admin-timezone";
+import { customerNotesTooltip } from "./lib/customer-notes";
 import { useBusinessContext } from "../components/BusinessContext";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -54,6 +55,7 @@ interface ManifestBooking {
     total_amount: number;
     status: string;
     checked_in: boolean;
+    custom_fields: Record<string, string> | null;
     tours: { name?: string } | null;
     slots: { start_time?: string } | null;
     add_ons: Array<{ name: string; qty: number }>;
@@ -370,7 +372,7 @@ export default function Dashboard() {
             // (slot reservations that never got paid for) and CANCELLED bookings
             // were inflating "Today's Pax" by ~50% on busy days.
             const { data: bks } = await supabase.from("bookings")
-                .select("id, customer_name, phone, qty, total_amount, status, checked_in, slots(start_time), tours(name)")
+                .select("id, customer_name, phone, qty, total_amount, status, checked_in, custom_fields, slots(start_time), tours(name)")
                 .eq("business_id", businessId)
                 .in("status", ["PAID", "CONFIRMED", "COMPLETED", "PENDING"])
                 .in("slot_id", slotIds)
@@ -416,7 +418,8 @@ export default function Dashboard() {
         const [todayManifest, tomorrowData, refundsData, inboxData, photosData, revRows] = await Promise.all([
             fetchManifest(today, tomorrow),
             fetchManifest(tomorrow, dayAfter),
-            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "ACTION_REQUIRED"]),
+            // ACTION_REQUIRED excluded — those await the customer's remediation choice, not operator action
+            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).eq("refund_status", "REQUESTED"),
             supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
             Promise.all([
                 supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
@@ -874,7 +877,15 @@ export default function Dashboard() {
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3.5">
-                                                    <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</div>
+                                                    <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>
+                                                        <span
+                                                            title={customerNotesTooltip(b.custom_fields)}
+                                                            className={customerNotesTooltip(b.custom_fields) ? "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : undefined}
+                                                        >{b.customer_name}</span>
+                                                        {customerNotesTooltip(b.custom_fields) && (
+                                                            <span title={customerNotesTooltip(b.custom_fields)} className="ml-1 text-[12px] cursor-help" aria-label="Customer added notes">📝</span>
+                                                        )}
+                                                    </div>
                                                     {b.add_ons && b.add_ons.length > 0 && (
                                                         <div className="mt-1 flex flex-wrap gap-1">
                                                             {b.add_ons.map((ao, idx) => (

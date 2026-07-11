@@ -34,7 +34,10 @@ export default function Refunds() {
     const { data: pending } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
       .eq("business_id", businessId)
-      .in("refund_status", ["REQUESTED", "ACTION_REQUIRED"])
+      // ACTION_REQUIRED deliberately excluded: those bookings are waiting for
+      // the CUSTOMER to choose refund / voucher / reschedule on My Bookings.
+      // Money only enters this queue once they pick "refund" (→ REQUESTED).
+      .eq("refund_status", "REQUESTED")
       .order("cancelled_at", { ascending: false });
     setRefunds(pending || []);
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
+import { Boat, CaretRight, Check, Images, Phone, WhatsappLogo } from "@phosphor-icons/react";
 
 type Booking = {
   id: string;
@@ -131,82 +132,91 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
   return (
     <div className="pt-5">
-      {/* Trip summary */}
+      {/* Trip summary — night surface hero, amber check-in trail */}
       {slotInfo && (
-        <div className="rounded-2xl p-4 mb-4 text-white shadow-sm" style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+        <div className="bg-bt-dark rounded-2xl p-4 mb-4 text-white" style={{ boxShadow: "var(--ck-shadow-md)" }}>
           <div className="flex items-end justify-between">
             <div className="min-w-0">
-              <p className="text-[12px] font-semibold text-cyan-50/80 truncate">{slotInfo.tour_name}</p>
-              <p className="text-[28px] font-extrabold leading-none tabular-nums mt-0.5">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>
+              <p className="text-[12px] font-semibold truncate" style={{ color: "rgba(246,243,234,0.75)" }}>{slotInfo.tour_name}</p>
+              <p className="font-display text-[28px] font-semibold leading-none tabular-nums mt-0.5">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-[24px] font-extrabold leading-none tabular-nums">{checkedCount}<span className="text-cyan-100/60 text-[16px]">/{bookings.length}</span></p>
-              <p className="text-[11px] font-semibold text-cyan-50/80 mt-0.5">checked in</p>
+              <p className="font-display text-[24px] font-semibold leading-none tabular-nums">{checkedCount}<span className="text-[16px]" style={{ color: "rgba(246,243,234,0.55)" }}>/{bookings.length}</span></p>
+              <p className="ui-mono-label mt-1" style={{ color: "rgba(246,243,234,0.75)" }}>checked in</p>
             </div>
           </div>
-          <div className="mt-3 h-2 rounded-full bg-white/20 overflow-hidden">
-            <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: pct + "%" }} />
+          <div className="mt-3 h-2 rounded-full bg-white/15 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: pct + "%", background: "var(--ck-amber-bright)" }} />
           </div>
           <div className="flex items-center justify-between mt-2.5 text-[12px]">
-            <span className="text-cyan-50/80 font-medium">{totalPax} guest{totalPax !== 1 ? "s" : ""} aboard</span>
-            <Link href={"/guide/photos/" + slotId} className="font-bold text-white inline-flex items-center gap-1">Trip photos
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+            <span className="font-medium" style={{ color: "rgba(246,243,234,0.75)" }}>{totalPax} guest{totalPax !== 1 ? "s" : ""} aboard</span>
+            <Link href={"/guide/photos/" + slotId} className="font-semibold text-white inline-flex items-center gap-1">Trip photos
+              <CaretRight size={14} weight="bold" />
             </Link>
           </div>
         </div>
       )}
 
       {loading && (
-        <div className="space-y-2.5">{[0, 1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-2xl bg-slate-100 animate-pulse" />)}</div>
+        <div className="space-y-2.5">{[0, 1, 2, 3].map(i => <div key={i} className="ui-skeleton h-[72px] rounded-2xl" />)}</div>
       )}
 
       {!loading && bookings.length === 0 && (
-        <div className="mt-12 text-center">
-          <div className="text-4xl mb-2">🛶</div>
-          <p className="text-[14px] font-bold text-slate-700">No passengers on this trip yet.</p>
+        <div className="ui-empty mt-6">
+          <div className="ui-icon-chip">
+            <Boat size={20} />
+          </div>
+          <p className="text-[14px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No passengers on this trip yet.</p>
         </div>
       )}
 
       <ul className="space-y-2.5">
         {bookings.map(b => (
-          <li key={b.id} className={"rounded-2xl border p-3.5 transition-all " + (b.checked_in ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-100 shadow-sm")}>
+          <li key={b.id} className={"rounded-2xl border p-3.5 transition-all " + (b.checked_in ? "" : "ui-card")}
+            style={b.checked_in ? { background: "var(--ck-success-soft)", borderColor: "color-mix(in srgb, var(--ck-success) 30%, transparent)" } : undefined}>
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-bold text-[15px] text-slate-800 truncate">{b.customer_name}</p>
+                  <p className="font-semibold text-[15px] truncate" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
                   {b.waiver_status === "SIGNED"
-                    ? <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">✓ Waiver</span>
+                    ? <span className="ui-status ui-pill-success">✓ Waiver</span>
                     : b.waiver_status
-                      ? <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-full">Waiver: {b.waiver_status}</span>
+                      ? <span className="ui-status ui-pill-danger">Waiver: {b.waiver_status}</span>
                       : null}
                 </div>
                 <div className="flex items-center gap-3 text-[12px] mt-1">
-                  <span className="font-semibold text-slate-500">{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
+                  <span className="font-semibold ui-text-muted">{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
                   {b.phone && (
-                    <a href={"tel:" + b.phone} className="inline-flex items-center gap-1 text-cyan-600 font-semibold">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11 11 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                      Call
-                    </a>
+                    <>
+                      <a href={"tel:" + b.phone} className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-ocean)" }}>
+                        <Phone size={14} />
+                        Call
+                      </a>
+                      <a href={"https://wa.me/" + b.phone.replace(/\D/g, "").replace(/^0/, "27")} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-success)" }}>
+                        <WhatsappLogo size={14} />
+                        WhatsApp
+                      </a>
+                    </>
                   )}
                 </div>
                 {(b.add_ons.length > 0 || b.dietary) && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {b.add_ons.map((ao, idx) => (
-                      <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-700">
+                      <span key={idx} className="ui-pill ui-pill-amber text-[11px]">
                         {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                       </span>
                     ))}
-                    {b.dietary && <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-rose-100 text-rose-700">🍽 {b.dietary}</span>}
+                    {b.dietary && <span className="ui-pill ui-pill-danger text-[11px]">🍽 {b.dietary}</span>}
                   </div>
                 )}
               </div>
               {b.checked_in ? (
-                <div className="shrink-0 w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                <div className="shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center" style={{ background: "var(--ck-success)", boxShadow: "var(--ck-shadow-sm)" }}>
+                  <Check size={22} weight="bold" />
                 </div>
               ) : (
-                <button onClick={() => checkIn(b.id)}
-                  className="shrink-0 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-[13px] font-bold active:scale-95 hover:bg-slate-800 transition">
+                <button onClick={() => checkIn(b.id)} className="ui-btn ui-btn-primary shrink-0">
                   Check in
                 </button>
               )}
@@ -217,8 +227,9 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
       {!loading && bookings.length > 0 && (
         <Link href={"/guide/photos/" + slotId}
-          className="flex items-center justify-center gap-2 mt-6 p-4 rounded-2xl bg-white border border-slate-200 text-slate-700 font-bold text-[14px] shadow-sm active:scale-[0.99] hover:border-cyan-200 transition">
-          <svg className="w-5 h-5 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          className="ui-card ui-card-hover flex items-center justify-center gap-2 mt-6 p-4 font-semibold text-[14px] active:scale-[0.99]"
+          style={{ color: "var(--ck-text-strong)" }}>
+          <Images size={20} style={{ color: "var(--ck-accent)" }} />
           Upload trip photos &amp; send thank-you
         </Link>
       )}

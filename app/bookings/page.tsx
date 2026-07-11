@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
 import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
+import { customerNotesTooltip } from "../lib/customer-notes";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap, CheckCircle, XCircle, Spinner, CalendarBlank, Timer } from "@phosphor-icons/react";
@@ -13,17 +14,6 @@ import { MonthPicker } from "../../components/MonthPicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-
-// Build a hover tooltip from any details the customer added (special requests,
-// dietary notes, etc.) stored on bookings.custom_fields. Returns undefined when
-// there's nothing to show, so the name renders plainly.
-function customerNotesTooltip(cf: Record<string, string> | null | undefined): string | undefined {
-  if (!cf) return undefined;
-  const parts = Object.entries(cf)
-    .filter(([, v]) => v && String(v).trim())
-    .map(([k, v]) => k.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase()) + ": " + String(v).trim());
-  return parts.length ? parts.join("\n") : undefined;
-}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", {
@@ -394,8 +384,12 @@ export default function Bookings() {
         .eq("status", "PENDING");
       for (const row of (prRows || []) as any[]) {
         const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
-        if (hold && hold.status && hold.status !== "ACTIVE") continue;
+        // Expired/lapsed holds stay visible: the upgrade fee is still owed if
+        // the customer wants the move — "Send link" issues a fresh checkout.
         const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
+        // ponytail: skip reschedules whose target slot already departed —
+        // nothing is owed for a trip that can no longer happen.
+        if (slot?.start_time && new Date(slot.start_time).getTime() < Date.now()) continue;
         const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
         pendingByBooking[row.booking_id] = {
           pendingId: row.id,
@@ -523,6 +517,8 @@ export default function Bookings() {
         const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
         const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
         const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
+        // Unpaid reschedule-upgrade fees are outstanding funds too
+        const rescheduleDue = activeBks.reduce((s, b) => s + Math.max(0, Number(b.pending_reschedule?.diff || 0)), 0);
         slots.push({
           timeLabel: tk,
           sortKey: tk,
@@ -530,7 +526,7 @@ export default function Bookings() {
           totalPax,
           totalPrice,
           totalPaid,
-          totalDue: totalPrice - totalPaid,
+          totalDue: totalPrice - totalPaid + rescheduleDue,
         });
       }
       slots.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -545,7 +541,7 @@ export default function Bookings() {
         totalPax,
         totalPrice,
         totalPaid,
-        totalDue: totalPrice - totalPaid,
+        totalDue: slots.reduce((s, sl) => s + sl.totalDue, 0),
       });
     }
     days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -664,7 +660,7 @@ export default function Bookings() {
             unit_price: Number(unitPrice),
             subtotal: total,
             total_amount: total,
-            payment_method: b.status === "PAID" ? "Admin (Manual)" : "Pending",
+            payment_method: isPaid(b.status) ? "Admin (Manual)" : "Pending",
           }).select("id").single();
 
           if (invData?.id) {
@@ -691,7 +687,8 @@ export default function Bookings() {
             unit_price: unitPrice,
             subtotal: total.toFixed(2),
             total_amount: total.toFixed(2),
-            payment_method: b.status === "PAID" ? "Admin (Manual)" : "Pending",
+            amount_paid: isPaid(b.status) ? total.toFixed(2) : "0.00",
+            payment_method: isPaid(b.status) ? "Admin (Manual)" : "Pending",
             payment_reference: ref,
           },
         },
@@ -796,7 +793,39 @@ export default function Bookings() {
       }
     }
 
-    if (shouldInvalidatePaymentLink) {
+    // If contact details changed on an unpaid booking that already had a
+    // payment link, that link only ever reached the OLD address — resend it
+    // so the customer can actually pay. create-checkout re-reads the booking
+    // row (updated above) and notifies the new email + WhatsApp itself.
+    let paymentLinkResent = false;
+    const contactChanged =
+      updateData.email !== (editBooking.email || "").toLowerCase() ||
+      updateData.phone !== (editBooking.phone || "");
+    if (isPending && !isChangingToPaid && contactChanged && editBooking.yoco_checkout_id && editForm.email.trim()) {
+      try {
+        const linkRes = await supabase.functions.invoke("create-checkout", {
+          body: {
+            amount: total,
+            booking_id: editBooking.id,
+            type: "BOOKING",
+            customer_name: editForm.customer_name.trim(),
+            qty,
+          },
+        });
+        if (!linkRes.error && linkRes.data?.redirectUrl) {
+          paymentLinkResent = true;
+          notify({ title: "Payment link sent", message: "Payment link sent to " + editForm.email.trim().toLowerCase() + (editForm.phone.trim() ? " & WhatsApp" : ""), tone: "success" });
+        } else {
+          const detail = linkRes.error?.message || linkRes.data?.error || "unknown";
+          notify({ title: "Payment link not re-sent", message: "Saved, but the payment link could not be re-sent to the new contact details: " + detail, tone: "warning", duration: 8000 });
+        }
+      } catch (e) {
+        console.error("Payment link resend failed:", e);
+        notify({ title: "Payment link not re-sent", message: "Saved, but the payment link could not be re-sent to the new contact details.", tone: "warning", duration: 8000 });
+      }
+    }
+
+    if (shouldInvalidatePaymentLink && !paymentLinkResent) {
       // Note: Yoco Checkout API does not currently support cancelling an existing checkout.
       // The old checkout link will simply expire or fail if the customer tries to use it.
       notify({
@@ -1114,6 +1143,40 @@ export default function Bookings() {
     setPaymentLinkBookingId(null);
   }
 
+  // Send/re-send the checkout link for an unpaid reschedule-upgrade fee
+  // (create-checkout notifies the customer via email + WhatsApp).
+  async function sendRescheduleLink(b: Booking) {
+    const pr = b.pending_reschedule;
+    if (!pr) return;
+    if (!b.email) {
+      notify({ title: "Missing email", message: "No email address on this booking.", tone: "warning" });
+      return;
+    }
+    setQuickResendingId(b.id);
+    try {
+      const res = await supabase.functions.invoke("create-checkout", {
+        body: {
+          amount: Number(pr.diff || 0),
+          booking_id: b.id,
+          business_id: businessId,
+          type: "RESCHEDULE",
+          pending_reschedule_id: pr.pendingId,
+        },
+      });
+      if (res.error) {
+        notify({ title: "Send failed", message: res.error.message, tone: "error" });
+      } else if (res.data?.redirectUrl) {
+        notify({ title: "Payment link sent", message: `Sent to ${b.email}${b.phone ? " & WhatsApp" : ""}`, tone: "success" });
+        loadBookings();
+      } else {
+        notify({ title: "Send failed", message: "No redirect URL returned", tone: "error" });
+      }
+    } catch (err: unknown) {
+      notify({ title: "Send failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
+    }
+    setQuickResendingId(null);
+  }
+
   async function quickResendPaymentLink(b: Booking) {
     console.log("[BOOKINGS] quickResendPaymentLink", { bookingId: b.id, email: b.email });
     if (!b.email) {
@@ -1172,6 +1235,13 @@ export default function Bookings() {
   }, [rebookBooking, rebookDate]);
 
 
+  // A cancelled booking only carries credit while its payout is still parked
+  // (weather-cancel refund_status ACTION_REQUIRED). Once a refund/voucher was
+  // issued, no credit remains — rebooking charges the full new price.
+  function rebookHasNoCredit(b: Booking) {
+    return b.status === "CANCELLED" && !(b.refund_status === "ACTION_REQUIRED" && Number(b.refund_amount || 0) > 0);
+  }
+
   async function saveRebook() {
     if (!rebookBooking || !rebookSlotId) return;
     // Defensive in-flight guard via ref — useState's disabled-button guard
@@ -1184,7 +1254,7 @@ export default function Bookings() {
     // field is irrelevant on same-price / upgrade rebooks and was being sent
     // by default (harmless but noisy in network panel).
     const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
-    const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
+    const currentUnitPrice = rebookHasNoCredit(rebookBooking) ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
     const newUnitPrice = selectedSlot?.price_per_person_override ?? selectedSlot?.base_price_per_person ?? currentUnitPrice;
     const willBeDowngrade = newUnitPrice < currentUnitPrice;
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
@@ -1208,7 +1278,7 @@ export default function Bookings() {
     if (data?.diff > 0) {
       notify({
         title: "Booking changed — payment due",
-        message: "Cost increased by R" + data.diff + ". A payment link was sent to the customer's email and WhatsApp.",
+        message: (rebookHasNoCredit(rebookBooking) ? "No credit remains on this cancelled booking. " : "Cost increased by R" + data.diff + ". ") + "A payment link for R" + data.diff + " was sent to the customer's email and WhatsApp.",
         tone: "success",
       });
     } else if (data?.diff < 0) {
@@ -1623,6 +1693,7 @@ export default function Bookings() {
                             cancellingWeatherId={cancellingWeatherId}
                             quickResendingId={quickResendingId}
                             onQuickResend={quickResendPaymentLink}
+                            onSendRescheduleLink={sendRescheduleLink}
                             selected={selected}
                             onToggleSelect={toggleSelect}
                           />
@@ -1843,8 +1914,23 @@ export default function Bookings() {
             {rebookSlotId && (() => {
               const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
               if (!selectedSlot) return null;
-              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
               const newUnitPrice = selectedSlot.price_per_person_override ?? selectedSlot.base_price_per_person ?? 0;
+              if (rebookHasNoCredit(rebookBooking)) {
+                return (
+                  <div className="mt-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Price</span>
+                      <span className="font-medium tabular-nums">{fmtCurrency(newUnitPrice)}/pp</span>
+                    </div>
+                    <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
+                      <span className="text-gray-600">Total due ({rebookBooking.qty} pax)</span>
+                      <span className="font-semibold tabular-nums">{fmtCurrency(newUnitPrice * rebookBooking.qty)}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">This booking was cancelled and its refund/voucher already issued, so no credit remains — the customer pays the full price.</p>
+                  </div>
+                );
+              }
+              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
               const diff = newUnitPrice - currentUnitPrice;
               const totalDiff = diff * rebookBooking.qty;
               return (
@@ -1873,20 +1959,22 @@ export default function Bookings() {
             {rebookSlotId && (() => {
               const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
               if (!selectedSlot) return null;
-              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
+              const noCredit = rebookHasNoCredit(rebookBooking);
+              const currentUnitPrice = noCredit ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
               const newUnitPrice = selectedSlot.price_per_person_override ?? selectedSlot.base_price_per_person ?? 0;
               const totalDiff = (newUnitPrice - currentUnitPrice) * rebookBooking.qty;
               if (totalDiff <= 0) return null;
               return (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <p className="font-semibold">Customer will be charged the difference</p>
-                  <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(totalDiff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. The original slot is released only after the new payment lands.</p>
+                  <p className="font-semibold">{noCredit ? "Customer will be charged the full price" : "Customer will be charged the difference"}</p>
+                  <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(totalDiff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. {noCredit ? "The booking is confirmed once the payment lands." : "The original slot is released only after the new payment lands."}</p>
                 </div>
               );
             })()}
 
             {/* Downgrade controls — only relevant when the customer gets credit back */}
             {(() => {
+              if (rebookHasNoCredit(rebookBooking)) return null;
               const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
               const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
               const newUnitPrice = selectedSlot?.price_per_person_override ?? selectedSlot?.base_price_per_person ?? currentUnitPrice;
@@ -1989,6 +2077,7 @@ function SlotRows({
   cancellingWeatherId,
   quickResendingId,
   onQuickResend,
+  onSendRescheduleLink,
   selected,
   onToggleSelect,
 }: {
@@ -2012,6 +2101,7 @@ function SlotRows({
   cancellingWeatherId: string | null;
   quickResendingId: string | null;
   onQuickResend: (b: Booking) => void;
+  onSendRescheduleLink: (b: Booking) => void;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
 }) {
@@ -2056,7 +2146,8 @@ function SlotRows({
         slot.bookings.map((b) => {
           const refundAmt = b.status === "CANCELLED" && b.refund_amount ? Number(b.refund_amount) : 0;
           const paid = isPaid(b.status) ? Number(b.total_amount) : 0;
-          const due = refundAmt > 0 ? refundAmt : Number(b.total_amount || 0) - paid;
+          const rescheduleDue = Math.max(0, Number(b.pending_reschedule?.diff || 0));
+          const due = (refundAmt > 0 ? refundAmt : Number(b.total_amount || 0) - paid) + rescheduleDue;
           const isLoading = actionBookingId === b.id;
           const isResending = resendingInvoiceId === b.id;
           const isGeneratingLink = paymentLinkBookingId === b.id;
@@ -2079,10 +2170,10 @@ function SlotRows({
                     <span className="inline-block w-2 text-gray-400 transition-transform lg:hidden" style={{ transform: actionsOpen ? "rotate(90deg)" : "none" }}>›</span>
                     <span
                       title={customerNotesTooltip(b.custom_fields)}
-                      className={"font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
+                      className={"font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
                     >{b.customer_name}</span>
                     {customerNotesTooltip(b.custom_fields) && (
-                      <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help" aria-label="Customer added notes">📝</span>
+                      <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help lg:pointer-events-auto" aria-label="Customer added notes">📝</span>
                     )}
                     {b.waiver_status === "SIGNED"
                       ? <span title="Waiver signed" className="shrink-0" style={{ color: "var(--ck-success)" }}>✓</span>
@@ -2119,11 +2210,23 @@ function SlotRows({
                     const newWhen = pr.newSlotStart ? new Date(pr.newSlotStart).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: getAdminTimezone() }) : "new slot";
                     const label = `Pending reschedule → ${pr.newTourName || "Tour"} ${newWhen}${minsLeft !== null ? ` · hold ${minsLeft > 0 ? minsLeft + "m" : "expired"}` : ""} · +R${pr.diff.toFixed(0)}`;
                     return (
-                      <span
-                        title={label + " — customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
-                        className={`mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold pl-[18px] lg:pl-2 ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
-                      >
-                        <Timer size={11} weight="bold" className="shrink-0" /> {label}
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 pl-[18px] lg:pl-0">
+                        <span
+                          title={label + " — customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
+                          className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
+                        >
+                          <Timer size={11} weight="bold" className="shrink-0" /> {label}
+                        </span>
+                        <button
+                          type="button"
+                          title="Send a fresh payment link for the reschedule difference (email + WhatsApp)"
+                          disabled={quickResendingId === b.id}
+                          onClick={(e) => { e.stopPropagation(); onSendRescheduleLink(b); }}
+                          className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                        >
+                          {quickResendingId === b.id ? <SpinnerGap className="h-3 w-3 animate-spin" /> : <PaperPlaneTilt className="h-3 w-3" />}
+                          Send link
+                        </button>
                       </span>
                     );
                   })()}
@@ -2152,12 +2255,19 @@ function SlotRows({
                         disabled={isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED"}
                         tone="blue"
                       />
-                      <ActionButton label="Refund" onClick={() => onRefund(b)} disabled={isLoading || b.status === "CANCELLED"} tone="amber" />
+                      <ActionButton
+                        label="Refund"
+                        onClick={() => onRefund(b)}
+                        disabled={isLoading || !isPaid(b.status)}
+                        title={!isPaid(b.status) ? "Nothing to refund — no payment received" : undefined}
+                        tone="amber"
+                      />
                       <ActionButton label="Cancel" onClick={() => onCancel(b)} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
                       <ActionButton
                         label={isResending ? "Sending…" : "Resend Inv"}
                         onClick={() => onResendInvoice(b.id)}
-                        disabled={isResending}
+                        disabled={isResending || !isPaid(b.status)}
+                        title={!isPaid(b.status) ? "Payment still outstanding — send a payment link instead" : undefined}
                         tone="blue"
                       />
                       <RefundBadge status={b.refund_status} />
@@ -2201,12 +2311,19 @@ function SlotRows({
                           disabled={isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED"}
                           tone="blue"
                         />
-                        <ActionMenuItem label="Refund" onClick={() => { onRefund(b); setOpenActions(null); }} disabled={isLoading || b.status === "CANCELLED"} tone="amber" />
+                        <ActionMenuItem
+                          label="Refund"
+                          onClick={() => { onRefund(b); setOpenActions(null); }}
+                          disabled={isLoading || !isPaid(b.status)}
+                          title={!isPaid(b.status) ? "Nothing to refund — no payment received" : undefined}
+                          tone="amber"
+                        />
                         <ActionMenuItem label="Cancel" onClick={() => { onCancel(b); setOpenActions(null); }} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
                         <ActionMenuItem
                           label={isResending ? "Resending..." : "Resend Invoice"}
                           onClick={() => { onResendInvoice(b.id); setOpenActions(null); }}
-                          disabled={isResending}
+                          disabled={isResending || !isPaid(b.status)}
+                          title={!isPaid(b.status) ? "Payment still outstanding — send a payment link instead" : undefined}
                           tone="blue"
                         />
                       </div>
@@ -2225,11 +2342,13 @@ function ActionButton({
   label,
   onClick,
   disabled,
+  title,
   tone = "gray",
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  title?: string;
   tone?: "gray" | "blue" | "green" | "red" | "amber";
 }) {
   const tones: Record<string, string> = {
@@ -2251,7 +2370,8 @@ function ActionButton({
         onClick();
       }}
       disabled={disabled}
-      className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50 ${tones[tone]}`}
+      title={title}
+      className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${tones[tone]}`}
     >
       {label}
     </button>
@@ -2301,11 +2421,13 @@ function ActionMenuItem({
   label,
   onClick,
   disabled,
+  title,
   tone = "gray",
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  title?: string;
   tone?: "gray" | "blue" | "green" | "red" | "amber";
 }) {
   const tones: Record<string, string> = {
@@ -2324,7 +2446,8 @@ function ActionMenuItem({
         onClick();
       }}
       disabled={disabled}
-      className={`w-full text-left px-3 py-1.5 text-xs font-medium disabled:opacity-40 ${tones[tone]}`}
+      title={title}
+      className={`w-full text-left px-3 py-1.5 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed ${tones[tone]}`}
     >
       {label}
     </button>

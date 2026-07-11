@@ -32,16 +32,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Only DELETION requests can be fulfilled via this endpoint" }, { status: 400 });
   }
 
-  if (!request.customer_id) {
-    return NextResponse.json({ error: "No customer linked to this request. Manual review required." }, { status: 400 });
+  // Resolve customer_id from the request email if it wasn't linked at submit
+  // time (customer-submitted requests never set it). The anonymizer also
+  // sweeps orphan rows by email/phone, so even a subject with no customers
+  // row is fully anonymized via p_email.
+  let customerId: string | null = request.customer_id;
+  if (!customerId && request.email) {
+    const { data: cust } = await db.from("customers")
+      .select("id")
+      .eq("business_id", caller.business_id)
+      .eq("email_lower", String(request.email).toLowerCase())
+      .maybeSingle();
+    customerId = cust?.id || null;
   }
 
-  // Run anonymization RPC
+  if (!customerId && !request.email) {
+    return NextResponse.json({ error: "No customer or email on this request. Manual review required." }, { status: 400 });
+  }
+
+  // Run anonymization RPC — matches by customer_id when known, and always
+  // sweeps orphan records by the request email/phone.
   const { data: result, error } = await db.rpc("anonymize_customer", {
-    p_customer_id: request.customer_id,
+    p_customer_id: customerId,
     p_business_id: caller.business_id,
     p_request_id: request.id,
     p_admin_id: caller.id,
+    p_email: request.email || null,
   });
 
   if (error) return NextResponse.json({ error: "Anonymization failed: " + error.message }, { status: 500 });

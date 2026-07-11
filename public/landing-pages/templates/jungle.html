@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens & Base CSS ── */
+:root {
+  --bg: #0E1F16; /* DARK theme */
+  --ink: #DCE8DF;
+  --accent: #D65780;
+  --surface: #142a1f;
+  --text-muted: #9ab3a4;
+  --border-alpha: rgba(220, 232, 223, 0.08);
+  --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-display: 'Young Serif', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
+}
+
+/* Base resets */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+h1, h2, h3, .editorial-heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Glass Recipe */
+.glass-panel {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mono Micro-Label */
+.mono-label {
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Layout System: Anti-Grid */
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+.section-seam {
+  width: 100%;
+  line-height: 0;
+  margin: 0;
+}
+.section-seam svg {
+  width: 100%;
+  height: 40px;
+  fill: var(--bg);
+  transform: translateY(1px);
+}
+.section-seam.invert svg {
+  transform: scaleY(-1) translateY(1px);
+}
+
+/* Whitespace Budget */
+.narrative-section {
+  padding: 20vh 0;
+  position: relative;
+}
+.anti-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2rem;
+  align-items: center;
+}
+.anti-grid-text {
+  grid-column: 1 / 6;
+  max-width: 34rem;
+}
+.anti-grid-image {
+  grid-column: 7 / 13;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 16/11;
+}
+.anti-grid-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Navigation */
+header.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s, backdrop-filter 0.3s;
+}
+header.sticky-nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+  height: 70px;
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.logo-area h1 {
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.nav-links {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+}
+.nav-links a {
+  text-decoration: none;
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+.nav-links a:hover {
+  color: var(--accent);
+}
+.cta-button {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+}
+
+/* Audio Toggle Widget */
+.audio-consent-widget {
+  background: rgba(20, 42, 31, 0.5);
+  border: 1px solid var(--border-alpha);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 500px;
+}
+.audio-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Hero: Layered Foliage Parallax parting on scroll */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  overflow: hidden;
+  background-color: #050d09;
+}
+.hero-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.1s ease-out;
+}
+.layer-bg {
+  background: radial-gradient(ellipse at 50% 35%, #17402c 0%, #0a1c13 55%, #050d09 100%);
+  opacity: 0.6;
+}
+/* Visual representations of left/right foliage overlay parting */
+.layer-foliage-left {
+  background: linear-gradient(90deg, rgba(5,13,9,0.95) 0%, rgba(5,13,9,0) 100%);
+  width: 50%;
+  right: 50%;
+  z-index: 2;
+}
+.layer-foliage-right {
+  background: linear-gradient(-90deg, rgba(5,13,9,0.95) 0%, rgba(5,13,9,0) 100%);
+  width: 50%;
+  left: 50%;
+  z-index: 2;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(14,31,22,0.9) 0%, rgba(14,31,22,0.2) 100%);
+  z-index: 3;
+}
+.hero-content {
+  position: relative;
+  z-index: 4;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 4rem;
+  align-items: center;
+  width: 100%;
+}
+.hero-text h2 {
+  font-size: clamp(2.4rem, 6vw, 4.8rem);
+  line-height: 1.05;
+  margin: 1rem 0;
+}
+.hero-text p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  max-width: 44rem;
+  margin-bottom: 2rem;
+}
+.hero-widget-box {
+  width: 100%;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+/* Hover-Reveal Destinations List (Niarra Device - Liana oval) */
+.hover-reveal-section {
+  padding: 15vh 0;
+  background-color: var(--surface);
+  color: #fff;
+  position: relative;
+}
+.hover-list {
+  list-style: none;
+  max-width: 900px;
+  margin: 4rem auto 0 auto;
+}
+.hover-item {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 2rem 0;
+  position: relative;
+  cursor: pointer;
+}
+.hover-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hover-item-title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-family: var(--font-display);
+  transition: transform 0.3s var(--ck-ease);
+}
+.hover-item:hover .hover-item-title {
+  transform: translateX(15px);
+}
+.hover-item-meta {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.reveal-mask-container {
+  pointer-events: none;
+  position: fixed;
+  width: 320px;
+  height: 220px;
+  overflow: hidden;
+  z-index: 50;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
+  /* Liana framed oval mask */
+  clip-path: url(#liana-oval-clip);
+}
+.reveal-mask-container.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.reveal-mask-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Visual Product Sheet */
+.product-sheet {
+  background-color: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border-alpha);
+  overflow: hidden;
+  margin-top: 4rem;
+}
+.sheet-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--border-alpha);
+  background: var(--bg);
+}
+.stat-chip {
+  padding: 1.8rem;
+  text-align: center;
+  border-right: 1px solid var(--border-alpha);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.stat-chip:last-child { border-right: none; }
+.stat-value {
+  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Persistent Booking Rail */
+.booking-rail {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-alpha);
+  padding: 1.2rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rail-price-info {
+  display: flex;
+  flex-direction: column;
+}
+.rail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.rail-price {
+  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* Tour cards */
+.tour-image {
+  width: 100%;
+  height: 220px;
+  background-size: cover;
+  background-position: center;
+}
+.skin-fill,
+.tour-image--skin {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(214,87,128,0.14), transparent 45%),
+    linear-gradient(135deg, var(--surface) 0%, #050d09 100%);
+}
+.skin-fill { width: 100%; height: 100%; }
+.tour-body { padding: 2rem 2.5rem 2.5rem; }
+.stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Reviews strip */
+.reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+.review-card { padding: 2rem; border-radius: 12px; }
+.review-quote {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.5;
+  color: var(--ink);
+  margin-bottom: 1.5rem;
+}
+.review-author {
+  font-style: normal;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Footer */
+.site-footer {
+  background: var(--surface);
+  padding: 5rem 0 8rem;
+  border-top: 1px solid var(--border-alpha);
+}
+.footer-brand { font-size: 2rem; color: var(--ink); margin-bottom: 1rem; }
+.footer-line { color: var(--text-muted); font-size: 0.95rem; }
+.footer-copyright { color: var(--text-muted); opacity: 0.6; font-size: 0.85rem; margin-top: 2rem; }
+
+@media (max-width: 1024px) {
+  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .anti-grid { grid-template-columns: 1fr; }
+  .anti-grid-text { grid-column: 1 / -1; }
+  .anti-grid-image { grid-column: 1 / -1; }
+  .tour-body { padding: 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- SVG Canopy Silhouette Mask and Dividers -->
+<svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
+  <defs>
+    <!-- Liana oval framed clip path for Niarra reveal -->
+    <clipPath id="liana-oval-clip" clipPathUnits="objectBoundingBox">
+      <path d="M0.15,0.5 C0.15,0.2,0.3,0.05,0.5,0.05 C0.7,0.05,0.85,0.2,0.85,0.5 C0.85,0.8,0.7,0.95,0.5,0.95 C0.3,0.95,0.15,0.8,0.15,0.5 Z" />
+    </clipPath>
+  </defs>
+</svg>
+
+<!-- Navigation -->
+<header class="sticky-nav" id="main-nav">
+  <div class="container nav-inner">
+    <div class="logo-area">
+      {{#if logo_url}}
+        <img src="{{logo_url}}" alt="{{business_name}}">
+      {{else}}
+        <h1>{{business_name}}</h1>
+      {{/if}}
+    </div>
+    <nav class="nav-links">
+      <a href="#about">The Moss</a>
+      <a href="#audio">Soundscape</a>
+      <a href="#experiences">Outposts</a>
+      <a class="cta-button" href="{{booking_url}}">Book Drift</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero Section with parting foliage layers -->
+<section class="hero">
+  <div class="hero-layer layer-bg" id="parallax-bg"{{#if hero_image}} style="background-image:url('{{hero_image}}')"{{/if}}></div>
+  <div class="hero-layer layer-foliage-left" id="parallax-left"></div>
+  <div class="hero-layer layer-foliage-right" id="parallax-right"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-text reveal-fade-up active">
+      <span class="mono-label" style="background-color:var(--accent);color:#fff;">{{hero_eyebrow}}</span>
+      <h2 style="color:var(--ink);">Listen first. The river explains itself.</h2>
+      <p>{{hero_subtitle}}</p>
+      <a class="cta-button" style="background-color: var(--accent);" href="{{booking_url}}">Book River Drift</a>
+    </div>
+    
+    <div class="hero-widget-box glass-panel">
+      <h3 style="color:#fff;font-family:var(--font-display);font-size:1.6rem;margin-bottom:0.75rem;">Find your drift</h3>
+      <p style="color:var(--text-muted);font-size:0.95rem;margin-bottom:1.5rem;">Live dates and open seats are on our booking page. Pick a river, choose a launch window, and we hold your spot.</p>
+      <a class="cta-button" href="{{booking_url}}" style="width:100%;">Check availability</a>
+    </div>
+  </div>
+</section>
+
+<!-- Canopy Silhouette divider seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,40 Q180,20 360,30 T720,25 T1080,35 T1440,40 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Narrative Anti-Grid Section -->
+<section class="narrative-section" id="about">
+  <div class="container anti-grid">
+    <div class="anti-grid-text reveal-fade-up">
+      <span class="mono-label">The Canopy Layer</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A soundscape before sights</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We drift the dark moss watercourses at the river's own pace. This isn't about speed — it's about listening. Light filters thin through the canopy, and the forest floor stays in a green half-dark.</p>
+      <p style="color: var(--text-muted);">Ambient river sound moves with you the whole way down. Turn it on below and listen before you arrive.</p>
+    </div>
+    <div class="anti-grid-image reveal-fade-up">
+      <div class="skin-fill"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Signature Interaction: Sound on Consent -->
+<section class="narrative-section" id="audio" style="background:var(--surface);">
+  <div class="container">
+    <span class="mono-label">Soundscape toggle</span>
+    <h2 style="font-size:2.2rem;margin:1rem 0;">Audio Environment</h2>
+    <p style="color:var(--text-muted);margin-bottom:2rem;">Activate the ambient jungle river sound loop. State is remembered locally for your return.</p>
+    
+    <div class="audio-consent-widget">
+      <div>
+        <div style="font-weight:700;">Jungle River Sounds</div>
+        <div style="font-size:0.8rem;opacity:0.6;" id="audio-status">Audio Muted</div>
+      </div>
+      <button class="audio-btn" id="audio-toggle-btn" onclick="toggleJungleAudio()">Turn On</button>
+    </div>
+  </div>
+</section>
+
+<!-- Real tours from tenant context -->
+<section class="narrative-section" id="experiences">
+  <div class="container">
+    <span class="mono-label">The Outpost Profile</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Choose your river</h2>
+
+    {{#if has_tours}}
+      {{#each tours}}
+      <div class="product-sheet">
+        {{#if image_url}}
+        <div class="tour-image" style="background-image:url('{{image_url}}')"></div>
+        {{else}}
+        <div class="tour-image tour-image--skin"></div>
+        {{/if}}
+        <div class="tour-body">
+          <h3 style="font-family:var(--font-display);font-size:1.8rem;color:var(--ink);margin-bottom:0.75rem;">{{name}}</h3>
+          {{#if description}}<p style="color:var(--text-muted);margin-bottom:1.5rem;">{{description}}</p>{{/if}}
+          <div class="sheet-meta-grid" style="grid-template-columns:repeat(3,1fr);border-radius:8px;overflow:hidden;">
+            <div class="stat-chip">
+              <span class="stat-value">{{duration_minutes}} min</span>
+              <span class="stat-label">Duration</span>
+            </div>
+            <div class="stat-chip">
+              <span class="stat-value">{{../currency}}{{base_price_per_person}}</span>
+              <span class="stat-label">Per person</span>
+            </div>
+            <div class="stat-chip">
+              <span class="stat-value">{{default_capacity}} pax</span>
+              <span class="stat-label">Group limit</span>
+            </div>
+          </div>
+          <a class="cta-button" href="{{../booking_url}}" style="margin-top:1.5rem;">Book {{name}}</a>
+        </div>
+      </div>
+      {{/each}}
+    {{else}}
+      <div class="product-sheet">
+        <div class="tour-body">
+          <p style="color:var(--text-muted);font-size:1.05rem;margin-bottom:1.5rem;">Our drift routes are being set for the season. Tell us when you'd like to be on the water and we'll place you on the first open launch.</p>
+          <a class="cta-button" href="{{booking_url}}">Enquire about dates</a>
+        </div>
+      </div>
+    {{/if}}
+  </div>
+</section>
+
+<!-- Reviews strip -->
+{{#if has_reviews}}
+<section class="narrative-section" id="reviews">
+  <div class="container">
+    <span class="mono-label">From the water</span>
+    <h2 style="font-size:clamp(2rem,4vw,3rem);margin:1rem 0 3rem;">What drifters say</h2>
+    <div class="reviews-grid">
+      {{#each reviews}}
+      <blockquote class="review-card glass-panel">
+        <p class="review-quote">{{quote}}</p>
+        <cite class="review-author">— {{author}}</cite>
+      </blockquote>
+      {{/each}}
+    </div>
+  </div>
+</section>
+{{/if}}
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-brand editorial-heading">{{business_name}}</div>
+    {{#if footer_line_one}}<p class="footer-line">{{footer_line_one}}</p>{{/if}}
+    {{#if footer_line_two}}<p class="footer-line">{{footer_line_two}}</p>{{/if}}
+    <p class="footer-copyright">© {{year}} {{business_name}}</p>
+  </div>
+</footer>
+
+<!-- Persistent Booking Rail -->
+<div class="booking-rail">
+  <div class="rail-price-info">
+    <span class="rail-label">Ready when you are</span>
+    <span class="rail-price" style="font-size:1.2rem;">Reserve your drift</span>
+  </div>
+  <a class="cta-button" href="{{booking_url}}">Book Drift</a>
+</div>
+
+<script>
+// Layered Foliage Parallax parting scroll behavior
+window.addEventListener("scroll", () => {
+  const scrollVal = window.scrollY;
+  const leftFoliage = document.getElementById("parallax-left");
+  const rightFoliage = document.getElementById("parallax-right");
+  const bg = document.getElementById("parallax-bg");
+  
+  if (leftFoliage && rightFoliage && bg) {
+    // Translate left foliage layer to the left
+    leftFoliage.style.transform = `translateX(${-scrollVal * 0.4}px)`;
+    // Translate right foliage layer to the right
+    rightFoliage.style.transform = `translateX(${scrollVal * 0.4}px)`;
+    // Scale background slightly
+    bg.style.transform = `scale(${1 + scrollVal * 0.0005})`;
+  }
+});
+
+// Ambient Audio toggle with localstorage consent caching
+let audioPlaying = false;
+let audioContext = null;
+let oscillator = null; // We can simulate ambient sound using Web Audio API!
+
+function toggleJungleAudio() {
+  if (!audioContext) {
+    // Initialize Web Audio API to produce a simulated soft flowing river sound (white/pink noise)
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass();
+  }
+  
+  const statusEl = document.getElementById("audio-status");
+  const btnEl = document.getElementById("audio-toggle-btn");
+  
+  if (!audioPlaying) {
+    audioPlaying = true;
+    statusEl.innerText = "Ambient river noise active";
+    btnEl.innerText = "Turn Off";
+    localStorage.setItem("bt_jungle_audio_consent", "true");
+    
+    // Create pink noise buffer for river sound
+    const bufferSize = 4096;
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
+    node.onaudioprocess = function(e) {
+      const output = e.outputBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+        output[i] *= 0.02; // Very soft volume
+        b6 = white * 0.115926;
+      }
+    };
+    
+    node.connect(audioContext.destination);
+    window.jungleAudioNode = node;
+  } else {
+    audioPlaying = false;
+    statusEl.innerText = "Audio Muted";
+    btnEl.innerText = "Turn On";
+    localStorage.setItem("bt_jungle_audio_consent", "false");
+    
+    if (window.jungleAudioNode) {
+      window.jungleAudioNode.disconnect();
+      window.jungleAudioNode = null;
+    }
+  }
+}
+
+// Restore consent state on mount
+document.addEventListener("DOMContentLoaded", () => {
+  const consent = localStorage.getItem("bt_jungle_audio_consent");
+  if (consent === "true") {
+    // Wait for click interaction to allow audio context start
+    document.body.addEventListener("click", () => {
+      if (!audioPlaying && !window.jungleAudioNode) {
+        toggleJungleAudio();
+      }
+    }, { once: true });
+  }
+});
+
+</script>
+</body>
+</html>

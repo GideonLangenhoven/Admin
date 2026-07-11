@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
+import { periodBounds } from "@/app/lib/billing-period";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -14,28 +15,11 @@ function adminClient() {
 // — none of which exist in the real schema. PostgREST silently returned an
 // error and the page rendered the empty-state copy. The data tenants actually
 // need (plan, seats, billing period, email usage, overage rate) lives on
-// `businesses` + the simpler `subscriptions` row. Read from those.
-const PLAN_PRICING: Record<string, { name: string; monthly_price_zar: number; extra_seat_price_zar: number; included_seats: number }> = {
-  pro: { name: "Pro", monthly_price_zar: 1500, extra_seat_price_zar: 750, included_seats: 1 },
-  starter: { name: "Starter", monthly_price_zar: 750, extra_seat_price_zar: 750, included_seats: 1 },
-  growth: { name: "Growth", monthly_price_zar: 2500, extra_seat_price_zar: 750, included_seats: 3 },
-};
-
-function periodBounds(rawStart: string | null, rawEnd: string | null) {
-  const now = new Date();
-  const fallbackStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const fallbackEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const start = rawStart ? new Date(rawStart) : fallbackStart;
-  // period_end is often null while a subscription is open-ended; bound it to
-  // the calendar month end so the UI has a real date to render.
-  const end = rawEnd && !Number.isNaN(new Date(rawEnd).getTime())
-    ? new Date(rawEnd)
-    : new Date(start.getFullYear(), start.getMonth() + 1, 0);
-  return {
-    billing_cycle_start: start.toISOString().slice(0, 10),
-    billing_cycle_end: end.toISOString().slice(0, 10),
-  };
-}
+// `businesses` + the simpler `subscriptions` row, plus the real `plans` table
+// for pricing — a hardcoded PLAN_PRICING map used to live here too, which was
+// its own drift risk (it didn't even match plans.monthly_price_zar). Both
+// this route and /api/billing/seats now read pricing from the same place.
+const FALLBACK_PLAN = { name: "Pro", monthly_price_zar: 1500, extra_seat_price_zar: 500, included_seats: 1 };
 
 export async function GET(req: NextRequest) {
   // A suspended tenant must still see their billing status to reactivate.
@@ -44,14 +28,27 @@ export async function GET(req: NextRequest) {
 
   const db = adminClient();
 
-  const [bizRes, subRes] = await Promise.all([
+  // Scope usage to the CURRENT calendar-month period, matching the
+  // super-admin "Email Usage & Billing" panel (app/super-admin/page.tsx).
+  // This route previously read businesses.marketing_email_usage — a
+  // lifetime, never-reset counter — so once a tenant crossed their included
+  // quota even once, every future month showed a permanent overage charge,
+  // even months with zero sends.
+  const currentPeriod = new Date().toISOString().slice(0, 7); // "2026-03"
+
+  const [bizRes, subRes, usageRes] = await Promise.all([
     db.from("businesses")
-      .select("id, business_name, name, max_admin_seats, subscription_status, marketing_email_usage, marketing_included_emails, marketing_overage_rate_zar")
+      .select("id, business_name, name, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
       .eq("id", caller.business_id)
       .maybeSingle(),
     db.from("subscriptions")
       .select("id, status, plan_id, period_start, period_end")
       .eq("business_id", caller.business_id)
+      .maybeSingle(),
+    db.from("marketing_usage_monthly")
+      .select("emails_sent")
+      .eq("business_id", caller.business_id)
+      .eq("period", currentPeriod)
       .maybeSingle(),
   ]);
 
@@ -62,7 +59,15 @@ export async function GET(req: NextRequest) {
   const sub = subRes.data as any | null;
 
   const planId = String(sub?.plan_id || "pro").toLowerCase();
-  const plan = PLAN_PRICING[planId] || { name: planId.charAt(0).toUpperCase() + planId.slice(1), monthly_price_zar: 1500, extra_seat_price_zar: 750, included_seats: 1 };
+  const planRes = await db.from("plans")
+    .select("name, monthly_price_zar, extra_seat_price_zar, seat_limit")
+    .eq("id", planId)
+    .maybeSingle();
+  if (planRes.error) console.error("BILLING_PLAN_LOOKUP_ERR business=" + caller.business_id + " plan=" + planId + ": " + planRes.error.message);
+  const planRow = planRes.data as any | null;
+  const plan = planRow
+    ? { name: planRow.name, monthly_price_zar: Number(planRow.monthly_price_zar), extra_seat_price_zar: Number(planRow.extra_seat_price_zar), included_seats: Number(planRow.seat_limit) }
+    : FALLBACK_PLAN;
 
   const seatsPurchased = Number(biz.max_admin_seats || plan.included_seats || 1);
   const { billing_cycle_start, billing_cycle_end } = periodBounds(sub?.period_start || null, sub?.period_end || null);
@@ -90,7 +95,7 @@ export async function GET(req: NextRequest) {
   // the super-admin "Email Usage & Billing" panel so the two views agree.
   const extraSeats = Math.max(0, seatsPurchased - plan.included_seats);
   const seatTotal = plan.monthly_price_zar + extraSeats * plan.extra_seat_price_zar;
-  const emailUsage = Number(biz.marketing_email_usage || 0);
+  const emailUsage = Number(usageRes.data?.emails_sent || 0);
   const emailIncluded = Number(biz.marketing_included_emails || 0);
   const emailRate = Number(biz.marketing_overage_rate_zar || 0);
   const overageEmails = Math.max(0, emailUsage - emailIncluded);

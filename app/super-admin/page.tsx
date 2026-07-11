@@ -37,7 +37,7 @@ const DEFAULT_FORM: OnboardForm = {
   yocoWebhookSecret: "",
 };
 
-const BOOKING_DOMAIN = "bookingtours.co.za";
+const BOOKING_DOMAIN = "booking.bookingtours.co.za";
 
 type BusinessRow = {
   id: string;
@@ -976,20 +976,21 @@ export default function SuperAdminPage() {
 // The super-admin UI fetches /landing-pages/templates/<id>.html — if the file is
 // missing the preview 404s. Template ids shown here are the ones currently on disk.
 const TEMPLATES = [
-  { id: "adventure", name: "Adventure", desc: "Cinematic fullscreen hero, scroll-reveal animations, glassmorphism nav", preview: "A" },
-  { id: "modern", name: "Modern", desc: "Bold split-hero layout, stat counters, sharp geometric design", preview: "M" },
-  { id: "luxury", name: "Luxury", desc: "Elegant serif typography, gold accents, refined whitespace", preview: "L" },
-  { id: "safari", name: "Safari", desc: "Warm earthy tones, bottom-aligned hero, lodge aesthetic", preview: "S" },
-  { id: "coastal", name: "Coastal", desc: "Ocean blues, wave dividers, fresh beach vibes", preview: "C" },
-  { id: "minimal", name: "Minimal", desc: "Ultra-clean whitespace, no decoration, typography-focused", preview: "Mi" },
-  { id: "dark", name: "Dark", desc: "Full dark mode, neon glow accents, cinematic moody feel", preview: "D" },
-  { id: "retro", name: "Retro", desc: "Vintage serif fonts, warm film tones, nostalgic charm", preview: "R" },
-  { id: "tropical", name: "Tropical", desc: "Lush greens, vibrant gradients, paradise island energy", preview: "T" },
+  { id: "sea_kayak", name: "Sea-Kayak & Coastal", desc: "Warm paper tone, long swell divider, conditions-aware calendar, organic wave-blob hover reveal", preview: "SK" },
+  { id: "polar", name: "Polar Cruise", desc: "Ice white, jagged floe edge, temperature season dial shifts gear list", preview: "PE" },
+  { id: "desert", name: "Desert Overlanding", desc: "Sun-bleached sand, dune divider, route scrubber on custom-styled map", preview: "DO" },
+  { id: "alpine", name: "Alpine Ascent", desc: "Slate grey, mountain ridgeline, difficulty scale profile graph", preview: "AM" },
+  { id: "safari", name: "Safari Wildlife", desc: "Savanna cream, grass divider, cinema borders, live recent sightings ticker", preview: "SW" },
+  { id: "aerial", name: "Skydive Aerial", desc: "Stratosphere blue, falling teardrop mask, scroll-driven altimeter", preview: "SA" },
+  { id: "jungle", name: "Jungle River", desc: "Deep moss dark theme, foliage scroll parallax, ambient audio toggle", preview: "JR" },
+  { id: "nordic", name: "Nordic Fjord", desc: "Fog tones, waterline reflection, historical weather odds cards", preview: "NF" },
+  { id: "dive", name: "Dive & Reef", desc: "Abyss dark theme, caustic light ripple, descent depth overlay, species index", preview: "DR" },
+  { id: "wine_cycling", name: "Wine Cycling", desc: "Chalk background, vineyard rows, editorial asymmetric pairs, menu route pairing", preview: "WC" }
 ];
 
 function LandingPageManager({ businesses }: { businesses: any[] }) {
   const [selectedBiz, setSelectedBiz] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState("adventure");
+  const [selectedTemplate, setSelectedTemplate] = useState("sea_kayak");
   const [generating, setGenerating] = useState(false);
   const [generatedHtml, setGeneratedHtml] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -1003,6 +1004,16 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
     // Load business + tours data
     const { data: biz } = await supabase.from("businesses").select("*").eq("id", selectedBiz).single();
     const { data: tours } = await supabase.from("tours").select("name, description, duration_minutes, default_capacity, base_price_per_person, image_url").eq("business_id", selectedBiz).eq("hidden", false).order("sort_order");
+    // Real social proof only — approved reviews, best-rated first. Templates
+    // hide their reviews strip entirely when a business has none.
+    const { data: reviewRows } = await supabase.from("reviews")
+      .select("rating, comment, reviewer_name")
+      .eq("business_id", selectedBiz)
+      .eq("status", "APPROVED")
+      .not("comment", "is", null)
+      .order("rating", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(3);
 
     if (!biz) { notify({ title: "Error", message: "Business not found.", tone: "error" }); setGenerating(false); return; }
 
@@ -1014,14 +1025,16 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       hero_eyebrow: biz.hero_eyebrow || "",
       hero_title: biz.hero_title || biz.business_name || "Welcome",
       hero_subtitle: biz.hero_subtitle || biz.business_tagline || "",
-      hero_image: "",
+      // Photography-first: business hero image, else the first tour's image.
+      hero_image: biz.hero_image || (tours || []).find((t: any) => t.image_url)?.image_url || "",
       color_main: biz.color_main || "#1a3c34",
       color_secondary: biz.color_secondary || "#132833",
       color_cta: biz.color_cta || "#ca6c2f",
       color_bg: biz.color_bg || "#f5f5f5",
       color_nav: biz.color_nav || "#ffffff",
       color_hover: biz.color_hover || "#48cfad",
-      booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.bookingtours.co.za` : "#"),
+      booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.${BOOKING_DOMAIN}` : "#"),
+      subdomain: biz.subdomain || "",
       directions: biz.directions || "",
       what_to_bring: biz.what_to_bring || "",
       what_to_wear: biz.what_to_wear || "",
@@ -1036,6 +1049,15 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         base_price_per_person: t.base_price_per_person || "0",
         image_url: t.image_url || "",
       })),
+      has_tours: (tours || []).length > 0,
+      tour_count: String((tours || []).length),
+      reviews: (reviewRows || []).map((r: any) => ({
+        quote: r.comment || "",
+        author: r.reviewer_name || "Verified guest",
+        rating: String(r.rating || 5),
+      })),
+      has_reviews: (reviewRows || []).length > 0,
+      review_count: String((reviewRows || []).length),
     };
 
     // Fetch template
@@ -1142,7 +1164,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       </div>
 
       {/* Template previews */}
-      <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="grid grid-cols-5 md:grid-cols-10 gap-2 mb-4">
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
             className={"rounded-xl border p-2.5 text-center transition-all cursor-pointer " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-50 hover:opacity-80")}

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
+import { Camera, Envelope } from "@phosphor-icons/react";
 
 type Photo = { id: string; photo_url: string; gdrive_view_url: string | null; uploaded_at: string };
 
@@ -77,23 +78,26 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   return (
     <div className="pt-5">
       <div className="mb-4">
-        <h2 className="text-[22px] font-extrabold text-slate-900 leading-tight">Trip photos</h2>
-        {slotInfo && <p className="text-[13px] text-slate-500 font-medium">{slotInfo.tour_name} · {new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>}
+        <h2 className="font-display text-[24px] font-semibold leading-tight" style={{ color: "var(--ck-text-strong)" }}>Trip photos</h2>
+        {slotInfo && <p className="text-[13px] font-medium ui-text-muted">{slotInfo.tour_name} · {new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>}
       </div>
 
-      <label className={"flex flex-col items-center justify-center gap-2 p-6 rounded-2xl text-center cursor-pointer transition border-2 border-dashed " + (uploading ? "border-cyan-300 bg-cyan-50" : "border-slate-200 bg-white hover:border-cyan-300 active:scale-[0.99]")}>
+      <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-2xl text-center cursor-pointer transition border-2 border-dashed active:scale-[0.99]"
+        style={uploading
+          ? { borderColor: "var(--ck-accent)", background: "var(--ck-accent-soft)" }
+          : { borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)" }}>
         {uploading ? (
           <>
-            <div className="w-10 h-10 rounded-full border-[3px] border-cyan-200 border-t-cyan-600 animate-spin" />
-            <span className="text-[14px] font-bold text-cyan-700">Uploading {progress?.done || 0}/{progress?.total || 0}…</span>
+            <div className="w-10 h-10 rounded-full border-[3px] animate-spin" style={{ borderColor: "var(--ck-accent-soft)", borderTopColor: "var(--ck-accent)" }} />
+            <span className="text-[14px] font-semibold" style={{ color: "var(--ck-accent)" }}>Uploading {progress?.done || 0}/{progress?.total || 0}…</span>
           </>
         ) : (
           <>
-            <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 019.07 4h5.86a2 2 0 011.664.89l.812 1.22A2 2 0 0019.07 7H20a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <div className="ui-icon-chip w-12 h-12" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
+              <Camera size={24} />
             </div>
-            <span className="text-[15px] font-bold text-slate-800">Take or pick photos</span>
-            <span className="text-[12px] text-slate-400">Saved to your Google Drive, shared as a private gallery in the thank-you email.</span>
+            <span className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Take or pick photos</span>
+            <span className="text-[12px] ui-text-muted">Saved to your Google Drive, shared as a private gallery in the thank-you email.</span>
           </>
         )}
         <input type="file" multiple accept="image/*" capture="environment" className="hidden"
@@ -102,26 +106,28 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
 
       {photos.length > 0 && (
         <>
-          <h3 className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Uploaded · {photos.length}</h3>
+          <h3 className="ui-section-title mt-6 mb-2">Uploaded · {photos.length}</h3>
           <div className="grid grid-cols-3 gap-2">
             {photos.map(p => (
               <a key={p.id} href={p.gdrive_view_url || p.photo_url} target="_blank" rel="noreferrer"
-                className="block aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-100 active:scale-95 transition">
+                className="block aspect-square rounded-xl overflow-hidden border active:scale-95 transition"
+                style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
                 <img src={p.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
               </a>
             ))}
           </div>
 
           <button onClick={sendThankYou} disabled={!!emailStatus?.startsWith("Sending")}
-            className="mt-6 w-full flex items-center justify-center gap-2 p-4 rounded-2xl text-white font-bold shadow-sm active:scale-[0.99] transition disabled:opacity-60"
-            style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            className="mt-6 w-full flex items-center justify-center gap-2 p-4 rounded-2xl text-white font-semibold active:scale-[0.99] transition disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #D9822F, #B4641C)", boxShadow: "var(--ck-shadow-sm)" }}>
+            <Envelope size={20} />
             Send thank-you email with photos
           </button>
         </>
       )}
       {emailStatus && (
-        <p className={"mt-3 text-[13px] font-semibold text-center " + (emailStatus.startsWith("Sent") ? "text-emerald-600" : emailStatus.startsWith("Sending") ? "text-slate-400" : "text-rose-500")}>{emailStatus}</p>
+        <p className="mt-3 text-[13px] font-semibold text-center"
+          style={{ color: emailStatus.startsWith("Sent") ? "var(--ck-success)" : emailStatus.startsWith("Sending") ? "var(--ck-text-muted)" : "var(--ck-danger)" }}>{emailStatus}</p>
       )}
     </div>
   );

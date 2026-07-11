@@ -391,7 +391,6 @@ export default function NewBookingPage() {
   const qty = Math.max(0, Number(adults) || 0) + Math.max(0, Number(children) || 0);
   const unitPrice = Number(
     selectedSlot?.price_per_person_override ??
-    selectedTour?.peak_price_per_person ??
     selectedTour?.base_price_per_person ??
     0
   );

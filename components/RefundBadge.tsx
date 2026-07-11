@@ -21,20 +21,36 @@ export default function RefundBadge() {
                 { event: "*", schema: "public", table: "bookings" },
                 () => fetchCount()
             )
-            .subscribe();
+            // Refetch on (re)connect — covers changes missed while the
+            // channel was down; realtime failures are otherwise silent.
+            .subscribe((status) => {
+                if (status === "SUBSCRIBED") fetchCount();
+            });
+
+        // Realtime can silently drop; refetch whenever the tab regains focus.
+        const onFocus = () => {
+            if (document.visibilityState === "visible") fetchCount();
+        };
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onFocus);
 
         return () => {
             supabase.removeChannel(channel);
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onFocus);
         };
     }, [businessId]);
 
     async function fetchCount() {
         if (!businessId) return;
+        // ACTION_REQUIRED excluded: those await the CUSTOMER's choice
+        // (refund/voucher/reschedule) and are not operator work yet —
+        // mirrors the refunds-page queue filter.
         const { count } = await supabase
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("business_id", businessId)
-            .in("refund_status", ["REQUESTED", "ACTION_REQUIRED"]);
+            .eq("refund_status", "REQUESTED");
 
         setCount(count || 0);
     }

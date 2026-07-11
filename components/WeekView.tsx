@@ -12,7 +12,6 @@ export interface Slot {
     price_per_person_override?: number | null;
     booked: number;
     held: number;
-    available_capacity?: number;
 }
 
 interface WeekViewProps {
@@ -59,13 +58,7 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
         });
     };
 
-    const getVisibleAvailability = (slot: Slot) => {
-        const directAvailability = slot.capacity_total - slot.booked - (slot.held || 0);
-        return {
-            directAvailability,
-            effectiveAvailability: typeof slot.available_capacity === "number" ? slot.available_capacity : directAvailability,
-        };
-    };
+    const getAvailability = (slot: Slot) => slot.capacity_total - slot.booked - (slot.held || 0);
 
     const nowLabel = new Date().toLocaleTimeString("en-ZA", {
         hour: "2-digit",
@@ -106,16 +99,18 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                 </div>
                             </div>
 
-                            <div className="min-h-[280px] flex-1 space-y-2 bg-white p-2">
+                            <div className="min-h-[280px] max-h-[560px] flex-1 space-y-2 overflow-y-auto bg-white p-2">
+                                {/* max-h + overflow-y-auto: a day with many bulk-generated slots must scroll
+                                    within its own column, not stretch every other day in the row to match
+                                    (CSS Grid's default align-items:stretch would otherwise force that). */}
                                 {isToday && (
                                     <div className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
                                         Now {nowLabel}
                                     </div>
                                 )}
                                 {daySlots.map((slot) => {
-                                    const { directAvailability, effectiveAvailability } = getVisibleAvailability(slot);
+                                    const availability = getAvailability(slot);
                                     const isClosed = slot.status !== "OPEN";
-                                    const isResourceLimited = effectiveAvailability < directAvailability;
                                     return (
                                         <div
                                             key={slot.id}
@@ -123,7 +118,7 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                             className="p-2 rounded-lg border text-xs cursor-pointer transition-colors"
                                             style={isClosed
                                                 ? { background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 22%, transparent)", opacity: 0.85 }
-                                                : effectiveAvailability <= 0
+                                                : availability <= 0
                                                     ? { background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }
                                                     : { background: "var(--ck-accent-soft)", borderColor: "color-mix(in srgb, var(--ck-accent) 22%, transparent)" }}
                                         >
@@ -132,15 +127,10 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
                                                 {isClosed && <span className="rounded px-1 text-[10px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>Closed</span>}
                                             </div>
                                             <div className="mb-1 truncate font-medium" title={slot.tours?.name} style={{ color: "var(--ck-text)" }}>{slot.tours?.name}</div>
-                                            {isResourceLimited && !isClosed && (
-                                                <div className="mb-1 rounded px-1.5 py-1 text-[10px] font-medium" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
-                                                    Shared resource cap active
-                                                </div>
-                                            )}
                                             <div className="flex justify-between gap-2" style={{ color: "var(--ck-text-muted)" }}>
                                                 <span className="tabular-nums">{slot.booked}/{slot.capacity_total}</span>
-                                                <span className="tabular-nums" style={effectiveAvailability > 0 ? { color: "var(--ck-success)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}>
-                                                    {effectiveAvailability} left
+                                                <span className="tabular-nums" style={availability > 0 ? { color: "var(--ck-success)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}>
+                                                    {availability} left
                                                 </span>
                                             </div>
                                         </div>

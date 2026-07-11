@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}} — {{tagline}}</title>
+<meta name="description" content="{{hero_subtitle}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens & Base CSS ── */
+:root {
+  --bg: #EDF4FB;
+  --ink: #0B1B33;
+  --accent: #C6F432;
+  --surface: #ffffff;
+  --text-muted: #536072;
+  --border-alpha: rgba(11, 27, 51, 0.08);
+  --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
+}
+
+/* Base resets */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--ink);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+h1, h2, h3, .editorial-heading {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+/* Glass Recipe */
+.glass-panel {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Mono Micro-Label */
+.mono-label {
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--accent);
+  padding: 0.2rem 0.6rem;
+  display: inline-block;
+}
+
+/* Layout System: Anti-Grid */
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+.section-seam {
+  width: 100%;
+  line-height: 0;
+  margin: 0;
+}
+.section-seam svg {
+  width: 100%;
+  height: 40px;
+  fill: var(--bg);
+  transform: translateY(1px);
+}
+.section-seam.invert svg {
+  transform: scaleY(-1) translateY(1px);
+}
+
+/* Whitespace Budget */
+.narrative-section {
+  padding: 20vh 0;
+  position: relative;
+}
+.anti-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2rem;
+  align-items: center;
+}
+.anti-grid-text {
+  grid-column: 1 / 6;
+  max-width: 34rem;
+}
+.anti-grid-image {
+  grid-column: 7 / 13;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 16/11;
+}
+.anti-grid-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Skinned altitude panel (no-photo state) */
+.skin-altitude {
+  background: linear-gradient(160deg, var(--ink) 0%, #14315c 100%);
+  display: flex;
+}
+.skin-altitude svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Navigation */
+header.sticky-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s, backdrop-filter 0.3s;
+}
+header.sticky-nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-alpha);
+  height: 70px;
+}
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.logo-area h1 {
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.nav-links {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+}
+.nav-links a {
+  text-decoration: none;
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.nav-links a:hover {
+  opacity: 0.7;
+}
+.cta-button {
+  background-color: var(--ink);
+  color: var(--accent);
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* Altimeter indicator widget in margin */
+.altimeter-widget {
+  position: fixed;
+  right: 2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 99;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--accent);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+.alt-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+.alt-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+/* Hero Section: Full bleed Freefall POV */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  overflow: hidden;
+  background: linear-gradient(160deg, #050e1a 0%, #0d2748 55%, #16406f 100%);
+}
+.hero-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+}
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(11,27,51,0.9) 0%, rgba(11,27,51,0.2) 100%);
+  z-index: 2;
+}
+.hero-content {
+  position: relative;
+  z-index: 3;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4rem;
+  align-items: center;
+  width: 100%;
+}
+.hero-text h2 {
+  font-size: clamp(2.6rem, 6vw, 5.5rem);
+  line-height: 1;
+  margin: 1rem 0;
+}
+.hero-text p {
+  font-size: 1.15rem;
+  opacity: 0.9;
+  max-width: 44rem;
+  margin-bottom: 2rem;
+}
+
+/* Hover-Reveal Destinations List (Niarra Device - Teardrop) */
+.hover-reveal-section {
+  padding: 15vh 0;
+  background-color: var(--ink);
+  color: #fff;
+  position: relative;
+}
+.hover-list {
+  list-style: none;
+  max-width: 900px;
+  margin: 4rem auto 0 auto;
+}
+.hover-item {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 2rem 0;
+  position: relative;
+  cursor: pointer;
+}
+.hover-item-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.hover-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+.hover-item-title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-family: var(--font-display);
+  transition: transform 0.3s var(--ck-ease);
+}
+.hover-item:hover .hover-item-title {
+  transform: translateX(15px);
+}
+.hover-item-meta {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.hover-item-desc {
+  margin-top: 0.6rem;
+  font-size: 0.95rem;
+  opacity: 0.55;
+  max-width: 46rem;
+}
+.reveal-mask-container {
+  pointer-events: none;
+  position: fixed;
+  width: 320px;
+  height: 220px;
+  overflow: hidden;
+  z-index: 50;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
+  /* Falling teardrop mask */
+  clip-path: url(#teardrop-clip);
+}
+.reveal-mask-container.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.reveal-mask-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Reviews Strip */
+.reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 4rem;
+}
+.review-card {
+  border-radius: 12px;
+  padding: 2rem;
+  border-left: 4px solid var(--accent);
+}
+.review-quote {
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+.review-author {
+  display: block;
+  margin-top: 1.2rem;
+  font-weight: 600;
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+/* Persistent Booking Rail */
+.booking-rail {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-alpha);
+  padding: 1.2rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+.rail-price-info {
+  display: flex;
+  flex-direction: column;
+}
+.rail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.rail-price {
+  font-size: 1.15rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* Footer */
+.site-footer {
+  background: var(--ink);
+  color: rgba(255,255,255,0.7);
+  padding: 4rem 0 3rem;
+  text-align: center;
+}
+.site-footer .footer-line-one {
+  font-size: 1.1rem;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+.site-footer .footer-legal {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .anti-grid { grid-template-columns: 1fr; }
+  .anti-grid-text { grid-column: 1 / -1; }
+  .anti-grid-image { grid-column: 1 / -1; }
+  .altimeter-widget { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- SVG Teardrop Mask and Arc Dividers -->
+<svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
+  <defs>
+    <!-- Teardrop clip path for reveal -->
+    <clipPath id="teardrop-clip" clipPathUnits="objectBoundingBox">
+      <path d="M0.5,0 C0.7,0.3,1,0.6,1,0.8 C1,0.9,0.8,1,0.5,1 C0.2,1,0,0.9,0,0.8 C0,0.6,0.3,0.3,0.5,0 Z" />
+    </clipPath>
+  </defs>
+</svg>
+
+<!-- Navigation -->
+<header class="sticky-nav" id="main-nav">
+  <div class="container nav-inner">
+    <div class="logo-area">
+      {{#if logo_url}}
+        <img src="{{logo_url}}" alt="{{business_name}}">
+      {{else}}
+        <h1>{{business_name}}</h1>
+      {{/if}}
+    </div>
+    <nav class="nav-links">
+      <a href="#about">The Freefall</a>
+      {{#if has_tours}}<a href="#experiences">Drops</a>{{/if}}
+      <a href="{{booking_url}}" class="cta-button">Book jump</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Altimeter floating display -->
+<div class="altimeter-widget" id="altimeter-box">
+  <span class="alt-val" id="altimeter-val">14k</span>
+  <span class="alt-label">FT ALT</span>
+</div>
+
+<!-- Hero Section with POV Freefall media -->
+<section class="hero">
+  <div class="hero-media">
+    {{#if hero_image}}
+      <img src="{{hero_image}}" alt="{{business_name}}">
+    {{/if}}
+  </div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-text reveal-fade-up active">
+      <span class="mono-label">{{hero_eyebrow}}</span>
+      <h2>Sixty seconds of freefall. A lifetime of retelling.</h2>
+      <p>{{hero_subtitle}}</p>
+      <a href="{{booking_url}}" class="cta-button" style="background-color: var(--accent); color: var(--ink);">Reserve your jump</a>
+    </div>
+  </div>
+</section>
+
+<!-- Slipstream arc divider seam -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,0 Q720,80 1440,0 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+<!-- Narrative Anti-Grid Section -->
+<section class="narrative-section" id="about">
+  <div class="container anti-grid">
+    <div class="anti-grid-text reveal-fade-up">
+      <span class="mono-label">The Freefall</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">No engine. No net. Just air.</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">The door opens and the ground stops being a place you stand on. {{business_name}} isn't about looking at the view — it's about falling through it, wind roaring, everything you were carrying left behind in the plane.</p>
+      <p style="color: var(--text-muted);">Then the canopy snaps open and the world goes quiet. That's the part nobody warns you about: how still it gets on the way down.</p>
+    </div>
+    <div class="anti-grid-image skin-altitude reveal-fade-up" aria-hidden="true">
+      <svg viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice">
+        <g fill="none" stroke="rgba(198,244,50,0.5)" stroke-width="1.5">
+          <circle cx="200" cy="140" r="40"/>
+          <circle cx="200" cy="140" r="80"/>
+          <circle cx="200" cy="140" r="120"/>
+        </g>
+        <path d="M0,60 Q200,140 400,60" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="1.5"/>
+        <path d="M0,220 Q200,140 400,220" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="1.5"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- Section Divider Seam -->
+<div class="section-seam invert">
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,0 Q720,80 1440,0 L1440,40 L0,40 Z"></path>
+  </svg>
+</div>
+
+{{#if has_tours}}
+<!-- Tours as Hover-Reveal Teardrop List (Niarra Device) -->
+<section class="hover-reveal-section" id="experiences">
+  <div class="container">
+    <span class="mono-label" style="color: rgba(255,255,255,0.6)">The Manifest</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Jumps on offer</h2>
+
+    <ul class="hover-list">
+      {{#each tours}}
+      <li class="hover-item" data-image="{{image_url}}">
+        <a href="{{../booking_url}}" class="hover-item-link">
+          <div class="hover-item-content">
+            <span class="hover-item-title">{{name}}</span>
+            <span class="hover-item-meta">{{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp</span>
+          </div>
+          {{#if description}}<p class="hover-item-desc">{{description}}</p>{{/if}}
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+
+  <div class="reveal-mask-container" id="reveal-mask">
+    <img src="" id="reveal-mask-img" alt="">
+  </div>
+</section>
+{{/if}}
+
+{{#if has_reviews}}
+<!-- Reviews Strip -->
+<section class="narrative-section reviews-section">
+  <div class="container">
+    <span class="mono-label">From the drop zone</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0 0 0;">What jumpers say</h2>
+    <div class="reviews-grid">
+      {{#each reviews}}
+      <blockquote class="review-card glass-panel">
+        <p class="review-quote">{{quote}}</p>
+        <cite class="review-author">— {{author}}</cite>
+      </blockquote>
+      {{/each}}
+    </div>
+  </div>
+</section>
+{{/if}}
+
+<!-- Persistent Booking Rail -->
+<div class="booking-rail">
+  <div class="rail-price-info">
+    <span class="rail-label">{{business_name}}</span>
+    <span class="rail-price">{{tagline}}</span>
+  </div>
+  <a href="{{booking_url}}" class="cta-button">Book your jump</a>
+</div>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="container">
+    {{#if footer_line_one}}<p class="footer-line-one">{{footer_line_one}}</p>{{/if}}
+    {{#if footer_line_two}}<p>{{footer_line_two}}</p>{{/if}}
+    <p class="footer-legal">© {{year}} {{business_name}}</p>
+  </div>
+</footer>
+
+<script>
+// Niarra Hover-Mask: teardrop reveal for tours that have imagery
+const hoverItems = document.querySelectorAll('.hover-item');
+const mask = document.getElementById('reveal-mask');
+const maskImg = document.getElementById('reveal-mask-img');
+hoverItems.forEach(item => {
+  const img = item.getAttribute('data-image');
+  if (!img || !mask) return; // no image → list still links out, just no reveal
+  item.addEventListener('mouseenter', () => {
+    maskImg.src = img;
+    mask.classList.add('active');
+  });
+  item.addEventListener('mouseleave', () => mask.classList.remove('active'));
+  item.addEventListener('mousemove', (e) => {
+    mask.style.left = e.clientX + 'px';
+    mask.style.top = e.clientY + 'px';
+  });
+});
+
+// Signature Interaction: Altimeter Scroll — page position IS altitude
+window.addEventListener("scroll", () => {
+  const altBox = document.getElementById("altimeter-val");
+  if (altBox) {
+    const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const scrollPercent = totalHeight > 0 ? window.scrollY / totalHeight : 0;
+    // Unwind altimeter from 14,000 to landing (0)
+    const alt = Math.max(0, Math.round((1 - scrollPercent) * 14000));
+    altBox.innerText = alt > 1000 ? (alt/1000).toFixed(1) + 'k' : alt;
+  }
+});
+</script>
+</body>
+</html>

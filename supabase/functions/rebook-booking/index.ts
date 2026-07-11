@@ -112,7 +112,7 @@ async function authorizeCaller(req: any, body: any, booking: any): Promise<Calle
 }
 
 // ───── RESCHEDULE ─────
-async function handleReschedule(req: any, booking: any, body: any) {
+async function handleReschedule(req: any, booking: any, body: any, claimEligible: boolean) {
   const newSlotId = body.new_slot_id;
   if (!newSlotId) return fail(req, "new_slot_id required for RESCHEDULE", 400);
 
@@ -148,11 +148,15 @@ async function handleReschedule(req: any, booking: any, body: any) {
 
   // Calculate price diff
   const oldUnitPrice = Number(booking.unit_price || 0);
-  const newTourRes = await supabase.from("tours").select("base_price_per_person").eq("id", newSlot.tour_id).single();
+  const newTourRes = await supabase.from("tours").select("base_price_per_person, name").eq("id", newSlot.tour_id).single();
   const newBasePrice = (newTourRes.data && newTourRes.data.base_price_per_person) ? Number(newTourRes.data.base_price_per_person) : oldUnitPrice;
   const newUnitPrice = (newSlot.price_per_person_override != null) ? Number(newSlot.price_per_person_override) : newBasePrice;
   const newTotalAmount = newUnitPrice * newQty;
-  const diff = newTotalAmount - Number(booking.total_amount || 0);
+  // A cancelled booking only carries credit while its payout is still parked
+  // (refund_status ACTION_REQUIRED). Once the refund/voucher was issued the
+  // money already left — rebooking charges the full new price.
+  const credit = isCreditClaim && !claimEligible ? 0 : Number(booking.total_amount || 0);
+  const diff = newTotalAmount - credit;
 
   const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
 
@@ -356,7 +360,13 @@ async function handleReschedule(req: any, booking: any, body: any) {
       rebookNotifyMsg = "Your booking has been moved to a new date/time. Since the new slot costs less, we've issued you a credit voucher for the difference. Voucher code: " + vResult.data.code + " (valid for 3 years).";
     }
 
-    // Send notifications only for immediate swaps
+    // Send notifications only for immediate swaps. The in-memory relations
+    // still point at the pre-swap slot/tour — refresh them so the customer
+    // sees the NEW date/time, not the one they just moved off.
+    booking.slots = { ...(booking.slots || {}), start_time: newSlot.start_time };
+    if (newTourRes.data && newTourRes.data.name) {
+      booking.tours = { ...(booking.tours || {}), name: newTourRes.data.name };
+    }
     await sendRebookNotification(booking, "rescheduled", rebookNotifyMsg);
   }
 
@@ -1389,13 +1399,16 @@ Deno.serve(async function (req: any) {
     // UPDATE_CONTACT / SPECIAL_REQUEST / REQUEST_CHANGE are messages/metadata,
     // not booking mutations, so they're allowed on any active booking.
     if (action !== "UPDATE_CONTACT" && action !== "SPECIAL_REQUEST" && action !== "REQUEST_CHANGE") {
+      // RESCHEDULE is allowed on any cancelled booking: claim-eligible ones
+      // consume their parked credit; settled ones (refund/voucher already
+      // issued) pay the full new price via the upgrade payment-link path.
       if (!["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
-        && !(action === "RESCHEDULE" && claimEligible)) {
+        && !(action === "RESCHEDULE" && booking.status === "CANCELLED")) {
         return fail(req, "Booking is not in a modifiable state (status: " + booking.status + ")", 400);
       }
     }
 
-    if (action === "RESCHEDULE") return await handleReschedule(req, booking, body);
+    if (action === "RESCHEDULE") return await handleReschedule(req, booking, body, claimEligible);
     if (action === "ADD_GUESTS") return await handleAddGuests(req, booking, body);
     if (action === "REMOVE_GUESTS") return await handleRemoveGuests(req, booking, body);
     if (action === "UPDATE_CONTACT") return await handleUpdateContact(req, booking, body);

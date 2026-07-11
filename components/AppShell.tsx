@@ -12,6 +12,7 @@ import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 import { isNavItemActive } from "./nav-active";
+import WaFailureWatcher from "./WaFailureWatcher";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
@@ -57,8 +58,8 @@ function isSuspendedAllowed(path: string) {
    rules are unchanged; groups whose items are all hidden don't render. */
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
-  { label: "Operations", hrefs: ["/bookings", "/bookings/pending-reschedules", "/new-booking", "/slots", "/guide", "/photos"] },
-  { label: "Customers", hrefs: ["/inbox", "/notifications", "/refunds", "/vouchers", "/reviews"] },
+  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
+  { label: "Customers", hrefs: ["/inbox", "/refunds", "/vouchers", "/reviews"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts"] },
   { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/privacy/data-requests", "/super-admin"] },
@@ -186,6 +187,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Surfaces failed WhatsApp sends as in-the-moment toasts (replaces the
+          removed Notifications tab). Renders nothing. */}
+      <WaFailureWatcher />
       <aside
         className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`}
         style={{ background: SIDEBAR_BG, borderColor: "var(--ck-sidebar-border)" }}

@@ -217,11 +217,13 @@ export default function MarketingOverview() {
         </div>
         <div className="mt-2 flex items-center justify-between">
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{monthlyUsage.toLocaleString()} of {includedEmails.toLocaleString()} included</p>
-          {monthlyUsage >= includedEmails && (
-            <p className="text-xs font-medium" style={{ color: "var(--ck-danger)" }}>
-              Overage: R{((monthlyUsage - includedEmails) * overageRate).toFixed(2)}
-            </p>
-          )}
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>R{overageRate.toFixed(2)}/email over quota</p>
+        </div>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Emails sent all-time: {emailsSent.toLocaleString()}</p>
+          <p className="text-xs font-medium" style={{ color: monthlyUsage > includedEmails ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>
+            Cost this month: R{(Math.max(0, monthlyUsage - includedEmails) * overageRate).toFixed(2)}
+          </p>
         </div>
       </div>
 
