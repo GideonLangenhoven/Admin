@@ -77,7 +77,10 @@ export default function PaymentReminders() {
 
   const fmt = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-  const hoursUntil = (iso?: string | null) => (iso ? (new Date(iso).getTime() - Date.now()) / 3600000 : Infinity);
+  // Frozen at mount: render must stay pure (react-hooks lint), and a
+  // minutes-stale "cancels within Nh" warning is harmless.
+  const [now] = useState(() => Date.now());
+  const hoursUntil = (iso?: string | null) => (iso ? (new Date(iso).getTime() - now) / 3600000 : Infinity);
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
