@@ -413,7 +413,7 @@ export default function NewBookingPage() {
     const avail = Math.max(Number(s.available_capacity || 0), 0);
     return avail > 0 && (qty <= 0 || avail >= qty);
   });
-  const availableSeats = availableSlots.reduce((sum, s) => sum + Math.max((s.capacity_total || 0) - (s.booked || 0), 0), 0);
+  const availableSeats = availableSlots.reduce((sum, s) => sum + Math.max(Number(s.available_capacity || 0), 0), 0);
   const availabilityDays = useMemo(
     () => Array.from({ length: 5 }, (_, index) => addDays(matrixStartDate, index)),
     [matrixStartDate],
@@ -592,6 +592,22 @@ export default function NewBookingPage() {
         setSubmitting(false);
         notify({ title: "Booking creation failed", message: formatSupabaseError(insertError), tone: "error" });
         return;
+      }
+
+      // Count this booking's seats on the slot (held for PENDING, booked for
+      // PAID/CONFIRMED) so the public site can't oversell them. On failure the
+      // booking is rolled back — accepting it would be an overbooking.
+      if (["PENDING", "PAID", "CONFIRMED"].includes(status)) {
+        const reserveRes = await supabase.functions.invoke("manual-mark-paid", {
+          body: { action: "reserve_capacity", booking_id: createdBooking.id },
+        });
+        const reserveErr = reserveRes.error?.message || reserveRes.data?.error;
+        if (reserveErr) {
+          await supabase.from("bookings").delete().eq("id", createdBooking.id).eq("business_id", businessId);
+          setSubmitting(false);
+          notify({ title: "Not enough capacity", message: String(reserveErr), tone: "error" });
+          return;
+        }
       }
 
       // Save add-on line items (snapshot pricing at booking time)
@@ -948,7 +964,7 @@ export default function NewBookingPage() {
               <div className="mt-4 flex w-full flex-col gap-2 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <p className="ui-mono-label mb-1 !text-[10px]">Time Slots Available</p>
                 {availableSlots.slice(0, 4).map((slot, i) => {
-                  const available = Math.max((slot.capacity_total || 0) - (slot.booked || 0), 0);
+                  const available = Math.max(Number(slot.available_capacity || 0), 0);
                   const color = ["var(--ck-chart-1)", "var(--ck-chart-2)", "var(--ck-chart-3)", "var(--ck-chart-4)"][i] || "var(--ck-text-muted)";
                   return (
                     <div key={slot.id} className="flex items-center gap-2 text-sm" style={{ color: "var(--ck-text)" }}>
@@ -1157,7 +1173,7 @@ export default function NewBookingPage() {
             placeholder={availableSlots.length > 0 ? "Choose slot" : "No slots available"}
             value={selectedSlotId}
             options={availableSlots.map((slot) => {
-              const available = Math.max((slot.capacity_total || 0) - (slot.booked || 0), 0);
+              const available = Math.max(Number(slot.available_capacity || 0), 0);
               return {
                 id: slot.id,
                 name: `${fmtTime(slot.start_time)} · ${available} seats open`,

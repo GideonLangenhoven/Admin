@@ -1455,7 +1455,7 @@ Deno.serve(async function (req: any) {
     const booking = br.data;
 
     const authz = await authorizeCaller(req, body, booking);
-    if (!authz.ok) return fail(req, authz.message, authz.status);
+    if (authz.ok !== true) return fail(req, authz.message, authz.status);
 
     // Weather/admin-cancelled bookings awaiting a customer decision may claim
     // their credit (voucher/refund) or pick a new date with it.

@@ -19,7 +19,7 @@ describe("rebook-booking caller authorization (S1)", () => {
     // The gate must sit between booking load and the first action dispatch.
     const dispatchIdx = rebook.indexOf('if (action === "CLAIM_CREDIT")');
     expect(authIdx).toBeLessThan(dispatchIdx);
-    expect(rebook).toContain("if (!authz.ok) return fail(req, authz.message, authz.status)");
+    expect(rebook).toContain("if (authz.ok !== true) return fail(req, authz.message, authz.status)");
   });
 
   it("customer sessions must match the booking email AND business", () => {

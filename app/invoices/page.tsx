@@ -125,7 +125,10 @@ function counts(inv: InvoiceRecord) {
 
 function payment(inv: InvoiceRecord) {
   const total = asNumber(inv.total_amount, 0);
-  const amountPaid = asNumber(inv.amount_paid, asNumber(inv.paid_amount, 0));
+  // No amount_paid column exists — same rule as send-email's invoice render:
+  // an invoice is fully paid unless its payment method is still "Pending".
+  const paidUnlessPending = String(inv.payment_method || "").trim().toLowerCase() === "pending" ? 0 : total;
+  const amountPaid = asNumber(inv.amount_paid, asNumber(inv.paid_amount, paidUnlessPending));
   const balanceDue = Math.max(total - amountPaid, 0);
   const subtotal = total / (1 + VAT_RATE);
   const vat = total - subtotal;
