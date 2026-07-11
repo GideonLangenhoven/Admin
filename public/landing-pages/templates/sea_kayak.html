@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- signature: Tide Progress Swell - The swell line fills dynamically with tide amber as the user scrolls, cresting at the final CTA. -->
+<!-- pack: sea_kayak · signature: Tide Rail - a fixed vertical tide gauge (desktop) fills with tide amber as you scroll toward Launch, marked DAWN / UNDERWAY / LAUNCH; the same fill echoes in every terrain-seam divider and the Concierge Dock header, so the mechanic persists even where the rail itself is hidden (mobile/touch/reduced-motion). -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -22,6 +22,12 @@
   --font-display: 'Fraunces', Georgia, serif;
   --font-sans: 'Inter', system-ui, sans-serif;
 
+  /* Glass Tint personality details */
+  --glass-tint: #F7F5F0; /* Default light packs tint equals bg */
+  --r: 24px;
+  /* AA-safe deep tide amber for small labels on light surfaces */
+  --accent-text: color-mix(in srgb, var(--accent) 70%, black);
+
   /* Tenant accent colors configured in system settings */
   --tenant-main: {{color_main}};
   --tenant-secondary: {{color_secondary}};
@@ -39,20 +45,96 @@ body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  scrollbar-color: var(--accent) var(--bg);
 }
 h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+::selection { background: var(--accent); color: var(--bg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 8px; }
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 1rem;
+  z-index: 200;
+  background: var(--ink);
+  color: var(--bg) !important;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: top 0.2s var(--ck-ease);
+}
+.skip-link:focus { top: 1rem; }
+
+/* 2026 Glass tiers with border lights & noise */
+.g1 {
+  background: color-mix(in srgb, var(--glass-tint) 45%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.g2 {
+  position: relative;
+  background: color-mix(in srgb, var(--glass-tint) 66%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  backdrop-filter: blur(16px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top-color: rgba(255, 255, 255, 0.38);
+  border-radius: var(--r);
+}
+.g3 {
+  position: relative;
+  background: color-mix(in srgb, var(--glass-tint) 72%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-top-color: rgba(255, 255, 255, 0.45);
+  border-radius: var(--r);
+  box-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.35);
 }
 
-/* Glass Recipe */
-.glass-panel {
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+/* Film noise overlays inside glass (shared noise data-URI) */
+.g2::after, .g3::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+.hero-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* Backdrop-filter fallback: identical layout, quieter material */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .g1 { background: color-mix(in srgb, var(--glass-tint) 92%, transparent); }
+  .g2, .g3 {
+    background: color-mix(in srgb, var(--glass-tint) 92%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .sticky-nav.scrolled, .booking-rail {
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* Mono Micro-Label */
@@ -62,8 +144,9 @@ h1, h2, h3, .editorial-heading {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
 }
+.tnum { font-variant-numeric: tabular-nums; }
 
 /* Layout System: Anti-Grid */
 .container {
@@ -90,6 +173,7 @@ h1, h2, h3, .editorial-heading {
   grid-template-columns: repeat(12, 1fr);
   gap: 3rem;
   align-items: center;
+  position: relative;
 }
 .anti-grid-text {
   grid-column: 1 / 6;
@@ -98,12 +182,20 @@ h1, h2, h3, .editorial-heading {
   grid-column: 7 / 13;
   position: relative;
   height: 480px;
-  border-radius: 16px;
+  border-radius: var(--r);
   overflow: hidden;
   box-shadow: 0 30px 60px rgba(0,0,0,0.12);
 }
+/* Genuine edge bleed on wide viewports — the image runs past the container's
+   right padding to the viewport edge while the text column stays contained */
+@media (min-width: 1180px) {
+  .anti-grid-image {
+    border-radius: var(--r) 0 0 var(--r);
+    margin-right: calc(-1 * max(2rem, (100vw - 1300px) / 2 + 2rem));
+  }
+}
 
-/* reveal reveals observer styling */
+/* 2026 Scroll reveal animations — IntersectionObserver path (used when animation-timeline is unsupported) */
 .reveal-fade-up {
   opacity: 0;
   transform: translateY(12px);
@@ -113,6 +205,40 @@ h1, h2, h3, .editorial-heading {
   opacity: 1;
   transform: translateY(0);
 }
+.unclip-reveal {
+  clip-path: inset(8% round var(--r));
+  transform: scale(1.06);
+  transition: clip-path 0.8s var(--ck-ease), transform 0.8s var(--ck-ease);
+}
+.unclip-reveal.active {
+  clip-path: inset(0% round var(--r));
+  transform: scale(1);
+}
+
+/* Native CSS scroll-driven path — browsers that support animation-timeline skip the JS observer entirely */
+@supports (animation-timeline: view()) {
+  .reveal-fade-up {
+    animation: fadeUpReveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 25%;
+  }
+  .unclip-reveal {
+    animation: unclipReveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+}
+@keyframes fadeUpReveal { to { opacity: 1; transform: translateY(0); } }
+@keyframes unclipReveal { to { clip-path: inset(0% round var(--r)); transform: scale(1); } }
+
+/* Split-line heading reveal (shared grammar item #1) */
+.split-line-clip { display: block; overflow: hidden; }
+.split-line-inner {
+  display: block;
+  transform: translateY(110%);
+  transition: transform 0.6s var(--ck-ease);
+}
+.split-heading.lines-active .split-line-inner { transform: translateY(0); }
 
 /* Hero Section */
 .hero {
@@ -121,6 +247,7 @@ h1, h2, h3, .editorial-heading {
   display: flex;
   align-items: center;
   overflow: hidden;
+  padding: 7.5rem 0 4rem 0; /* clear the fixed nav */
 }
 .hero-media {
   position: absolute;
@@ -131,30 +258,61 @@ h1, h2, h3, .editorial-heading {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform-origin: center;
 }
+@keyframes kenBurns {
+  0% { transform: scale(1.0) translateX(0); }
+  100% { transform: scale(1.05) translateX(-2%); }
+}
+.hero-fallback-mesh {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(ellipse at 18% 15%, color-mix(in srgb, var(--accent) 30%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse at 82% 25%, color-mix(in srgb, var(--ink) 26%, transparent) 0%, transparent 60%),
+    var(--bg);
+}
+/* Salt-haze veil: paper-tinted so ink text stays AA over ANY photograph */
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.4) 100%);
+  background: linear-gradient(to top,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 74%, transparent) 45%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 100%);
   z-index: 2;
+}
+/* Persistent terrain-motif watermark — present even over real photography,
+   so the swell line reads as this pack's signature everywhere, not just
+   in the imageless fallback state */
+.hero-motif-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  opacity: 0.5;
+  pointer-events: none;
 }
 .hero-content {
   position: relative;
   z-index: 3;
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr min(400px, 38vw);
   gap: 4rem;
   align-items: center;
 }
 .hero-text {
   text-align: left;
 }
-.hero-text h2 {
-  font-size: clamp(2.6rem, 7vw, 6rem);
-  line-height: 1.05;
-  margin: 1rem 0;
+.hero-text h1 {
+  font-size: clamp(2.4rem, 4.8vw, 4.8rem);
+  line-height: 1.08;
+  margin: 1rem 0 1.25rem 0;
   color: var(--ink);
+  font-weight: 600;
 }
 .hero-text p {
   font-size: 1.15rem;
@@ -162,16 +320,33 @@ h1, h2, h3, .editorial-heading {
   max-width: 34rem;
   margin-bottom: 2rem;
 }
-.hero-widget-box {
+
+/* G3 Concierge Dock inside Hero */
+.concierge-dock {
   width: 100%;
-  border-radius: 16px;
-  padding: 2.5rem;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+  min-height: 340px;
+  overflow: hidden;
+  z-index: 10;
 }
-.widget-cta {
+.concierge-body {
+  padding: 2rem;
+  position: relative;
+  z-index: 2;
+}
+.concierge-suggestions {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+.concierge-suggestions a {
+  text-decoration: none;
+  font-weight: 500;
+  color: var(--ink);
+  transition: color 0.2s ease;
+}
+.concierge-suggestions a:hover {
+  color: var(--accent);
 }
 
 /* Nav */
@@ -196,9 +371,17 @@ h1, h2, h3, .editorial-heading {
   justify-content: space-between;
   align-items: center;
 }
-.logo-area h1 {
+.logo-area {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.logo-area .logo-wordmark {
   font-size: 1.6rem;
   color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
 }
 .logo-area img {
   height: 40px;
@@ -231,6 +414,39 @@ h1, h2, h3, .editorial-heading {
 }
 .cta-button:hover {
   transform: translateY(-2px);
+}
+/* Fill-sweep micro: a currentColor wash sweeps in on hover (transform-only) */
+.cta-button {
+  position: relative;
+  overflow: hidden;
+}
+.cta-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.14;
+  transform: translateX(-101%);
+  transition: transform 0.35s var(--ck-ease);
+  pointer-events: none;
+}
+.cta-button:hover::before, .cta-button:focus-visible::before {
+  transform: translateX(0);
+}
+/* JS flips CTA text to ink when the tenant CTA colour is light (AA guard) */
+.cta-button.cta-ink-text { color: var(--ink) !important; }
+/* Link underline draw micro */
+.nav-links a:not(.cta-button), .footer-col a, .concierge-suggestions a {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s var(--ck-ease), color 0.3s ease, opacity 0.3s ease;
+}
+.nav-links a:not(.cta-button):hover, .nav-links a:not(.cta-button):focus-visible,
+.footer-col a:hover, .footer-col a:focus-visible,
+.concierge-suggestions a:hover, .concierge-suggestions a:focus-visible {
+  background-size: 100% 1px;
 }
 
 /* Hamburger mobile nav */
@@ -275,6 +491,79 @@ h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
 }
 
+/* Mobile Action Bar */
+.mobile-action-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1rem 1.5rem;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.mobile-action-bar .cta-button {
+  flex: 1;
+  text-align: center;
+}
+
+/* Mobile Bottom Sheet for Chat */
+.mobile-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.mobile-sheet-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mobile-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 125;
+  max-height: 78vh;
+  transform: translateY(100%);
+  transition: transform 0.3s var(--ck-ease);
+  border-top-left-radius: var(--r);
+  border-top-right-radius: var(--r);
+  padding: 2.5rem 1.5rem;
+}
+.mobile-sheet.active {
+  transform: translateY(0);
+}
+.close-sheet-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+/* Shimmer load states */
+.shimmer-placeholder {
+  height: 250px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-placeholder { animation: none; background: rgba(255,255,255,0.1); }
+}
+
 /* Flagship Hover-Mask reveal */
 .hover-reveal-section {
   padding: 20vh 0;
@@ -285,7 +574,7 @@ h1, h2, h3, .editorial-heading {
 .hover-list {
   list-style: none;
   max-width: 900px;
-  margin: 4rem auto 0 auto;
+  margin: 4rem 0 0 0;
 }
 .hover-item {
   border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -305,7 +594,7 @@ h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
   transition: transform 0.3s var(--ck-ease);
 }
-.hover-item:hover .hover-item-title {
+.hover-item:hover .hover-item-title, .hover-item:focus-within .hover-item-title {
   transform: translateX(15px);
 }
 .hover-item-meta {
@@ -317,7 +606,7 @@ h1, h2, h3, .editorial-heading {
   position: fixed;
   width: 320px;
   height: 220px;
-  border-radius: 12px;
+  border-radius: var(--r);
   overflow: hidden;
   z-index: 50;
   opacity: 0;
@@ -333,12 +622,159 @@ h1, h2, h3, .editorial-heading {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.1s ease-out;
 }
 
-/* Product Sheet Cards */
+/* Visual Product Sheet cards */
+.tour-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 5rem;
+}
+@media (min-width: 900px) {
+  .tour-cards-grid > .tour-card:nth-child(2) { margin-top: 2.5rem; }
+  .tour-cards-grid > .tour-card:nth-child(3) { margin-top: -1rem; }
+}
+.tour-card {
+  color: var(--ink);
+  overflow: hidden;
+  /* g2 minimum fill fails AA over the dark tours section — raise it (contrast guard) */
+  background: color-mix(in srgb, var(--glass-tint) 86%, transparent);
+  transition: transform 0.3s var(--ck-ease), background-color 0.3s var(--ck-ease);
+}
+.tour-card:hover, .tour-card:focus-within {
+  transform: translateY(-4px);
+  background: color-mix(in srgb, var(--glass-tint) 94%, transparent);
+}
+.tour-card-media {
+  height: 220px;
+  position: relative;
+  overflow: hidden;
+}
+.tour-card-media img { width: 100%; height: 100%; object-fit: cover; }
+.tour-card-media .hero-fallback-mesh { border-radius: 0; }
+.tour-card h3 {
+  font-size: 1.3rem;
+  padding: 1.2rem 1.5rem 0 1.5rem;
+}
+.tour-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  padding: 0.8rem 1.5rem 0 1.5rem;
+}
+.tour-card-chip { color: var(--ink); }
+.tour-card-desc {
+  padding: 1rem 1.5rem 0 1.5rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+  opacity: 0.85;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tour-card-cta {
+  display: inline-block;
+  margin: 1.2rem 1.5rem 1.5rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 2px;
+  transition: color 0.2s ease;
+}
+.tour-card-cta:hover { color: var(--accent); }
+
+/* Cursor Aura */
+.cursor-aura {
+  position: fixed;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s, background 0.3s;
+}
+.cursor-dot {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .cursor-aura, .cursor-dot { display: none !important; }
+}
+
+/* Tide Rail — the signature interaction's prominent desktop instrument.
+   Fixed vertical tide gauge, transform-only (scaleY/translateY), so it
+   never touches layout properties during scroll. */
+.tide-rail {
+  display: none;
+  position: fixed;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 70vh;
+  width: 40px;
+  z-index: 80;
+  padding: 1.25rem 0;
+  border-radius: 999px;
+  pointer-events: none;
+}
+@media (min-width: 1280px) and (pointer: fine) {
+  .tide-rail { display: block; }
+  /* Reserve the rail's gutter site-wide — the rail is fixed to the
+     viewport, so every section that scrolls through its vertical band
+     needs the same left clearance, not just the hero. */
+  .container { padding-left: 6rem; }
+}
+.tide-rail-track {
+  position: relative;
+  width: 3px;
+  height: 100%;
+  margin: 0 auto;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tide-rail-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  border-radius: 3px;
+  transform: scaleY(0);
+  transform-origin: top;
+  will-change: transform;
+}
+.tide-rail-marker {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translate(-50%, 0);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tide-rail-fill, .tide-rail-marker { transition: none !important; }
+}
+
+/* Product Sheet Cards (Practical Guide) */
 .product-sheet {
   background-color: var(--surface);
-  border-radius: 16px;
+  border-radius: var(--r);
   border: 1px solid var(--border-alpha);
   overflow: hidden;
   margin-top: 4rem;
@@ -375,7 +811,7 @@ h1, h2, h3, .editorial-heading {
 .review-quote {
   padding: 2rem;
   background: var(--surface);
-  border-radius: 12px;
+  border-radius: var(--r);
   border: 1px solid var(--border-alpha);
   box-shadow: 0 10px 30px rgba(0,0,0,0.02);
 }
@@ -395,6 +831,94 @@ h1, h2, h3, .editorial-heading {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* Pinned chapter — "first light, hour by hour": the page's single pinned scene.
+   Static (no JS / reduced motion): a calm pre-dawn section, all steps visible.
+   Enhanced (.pc-live): 280vh runway, sticky viewport, backdrops crossfade and
+   steps swap driven purely by native scroll progress. */
+.pinned-chapter { position: relative; background: #0A1F16; }
+.pinned-sticky { position: relative; padding: 20vh 0; overflow: hidden; }
+.pinned-backdrop { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.pinned-backdrop.pb-1 {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 55%),
+    linear-gradient(to top, #0E2A1D 0%, #071510 100%);
+}
+.pinned-backdrop.pb-2 {
+  background:
+    radial-gradient(ellipse at 50% 88%, color-mix(in srgb, var(--accent) 55%, transparent) 0%, transparent 60%),
+    linear-gradient(to top, #35473D 0%, #12291E 100%);
+}
+.pinned-backdrop.pb-3 {
+  background:
+    radial-gradient(ellipse at 50% 82%, color-mix(in srgb, var(--accent) 38%, transparent) 0%, transparent 65%),
+    linear-gradient(to top, var(--bg) 0%, #C9CDC2 100%);
+}
+.pinned-panel {
+  position: relative;
+  max-width: 30rem;
+  padding: 2.5rem;
+  /* raised fill: ink text must stay AA over the darkest backdrop */
+  background: color-mix(in srgb, var(--glass-tint) 86%, transparent);
+}
+.pinned-step { padding: 1.25rem 0; border-bottom: 1px solid var(--border-alpha); }
+.pinned-step:last-child { border-bottom: none; }
+.pinned-time {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-style: italic;
+  color: var(--accent-text);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.pinned-step p { font-size: 0.98rem; color: var(--ink); opacity: 0.85; }
+.pinned-chapter.pc-live { height: 280vh; }
+.pinned-chapter.pc-live .pinned-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.pinned-chapter.pc-live .pinned-steps { position: relative; height: 12rem; margin-top: 1rem; }
+.pinned-chapter.pc-live .pinned-step {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border: none;
+  padding: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s var(--ck-ease), transform 0.5s var(--ck-ease);
+}
+.pinned-chapter.pc-live .pinned-step.on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Final CTA */
+.final-cta {
+  position: relative;
+  padding: 24vh 0;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--bg);
+}
+.final-cta .hero-fallback-mesh {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* dark variant: paper display text must stay AA on this backdrop */
+  background:
+    radial-gradient(ellipse at 30% 15%, color-mix(in srgb, var(--accent) 24%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 95%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 60%),
+    var(--ink);
+}
+.final-cta .container { position: relative; z-index: 2; }
+.final-cta h2 { color: var(--bg); max-width: 42rem; }
 
 /* Persistent Booking Rail */
 .booking-rail {
@@ -421,15 +945,51 @@ h1, h2, h3, .editorial-heading {
 footer {
   background-color: var(--ink);
   color: var(--bg);
-  padding: 6rem 2rem 3rem 2rem;
-  text-align: center;
+  padding: 0 2rem 3rem 2rem;
   border-top: 1px solid rgba(255,255,255,0.05);
 }
+.footer-wordmark {
+  font-size: clamp(3rem, 11vw, 8.5rem);
+  font-style: italic;
+  line-height: 0.95;
+  margin: 5rem 0 3rem 0;
+  color: var(--bg);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.footer-col { display: flex; flex-direction: column; gap: 0.7rem; }
+.footer-col a, .footer-col p {
+  color: var(--bg);
+  opacity: 0.75;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.footer-col a:hover { opacity: 1; color: var(--accent); }
+.footer-copyright {
+  opacity: 0.6;
+  font-size: 0.8rem;
+  padding: 2rem 0;
+}
+.footer-copyright a { color: inherit; text-decoration: underline; }
 
-/* Fallback SVG styling */
+/* Below-fold render skipping (Lighthouse). Not applied to the tours section:
+   paint containment would re-root its position:fixed hover mask. */
+#practical, .reviews-section, .final-cta {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
+/* Fallback SVG styling (mask motif — hover-reveal clip-path only) */
 .fallback-svg {
-  background-color: var(--accent);
-  fill: var(--bg);
+  background: radial-gradient(circle, var(--accent) 0%, var(--bg) 100%);
+  fill: var(--ink);
 }
 
 /* Responsive */
@@ -448,7 +1008,12 @@ footer {
 @media (max-width: 768px) {
   .nav-links { display: none; }
   .hamburger { display: block; }
-  .booking-rail { flex-direction: column; gap: 1rem; text-align: center; }
+  .booking-rail { display: none; }
+  .mobile-action-bar { display: flex; }
+  .footer-wordmark { white-space: normal; }
+  /* The dock lives in the mobile bottom sheet only — not inline in the hero */
+  .concierge-dock { display: none; }
+  .hero-text { padding-bottom: 5rem; }
 }
 
 /* prefers-reduced-motion check */
@@ -459,14 +1024,16 @@ footer {
     animation-iteration-count: 1 !important;
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
+  }
+  /* Neutralise motion transforms only — state-bearing transforms
+     (mobile sheet off-screen state, tide-rail centring) must survive */
+  .reveal-fade-up, .unclip-reveal {
+    opacity: 1 !important;
+    clip-path: inset(0) !important;
     transform: none !important;
   }
-  .reveal-fade-up { opacity: 1 !important; }
-}
-
-@keyframes kenBurns {
-  0% { transform: scale(1.0); }
-  100% { transform: scale(1.06); }
+  .split-line-inner { transform: none !important; }
+  .hero-media img { animation: none !important; }
 }
 
 
@@ -478,12 +1045,45 @@ footer {
         stroke-dashoffset: 1500;
         transition: stroke-dashoffset 0.1s ease-out;
       }
-    
+      /* Custom Swell Animation for Concierge Dock Header */
+      .dock-swell-header {
+        position: relative;
+        height: 48px;
+        background: var(--ink);
+        color: var(--bg);
+        display: flex;
+        align-items: center;
+        padding: 0 1.5rem;
+        border-top-left-radius: inherit;
+        border-top-right-radius: inherit;
+        overflow: hidden;
+      }
+      .dock-swell-header::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 8px;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,10 Q25,0 50,10 T100,10 L100,10 L0,10 Z' fill='%23F7F5F0'/%3E%3C/svg%3E");
+        background-size: 50px 8px;
+        animation: swellMove 4s infinite linear;
+      }
+      @keyframes swellMove {
+        0% { background-position-x: 0; }
+        100% { background-position-x: 50px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dock-swell-header::before { animation: none; }
+      }
+
 </style>
 </head>
 <body>
 
-<!-- SVG Organic clip-path mask -->
+<a href="#main-content" class="skip-link">Skip to content</a>
+
+<!-- SVG Organic clip-path mask (sanctioned use: hover-mask reveal only) -->
 <svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
   <defs>
     <clipPath id="organic-mask" clipPathUnits="objectBoundingBox">
@@ -492,23 +1092,35 @@ footer {
   </defs>
 </svg>
 
+<!-- Interactive Cursor Aura (Fine pointer only) -->
+<div class="cursor-aura" id="aura"></div>
+<div class="cursor-dot" id="dot"></div>
+
+<!-- Tide Rail: signature interaction, prominent desktop instrument -->
+<div class="tide-rail g3" aria-hidden="true">
+  <div class="tide-rail-track">
+    <div class="tide-rail-fill" id="tide-fill"></div>
+    <div class="tide-rail-marker" id="tide-marker"></div>
+  </div>
+</div>
+
 <!-- Navigation -->
 <header class="sticky-nav" id="main-nav">
   <div class="container nav-inner">
-    <div class="logo-area">
+    <a class="logo-area" href="#top" aria-label="{{business_name}} — back to top">
       {{#if logo_url}}
         <img src="{{logo_url}}" alt="{{business_name}}">
       {{else}}
-        <h1>{{business_name}}</h1>
+        <span class="logo-wordmark">{{business_name}}</span>
       {{/if}}
-    </div>
-    <nav class="nav-links">
+    </a>
+    <nav class="nav-links" aria-label="Primary">
       <a href="#about">Our Story</a>
       <a href="#experiences">Experiences</a>
       <a href="#practical">Practical Guide</a>
-      <a class="cta-button" href="{{booking_url}}">Book Now</a>
+      <a class="cta-button magnet-target" href="{{booking_url}}">Book Now</a>
     </nav>
-    <button class="hamburger" id="ham-toggle" aria-label="Toggle Navigation">
+    <button class="hamburger" id="ham-toggle" aria-label="Toggle Navigation" aria-expanded="false">
       <span></span>
       <span></span>
       <span></span>
@@ -517,39 +1129,64 @@ footer {
 </header>
 
 <!-- Mobile Navigation Drawer -->
-<div class="mobile-overlay" id="mobile-nav">
+<div class="mobile-overlay" id="mobile-nav" role="dialog" aria-modal="true" aria-label="Mobile navigation">
   <a href="#about" id="link-about">Our Story</a>
   <a href="#experiences" id="link-experiences">Experiences</a>
   <a href="#practical" id="link-practical">Practical Guide</a>
   <a class="cta-button" href="{{booking_url}}">Book Now</a>
 </div>
 
+<main id="main-content">
+
 <!-- Hero Section -->
 <section class="hero">
   <div class="hero-media">
     {{#if hero_image}}
-      <img src="{{hero_image}}" alt="{{business_name}}" style="animation: kenBurns 20s infinite alternate linear;" fetchpriority="high">
+      <img src="{{hero_image}}" alt="{{business_name}}" style="animation: kenBurns 24s infinite alternate linear;" fetchpriority="high">
     {{else}}
-      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
-        <rect width="100" height="100" fill="var(--bg)"/>
-        <path d="M0.12,0.3 C0.23,0.12,0.45,0.02,0.65,0.08 C0.82,0.13,0.95,0.35,0.91,0.58 C0.86,0.85,0.58,0.98,0.35,0.92 C0.18,0.88,0.02,0.68,0.01,0.5 C-0.01,0.38,0.04,0.36,0.12,0.3 Z" fill="var(--ink)" opacity="0.1"/>
-      </svg>
+      <div class="hero-fallback-mesh">
+        <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;">
+          <path d="M0,560 C240,610 480,500 720,540 C960,580 1200,480 1440,530 L1440,900 L0,900 Z" fill="var(--ink)" opacity="0.14"/>
+          <path d="M0,660 C240,700 480,620 720,650 C960,680 1200,610 1440,640 L1440,900 L0,900 Z" fill="var(--accent)" opacity="0.18"/>
+        </svg>
+      </div>
     {{/if}}
   </div>
   <div class="hero-overlay"></div>
+  <div class="hero-motif-line" aria-hidden="true">
+    <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;">
+      <path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="2" fill="none"/>
+    </svg>
+  </div>
+  <div class="hero-noise"></div>
   <div class="hero-content container">
     <div class="hero-text reveal-fade-up active">
-      <span class="mono-label" style="color:var(--bg);">{{hero_eyebrow}}</span>
-      <h2>{{#if hero_title}}{{hero_title}}{{else}}Paddle out at first light — we'll have the coffee ready.{{/if}}</h2>
-      <p style="color:var(--bg); opacity: 0.8;">{{hero_subtitle}}</p>
-      <a class="cta-button" href="{{booking_url}}">Book Experience</a>
+      <span class="mono-label" style="font-weight:700;">{{hero_eyebrow}}</span>
+      <h1 class="split-heading lines-active">{{#if hero_title}}{{hero_title}}{{else}}Paddle out at first light — we'll have the coffee ready.{{/if}}</h1>
+      <p style="color:var(--ink); opacity: 0.85;">{{hero_subtitle}}</p>
+      <a class="cta-button magnet-target" href="{{booking_url}}">Explore Excursions</a>
     </div>
-    <div class="hero-widget-box glass-panel">
-      <div class="widget-cta">
-        <span class="mono-label">Online bookings</span>
-        <h3 style="font-family: var(--font-display);">Check Real-Time Openings</h3>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">Select your route, view verified spaces, and secure checkout instantly.</p>
-        <a class="cta-button" href="{{booking_url}}" style="width: 100%; text-align: center;">Launch Booking Portal</a>
+
+    <!-- V2 G3 Concierge Dock (Desktop Inline) -->
+    <div class="concierge-dock g3" id="desktop-dock">
+      <div class="dock-swell-header">
+        <span class="mono-label" style="color:#fff; font-size:10px;">Concierge</span>
+      </div>
+      <div class="concierge-body">
+        {{#if has_chat}}
+          <div id="concierge-mount">
+            <div class="shimmer-placeholder"></div>
+          </div>
+          <template id="concierge-embed">{{chat_embed}}</template>
+        {{else}}
+          <span class="mono-label">Concierge</span>
+          <p style="font-size:0.95rem; margin:0.5rem 0 1.5rem 0; line-height:1.5;">Tides, routes, what to wear — the practical guide below covers most of it. The dawn slots go first.</p>
+          <div class="concierge-suggestions">
+            <a href="#about" class="mono-label" style="font-size:12px;">&rarr; Our Story</a>
+            <a href="#experiences" class="mono-label" style="font-size:12px;">&rarr; View Experiences</a>
+            <a href="{{booking_url}}" class="mono-label" style="font-size:12px;">&rarr; Book Now</a>
+          </div>
+        {{/if}}
       </div>
     </div>
   </div>
@@ -557,51 +1194,113 @@ footer {
 
 <!-- Section Divider Seam -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--bg)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" /></svg>
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--bg)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
 </div>
 
 <!-- Narrative Anti-Grid Section -->
 <section class="narrative-section" id="about">
   <div class="container anti-grid">
     <div class="anti-grid-text reveal-fade-up">
-      <span class="mono-label">Narrative</span>
-      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A deliberate pace of outdoor adventure</h2>
-      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We believe the best experiences are measured by depth, not distance. Our guided outings offer an intentional redirection from the haste of the world. With expert guides and custom gear, we venture into wild spaces with restraint and curiosity.</p>
-      <p style="color: var(--text-muted);">Every details is mapped. You bring the curiosity, we handle the rest.</p>
+      <span class="mono-label">The Water</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">The tide doesn't wait, so neither do we</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">Most mornings we're on the water before the town wakes — flat calm, low light, the kind of quiet you don't get to choose back on land. The coast changes by the hour here, and knowing which hour to be on it is most of the job.</p>
+      <p style="color: var(--text-muted);">You don't need experience. You need fifteen minutes of instruction, a boat that fits, and a guide who's read this stretch of coast for years. We handle the rest.</p>
     </div>
-    <div class="anti-grid-image reveal-fade-up">
-      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
-        <rect width="100" height="100" fill="var(--bg)"/>
-        <path d="M0.12,0.3 C0.23,0.12,0.45,0.02,0.65,0.08 C0.82,0.13,0.95,0.35,0.91,0.58 C0.86,0.85,0.58,0.98,0.35,0.92 C0.18,0.88,0.02,0.68,0.01,0.5 C-0.01,0.38,0.04,0.36,0.12,0.3 Z" fill="var(--accent)" opacity="0.2"/>
-      </svg>
+    <div class="anti-grid-image unclip-reveal">
+      <div class="hero-fallback-mesh">
+        <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;">
+          <path d="M0,560 C240,610 480,500 720,540 C960,580 1200,480 1440,530 L1440,900 L0,900 Z" fill="var(--ink)" opacity="0.14"/>
+          <path d="M0,660 C240,700 480,620 720,650 C960,680 1200,610 1440,640 L1440,900 L0,900 Z" fill="var(--accent)" opacity="0.18"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section Divider Seam (into the pre-dawn chapter) -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="#0A1F16"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
+</div>
+
+<!-- Pinned Chapter: first light, hour by hour -->
+<section class="pinned-chapter" id="daybreak" aria-label="A first-light outing, hour by hour">
+  <div class="pinned-sticky">
+    <div class="pinned-backdrop pb-1" aria-hidden="true"></div>
+    <div class="pinned-backdrop pb-2" aria-hidden="true"></div>
+    <div class="pinned-backdrop pb-3" aria-hidden="true"></div>
+    <div class="container">
+      <div class="pinned-panel g3">
+        <span class="mono-label">A first-light outing, hour by hour</span>
+        <div class="pinned-steps">
+          <div class="pinned-step">
+            <span class="pinned-time tnum">05:40</span>
+            <p>Kit fitted on the slipway in the half-dark. The water is glass and nobody is talking much yet.</p>
+          </div>
+          <div class="pinned-step">
+            <span class="pinned-time tnum">06:10</span>
+            <p>First light finds the kelp beds and the whole coast turns amber. This is the hour we build the trip around.</p>
+          </div>
+          <div class="pinned-step">
+            <span class="pinned-time tnum">07:00</span>
+            <p>Back on the sand — coffee going around, salt drying on your hands, the whole day still ahead of you.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- Section Divider Seam -->
 <div class="section-seam invert">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--bg)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" /></svg>
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--ink)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
 </div>
 
-<!-- Hover-Reveal Experiences List -->
+<!-- Hover-Reveal Experiences List + Visual Product Sheets -->
 {{#if has_tours}}
 <section class="hover-reveal-section" id="experiences">
   <div class="container">
     <span class="mono-label" style="color: var(--bg); opacity: 0.6;">Curated Routes</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Select Your Excursion</h2>
+    <h2 class="split-heading" style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Select Your Excursion</h2>
 
     <ul class="hover-list">
       {{#each tours}}
       <li class="hover-item" data-image="{{image_url}}">
         <a href="{{../booking_url}}" class="hover-item-content">
           <span class="hover-item-title">{{name}}</span>
-          <span class="hover-item-meta mono-label" style="color: inherit;">
+          <span class="hover-item-meta mono-label tnum" style="color: inherit;">
             {{duration_minutes}} min &middot; max {{default_capacity}} &middot; from {{../currency}}{{base_price_per_person}}
           </span>
         </a>
       </li>
       {{/each}}
     </ul>
+
+    <div class="tour-cards-grid">
+      {{#each tours}}
+      <article class="tour-card g2">
+        <div class="tour-card-media unclip-reveal">
+          {{#if image_url}}
+            <img src="{{image_url}}" alt="{{name}}" loading="lazy">
+          {{else}}
+            <div class="hero-fallback-mesh">
+              <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;">
+                <path d="M0,560 C240,610 480,500 720,540 C960,580 1200,480 1440,530 L1440,900 L0,900 Z" fill="var(--ink)" opacity="0.14"/>
+                <path d="M0,660 C240,700 480,620 720,650 C960,680 1200,610 1440,640 L1440,900 L0,900 Z" fill="var(--accent)" opacity="0.18"/>
+              </svg>
+            </div>
+          {{/if}}
+        </div>
+        <h3>{{name}}</h3>
+        <div class="tour-card-chips">
+          <span class="tour-card-chip mono-label tnum"><span class="count-up" data-target="{{duration_minutes}}">{{duration_minutes}}</span> min</span>
+          <span class="tour-card-chip mono-label tnum">max <span class="count-up" data-target="{{default_capacity}}">{{default_capacity}}</span></span>
+          <span class="tour-card-chip mono-label tnum">from {{../currency}}<span class="count-up" data-target="{{base_price_per_person}}">{{base_price_per_person}}</span></span>
+        </div>
+        <p class="tour-card-desc">{{description}}</p>
+        <a class="tour-card-cta" href="{{../booking_url}}">Book This Route &rarr;</a>
+      </article>
+      {{/each}}
+    </div>
   </div>
 
   <!-- Float reveal mask -->
@@ -613,7 +1312,7 @@ footer {
 
 <!-- Section Divider Seam -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--bg)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" /></svg>
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--bg)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
 </div>
 
 <!-- Practical Guide -->
@@ -621,11 +1320,10 @@ footer {
   <div class="container">
     <span class="mono-label">Preparation</span>
     <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Trip Guidelines</h2>
-    <p style="color: var(--text-muted); max-width: 45rem;">Everything you need to know to ensure a comfortable and secure journey.</p>
+    <p style="color: var(--text-muted); max-width: 45rem;">Show up ready and the rest is easy.</p>
 
-    <div class="product-sheet">
+    <div class="product-sheet g2">
       {{#if what_to_bring}}
-      <div class="skin-divider-line" style="border-bottom: 1px solid var(--border-alpha);"></div>
       <div class="gear-section">
         <div class="gear-col">
           <span class="mono-label">What to bring</span>
@@ -650,8 +1348,6 @@ footer {
       </div>
       {{/if}}
     </div>
-    
-    
   </div>
 </section>
 
@@ -663,7 +1359,7 @@ footer {
     <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">From Our Guests</h2>
     <div class="reviews-grid">
       {{#each reviews}}
-      <blockquote class="review-quote">
+      <blockquote class="review-quote g2">
         <p>"{{quote}}"</p>
         <cite>{{author}}</cite>
       </blockquote>
@@ -673,39 +1369,198 @@ footer {
 </section>
 {{/if}}
 
-<!-- Persistent Booking Rail -->
-<div class="booking-rail">
+<!-- Section Divider Seam (into the dark finale) -->
+<div class="section-seam">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--ink)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
+</div>
+
+<!-- Final CTA -->
+<section class="final-cta">
+  <div class="hero-fallback-mesh">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;">
+      <path d="M0,560 C240,610 480,500 720,540 C960,580 1200,480 1440,530 L1440,900 L0,900 Z" fill="var(--accent)" opacity="0.14"/>
+      <path d="M0,660 C240,700 480,620 720,650 C960,680 1200,610 1440,640 L1440,900 L0,900 Z" fill="var(--bg)" opacity="0.06"/>
+    </svg>
+  </div>
+  <div class="hero-noise"></div>
+  <div class="container">
+    <span class="mono-label">Set Sail</span>
+    <h2 class="split-heading" style="font-size: clamp(2.2rem, 5vw, 4.5rem); margin: 1rem 0 2.5rem 0;">The coffee's on. The tide's already turning.</h2>
+    <a class="cta-button magnet-target" href="{{booking_url}}">Reserve Your Launch</a>
+  </div>
+</section>
+
+</main>
+
+<!-- Persistent Booking Rail (Desktop/Tablet) -->
+<div class="booking-rail g3">
   <div class="rail-price-info">
     <span class="mono-label">Instant Booking</span>
     <span class="rail-price" style="font-size:1.2rem; font-family:var(--font-sans); font-weight:500;">Secure your calendar slot</span>
   </div>
-  <a class="cta-button" href="{{booking_url}}">Secure My Spot</a>
+  <a class="cta-button magnet-target" href="{{booking_url}}">Secure My Spot</a>
+</div>
+
+<!-- Mobile Bottom Action Bar -->
+<div class="mobile-action-bar g3">
+  <a class="cta-button" href="{{booking_url}}">Book Now</a>
+  {{#if has_chat}}
+    <button class="cta-button" id="chat-bar-btn" style="background:var(--ink); border:1px solid rgba(255,255,255,0.15);">Chat</button>
+  {{/if}}
+</div>
+
+<!-- Mobile Chat Bottom Sheet -->
+<div class="mobile-sheet-overlay" id="sheet-overlay"></div>
+<div class="mobile-sheet g3" id="chat-sheet" role="dialog" aria-modal="true" aria-label="{{business_name}} chat">
+  <button class="close-sheet-btn" id="close-sheet" aria-label="Close Chat">&times;</button>
+  <div class="dock-swell-header">
+    <span class="mono-label" style="color:#fff; font-size:10px;">Concierge</span>
+  </div>
+  <div class="concierge-body" style="padding:1.5rem 0;">
+    <div id="concierge-mount-mobile">
+      <div class="shimmer-placeholder"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Footer -->
 <footer>
+  <div class="section-seam">
+    <svg viewBox="0 0 1440 60" preserveAspectRatio="none" class="swell-progress-svg" style="width:100%;height:60px;fill:none;stroke-linecap:round;"><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35 L1440,60 L0,60 Z" fill="var(--ink)"/><path d="M0,35 C240,60 480,10 720,35 C960,60 1200,10 1440,35" stroke="var(--accent)" stroke-width="3" class="progress-path" fill="none"/></svg>
+  </div>
   <div class="container">
-    <h3 style="font-size: 2.2rem; margin-bottom: 1rem; font-family: var(--font-display);">Paddle out at first light — we'll have the coffee ready.</h3>
-    <p style="opacity: 0.8; max-width: 32rem; margin: 0 auto 2rem auto; font-size: 0.95rem;">Join us for an unforgettable outing. Live availability is updated in real-time.</p>
-    <a class="cta-button" href="{{booking_url}}" style="margin-bottom: 3rem;">Launch Calendar</a>
-    <p style="opacity: 0.6; font-size: 0.8rem; margin-top:2rem;">&copy; {{year}} {{business_name}} &middot; {{footer_line_one}}{{#if footer_line_two}} &middot; {{footer_line_two}}{{/if}} &middot; Powered by <a href="https://bookingtours.co.za" style="color: inherit; text-decoration: underline;">BookingTours</a></p>
+    <p class="footer-wordmark split-heading">{{business_name}}</p>
+    <div class="footer-columns">
+      <div class="footer-col">
+        <span class="mono-label" style="color:var(--accent);">Explore</span>
+        <a href="#about">Our Story</a>
+        <a href="#experiences">Experiences</a>
+        <a href="#practical">Practical Guide</a>
+      </div>
+      <div class="footer-col">
+        <span class="mono-label" style="color:var(--accent);">Book</span>
+        <a href="{{booking_url}}">Reserve a Spot</a>
+      </div>
+      {{#if footer_line_one}}
+      <div class="footer-col">
+        <span class="mono-label" style="color:var(--accent);">Find Us</span>
+        <p>{{footer_line_one}}</p>
+        <p>{{footer_line_two}}</p>
+      </div>
+      {{/if}}
+    </div>
+    <p class="footer-copyright">&copy; {{year}} {{business_name}} &middot; Powered by <a href="https://bookingtours.co.za">BookingTours</a></p>
   </div>
 </footer>
 
 <script>
-// Scroll Reveal Observer
-document.addEventListener("DOMContentLoaded", () => {
-  const elements = document.querySelectorAll('.reveal-fade-up');
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('active');
-      }
-    });
-  }, { threshold: 0.1 });
+// Split-line heading reveal (shared grammar item #1)
+function splitLines(el) {
+  const words = el.textContent.split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  el.setAttribute('aria-label', el.textContent.trim());
+  el.innerHTML = '';
+  const measureSpans = words.map((w, i) => {
+    const span = document.createElement('span');
+    span.textContent = w + (i < words.length - 1 ? ' ' : '');
+    span.style.display = 'inline-block';
+    el.appendChild(span);
+    return span;
+  });
+  const lines = [];
+  let currentTop = null;
+  let currentLine = [];
+  measureSpans.forEach((span) => {
+    const top = span.offsetTop;
+    if (currentTop === null || Math.abs(top - currentTop) < 2) {
+      currentLine.push(span);
+      currentTop = top;
+    } else {
+      lines.push(currentLine);
+      currentLine = [span];
+      currentTop = top;
+    }
+  });
+  if (currentLine.length) lines.push(currentLine);
+  el.innerHTML = '';
+  lines.forEach((lineSpans, i) => {
+    const clip = document.createElement('span');
+    clip.className = 'split-line-clip';
+    const inner = document.createElement('span');
+    inner.className = 'split-line-inner';
+    inner.style.transitionDelay = (i * 70) + 'ms';
+    lineSpans.forEach((s) => inner.appendChild(s));
+    clip.appendChild(inner);
+    el.appendChild(clip);
+  });
+}
 
-  elements.forEach(el => observer.observe(el));
-});
+const splitObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('lines-active');
+      splitObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.2 });
+
+const runSplit = () => {
+  document.querySelectorAll('.split-heading').forEach((el) => {
+    if (!el.textContent.trim() || el.dataset.split) return;
+    el.dataset.split = 'true';
+    const wasActive = el.classList.contains('lines-active');
+    splitLines(el);
+    if (wasActive) el.classList.add('lines-active');
+    else splitObserver.observe(el);
+  });
+};
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(runSplit);
+} else {
+  runSplit();
+}
+
+// Scroll Reveal Observer — only needed when the browser lacks animation-timeline: view()
+if (!(window.CSS && CSS.supports && CSS.supports('animation-timeline', 'view()'))) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const elements = document.querySelectorAll('.reveal-fade-up, .unclip-reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+        }
+      });
+    }, { threshold: 0.1 });
+    elements.forEach(el => observer.observe(el));
+  });
+}
+
+// Count-up on stat chips
+function animateCount(el) {
+  const target = parseFloat(el.dataset.target);
+  if (isNaN(target)) return;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) { el.textContent = el.dataset.target; return; }
+  const duration = 800;
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = el.dataset.target;
+  }
+  requestAnimationFrame(tick);
+}
+const countObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      animateCount(entry.target);
+      countObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.4 });
+document.querySelectorAll('.count-up').forEach(el => countObserver.observe(el));
 
 // Sticky Header on Scroll
 window.addEventListener("scroll", () => {
@@ -719,21 +1574,50 @@ window.addEventListener("scroll", () => {
   }
 });
 
+// Minimal focus trap used by the mobile nav overlay and chat sheet
+function trapFocus(container) {
+  const focusables = container.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return () => {};
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  function handleKey(e) {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }
+  container.addEventListener('keydown', handleKey);
+  first.focus();
+  return () => container.removeEventListener('keydown', handleKey);
+}
+
 // Mobile Hamburger Toggle
 const toggleBtn = document.getElementById('ham-toggle');
 const mobNav = document.getElementById('mobile-nav');
 const mobLinks = document.querySelectorAll('.mobile-overlay a');
+let navFocusCleanup = null;
+let lastFocusedBeforeNav = null;
 
 if (toggleBtn && mobNav) {
   const toggleMenu = () => {
     const active = mobNav.classList.toggle('active');
     toggleBtn.classList.toggle('active');
+    toggleBtn.setAttribute('aria-expanded', active ? 'true' : 'false');
     document.body.style.overflow = active ? 'hidden' : 'auto';
+    if (active) {
+      lastFocusedBeforeNav = document.activeElement;
+      navFocusCleanup = trapFocus(mobNav);
+    } else {
+      if (navFocusCleanup) navFocusCleanup();
+      navFocusCleanup = null;
+      if (lastFocusedBeforeNav && lastFocusedBeforeNav.focus) lastFocusedBeforeNav.focus();
+    }
   };
   toggleBtn.addEventListener('click', toggleMenu);
   mobLinks.forEach(link => link.addEventListener('click', toggleMenu));
-  
-  // Close on ESC
+
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && mobNav.classList.contains('active')) {
       toggleMenu();
@@ -763,23 +1647,213 @@ if (hoverItems.length > 0 && mask && maskImg) {
     item.addEventListener('mousemove', (e) => {
       mask.style.left = e.clientX + 'px';
       mask.style.top = e.clientY + 'px';
+      // Image drift
+      const rect = item.getBoundingClientRect();
+      const xPercent = (e.clientX - rect.left) / rect.width;
+      const yPercent = (e.clientY - rect.top) / rect.height;
+      maskImg.style.transform = `translate(${(xPercent - 0.5) * 8}px, ${(yPercent - 0.5) * 8}px)`;
     });
   });
 }
 
+// Cursor Aura (fine pointers only, and not under reduced motion)
+const aura = document.getElementById('aura');
+const dot = document.getElementById('dot');
+const auraEnabled = window.matchMedia('(pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      const path = document.querySelector('.progress-path');
-      if (path) {
-        const pathLength = path.getTotalLength();
-        path.style.strokeDasharray = pathLength + ' ' + pathLength;
-        path.style.strokeDashoffset = pathLength;
-        window.addEventListener('scroll', () => {
-          const scrollPercent = (document.documentElement.scrollTop + document.body.scrollTop) / (document.documentElement.scrollHeight - document.documentElement.clientHeight);
-          const draw = pathLength * (1 - scrollPercent);
-          path.style.strokeDashoffset = draw;
-        });
+if (aura && dot && auraEnabled) {
+  window.addEventListener('mousemove', (e) => {
+    dot.style.left = e.clientX + 'px';
+    dot.style.top = e.clientY + 'px';
+
+    // Smooth trailing ring
+    aura.animate({
+      left: e.clientX + 'px',
+      top: e.clientY + 'px'
+    }, { duration: 150, fill: 'forwards' });
+  });
+
+  // Scale aura on hoverable elements
+  document.querySelectorAll('a, button, .hover-item').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      aura.style.width = '40px';
+      aura.style.height = '40px';
+      aura.style.backgroundColor = 'color-mix(in srgb, var(--accent) 15%, transparent)';
+    });
+    el.addEventListener('mouseleave', () => {
+      aura.style.width = '24px';
+      aura.style.height = '24px';
+      aura.style.backgroundColor = 'transparent';
+    });
+  });
+} else {
+  if (aura) aura.style.display = 'none';
+  if (dot) dot.style.display = 'none';
+}
+
+// AA guard: flip CTA text to ink when the tenant CTA colour is light
+(() => {
+  const probe = document.querySelector('.cta-button');
+  if (!probe) return;
+  const m = getComputedStyle(probe).backgroundColor.match(/\d+(\.\d+)?/g);
+  if (!m) return;
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(+m[0]) + 0.7152 * lin(+m[1]) + 0.0722 * lin(+m[2]);
+  if (L > 0.18) document.querySelectorAll('.cta-button').forEach(el => el.classList.add('cta-ink-text'));
+})();
+
+// Magnetic Buttons (fine pointers, motion allowed)
+const magnetOK = window.matchMedia('(pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('.magnet-target').forEach(btn => {
+  if (magnetOK) {
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+      btn.style.transform = `translate(${x * 0.25}px, ${y * 0.25}px)`;
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = '';
+    });
+  }
+});
+
+// Deferred Chat Widget Loader
+const mountWidget = (mountId) => {
+  const mount = document.getElementById(mountId);
+  const temp = document.getElementById('concierge-embed');
+  if (mount && temp && !mount.querySelector('.chat-loaded')) {
+    mount.innerHTML = ''; // clear shimmer
+    const clone = temp.content.cloneNode(true);
+    const scripts = clone.querySelectorAll('script');
+
+    // Create wrapper to tag it
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-loaded';
+
+    scripts.forEach(s => {
+      const newScript = document.createElement('script');
+      Array.from(s.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+      newScript.textContent = s.textContent;
+      s.parentNode.replaceChild(newScript, s);
+    });
+    wrapper.appendChild(clone);
+    mount.appendChild(wrapper);
+  }
+};
+
+window.addEventListener('load', () => {
+  const temp = document.getElementById('concierge-embed');
+  if (temp) {
+    if (window.innerWidth >= 1024) {
+      setTimeout(() => mountWidget('concierge-mount'), 2000);
+    }
+  } else {
+    document.querySelectorAll('.shimmer-placeholder').forEach(el => el.remove());
+  }
+});
+
+// Mobile Bottom Sheet Trigger
+const chatBtn = document.getElementById('chat-bar-btn');
+const sheet = document.getElementById('chat-sheet');
+const sheetOverlay = document.getElementById('sheet-overlay');
+const closeSheet = document.getElementById('close-sheet');
+let sheetFocusCleanup = null;
+let lastFocusedBeforeSheet = null;
+
+if (chatBtn && sheet && sheetOverlay && closeSheet) {
+  const openSheet = () => {
+    sheet.classList.add('active');
+    sheetOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    mountWidget('concierge-mount-mobile');
+    lastFocusedBeforeSheet = document.activeElement;
+    sheetFocusCleanup = trapFocus(sheet);
+  };
+  const closeChat = () => {
+    sheet.classList.remove('active');
+    sheetOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+    if (sheetFocusCleanup) sheetFocusCleanup();
+    sheetFocusCleanup = null;
+    if (lastFocusedBeforeSheet && lastFocusedBeforeSheet.focus) lastFocusedBeforeSheet.focus();
+  };
+  chatBtn.addEventListener('click', openSheet);
+  closeSheet.addEventListener('click', closeChat);
+  sheetOverlay.addEventListener('click', closeChat);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sheet.classList.contains('active')) {
+      closeChat();
+    }
+  });
+}
+
+
+      // Signature interaction: Tide Rail + swell-as-scroll-progress, both driven
+      // by the same scroll percentage so the mechanic is one continuous idea.
+      // The pinned chapter shares the same rAF tick.
+      const progressPaths = document.querySelectorAll('.progress-path');
+      const tideFill = document.getElementById('tide-fill');
+      const tideMarker = document.getElementById('tide-marker');
+      const tideTrack = document.querySelector('.tide-rail-track');
+      const chapter = document.querySelector('.pinned-chapter');
+      const chapterSteps = chapter ? chapter.querySelectorAll('.pinned-step') : [];
+      const chapterBacks = chapter ? chapter.querySelectorAll('.pinned-backdrop') : [];
+      if (chapter && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        chapter.classList.add('pc-live');
       }
-    
+
+      const lengths = Array.from(progressPaths).map(p => {
+        const len = p.getTotalLength();
+        p.style.strokeDasharray = len + ' ' + len;
+        p.style.strokeDashoffset = len;
+        return len;
+      });
+
+      let tideTrackHeight = 0;
+      const measureTideRail = () => {
+        if (tideTrack) tideTrackHeight = tideTrack.getBoundingClientRect().height;
+      };
+      measureTideRail();
+      window.addEventListener('resize', measureTideRail);
+
+      let scrollTicking = false;
+      const updateScrollProgress = () => {
+        const scrollPercent = Math.min(Math.max(
+          (document.documentElement.scrollTop + document.body.scrollTop) / (document.documentElement.scrollHeight - document.documentElement.clientHeight),
+          0
+        ), 1);
+        progressPaths.forEach((p, i) => {
+          p.style.strokeDashoffset = lengths[i] * (1 - scrollPercent);
+        });
+        if (tideFill) tideFill.style.transform = 'scaleY(' + scrollPercent + ')';
+        if (tideMarker && tideTrackHeight) {
+          tideMarker.style.transform = 'translate(-50%, ' + (scrollPercent * tideTrackHeight) + 'px)';
+        }
+        // Pinned chapter: backdrops crossfade continuously; copy steps swap in thirds
+        if (chapter && chapter.classList.contains('pc-live')) {
+          const r = chapter.getBoundingClientRect();
+          const runway = r.height - window.innerHeight;
+          const p = runway > 0 ? Math.min(Math.max(-r.top / runway, 0), 1) : 0;
+          const idx = p < 1 / 3 ? 0 : p < 2 / 3 ? 1 : 2;
+          chapterSteps.forEach((s, i) => s.classList.toggle('on', i === idx));
+          const seg = p * 2;
+          chapterBacks.forEach((b, i) => {
+            b.style.opacity = Math.max(0, 1 - Math.abs(seg - i)).toFixed(3);
+          });
+        }
+        scrollTicking = false;
+      };
+      if (progressPaths.length || tideFill || chapter) {
+        window.addEventListener('scroll', () => {
+          if (!scrollTicking) {
+            requestAnimationFrame(updateScrollProgress);
+            scrollTicking = true;
+          }
+        }, { passive: true });
+        updateScrollProgress();
+      }
+
 </script>
 
 </body>
