@@ -6031,6 +6031,111 @@
       "grantee": "service_role",
       "table_name": "webchat_sessions",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "tenant_health",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "UPDATE"
     }
   ],
   "rls_status": [
@@ -6417,6 +6522,11 @@
     {
       "schema": "public",
       "table_name": "webchat_sessions",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "tenant_health",
       "rls_enabled": true
     }
   ],
@@ -8445,6 +8555,24 @@
       "roles": "{authenticated}",
       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "tenant_health",
+      "policyname": "tenant_health_service_all",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "tenant_health",
+      "policyname": "tenant_health_superadmin_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
+      "with_check": null
     }
   ]
 }
