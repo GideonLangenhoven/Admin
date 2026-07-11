@@ -98,11 +98,23 @@ Deno.serve(async (req: any) => {
     const totalAmount = Number(booking.total_amount || 0);
     const totalCaptured = Number(booking.total_captured || totalAmount);
     const totalRefunded = Number(booking.total_refunded || 0);
-    const refundableAmount = totalCaptured - totalRefunded;
 
-    // Cap at what was actually captured via Yoco (prevents refunding more than the Yoco portion in split-tender)
-    if (refundAmount > refundableAmount) refundAmount = refundableAmount;
-    if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Nothing left to refund (captured: " + totalCaptured + ", already refunded: " + totalRefunded + ")" }), { status: 400, headers: getCors(req) });
+    // S2: reserve BEFORE calling Yoco. reserve_refund locks the booking row and
+    // atomically increments total_refunded by the clamped reservable amount,
+    // returning what it actually reserved. A concurrent refund waits on the lock
+    // then can only reserve the remainder (or 0) -> Yoco is never double-charged.
+    const { data: reservedRaw, error: reserveErr } = await supabase.rpc("reserve_refund", {
+      p_booking_id: booking.id,
+      p_amount: refundAmount,
+    });
+    if (reserveErr) {
+      return new Response(JSON.stringify({ error: "Refund reservation failed: " + reserveErr.message }), { status: 500, headers: getCors(req) });
+    }
+    const reservedAmount = Number(reservedRaw || 0);
+    if (reservedAmount <= 0) {
+      return new Response(JSON.stringify({ error: "Nothing left to refund (captured: " + totalCaptured + ", already refunded: " + totalRefunded + ")" }), { status: 400, headers: getCors(req) });
+    }
+    refundAmount = reservedAmount; // Yoco is refunded exactly what we reserved
     const isPartial = refundAmount < totalCaptured;
 
     const refundAmountCents = Math.round(refundAmount * 100);
@@ -122,6 +134,9 @@ Deno.serve(async (req: any) => {
 
     if (!yocoRes.ok || (yocoData.status && yocoData.status !== "successful")) {
       const errMsg = yocoData.displayMessage || yocoData.message || yocoData.errorMessage || JSON.stringify(yocoData);
+      // S2: Yoco refund failed after we reserved — release the reservation so the
+      // amount becomes refundable again (no money moved).
+      await supabase.rpc("release_refund_reservation", { p_booking_id: booking.id, p_amount: refundAmount });
       await supabase.from("bookings").update({
         refund_status: "FAILED",
         refund_amount: refundAmount,
@@ -139,12 +154,13 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, error: errMsg }), { status: 200, headers: getCors(req) });
     }
 
+    // S2: total_refunded was already set atomically by reserve_refund — do NOT
+    // re-add it here (that would double-count).
     const newTotalRefunded = totalRefunded + refundAmount;
     await supabase.from("bookings").update({
       status: "CANCELLED",
       refund_status: "REFUNDED",
       refund_amount: refundAmount,
-      total_refunded: newTotalRefunded,
       refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund — " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")",
       cancellation_reason: "Auto-cancelled — refund processed by admin",
       cancelled_at: new Date().toISOString(),

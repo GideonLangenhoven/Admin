@@ -54,8 +54,14 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
   if (!integration) return respond(401, { error: "No GYG integration for this business" }, origin);
   if (!integration.enabled) return respond(200, { ok: true, skipped: "integration disabled" }, origin);
 
-  // HMAC signature verification
-  if (integration.webhook_secret_encrypted && SETTINGS_ENCRYPTION_KEY) {
+  // HMAC signature verification — REQUIRED. A missing secret must REJECT, not
+  // bypass: otherwise anyone who knows ?b=<businessId> can inject fake bookings
+  // (S6 stress-test finding). Fail closed.
+  if (!integration.webhook_secret_encrypted || !SETTINGS_ENCRYPTION_KEY) {
+    console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
+    return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
+  }
+  {
     const { data: creds } = await db.rpc("get_ota_credentials", {
       p_business_id: businessId,
       p_key: SETTINGS_ENCRYPTION_KEY,
@@ -63,13 +69,15 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
     });
     const credRow = Array.isArray(creds) ? creds[0] : creds;
     const webhookSecret = credRow?.webhook_secret || "";
-    if (webhookSecret) {
-      const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
-      const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
-      if (!sigValid) {
-        console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
-        return respond(401, { error: "Invalid signature" }, origin);
-      }
+    if (!webhookSecret) {
+      console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
+      return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
+    }
+    const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
+    const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
+    if (!sigValid) {
+      console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
+      return respond(401, { error: "Invalid signature" }, origin);
     }
   }
 

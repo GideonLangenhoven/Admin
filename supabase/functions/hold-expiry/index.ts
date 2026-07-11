@@ -32,9 +32,10 @@ Deno.serve(async () => {
       await supabase.from("holds").update({ status: "EXPIRED" }).eq("id", hold.id);
       await supabase.from("bookings").update({ status: "EXPIRED", cancellation_reason: "Hold expired", cancelled_at: new Date().toISOString() }).eq("id", hold.booking_id);
       if (hold.slot_id) {
-        const sr = await supabase.from("slots").select("held").eq("id", hold.slot_id).single();
-        if (sr.data) await supabase.from("slots").update({ held: Math.max(0, Number(sr.data.held || 0) - Number(bk.qty || 0)) }).eq("id", hold.slot_id);
+        // S3: atomic held decrement (no read-modify-write race).
+        await supabase.rpc("adjust_slot_capacity", { p_slot_id: hold.slot_id, p_business_id: BUSINESS_ID, p_booked_delta: 0, p_held_delta: -Number(bk.qty || 0) });
       }
+
       await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", bk.phone).eq("business_id", BUSINESS_ID);
       if (bk.phone) await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment was not received.\n\nNo worries \u2014 type *menu* to book again!", hold.booking_id);
       await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: hold.booking_id, event: "hold_expired", payload: { hold_id: hold.id } });

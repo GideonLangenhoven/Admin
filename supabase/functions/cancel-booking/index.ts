@@ -138,13 +138,14 @@ Deno.serve(async (req: any) => {
 
     // Release slot capacity (atomic single update)
     if (booking.slot_id) {
-      const { data: slotData } = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).maybeSingle();
-      if (slotData) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotData.booked || 0) - Number(booking.qty || 0)),
-          held: Math.max(0, (slotData.held || 0) - (booking.status === "HELD" ? Number(booking.qty || 0) : 0)),
-        }).eq("id", booking.slot_id);
-      }
+      // S3: atomic RPC, no read-modify-write
+      const qty = Number(booking.qty || 0);
+      await supabase.rpc("adjust_slot_capacity", {
+        p_slot_id: booking.slot_id,
+        p_business_id: booking.business_id,
+        p_booked_delta: -qty,
+        p_held_delta: booking.status === "HELD" ? -qty : 0,
+      });
     }
 
     const ref = String(booking_id).substring(0, 8).toUpperCase();

@@ -387,13 +387,12 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
             if (failedPr.data.hold_id) {
               await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedPr.data.hold_id);
             }
-            // Release held capacity on new slot
-            const failedSlot = await supabase.from("slots").select("held").eq("id", failedPr.data.new_slot_id).single();
-            if (failedSlot.data) {
+            // Release held capacity on new slot (S3: atomic, no read-modify-write)
+            {
               const failedBooking = await supabase.from("bookings").select("qty").eq("id", failedPr.data.booking_id).single();
               // Remediation reschedules hold the (possibly reduced) new_qty
               const failedQty = Number(failedPr.data.new_qty || failedBooking.data?.qty || 0);
-              await supabase.from("slots").update({ held: Math.max(0, (failedSlot.data.held || 0) - failedQty) }).eq("id", failedPr.data.new_slot_id);
+              if (failedQty > 0) await supabase.rpc("adjust_slot_capacity", { p_slot_id: failedPr.data.new_slot_id, p_business_id: failedPr.data.business_id, p_booked_delta: 0, p_held_delta: -failedQty });
             }
             await supabase.from("logs").insert({
               business_id: failedPr.data.business_id,
@@ -416,14 +415,12 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedHoldId);
           // Release held capacity
           if (failedAgBookingId) {
-            const failedAgBooking = await supabase.from("bookings").select("slot_id, qty").eq("id", failedAgBookingId).single();
+            const failedAgBooking = await supabase.from("bookings").select("slot_id, qty, business_id").eq("id", failedAgBookingId).single();
             if (failedAgBooking.data) {
               const failedAgDelta = failedAgNewQty - failedAgBooking.data.qty;
               if (failedAgDelta > 0) {
-                const failedAgSlot = await supabase.from("slots").select("held").eq("id", failedAgBooking.data.slot_id).single();
-                if (failedAgSlot.data) {
-                  await supabase.from("slots").update({ held: Math.max(0, (failedAgSlot.data.held || 0) - failedAgDelta) }).eq("id", failedAgBooking.data.slot_id);
-                }
+                // S3: atomic held release (no read-modify-write)
+                await supabase.rpc("adjust_slot_capacity", { p_slot_id: failedAgBooking.data.slot_id, p_business_id: failedAgBooking.data.business_id, p_booked_delta: 0, p_held_delta: -failedAgDelta });
               }
             }
           }
@@ -534,21 +531,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       // 1. Release old slot capacity (decrement booked)
       if (!wasCancelled) {
-        const oldSlotData = await supabase.from("slots").select("booked").eq("id", pr.old_slot_id).single();
-        if (oldSlotData.data) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, (oldSlotData.data.booked || 0) - rBooking.qty),
-          }).eq("id", pr.old_slot_id);
-        }
+        // S3: atomic booked release on the old slot (no read-modify-write)
+        await supabase.rpc("adjust_slot_capacity", { p_slot_id: pr.old_slot_id, p_business_id: pr.business_id, p_booked_delta: -Number(rBooking.qty), p_held_delta: 0 });
       }
 
-      // 2. Convert hold on new slot: held -> booked
-      const newSlotData = await supabase.from("slots").select("booked, held").eq("id", pr.new_slot_id).single();
-      if (newSlotData.data) {
-        await supabase.from("slots").update({
-          booked: (newSlotData.data.booked || 0) + finalQty,
-          held: Math.max(0, (newSlotData.data.held || 0) - finalQty),
-        }).eq("id", pr.new_slot_id);
+      // 2. Convert hold on new slot: held -> booked (S3: atomic)
+      if (finalQty > 0) {
+        await supabase.rpc("adjust_slot_capacity", { p_slot_id: pr.new_slot_id, p_business_id: pr.business_id, p_booked_delta: finalQty, p_held_delta: -finalQty });
       }
 
       // 3. Update booking to new slot
@@ -679,12 +668,9 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           if (agHoldId) {
             await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", agHoldId);
           }
-          const agSlot = await supabase.from("slots").select("booked, held").eq("id", agBk.slot_id).single();
-          if (agSlot.data) {
-            await supabase.from("slots").update({
-              booked: (agSlot.data.booked || 0) + agDelta,
-              held: Math.max(0, (agSlot.data.held || 0) - agDelta),
-            }).eq("id", agBk.slot_id);
+          // S3: atomic convert (booked += agDelta, held -= agDelta)
+          if (agDelta !== 0) {
+            await supabase.rpc("adjust_slot_capacity", { p_slot_id: agBk.slot_id, p_business_id: agBk.business_id, p_booked_delta: agDelta, p_held_delta: -agDelta });
           }
 
           await supabase.from("logs").insert({
@@ -1096,14 +1082,12 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       return new Response("OK", { status: 200 });
     }
     const holdConvert = await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE").select("id").maybeSingle();
-    const sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
-    if (sr.data) {
-      // If hold was still active, convert held -> booked. If hold expired, just increment booked.
+    // S3: atomic convert. If hold was still active, held -> booked; if it expired
+    // (cron released it), just increment booked. Single atomic statement — no
+    // read-modify-write race with a concurrent cron hold-expiry on this slot.
+    {
       const heldDecrement = holdConvert.data ? booking.qty : 0;
-      await supabase.from("slots").update({
-        booked: sr.data.booked + booking.qty,
-        held: Math.max(0, sr.data.held - heldDecrement),
-      }).eq("id", booking.slot_id);
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: booking.qty, p_held_delta: -heldDecrement });
     }
 
     // Deduct voucher balances for vouchers applied to this booking (sequential, atomic RPC)

@@ -110,13 +110,8 @@ Deno.serve(async (req: Request) => {
 
     await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
 
-    const sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
-    if (sr.data) {
-      await supabase.from("slots").update({
-        booked: sr.data.booked + booking.qty,
-        held: Math.max(0, sr.data.held - booking.qty),
-      }).eq("id", booking.slot_id);
-    }
+    // S3: atomic convert held -> booked (no read-modify-write)
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: Number(booking.qty), p_held_delta: -Number(booking.qty) });
 
     await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true, payment_method: paymentMethod, payment_note: paymentNote || null, user_id: auth?.userId || null } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);

@@ -187,11 +187,8 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
       return fail(req, "Failed to create hold on new slot", 500);
     }
 
-    // 2. Increment held count on new slot
-    const heldSlotRes = await supabase.from("slots").select("held").eq("id", newSlotId).single();
-    if (heldSlotRes.data) {
-      await supabase.from("slots").update({ held: (heldSlotRes.data.held || 0) + newQty }).eq("id", newSlotId);
-    }
+    // 2. Increment held count on new slot (S3: atomic, no read-modify-write)
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: newSlotId, p_business_id: booking.business_id, p_booked_delta: 0, p_held_delta: Number(newQty) });
 
     // 3. Create pending_reschedule record
     const pendingRes = await supabase.from("pending_reschedules").insert({
@@ -210,11 +207,10 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
 
     if (pendingRes.error) {
       console.error("PENDING_RESCHEDULE_INSERT_ERR:", pendingRes.error);
-      // Clean up the hold we just created
+      // Clean up the hold we just created, and roll back the held increment
+      // atomically (S3; the previous code set held to itself and never rolled back).
       await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", holdRes.data.id);
-      if (heldSlotRes.data) {
-        await supabase.from("slots").update({ held: Math.max(0, (heldSlotRes.data.held || 0)) }).eq("id", newSlotId);
-      }
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: newSlotId, p_business_id: booking.business_id, p_booked_delta: 0, p_held_delta: -Number(newQty) });
       return fail(req, "Failed to create pending reschedule", 500);
     }
 

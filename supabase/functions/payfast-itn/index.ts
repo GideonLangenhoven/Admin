@@ -69,8 +69,10 @@ async function validateWithPayFast(params: any) {
     console.log("PF_VALIDATE:" + text);
     return text.trim() === "VALID";
   } catch (err) {
-    console.error("PF_VALIDATE_ERR:", err);
-    return true; // Fail open to not block payments, log for review
+    // Fail CLOSED: a validation outage must NOT mark a booking PAID unverified.
+    // (CLAUDE.md payment rule; S5 stress-test finding.)
+    console.error("PF_VALIDATE_ERR (failing closed):", err);
+    return false;
   }
 }
 
@@ -131,11 +133,8 @@ Deno.serve(async (req: any) => {
         await supabase.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Payment cancelled" }).eq("id", bookingId);
         // Release hold
         await supabase.from("holds").update({ status: "RELEASED" }).eq("booking_id", bookingId).eq("status", "ACTIVE");
-        // Release held seats
-        const cancelSlot = await supabase.from("slots").select("held").eq("id", booking.slot_id).single();
-        if (cancelSlot.data) {
-          await supabase.from("slots").update({ held: Math.max(0, cancelSlot.data.held - booking.qty) }).eq("id", booking.slot_id);
-        }
+        // Release held seats (S3: atomic)
+        await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: BUSINESS_ID, p_booked_delta: 0, p_held_delta: -Number(booking.qty) });
         await sendText(booking.phone, "Your payment was cancelled. Your hold has been released.\n\nReply *menu* to start again.", bookingId);
       }
       await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: bookingId, event: "itn_status_" + paymentStatus, payload: params });
@@ -161,14 +160,8 @@ Deno.serve(async (req: any) => {
     // 2. Convert hold to CONVERTED
     await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", bookingId).eq("status", "ACTIVE");
 
-    // 3. Move seats from held to booked
-    const slotR = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
-    if (slotR.data) {
-      await supabase.from("slots").update({
-        booked: slotR.data.booked + booking.qty,
-        held: Math.max(0, slotR.data.held - booking.qty),
-      }).eq("id", booking.slot_id);
-    }
+    // 3. Move seats from held to booked (S3: atomic)
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: BUSINESS_ID, p_booked_delta: Number(booking.qty), p_held_delta: -Number(booking.qty) });
 
     // 4. Log success
     await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: bookingId, event: "payment_confirmed", payload: { pf_payment_id: pfPaymentId, amount: amountGross } });

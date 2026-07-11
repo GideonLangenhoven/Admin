@@ -159,9 +159,12 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingA.id);
   await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingB.id);
 
-  // Hold capacity on both slots
-  await supabase.from("slots").update({ held: (slotA.held || 0) + qty }).eq("id", slot_a_id);
-  await supabase.from("slots").update({ held: (slotB.held || 0) + qty }).eq("id", slot_b_id);
+  // Hold capacity on both slots (S3: atomic increment, no read-modify-write).
+  // NOTE: combo reserves via slots.held directly (no holds row) and does not use
+  // the capacity-checked create_hold_with_capacity_check — a combo-channel
+  // overbooking guard is a separate follow-up (S8).
+  await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: Number(qty) });
+  await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_booked_delta: 0, p_held_delta: Number(qty) });
 
   // Load Paysafe account ID (public key for SDK) from business_a
   const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, currency").eq("id", offer.business_a_id).single();

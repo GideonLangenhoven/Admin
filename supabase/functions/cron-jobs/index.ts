@@ -36,7 +36,7 @@ async function releaseExpiredHolds() {
   for (let i = 0; i < holds.length; i++) {
     const h = holds[i];
     // Get booking info
-    const br = await supabase.from("bookings").select("qty, phone, status, slot_id").eq("id", h.booking_id).single();
+    const br = await supabase.from("bookings").select("qty, phone, status, slot_id, business_id").eq("id", h.booking_id).single();
     if (!br.data) continue;
     const bk = br.data;
 
@@ -52,13 +52,10 @@ async function releaseExpiredHolds() {
     // Update booking to EXPIRED
     await supabase.from("bookings").update({ status: "EXPIRED", cancellation_reason: "Hold expired - payment not received" }).eq("id", h.booking_id);
 
-    // Release held seats
+    // Release held seats (S3: atomic, no read-modify-write)
     const slotId = h.slot_id || bk.slot_id;
-    if (slotId) {
-      const sr = await supabase.from("slots").select("held").eq("id", slotId).single();
-      if (sr.data) {
-        await supabase.from("slots").update({ held: Math.max(0, sr.data.held - bk.qty) }).eq("id", slotId);
-      }
+    if (slotId && Number(bk.qty) > 0 && bk.business_id) {
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: slotId, p_business_id: bk.business_id, p_booked_delta: 0, p_held_delta: -Number(bk.qty) });
     }
 
     // Notify customer

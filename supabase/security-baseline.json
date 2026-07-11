@@ -99,41 +99,6 @@
     },
     {
       "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
       "table_name": "chatbot_avatars",
       "privilege_type": "DELETE"
     },
@@ -955,41 +920,6 @@
     {
       "grantee": "authenticated",
       "table_name": "chat_faq_entries",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_intent_daily",
       "privilege_type": "UPDATE"
     },
     {

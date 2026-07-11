@@ -134,13 +134,8 @@ Deno.serve(async (req: any) => {
         p_held_delta: -delta.held,
       });
       if (rpcRes.error) {
-        const { data: slotData } = await supabase.from("slots").select("booked, held").eq("business_id", business_id).eq("id", slotId).maybeSingle();
-        if (slotData) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, (slotData.booked || 0) - delta.booked),
-            held: Math.max(0, (slotData.held || 0) - delta.held),
-          }).eq("business_id", business_id).eq("id", slotId);
-        }
+        // S3: no read-modify-write fallback (that reintroduces the race). Log only.
+        console.error("ADJUST_CAPACITY_RPC_ERR (weather-cancel) slot=" + slotId + " err=" + rpcRes.error.message);
       }
     }
 

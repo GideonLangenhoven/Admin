@@ -279,16 +279,13 @@ async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
     .eq("id", combo.booking_b_id)
     .single();
 
-  // Release held capacity on both slots
-  if (bookingA?.slots) {
-    await supabase.from("slots").update({
-      held: Math.max(0, (bookingA.slots.held || 0) - bookingA.qty),
-    }).eq("id", bookingA.slot_id);
+  // Release held capacity on both slots (S3: atomic; combo spans two tenants so
+  // each slot is adjusted with its own business_id).
+  if (bookingA?.slot_id && Number(bookingA.qty) > 0) {
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: bookingA.slot_id, p_business_id: bookingA.business_id, p_booked_delta: 0, p_held_delta: -Number(bookingA.qty) });
   }
-  if (bookingB?.slots) {
-    await supabase.from("slots").update({
-      held: Math.max(0, (bookingB.slots.held || 0) - bookingB.qty),
-    }).eq("id", bookingB.slot_id);
+  if (bookingB?.slot_id && Number(bookingB.qty) > 0) {
+    await supabase.rpc("adjust_slot_capacity", { p_slot_id: bookingB.slot_id, p_business_id: bookingB.business_id, p_booked_delta: 0, p_held_delta: -Number(bookingB.qty) });
   }
 
   // Mark both bookings as PENDING PAYMENT

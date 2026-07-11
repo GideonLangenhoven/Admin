@@ -83,12 +83,8 @@ async function cleanupExpiredHolds() {
             p_held_delta: -qty,
           });
           if (rpcRes.error) {
-            const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", pr.business_id).eq("id", pr.new_slot_id).maybeSingle();
-            if (slotHeldData) {
-              await supabase.from("slots").update({
-                held: Math.max(0, (slotHeldData.held || 0) - qty),
-              }).eq("business_id", pr.business_id).eq("id", pr.new_slot_id);
-            }
+            // S3: no read-modify-write fallback — log; periodic reconcile heals it.
+            console.error("ADJUST_HELD_RPC_ERR (reschedule) slot=" + pr.new_slot_id + " err=" + rpcRes.error.message);
           }
         }
 
@@ -119,12 +115,9 @@ async function cleanupExpiredHolds() {
         p_held_delta: -heldQty,
       });
       if (rpcRes.error) {
-        const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", hold.business_id).eq("id", hold.slot_id).maybeSingle();
-        if (slotHeldData) {
-          await supabase.from("slots").update({
-            held: Math.max(0, (slotHeldData.held || 0) - heldQty),
-          }).eq("business_id", hold.business_id).eq("id", hold.slot_id);
-        }
+        // S3: do NOT fall back to a read-modify-write (that reintroduces the
+        // race). Log; the periodic held reconcile at the end of this sweep heals it.
+        console.error("ADJUST_HELD_RPC_ERR slot=" + hold.slot_id + " err=" + rpcRes.error.message);
       }
     }
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
