@@ -10,6 +10,10 @@
 // Invocation (service key or cron):
 //   POST { "business_id": "<uuid>" }  — sync one tenant
 //   POST { "all": true }              — sweep every business
+//   POST { "admin_chunks": [...] }    — replace the platform-wide admin help
+//                                       KB (admin_kb_chunks, no tenant scope);
+//                                       chunks are authored in docs/admin-help
+//                                       and posted by scripts/sync-admin-help.mjs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { embedText, sha256Hex } from "../_shared/kb.ts";
@@ -137,6 +141,62 @@ async function syncBusiness(businessId: string) {
   return { business_id: businessId, total: chunks.length, embedded, skipped, removed, failed, errors: errors.slice(0, 5) };
 }
 
+type AdminChunkInput = {
+  chunk_key: string;
+  title: string | null;
+  route: string | null;
+  required_role: string;
+  content: string;
+};
+
+// Platform-wide help articles for the in-dashboard help bot. Same
+// hash-skip/upsert/prune shape as syncBusiness, minus the tenant scope.
+async function syncAdminHelp(chunks: AdminChunkInput[]) {
+  const { data: existing } = await supabase.from("admin_kb_chunks")
+    .select("chunk_key, content_hash").limit(2000);
+  const existingHash = new Map((existing || []).map((r: any) => [r.chunk_key, r.content_hash]));
+
+  let embedded = 0, skipped = 0, failed = 0;
+  const errors: string[] = [];
+
+  for (const c of chunks) {
+    const hash = await sha256Hex(c.content);
+    if (existingHash.get(c.chunk_key) === hash) { skipped++; continue; }
+    const emb = await embedText(c.content, "RETRIEVAL_DOCUMENT");
+    if (!emb) {
+      failed++;
+      errors.push(c.chunk_key + ": embedding failed");
+      continue;
+    }
+    const { error } = await supabase.from("admin_kb_chunks").upsert({
+      chunk_key: c.chunk_key,
+      title: c.title,
+      route: c.route,
+      required_role: c.required_role,
+      content: c.content,
+      content_hash: hash,
+      embedding: emb,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "chunk_key" });
+    if (error) { failed++; errors.push(c.chunk_key + ": " + error.message); }
+    else embedded++;
+  }
+
+  // Prune chunks whose article was deleted/renamed — but never on a failed
+  // run: a partial push must not wipe help content the bot is serving.
+  let removed = 0;
+  if (failed === 0 && chunks.length > 0) {
+    const liveKeys = new Set(chunks.map((c) => c.chunk_key));
+    const staleKeys = (existing || []).map((r: any) => r.chunk_key).filter((k: string) => !liveKeys.has(k));
+    if (staleKeys.length > 0) {
+      const { error } = await supabase.from("admin_kb_chunks").delete().in("chunk_key", staleKeys);
+      if (!error) removed = staleKeys.length;
+    }
+  }
+
+  return { total: chunks.length, embedded, skipped, removed, failed, errors: errors.slice(0, 5) };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("Not allowed", { status: 405 });
   // Shared-secret guard: embedding sweeps cost real money, so this function
@@ -147,6 +207,22 @@ Deno.serve(async (req: Request) => {
   }
   try {
     const body = await req.json().catch(() => ({}));
+
+    if (Array.isArray(body.admin_chunks)) {
+      const ALLOWED_ROLES = new Set(["OPERATOR", "MAIN_ADMIN", "SUPER_ADMIN"]);
+      const chunks: AdminChunkInput[] = body.admin_chunks
+        .filter((c: any) => c && typeof c.chunk_key === "string" && typeof c.content === "string" && c.content.trim())
+        .map((c: any) => ({
+          chunk_key: String(c.chunk_key).slice(0, 200),
+          title: c.title ? String(c.title).slice(0, 300) : null,
+          route: c.route ? String(c.route).slice(0, 200) : null,
+          required_role: ALLOWED_ROLES.has(c.required_role) ? c.required_role : "MAIN_ADMIN",
+          content: String(c.content).slice(0, 8000),
+        }));
+      const result = await syncAdminHelp(chunks);
+      console.log("KB_SYNC_ADMIN_HELP " + JSON.stringify(result));
+      return new Response(JSON.stringify({ ok: true, ...result }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
 
     if (body.business_id) {
       const result = await syncBusiness(String(body.business_id));

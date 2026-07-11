@@ -87,3 +87,9 @@ verify_jwt = false
 # MAIN_ADMIN/SUPER_ADMIN on admin_users — the gateway check adds nothing.
 [functions.weather-cancel]
 verify_jwt = false
+
+# admin-help-chat is invoked from the admin app with the operator's session
+# JWT — same gateway HS256/ES256 issue as weather-cancel above. requireAuth
+# inside the function validates the JWT and rejects non-admin callers.
+[functions.admin-help-chat]
+verify_jwt = false

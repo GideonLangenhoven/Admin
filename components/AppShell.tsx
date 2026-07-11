@@ -13,6 +13,8 @@ import { useBusinessContext } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 import { isNavItemActive } from "./nav-active";
 import WaFailureWatcher from "./WaFailureWatcher";
+import HelpChat from "./HelpChat";
+import WelcomeChecklist from "./WelcomeChecklist";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
@@ -190,6 +192,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
       {/* Surfaces failed WhatsApp sends as in-the-moment toasts (replaces the
           removed Notifications tab). Renders nothing. */}
       <WaFailureWatcher />
+      {/* Floating help assistant + one-time first-login welcome. */}
+      <HelpChat />
+      <WelcomeChecklist />
       <aside
         className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`}
         style={{ background: SIDEBAR_BG, borderColor: "var(--ck-sidebar-border)" }}

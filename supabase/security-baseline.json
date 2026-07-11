@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-07-10T17:00:00Z",
-  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking; 2026-07-02 S3: reviews authenticated RLS tenant-scoped, vouchers anon insert forced PENDING+tenant, vouchers anon update dropped; 2026-07-10 regenerated from live: initplan policy rewrites, 10 new RLS tables (customers, reviews, OTA, chat, POPIA, check-ins), kb_chunks service-only, subscriptions tenant select-only, combo_bookings public read dropped, vouchers anon UPDATE re-revoked (migration 20260710130000)",
+  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking; 2026-07-02 S3: reviews authenticated RLS tenant-scoped, vouchers anon insert forced PENDING+tenant, vouchers anon update dropped; 2026-07-10 regenerated from live: initplan policy rewrites, 10 new RLS tables (customers, reviews, OTA, chat, POPIA, check-ins), kb_chunks service-only, subscriptions tenant select-only, combo_bookings public read dropped, vouchers anon UPDATE re-revoked (migration 20260710130000); 2026-07-11 admin_kb_chunks (in-dashboard help bot KB, service-role only, migration 20260711200000)",
   "grants": [
     {
       "grantee": "anon",
@@ -6066,6 +6066,41 @@
       "grantee": "service_role",
       "table_name": "tenant_health",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "UPDATE"
     }
   ],
   "rls_status": [
@@ -6457,6 +6492,11 @@
     {
       "schema": "public",
       "table_name": "tenant_health",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "admin_kb_chunks",
       "rls_enabled": true
     }
   ],
