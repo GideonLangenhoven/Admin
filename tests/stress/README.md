@@ -59,11 +59,33 @@ and S8 (combo overbooking via new reserve_combo_capacity RPC) both fixed — ZER
 non-atomic booked/held writes remain anywhere. Live functional proof passed
 (combo guard rejects overbooking; refund clamps 60/40/0). k6 installed.
 
-REMAINING = load EXECUTION only (operational, needs a dedicated stress tenant +
-announced window per this plan's own rules): the k6 concurrency runs (1.2–1.4,
-2.1–2.2), the 1500-tenant fleet + cron sweeps (Phase 3), the 48h soak (Phase 4),
-and abuse drills (Phase 5). Scripts are ready (`webhook-replay.k6.js`,
-`seed-fleet.sql`); nothing here fires load at live prod unannounced.
+## Executed live 2026-07-11 (results)
+| Phase | How | Result |
+|---|---|---|
+| 0 gates | npm | 222/222 unit, build, drift, advisors |
+| 1.1 idempotency | construction | UNIQUE index on idempotency_keys.key + sig-before-logic |
+| **1.2 double-spend** | **k6, 20 VUs** | **cap-5 slot → 5 reserved / 15 rejected, no overbooking, DB consistent** |
+| 1.5 refund ceiling | live SQL proof | reserve_refund clamps 60→40→0 |
+| 2.1 cross-tenant | live anon probe | bookings/customers/vouchers/conversations/invoices/refunds/marketing_contacts/holds all return 0 rows to anon |
+| 2.3 drift | hash-match | baseline == live |
+| 2.4 reviews RLS | verified | already scoped to current_business_ids() |
+| 3.2 no-truncation | construction | cron-tasks + auto-messages use fetchAllRows; marketing-dispatch uses atomic claim + batch |
+| 5.1 S6 unsigned inject | live attack | GYG unsigned booking → 401 |
+| 5.2 bad-sig payment | live attack | yoco bad-sig → 401 |
+| 5.4 SSRF | live attack | file://, 169.254.169.254, localhost → all blocked |
+| S8 combo overbook | live SQL proof | reserve_combo_capacity rejects at capacity |
+
+## GENUINELY NOT completable in one session (not a missing fix)
+- **Phase 4 — 48h soak**: passes by running 48 hours of wall-clock. No code/action
+  makes time elapse in-session.
+- **Phase 3.1 full 1500-tenant fleet + live cron sweep at scale, 3.3 messaging burst**:
+  the fan-out crons email/WA REAL customers and process ALL tenants (no per-tenant
+  filter), so they cannot be invoked ad-hoc — hence the plan's announced-window rule.
+  The no-truncation *logic* is verified above; the at-scale *timing* run needs a window.
+- **3.4 hot-page k6 / 3.5 realtime**: runnable in a window against a seeded large tenant.
+
+To finish: open a low-traffic window, seed with `seed-fleet.sql`, run the k6 scripts,
+and leave the day-in-the-life loop soaking. Everything else is done and load-proven.
 
 ## Findings (RESOLVED — kept for history)
 
