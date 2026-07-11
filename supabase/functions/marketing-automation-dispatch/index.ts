@@ -169,8 +169,9 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain").eq("id", enrollment.business_id).maybeSingle();
+        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain, booking_site_url").eq("id", enrollment.business_id).maybeSingle();
         const bizName = bizRow?.business_name || "Marketing";
+        const bizSiteUrl = String(bizRow?.booking_site_url || (bizRow?.subdomain ? "https://" + bizRow.subdomain + ".booking.bookingtours.co.za" : "")).replace(/\/+$/, "");
         // V-12 fix: send from the verified ROOT domain with the tenant name as
         // the display label. Per-subdomain From requires each tenant's
         // subdomain (e.g. aonyx.bookingtours.co.za) to be added + DNS-verified
@@ -259,14 +260,18 @@ Deno.serve(async (req: Request) => {
               .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
               .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
               .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "");
+              .replace(/\{promo_discount\}/g, metadata.promo_discount || "")
+              .replace(/\{business_name\}/g, bizName)
+              .replace(/\{company_name\}/g, bizName)
+              .replace(/\{site_url\}/g, bizSiteUrl);
 
             const subject = (config.subject_override || template.subject_line || "Update")
               .replace(/\{first_name\}/g, contact.first_name || "there")
               .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
               .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
               .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "");
+              .replace(/\{promo_discount\}/g, metadata.promo_discount || "")
+              .replace(/\{business_name\}/g, bizName);
 
             // Generate unsubscribe token
             const unsubToken = crypto.randomUUID();

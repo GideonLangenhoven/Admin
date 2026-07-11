@@ -90,11 +90,13 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
     const bizBrandMap: Record<string, string> = {};
+    const bizSiteMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name, subdomain, booking_site_url").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
         const name = b.business_name || b.name || "Marketing";
         bizBrandMap[b.id] = name;
+        bizSiteMap[b.id] = String(b.booking_site_url || (b.subdomain ? "https://" + b.subdomain + ".booking.bookingtours.co.za" : "")).replace(/\/+$/, "");
         // V-12: send from the verified ROOT domain bookingtours.co.za with the
         // tenant's brand name as the display label. Per-subdomain From would
         // need each tenant subdomain DNS-verified in Resend, which isn't done,
@@ -175,6 +177,7 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
         .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
         .replace(/Cape Kayak Adventures/g, brand)
         .replace(/Cape Kayak/g, brand)
+        .replace(/\{site_url\}/g, bizSiteMap[item.business_id] || "")
         .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
 
       const subject = camp.subject

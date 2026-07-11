@@ -1,6 +1,18 @@
 import { Block, uid } from "./blocks/block-types";
 
+/* ── Starter template library ─────────────────────────────────────────────
+   One designed email per automation step (see AUTOMATION recipe keys in
+   app/marketing/automations/page.tsx — each send_email step carries a
+   template_key that resolves here). Installing an automation auto-creates
+   its templates, so operators never hunt for "which template goes with
+   which automation".
+
+   Merge tokens (replaced by marketing dispatch at send time):
+   {first_name} {last_name} {email} {voucher_code} {voucher_amount}
+   {promo_code} {promo_discount} {business_name} {site_url}              */
+
 export interface StarterTemplate {
+  key?: string;
   name: string;
   category: string;
   description: string;
@@ -8,10 +20,20 @@ export interface StarterTemplate {
   blocks: () => Block[];
 }
 
+/* ── Brand tokens (mirror blocks-to-html.ts) ── */
+const PINE = "#1b3b36";
+const INK = "#17221C";
+const BODY = "#4A5651";
+const AMBER = "#D9822F";
+const MUTED = "#66736B";
+const MONO = "'Courier New',monospace";
+
+/* ── Composable pieces ── */
+
 const defaultFooter = (): Block => ({
   type: "footer",
   id: uid(),
-  companyName: "{company_name}",
+  companyName: "{business_name}",
   address: "",
   phone: "",
   socials: { facebook: "", instagram: "" },
@@ -23,190 +45,518 @@ const defaultSocial = (): Block => ({
   platforms: { facebook: "", instagram: "", whatsapp: "" },
 });
 
+// Courier micro-label — the signature editorial device.
+const eyebrow = (label: string): Block => ({
+  type: "text",
+  id: uid(),
+  content: `<p style="margin:0;letter-spacing:.16em;text-transform:uppercase;">${label}</p>`,
+  fontFamily: MONO,
+  fontSize: 11,
+  color: MUTED,
+});
+
+const h1 = (text: string): Block => ({ type: "header", id: uid(), text, level: "h1", color: INK });
+const h2 = (text: string): Block => ({ type: "header", id: uid(), text, level: "h2", color: INK });
+
+const para = (html: string): Block => ({ type: "text", id: uid(), content: html, color: BODY });
+
+const cta = (text: string, url = "{site_url}", color = PINE): Block => ({ type: "button", id: uid(), text, url, color });
+
+const gap = (height = 8): Block => ({ type: "spacer", id: uid(), height });
+
+// Amber voucher chip — code + value set at send time by the automation.
+const voucherPanel = (note: string): Block => ({
+  type: "text",
+  id: uid(),
+  content:
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0;"><tr>` +
+    `<td style="background:#FDF6EE;border:1px dashed ${AMBER};border-radius:14px;padding:22px 24px;text-align:center;">` +
+    `<p style="margin:0 0 6px;font-family:${MONO};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${AMBER};">Your voucher</p>` +
+    `<p style="margin:0;font-family:Georgia,serif;font-size:30px;letter-spacing:.06em;color:${INK};">{voucher_code}</p>` +
+    `<p style="margin:8px 0 0;font-size:14px;color:${BODY};">${note}</p>` +
+    `</td></tr></table>`,
+});
+
+const factList = (items: string[]): Block =>
+  para(`<ul style="margin:6px 0;padding-left:20px;">${items.map((i) => `<li style="margin:6px 0;">${i}</li>`).join("")}</ul>`);
+
+const signoff = (): Block =>
+  para(`<p style="margin:14px 0 0;">See you out there,<br/><span style="font-family:Georgia,serif;font-style:italic;color:${INK};">The {business_name} team</span></p>`);
+
+// Standard shell: eyebrow → headline → body → (extras) → CTA → footer
+function shell(opts: { eyebrow: string; title: string; body: Block[]; ctaText?: string; ctaUrl?: string }): Block[] {
+  return [
+    eyebrow(opts.eyebrow),
+    h1(opts.title),
+    ...opts.body,
+    ...(opts.ctaText ? [gap(4), cta(opts.ctaText, opts.ctaUrl)] : []),
+    signoff(),
+    gap(10),
+    defaultSocial(),
+    defaultFooter(),
+  ];
+}
+
+/* ── The library ─────────────────────────────────────────────────────── */
+
 export const starterTemplates: StarterTemplate[] = [
-  /* ── 1 — Blank Canvas ── */
+  /* ═══ Welcome Series ═══ */
+  {
+    key: "welcome-series-1",
+    name: "Welcome · The Story",
+    category: "follow-up",
+    description: "First touch: who you are, what makes the experience unforgettable, what to expect.",
+    subject: "Welcome to {business_name} — your adventure starts here",
+    blocks: () =>
+      shell({
+        eyebrow: "Welcome aboard",
+        title: "The best stories start outside",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Welcome — we're genuinely glad you're here. Every trip we run is built around one idea: an hour outside beats a day of scrolling.</p>`),
+          para(`<p>Here's what you can expect from us (and nothing else):</p>`),
+          factList([
+            "Insider tips on the best conditions, seasons and secret spots",
+            "First access to new experiences before they're public",
+            "Photos and stories from recent trips — the real thing, unfiltered",
+          ]),
+        ],
+        ctaText: "Browse experiences",
+      }),
+  },
+  {
+    key: "welcome-series-2",
+    name: "Welcome · Guest Favourites",
+    category: "follow-up",
+    description: "Second touch: social proof — the most-loved experiences with a real guest quote.",
+    subject: "The experiences our guests can't stop talking about",
+    blocks: () => [
+      eyebrow("Guest favourites"),
+      h1("Loved by people like you"),
+      para(`<p>Hi {first_name},</p><p>Not sure where to start? These are the trips our guests rebook, gift, and tell their friends about.</p>`),
+      { type: "quote", id: uid(), text: "I've lived here my whole life and never seen the coast like this. Booked again before we'd even dried off.", attribution: "Recent guest review", photoUrl: "" } as Block,
+      para(`<p>Every experience is small-group, guided, and beginner-friendly — no experience needed, just a sense of adventure.</p>`),
+      gap(4),
+      cta("See what's on"),
+      signoff(),
+      gap(10),
+      defaultSocial(),
+      defaultFooter(),
+    ],
+  },
+  {
+    key: "welcome-series-3",
+    name: "Welcome · First-Booking Gift",
+    category: "promotional",
+    description: "Conversion touch: a personal discount voucher to turn a subscriber into a first booking.",
+    subject: "{first_name}, here's a little push out the door",
+    blocks: () =>
+      shell({
+        eyebrow: "A gift from us",
+        title: "Your first adventure, on better terms",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Talk is cheap — so here's something real. A personal voucher for your first booking with us:</p>`),
+          voucherPanel("Apply it at checkout. It's yours alone, and it won't wait forever."),
+        ],
+        ctaText: "Use my voucher",
+      }),
+  },
+
+  /* ═══ Post-Tour Review Request ═══ */
+  {
+    key: "post-tour-review-1",
+    name: "Review · Thank You + Ask",
+    category: "follow-up",
+    description: "Sent hours after the trip: warm thank-you with direct review links.",
+    subject: "How was it, {first_name}?",
+    blocks: () =>
+      shell({
+        eyebrow: "Trip complete",
+        title: "That was a good one",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Thank you for coming out with us today — trips like that are exactly why we do this.</p><p>If you have 30 seconds, a short review makes an outsized difference to a small team like ours. It's how the next adventurer finds us.</p>`),
+        ],
+        ctaText: "Leave a quick review",
+      }),
+  },
+  {
+    key: "post-tour-review-2",
+    name: "Review · Gentle Nudge",
+    category: "follow-up",
+    description: "Follow-up for guests who opened but didn't review — different angle, zero pressure.",
+    subject: "One small favour, {first_name}",
+    blocks: () =>
+      shell({
+        eyebrow: "While it's fresh",
+        title: "Help the next person take the leap",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Most people hesitate before booking something new — a review from someone who's actually done it is what tips them over.</p><p>Two sentences is plenty. What you saw, how it felt.</p>`),
+        ],
+        ctaText: "Write two sentences",
+      }),
+  },
+
+  /* ═══ Win-Back ═══ */
+  {
+    key: "win-back-1",
+    name: "Win-Back · We Miss You",
+    category: "follow-up",
+    description: "Nostalgia + what's new since their last visit. No discount yet.",
+    subject: "It's been a while, {first_name}",
+    blocks: () =>
+      shell({
+        eyebrow: "Since you've been gone",
+        title: "The water hasn't forgotten you",
+        body: [
+          para(`<p>Hi {first_name},</p><p>It's been a while since your last trip with us — and a lot has changed:</p>`),
+          factList([
+            "New routes and experiences added this season",
+            "Upgraded gear across the fleet",
+            "New photo packages so you take the day home with you",
+          ]),
+          para(`<p>Same ocean, better everything. Come see for yourself.</p>`),
+        ],
+        ctaText: "See what's new",
+      }),
+  },
+  {
+    key: "win-back-2",
+    name: "Win-Back · Personal Offer",
+    category: "promotional",
+    description: "For engaged lapsed customers: a personal comeback voucher.",
+    subject: "{first_name}, this one's just for you",
+    blocks: () =>
+      shell({
+        eyebrow: "Welcome-back offer",
+        title: "Let's make it easy to come back",
+        body: [
+          para(`<p>Hi {first_name},</p><p>No long story — we'd love to have you back, so here's a personal voucher to make the decision simple:</p>`),
+          voucherPanel("Valid on any experience. Bring a friend; the ocean's big enough."),
+        ],
+        ctaText: "Book with my voucher",
+      }),
+  },
+  {
+    key: "win-back-3",
+    name: "Win-Back · Last Chance",
+    category: "promotional",
+    description: "Final urgency email before the comeback voucher expires.",
+    subject: "Your voucher is about to expire, {first_name}",
+    blocks: () =>
+      shell({
+        eyebrow: "Final call",
+        title: "It expires. The memories don't.",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Quick reminder — your personal voucher is in its final days:</p>`),
+          voucherPanel("After it expires, it's gone for good. One booking is all it takes."),
+        ],
+        ctaText: "Use it before it's gone",
+      }),
+  },
+
+  /* ═══ Birthday Special ═══ */
+  {
+    key: "birthday-special-1",
+    name: "Birthday · The Gift",
+    category: "promotional",
+    description: "Birthday greeting with an exclusive voucher — warm, personal, zero corporate.",
+    subject: "Happy birthday, {first_name} — gift inside",
+    blocks: () =>
+      shell({
+        eyebrow: "It's your day",
+        title: "Happy birthday, {first_name}",
+        body: [
+          para(`<p>Another year older, another year braver. We think that calls for open water and a bit of salt in the air.</p><p>Our gift to you:</p>`),
+          voucherPanel("Valid for 30 days — a birthday should last at least that long."),
+        ],
+        ctaText: "Claim my birthday trip",
+      }),
+  },
+  {
+    key: "birthday-special-2",
+    name: "Birthday · Voucher Reminder",
+    category: "promotional",
+    description: "Two weeks later: the birthday voucher is expiring soon.",
+    subject: "Your birthday gift is still waiting, {first_name}",
+    blocks: () =>
+      shell({
+        eyebrow: "Don't leave it unwrapped",
+        title: "Your birthday gift expires soon",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Just a friendly nudge — the birthday voucher we sent you is still unused, and it won't keep forever:</p>`),
+          voucherPanel("Belated birthday adventures are still birthday adventures."),
+        ],
+        ctaText: "Book before it expires",
+      }),
+  },
+
+  /* ═══ Referral ═══ */
+  {
+    key: "referral-program-1",
+    name: "Referral · Share the Adventure",
+    category: "promotional",
+    description: "After a positive review: a shareable reward code — they win, their friend wins.",
+    subject: "{first_name}, share the adventure — get rewarded",
+    blocks: () =>
+      shell({
+        eyebrow: "For our favourite people",
+        title: "Good stories are better shared",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Thank you for that review — it made the team's week. Since you clearly get it, here's a reward for spreading the word:</p>`),
+          voucherPanel("Use it yourself, or share the code with a friend — when they book, you both win."),
+        ],
+        ctaText: "Plan the next one",
+      }),
+  },
+
+  /* ═══ Voucher Expiry ═══ */
+  {
+    key: "voucher-expiry-1",
+    name: "Voucher Expiry · 30 Days",
+    category: "follow-up",
+    description: "First reminder: 30 days to use the voucher, with inspiration.",
+    subject: "Your voucher expires in 30 days",
+    blocks: () =>
+      shell({
+        eyebrow: "30 days remaining",
+        title: "Don't let a good voucher go to waste",
+        body: [
+          para(`<p>Hi {first_name},</p><p>A heads-up from your calendar's best friend: your voucher has 30 days left on the clock.</p>`),
+          voucherPanel("Fully redeemable against any experience. Weekends fill first — book early."),
+        ],
+        ctaText: "Browse and book",
+      }),
+  },
+  {
+    key: "voucher-expiry-2",
+    name: "Voucher Expiry · 7 Days",
+    category: "promotional",
+    description: "One week left — urgency rising, concrete suggestions.",
+    subject: "7 days left on your voucher",
+    blocks: () =>
+      shell({
+        eyebrow: "One week left",
+        title: "Seven days. One decision.",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Your voucher expires in 7 days. That's one weekend — enough time to do something worth telling people about.</p>`),
+          voucherPanel("Any experience, any available date inside the week."),
+        ],
+        ctaText: "Pick my date",
+      }),
+  },
+  {
+    key: "voucher-expiry-3",
+    name: "Voucher Expiry · Final Day",
+    category: "promotional",
+    description: "Expiry-day email — direct, short, one job.",
+    subject: "Final day: your voucher expires tonight",
+    blocks: () =>
+      shell({
+        eyebrow: "Expires today",
+        title: "Last call",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Short and honest: your voucher expires at midnight tonight. Book now and pick any future date — the value is locked in the moment you book.</p>`),
+          voucherPanel("Book today, paddle whenever. After midnight it's gone."),
+        ],
+        ctaText: "Redeem it now",
+      }),
+  },
+
+  /* ═══ VIP ═══ */
+  {
+    key: "vip-treatment-1",
+    name: "VIP · Welcome to the Inner Circle",
+    category: "announcement",
+    description: "Tells your best customers they've been upgraded, and what VIP actually means.",
+    subject: "{first_name}, you're one of ours now",
+    blocks: () =>
+      shell({
+        eyebrow: "VIP status unlocked",
+        title: "Welcome to the inner circle",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Some guests come once. You keep coming back — and we notice. As of today you're a {business_name} VIP. Concretely, that means:</p>`),
+          factList([
+            "Priority booking on high-demand dates",
+            "Early access to new experiences before public release",
+            "Exclusive VIP-only offers through the year",
+            "A direct line to our team for special requests",
+          ]),
+          para(`<p>No points, no apps, no fine print. Just first pick of the good stuff.</p>`),
+        ],
+        ctaText: "See what's coming up",
+      }),
+  },
+  {
+    key: "vip-treatment-2",
+    name: "VIP · Exclusive Offer",
+    category: "promotional",
+    description: "The VIP-only voucher — generous, personal, time-boxed.",
+    subject: "Your VIP offer is here, {first_name}",
+    blocks: () =>
+      shell({
+        eyebrow: "VIP only",
+        title: "This one isn't public",
+        body: [
+          para(`<p>Hi {first_name},</p><p>As promised — a VIP-only thank you. This code doesn't appear on the site, in ads, or anywhere else:</p>`),
+          voucherPanel("VIP-exclusive. Use it on any experience, any group size."),
+        ],
+        ctaText: "Book as a VIP",
+      }),
+  },
+
+  /* ═══ Seasonal Launch ═══ */
+  {
+    key: "seasonal-launch-1",
+    name: "Season · Sneak Peek",
+    category: "newsletter",
+    description: "Season preview — new routes, gear, and dates before booking opens.",
+    subject: "The new season is almost here",
+    blocks: () =>
+      shell({
+        eyebrow: "Season preview",
+        title: "We've been busy all winter",
+        body: [
+          para(`<p>Hi {first_name},</p><p>The new season is around the corner, and this is your early look at what's coming:</p>`),
+          factList([
+            "New routes we scouted in the off-season",
+            "Upgraded gear across every experience",
+            "Extended seasonal tours while conditions are at their best",
+          ]),
+          para(`<p>Early birds get first pick — an exclusive pre-season offer lands in your inbox soon.</p>`),
+        ],
+        ctaText: "Preview the season",
+      }),
+  },
+  {
+    key: "seasonal-launch-2",
+    name: "Season · Early-Bird Offer",
+    category: "promotional",
+    description: "Early-bird voucher for engaged readers before public booking opens.",
+    subject: "Early bird: book before everyone else",
+    blocks: () =>
+      shell({
+        eyebrow: "Before the crowds",
+        title: "First pick goes to the early birds",
+        body: [
+          para(`<p>Hi {first_name},</p><p>You opened the preview — so you get the head start. Book with this code before the season opens to everyone else:</p>`),
+          voucherPanel("Valid on all pre-season bookings. Prime dates go first."),
+        ],
+        ctaText: "Claim my early-bird spot",
+      }),
+  },
+
+  /* ═══ Anniversary ═══ */
+  {
+    key: "booking-anniversary-1",
+    name: "Anniversary · One Year Ago",
+    category: "follow-up",
+    description: "\"This time last year\" nostalgia with a nudge to make it a tradition.",
+    subject: "{first_name}, remember this time last year?",
+    blocks: () =>
+      shell({
+        eyebrow: "One year ago today",
+        title: "Some days deserve a sequel",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Exactly a year ago, you were out there with us. We think that day deserves an anniversary — and traditions have to start somewhere.</p><p>Same trip, new season? Or something you haven't tried yet?</p>`),
+        ],
+        ctaText: "Book the sequel",
+      }),
+  },
+
+  /* ═══ Photo Delivery ═══ */
+  {
+    key: "photo-share-1",
+    name: "Photos · Your Trip Photos Are Ready",
+    category: "follow-up",
+    description: "Delivers the trip photo gallery link — the email guests actually want.",
+    subject: "Your trip photos are ready, {first_name} 📸",
+    blocks: () =>
+      shell({
+        eyebrow: "Fresh from the water",
+        title: "You look good out there",
+        body: [
+          para(`<p>Hi {first_name},</p><p>Your photos from the trip are edited and ready. Download them, keep them, print the good ones — they're yours.</p>`),
+        ],
+        ctaText: "View my photos",
+      }),
+  },
+  {
+    key: "photo-share-2",
+    name: "Photos · Share & Tag Us",
+    category: "follow-up",
+    description: "Follow-up: encourage social sharing and tagging for reach.",
+    subject: "That photo deserves an audience",
+    blocks: () =>
+      shell({
+        eyebrow: "Show it off",
+        title: "Don't let them sit in your camera roll",
+        body: [
+          para(`<p>Hi {first_name},</p><p>The best trip photos are the ones that make someone else book their own. If you post yours, tag us — we share our favourites every week, and yours is a contender.</p>`),
+        ],
+        ctaText: "Book your next shot",
+      }),
+  },
+
+  /* ═══ Generics (campaign starting points) ═══ */
   {
     name: "Blank Canvas",
     category: "general",
-    description: "A clean starting point with essential structure.",
+    description: "A clean, branded starting point — eyebrow, headline, body, button.",
     subject: "",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Your Headline Here", level: "h1", color: "#111827" },
-      { type: "text", id: uid(), content: "<p>Start writing your email content here. You can add images, buttons, and more using the block toolbar above.</p>" },
-      { type: "button", id: uid(), text: "Call to Action", url: "https://your-booking-site.bookingtours.co.za", color: "#111827" },
-      defaultFooter(),
-    ],
+    blocks: () =>
+      shell({
+        eyebrow: "Your label here",
+        title: "Your headline here",
+        body: [para(`<p>Start writing your email here. Add images, quotes, tour cards and more from the block toolbar.</p>`)],
+        ctaText: "Call to action",
+      }),
   },
-
-  /* ── 2 — Welcome Email ── */
-  {
-    name: "Welcome Email",
-    category: "follow-up",
-    description: "A warm first impression for new subscribers.",
-    subject: "Welcome — here's what to expect",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Welcome Aboard", level: "h1", color: "#0f172a" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>Thanks for signing up! We're excited to have you with us.</p><p>Here's what you can look forward to:</p><ul><li>Exclusive offers and early access to new experiences</li><li>Seasonal updates and insider tips</li><li>Photos and stories from recent trips</li></ul><p>In the meantime, take a look at what we have on offer.</p>" },
-      { type: "button", id: uid(), text: "Browse Experiences", url: "https://your-booking-site.bookingtours.co.za", color: "#0f172a" },
-      { type: "spacer", id: uid(), height: 16 },
-      defaultSocial(),
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 3 — Newsletter ── */
   {
     name: "Newsletter",
     category: "newsletter",
-    description: "A polished two-column layout for regular updates.",
-    subject: "This month's highlights",
+    description: "Monthly update: a story, a list of what's new, one clear call to action.",
+    subject: "What's new at {business_name}",
     blocks: () => [
-      { type: "header", id: uid(), text: "Monthly Highlights", level: "h1", color: "#0f172a" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name}, here's a roundup of what's been happening and what's coming up next.</p>" },
-      { type: "divider", id: uid() },
-      {
-        type: "columns", id: uid(), columnCount: 2, columns: [
-          [
-            { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80", alt: "Featured experience", width: "100%" } as Block,
-            { type: "text", id: uid(), content: "<p><strong>Featured This Month</strong></p><p>Our most popular experience is back for the new season — with limited availability. Don't miss out.</p>" } as Block,
-          ],
-          [
-            { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=600&q=80", alt: "What's new", width: "100%" } as Block,
-            { type: "text", id: uid(), content: "<p><strong>What's New</strong></p><p>We've added a brand new experience to the lineup. Perfect for groups, families, or solo adventurers.</p>" } as Block,
-          ],
-        ],
-      },
-      { type: "button", id: uid(), text: "View All Experiences", url: "https://your-booking-site.bookingtours.co.za", color: "#0f172a" },
+      eyebrow("The monthly dispatch"),
+      h1("News from out there"),
+      para(`<p>Hi {first_name},</p><p>Here's what's been happening — the short version, no fluff.</p>`),
+      h2("What's new"),
+      factList([
+        "New experience or route announcement",
+        "A seasonal highlight worth booking early",
+        "One great guest story or photo from this month",
+      ]),
+      gap(4),
+      cta("Book your next trip"),
+      signoff(),
+      gap(10),
+      defaultSocial(),
       defaultFooter(),
     ],
   },
-
-  /* ── 4 — Flash Sale ── */
   {
     name: "Flash Sale",
     category: "promotional",
-    description: "Drive urgency with a countdown and bold styling.",
-    subject: "Flash sale — 25% off for 48 hours",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Flash Sale — 25% Off", level: "h1", color: "#dc2626" },
-      { type: "countdown", id: uid(), targetDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16), label: "Offer expires in" },
-      { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1472745433479-4556f22e32c2?w=800&q=80", alt: "Special offer", width: "100%" },
-      { type: "text", id: uid(), content: "<p>For 48 hours only, every experience is <strong>25% off</strong>. Whether it's a morning outing, a sunset adventure, or a full-day expedition — now is the time to book.</p><p>Use code <strong>FLASH25</strong> at checkout.</p>" },
-      { type: "button", id: uid(), text: "Shop the Sale", url: "https://your-booking-site.bookingtours.co.za", color: "#dc2626" },
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 5 — Event Invitation ── */
-  {
-    name: "Event Invitation",
-    category: "announcement",
-    description: "Announce a special event with all the details.",
-    subject: "You're invited — save the date",
-    blocks: () => [
-      { type: "header", id: uid(), text: "You're Invited", level: "h1", color: "#1e40af" },
-      { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80", alt: "Upcoming event", width: "100%" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>We're hosting a special event and we'd love for you to join us.</p><p><strong>Date:</strong> TBC<br/><strong>Time:</strong> TBC<br/><strong>Location:</strong> TBC</p><p>Spaces are limited — reserve yours now.</p>" },
-      { type: "countdown", id: uid(), targetDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16), label: "Event starts in" },
-      { type: "button", id: uid(), text: "Reserve Your Spot", url: "https://your-booking-site.bookingtours.co.za", color: "#1e40af" },
-      defaultSocial(),
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 6 — Post-Trip Follow-up ── */
-  {
-    name: "Post-Trip Follow-up",
-    category: "follow-up",
-    description: "Thank customers and ask for a review.",
-    subject: "Thanks for joining us, {first_name}!",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Thanks for Joining Us", level: "h1", color: "#0f172a" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>We hope you had an incredible time! Your support means the world to our team.</p><p>If you enjoyed the experience, we'd love to hear about it. A quick review helps us improve and lets others know what to expect.</p>" },
-      { type: "quote", id: uid(), text: "Absolutely amazing! The guides were fantastic and the views were breathtaking. Can't wait to come back!", attribution: "Happy Customer", photoUrl: "" },
-      { type: "button", id: uid(), text: "Leave a Review", url: "https://your-booking-site.bookingtours.co.za", color: "#0f172a" },
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 7 — Birthday Treat ── */
-  {
-    name: "Birthday Treat",
-    category: "promotional",
-    description: "Celebrate subscribers' birthdays with a personal offer.",
-    subject: "Happy Birthday, {first_name}! Here's a gift",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Happy Birthday!", level: "h1", color: "#7c3aed" },
-      { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80", alt: "Birthday celebration", width: "100%" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>It's your special day! As a thank you for being part of our community, here's a <strong>15% birthday discount</strong> on any experience.</p><p>Valid for the next 30 days — treat yourself or share it with a friend.</p>" },
-      { type: "button", id: uid(), text: "Redeem Your Gift", url: "https://your-booking-site.bookingtours.co.za", color: "#7c3aed" },
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 8 — Win-Back ── */
-  {
-    name: "Win-Back",
-    category: "follow-up",
-    description: "Re-engage inactive subscribers with a personal touch.",
-    subject: "It's been a while, {first_name}",
-    blocks: () => [
-      { type: "header", id: uid(), text: "We Miss You", level: "h1", color: "#0891b2" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>It's been a while since we last saw you, and we'd love to have you back.</p><p>Here's a little something to sweeten the deal: <strong>10% off</strong> your next booking with code <strong>COMEBACK10</strong>.</p>" },
-      { type: "button", id: uid(), text: "Book Again", url: "https://your-booking-site.bookingtours.co.za", color: "#0891b2" },
-      { type: "spacer", id: uid(), height: 20 },
-      { type: "text", id: uid(), content: "<p style=\"text-align:center;font-size:13px;\">Not interested anymore? No worries — you can update your preferences or unsubscribe below.</p>" },
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 9 — Feedback Request ── */
-  {
-    name: "Feedback Request",
-    category: "follow-up",
-    description: "A clean, focused ask for customer feedback.",
-    subject: "Quick question, {first_name}",
-    blocks: () => [
-      { type: "header", id: uid(), text: "How Did We Do?", level: "h1", color: "#059669" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>Your feedback helps us get better. It only takes 2 minutes and makes a real difference.</p>" },
-      { type: "button", id: uid(), text: "Share Your Feedback", url: "https://your-booking-site.bookingtours.co.za", color: "#059669" },
-      { type: "spacer", id: uid(), height: 16 },
-      defaultSocial(),
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 10 — Seasonal Promo ── */
-  {
-    name: "Seasonal Promo",
-    category: "promotional",
-    description: "Showcase top experiences with tour cards and a countdown.",
-    subject: "Seasonal deals — limited time only",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Seasonal Specials", level: "h1", color: "#b91c1c" },
-      { type: "image", id: uid(), src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", alt: "Seasonal deals", width: "100%" },
-      { type: "countdown", id: uid(), targetDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16), label: "Deal ends in" },
-      { type: "tourcard", id: uid(), imageUrl: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80", title: "Featured Experience", price: "R 450", ctaText: "Book Now", ctaUrl: "https://your-booking-site.bookingtours.co.za" },
-      { type: "button", id: uid(), text: "View All Deals", url: "https://your-booking-site.bookingtours.co.za", color: "#b91c1c" },
-      defaultFooter(),
-    ],
-  },
-
-  /* ── 11 — Experience Showcase ── */
-  {
-    name: "Experience Showcase",
-    category: "promotional",
-    description: "Highlight your best experiences with tour cards.",
-    subject: "Our top-rated experiences",
-    blocks: () => [
-      { type: "header", id: uid(), text: "Our Most Popular Experiences", level: "h1", color: "#0f172a" },
-      { type: "text", id: uid(), content: "<p>Hi {first_name},</p><p>Looking for your next adventure? Here are our most-loved experiences — handpicked by our team and rated highly by past guests.</p>" },
-      { type: "tourcard", id: uid(), imageUrl: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80", title: "Signature Experience", price: "R 450", ctaText: "Book Now", ctaUrl: "https://your-booking-site.bookingtours.co.za" },
-      { type: "spacer", id: uid(), height: 12 },
-      { type: "tourcard", id: uid(), imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=600&q=80", title: "Premium Adventure", price: "R 650", ctaText: "Book Now", ctaUrl: "https://your-booking-site.bookingtours.co.za" },
-      { type: "button", id: uid(), text: "View All Experiences", url: "https://your-booking-site.bookingtours.co.za", color: "#0f172a" },
-      defaultSocial(),
-      defaultFooter(),
-    ],
+    description: "Short-window promotion with a promo code and hard deadline.",
+    subject: "48 hours: {promo_discount} off everything",
+    blocks: () =>
+      shell({
+        eyebrow: "Limited window",
+        title: "Blink and it's gone",
+        body: [
+          para(`<p>Hi {first_name},</p><p>For the next 48 hours, every experience is {promo_discount} off with the code below. No fine print — pick a date and go.</p>`),
+          para(
+            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0;"><tr>` +
+              `<td style="background:#FDF6EE;border:1px dashed ${AMBER};border-radius:14px;padding:22px 24px;text-align:center;">` +
+              `<p style="margin:0 0 6px;font-family:${MONO};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${AMBER};">Promo code</p>` +
+              `<p style="margin:0;font-family:Georgia,serif;font-size:30px;letter-spacing:.06em;color:${INK};">{promo_code}</p>` +
+              `</td></tr></table>`
+          ),
+        ],
+        ctaText: "Shop the sale",
+      }),
   },
 ];
+
+export function getStarterTemplateByKey(key: string): StarterTemplate | undefined {
+  return starterTemplates.find((t) => t.key === key);
+}

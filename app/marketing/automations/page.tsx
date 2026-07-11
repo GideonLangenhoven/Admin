@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
+import { getStarterTemplateByKey } from "../../../components/marketing/starter-templates";
+import { blocksToHtml } from "../../../components/marketing/blocks/blocks-to-html";
 import {
   Plus, Trash, Play, Pause, Sparkle, CaretRight, X, ArrowRight,
 } from "@phosphor-icons/react";
@@ -378,14 +380,44 @@ export default function AutomationsPage() {
 
     const newAutoId = autoData.id;
 
-    // Create steps
+    // Create steps. Every send_email step has a matching designed template in
+    // the starter library (key = `${automation key}-${email ordinal}`) —
+    // find-or-create it for this business and link it, so the automation is
+    // ready to activate without hunting for the right template.
+    let linkedTemplates = 0;
     if (template.steps.length > 0) {
-      const stepRows = template.steps.map((s, i) => ({
-        automation_id: newAutoId,
-        position: i,
-        step_type: s.step_type,
-        config: s.config,
-      }));
+      const stepRows: { automation_id: string; position: number; step_type: string; config: Record<string, any> }[] = [];
+      let emailOrdinal = 0;
+      for (let i = 0; i < template.steps.length; i++) {
+        const s = template.steps[i];
+        const config: Record<string, any> = { ...s.config };
+        if (s.step_type === "send_email") {
+          emailOrdinal++;
+          const starter = getStarterTemplateByKey(`${template.key}-${emailOrdinal}`);
+          if (starter && !config.template_id) {
+            const existing = await supabase.from("marketing_templates").select("id")
+              .eq("business_id", businessId).eq("name", starter.name).limit(1).maybeSingle();
+            let tplId: string | undefined = existing.data?.id;
+            if (!tplId) {
+              const blocks = starter.blocks();
+              const ins = await supabase.from("marketing_templates").insert({
+                business_id: businessId,
+                name: starter.name,
+                subject_line: starter.subject,
+                category: starter.category,
+                editor_json: blocks,
+                html_content: blocksToHtml(blocks),
+              }).select("id").single();
+              tplId = ins.data?.id;
+            }
+            if (tplId) {
+              config.template_id = tplId;
+              linkedTemplates++;
+            }
+          }
+        }
+        stepRows.push({ automation_id: newAutoId, position: i, step_type: s.step_type, config });
+      }
       const { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
       if (stepErr) {
         notify({ message: stepErr.message, tone: "error" });
@@ -394,7 +426,12 @@ export default function AutomationsPage() {
       }
     }
 
-    notify({ message: `"${template.name}" automation created! Customize your email templates and activate.`, tone: "success" });
+    notify({
+      message: linkedTemplates > 0
+        ? `"${template.name}" created with ${linkedTemplates} designed email${linkedTemplates === 1 ? "" : "s"} already linked — review and activate.`
+        : `"${template.name}" automation created! Customize your email templates and activate.`,
+      tone: "success",
+    });
     setCreating(false);
     setSelectedTemplate(null);
     setShowGallery(false);
@@ -679,7 +716,7 @@ export default function AutomationsPage() {
                               {t.steps.length} steps
                             </span>
                             <span className="ui-status ui-pill-ocean">
-                              {emailSteps} email{emailSteps !== 1 ? "s" : ""}
+                              {emailSteps} designed email{emailSteps !== 1 ? "s" : ""} included
                             </span>
                           </div>
                         </div>
