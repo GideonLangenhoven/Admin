@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- signature: Pedal Stroke Reveal - A circular transition lens that 'pedals' or rotates around the image on hover. -->
+<!-- pack: wine_cycling · signature: Route elevation — the ride profile fills as scroll progress -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -8,7 +8,7 @@
 <meta name="description" content="{{hero_subtitle}}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ── Design Tokens & Base CSS ── */
 :root {
@@ -16,21 +16,20 @@
   --ink: #4A5238;
   --accent: #C97B84;
   --surface: #ffffff;
-  --text-muted: #717960;
+  --text-muted: #6e7561;
   --border-alpha: rgba(74, 82, 56, 0.08);
   --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --font-display: 'DM Serif Display', Georgia, serif;
-  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
 
-  /* Tenant accent colors configured in system settings */
-  --tenant-main: {{color_main}};
-  --tenant-secondary: {{color_secondary}};
-  --tenant-cta: {{color_cta}};
-  --tenant-nav: {{color_nav}};
-  --tenant-hover: {{color_hover}};
+  --main: {{color_main}};
+  --secondary: {{color_secondary}};
+  --cta: {{color_cta}};
+  --nav: {{color_nav}};
+  --hover: {{color_hover}};
 }
 
-/* Resets */
+/* Base resets */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: var(--font-sans);
@@ -42,9 +41,9 @@ body {
 }
 h1, h2, h3, .editorial-heading {
   font-family: var(--font-display);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 /* Glass Recipe */
@@ -71,13 +70,20 @@ h1, h2, h3, .editorial-heading {
   margin: 0 auto;
   padding: 0 2rem;
 }
+.text-center { text-align: center; }
 .section-seam {
   width: 100%;
   line-height: 0;
   margin: 0;
 }
+.section-seam svg {
+  width: 100%;
+  height: 40px;
+  fill: var(--bg);
+  transform: translateY(1px);
+}
 .section-seam.invert svg {
-  transform: scaleY(-1);
+  transform: scaleY(-1) translateY(1px);
 }
 
 /* Whitespace Budget */
@@ -88,198 +94,168 @@ h1, h2, h3, .editorial-heading {
 .anti-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 3rem;
+  gap: 2rem;
   align-items: center;
 }
 .anti-grid-text {
   grid-column: 1 / 6;
+  max-width: 34rem;
 }
 .anti-grid-image {
   grid-column: 7 / 13;
   position: relative;
-  height: 480px;
-  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  aspect-ratio: 16/11;
 }
-
-/* reveal reveals observer styling */
-.reveal-fade-up {
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.5s var(--ck-ease), transform 0.5s var(--ck-ease);
-}
-.reveal-fade-up.active {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Hero Section */
-.hero {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-.hero-media {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-.hero-media img {
+.anti-grid-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.4) 100%);
-  z-index: 2;
-}
-.hero-content {
-  position: relative;
-  z-index: 3;
+
+/* Vine-row decorative skin (replaces stock photography) */
+.vine-skin {
   width: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
-  align-items: center;
-}
-.hero-text {
-  text-align: left;
-}
-.hero-text h2 {
-  font-size: clamp(2.6rem, 7vw, 6rem);
-  line-height: 1.05;
-  margin: 1rem 0;
-  color: var(--ink);
-}
-.hero-text p {
-  font-size: 1.15rem;
-  opacity: 0.9;
-  max-width: 34rem;
-  margin-bottom: 2rem;
-}
-.hero-widget-box {
-  width: 100%;
-  border-radius: 16px;
-  padding: 2.5rem;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.15);
-}
-.widget-cta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
+  height: 100%;
+  background:
+    repeating-linear-gradient(112deg, transparent 0 18px, color-mix(in srgb, var(--ink) 7%, transparent) 18px 20px),
+    linear-gradient(155deg, color-mix(in srgb, var(--ink) 15%, var(--bg)), color-mix(in srgb, var(--accent) 22%, var(--bg)));
 }
 
-/* Nav */
-.sticky-nav {
+/* Navigation */
+header.sticky-nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  transition: padding 0.3s var(--ck-ease), background 0.3s var(--ck-ease);
-  padding: 1.5rem 0;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s, backdrop-filter 0.3s;
 }
-.sticky-nav.scrolled {
-  padding: 1rem 0;
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
+header.sticky-nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
   backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-alpha);
+  height: 70px;
 }
 .nav-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
 }
 .logo-area h1 {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   color: var(--ink);
 }
-.logo-area img {
-  height: 40px;
-}
+.logo-area img { max-height: 44px; width: auto; }
 .nav-links {
   display: flex;
+  gap: 2.5rem;
   align-items: center;
-  gap: 2rem;
 }
 .nav-links a {
   text-decoration: none;
+  font-size: 0.95rem;
   color: var(--ink);
-  font-size: 0.9rem;
   font-weight: 500;
-  transition: color 0.3s ease;
 }
 .nav-links a:hover {
   color: var(--accent);
 }
 .cta-button {
   display: inline-block;
-  text-decoration: none;
-  background-color: var(--tenant-cta, var(--accent));
-  color: #fff !important;
-  padding: 0.8rem 1.6rem;
-  border-radius: 8px;
+  background-color: var(--accent);
+  color: #fff;
+  padding: 0.8rem 1.8rem;
+  border-radius: 4px;
+  text-transform: uppercase;
   font-weight: 600;
-  font-size: 0.9rem;
-  transition: transform 0.2s var(--ck-ease), background 0.2s ease;
-}
-.cta-button:hover {
-  transform: translateY(-2px);
-}
-
-/* Hamburger mobile nav */
-.hamburger {
-  display: none;
-  background: none;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
   border: none;
   cursor: pointer;
-  padding: 0.5rem;
-  z-index: 110;
+  text-align: center;
+  text-decoration: none;
 }
-.hamburger span {
-  display: block;
-  width: 25px;
-  height: 2px;
-  background: var(--ink);
-  margin: 5px 0;
-  transition: 0.3s;
+.nav-links a.cta-button { color: #fff; }
+
+/* Hero: Editorial Magazine Spread layout with asymmetric photo pairs */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-top: 100px;
+  background-color: var(--bg);
 }
-.mobile-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg);
-  z-index: 105;
+.hero-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  width: 100%;
+}
+.hero-magazine-spread {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 1.5rem;
+  align-items: flex-end;
+}
+.spread-img-1 {
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 4/5;
+  box-shadow: 0 15px 30px var(--border-alpha);
+}
+.spread-img-2 {
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 1/1;
+  box-shadow: 0 10px 20px var(--border-alpha);
+  transform: translateY(-20px);
+}
+.spread-img-1 img, .spread-img-2 img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-text h2 {
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  line-height: 1.1;
+  margin: 1rem 0;
+  color: var(--ink);
+}
+.hero-text p {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+.hero-actions {
+  margin-top: 1rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
+  gap: 0.75rem;
+  align-items: flex-start;
 }
-.mobile-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-.mobile-overlay a {
-  font-size: 1.8rem;
-  text-decoration: none;
-  color: var(--ink);
-  font-family: var(--font-display);
+.hero-actions-note {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
-/* Flagship Hover-Mask reveal */
+/* Hover-Reveal Destinations List (Niarra Device - Pedal Circle) */
 .hover-reveal-section {
-  padding: 20vh 0;
+  padding: 15vh 0;
   background-color: var(--ink);
-  color: var(--bg);
+  color: #fff;
   position: relative;
 }
 .hover-list {
@@ -293,12 +269,15 @@ h1, h2, h3, .editorial-heading {
   position: relative;
   cursor: pointer;
 }
+.hover-item-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
 .hover-item-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: inherit;
-  text-decoration: none;
 }
 .hover-item-title {
   font-size: clamp(1.8rem, 4vw, 3rem);
@@ -311,19 +290,20 @@ h1, h2, h3, .editorial-heading {
 .hover-item-meta {
   font-size: 0.85rem;
   opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 .reveal-mask-container {
   pointer-events: none;
   position: fixed;
-  width: 320px;
-  height: 220px;
-  border-radius: 12px;
+  width: 250px;
+  height: 250px; /* Circle */
+  border-radius: 50%;
   overflow: hidden;
   z-index: 50;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.8);
   transition: opacity 0.3s var(--ck-ease), transform 0.3s var(--ck-ease);
-  clip-path: url(#organic-mask);
 }
 .reveal-mask-container.active {
   opacity: 1;
@@ -335,65 +315,118 @@ h1, h2, h3, .editorial-heading {
   object-fit: cover;
 }
 
-/* Product Sheet Cards */
-.product-sheet {
-  background-color: var(--surface);
-  border-radius: 16px;
+/* Signature Interaction: Menu & Route Pairing */
+.pairing-card {
+  background: #fff;
   border: 1px solid var(--border-alpha);
-  overflow: hidden;
-  margin-top: 4rem;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.04);
-}
-.gear-section {
+  border-radius: 12px;
   padding: 2.5rem;
-  border-bottom: 1px solid var(--border-alpha);
+  max-width: 700px;
+  margin: 3rem auto 0 auto;
+  text-align: left;
 }
-.gear-col h4 {
-  font-size: 0.85rem;
+.route-selector-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.route-btn {
+  background: var(--bg);
+  border: 1px solid var(--border-alpha);
+  padding: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.route-btn.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
+.route-detail {
+  background: var(--bg);
+  padding: 1.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-alpha);
+  text-align: left;
+}
+.route-desc {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.route-chips {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  border: 1px solid var(--border-alpha);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.route-chips .stat-chip { flex: 1 1 120px; }
+
+/* Stat chips (shared) */
+.stat-chip {
+  padding: 1.8rem;
+  text-align: center;
+  border-right: 1px solid var(--border-alpha);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.stat-chip:last-child { border-right: none; }
+.stat-value {
+  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+.stat-label {
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 1rem;
   color: var(--text-muted);
 }
-.gear-copy {
-  color: var(--ink);
-  font-size: 0.95rem;
-  line-height: 1.7;
-}
 
-/* Reviews */
-.reviews-section {
-  padding: 20vh 0;
+/* Reviews strip */
+.reviews-strip {
+  padding: 14vh 0;
   background: var(--bg);
 }
 .reviews-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
   margin-top: 3rem;
 }
-.review-quote {
-  padding: 2rem;
-  background: var(--surface);
-  border-radius: 12px;
+.review-card {
+  background: #fff;
   border: 1px solid var(--border-alpha);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+  border-radius: 12px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
-.review-quote p {
+.review-rating {
+  font-size: 0.85rem;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+}
+.review-quote {
   font-family: var(--font-display);
-  font-size: 1.3rem;
-  line-height: 1.4;
+  font-size: 1.15rem;
+  line-height: 1.5;
   color: var(--ink);
+  font-style: italic;
 }
-.review-quote cite {
-  display: block;
-  margin-top: 1.2rem;
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.review-author {
   color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: normal;
 }
 
 /* Persistent Booking Rail */
@@ -405,7 +438,6 @@ h1, h2, h3, .editorial-heading {
   z-index: 90;
   background: color-mix(in srgb, var(--surface) 85%, transparent);
   backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--border-alpha);
   padding: 1.2rem 2.5rem;
   display: flex;
@@ -416,79 +448,51 @@ h1, h2, h3, .editorial-heading {
   display: flex;
   flex-direction: column;
 }
+.rail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.rail-price {
+  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
 
 /* Footer */
-footer {
-  background-color: var(--ink);
-  color: var(--bg);
-  padding: 6rem 2rem 3rem 2rem;
+.site-footer {
+  background: var(--ink);
+  color: #fff;
+  padding: 5rem 0;
   text-align: center;
-  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.footer-brand {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+}
+.site-footer p {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.95rem;
+}
+.footer-meta {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  opacity: 0.6;
 }
 
-/* Fallback SVG styling */
-.fallback-svg {
-  background-color: var(--accent);
-  fill: var(--bg);
-}
-
-/* Responsive */
 @media (max-width: 1024px) {
-  .hero-content {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    text-align: center;
-  }
-  .hero-text { text-align: center; }
-  .hero-text p { margin-left: auto; margin-right: auto; }
+  .hero-content { grid-template-columns: 1fr; text-align: center; }
+  .hero-actions { align-items: center; }
   .anti-grid { grid-template-columns: 1fr; }
   .anti-grid-text { grid-column: 1 / -1; }
-  .anti-grid-image { grid-column: 1 / -1; height: 350px; }
+  .anti-grid-image { grid-column: 1 / -1; }
+  .route-selector-box { grid-template-columns: 1fr; }
 }
-@media (max-width: 768px) {
-  .nav-links { display: none; }
-  .hamburger { display: block; }
-  .booking-rail { flex-direction: column; gap: 1rem; text-align: center; }
-}
-
-/* prefers-reduced-motion check */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-delay: 0s !important;
-    animation-duration: 0s !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0s !important;
-    scroll-behavior: auto !important;
-    transform: none !important;
-  }
-  .reveal-fade-up { opacity: 1 !important; }
-}
-
-@keyframes kenBurns {
-  0% { transform: scale(1.0); }
-  100% { transform: scale(1.06); }
-}
-
-
-      .reveal-mask-container {
-        transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
-      }
-      .hover-item:hover ~ .reveal-mask-container {
-        transform: translate(-50%, -50%) rotate(180deg);
-      }
-    
 </style>
 </head>
 <body>
-
-<!-- SVG Organic clip-path mask -->
-<svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
-  <defs>
-    <clipPath id="organic-mask" clipPathUnits="objectBoundingBox">
-      <path d="M0.5,0.5 C0.77,0.5,0.5,0.77,0.5,0.9 C0.23,0.77,0.23,0.23,0.5,0.1 C0.77,0.23,0.5,0.5,0.5,0.5 Z" />
-    </clipPath>
-  </defs>
-</svg>
 
 <!-- Navigation -->
 <header class="sticky-nav" id="main-nav">
@@ -501,169 +505,146 @@ footer {
       {{/if}}
     </div>
     <nav class="nav-links">
-      <a href="#about">Our Story</a>
-      <a href="#experiences">Experiences</a>
-      <a href="#practical">Practical Guide</a>
-      <a class="cta-button" href="{{booking_url}}">Book Now</a>
+      <a href="#about">The Ride</a>
+      {{#if has_tours}}<a href="#trails">Trails</a><a href="#pairing">Routes</a>{{/if}}
+      <a href="{{booking_url}}" class="cta-button">Book</a>
     </nav>
-    <button class="hamburger" id="ham-toggle" aria-label="Toggle Navigation">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
   </div>
 </header>
 
-<!-- Mobile Navigation Drawer -->
-<div class="mobile-overlay" id="mobile-nav">
-  <a href="#about" id="link-about">Our Story</a>
-  <a href="#experiences" id="link-experiences">Experiences</a>
-  <a href="#practical" id="link-practical">Practical Guide</a>
-  <a class="cta-button" href="{{booking_url}}">Book Now</a>
-</div>
-
-<!-- Hero Section -->
+<!-- Hero Section with Magazine Spread Layout -->
 <section class="hero">
-  <div class="hero-media">
-    {{#if hero_image}}
-      <img src="{{hero_image}}" alt="{{business_name}}" style="animation: kenBurns 20s infinite alternate linear;" fetchpriority="high">
-    {{else}}
-      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
-        <rect width="100" height="100" fill="var(--bg)"/>
-        <path d="M0.5,0.5 C0.77,0.5,0.5,0.77,0.5,0.9 C0.23,0.77,0.23,0.23,0.5,0.1 C0.77,0.23,0.5,0.5,0.5,0.5 Z" fill="var(--ink)" opacity="0.1"/>
-      </svg>
-    {{/if}}
-  </div>
-  <div class="hero-overlay"></div>
-  <div class="hero-content container">
-    <div class="hero-text reveal-fade-up active">
-      <span class="mono-label" style="color:var(--bg);">{{hero_eyebrow}}</span>
-      <h2>{{#if hero_title}}{{hero_title}}{{else}}Eleven gentle kilometres. Two excellent estates. Zero rush.{{/if}}</h2>
-      <p style="color:var(--bg); opacity: 0.8;">{{hero_subtitle}}</p>
-      <a class="cta-button" href="{{booking_url}}">Book Experience</a>
+  <div class="container hero-content">
+    <div class="hero-text">
+      <span class="mono-label">{{hero_eyebrow}}</span>
+      <h2>{{#if hero_title}}{{hero_title}}{{else}}{{business_name}}{{/if}}</h2>
+      <p>{{hero_subtitle}}</p>
+
+      <div class="hero-actions">
+        <a href="{{booking_url}}" class="cta-button">Book your ride</a>
+        <span class="hero-actions-note">Eleven gentle kilometres. Two excellent estates. Zero rush.</span>
+      </div>
     </div>
-    <div class="hero-widget-box glass-panel">
-      <div class="widget-cta">
-        <span class="mono-label">Online bookings</span>
-        <h3 style="font-family: var(--font-display);">Check Real-Time Openings</h3>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">Select your route, view verified spaces, and secure checkout instantly.</p>
-        <a class="cta-button" href="{{booking_url}}" style="width: 100%; text-align: center;">Launch Booking Portal</a>
+
+    <div class="hero-magazine-spread">
+      <div class="spread-img-1">
+        {{#if hero_image}}
+          <img src="{{hero_image}}" alt="{{business_name}}">
+        {{else}}
+          <div class="vine-skin"></div>
+        {{/if}}
+      </div>
+      <div class="spread-img-2">
+        <div class="vine-skin"></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Section Divider Seam -->
+<!-- Rolling vineyard rows divider seam -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,45 C240,25 480,55 720,45 C960,35 1200,55 1440,45 L1440,60 L0,60 Z"/></svg>
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <!-- Vine rows rolling hills wave curve -->
+    <path d="M0,20 C360,40 720,0 1080,30 C1260,40 1380,20 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
 </div>
 
 <!-- Narrative Anti-Grid Section -->
 <section class="narrative-section" id="about">
   <div class="container anti-grid">
-    <div class="anti-grid-text reveal-fade-up">
-      <span class="mono-label">Narrative</span>
-      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A deliberate pace of outdoor adventure</h2>
-      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">We believe the best experiences are measured by depth, not distance. Our guided outings offer an intentional redirection from the haste of the world. With expert guides and custom gear, we venture into wild spaces with restraint and curiosity.</p>
-      <p style="color: var(--text-muted);">Every details is mapped. You bring the curiosity, we handle the rest.</p>
+    <div class="anti-grid-text">
+      <span class="mono-label">The Vineyard Pace</span>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 1rem 0;">A path lined with vines</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">This is cycling measured in views, not kilometres — quiet lanes, the shade of the vines, and time to actually look up.</p>
+      <p style="color: var(--text-muted);">Bring an easy pace and an appetite. The rest is the road.</p>
     </div>
-    <div class="anti-grid-image reveal-fade-up">
-      <svg viewBox="0 0 100 100" class="fallback-svg" style="width:100%;height:100%;">
-        <rect width="100" height="100" fill="var(--bg)"/>
-        <path d="M0.5,0.5 C0.77,0.5,0.5,0.77,0.5,0.9 C0.23,0.77,0.23,0.23,0.5,0.1 C0.77,0.23,0.5,0.5,0.5,0.5 Z" fill="var(--accent)" opacity="0.2"/>
-      </svg>
+    <div class="anti-grid-image">
+      <div class="vine-skin"></div>
     </div>
   </div>
 </section>
 
 <!-- Section Divider Seam -->
 <div class="section-seam invert">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,45 C240,25 480,55 720,45 C960,35 1200,55 1440,45 L1440,60 L0,60 Z"/></svg>
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,20 C360,40 720,0 1080,30 C1260,40 1380,20 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
 </div>
 
-<!-- Hover-Reveal Experiences List -->
 {{#if has_tours}}
-<section class="hover-reveal-section" id="experiences">
+<!-- Hover-Reveal Trails List (Niarra Device - Pedal stroke circle) -->
+<section class="hover-reveal-section" id="trails">
   <div class="container">
-    <span class="mono-label" style="color: var(--bg); opacity: 0.6;">Curated Routes</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Select Your Excursion</h2>
+    <span class="mono-label" style="color: rgba(255,255,255,0.6)">The rides</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3.2rem); margin: 1rem 0 3rem 0;">Choose your trail</h2>
 
     <ul class="hover-list">
       {{#each tours}}
-      <li class="hover-item" data-image="{{image_url}}">
-        <a href="{{../booking_url}}" class="hover-item-content">
-          <span class="hover-item-title">{{name}}</span>
-          <span class="hover-item-meta mono-label" style="color: inherit;">
-            {{duration_minutes}} min &middot; max {{default_capacity}} &middot; from {{../currency}}{{base_price_per_person}}
-          </span>
+      <li class="hover-item"{{#if image_url}} data-image="{{image_url}}"{{/if}}>
+        <a class="hover-item-link" href="{{../booking_url}}">
+          <div class="hover-item-content">
+            <span class="hover-item-title">{{name}}</span>
+            <span class="hover-item-meta">{{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp</span>
+          </div>
         </a>
       </li>
       {{/each}}
     </ul>
   </div>
 
-  <!-- Float reveal mask -->
   <div class="reveal-mask-container" id="reveal-mask">
     <img src="" id="reveal-mask-img" alt="">
   </div>
 </section>
-{{/if}}
 
-<!-- Section Divider Seam -->
+<!-- Rolling vineyard rows divider seam -->
 <div class="section-seam">
-  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" style="width:100%;height:60px;fill:var(--bg);"><path d="M0,45 C240,25 480,55 720,45 C960,35 1200,55 1440,45 L1440,60 L0,60 Z"/></svg>
+  <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+    <path d="M0,20 C360,40 720,0 1080,30 C1260,40 1380,20 1440,20 L1440,40 L0,40 Z"></path>
+  </svg>
 </div>
 
-<!-- Practical Guide -->
-<section class="narrative-section" id="practical">
-  <div class="container">
-    <span class="mono-label">Preparation</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">Trip Guidelines</h2>
-    <p style="color: var(--text-muted); max-width: 45rem;">Everything you need to know to ensure a comfortable and secure journey.</p>
+<!-- Signature Interaction: Route + Detail Pairing (real tours) -->
+<section class="narrative-section" id="pairing">
+  <div class="container text-center">
+    <span class="mono-label">The rides</span>
+    <h2 style="font-size: 2.2rem; margin: 1rem 0;">Pick your route</h2>
+    <p style="color:var(--text-muted)">Select a ride to see what's included.</p>
 
-    <div class="product-sheet">
-      {{#if what_to_bring}}
-      <div class="skin-divider-line" style="border-bottom: 1px solid var(--border-alpha);"></div>
-      <div class="gear-section">
-        <div class="gear-col">
-          <span class="mono-label">What to bring</span>
-          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_bring}}</p>
-        </div>
+    <div class="pairing-card">
+      <div class="route-selector-box">
+        {{#each tours}}
+        <button class="route-btn" onclick="selectRoute(this)"
+          data-desc="{{description}}"
+          data-duration="{{duration_minutes}}"
+          data-cap="{{default_capacity}}"
+          data-price="{{../currency}}{{base_price_per_person}}">
+          <strong>{{name}}</strong><br>
+          {{duration_minutes}} min · {{../currency}}{{base_price_per_person}} pp
+        </button>
+        {{/each}}
       </div>
-      {{/if}}
-      {{#if what_to_wear}}
-      <div class="gear-section">
-        <div class="gear-col">
-          <span class="mono-label">What to wear</span>
-          <p class="gear-copy" style="margin-top:0.5rem;">{{what_to_wear}}</p>
-        </div>
-      </div>
-      {{/if}}
-      {{#if directions}}
-      <div class="gear-section" style="border-bottom: none;">
-        <div class="gear-col">
-          <span class="mono-label">Directions</span>
-          <p class="gear-copy" style="margin-top:0.5rem;">{{directions}}</p>
-        </div>
-      </div>
-      {{/if}}
+
+      <div id="route-detail" class="route-detail"></div>
+
+      <a href="{{booking_url}}" class="cta-button" style="margin-top:1.5rem;">Book your ride</a>
     </div>
-    
-    
   </div>
 </section>
+{{/if}}
 
-<!-- Reviews -->
 {{#if has_reviews}}
-<section class="reviews-section">
+<!-- Reviews strip -->
+<section class="reviews-strip" id="reviews">
   <div class="container">
-    <span class="mono-label">Testimonials</span>
-    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 1rem 0;">From Our Guests</h2>
+    <span class="mono-label">In their words</span>
+    <h2 style="font-size: clamp(2rem, 4vw, 3rem); margin: 0.5rem 0 0 0;">What riders say</h2>
     <div class="reviews-grid">
       {{#each reviews}}
-      <blockquote class="review-quote">
-        <p>"{{quote}}"</p>
-        <cite>{{author}}</cite>
+      <blockquote class="review-card">
+        {{#if rating}}<span class="review-rating">★ {{rating}}</span>{{/if}}
+        <p class="review-quote">{{quote}}</p>
+        <cite class="review-author">— {{author}}</cite>
       </blockquote>
       {{/each}}
     </div>
@@ -671,102 +652,73 @@ footer {
 </section>
 {{/if}}
 
-<!-- Persistent Booking Rail -->
-<div class="booking-rail">
-  <div class="rail-price-info">
-    <span class="mono-label">Instant Booking</span>
-    <span class="rail-price" style="font-size:1.2rem; font-family:var(--font-sans); font-weight:500;">Secure your calendar slot</span>
-  </div>
-  <a class="cta-button" href="{{booking_url}}">Secure My Spot</a>
-</div>
-
 <!-- Footer -->
-<footer>
+<footer class="site-footer">
   <div class="container">
-    <h3 style="font-size: 2.2rem; margin-bottom: 1rem; font-family: var(--font-display);">Eleven gentle kilometres. Two excellent estates. Zero rush.</h3>
-    <p style="opacity: 0.8; max-width: 32rem; margin: 0 auto 2rem auto; font-size: 0.95rem;">Join us for an unforgettable outing. Live availability is updated in real-time.</p>
-    <a class="cta-button" href="{{booking_url}}" style="margin-bottom: 3rem;">Launch Calendar</a>
-    <p style="opacity: 0.6; font-size: 0.8rem; margin-top:2rem;">&copy; {{year}} {{business_name}} &middot; {{footer_line_one}}{{#if footer_line_two}} &middot; {{footer_line_two}}{{/if}} &middot; Powered by <a href="https://bookingtours.co.za" style="color: inherit; text-decoration: underline;">BookingTours</a></p>
+    <div class="footer-brand">{{business_name}}</div>
+    {{#if footer_line_one}}<p>{{footer_line_one}}</p>{{/if}}
+    {{#if footer_line_two}}<p>{{footer_line_two}}</p>{{/if}}
+    <p class="footer-meta">© {{year}} {{business_name}}</p>
   </div>
 </footer>
 
+<!-- Persistent Booking Rail -->
+<div class="booking-rail">
+  <div class="rail-price-info">
+    <span class="rail-label">{{business_name}}</span>
+    <span class="rail-price" style="font-size:1.15rem;font-weight:600;">Book your wine cycling ride</span>
+  </div>
+  <a href="{{booking_url}}" class="cta-button">Book now</a>
+</div>
+
 <script>
-// Scroll Reveal Observer
-document.addEventListener("DOMContentLoaded", () => {
-  const elements = document.querySelectorAll('.reveal-fade-up');
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('active');
-      }
+// Trails hover-reveal (real tours)
+(function () {
+  var mask = document.getElementById('reveal-mask');
+  var maskImg = document.getElementById('reveal-mask-img');
+  if (!mask || !maskImg) return;
+  document.querySelectorAll('.hover-item').forEach(function (item) {
+    item.addEventListener('mouseenter', function () {
+      var src = item.getAttribute('data-image');
+      if (!src) return;
+      maskImg.src = src;
+      mask.classList.add('active');
     });
-  }, { threshold: 0.1 });
-
-  elements.forEach(el => observer.observe(el));
-});
-
-// Sticky Header on Scroll
-window.addEventListener("scroll", () => {
-  const header = document.getElementById("main-nav");
-  if (header) {
-    if (window.scrollY > 20) {
-      header.classList.add("scrolled");
-    } else {
-      header.classList.remove("scrolled");
-    }
-  }
-});
-
-// Mobile Hamburger Toggle
-const toggleBtn = document.getElementById('ham-toggle');
-const mobNav = document.getElementById('mobile-nav');
-const mobLinks = document.querySelectorAll('.mobile-overlay a');
-
-if (toggleBtn && mobNav) {
-  const toggleMenu = () => {
-    const active = mobNav.classList.toggle('active');
-    toggleBtn.classList.toggle('active');
-    document.body.style.overflow = active ? 'hidden' : 'auto';
-  };
-  toggleBtn.addEventListener('click', toggleMenu);
-  mobLinks.forEach(link => link.addEventListener('click', toggleMenu));
-  
-  // Close on ESC
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && mobNav.classList.contains('active')) {
-      toggleMenu();
-    }
-  });
-}
-
-// Niarra Hover-Mask Device
-const hoverItems = document.querySelectorAll('.hover-item');
-const mask = document.getElementById('reveal-mask');
-const maskImg = document.getElementById('reveal-mask-img');
-
-if (hoverItems.length > 0 && mask && maskImg) {
-  hoverItems.forEach(item => {
-    item.addEventListener('mouseenter', () => {
-      const imgUrl = item.getAttribute('data-image');
-      if (imgUrl) {
-        maskImg.src = imgUrl;
-        mask.classList.add('active');
-      }
-    });
-
-    item.addEventListener('mouseleave', () => {
-      mask.classList.remove('active');
-    });
-
-    item.addEventListener('mousemove', (e) => {
+    item.addEventListener('mouseleave', function () { mask.classList.remove('active'); });
+    item.addEventListener('mousemove', function (e) {
       mask.style.left = e.clientX + 'px';
       mask.style.top = e.clientY + 'px';
     });
   });
+})();
+
+// Route + detail pairing (real tours)
+function selectRoute(btn) {
+  document.querySelectorAll('.route-btn').forEach(function (b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  var box = document.getElementById('route-detail');
+  if (!box) return;
+  var d = btn.dataset;
+  box.innerHTML = '';
+  var p = document.createElement('p');
+  p.className = 'route-desc';
+  p.textContent = d.desc || '';
+  box.appendChild(p);
+  var chip = function (v, l) {
+    return v ? '<span class="stat-chip"><span class="stat-value">' + v + '</span><span class="stat-label">' + l + '</span></span>' : '';
+  };
+  var chips = document.createElement('div');
+  chips.className = 'route-chips';
+  chips.innerHTML =
+    chip(d.duration ? d.duration + ' min' : '', 'Duration') +
+    chip(d.cap ? d.cap + ' pax' : '', 'Group cap') +
+    chip(d.price, 'Per person');
+  box.appendChild(chips);
 }
-
-
+(function () {
+  var first = document.querySelector('.route-btn');
+  if (first) selectRoute(first);
+})();
 </script>
-
 </body>
 </html>

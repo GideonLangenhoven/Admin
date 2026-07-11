@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -18,7 +18,7 @@ const TEMPLATES = [
   "wine_cycling"
 ];
 
-const REQUIRED_PLACEHOLDERS = [
+const REQUIRED_PLACEHOLDERS_V1 = [
   "{{business_name}}",
   "{{tagline}}",
   "{{logo_url}}",
@@ -31,6 +31,12 @@ const REQUIRED_PLACEHOLDERS = [
   "{{#each tours}}",
   "{{#if has_reviews}}",
   "{{#each reviews}}"
+];
+
+const REQUIRED_PLACEHOLDERS_V2 = [
+  ...REQUIRED_PLACEHOLDERS_V1,
+  "{{chat_embed}}",
+  "has_chat"
 ];
 
 const FORBIDDEN_STRINGS = [
@@ -47,19 +53,23 @@ function validate() {
   for (const name of TEMPLATES) {
     const filename = `${name}.html`;
     const filepath = join(TEMPLATES_DIR, filename);
-    console.log(`Checking ${filename}...`);
 
     try {
       const content = readFileSync(filepath, "utf8");
+      
+      // Auto-detect version
+      const isV2 = content.includes("chat_embed") || content.includes("has_chat") || name === "sea_kayak";
+      console.log(`Checking ${filename} [V${isV2 ? "2" : "1"}]...`);
 
       // 1. Signature Comment Check
-      if (!content.includes("<!-- signature:")) {
-        console.error(`  ❌ Error: Missing signature comment (<!-- signature: ... -->)`);
+      if (!content.includes("<!-- pack:") || !content.includes("signature:")) {
+        console.error(`  ❌ Error: Missing signature comment (<!-- pack: ${name} · signature: ... -->)`);
         failed = true;
       }
 
       // 2. Required Placeholders Check
-      for (const placeholder of REQUIRED_PLACEHOLDERS) {
+      const required = isV2 ? REQUIRED_PLACEHOLDERS_V2 : REQUIRED_PLACEHOLDERS_V1;
+      for (const placeholder of required) {
         if (!content.includes(placeholder)) {
           console.error(`  ❌ Error: Missing required Handlebars token "${placeholder}"`);
           failed = true;
@@ -87,7 +97,7 @@ function validate() {
       }
 
     } catch (err) {
-      console.error(`  ❌ Error: Failed to read file: ${err.message}`);
+      console.error(`  ❌ Error: Failed to read file ${filename}: ${err.message}`);
       failed = true;
     }
   }
@@ -96,7 +106,7 @@ function validate() {
     console.log("\n❌ Validation FAILED. Please correct the errors above.");
     process.exit(1);
   } else {
-    console.log("\n✅ All 10 templates validated successfully! Award-grade standards met.");
+    console.log("\n✅ All templates validated successfully!");
   }
 }
 
