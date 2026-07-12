@@ -250,7 +250,7 @@ export default function SettingsPage() {
     const [role, setRole] = useState<string | null>(null);
 
     // Collapsible section state
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ admins: true });
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
     function toggleSection(id: string) { setOpenSections((prev) => ({ ...prev, [id]: !(prev[id] ?? false) })); }
 
     // New Admin Form
@@ -1514,7 +1514,7 @@ export default function SettingsPage() {
 
             <div className="space-y-4">
 
-            {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
+            {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection}>
                 {/* Business logo — shown in the dashboard sidebar, the booking
                     site header, every customer email, and on invoices. Saves
                     immediately on upload/remove. */}
