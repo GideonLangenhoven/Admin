@@ -197,6 +197,7 @@ const DEFAULT_SITE_SETTINGS = {
     hero_eyebrow: "",
     hero_title: "",
     hero_subtitle: "",
+    hero_image: "",
     business_name: "",
     business_tagline: "",
     logo_url: "",
@@ -833,6 +834,7 @@ export default function SettingsPage() {
                 hero_eyebrow: data.hero_eyebrow || DEFAULT_SITE_SETTINGS.hero_eyebrow,
                 hero_title: data.hero_title || DEFAULT_SITE_SETTINGS.hero_title,
                 hero_subtitle: data.hero_subtitle || DEFAULT_SITE_SETTINGS.hero_subtitle,
+                hero_image: data.hero_image || DEFAULT_SITE_SETTINGS.hero_image,
                 business_name: data.business_name || DEFAULT_SITE_SETTINGS.business_name,
                 business_tagline: data.business_tagline || DEFAULT_SITE_SETTINGS.business_tagline,
                 logo_url: data.logo_url || DEFAULT_SITE_SETTINGS.logo_url,
@@ -1034,6 +1036,7 @@ export default function SettingsPage() {
             hero_eyebrow: siteSettings.hero_eyebrow || null,
             hero_title: siteSettings.hero_title || null,
             hero_subtitle: siteSettings.hero_subtitle || null,
+            hero_image: siteSettings.hero_image || null,
             business_name: siteSettings.business_name || null,
             business_tagline: siteSettings.business_tagline || null,
             logo_url: siteSettings.logo_url || null,
@@ -2204,6 +2207,41 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
                                 <input type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
+                            </div>
+                            {/* Site background image — saves immediately on upload/remove
+                                (same pattern as the logo). Falls back to the first active
+                                tour's photo, then a palette gradient, when empty. */}
+                            <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">— the photo behind the glass panels on your booking site</span></label>
+                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Recommended: landscape 2560×1440px (16:9), JPG, under 500KB. It renders softly blurred behind frosted panels, so sharpness matters less than good colour and light. If empty, your first tour&apos;s photo is used.</p>
+                                <div className="flex items-center gap-3">
+                                    {siteSettings.hero_image && (
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        <img src={siteSettings.hero_image} alt="Background preview" className="h-14 w-24 shrink-0 rounded border border-[var(--ck-border-subtle)] object-cover" />
+                                    )}
+                                    <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "hero_bg" ? " opacity-50 pointer-events-none" : "")}>
+                                        {uploadingField === "hero_bg" ? "Uploading..." : (siteSettings.hero_image ? "Change background" : "Upload background")}
+                                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            setUploadingField("hero_bg");
+                                            await handleImageUpload(file, "email-images", businessId + "/branding", async (url) => {
+                                                setSiteSettings(prev => ({ ...prev, hero_image: url }));
+                                                const { error } = await supabase.from("businesses").update({ hero_image: url }).eq("id", businessId);
+                                                notify(error ? { message: "Background uploaded but failed to persist: " + error.message, tone: "error" } : { message: "Background image updated — reload your booking site to see it.", tone: "success" });
+                                            });
+                                            setUploadingField(null);
+                                            e.target.value = "";
+                                        }} />
+                                    </label>
+                                    {siteSettings.hero_image && (
+                                        <button type="button" onClick={async () => {
+                                            setSiteSettings(prev => ({ ...prev, hero_image: "" }));
+                                            const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
+                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed — the site falls back to your first tour photo.", tone: "success" });
+                                        }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
