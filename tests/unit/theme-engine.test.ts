@@ -1,9 +1,24 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   hexToRgb, rgbToHex, luminance, contrast, over,
   solveSurface, solveButtonInk, computeTheme,
   INK_DARK, INK_LIGHT, type RGB,
 } from "../../booking/lib/theme-engine";
+
+// The admin app carries a vendored copy (app/lib/theme-engine.ts) because
+// Vercel can't upload across the nested booking/ git repo boundary. Drift
+// guard: the copy must stay byte-identical to the canonical engine (modulo
+// its provenance header).
+describe("vendored admin copy", () => {
+  it("app/lib/theme-engine.ts matches booking/lib/theme-engine.ts", () => {
+    const canonical = readFileSync(resolve(__dirname, "../../booking/lib/theme-engine.ts"), "utf8");
+    const vendored = readFileSync(resolve(__dirname, "../../app/lib/theme-engine.ts"), "utf8");
+    const stripped = vendored.split("\n").filter((l) => !l.startsWith("// VENDORED") && !l.startsWith("// The admin app cannot") && !l.startsWith("// (Vercel doesn't") && !l.startsWith("// copy is byte-identical")).join("\n");
+    expect(stripped).toBe(canonical);
+  });
+});
 
 const WHITE: RGB = [255, 255, 255];
 const BLACK: RGB = [0, 0, 0];

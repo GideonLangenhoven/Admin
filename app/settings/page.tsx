@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { computeTheme as computeGlassTheme } from "../../booking/lib/theme-engine";
+import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
 import dynamic from "next/dynamic";
 import { CaretDown, Lock } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
