@@ -810,6 +810,7 @@ export default function Bookings() {
             amount: total,
             booking_id: editBooking.id,
             type: "BOOKING",
+          send_payment_link: true, // admin explicitly sending the link
             customer_name: editForm.customer_name.trim(),
             qty,
           },
@@ -1155,6 +1156,7 @@ export default function Bookings() {
           amount: Number(b.total_amount || 0),
           booking_id: b.id,
           type: "BOOKING",
+          send_payment_link: true, // admin explicitly sending the link
           customer_name: b.customer_name || "",
           qty: b.qty || 1,
         },
@@ -1227,6 +1229,7 @@ export default function Bookings() {
           amount: Number(b.total_amount || 0),
           booking_id: b.id,
           type: "BOOKING",
+          send_payment_link: true, // admin explicitly sending the link
           customer_name: b.customer_name || "",
           qty: b.qty || 1,
         },

@@ -86,6 +86,12 @@ Deno.serve(async (req: any) => {
     const type = body.type || "BOOKING";
     const topupBusinessId = body.business_id;
     const skipNotifications = body.skip_notifications === true;
+    // Payment-link email/WhatsApp for NEW bookings is OPT-IN: only the admin
+    // "book them in / resend link" flows pass this. Customer-initiated bookings
+    // (chatbot, booking site, WhatsApp bot, OTA) pay inline and must NOT be
+    // emailed/WhatsApp'd the link up front — the hold-expiry cron chases them
+    // only if they abandon or payment lags past the 15-min hold.
+    const sendPaymentLink = body.send_payment_link === true;
 
     if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
@@ -355,8 +361,9 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      // Send payment link via WhatsApp + email for BOOKING checkouts (unless caller already handles notifications)
-      if (type === "BOOKING" && bookingId && !skipNotifications) {
+      // Send payment link via WhatsApp + email for BOOKING checkouts — opt-in
+      // (admin-only). See sendPaymentLink note above.
+      if (type === "BOOKING" && bookingId && sendPaymentLink) {
         try {
           const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
           const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";

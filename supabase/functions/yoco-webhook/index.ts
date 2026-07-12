@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Webhook } from "npm:standardwebhooks";
-import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant, sendWhatsappFreeformOrSignal } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
@@ -234,8 +234,11 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   if (booking.phone && tenant) {
     try {
       const currency = tenant.business.currency || "ZAR";
-      const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
-      await sendWhatsappTextForTenant(
+      // Confirmation WhatsApp only inside the 24h window. Outside it the
+      // confirmation EMAIL (sent below) is the sole notification — no template.
+      // sendWhatsappFreeformOrSignal reports windowClosed instead of
+      // auto-falling-back to a template, so a lapsed window just means no WA.
+      const waRes = await sendWhatsappFreeformOrSignal(
         tenant,
         booking.phone,
         "Booking confirmed\n\n" +
@@ -249,20 +252,8 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
           ? (isLastMinute ? "IMPORTANT - Please sign your waiver before the trip:\n" : "Waiver: ") + waiver.waiverLink + "\n\n"
           : "") +
         "Thanks for booking with " + brandName + ".",
-        // Template fallback for customers outside the 24h window
-        {
-          name: "booking_confirmed1",
-          params: [
-            ref,
-            tourName,
-            slotTime,
-            String(booking.qty),
-            currency + " " + booking.total_amount,
-            myBookingsUrl,
-          ],
-        },
       );
-      waSent = true;
+      waSent = waRes.ok;
     } catch (e) {
       waError = e instanceof Error ? e.message : String(e);
       console.error("WA confirm err:", e);

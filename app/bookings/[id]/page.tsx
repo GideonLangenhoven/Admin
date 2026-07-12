@@ -697,6 +697,7 @@ export default function BookingDetailPage() {
           booking_id: booking.id,
           business_id: businessId,
           type: "BOOKING",
+          send_payment_link: true, // admin explicitly sending the link
           customer_name: booking.customer_name || "",
           customer_email: booking.email || "",
           qty: booking.qty || 1,
