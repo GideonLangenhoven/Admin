@@ -1292,6 +1292,29 @@ export default function SettingsPage() {
 
     const [uploadingField, setUploadingField] = useState<string | null>(null);
 
+    // Downscale/compress a photo in the browser so operators can upload
+    // camera-size originals: longest edge capped, re-encoded as JPEG. Returns
+    // the original file untouched if it's already small or not bitmap-decodable
+    // (e.g. SVG).
+    async function compressImage(file: File, maxEdge = 2560, quality = 0.82): Promise<File> {
+        if (file.size < 600 * 1024 || file.type === "image/svg+xml" || file.type === "image/gif") return file;
+        try {
+            const bitmap = await createImageBitmap(file);
+            const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+            const w = Math.round(bitmap.width * scale);
+            const h = Math.round(bitmap.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
+            bitmap.close();
+            const blob: Blob | null = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+            if (!blob || blob.size >= file.size) return file;
+            return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+        } catch {
+            return file; // decode failed — let the normal size gate handle it
+        }
+    }
+
     async function handleImageUpload(file: File, bucket: string, folder: string, onUrl: (url: string) => void) {
         const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
         if (!["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(ext)) {
@@ -2213,7 +2236,7 @@ export default function SettingsPage() {
                                 tour's photo, then a palette gradient, when empty. */}
                             <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">— the photo behind the glass panels on your booking site</span></label>
-                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Recommended: landscape 2560×1440px (16:9), JPG, under 500KB. It renders softly blurred behind frosted panels, so sharpness matters less than good colour and light. If empty, your first tour&apos;s photo is used.</p>
+                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB — it&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
                                 <div className="flex items-center gap-3">
                                     {siteSettings.hero_image && (
                                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -2224,8 +2247,14 @@ export default function SettingsPage() {
                                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
+                                            if (file.size > 20 * 1024 * 1024) {
+                                                notify({ title: "File too large", message: "Please choose a photo under 20MB.", tone: "warning" });
+                                                e.target.value = "";
+                                                return;
+                                            }
                                             setUploadingField("hero_bg");
-                                            await handleImageUpload(file, "email-images", businessId + "/branding", async (url) => {
+                                            const optimised = await compressImage(file);
+                                            await handleImageUpload(optimised, "email-images", businessId + "/branding", async (url) => {
                                                 setSiteSettings(prev => ({ ...prev, hero_image: url }));
                                                 const { error } = await supabase.from("businesses").update({ hero_image: url }).eq("id", businessId);
                                                 notify(error ? { message: "Background uploaded but failed to persist: " + error.message, tone: "error" } : { message: "Background image updated — reload your booking site to see it.", tone: "success" });
