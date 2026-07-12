@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { computeTheme as computeGlassTheme } from "../../booking/lib/theme-engine";
 import dynamic from "next/dynamic";
 import { CaretDown, Lock } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
@@ -41,6 +42,73 @@ import InlineSlotManager from "../../components/InlineSlotManager";
 // SUPER_ADMIN has every right that MAIN_ADMIN has, plus cross-tenant access.
 function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
+}
+
+// Live glass preview of the public booking site, driven by the SAME theme
+// engine the customer site runs (booking/lib/theme-engine): the inks and
+// glass alphas shown here are exactly what customers will get — including
+// automatic contrast repair for hard palettes.
+function BookingSitePreview({ siteSettings }: { siteSettings: Record<string, any> }) {
+    const glass = computeGlassTheme({
+        main: siteSettings.color_main,
+        secondary: siteSettings.color_secondary,
+        cta: siteSettings.color_cta,
+        bg: siteSettings.color_bg,
+        nav: siteSettings.color_nav,
+        hover: siteSettings.color_hover,
+    });
+    const v = glass.vars;
+    const glassCard: React.CSSProperties = {
+        background: v["--glass-tint-card"],
+        border: "1px solid " + v["--glass-border"],
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 32px rgba(0,0,0,0.22)",
+        backdropFilter: "blur(14px) saturate(160%)",
+        WebkitBackdropFilter: "blur(14px) saturate(160%)",
+    };
+    return (
+        <div>
+            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Preview</h3>
+            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview — text colors are solved automatically so any palette stays readable.</p>
+            <div
+                className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden"
+                style={{
+                    background:
+                        `radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, ${v["--cfg-main"]} 42%, transparent), transparent 60%),` +
+                        `radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, ${v["--cfg-hover"]} 30%, transparent), transparent 62%),` +
+                        `radial-gradient(110% 80% at 50% 105%, color-mix(in srgb, ${v["--cfg-secondary"]} 55%, transparent), transparent 70%),` +
+                        v["--cfg-bg"],
+                }}
+            >
+                <div className="flex items-center justify-between gap-4 px-5 py-3 m-3 rounded-full" style={{ ...glassCard, background: v["--glass-tint-nav"] }}>
+                    <div className="min-w-0">
+                        <div className="text-base font-semibold truncate" style={{ color: v["--ink-nav"] }}>{siteSettings.business_name || "Business Name"}</div>
+                        <div className="text-xs truncate" style={{ color: v["--ink-nav"], opacity: 0.72 }}>{siteSettings.business_tagline || "Business tagline"}</div>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm shrink-0">
+                        <span style={{ color: v["--ink-nav"] }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
+                        <span className="px-4 py-2 rounded-full font-semibold" style={{ backgroundColor: v["--accent"], backgroundImage: `linear-gradient(${v["--main-overlay"]}, ${v["--main-overlay"]})`, color: v["--ink-on-main"] }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
+                    </div>
+                </div>
+                <div className="px-6 py-8 text-center">
+                    <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: v["--accent-text"] }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
+                    <div className="mt-3 text-4xl font-semibold" style={{ color: v["--ink"] }}>{siteSettings.hero_title || "Hero Title"}</div>
+                    <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: v["--ink-muted"] }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
+                    <div className="mt-6 mx-auto max-w-sm rounded-3xl p-4 text-left" style={glassCard}>
+                        <div className="text-sm font-semibold" style={{ color: v["--ink"] }}>Sample Tour Card</div>
+                        <div className="text-xs mt-0.5" style={{ color: v["--ink-muted"] }}>2 hours · R495 per person</div>
+                        <div className="mt-3 inline-flex w-full items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: v["--cta"], backgroundImage: `linear-gradient(${v["--cta-overlay"]}, ${v["--cta-overlay"]})`, color: v["--ink-on-cta"] }}>{siteSettings.card_cta_label || "Book Now"}</div>
+                    </div>
+                </div>
+                <div className="px-6 pb-6 text-center text-sm">
+                    <div style={{ color: v["--ink"] }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
+                    <div className="mt-1" style={{ color: v["--ink-muted"] }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={glassCard}>
+                        <span style={{ color: v["--ink"] }}>{siteSettings.chat_widget_label || "Book here"}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // Personal (per-admin) preference — stored on the caller's own admin_users row
@@ -933,17 +1001,35 @@ export default function SettingsPage() {
             return;
         }
 
+        // Theme colors are consumed by the public booking site — reject
+        // non-hex values here so garbage never reaches the tenant theme row.
+        const HEX_RE = /^#?[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/;
+        const colorFields = ["color_main", "color_secondary", "color_cta", "color_bg", "color_nav", "color_hover"] as const;
+        for (const key of colorFields) {
+            const raw = String((siteSettings as any)[key] || "").trim();
+            if (!HEX_RE.test(raw)) {
+                setSiteMessage({ type: "error", text: `"${key.replace("color_", "").replace("_", " ")}" color must be a hex value like #1F7A8C (got "${raw}").` });
+                setSiteSaving(false);
+                return;
+            }
+        }
+        const normHex = (v: string) => {
+            let h = v.trim().replace(/^#/, "").toLowerCase();
+            if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+            return "#" + h;
+        };
+
         const { error } = await supabase.from("businesses").update({
             directions: siteSettings.directions,
             terms_conditions: siteSettings.terms_conditions,
             privacy_policy: siteSettings.privacy_policy,
             cookies_policy: siteSettings.cookies_policy,
-            color_main: siteSettings.color_main,
-            color_secondary: siteSettings.color_secondary,
-            color_cta: siteSettings.color_cta,
-            color_bg: siteSettings.color_bg,
-            color_nav: siteSettings.color_nav,
-            color_hover: siteSettings.color_hover,
+            color_main: normHex(siteSettings.color_main),
+            color_secondary: normHex(siteSettings.color_secondary),
+            color_cta: normHex(siteSettings.color_cta),
+            color_bg: normHex(siteSettings.color_bg),
+            color_nav: normHex(siteSettings.color_nav),
+            color_hover: normHex(siteSettings.color_hover),
             chatbot_avatar: siteSettings.chatbot_avatar,
             hero_eyebrow: siteSettings.hero_eyebrow || null,
             hero_title: siteSettings.hero_title || null,
@@ -2221,32 +2307,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Copy Preview</h3>
-                        <div className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden" style={{ background: siteSettings.color_bg }}>
-                            <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--ck-border-subtle)]" style={{ background: siteSettings.color_nav }}>
-                                <div className="min-w-0">
-                                    <div className="text-lg font-semibold truncate" style={{ color: siteSettings.color_secondary }}>{siteSettings.business_name || "Business Name"}</div>
-                                    <div className="text-sm truncate" style={{ color: siteSettings.color_main }}>{siteSettings.business_tagline || "Business tagline"}</div>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm shrink-0">
-                                    <span style={{ color: siteSettings.color_secondary }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
-                                    <span className="px-4 py-2 rounded-full font-semibold" style={{ background: siteSettings.color_main, color: "#ffffff" }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
-                                </div>
-                            </div>
-                            <div className="px-6 py-8 text-center">
-                                <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: siteSettings.color_main }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
-                                <div className="mt-3 text-4xl font-semibold" style={{ color: siteSettings.color_secondary }}>{siteSettings.hero_title || "Hero Title"}</div>
-                                <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
-                                <div className="mt-8 inline-flex px-5 py-2.5 rounded-full font-semibold text-sm" style={{ background: siteSettings.color_cta, color: "#ffffff" }}>{siteSettings.card_cta_label || "Book Now"}</div>
-                            </div>
-                            <div className="px-6 py-6 border-t border-[var(--ck-border-subtle)] text-center text-sm">
-                                <div style={{ color: siteSettings.color_secondary }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
-                                <div className="mt-2" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
-                                <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={{ background: siteSettings.color_nav, color: siteSettings.color_secondary, boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)" }}>{siteSettings.chat_widget_label || "Book here"}</div>
-                            </div>
-                        </div>
-                    </div>
+                    <BookingSitePreview siteSettings={siteSettings} />
 
                     {/* Branding Colors */}
                     <div>
