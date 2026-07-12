@@ -43,6 +43,55 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
+// Personal (per-admin) preference — stored on the caller's own admin_users row
+// via self-scoped RPCs, so it follows them across devices. Not gated by
+// settings_permissions: every Settings viewer manages only their own bubble.
+function HelpAssistantSection() {
+    const [hidden, setHidden] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        supabase.rpc("get_my_admin_onboarding").then(({ data }) => {
+            if (!cancelled) setHidden(!!(Array.isArray(data) && data[0]?.help_chat_hidden));
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    async function toggle(next: boolean) {
+        setHidden(next);
+        const { error } = await supabase.rpc("set_my_help_chat_hidden", { p_hidden: next });
+        if (error) {
+            setHidden(!next);
+            notify({ message: "Couldn't save the preference: " + error.message, tone: "error" });
+            return;
+        }
+        // HelpChat (mounted in AppShell) listens for this so the bubble reacts instantly.
+        window.dispatchEvent(new CustomEvent("ck-help-chat-hidden", { detail: { hidden: next } }));
+        notify({ message: next ? "Help assistant hidden. You can turn it back on here any time." : "Help assistant is back.", tone: "success" });
+    }
+
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <div>
+                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Help assistant bubble</h3>
+                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">
+                    The floating chat bubble that answers questions about the dashboard. This only affects your own account — other team members keep their own setting.
+                </p>
+            </div>
+            <label className="flex shrink-0 cursor-pointer items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={hidden === null ? true : !hidden}
+                    disabled={hidden === null}
+                    onChange={(e) => toggle(!e.target.checked)}
+                    className="h-4 w-4 accent-[var(--ck-accent)]"
+                />
+                <span className="text-sm text-[var(--ck-text)]">Show</span>
+            </label>
+        </div>
+    );
+}
+
 // Settings sections that MAIN_ADMIN can grant to regular admins
 const SETTINGS_SECTIONS = [
     { key: "tours", label: "Tours & Activities" },
@@ -2647,6 +2696,10 @@ export default function SettingsPage() {
                 <WhatsAppBotSection />
               </CollapsibleSection>
             )}
+
+            <CollapsibleSection id="dashboard-prefs" title="Dashboard Preferences" subtitle="Personal preferences for your own admin account" openSections={openSections} toggle={toggleSection}>
+                <HelpAssistantSection />
+            </CollapsibleSection>
 
             {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={async (e) => {

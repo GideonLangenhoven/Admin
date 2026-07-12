@@ -57,11 +57,31 @@ export default function HelpChat() {
   const { businessId, role } = useBusinessContext();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Per-admin "hide the bubble" preference (admin_users.help_chat_hidden),
+  // toggled under Settings → Dashboard Preferences. The custom event makes
+  // the toggle take effect without a reload.
+  useEffect(() => {
+    if (!businessId) return;
+    let cancelled = false;
+    supabase.rpc("get_my_admin_onboarding").then(({ data }) => {
+      if (!cancelled && Array.isArray(data) && data[0]?.help_chat_hidden) setHidden(true);
+    });
+    function onVisibility(e: Event) {
+      setHidden(!!(e as CustomEvent).detail?.hidden);
+    }
+    window.addEventListener("ck-help-chat-hidden", onVisibility);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("ck-help-chat-hidden", onVisibility);
+    };
+  }, [businessId]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -80,7 +100,7 @@ export default function HelpChat() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (!businessId) return null;
+  if (!businessId || hidden) return null;
 
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const suggestions = SUGGESTED.filter((s) => !s.privilegedOnly || isPrivileged);

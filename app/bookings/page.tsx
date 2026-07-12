@@ -95,6 +95,8 @@ interface Booking {
   refund_amount: number | null;
   yoco_checkout_id: string | null;
   payment_deadline: string | null;
+  payment_url: string | null;
+  allow_unpaid: boolean;
   waiver_status: string | null;
   custom_fields: Record<string, string> | null;
   tour_id?: string;
@@ -324,7 +326,7 @@ export default function Bookings() {
         const batch = slotIds.slice(i, i + BATCH);
         const { data, error } = await supabase
           .from("bookings")
-          .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
           .eq("business_id", businessId)
           .in("slot_id", batch)
           .order("created_at", { ascending: true })
@@ -877,6 +879,41 @@ export default function Bookings() {
       notify({ title: "Mark paid failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
     }
     setActionBookingId(null);
+    loadBookings();
+  }
+
+  async function sendPaymentReminder(b: Booking) {
+    setActionBookingId(b.id);
+    try {
+      const res = await supabase.functions.invoke("auto-messages", {
+        body: { action: "payment_reminder_one", booking_id: b.id },
+      });
+      if (res.error) {
+        notify({ title: "Reminder failed", message: res.error.message, tone: "error" });
+      } else if (res.data?.ok === false) {
+        notify({ title: "Reminder failed", message: res.data.error || "Unknown error", tone: "error" });
+      } else {
+        notify({ title: "Payment reminder sent", message: "A friendly payment reminder with the link was sent to " + (b.customer_name || "the guest") + ".", tone: "success" });
+      }
+    } catch (err: unknown) {
+      notify({ title: "Reminder failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
+    }
+    setActionBookingId(null);
+  }
+
+  async function toggleAllowUnpaid(b: Booking) {
+    const next = !b.allow_unpaid;
+    setActionBookingId(b.id);
+    const { error } = await supabase.from("bookings").update({ allow_unpaid: next }).eq("id", b.id).eq("business_id", businessId);
+    setActionBookingId(null);
+    if (error) { notify({ title: "Update failed", message: error.message, tone: "error" }); return; }
+    notify({
+      title: next ? "Allowed without payment" : "Payment now required",
+      message: next
+        ? (b.customer_name || "This booking") + " can go ahead unpaid — reminders and auto-cancel are off for it."
+        : "Reminders and auto-cancel are back on for " + (b.customer_name || "this booking") + ".",
+      tone: "success",
+    });
     loadBookings();
   }
 
@@ -2071,6 +2108,8 @@ function SlotRows({
   onResendInvoice,
   paymentLinkBookingId,
   onSendPaymentLink,
+  onPaymentReminder,
+  onToggleAllowUnpaid,
   onWhatsApp,
   onView,
   onCancelSlot,
@@ -2095,6 +2134,8 @@ function SlotRows({
   onResendInvoice: (bookingId: string) => void;
   paymentLinkBookingId: string | null;
   onSendPaymentLink: (b: Booking) => void;
+  onPaymentReminder: (b: Booking) => void;
+  onToggleAllowUnpaid: (b: Booking) => void;
   onWhatsApp: (b: Booking) => void;
   onView: (b: Booking) => void;
   onCancelSlot: (group: SlotGroup) => void;
@@ -2310,6 +2351,19 @@ function SlotRows({
                           onClick={() => { onSendPaymentLink(b); setOpenActions(null); }}
                           disabled={isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED"}
                           tone="blue"
+                        />
+                        <ActionMenuItem
+                          label="Payment Reminder"
+                          onClick={() => { onPaymentReminder(b); setOpenActions(null); }}
+                          disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED" || !b.payment_url}
+                          title={!b.payment_url ? "No payment link on this booking — send a Payment Link first" : "Send a friendly 'payment outstanding' reminder with the payment link"}
+                          tone="amber"
+                        />
+                        <ActionMenuItem
+                          label={b.allow_unpaid ? "Require Payment" : "Allow Without Payment"}
+                          onClick={() => { onToggleAllowUnpaid(b); setOpenActions(null); }}
+                          disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED"}
+                          title={b.allow_unpaid ? "Re-enable reminders + auto-cancel for this booking" : "Let this trip go ahead unpaid — skips reminders and auto-cancel"}
                         />
                         <ActionMenuItem
                           label="Refund"

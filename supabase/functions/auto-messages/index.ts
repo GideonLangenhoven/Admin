@@ -548,12 +548,65 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
   return actioned;
 }
 
+// Manual, per-booking payment reminder — fired from the Bookings page action menu.
+// Sends regardless of the enabled/window gates (the admin explicitly asked), and
+// records a PAYMENT_REMINDER so the automated sweep won't pile a duplicate on top.
+async function sendOnePaymentReminder(bookingId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: b } = await db.from("bookings")
+    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, tours(name), slots(start_time)")
+    .eq("id", bookingId).maybeSingle();
+  if (!b) return { ok: false, error: "Booking not found" };
+  if (!(b as any).payment_url) return { ok: false, error: "This booking has no payment link to send." };
+  const bk: any = b;
+  const tenant = await getTenantContext(db, bk.business_id);
+  const { data: bizRow } = await db.from("businesses").select("automation_config").eq("id", bk.business_id).maybeSingle();
+  const cancelHours = Math.max(1, Number((bizRow as any)?.automation_config?.payment_reminder_cancel_hours ?? 12));
+  const cancelPhrase = cancelHours >= 24
+    ? Math.round(cancelHours / 24) + " day" + (Math.round(cancelHours / 24) === 1 ? "" : "s")
+    : cancelHours + " hour" + (cancelHours === 1 ? "" : "s");
+  const firstName = String(bk.customer_name || "").split(" ")[0] || "there";
+  const tourName = bk.tours?.name || "your booking";
+  const timeStr = bk.slots?.start_time ? formatTenantDateTime(tenant.business, bk.slots.start_time) : "your upcoming trip";
+  const message =
+    "Hi " + firstName + " \u{1F44B}\n\n" +
+    "Friendly reminder that your " + tourName + " is coming up:\n" + timeStr + "\n" +
+    bk.qty + " guest" + (Number(bk.qty || 0) === 1 ? "" : "s") + "\n\n" +
+    "We haven't received your payment yet. To lock in your spot, you can pay securely here:\n" + bk.payment_url + "\n\n" +
+    "Just so you know: if payment isn't made, the booking will be automatically cancelled about " + cancelPhrase +
+    " before the trip so the spot can be freed up. Having any trouble paying? Reply here and we'll sort it out. \u{1F60A}";
+  if (bk.phone) { try { await sendWhatsappTextForTenant(tenant, bk.phone, message); } catch (_e) { /* best effort */ } }
+  if (bk.email) {
+    try {
+      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+        body: JSON.stringify({ type: "PAYMENT_REMINDER", data: {
+          business_id: bk.business_id, email: bk.email, customer_name: bk.customer_name,
+          tour_name: tourName, start_time: bk.slots?.start_time, qty: bk.qty,
+          payment_url: bk.payment_url, cancel_phrase: cancelPhrase, total_amount: bk.total_amount,
+        } }),
+      });
+    } catch (_e) { /* best effort */ }
+  }
+  await logSent(bk.business_id, bk.id, bk.phone || "", "PAYMENT_REMINDER");
+  return { ok: true };
+}
+
 Deno.serve(withSentry("auto-messages", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "all");
+
+    // Manual, single-booking payment reminder from the Bookings action menu.
+    if (action === "payment_reminder_one") {
+      const bookingId = String(body.booking_id || "");
+      if (!bookingId) return new Response(JSON.stringify({ ok: false, error: "booking_id required" }), { status: 400, headers: getHeaders(req.headers.get("origin")) });
+      const r = await sendOnePaymentReminder(bookingId);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: getHeaders(req.headers.get("origin")) });
+    }
+
     const businesses = await getBusinesses();
     const results: Record<string, number> = {
       reminders: 0,
