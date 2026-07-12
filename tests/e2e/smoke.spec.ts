@@ -15,8 +15,10 @@ test.describe("Smoke", () => {
 
   test("booking site home renders with at least one tour", async ({ page }) => {
     await gotoWithAbortRetry(page, BASE_URL + "/");
-    // Tour cards expose accessible labels like "Book <tour name>"
-    await expect(page.getByRole("button", { name: /^Book / })).toBeVisible({ timeout: 45_000 });
+    // Tour cards expose accessible labels like "Book <tour name>". .first():
+    // any tenant with 2+ tours renders multiple matches, which strict mode
+    // rejects even for a visibility check.
+    await expect(page.getByRole("button", { name: /^Book / }).first()).toBeVisible({ timeout: 45_000 });
   });
 
   test("chat widget opens and shows input", async ({ page }) => {
@@ -58,9 +60,12 @@ test.describe("Smoke", () => {
 
   test("admin login screen renders", async ({ page }) => {
     await gotoWithAbortRetry(page, ADMIN_URL + "/", 90_000);
-    await expect(page.getByRole("heading", { name: /admin dashboard/i })).toBeVisible({
+    // Login screen heading is the BookingTours wordmark with an
+    // "operator dashboard" subtitle (post-redesign copy).
+    await expect(page.getByRole("heading", { name: /bookingtours/i })).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByText(/sign in to your operator dashboard/i)).toBeVisible();
     await expect(page.getByPlaceholder(/email/i)).toBeVisible();
     await expect(page.getByPlaceholder(/password/i)).toBeVisible();
   });
