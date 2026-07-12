@@ -342,7 +342,7 @@ export default function Bookings() {
     if (page === 0) {
       const { data: unslotted } = await supabase
         .from("bookings")
-        .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+        .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
         .eq("business_id", businessId)
         .is("slot_id", null)
         .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
@@ -1724,6 +1724,8 @@ export default function Bookings() {
                             onResendInvoice={resendInvoiceForBooking}
                             paymentLinkBookingId={paymentLinkBookingId}
                             onSendPaymentLink={sendPaymentLink}
+                            onPaymentReminder={sendPaymentReminder}
+                            onToggleAllowUnpaid={toggleAllowUnpaid}
                             onWhatsApp={openWhatsApp}
                             onView={(b) => router.push(`/bookings/${b.id}`)}
                             onCancelSlot={cancelSlotWeather}
