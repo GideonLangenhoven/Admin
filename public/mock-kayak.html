@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cape Kayak Adventures — Cape Town Sea Kayaking</title>
+  
+  <!-- Fonts: Fraunces (Display) + Inter (Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Design Tokens */
+    :root {
+      --bg: #F7F5F0;
+      --ink: #0F2B1F;
+      --ink-muted: #2d463a;
+      --accent: #D9822F;
+      --accent-soft: rgba(217, 130, 47, 0.1);
+      --glass-bg: rgba(247, 245, 240, 0.72);
+      --glass-border: rgba(15, 43, 31, 0.14);
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    /* Core Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Typography */
+    h1, h2, h3, .font-serif {
+      font-family: var(--font-display);
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    
+    .font-mono-label {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    /* Header Nav */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1.25rem 2rem;
+      transition: all 0.4s var(--ease);
+    }
+    
+    header.scrolled {
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 0.85rem 2rem;
+    }
+
+    .nav-container {
+      max-w: 80rem;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-main {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-top: -2px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+      align-items: center;
+      list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--ink-muted);
+      font-size: 13px;
+      font-weight: 600;
+      transition: color 0.3s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+
+    /* Hero Section */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 8rem 2rem 6rem;
+      background: radial-gradient(circle at 10% 20%, rgba(217, 130, 47, 0.05) 0%, transparent 60%),
+                  radial-gradient(circle at 90% 80%, rgba(15, 43, 31, 0.04) 0%, transparent 50%);
+    }
+
+    .hero-bg-container {
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.12;
+      filter: grayscale(30%) contrast(110%);
+      transform: scale(1.0);
+      animation: kenBurns 40s infinite alternate var(--ease);
+    }
+
+    @keyframes kenBurns {
+      0% { transform: scale(1.0); }
+      100% { transform: scale(1.06); }
+    }
+
+    .hero-container {
+      max-w: 64rem;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .hero-content {
+      max-w: 48rem;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-eyebrow {
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      color: var(--ink);
+      margin-bottom: 2rem;
+      font-style: italic;
+      font-weight: 800;
+    }
+
+    .hero-description {
+      font-size: 1.125rem;
+      color: var(--ink-muted);
+      margin-bottom: 1.5rem;
+      max-width: 40rem;
+    }
+
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .trust-line {
+      height: 1px;
+      width: 2.5rem;
+      background-color: var(--accent);
+    }
+
+    .trust-text {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+    }
+
+    /* Embedded Booking Widget Container */
+    .widget-container {
+      width: 100%;
+      max-w: 48rem;
+      position: relative;
+      z-index: 10;
+      animation: floatUp 0.8s var(--ease);
+      text-align: left;
+    }
+
+    @keyframes floatUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* SVG Terrain Divider */
+    .terrain-divider {
+      width: 100%;
+      height: auto;
+      fill: var(--ink);
+      margin-top: -1px;
+      pointer-events: none;
+    }
+
+    /* Scroll progress signature swell line */
+    .tide-swell-line {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 4px;
+      background: var(--accent);
+      z-index: 200;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* Tour List Section (Anti-Grid & Hover-Mask Reveal) */
+    .adventures-section {
+      padding: 8rem 2rem;
+      max-w: 80rem;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      margin-bottom: 5rem;
+      text-align: left;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin-top: 0.5rem;
+      color: var(--ink);
+    }
+
+    /* Editorial List for Hover-Mask Reveal */
+    .tour-list {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--glass-border);
+    }
+
+    .tour-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2.25rem 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+      text-decoration: none;
+      color: var(--ink);
+      position: relative;
+      transition: all 0.3s var(--ease);
+    }
+
+    .tour-row:hover {
+      padding-left: 2.5rem;
+      background: rgba(15, 43, 31, 0.02);
+    }
+
+    .tour-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 3rem;
+    }
+
+    .tour-number {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.5rem;
+      color: var(--accent);
+      opacity: 0.8;
+    }
+
+    .tour-name {
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+
+    .tour-meta-right {
+      display: flex;
+      align-items: center;
+      gap: 4rem;
+      text-align: right;
+    }
+
+    .tour-duration {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-muted);
+    }
+
+    .tour-price {
+      font-size: 1.25rem;
+      font-weight: 800;
+      font-family: var(--font-display);
+    }
+
+    /* Hover-Mask Reveal Element */
+    .reveal-card {
+      position: fixed;
+      width: 24rem;
+      height: 16rem;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.9) translate(-50%, -50%);
+      transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+      z-index: 50;
+      overflow: hidden;
+      /* Smooth wave-blob mask */
+      clip-path: url(#wave-blob-mask);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+
+    .reveal-card.visible {
+      opacity: 1;
+      transform: scale(1.0) translate(-50%, -50%);
+    }
+
+    .reveal-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.05);
+      transition: transform 0.8s var(--ease);
+    }
+
+    .tour-row:hover ~ .reveal-card .reveal-img {
+      transform: scale(1.0);
+    }
+
+    /* Product Sheet (Conversion Core) */
+    .product-sheet-section {
+      background: var(--ink);
+      color: var(--bg);
+      padding: 8rem 2rem;
+      position: relative;
+    }
+
+    .sheet-container {
+      max-w: 80rem;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 6rem;
+    }
+
+    @media (max-width: 968px) {
+      .sheet-container {
+        grid-template-columns: 1fr;
+        gap: 4rem;
+      }
+    }
+
+    .sheet-title {
+      font-size: clamp(2rem, 4vw, 3.25rem);
+      margin-top: 0.5rem;
+      color: var(--bg);
+    }
+
+    .sheet-intro {
+      font-size: 1.125rem;
+      opacity: 0.85;
+      margin-top: 1.5rem;
+    }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+
+    .spec-card {
+      background: rgba(247, 245, 240, 0.05);
+      border: 1px solid rgba(247, 245, 240, 0.1);
+      padding: 1.75rem;
+      border-radius: 1.5rem;
+    }
+
+    .spec-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 0.25rem;
+    }
+
+    .spec-description {
+      font-size: 13px;
+      opacity: 0.7;
+      margin-top: 0.5rem;
+    }
+
+    /* Footer */
+    footer {
+      padding: 4rem 2rem;
+      background: var(--bg);
+      border-top: 1px solid var(--glass-border);
+      text-align: center;
+    }
+
+    .footer-container {
+      max-w: 80rem;
+      margin: 0 auto;
+    }
+
+    .footer-logo {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-style: italic;
+      color: var(--ink);
+    }
+
+    .footer-meta {
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-top: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* Embedded SVG for Clip Path Mask */
+    .svg-mask-defs {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Tide-swell scroll indicator -->
+  <div class="tide-swell-line" id="scroll-swell"></div>
+
+  <!-- Header Nav -->
+  <header id="main-header">
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <span class="logo-main">Cape Kayak</span>
+        <span class="logo-sub">Adventures</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#adventures">Adventures</a></li>
+        <li><a href="#about">Why Us</a></li>
+        <li><a href="#safety">Safety</a></li>
+        <li><a href="https://booking.bookingtours.co.za/my-bookings" target="_blank">My Bookings</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-bg-container">
+      <img src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1800&q=80" alt="Kayaking at dawn" class="hero-bg" />
+    </div>
+    
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-eyebrow font-mono-label">Sea Point, Cape Town</div>
+        <h1 class="hero-title">Paddle out at first light — we’ll have the coffee ready.</h1>
+        <p class="hero-description">Explore Cape Town’s iconic Atlantic shoreline with the original guided sea kayak team. Wind-calmed waters, marine life, and premium gear.</p>
+        
+        <div class="trust-badge" style="margin-bottom: 2rem;">
+          <div class="trust-line"></div>
+          <div class="trust-text">Cape Town’s original team · Established 1994</div>
+        </div>
+      </div>
+      
+      <!-- Widget Container placed directly below the text -->
+      <div class="widget-container">
+        <!-- EMBED WIDGET HERE -->
+        <div id="bookingtours-widget" data-tenant="jerrys"></div>
+        <script>
+          (function() {
+            var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            var host = isLocal ? 'http://127.0.0.1:3001' : 'https://booking.bookingtours.co.za';
+            var w = document.getElementById('bookingtours-widget');
+            if (w) {
+              w.setAttribute('data-host', host);
+            }
+            var script = document.createElement('script');
+            script.src = host + '/widget.js';
+            script.async = true;
+            document.head.appendChild(script);
+          })();
+        </script>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terrain Divider SVG -->
+  <svg class="terrain-divider" viewBox="0 0 1440 74" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,32 C240,70 480,72 720,40 C960,8 1200,-10 1440,24 L1440,74 L0,74 Z" />
+  </svg>
+
+  <!-- Tour Listings Section -->
+  <section class="adventures-section" id="adventures">
+    <div class="section-header">
+      <div class="font-mono-label">Our Adventures</div>
+      <h2 class="section-title">Coastal Expeditions</h2>
+    </div>
+
+    <!-- Editorial listings -->
+    <div class="tour-list">
+      <a href="#" class="tour-row" data-img="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80">
+        <div class="tour-meta-left">
+          <span class="tour-number">01</span>
+          <span class="tour-name">Three Anchor Bay Classic</span>
+        </div>
+        <div class="tour-meta-right">
+          <span class="tour-duration">2 Hours · Guided</span>
+          <span class="tour-price">R495</span>
+        </div>
+      </a>
+      
+      <a href="#" class="tour-row" data-img="https://images.unsplash.com/photo-1500259571355-332da5cb07aa?w=600&q=80">
+        <div class="tour-meta-left">
+          <span class="tour-number">02</span>
+          <span class="tour-name">Sunset Marine Paddle</span>
+        </div>
+        <div class="tour-meta-right">
+          <span class="tour-duration">2 Hours · Sunset</span>
+          <span class="tour-price">R550</span>
+        </div>
+      </a>
+
+      <a href="#" class="tour-row" data-img="https://images.unsplash.com/photo-1472745942893-4b9f730c7668?w=600&q=80">
+        <div class="tour-meta-left">
+          <span class="tour-number">03</span>
+          <span class="tour-name">Private Oyster Trail</span>
+        </div>
+        <div class="tour-meta-right">
+          <span class="tour-duration">3.5 Hours · Premium</span>
+          <span class="tour-price">R1,200</span>
+        </div>
+      </a>
+      
+      <!-- Follow-cursor reveal card container -->
+      <div class="reveal-card" id="reveal-card">
+        <img src="" alt="Tour preview" class="reveal-img" id="reveal-img" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Product Sheet Section -->
+  <section class="product-sheet-section" id="about">
+    <div class="sheet-container">
+      <div>
+        <div class="font-mono-label" style="color: var(--accent);">Operational Standard</div>
+        <h2 class="sheet-title">The Coastal Activity Checklist.</h2>
+        <p class="sheet-intro">We run our trips with strict safety ratios and top-tier equipment. Here is what is included in every paddle out of Three Anchor Bay.</p>
+      </div>
+      
+      <div class="spec-grid">
+        <div class="spec-card">
+          <div class="font-mono-label">Paddling Duration</div>
+          <div class="spec-value">120 min</div>
+          <p class="spec-description">Includes brief safety instructions and gearing up before heading out.</p>
+        </div>
+        
+        <div class="spec-card">
+          <div class="font-mono-label">Safety Ratio</div>
+          <div class="spec-value">1:5 max</div>
+          <p class="spec-description">One highly qualified guide for every 5 paddlers for complete peace of mind.</p>
+        </div>
+        
+        <div class="spec-card">
+          <div class="font-mono-label">Minimum Age</div>
+          <div class="spec-value">8 Years</div>
+          <p class="spec-description">Children welcome when accompanied by an adult in a double kayak.</p>
+        </div>
+        
+        <div class="spec-card">
+          <div class="font-mono-label">Gear Included</div>
+          <div class="spec-value">Premium</div>
+          <p class="spec-description">Fluorescent jackets, dry bags, splash covers, and carbon paddles.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-logo">Cape Kayak Adventures</div>
+      <p class="footer-meta">180 Beach Road, Three Anchor Bay · BookingTours Platform</p>
+    </div>
+  </footer>
+
+  <!-- SVG Clip Path for Niarra-Caliber Wave Blob Hover Mask -->
+  <svg class="svg-mask-defs">
+    <defs>
+      <clipPath id="wave-blob-mask" clipPathUnits="objectBoundingBox">
+        <path d="M 0.1,0.2 
+                 C 0.25,0.05 0.7,0.1 0.85,0.2 
+                 C 0.98,0.35 0.95,0.7 0.85,0.8 
+                 C 0.7,0.95 0.3,0.92 0.15,0.8 
+                 C 0.02,0.68 0.0,0.35 0.1,0.2 Z" />
+      </clipPath>
+    </defs>
+  </svg>
+
+  <script>
+    // 1. Header scroll effect
+    const header = document.getElementById('main-header');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 20) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    });
+
+    // 2. Scroll progress indicator swell line
+    const scrollSwell = document.getElementById('scroll-swell');
+    window.addEventListener('scroll', () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / scrollHeight) * 100;
+      scrollSwell.style.width = `${progress}%`;
+    });
+
+    // 3. Niarra Travel-style Hover-Mask Reveal Mechanic
+    const revealCard = document.getElementById('reveal-card');
+    const revealImg = document.getElementById('reveal-img');
+    const tourRows = document.querySelectorAll('.tour-row');
+
+    tourRows.forEach(row => {
+      row.addEventListener('mouseenter', (e) => {
+        const imgUrl = row.getAttribute('data-img');
+        revealImg.src = imgUrl;
+        revealCard.classList.add('visible');
+      });
+
+      row.addEventListener('mouseleave', () => {
+        revealCard.classList.remove('visible');
+      });
+
+      row.addEventListener('mousemove', (e) => {
+        // Offset card to follow cursor smoothly
+        const x = e.clientX + 30;
+        const y = e.clientY + 30;
+        revealCard.style.left = `${x}px`;
+        revealCard.style.top = `${y}px`;
+      });
+    });
+  </script>
+</body>
+</html>
