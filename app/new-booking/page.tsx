@@ -268,6 +268,22 @@ export default function NewBookingPage() {
     return bits.join(" | ");
   }
 
+  // Outer catch below can receive an Error, a string, or a plain error body
+  // from an edge function (e.g. create-checkout's {error, reason, details}).
+  // String(err) on that last case renders literally "[object Object]" in the
+  // toast — extract a real message instead of falling through to that.
+  function formatCaughtError(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const e = err as Record<string, unknown>;
+      const msg = e.reason || e.error || e.message || e.details;
+      if (typeof msg === "string") return msg;
+      try { return JSON.stringify(err); } catch { /* fall through */ }
+    }
+    return String(err);
+  }
+
   async function loadTours() {
     console.log("[NEW_BOOKING] loadTours started", { businessId });
     setLoadingTours(true);
@@ -901,7 +917,7 @@ export default function NewBookingPage() {
       loadSlots();
     } catch (err: unknown) {
       console.error("[NEW_BOOKING] createBooking error", err);
-      notify({ title: "Booking creation failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
+      notify({ title: "Booking creation failed", message: formatCaughtError(err), tone: "error" });
       setSubmitting(false);
     }
   }

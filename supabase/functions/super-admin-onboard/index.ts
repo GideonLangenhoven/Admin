@@ -158,13 +158,15 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({ amount: 100, currency: "ZAR" }),
         });
-        if (yocoRes.status === 401) {
+        if (yocoRes.status === 401 || yocoRes.status === 403) {
+          // 403 is real: reproduced live with a rejected live secret key —
+          // Yoco doesn't only use 401 for auth failures. Treat both as invalid.
           return respond(400, {
             success: false,
             error: "Invalid Yoco API keys. Please verify your Secret Key.",
           });
         }
-        // Any non-401 response (including 400 for missing fields) means the key is valid
+        // Any other response (including 400 for missing fields) means the key is valid
       } catch (yocoErr) {
         return respond(500, {
           success: false,

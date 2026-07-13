@@ -11,12 +11,13 @@ export function BrandMark({
   className?: string;
   variant?: "pine" | "ivory";
 }) {
+  const scaledSize = Math.round(size * 1.8);
   return (
     <img
       src="/brand/bt-mark.png"
       alt="BookingTours logo"
-      width={size}
-      height={size}
+      width={scaledSize}
+      height={scaledSize}
       className={className}
       style={{ objectFit: "contain" }}
     />
