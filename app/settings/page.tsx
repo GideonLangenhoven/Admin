@@ -2,6 +2,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { formatDuration } from "../lib/duration";
+import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
@@ -248,6 +249,8 @@ export default function SettingsPage() {
     const [admins, setAdmins] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
+    const [myEmail, setMyEmail] = useState<string | null>(null);
+    const [changingRole, setChangingRole] = useState<string | null>(null);
 
     // Collapsible section state
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
@@ -360,6 +363,7 @@ export default function SettingsPage() {
     useEffect(() => {
         const r = localStorage.getItem("ck_admin_role");
         setRole(r);
+        setMyEmail(localStorage.getItem("ck_admin_email"));
         if (isPrivileged(r)) {
             fetchAdmins();
             fetchTours();
@@ -750,6 +754,34 @@ export default function SettingsPage() {
             notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
         }
         setSavingPerms(null);
+    }
+
+    async function handleChangeRole(admin: { id: string; name?: string | null; email: string; role: string }, newRole: "ADMIN" | "MAIN_ADMIN") {
+        const label = admin.name || admin.email;
+        const promoting = newRole === "MAIN_ADMIN";
+        if (!await confirmAction({
+            title: promoting ? "Make Main Admin" : "Change to Admin",
+            message: promoting
+                ? `Give ${label} full Main Admin access (settings, billing, admin management)?`
+                : `Reduce ${label} to a regular Admin? They'll lose settings, billing and admin-management access.`,
+            tone: "warning",
+            confirmLabel: promoting ? "Make Main Admin" : "Change to Admin",
+        })) return;
+
+        setChangingRole(admin.id);
+        const res = await fetch("/api/admin/update", {
+            method: "POST",
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ action: "update_role", admin_id: admin.id, role: newRole }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setChangingRole(null);
+        if (!res.ok) {
+            notify({ title: "Couldn't change role", message: data?.error || "Unknown error", tone: "error" });
+            return;
+        }
+        setAdmins(admins.map(x => x.id === admin.id ? { ...x, role: newRole } : x));
+        notify({ title: "Role updated", message: `${label} is now ${promoting ? "a Main Admin" : "a regular Admin"}.`, tone: "success" });
     }
 
     async function handleSaveMarketingTestEmail(email: string) {
@@ -1583,6 +1615,16 @@ export default function SettingsPage() {
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-3 shrink-0">
+                                                {a.role !== "SUPER_ADMIN" && a.email !== myEmail && (
+                                                    <button
+                                                        onClick={() => handleChangeRole(a, a.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
+                                                        disabled={changingRole === a.id}
+                                                        className="text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
+                                                        style={{ color: "var(--ck-text-muted)" }}
+                                                    >
+                                                        {changingRole === a.id ? "Saving..." : (a.role === "MAIN_ADMIN" ? "Change to Admin" : "Make Main Admin")}
+                                                    </button>
+                                                )}
                                                 {a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
                                                     <button
                                                         onClick={() => setExpandedPermsAdmin(isExpanded ? null : a.id)}
@@ -1629,6 +1671,30 @@ export default function SettingsPage() {
                                                             <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
                                                         </label>
                                                     ))}
+                                                </div>
+                                                <p className="text-xs font-semibold text-[var(--ck-text-strong)] mt-5 mb-1">Dashboard sections visible to {a.name || a.email}</p>
+                                                <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide a section from this admin. Billing, Chat FAQ and Data Requests are always Main-Admin only.</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {OPERATOR_HIDEABLE_SECTIONS.map(section => {
+                                                        const hideKey = `hide:${section.key}`;
+                                                        const visible = perms[hideKey] !== true;
+                                                        return (
+                                                            <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={visible}
+                                                                    onChange={() => {
+                                                                        const newPerms = { ...perms, [hideKey]: visible };
+                                                                        setAdmins(admins.map(x => x.id === a.id ? { ...x, settings_permissions: newPerms } : x));
+                                                                        handleSaveAdminPerms(a.id, newPerms);
+                                                                    }}
+                                                                    disabled={savingPerms === a.id}
+                                                                    className="h-4 w-4 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
+                                                                />
+                                                                <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
+                                                            </label>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <p className="text-[10px] text-[var(--ck-text-muted)] mt-3 leading-relaxed">
                                                     Banking details and Admin Users management are always restricted to the Main Admin only.

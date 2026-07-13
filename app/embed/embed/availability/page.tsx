@@ -560,7 +560,10 @@ function AvailabilityWidget() {
             style={{ background: "var(--ck-accent, #125e40)" }}
           />
         </span>
-        <span
+        <a
+          href="https://bookingtours.co.za"
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-[9px] font-medium uppercase opacity-40"
           style={{
             letterSpacing: "0.1em",
@@ -568,7 +571,7 @@ function AvailabilityWidget() {
           }}
         >
           Powered by BookingTours
-        </span>
+        </a>
       </div>
     </div>
   );

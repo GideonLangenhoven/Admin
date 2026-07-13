@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const action = String(body.action || "");
-  if (!["update_permissions", "reset_password", "change_password"].includes(action)) {
+  if (!["update_permissions", "update_role", "reset_password", "change_password"].includes(action)) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
@@ -59,6 +59,62 @@ export async function POST(req: NextRequest) {
 
     const { error: updErr } = await db.from("admin_users").update({ settings_permissions: perms }).eq("id", targetId);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // --- update_role: privileged admin promotes/demotes another admin between
+  //     regular admin ("ADMIN", what /api/admin/add creates) and MAIN_ADMIN.
+  //     SUPER_ADMIN is platform-level and is never granted or removed here. ---
+  if (action === "update_role") {
+    const caller = await getCallerAdmin(req);
+    if (!caller || !isPrivilegedRole(caller.role)) {
+      return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
+    }
+
+    const targetId = String(body.admin_id || "");
+    const newRole = String(body.role || "");
+    if (!targetId || (newRole !== "ADMIN" && newRole !== "MAIN_ADMIN")) {
+      return NextResponse.json({ error: "admin_id and role ('ADMIN' or 'MAIN_ADMIN') are required" }, { status: 400 });
+    }
+    if (targetId === caller.id) {
+      return NextResponse.json({ error: "You cannot change your own role" }, { status: 400 });
+    }
+
+    const { data: target } = await db.from("admin_users").select("id, role, business_id").eq("id", targetId).maybeSingle();
+    if (!target) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    if (caller.role !== "SUPER_ADMIN" && target.business_id !== caller.business_id) {
+      return NextResponse.json({ error: "Cannot modify admins from another business" }, { status: 403 });
+    }
+    if (target.role === "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Super Admin role cannot be changed here" }, { status: 403 });
+    }
+    if (target.role === newRole) return NextResponse.json({ ok: true }); // no-op
+
+    // Lockout guard: a demotion must not leave the business with no full-access
+    // admin (MAIN_ADMIN or SUPER_ADMIN). SUPER_ADMIN counts — a tenant owned
+    // only by a platform Super Admin is still fully manageable.
+    if (target.role === "MAIN_ADMIN" && newRole === "ADMIN") {
+      const { count } = await db.from("admin_users")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", target.business_id)
+        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+        .neq("id", targetId);
+      if ((count ?? 0) < 1) {
+        return NextResponse.json({ error: "This is the last admin with full access — promote another admin first." }, { status: 400 });
+      }
+    }
+
+    const { error: updErr } = await db.from("admin_users").update({ role: newRole }).eq("id", targetId);
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    await db.from("audit_logs").insert({
+      actor_id: caller.id,
+      business_id: target.business_id,
+      action_type: newRole === "MAIN_ADMIN" ? "ADMIN_ROLE_PROMOTED" : "ADMIN_ROLE_DEMOTED",
+      target_entity: "admin_users",
+      target_id: targetId,
+      after_state: { from: target.role, to: newRole },
+    });
     return NextResponse.json({ ok: true });
   }
 

@@ -5,6 +5,8 @@ import { confirmAction, notify } from "./lib/app-notify";
 import { getAdminTimezone } from "./lib/admin-timezone";
 import { customerNotesTooltip } from "./lib/customer-notes";
 import { useBusinessContext } from "../components/BusinessContext";
+import { isPrivilegedRole } from "./lib/api-auth";
+import { isSectionHidden } from "./lib/operator-sections";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -135,7 +137,16 @@ function Sparkline({ data }: { data: number[] }) {
 
 /* ── main component ── */
 export default function Dashboard() {
-    const { businessId } = useBusinessContext();
+    const { businessId, role } = useBusinessContext();
+    // Main Admin can hide the revenue panel from operator-level admins.
+    const [hideRevenue, setHideRevenue] = useState(false);
+    useEffect(() => {
+        if (isPrivilegedRole(role)) { setHideRevenue(false); return; }
+        try {
+            const perms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
+            setHideRevenue(isSectionHidden(perms, "dashboard_reports"));
+        } catch { setHideRevenue(false); }
+    }, [role]);
     const [refundCount, setRefundCount] = useState(0);
     const [refundTotal, setRefundTotal] = useState(0);
     const [inboxCount, setInboxCount] = useState(0);
@@ -585,6 +596,7 @@ export default function Dashboard() {
                 </Link>
 
                 {/* Revenue at a glance — today, last 7 days, this month + month sparkline */}
+                {!hideRevenue && (
                 <Link href="/reports" className="ui-card ui-card-hover group block p-6 lg:col-span-3">
                     <div className="flex items-center justify-between mb-5">
                         <h3 className="ui-mono-label">Revenue</h3>
@@ -613,6 +625,7 @@ export default function Dashboard() {
                         </div>
                     )}
                 </Link>
+                )}
             </div>
 
             {/* ── KPI row ── */}

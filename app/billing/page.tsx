@@ -51,6 +51,7 @@ export default function BillingPage() {
   const [monthly, setMonthly] = useState(0);
   const [emailUsage, setEmailUsage] = useState<EmailUsage | null>(null);
   const [history, setHistory] = useState<LineItem[]>([]);
+  const [plansAvailable, setPlansAvailable] = useState<Array<{ id: string; name: string; monthly_price_zar: number; included_seats: number; current: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +72,7 @@ export default function BillingPage() {
       setUsedSeats(data.used_seats);
       setMonthly(data.monthly_total_zar);
       setEmailUsage(data.email_usage ?? null);
+      setPlansAvailable(data.plans_available ?? []);
     }
     if (histRes.ok) {
       const data = await histRes.json();
@@ -120,6 +122,31 @@ export default function BillingPage() {
 
     if (!r.ok) { setError(data.error); return; }
     notify({ title: "Seats updated", message: `Now at ${data.new_seats} seat(s). Proration: R${data.proration_zar}`, tone: "success" });
+    load();
+  }
+
+  async function changePlan(planId: string, planName: string, planPrice: number) {
+    if (!sub) return;
+    setError(null);
+    const upgrading = planPrice > (sub.plans?.monthly_price_zar ?? 0);
+    const confirmed = await confirmAction({
+      title: `Switch to ${planName}`,
+      message: `Change your plan to ${planName} (R${planPrice.toLocaleString()}/month base)? The ${upgrading ? "extra" : "difference"} is prorated for the rest of this billing period. Included seats adjust automatically.`,
+      tone: "info",
+      confirmLabel: `Switch to ${planName}`,
+    });
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    const r = await fetch("/api/billing/plan", {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ plan_id: planId }),
+    });
+    const data = await r.json();
+    setActionLoading(false);
+    if (!r.ok) { setError(data.error); return; }
+    notify({ title: "Plan changed", message: `You're now on ${planName}. Proration: R${data.proration_zar ?? 0}`, tone: "success" });
     load();
   }
 
@@ -210,6 +237,30 @@ export default function BillingPage() {
         <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
           R{sub.plans?.monthly_price_zar ?? 0}/month base · R{sub.plans?.extra_seat_price_zar ?? 0}/extra seat
         </p>
+
+        {(sub.status === "ACTIVE" || sub.status === "TRIAL") && plansAvailable.length > 1 && (
+          <div className="mt-4">
+            <div className="ui-mono-label !text-[10px] mb-2">Change plan</div>
+            <div className="grid grid-cols-3 gap-2">
+              {plansAvailable.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => !p.current && changePlan(p.id, p.name, p.monthly_price_zar)}
+                  disabled={actionLoading || p.current}
+                  className="p-3 rounded-[10px] border text-left transition-colors disabled:cursor-default hover:border-[var(--ck-accent)]"
+                  style={{
+                    background: p.current ? "var(--ck-accent-soft)" : "var(--ck-surface-sunken)",
+                    borderColor: p.current ? "var(--ck-accent)" : "var(--ck-border-subtle)",
+                  }}
+                >
+                  <div className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{p.name}</div>
+                  <div className="text-xs mt-0.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>R{p.monthly_price_zar.toLocaleString()}/mo · {p.included_seats} seat{p.included_seats !== 1 ? "s" : ""}</div>
+                  <div className="ui-mono-label !text-[9px] mt-1.5" style={{ color: p.current ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>{p.current ? "Current" : "Switch"}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>

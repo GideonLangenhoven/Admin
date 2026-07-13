@@ -15,6 +15,7 @@ import { isNavItemActive } from "./nav-active";
 import WaFailureWatcher from "./WaFailureWatcher";
 import HelpChat from "./HelpChat";
 import WelcomeChecklist from "./WelcomeChecklist";
+import { isSectionHidden } from "@/app/lib/operator-sections";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
@@ -118,16 +119,25 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     }
   }, [displayName]);
 
+  // Per-operator section visibility set by the Main Admin (see operator-sections.ts).
+  // Read directly from localStorage like the Settings gate below; guarded so SSR
+  // (no localStorage) simply shows everything, then hydration applies the hides.
+  let operatorPerms: Record<string, boolean> = {};
+  try {
+    operatorPerms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
+  } catch { /* SSR / malformed — treat as nothing hidden */ }
+
   const visibleNav = nav.filter((n) => {
     if (n.superAdminOnly) return role === "SUPER_ADMIN";
+    // Main-Admin-controlled hiding applies to operator-level admins only.
+    if (!isPrivilegedRole(role) && isSectionHidden(operatorPerms, n.href)) return false;
     if (!n.privilegedOnly) return true;
     if (isPrivilegedRole(role)) return true;
     // Show Settings for admins who have been granted section permissions
     if (n.href === "/settings") {
-      try {
-        const perms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
-        return Object.values(perms).some(Boolean);
-      } catch { return false; }
+      // Only the settings-section grants count — "hide:*" flags must not
+      // accidentally unlock the Settings page.
+      return Object.entries(operatorPerms).some(([k, v]) => v === true && !k.startsWith("hide:"));
     }
     return false;
   });
@@ -307,7 +317,10 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           })}
         </div>
         {/* Platform provenance — subtle, stays in hairline footer */}
-        <div
+        <a
+          href="https://bookingtours.co.za"
+          target="_blank"
+          rel="noopener noreferrer"
           className={`mt-auto border-t px-4 py-3 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}
           style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
           title="Powered by BookingTours"
@@ -319,7 +332,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               <BrandWordmark className="text-[12px]" />
             </span>
           )}
-        </div>
+        </a>
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Desktop topbar — glass chrome: breadcrumb, live clock, session controls */}

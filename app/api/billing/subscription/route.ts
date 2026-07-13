@@ -102,8 +102,23 @@ export async function GET(req: NextRequest) {
   const emailOverage = Math.round(overageEmails * emailRate * 100) / 100;
   const monthlyTotal = seatTotal + emailOverage;
 
+  // Active plans for the tenant-facing plan switcher (id + display fields only).
+  const { data: allPlans } = await db.from("plans")
+    .select("id, name, monthly_price_zar, seat_limit, extra_seat_price_zar")
+    .eq("active", true)
+    .order("monthly_price_zar");
+  const plansAvailable = (allPlans ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    monthly_price_zar: Number(p.monthly_price_zar),
+    included_seats: Number(p.seat_limit),
+    extra_seat_price_zar: Number(p.extra_seat_price_zar),
+    current: String(p.id).toLowerCase() === planId,
+  }));
+
   return NextResponse.json({
     subscription,
+    plans_available: plansAvailable,
     used_seats: usedSeats ?? 0,
     monthly_total_zar: monthlyTotal,
     email_usage: {

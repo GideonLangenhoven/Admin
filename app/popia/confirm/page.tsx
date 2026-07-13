@@ -88,7 +88,12 @@ function ConfirmContent() {
             </div>
           )}
         </div>
-        <p className="ui-mono-label mt-5 text-center !text-[9.5px]">Powered by BookingTours</p>
+        <p className="ui-mono-label mt-5 text-center !text-[9.5px]">
+          Powered by{" "}
+          <a href="https://bookingtours.co.za" target="_blank" rel="noopener noreferrer">
+            BookingTours
+          </a>
+        </p>
       </div>
     </div>
   );
