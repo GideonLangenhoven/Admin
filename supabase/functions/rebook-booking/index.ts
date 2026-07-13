@@ -497,14 +497,6 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   if (newQty < 1) return fail(req, "new_qty must be at least 1", 400);
   if (newQty >= booking.qty) return fail(req, "new_qty must be less than current qty (" + booking.qty + ")", 400);
 
-  // Block guest removal within 24 hours of departure (prevents cancellation loophole)
-  if (booking.slots?.start_time) {
-    const hoursUntilTrip = (new Date(booking.slots.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
-    if (hoursUntilTrip < 24 && hoursUntilTrip > 0) {
-      return fail(req, "Guest changes are not allowed within 24 hours of departure", 400);
-    }
-  }
-
   const removedGuests = booking.qty - newQty;
   // Use pro-rata discount math: divide total_amount by current guest count
   // to find the true discounted per-person price (not the base unit_price)
@@ -512,6 +504,21 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   const discountedUnitPrice = booking.qty > 0 ? totalAmountPaid / booking.qty : Number(booking.unit_price || 0);
   const excessAmount = removedGuests * discountedUnitPrice;
   const newTotal = totalAmountPaid - excessAmount;
+
+  // Removing guests close to the trip used to be blocked outright, because a full
+  // refund here would undercut the cancellation policy (remove-all-but-one to dodge
+  // the cancel penalty). Instead we now allow it at any time and refund the removed
+  // guests' portion at the SAME cancellation-policy percentage a cancel would apply
+  // — policy-aligned and no loophole. Vouchers stay full value (as with cancel).
+  let removePolicyPercent = 95;
+  if (booking.slots?.start_time && booking.business_id) {
+    const { data: pctData } = await supabase.rpc("calculate_refund_percent", {
+      p_business_id: booking.business_id,
+      p_tour_start: booking.slots.start_time,
+    });
+    if (typeof pctData === "number") removePolicyPercent = pctData;
+  }
+  const removePolicyFraction = removePolicyPercent / 100;
 
   if (isUnpaidBooking(booking)) {
     // Unpaid: reprice, release the removed guests' held seats (if this
@@ -570,7 +577,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       result.voucher_code = vResult.data.code;
       result.payment_method = booking.payment_method;
     } else if (isManualPayment(booking)) {
-      const manualRefund = excessAmount * 0.95;
+      const manualRefund = excessAmount * removePolicyFraction;
       await supabase.from("bookings").update({
         refund_status: "MANUAL_EFT_REQUIRED",
         refund_amount: manualRefund,
@@ -582,7 +589,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       const guestTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
       const guestTotalRefunded = Number(booking.total_refunded || 0);
       const guestRefundable = guestTotalCaptured - guestTotalRefunded;
-      const refundAmount = Math.min(excessAmount * 0.95, guestRefundable);
+      const refundAmount = Math.min(excessAmount * removePolicyFraction, guestRefundable);
       // No total_refunded bump at request time — see process-refund
       await supabase.from("bookings").update({
         refund_status: "REQUESTED",
