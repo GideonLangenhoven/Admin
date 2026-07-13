@@ -49,7 +49,7 @@ type BusinessRow = {
 };
 
 export default function SuperAdminPage() {
-  const { role } = useBusinessContext();
+  const { role, refreshBusiness } = useBusinessContext();
 
   if (role !== "SUPER_ADMIN") {
     return (
@@ -379,7 +379,15 @@ export default function SuperAdminPage() {
         },
       });
 
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        // functions.invoke gives a generic "non-2xx" message; the real reason is in the response body.
+        let detail = "";
+        try {
+          const ctx = (res.error as { context?: Response }).context;
+          if (ctx && typeof ctx.json === "function") detail = (await ctx.json())?.error || "";
+        } catch { /* body already consumed or not JSON */ }
+        throw new Error(detail || res.error.message);
+      }
       if (!res.data?.success) throw new Error(res.data?.error || "Unknown onboarding error");
 
       const admin = res.data.admin;
@@ -404,6 +412,9 @@ export default function SuperAdminPage() {
       setForm(DEFAULT_FORM);
       setRequesterPassword("");
       notify({ title: "Client created", message: "The tenant environment was created successfully.", tone: "success" });
+      // The sidebar's tenant switcher fetches operators once on session load —
+      // without this, a newly created tenant stays invisible until a hard reload.
+      await refreshBusiness?.();
     } catch (error) {
       notify({
         title: "Onboarding failed",

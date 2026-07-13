@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
       .insert({
         name: businessName,
         business_name: businessName,
+        operator_email: adminEmail,
         business_tagline: businessTagline || null,
         logo_url: logoUrl,
         timezone,
@@ -205,9 +206,13 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("super-admin-onboard error", error);
-    return respond(500, {
-      success: false,
-      error: error instanceof Error ? error.message : "Unhandled error",
-    });
+    // Supabase query errors are PostgrestError objects, NOT Error instances, so
+    // `instanceof Error` would drop the real message. Read .message directly.
+    const e = error as { message?: string; details?: string; hint?: string; code?: string };
+    const msg = e?.message || e?.details || (typeof error === "string" ? error : "") || "Unhandled error";
+    const friendly = e?.code === "23505"
+      ? `A record with these details already exists (${e.details || e.message}). The admin email or subdomain may already be in use.`
+      : msg;
+    return respond(500, { success: false, error: friendly });
   }
 });

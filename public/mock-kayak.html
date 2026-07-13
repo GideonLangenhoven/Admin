@@ -678,8 +678,13 @@
         // Offset card to follow cursor smoothly
         const x = e.clientX + 30;
         const y = e.clientY + 30;
+        // Card is centered on (x, y) via translate(-50%, -50%), so its visual
+        // top edge sits at y - cardHeight/2. Clamp so that never rises above
+        // the fixed header, which otherwise paints over the top of the image.
+        const headerBottom = header.getBoundingClientRect().bottom;
+        const minCenterY = headerBottom + 16 + revealCard.offsetHeight / 2;
         revealCard.style.left = `${x}px`;
-        revealCard.style.top = `${y}px`;
+        revealCard.style.top = `${Math.max(y, minCenterY)}px`;
       });
     });
   </script>

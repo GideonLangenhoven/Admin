@@ -649,6 +649,9 @@ export default function BookingDetailPage() {
           ...booking,
           qty: reduceGuestsTarget,
           total_amount: booking.qty > 0 ? (Number(booking.total_amount) / booking.qty) * reduceGuestsTarget : Number(booking.total_amount),
+          // A refund/EFT request was just filed server-side — reflect it immediately
+          // instead of leaving the stale pill until the page is manually reloaded.
+          ...(data.refund_amount ? { refund_status: data.refund_status || "REQUESTED", refund_amount: data.refund_amount } : {}),
         } as BookingDetail);
         setReduceGuestsOpen(false);
       }
