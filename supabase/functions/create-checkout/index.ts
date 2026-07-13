@@ -38,11 +38,20 @@ function ensureCheckoutUrls(urls: { bookingSuccessUrl?: string; bookingCancelUrl
   return Boolean(urls.bookingSuccessUrl && urls.bookingCancelUrl);
 }
 
-async function resolveCheckoutBusiness(params: { bookingId?: string; voucherId?: string; businessId?: string }) {
-  let businessId = params.businessId || "";
+async function resolveCheckoutBusiness(params: { bookingId?: string; voucherId?: string }) {
+  // SECURITY: business_id is ALWAYS derived from the booking/voucher row's
+  // own column, never from client input. A client-supplied business_id used
+  // to take priority here, letting a request carry a real booking_id for
+  // Tenant A alongside a business_id for Tenant B — the checkout session
+  // (and Yoco secret key) would be created under Tenant B while Tenant A's
+  // booking still got marked PAID by Tenant A's own webhook. TOPUP was the
+  // only checkout type that ever needed a bare business_id, and it's been
+  // discontinued (see the TOPUPS_DISCONTINUED branch below) — every
+  // remaining type has a real bookingId or voucherId to resolve from.
+  let businessId = "";
   let bookingStatus = "";
 
-  if (!businessId && params.bookingId) {
+  if (params.bookingId) {
     const bookingRow = await supabase.from("bookings").select("business_id, status").eq("id", params.bookingId).maybeSingle();
     businessId = String(bookingRow.data?.business_id || "");
     bookingStatus = String(bookingRow.data?.status || "");
@@ -84,7 +93,6 @@ Deno.serve(async (req: any) => {
     const promoCode = body.promo_code || "";
     const customerEmail = body.customer_email || "";
     const type = body.type || "BOOKING";
-    const topupBusinessId = body.business_id;
     const skipNotifications = body.skip_notifications === true;
     // Payment-link email/WhatsApp for NEW bookings is OPT-IN: only the admin
     // "book them in / resend link" flows pass this. Customer-initiated bookings
@@ -219,7 +227,7 @@ Deno.serve(async (req: any) => {
       amount = faceValue;
     }
 
-    const resolved = await resolveCheckoutBusiness({ bookingId, voucherId, businessId: topupBusinessId });
+    const resolved = await resolveCheckoutBusiness({ bookingId, voucherId });
     const tenant = resolved.tenant;
     const businessUrls = resolved.businessUrls;
     const origin = req?.headers?.get("origin") || "";

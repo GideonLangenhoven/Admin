@@ -824,7 +824,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         reply = (dName || dEmail || dPhone ? "Thanks! " : "") + "I still just need your " + dMiss.join(" and ") + " — send it whenever you're ready.";
         return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
       }
-      const customDefs = await getBookingCustomFields(ns.bid || tours[0]?.business_id);
+      const customDefs = await getBookingCustomFields(requestedBusinessId);
       if (customDefs.length > 0) {
         ns = { ...ns, step: "ASK_CUSTOM_FIELD", name: dName, email: dEmail, phone: dPhone, custom_field_defs: customDefs, custom_fields: {} };
         reply = "Thanks " + dName.split(" ")[0] + "! A few trip-specific details first:\n\n" + promptForCustomField(customDefs[0]);
@@ -900,7 +900,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
 
       if (btnVal === "confirm" || lo.includes("yes") || lo.includes("confirm") || lo.includes("go ahead") || lo.includes("sure") || lo.includes("yep")) {
         let ft = Number(ns.total || 0);
-        const businessId = ns.bid || requestedBusinessId;
+        // SECURITY: always use the Origin/subdomain-validated requestedBusinessId,
+        // never ns.bid — ns is the conversation state object round-tripped
+        // verbatim from the client every turn and isn't server-signed, so a
+        // tampered ns.bid could tag this booking under a different tenant
+        // while tour_id/slot_id still reference requestedBusinessId's tour.
+        const businessId = requestedBusinessId;
         // L1: Fetch meeting point dynamically from the business record.
         const { data: _tourData } = await db.from("tours").select("base_price_per_person, business_id").eq("id", ns.tid).eq("business_id", requestedBusinessId).maybeSingle();
         let meetingPointText = "";
@@ -1348,7 +1353,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     if (step === "RESEND_CONFIRM") {
       if (btnVal === "resend_email" || lo.includes("yes") || lo.includes("resend")) {
         try {
-          await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: ns.booking_id, business_id: ns.bid || tours[0]?.business_id, email: ns.email, customer_name: ns.customer_name, ref: ns.booking_id.substring(0, 8).toUpperCase() } }) });
+          await fetch(SU + "/functions/v1/send-email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: ns.booking_id, business_id: requestedBusinessId, email: ns.email, customer_name: ns.customer_name, ref: ns.booking_id.substring(0, 8).toUpperCase() } }) });
           reply = "Sent! Check your inbox and spam folder \u2709\uFE0F";
         } catch (e) { reply = "Something went wrong. Please try again."; }
       } else { reply = "No problem!"; }
@@ -1396,13 +1401,13 @@ Deno.serve(withSentry("web-chat", async (req) => {
         let gv: any = null;
         for (let _retry = 0; _retry < 5; _retry++) {
           if (_retry > 0) vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
-          const _ins = await db.from("vouchers").insert({ business_id: ns.gbid, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, current_balance: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
+          const _ins = await db.from("vouchers").insert({ business_id: requestedBusinessId, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, current_balance: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
           if (!_ins.error) { gv = _ins.data; break; }
           if (_ins.error.code !== "23505") break;
         }
         if (gv) {
-          const giftUrls = await getBusinessSiteUrls(ns.gbid);
-          const gyr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ns.gtprice, business_id: ns.gbid, voucher_id: gv.id, voucher_code: vcode, type: "GIFT_VOUCHER" }) });
+          const giftUrls = await getBusinessSiteUrls(requestedBusinessId);
+          const gyr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ns.gtprice, business_id: requestedBusinessId, voucher_id: gv.id, voucher_code: vcode, type: "GIFT_VOUCHER" }) });
           const gyd = await gyr.json();
           if (gyd && gyd.redirectUrl) { await db.from("vouchers").update({ yoco_checkout_id: gyd.id }).eq("id", gv.id); pay = gyd.redirectUrl; reply = "\ud83c\udf81 Voucher created! Click below to pay R" + ns.gtprice + ".\n\nOnce paid, we\u2019ll email the voucher to " + ns.gbuyeremail + " \u2709\ufe0f"; }
           else { reply = "Payment link didn\u2019t work \u2014 try the Gift Voucher page on the website?"; }

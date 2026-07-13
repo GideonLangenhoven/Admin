@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
+import { getCallerAdmin } from "../../lib/api-auth";
 
 function serviceClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -8,14 +9,19 @@ function serviceClient() {
     return createClient(url, key);
 }
 
-// GET /api/partner-tours?business_id=xxx&partner_id=yyy
-// Returns active tours for the partner business, after verifying an active partnership exists.
+// GET /api/partner-tours?partner_id=yyy
+// Returns active tours for the partner business, after verifying the CALLER's
+// own tenant has an active partnership with it. business_id was previously a
+// client-supplied query param — that let anyone enumerate business_id/
+// partner_id pairs and dump a partner's tour catalog with no login at all.
+// It's now derived server-side from the authenticated session.
 export async function GET(req: NextRequest) {
     if (!isComboEnabledServer()) return comboDisabledResponse();
-    const businessId = req.nextUrl.searchParams.get("business_id");
+    const caller = await getCallerAdmin(req);
+    if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const businessId = caller.business_id;
     const partnerId = req.nextUrl.searchParams.get("partner_id");
 
-    if (!businessId) return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
     if (!partnerId) return NextResponse.json({ error: "partner_id query param is required" }, { status: 400 });
 
     const supabase = serviceClient();

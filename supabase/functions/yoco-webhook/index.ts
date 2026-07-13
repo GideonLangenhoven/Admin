@@ -108,13 +108,18 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
     return existing.data;
   }
 
-  const invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
+  let invNumR: { data: any; error: { message: string } | null };
+  try {
+    invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id });
+  } catch (_e) {
+    invNumR = { data: null, error: { message: "RPC not found" } };
+  }
   if (invNumR.error) {
     console.warn("next_invoice_number RPC failed (using fallback):", invNumR.error.message);
   }
   const invNum = invNumR.data || ("INV-" + Date.now());
   const subtotal = Number(booking.original_total || booking.total_amount);
-  const discountAmt = subtotal - Number(booking.total_amount);
+  let discountAmt = subtotal - Number(booking.total_amount);
   if (discountAmt < 0) discountAmt = 0;
 
   const inv = await supabase.from("invoices").insert({
@@ -336,22 +341,15 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     try {
       await verifyWebhookSignature(req, rawBody, businessId, type);
     } catch (verifyError) {
-      console.error("YOCO_WEBHOOK_VERIFY_ERROR:", verifyError);
-      // Best-effort log so operators can see this in the logs table.
-      // We intentionally do not include rawBody (could contain PII).
-      try {
-        await supabase.from("logs").insert({
-          business_id: businessId || null,
-          event: "yoco_webhook_signature_failed",
-          payload: {
-            event_type: type,
-            checkout_id: checkoutId || null,
-            booking_id: metaBookingId || null,
-            yoco_payment_id: yocoPaymentId || null,
-            reason: verifyError instanceof Error ? verifyError.message : String(verifyError),
-          },
-        });
-      } catch (_logErr) { /* swallow — we already failed open above */ }
+      // Console-only: CLAUDE.md requires zero DB writes on an invalid/missing
+      // signature. A DB log insert here (even audit-only) violated that on
+      // this path; console.error is still fully visible in function logs.
+      console.error("YOCO_WEBHOOK_VERIFY_ERROR:", verifyError, {
+        event_type: type,
+        checkout_id: checkoutId || null,
+        booking_id: metaBookingId || null,
+        yoco_payment_id: yocoPaymentId || null,
+      });
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -1207,12 +1205,14 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     } catch (confirmErr) {
       console.error("CONFIRM_SEND_ERR booking=" + booking.id + ":", confirmErr);
       // Log the failure so it can be retried manually from admin
-      await supabase.from("logs").insert({
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        event: "booking_confirmation_failed",
-        payload: { error: confirmErr instanceof Error ? confirmErr.message : String(confirmErr), yoco_payment_id: yocoPaymentId },
-      }).catch(() => {});
+      try {
+        await supabase.from("logs").insert({
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          event: "booking_confirmation_failed",
+          payload: { error: confirmErr instanceof Error ? confirmErr.message : String(confirmErr), yoco_payment_id: yocoPaymentId },
+        });
+      } catch (_logErr) { /* best-effort */ }
     }
 
     console.log("PAYMENT CONFIRMED booking:" + booking.id);

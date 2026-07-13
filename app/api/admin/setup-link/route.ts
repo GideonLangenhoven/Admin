@@ -181,13 +181,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (!user) {
-      // Idempotency: if password was set within the last 5 minutes, treat as success
+      // Idempotency: a legitimate double-submit (e.g. the client retries after
+      // the first response was lost) replays the SAME token that already
+      // succeeded. setup_token_hash_used preserves that token's hash across
+      // the primary path's null-out specifically so this can be verified —
+      // matching only on email + a time window (the old check) let ANY
+      // submitted token, including a wrong/forged one, get ok:true back.
       const { data: recent } = await admin
         .from("admin_users")
-        .select("id, email, name, password_set_at")
+        .select("id, email, name, password_set_at, setup_token_hash_used")
         .eq("email", email)
         .maybeSingle();
-      if ((recent as any)?.password_set_at) {
+      if ((recent as any)?.password_set_at && (recent as any)?.setup_token_hash_used === tokenHash) {
         const setAgo = Date.now() - new Date((recent as any).password_set_at).getTime();
         if (setAgo < 5 * 60 * 1000) {
           return NextResponse.json({
@@ -218,6 +223,7 @@ export async function POST(req: NextRequest) {
         password_set_at: new Date().toISOString(),
         must_set_password: false,
         setup_token_hash: null,
+        setup_token_hash_used: tokenHash,
         setup_token_expires_at: null,
       })
       .eq("id", user.id);

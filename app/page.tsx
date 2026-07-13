@@ -5,7 +5,7 @@ import { confirmAction, notify } from "./lib/app-notify";
 import { getAdminTimezone } from "./lib/admin-timezone";
 import { customerNotesTooltip } from "./lib/customer-notes";
 import { useBusinessContext } from "../components/BusinessContext";
-import { isPrivilegedRole } from "./lib/api-auth";
+import { isPrivilegedRole } from "./lib/role-utils";
 import { isSectionHidden } from "./lib/operator-sections";
 import Link from "next/link";
 import dynamic from "next/dynamic";

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-10T17:00:00Z",
-  "note": "Prompt 23 plus 2026-05-08 tightened bookings anon SELECT policy for customer lookup isolation; 2026-05-10 adds OTP attempt tracking; 2026-07-02 S3: reviews authenticated RLS tenant-scoped, vouchers anon insert forced PENDING+tenant, vouchers anon update dropped; 2026-07-10 regenerated from live: initplan policy rewrites, 10 new RLS tables (customers, reviews, OTA, chat, POPIA, check-ins), kb_chunks service-only, subscriptions tenant select-only, combo_bookings public read dropped, vouchers anon UPDATE re-revoked (migration 20260710130000); 2026-07-11 admin_kb_chunks (in-dashboard help bot KB, service-role only, migration 20260711200000)",
+  "generated_at": "2026-07-13T17:30:00Z",
+  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition.",
   "grants": [
     {
       "grantee": "anon",
@@ -354,41 +354,6 @@
     },
     {
       "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
       "table_name": "promotion_uses",
       "privilege_type": "INSERT"
     },
@@ -466,6 +431,41 @@
       "grantee": "anon",
       "table_name": "slots",
       "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "tenant_health",
+      "privilege_type": "UPDATE"
     },
     {
       "grantee": "anon",
@@ -604,11 +604,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "admin_users",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "audit_logs",
       "privilege_type": "DELETE"
     },
@@ -815,41 +810,6 @@
     {
       "grantee": "authenticated",
       "table_name": "broadcasts",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "business_partnerships",
       "privilege_type": "UPDATE"
     },
     {
@@ -1134,41 +1094,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_settlements",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "conversations",
       "privilege_type": "DELETE"
     },
@@ -1445,41 +1370,6 @@
     {
       "grantee": "authenticated",
       "table_name": "idempotency_keys",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invite_tokens",
       "privilege_type": "UPDATE"
     },
     {
@@ -2009,76 +1899,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_intake_submissions",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ngt_payments",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "ota_integrations",
       "privilege_type": "DELETE"
     },
@@ -2499,41 +2319,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "processed_wa_messages",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "promotion_uses",
       "privilege_type": "DELETE"
     },
@@ -2849,37 +2634,37 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "DELETE"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "INSERT"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "REFERENCES"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "TRIGGER"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
-      "table_name": "tenant_invoice_sequences",
+      "table_name": "tenant_health",
       "privilege_type": "UPDATE"
     },
     {
@@ -3094,41 +2879,6 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "wa_messages",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "waitlist",
       "privilege_type": "DELETE"
     },
@@ -3230,6 +2980,41 @@
     {
       "grantee": "service_role",
       "table_name": "add_ons",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_kb_chunks",
       "privilege_type": "UPDATE"
     },
     {
@@ -5614,6 +5399,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "tenant_health",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "tenant_invoice_sequences",
       "privilege_type": "DELETE"
     },
@@ -5960,146 +5780,6 @@
     {
       "grantee": "service_role",
       "table_name": "webchat_sessions",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "tenant_health",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "service_role",
-      "table_name": "admin_kb_chunks",
       "privilege_type": "UPDATE"
     }
   ],
@@ -6111,6 +5791,11 @@
     },
     {
       "schema": "public",
+      "table_name": "admin_kb_chunks",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "admin_users",
       "rls_enabled": true
     },
@@ -6446,6 +6131,11 @@
     },
     {
       "schema": "public",
+      "table_name": "tenant_health",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "tenant_invoice_sequences",
       "rls_enabled": true
     },
@@ -6487,16 +6177,6 @@
     {
       "schema": "public",
       "table_name": "webchat_sessions",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "tenant_health",
-      "rls_enabled": true
-    },
-    {
-      "schema": "public",
-      "table_name": "admin_kb_chunks",
       "rls_enabled": true
     }
   ],
@@ -6971,33 +6651,6 @@
     },
     {
       "schemaname": "public",
-      "tablename": "combo_booking_items",
-      "policyname": "combo_booking_items_anon_insert",
-      "cmd": "INSERT",
-      "roles": "{anon,authenticated}",
-      "qual": null,
-      "with_check": "true"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "combo_bookings",
-      "policyname": "Anyone can insert combo_bookings",
-      "cmd": "INSERT",
-      "roles": "{public}",
-      "qual": null,
-      "with_check": "true"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "combo_bookings",
-      "policyname": "combo_bookings_anon_insert",
-      "cmd": "INSERT",
-      "roles": "{anon,authenticated}",
-      "qual": null,
-      "with_check": "true"
-    },
-    {
-      "schemaname": "public",
       "tablename": "combo_offer_items",
       "policyname": "combo_offer_items_anon_select",
       "cmd": "SELECT",
@@ -7233,11 +6886,29 @@
     {
       "schemaname": "public",
       "tablename": "holds",
-      "policyname": "holds_authenticated_all",
-      "cmd": "ALL",
+      "policyname": "holds_authenticated_delete",
+      "cmd": "DELETE",
       "roles": "{authenticated}",
-      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))))",
-      "with_check": "true"
+      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "holds",
+      "policyname": "holds_authenticated_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "holds",
+      "policyname": "holds_authenticated_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
+      "with_check": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))"
     },
     {
       "schemaname": "public",
@@ -8024,15 +7695,6 @@
     },
     {
       "schemaname": "public",
-      "tablename": "promotion_uses",
-      "policyname": "promotion_uses_anon_insert",
-      "cmd": "INSERT",
-      "roles": "{anon,authenticated}",
-      "qual": null,
-      "with_check": "true"
-    },
-    {
-      "schemaname": "public",
       "tablename": "promotions",
       "policyname": "promotions_anon_select",
       "cmd": "SELECT",
@@ -8272,6 +7934,24 @@
       "cmd": "SELECT",
       "roles": "{authenticated}",
       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "tenant_health",
+      "policyname": "tenant_health_service_all",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "tenant_health",
+      "policyname": "tenant_health_superadmin_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
       "with_check": null
     },
     {
@@ -8525,24 +8205,6 @@
       "roles": "{authenticated}",
       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tenant_health",
-      "policyname": "tenant_health_service_all",
-      "cmd": "ALL",
-      "roles": "{service_role}",
-      "qual": "true",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tenant_health",
-      "policyname": "tenant_health_superadmin_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
-      "with_check": null
     }
   ]
 }

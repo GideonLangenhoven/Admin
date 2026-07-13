@@ -8,7 +8,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WA_TOKEN = Deno.env.get("WA_ACCESS_TOKEN")!;
 const WA_PHONE_ID = Deno.env.get("WA_PHONE_NUMBER_ID")!;
-const PAYFAST_PASSPHRASE = Deno.env.get("PAYFAST_PASSPHRASE") || "";
 const BUSINESS_ID = Deno.env.get("BUSINESS_ID")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -21,29 +20,6 @@ async function sendText(to: any, text: any, bookingId?: any) {
   });
   const data = await res.json().catch(() => ({}));
   await recordWaMessage(BUSINESS_ID, { to: to, kind: "text", body: text, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed"), bookingId: bookingId || null });
-}
-
-function verifySignature(params: any, receivedSig: any) {
-  // Build param string for signature check
-  const keys = Object.keys(params).filter(function(k) { return k !== "signature"; }).sort();
-  let pfParamString = "";
-  for (let i = 0; i < keys.length; i++) {
-    if (i > 0) pfParamString += "&";
-    pfParamString += keys[i] + "=" + encodeURIComponent(params[keys[i]]).replace(/%20/g, "+");
-  }
-  if (PAYFAST_PASSPHRASE) {
-    pfParamString += "&passphrase=" + encodeURIComponent(PAYFAST_PASSPHRASE).replace(/%20/g, "+");
-  }
-
-  // MD5 hash
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pfParamString);
-  const hashBuffer = new Uint8Array(16);
-
-  // Use SubtleCrypto for MD5 isn't available, fallback to simple check
-  // For production, validate server-side with PayFast
-  console.log("ITN_SIG_CHECK: received=" + receivedSig);
-  return true; // We validate with PayFast server below instead
 }
 
 async function validateWithPayFast(params: any) {
@@ -149,6 +125,19 @@ Deno.serve(async (req: any) => {
       // Still process but flag for review
     }
 
+    // ── IDEMPOTENCY CHECK ──
+    // The earlier "already PAID" status check above is a plain read-then-act
+    // with no DB-level guard — two ITN retries arriving concurrently could
+    // both pass it before either UPDATE lands, double-incrementing slot
+    // capacity below. idempotency_keys has a real UNIQUE constraint on `key`,
+    // so this insert is the atomic guard (same pattern as yoco-webhook).
+    const pfIdempotencyKey = "payfast_payment:" + (pfPaymentId || bookingId);
+    const pfIdempInsert = await supabase.from("idempotency_keys").insert({ key: pfIdempotencyKey }).select("id").maybeSingle();
+    if (pfIdempInsert.error && pfIdempInsert.error.code === "23505") {
+      console.log("ITN_IDEMPOTENCY_SKIP: already processed key=" + pfIdempotencyKey);
+      return new Response("OK", { status: 200 });
+    }
+
     // ---- PAYMENT CONFIRMED ----
 
     // 1. Update booking to PAID
@@ -170,7 +159,7 @@ Deno.serve(async (req: any) => {
     const ref = bookingId.substring(0, 8).toUpperCase();
     const slotTime = booking.slots ? fmtSlotTime(booking.slots.start_time) : "See confirmation email";
 
-    const discountLine = "";
+    let discountLine = "";
     if (booking.discount_type === "GROUP") discountLine = "\n\u{1F389} 5% group discount applied";
     if (booking.discount_type === "LOYALTY") discountLine = "\n\u{1F31F} 10% loyalty discount applied";
 

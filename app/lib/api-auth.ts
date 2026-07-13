@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+export { isPrivilegedRole } from "./role-utils";
 
 export type CallerAdmin = {
   id: string;
@@ -45,10 +46,6 @@ export async function getCallerAdmin(
   }
 
   return { id: adminRow.id, role: adminRow.role, business_id: adminRow.business_id };
-}
-
-export function isPrivilegedRole(role: string): boolean {
-  return role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
 }
 
 export async function requireActiveSubscription(businessId: string): Promise<{ active: boolean; status: string }> {
