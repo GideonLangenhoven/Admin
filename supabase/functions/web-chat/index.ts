@@ -304,9 +304,19 @@ async function getSlots(tourId, now) {
     p_range_end: in30.toISOString(),
     p_tour_id: tourId,
   });
-  return (data || [])
+  const mapped = (data || [])
     .filter(function (s) { return Number(s.available_capacity || 0) > 0; })
     .map(function (s) { return { ...s, booked: Math.max(0, Number(s.capacity_total || 0) - Number(s.available_capacity || 0)), held: 0 }; });
+  // Two open slot rows at the same start time render as duplicate buttons
+  // ("12:00 (9 spots)" twice) — keep the one with the most space.
+  // ponytail: chat books a single slot row anyway; merge capacities if
+  // operators start stacking same-time slots deliberately.
+  const byTime = new Map();
+  for (const s of mapped) {
+    const prev = byTime.get(s.start_time);
+    if (!prev || Number(s.available_capacity) > Number(prev.available_capacity)) byTime.set(s.start_time, s);
+  }
+  return Array.from(byTime.values());
 }
 
 // Release/claim booked capacity atomically via adjust_slot_capacity; falls
@@ -427,6 +437,23 @@ Deno.serve(withSentry("web-chat", async (req) => {
       }
     }
     function tourPriceLabel(t: any): string { return (t && t.priceLabel) ? t.priceLabel : ("R" + Number(t?.base_price_per_person || 0)); }
+    function tourBtn(t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; }
+    // Only ever offer tours that actually have an open slot — offering a
+    // sold-out tour sends the customer into a "Nothing open, try the other
+    // tour" loop. One RPC for the whole business, memoized per request,
+    // same filters as getSlots (60-min cutoff, capacity > 0).
+    let _availableTourIds: Set<string> | null = null;
+    async function bookableTours(exceptId?: string) {
+      if (!_availableTourIds) {
+        const btCutoff = new Date(now.getTime() + 60 * 60 * 1000);
+        const btEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        const { data: btSlots } = await db.rpc("list_available_slots", { p_business_id: requestedBusinessId, p_range_start: btCutoff.toISOString(), p_range_end: btEnd.toISOString(), p_tour_id: null });
+        _availableTourIds = new Set((btSlots || []).filter(function (s) { return Number(s.available_capacity || 0) > 0; }).map(function (s) { return s.tour_id; }));
+      }
+      return tours.filter(function (t) { return _availableTourIds!.has(t.id) && t.id !== exceptId; });
+    }
+    const NO_AVAILABILITY_REPLY = "We're fully booked right now — no open spots on any tour 😔 New dates open regularly, so please check back soon.";
+    const NO_AVAILABILITY_BUTTONS = [{ label: "❓ Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }];
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
@@ -508,8 +535,9 @@ Deno.serve(withSentry("web-chat", async (req) => {
         ns = { step: "IDLE" };
         buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }];
       } else if (prevStep === "PICK_TOUR") {
-        buttons = tours.map(function (t) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; });
-        reply = "Which tour are you keen on?";
+        const gbTours = await bookableTours();
+        if (gbTours.length === 0) { ns = { step: "IDLE" }; reply = NO_AVAILABILITY_REPLY; buttons = NO_AVAILABILITY_BUTTONS; }
+        else { buttons = gbTours.map(tourBtn); reply = "Which tour are you keen on?"; }
       } else if (prevStep === "ASK_VOUCHER") {
         reply = "Do you have a voucher or promo code?";
         buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
@@ -521,9 +549,9 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // Handle button clicks in IDLE state (e.g., "btn:book", "btn:question")
     if (step === "IDLE" && isBtnClick) {
       if (btnVal === "book" || btnVal === "btn:book") {
-        ns = { step: "PICK_TOUR" };
-        reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
-        buttons = tours.map(function (t4) { return { label: t4.name + " \u2014 " + tourPriceLabel(t4), value: t4.id }; });
+        const bkTours = await bookableTours();
+        if (bkTours.length === 0) { reply = NO_AVAILABILITY_REPLY; buttons = NO_AVAILABILITY_BUTTONS; }
+        else { ns = { step: "PICK_TOUR" }; reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]); buttons = bkTours.map(tourBtn); }
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
       if (btnVal === "question" || btnVal === "btn:question") {
@@ -545,7 +573,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
       // at the checkout voucher step, so start a booking and tell them so.
       const hasCodeToken = /\b[A-Z0-9]{4,}-[A-Z0-9-]{2,}\b/i.test(msg) || /\bGIFT[-\s]?[A-Z0-9]+/i.test(msg);
       const wRedeem = lo.includes("redeem") || lo.includes("use my voucher") || lo.includes("use a voucher") || lo.includes("have a voucher") || lo.includes("have a code") || lo.includes("have a gift") || (lo.includes("pay") && lo.includes("voucher")) || (hasCodeToken && (lo.includes("use") || lo.includes("redeem") || lo.includes("pay") || lo.includes("have") || lo.includes("apply")));
-      if (wRedeem) { ns = { step: "PICK_TOUR" }; reply = "You can redeem a voucher or gift code at checkout — I'll ask for it near the end of the booking. Let's get started: which tour would you like?"; buttons = tours.map(function (tr) { return { label: tr.name + " — " + tourPriceLabel(tr), value: tr.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (wRedeem) {
+        const rdTours = await bookableTours();
+        if (rdTours.length === 0) { reply = NO_AVAILABILITY_REPLY; buttons = NO_AVAILABILITY_BUTTONS; }
+        else { ns = { step: "PICK_TOUR" }; reply = "You can redeem a voucher or gift code at checkout — I'll ask for it near the end of the booking. Let's get started: which tour would you like?"; buttons = rdTours.map(tourBtn); }
+        return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+      }
       const wGift = !wRedeem && (lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get")));
       if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       if (wLook) {
@@ -573,11 +606,15 @@ Deno.serve(withSentry("web-chat", async (req) => {
             const dates = {}; for (const s of slots) { const dk = dateKey(s.start_time); if (!dates[dk]) dates[dk] = { date: dk, label: fmtDate(s.start_time), slots: [] }; dates[dk].slots.push({ id: s.id, time: s.start_time, avail: s.capacity_total - s.booked - (s.held || 0) }); }
             calendar = Object.values(dates);
             reply = pick(["Pick a date for the " + mt.name + " 📅", "When works for you? Here are the available dates for " + mt.name + ":"]);
-          } else { reply = "No " + mt.name + " slots in the next month 😔 Want to try the other tour?"; buttons = tours.filter(function (t2) { return t2.id !== mt.id; }).map(function (t3) { return { label: t3.name + " — " + tourPriceLabel(t3), value: t3.id }; }); ns.step = "PICK_TOUR"; }
+          } else {
+            const mtAlt = await bookableTours(mt.id);
+            if (mtAlt.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+            else { reply = "No open spots for " + mt.name + " right now 😔 These tours do have space:"; buttons = mtAlt.map(tourBtn); ns.step = "PICK_TOUR"; }
+          }
         } else {
-          ns = { step: "PICK_TOUR" };
-          reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]);
-          buttons = tours.map(function (t4) { return { label: t4.name + " — " + tourPriceLabel(t4), value: t4.id }; });
+          const wbTours = await bookableTours();
+          if (wbTours.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+          else { ns = { step: "PICK_TOUR" }; reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]); buttons = wbTours.map(tourBtn); }
         }
       }
       else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one — I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
@@ -598,7 +635,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         const ans = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id);
         const stepPrompt = step === "PICK_TOUR" ? "which tour are you keen on?" : "how many people will be joining?";
         reply = (ans ? ans + "\n\n" : "") + "Back to your booking — " + stepPrompt;
-        if (step === "PICK_TOUR") buttons = tours.map(function (t) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; });
+        if (step === "PICK_TOUR") buttons = (await bookableTours()).map(tourBtn);
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
     }
@@ -624,8 +661,16 @@ Deno.serve(withSentry("web-chat", async (req) => {
           const dates2 = {}; for (const s2 of slots2) { const dk2 = dateKey(s2.start_time); if (!dates2[dk2]) dates2[dk2] = { date: dk2, label: fmtDate(s2.start_time), slots: [] }; dates2[dk2].slots.push({ id: s2.id, time: s2.start_time, avail: s2.capacity_total - s2.booked - (s2.held || 0) }); }
           calendar = Object.values(dates2);
           reply = pick(["Great choice! Pick a date:", "" + picked.name + " it is! When works for you?"]);
-        } else { reply = "Nothing open for " + picked.name + ". Try the other tour?"; ns.step = "PICK_TOUR"; buttons = tours.filter(function (t6) { return t6.id !== picked.id; }).map(function (t7) { return { label: t7.name, value: t7.id }; }); }
-      } else { reply = "Which tour are you keen on?"; buttons = tours.map(function (t8) { return { label: t8.name + " — " + tourPriceLabel(t8), value: t8.id }; }); }
+        } else {
+          const pkAlt = await bookableTours(picked.id);
+          if (pkAlt.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+          else { reply = "No open spots for " + picked.name + " right now 😔 These tours do have space:"; ns.step = "PICK_TOUR"; buttons = pkAlt.map(tourBtn); }
+        }
+      } else {
+        const ptTours = await bookableTours();
+        if (ptTours.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+        else { reply = "Which tour are you keen on?"; buttons = ptTours.map(tourBtn); }
+      }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== PICK_DATE =====
@@ -675,7 +720,11 @@ Deno.serve(withSentry("web-chat", async (req) => {
         if (slots4b.length > 0) {
           const dates3b = {}; for (const s5b of slots4b) { const dk3b = dateKey(s5b.start_time); if (!dates3b[dk3b]) dates3b[dk3b] = { date: dk3b, label: fmtDate(s5b.start_time), slots: [] }; dates3b[dk3b].slots.push({ id: s5b.id, time: s5b.start_time, avail: s5b.capacity_total - s5b.booked - (s5b.held || 0) }); }
           calendar = Object.values(dates3b);
-        } else { reply = "No slots available right now. Try the other tour?"; buttons = tours.filter(function (t6b) { return t6b.id !== ns.tid; }).map(function (t7b) { return { label: t7b.name, value: t7b.id }; }); ns.step = "PICK_TOUR"; }
+        } else {
+          const pdAlt = await bookableTours(ns.tid);
+          if (pdAlt.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+          else { reply = "No open spots for this tour right now 😔 These tours do have space:"; buttons = pdAlt.map(tourBtn); ns.step = "PICK_TOUR"; }
+        }
       }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
@@ -703,14 +752,34 @@ Deno.serve(withSentry("web-chat", async (req) => {
       } else {
         const slots5 = await getSlots(ns.tid, now);
         const daySlots2 = slots5.filter(function (s6) { return dateKey(s6.start_time) === ns.selectedDate; });
-        reply = "Pick a time:";
-        buttons = daySlots2.map(function (s7) { const av2 = s7.capacity_total - s7.booked - (s7.held || 0); return { label: fmtTime(s7.start_time) + " (" + av2 + " spots)", value: s7.id }; });
+        if (daySlots2.length > 0) {
+          reply = "Pick a time:";
+          buttons = daySlots2.map(function (s7) { const av2 = s7.capacity_total - s7.booked - (s7.held || 0); return { label: fmtTime(s7.start_time) + " (" + av2 + " spots)", value: s7.id }; });
+        } else if (slots5.length > 0) {
+          // The chosen day sold out mid-flow — was a dead end ("Pick a time:"
+          // with zero buttons). Send the customer back to the calendar.
+          ns = { ...ns, step: "PICK_DATE" };
+          const datesPT = {}; for (const sPT of slots5) { const dkPT = dateKey(sPT.start_time); if (!datesPT[dkPT]) datesPT[dkPT] = { date: dkPT, label: fmtDate(sPT.start_time), slots: [] }; datesPT[dkPT].slots.push({ id: sPT.id, time: sPT.start_time, avail: sPT.capacity_total - sPT.booked - (sPT.held || 0) }); }
+          calendar = Object.values(datesPT);
+          reply = "Those times just sold out 😔 Pick another date:";
+        } else {
+          const tmAlt = await bookableTours(ns.tid);
+          if (tmAlt.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+          else { reply = "This tour just sold out 😔 These tours do have space:"; ns = { ...ns, step: "PICK_TOUR" }; buttons = tmAlt.map(tourBtn); }
+        }
       }
-      return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+      return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== ASK_QTY =====
     if (step === "ASK_QTY") {
-      const n = parseInt(lo.replace(/[^0-9]/g, ""));
+      let n = parseInt(lo.replace(/[^0-9]/g, ""));
+      // "four of us", "just me" — don't re-ask when the customer answers in words.
+      if (!(n > 0)) {
+        const qtyWords: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+        for (const w in qtyWords) if (new RegExp("\\b" + w + "\\b").test(lo)) { n = qtyWords[w]; break; }
+        if (!(n > 0) && /\b(just me|myself|solo|alone)\b/.test(lo)) n = 1;
+        if (!(n > 0) && /\bcouple\b/.test(lo)) n = 2;
+      }
       const { data: sc } = await db.rpc("slot_available_capacity", { p_slot_id: ns.slotId });
       const mx = Number(sc || 10);
       if (!(n > 0)) {
@@ -721,19 +790,38 @@ Deno.serve(withSentry("web-chat", async (req) => {
         reply = "This slot only has " + mx + " spot" + (mx === 1 ? "" : "s") + " left, so " + n + " won't fit. Could you do " + mx + " or fewer? For a bigger group, ask us about a private tour.";
       } else {
         let tot = n * ns.tprice; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
-        if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*";
-        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(You can just send them all in one message!)*"]);
+        if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time — whatever works!)*";
+        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time — whatever works!)*"]);
       }
       return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
     }
     // ===== ASK_NAME =====
     if (step === "ASK_DETAILS") {
       const dParts = msg.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
-      let dName = ""; let dEmail = ""; let dPhone = "";
-      for (const dp of dParts) { const dc = dp.replace(/^(name|email|phone|tel|mobile|cell|number)[:\-\s]*/i, "").trim(); if (!dc) continue; if (dc.includes("@") && dc.includes(".") && !dEmail) { dEmail = dc.toLowerCase(); } else if (dc.replace(/[\s\-\+\(\)]/g, "").match(/^\d{7,15}$/) && !dPhone) { dPhone = normP(dc); } else if (dc.match(/[a-zA-Z]/) && !dName) { dName = dc; } }
+      // Accept the details in any order, across as many messages as the
+      // customer likes — a partial answer used to be thrown away with a
+      // "send all three together" demand. Start from what we already have.
+      let dName = ns.name || ""; let dEmail = ns.email || ""; let dPhone = ns.phone || "";
+      for (const dp of dParts) {
+        const dc = dp.replace(/^(name|email|phone|tel|mobile|cell|number)[:\-\s]*/i, "").trim();
+        if (!dc) continue;
+        const emailMatch = dc.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+        if (emailMatch) {
+          if (!dEmail) dEmail = emailMatch[0].toLowerCase();
+          // "Jane Smith jane@x.com" in one part: the remainder is the name.
+          const rest = dc.replace(emailMatch[0], "").replace(/[<>()\[\]"',;]/g, " ").replace(/\s+/g, " ").trim();
+          if (rest && !dName && /[a-zA-Z]{2,}/.test(rest) && !rest.includes("?") && rest.split(" ").length <= 5) dName = rest;
+        } else if (dc.replace(/[\s\-\+\(\)]/g, "").match(/^\d{7,15}$/)) {
+          if (!dPhone) dPhone = normP(dc);
+        } else if (dc.match(/[a-zA-Z]/) && !dName && !dc.includes("?") && dc.split(/\s+/).length <= 5) {
+          // Question-looking or essay-length text is not a name.
+          dName = dc;
+        }
+      }
+      ns = { ...ns, name: dName, email: dEmail, phone: dPhone };
       if (!dName || !dEmail || !dPhone) {
-        const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address"); if (!dPhone) dMiss.push("phone number");
-        reply = "I still need your " + dMiss.join(", ") + ".\n\nPlease send all three together, e.g.:\n*John Smith, john@email.com, +27 82 123 4567*";
+        const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address"); if (!dPhone) dMiss.push("phone number (with country code, e.g. +27)");
+        reply = (dName || dEmail || dPhone ? "Thanks! " : "") + "I still just need your " + dMiss.join(" and ") + " — send it whenever you're ready.";
         return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
       }
       const customDefs = await getBookingCustomFields(ns.bid || tours[0]?.business_id);
@@ -1101,9 +1189,15 @@ Deno.serve(withSentry("web-chat", async (req) => {
           reply = "Tour changes aren't available within 24 hours. Contact our team.";
           ns = { step: "IDLE" };
         } else {
-          ns = { ...ns, step: "CHANGE_TOUR", booking_id: b.id, slot_id: b.slot_id, tour_id: b.tour_id, qty: b.qty };
-          reply = "Which tour would you like to switch to?";
-          buttons = tours.filter(function (t: any) { return t.id !== b.tour_id; }).map(function (t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: "chtour_" + t.id }; });
+          const chTours = await bookableTours(b.tour_id);
+          if (chTours.length === 0) {
+            reply = "No other tours have open spots right now — contact our team and we'll see what we can do.";
+            ns = { step: "IDLE" };
+          } else {
+            ns = { ...ns, step: "CHANGE_TOUR", booking_id: b.id, slot_id: b.slot_id, tour_id: b.tour_id, qty: b.qty };
+            reply = "Which tour would you like to switch to?";
+            buttons = chTours.map(function (t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: "chtour_" + t.id }; });
+          }
         }
       }
       else {
