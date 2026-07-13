@@ -426,15 +426,61 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         return new Response("OK", { status: 200 });
       }
 
+      const fbCols = "id, status, email, payment_url, customer_name, qty, total_amount, business_id, slots(start_time), tours(name)";
       let fb = checkoutId
-        ? await supabase.from("bookings").select("id, status").eq("yoco_checkout_id", checkoutId).maybeSingle()
-        : { data: null };
+        ? await supabase.from("bookings").select(fbCols).eq("yoco_checkout_id", checkoutId).maybeSingle()
+        : { data: null } as any;
       if (!fb.data && metaBookingId) {
-        fb = await supabase.from("bookings").select("id, status").eq("id", metaBookingId).maybeSingle();
+        fb = await supabase.from("bookings").select(fbCols).eq("id", metaBookingId).maybeSingle();
       }
-      if (fb.data && (fb.data.status === "HELD" || fb.data.status === "PENDING" || fb.data.status === "CONFIRMED")) {
-        await supabase.from("bookings").update({ status: "PENDING PAYMENT" }).eq("id", fb.data.id);
-        console.log("PAYMENT FAILED - Marking as PENDING PAYMENT for booking:" + fb.data.id);
+      const fbk = fb.data as any;
+      if (fbk && (fbk.status === "HELD" || fbk.status === "PENDING" || fbk.status === "CONFIRMED")) {
+        await supabase.from("bookings").update({ status: "PENDING PAYMENT" }).eq("id", fbk.id);
+        console.log("PAYMENT FAILED - Marking as PENDING PAYMENT for booking:" + fbk.id);
+      }
+
+      // Email the payment link on the 3rd distinct failed attempt (the timeout
+      // path in cron-tasks covers the abandon case). Dedup each attempt via
+      // idempotency_keys — payment.failed is NOT deduped above like succeeded —
+      // then count booking_payment_failed logs. ponytail: log-count as the
+      // counter avoids a schema change; distinct Yoco payment IDs make it exact.
+      const paidStatuses = ["PAID", "CONFIRMED", "COMPLETED", "CANCELLED"];
+      if (fbk && (yocoPaymentId || checkoutId) && fbk.email && fbk.payment_url && !paidStatuses.includes(fbk.status)) {
+        const failKey = "yoco_failed:" + (yocoPaymentId || checkoutId);
+        const dedup = await supabase.from("idempotency_keys").insert({ key: failKey }).select("id").maybeSingle();
+        if (!(dedup.error && dedup.error.code === "23505")) {
+          await supabase.from("logs").insert({ business_id: fbk.business_id, booking_id: fbk.id, event: "booking_payment_failed", payload: { checkout_id: checkoutId, payment_id: yocoPaymentId } });
+          const failCount = await supabase.from("logs").select("id", { count: "exact", head: true }).eq("booking_id", fbk.id).eq("event", "booking_payment_failed");
+          if ((failCount.count || 0) === 3) {
+            try {
+              const tenant = await getTenantByBusinessId(supabase, fbk.business_id);
+              const slot = Array.isArray(fbk.slots) ? fbk.slots[0] : fbk.slots;
+              const tour = Array.isArray(fbk.tours) ? fbk.tours[0] : fbk.tours;
+              await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+                body: JSON.stringify({
+                  type: "PAYMENT_LINK",
+                  data: {
+                    business_id: fbk.business_id,
+                    email: fbk.email,
+                    booking_id: fbk.id,
+                    customer_name: fbk.customer_name || "there",
+                    ref: String(fbk.id || "").slice(0, 8).toUpperCase(),
+                    tour_name: tour?.name || "your tour",
+                    tour_date: slot?.start_time ? formatTenantDateTime(tenant.business, slot.start_time) : "",
+                    qty: Number(fbk.qty || 1),
+                    total_amount: Number(fbk.total_amount || 0).toFixed(2),
+                    payment_url: fbk.payment_url,
+                  },
+                }),
+              });
+              console.log("PAYMENT_FAILED_3X_PAYLINK_SENT booking=" + fbk.id);
+            } catch (e) {
+              console.error("PAYMENT_FAILED_3X_EMAIL_ERR booking=" + fbk.id, e);
+            }
+          }
+        }
       }
       return new Response("OK", { status: 200 });
     }
