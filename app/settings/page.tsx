@@ -722,6 +722,25 @@ export default function SettingsPage() {
             return;
         }
 
+        // Any booking history (any status) blocks deletion — bookings must
+        // never disappear because the tour they were made on was deleted.
+        // The DB enforces this unconditionally too; this check exists so the
+        // admin sees a clear message instead of a raw constraint error.
+        const { count: bookingCount } = await supabase
+            .from("bookings")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", businessId)
+            .eq("tour_id", id);
+
+        if ((bookingCount || 0) > 0) {
+            notify({
+                title: "Cannot delete tour",
+                message: bookingCount + " booking(s) exist for \"" + name + "\". Deactivate the tour instead — deleting it would abandon that booking history.",
+                tone: "warning",
+            });
+            return;
+        }
+
         if (!await confirmAction({
             title: "Delete tour",
             message: "Delete \"" + name + "\"? This will also remove all associated slots, waitlist entries, and combo offers. This cannot be undone.",
@@ -731,7 +750,13 @@ export default function SettingsPage() {
 
         const { error: delErr } = await supabase.from("tours").delete().eq("id", id);
         if (delErr) {
-            notify({ title: "Delete failed", message: delErr.message, tone: "error" });
+            // 23503 = foreign_key_violation. A friendly message beats the raw
+            // Postgres constraint text reaching the admin, for whatever
+            // dependency the checks above didn't anticipate.
+            const message = (delErr as { code?: string }).code === "23503"
+                ? "This tour still has related records (bookings, combo offers, or other data) that need to be removed first. Try deactivating the tour instead."
+                : delErr.message;
+            notify({ title: "Delete failed", message, tone: "error" });
             return;
         }
         notify({ title: "Deleted", message: "\"" + name + "\" has been removed.", tone: "success" });
