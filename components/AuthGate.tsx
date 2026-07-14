@@ -6,7 +6,7 @@ import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 
-const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
+const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
 const SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
