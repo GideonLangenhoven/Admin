@@ -1,6 +1,22 @@
 [functions.yoco-webhook]
 verify_jwt = false
 
+# platform-invoice-checkout and platform-bank-details are invoked
+# server-to-server from Next.js API routes (already SUPER_ADMIN-gated there)
+# using the service-role key, never a browser session JWT — same reasoning
+# as create-checkout below.
+[functions.platform-invoice-checkout]
+verify_jwt = false
+
+[functions.platform-bank-details]
+verify_jwt = false
+
+# platform-invoice-webhook is BookingTours' own Yoco merchant webhook (a
+# different merchant context from any tenant's), verified with its own
+# PLATFORM_YOCO_WEBHOOK_SECRET inside the function.
+[functions.platform-invoice-webhook]
+verify_jwt = false
+
 [functions.wa-webhook]
 verify_jwt = false
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
+import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
+import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { EnvelopeSimple, WarningCircle, Receipt, Buildings, Robot } from "@phosphor-icons/react";
 
@@ -77,8 +79,11 @@ export default function SuperAdminPage() {
   const [bizDetailSaving, setBizDetailSaving] = useState(false);
   const [bizTours, setBizTours] = useState<any[]>([]);
   const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
-  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean }>>([]);
+  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean; settings_permissions: Record<string, boolean> | null }>>([]);
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+  const [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
+  const [savingPermsId, setSavingPermsId] = useState<string | null>(null);
 
   async function loadBusinesses() {
     setLoadingBiz(true);
@@ -209,9 +214,10 @@ export default function SuperAdminPage() {
     const { data: tours } = await supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order");
     setBizTours(tours || []);
 
-    // Load admin users
-    const { data: admins } = await supabase.from("admin_users").select("id, email, name, role, suspended").eq("business_id", bizId).order("role");
-    setBizAdmins(admins || []);
+    // Load admin users (hide the platform superadmin's own accounts — it's
+    // attached to every business's admin_users but should never appear here)
+    const { data: admins } = await supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role");
+    setBizAdmins((admins || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
 
     // Parse FAQs
     const faqRaw = data?.faq_json;
@@ -321,6 +327,51 @@ export default function SuperAdminPage() {
     } finally {
       setResettingPasswordId(null);
     }
+  }
+
+  async function changeAdminRole(admin: { id: string; email: string; name: string | null }, newRole: "ADMIN" | "MAIN_ADMIN") {
+    const label = admin.name || admin.email;
+    const promoting = newRole === "MAIN_ADMIN";
+    if (!await confirmAction({
+      title: promoting ? "Make Main Admin" : "Change to Admin",
+      message: promoting
+        ? `Give ${label} full Main Admin access (settings, billing, admin management) on this business?`
+        : `Reduce ${label} to a regular Admin on this business? They'll lose settings, billing and admin-management access.`,
+      tone: "warning",
+      confirmLabel: promoting ? "Make Main Admin" : "Change to Admin",
+    })) return;
+
+    setChangingRoleId(admin.id);
+    const res = await fetch("/api/admin/update", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "update_role", admin_id: admin.id, role: newRole }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setChangingRoleId(null);
+    if (!res.ok) {
+      notify({ title: "Couldn't change role", message: data?.error || "Unknown error", tone: "error" });
+      return;
+    }
+    setBizAdmins(bizAdmins.map(a => a.id === admin.id ? { ...a, role: newRole } : a));
+    notify({ title: "Role updated", message: `${label} is now ${promoting ? "a Main Admin" : "a regular Admin"}.`, tone: "success" });
+  }
+
+  async function saveBizAdminPerms(adminId: string, perms: Record<string, boolean>) {
+    setSavingPermsId(adminId);
+    const res = await fetch("/api/admin/update", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "update_permissions", admin_id: adminId, permissions: perms }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      notify({ title: "Failed to save permissions", message: data?.error || "Unknown error", tone: "error" });
+    } else {
+      setBizAdmins(bizAdmins.map(a => a.id === adminId ? { ...a, settings_permissions: perms } : a));
+      notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
+    }
+    setSavingPermsId(null);
   }
 
   function updateDetail(key: string, value: any) {
@@ -926,26 +977,71 @@ export default function SuperAdminPage() {
                             <p className="text-xs italic text-[var(--ck-text-muted)]">No admin users found for this business.</p>
                           ) : (
                             <div className="space-y-2">
-                              {bizAdmins.map((admin) => (
-                                <div key={admin.id} className="flex items-center justify-between rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
-                                      {admin.name || admin.email}
-                                      {admin.suspended && <span className="ml-1.5 text-[var(--ck-danger)] text-[10px] font-bold">(Suspended)</span>}
+                              {bizAdmins.map((admin) => {
+                                const perms = (admin.settings_permissions || {}) as Record<string, boolean>;
+                                const permsExpanded = expandedPermsAdmin === admin.id;
+                                return (
+                                <div key={admin.id} className="rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
+                                        {admin.name || admin.email}
+                                        {admin.suspended && <span className="ml-1.5 text-[var(--ck-danger)] text-[10px] font-bold">(Suspended)</span>}
+                                      </div>
+                                      <div className="text-[10px] text-[var(--ck-text-muted)]">
+                                        {admin.email} · {admin.role}
+                                      </div>
                                     </div>
-                                    <div className="text-[10px] text-[var(--ck-text-muted)]">
-                                      {admin.email} · {admin.role}
+                                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                                      {admin.role !== "SUPER_ADMIN" && (
+                                        <button
+                                          onClick={() => changeAdminRole(admin, admin.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
+                                          disabled={changingRoleId === admin.id}
+                                          className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                          {changingRoleId === admin.id ? "Saving..." : (admin.role === "MAIN_ADMIN" ? "Change to Admin" : "Make Main Admin")}
+                                        </button>
+                                      )}
+                                      {admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
+                                        <button
+                                          onClick={() => setExpandedPermsAdmin(permsExpanded ? null : admin.id)}
+                                          className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs whitespace-nowrap"
+                                        >
+                                          {permsExpanded ? "Close" : "Permissions"}
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => resetAdminPassword(admin.id, admin.email)}
+                                        disabled={resettingPasswordId === admin.id}
+                                        className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap"
+                                      >
+                                        {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
+                                      </button>
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => resetAdminPassword(admin.id, admin.email)}
-                                    disabled={resettingPasswordId === admin.id}
-                                    className="ui-btn ui-btn-ghost shrink-0 ml-3 !h-8 !px-3 !text-xs disabled:opacity-50"
-                                  >
-                                    {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
-                                  </button>
+                                  {permsExpanded && admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
+                                    <div className="mt-2 pt-2 border-t grid grid-cols-2 gap-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                      {SETTINGS_SECTIONS.map(section => (
+                                        <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded px-2 py-1 hover:bg-[var(--ck-surface-sunken)]">
+                                          <input
+                                            type="checkbox"
+                                            checked={perms[section.key] === true}
+                                            onChange={() => {
+                                              const newPerms = { ...perms, [section.key]: !perms[section.key] };
+                                              setBizAdmins(bizAdmins.map(a => a.id === admin.id ? { ...a, settings_permissions: newPerms } : a));
+                                              saveBizAdminPerms(admin.id, newPerms);
+                                            }}
+                                            disabled={savingPermsId === admin.id}
+                                            className="h-3.5 w-3.5 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
+                                          />
+                                          <span className="text-[10.5px] text-[var(--ck-text)]">{section.label}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </fieldset>
@@ -972,6 +1068,12 @@ export default function SuperAdminPage() {
 
       {/* ── Email Usage & Billing ── */}
       <EmailUsageBilling />
+
+      {/* ── Platform Invoices (BookingTours -> operator monthly billing) ── */}
+      <PlatformInvoicesBilling />
+
+      {/* ── Platform Settings (BookingTours' own logo + banking) ── */}
+      <PlatformSettingsPanel />
 
       {/* ── Chatbot Avatars (global catalog) ── */}
       <ChatbotAvatarManager />
@@ -1550,6 +1652,306 @@ function EmailUsageBilling() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Platform Invoices — BookingTours -> operator monthly billing
+   (mirrors EmailUsageBilling's month-picker + computed-row pattern)
+   ══════════════════════════════════════════════════════════════ */
+
+type PlatformInvoiceRow = {
+  business_id: string;
+  business_name: string;
+  has_subscription: boolean;
+  plan_name?: string;
+  monthly_price_zar?: number;
+  active_days?: number;
+  total_days?: number;
+  pro_rated?: boolean;
+  pause_note?: string | null;
+  amount_zar?: number;
+  existing_invoice: {
+    id: string;
+    status: string;
+    amount_zar: number;
+    yoco_payment_link_url: string | null;
+    paid_method: string | null;
+  } | null;
+};
+
+function PlatformInvoicesBilling() {
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [rows, setRows] = useState<PlatformInvoiceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function loadInvoices() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/platform-invoices/list?period=${period}`, { headers: await getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to load");
+      setRows(data.rows || []);
+    } catch (err: any) {
+      notify({ title: "Failed to load platform invoices", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadInvoices(); }, [period]);
+
+  async function generate(row: PlatformInvoiceRow) {
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/generate", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ business_id: row.business_id, period }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to generate");
+      notify({ title: "Invoice generated", message: `${row.business_name} — R${Number(data.invoice.amount_zar).toFixed(2)}`, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Generate failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function createPaymentLink(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/create-payment-link", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to create payment link");
+      notify({ title: "Payment link created", message: row.business_name, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Payment link failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function markPaidManually(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    const method = window.prompt("Payment method (MANUAL, EFT, OTHER):", "EFT");
+    if (!method) return;
+    const notes = window.prompt("Optional note / reference:") || "";
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/mark-paid", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id, method, notes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to mark paid");
+      notify({ title: "Marked as paid", message: row.business_name, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function sendEmail(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/send", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to send");
+      notify({ title: "Email sent", message: `${row.business_name} (${(data.sent_to || []).join(", ")})`, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Send failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+
+  return (
+    <div className="ui-card anim-fade-up anim-d3 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Invoices</h2>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours -&gt; operator monthly subscription invoices, pro-rated for pauses.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="ui-control rounded-lg px-3 py-1.5 text-sm outline-none" />
+          <button onClick={loadInvoices} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
+            <div className="col-span-3">Business</div>
+            <div className="col-span-2">Plan</div>
+            <div className="col-span-2 text-center">Active Days</div>
+            <div className="col-span-1 text-center">Amount</div>
+            <div className="col-span-1 text-center">Status</div>
+            <div className="col-span-3 text-center">Actions</div>
+          </div>
+
+          {rows.filter(r => r.has_subscription).map((r) => {
+            const invoice = r.existing_invoice;
+            const busy = busyId === r.business_id;
+            return (
+              <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+                <div className="col-span-3">
+                  <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
+                  {r.pro_rated && r.pause_note && <div className="text-[10px] text-[var(--ck-amber)] mt-0.5">{r.pause_note}</div>}
+                </div>
+                <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} (R{r.monthly_price_zar})</div>
+                <div className="col-span-2 text-center">
+                  <span className={r.pro_rated ? "text-[var(--ck-amber)] font-semibold" : "text-[var(--ck-success)]"}>{r.active_days}</span>
+                  <span className="text-[var(--ck-text-muted)]"> / {r.total_days}</span>
+                </div>
+                <div className="col-span-1 text-center font-bold">R{Number(invoice?.amount_zar ?? r.amount_zar ?? 0).toFixed(2)}</div>
+                <div className="col-span-1 text-center text-[10px] font-mono uppercase">{invoice?.status || "—"}</div>
+                <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
+                  {!invoice && (
+                    <button onClick={() => generate(r)} disabled={busy} className="ui-btn ui-btn-primary !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                      {busy ? "..." : "Generate"}
+                    </button>
+                  )}
+                  {invoice && invoice.status !== "PAID" && invoice.status !== "PAID_MANUALLY" && (
+                    <>
+                      <button onClick={() => createPaymentLink(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                        {invoice.yoco_payment_link_url ? "Recreate Link" : "Payment Link"}
+                      </button>
+                      <button onClick={() => markPaidManually(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Mark Paid</button>
+                      <button onClick={() => sendEmail(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Send</button>
+                    </>
+                  )}
+                  {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
+                    <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!loading && rows.filter(r => r.has_subscription).length === 0 && (
+        <p className="text-xs italic text-[var(--ck-text-muted)]">No active subscriptions for {periodLabel}.</p>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Platform Settings — BookingTours' own logo + banking details
+   ══════════════════════════════════════════════════════════════ */
+
+function PlatformSettingsPanel() {
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bank, setBank] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/platform-settings", { headers: await getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to load");
+      setLogoUrl(data.logo_url || "");
+      setBank({
+        account_owner: data.bank?.account_owner || "",
+        account_number: data.bank?.account_number || "",
+        account_type: data.bank?.account_type || "",
+        bank_name: data.bank?.bank_name || "",
+        branch_code: data.bank?.branch_code || "",
+      });
+    } catch (err: any) {
+      notify({ title: "Failed to load platform settings", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function handleLogoFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setLogoUrl(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/platform-settings", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ logo_url: logoUrl, bank }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to save");
+      notify({ title: "Saved", message: "Platform settings updated.", tone: "success" });
+    } catch (err: any) {
+      notify({ title: "Save failed", message: err.message, tone: "error" });
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="ui-card anim-fade-up anim-d3 p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Settings</h2>
+        <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours' own logo and banking details, shown on platform invoices.</p>
+      </div>
+      {loading ? (
+        <p className="text-xs text-[var(--ck-text-muted)]">Loading...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ck-text-muted)]">Logo</label>
+            <div className="mt-2 flex items-center gap-3">
+              {logoUrl && <img src={logoUrl} alt="BookingTours logo" className="h-12 w-12 rounded object-contain border" style={{ borderColor: "var(--ck-border-subtle)" }} />}
+              <label className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs cursor-pointer">
+                Upload
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0] || null)} />
+              </label>
+              {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ck-text-muted)]">Banking Details</label>
+            <input value={bank.account_owner} onChange={(e) => setBank({ ...bank, account_owner: e.target.value })} placeholder="Account owner" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.bank_name} onChange={(e) => setBank({ ...bank, bank_name: e.target.value })} placeholder="Bank name" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.account_number} onChange={(e) => setBank({ ...bank, account_number: e.target.value })} placeholder="Account number" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={bank.account_type} onChange={(e) => setBank({ ...bank, account_type: e.target.value })} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+              <input value={bank.branch_code} onChange={(e) => setBank({ ...bank, branch_code: e.target.value })} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex justify-end pt-4 mt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        <button onClick={save} disabled={saving || loading} className="ui-btn ui-btn-primary disabled:opacity-50">
+          {saving ? "Saving..." : "Save Platform Settings"}
+        </button>
+      </div>
     </div>
   );
 }

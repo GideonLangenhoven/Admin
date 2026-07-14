@@ -4,7 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withSentry } from "../_shared/sentry.ts";
 import { formatDuration } from "../_shared/duration.ts";
-import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin } from "../_shared/tenant.ts";
+import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin, resolveManageBookingsUrl } from "../_shared/tenant.ts";
 import {
   gateInbound,
   gateOutbound,
@@ -582,10 +582,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
       const wGift = !wRedeem && (lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get")));
       if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       if (wLook) {
-        if (wReschedule) ns = { step: "LOOKUP", intent: "reschedule" };
-        else if (wCancel) ns = { step: "LOOKUP", intent: "cancel" };
-        else ns = { step: "LOOKUP", intent: "view" };
-        reply = wReschedule ? "Sure, let me help you reschedule! What email did you use when you booked?" : wCancel ? "I can help with that. What email is the booking under?" : "What email did you use when you booked?";
+        // Chat self-service for existing bookings (view/reschedule/cancel) is retired —
+        // bugs there (duplicate sends, lock-ups) led to routing everything through the
+        // dedicated /my-bookings page instead. Do not enter the LOOKUP step.
+        const manageUrl = resolveManageBookingsUrl(requestTenant?.business);
+        reply = "To view, reschedule, cancel, or change your booking, please use the *My Bookings* tab on our website" + (manageUrl ? ": " + manageUrl : ".") + "\n\nIt's the quickest way to manage your booking directly.";
+        ns = { step: "IDLE" };
         return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
       }
       if (wBook || wAvail) {

@@ -256,7 +256,50 @@ async function cleanupExpiredOtpAttempts() {
 }
 
 async function cleanupAbandonedVouchers() {
-  const results = { vouchers_cleaned: 0 };
+  const results = { vouchers_cleaned: 0, voucher_reminders_sent: 0 };
+
+  // Payment-link reminder: a voucher still PENDING 15 min after checkout means
+  // the buyer didn't pay (or payment failed). Email the stored payment_url once.
+  // This replaces the old eager email at checkout creation — mirrors the booking
+  // hold-expiry sweep. The 24h delete below sweeps anything still unpaid after.
+  const reminderCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { data: unpaidVouchers } = await supabase
+    .from("vouchers")
+    .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url")
+    .eq("status", "PENDING")
+    .is("payment_reminder_sent_at", null)
+    .not("payment_url", "is", null)
+    .lt("created_at", reminderCutoff)
+    .order("created_at", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
+
+  for (const v of unpaidVouchers || []) {
+    const voucherEmail = String((v as any).buyer_email || "").trim().toLowerCase();
+    if (!voucherEmail.includes("@") || !(v as any).business_id) continue;
+    try {
+      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({
+          type: "VOUCHER_PAYMENT_LINK",
+          data: {
+            email: voucherEmail,
+            business_id: (v as any).business_id,
+            buyer_name: (v as any).buyer_name || "there",
+            recipient_name: (v as any).recipient_name || "your recipient",
+            tour_name: (v as any).tour_name || "Gift Voucher",
+            total_amount: Number((v as any).value || (v as any).purchase_amount || 0).toFixed(2),
+            payment_url: (v as any).payment_url,
+          },
+        }),
+      });
+      await supabase.from("vouchers").update({ payment_reminder_sent_at: new Date().toISOString() }).eq("id", (v as any).id);
+      results.voucher_reminders_sent += 1;
+      console.log("VOUCHER_PAYMENT_REMINDER_SENT voucher=" + (v as any).id);
+    } catch (remErr) {
+      console.error("VOUCHER_PAYMENT_REMINDER_ERR", (v as any).id, remErr);
+    }
+  }
 
   // Delete PENDING vouchers older than 24 hours (abandoned checkout flows)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

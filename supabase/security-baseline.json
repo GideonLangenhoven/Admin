@@ -5014,6 +5014,76 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_invoices",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_settings",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "policies",
       "privilege_type": "DELETE"
     },
@@ -6072,6 +6142,16 @@
     {
       "schema": "public",
       "table_name": "plans",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "platform_invoices",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "platform_settings",
       "rls_enabled": true
     },
     {

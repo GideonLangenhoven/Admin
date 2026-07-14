@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
   resolveBusinessSiteUrls,
+  resolveManageBookingsUrl,
   resolveTenantByWhatsappPayload,
   sendWhatsappFreeformOrSignal,
   recordWaMessage,
@@ -355,6 +356,15 @@ async function getConvo(tenant: TenantContext, phone: any) {
   return r2.data;
 }
 async function setConvo(id: any, u: any) { await supabase.from("conversations").update({ ...u, updated_at: new Date().toISOString() }).eq("id", id); }
+// Chat self-service for existing bookings (view/reschedule/cancel/change qty/swap tour) is
+// retired — bugs there (duplicate sends, lock-ups) led to routing everything through the
+// dedicated /my-bookings page instead. Call this instead of entering the old flow states.
+async function sendManageBookingsRedirect(tenant: TenantContext, phone: any, convoId: any) {
+  const manageUrl = resolveManageBookingsUrl(tenant.business);
+  const msg = "To view, reschedule, cancel, or change your booking, please use the *My Bookings* tab on our website" + (manageUrl ? ": " + manageUrl : ".") + "\n\nIt\u2019s the quickest way to manage your booking directly.";
+  await sendText(tenant, phone, msg);
+  await setConvo(convoId, { current_state: "MENU" });
+}
 async function logE(tenant: TenantContext, evt: any, p?: any, bid?: any) { await supabase.from("logs").insert({ business_id: tenant.business.id, booking_id: bid, event: evt, payload: p }); }
 function fmtTime(tenant: TenantContext, iso: any) { return formatDateTime(tenant, iso, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
@@ -1123,25 +1133,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // MY BOOKINGS / RESCHEDULE / CANCEL
       else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel") || (cManage && /\bbooking/.test(c))) {
-        const bkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED", "CANCELLED"])
-          .order("created_at", { ascending: false }).limit(5);
-        const bookings = bkr.data || [];
-        if (bookings.length === 0) {
-          await sendText(tenant, phone, "You don\u2019t have any active bookings at the moment.");
-          await sendButtons(tenant, phone, "Want to book your next adventure?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Main Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-        } else {
-          let bmsg = "Here are your bookings:\n\n"; const brows: any[] = [];
-          for (let bi = 0; bi < bookings.length; bi++) {
-            const b = bookings[bi]; const bslot = (b as any).slots; const btour = (b as any).tours;
-            const bref = b.id.substring(0, 8).toUpperCase(); const btime = bslot ? fmtTime(tenant, bslot.start_time) : "TBC";
-            bmsg += (bi + 1) + ". *" + bref + "* \u2014 " + (btour?.name || "Tour") + "\n   " + btime + " \u2022 " + b.qty + " pax \u2022 R" + b.total_amount + " \u2022 " + b.status + "\n\n";
-            brows.push({ id: "BK_" + b.id, title: bref + " - " + b.status, description: (btour?.name || "Tour").substring(0, 20) + " " + (btime || "").substring(0, 15) });
-          }
-          await sendList(tenant, phone, bmsg + "Tap to manage a booking:", "My Bookings", [{ title: "Your Bookings", rows: brows }]);
-          await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
+        return;
       }
 
       // ASK A QUESTION
@@ -2620,64 +2613,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Handle add/reduce people, change tour, change name — connect to team
       if (wantAddPeople) {
-        const addBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time, capacity_total, booked, held), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (addBkr.data) {
-          const addBk = addBkr.data; const addRef = addBk.id.substring(0, 8).toUpperCase();
-          const addSlot = (addBk as any).slots; const addTour = (addBk as any).tours;
-          const addAvail = addSlot ? addSlot.capacity_total - addSlot.booked - (addSlot.held || 0) : 0;
-          await sendText(tenant, phone, "Your booking *" + addRef + "* currently has " + addBk.qty + " people on " + (addTour?.name || "Tour") + " \u2014 " + (addSlot ? fmtTime(tenant, addSlot.start_time) : "TBC") + ".\n\n" + (addAvail > 0 ? "There are " + addAvail + " extra spots available.\n\n" : "This slot is full unfortunately.\n\n") + "How many people total would you like? (Currently " + addBk.qty + ")");
-          await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: addBk.id, slot_id: addBk.slot_id, tour_id: addBk.tour_id, current_qty: addBk.qty, unit_price: addBk.unit_price, max_avail: addBk.qty + addAvail } });
-        } else {
-          await sendText(tenant, phone, "I couldn\u2019t find an active booking. Try My Bookings or contact our team.");
-          await sendButtons(tenant, phone, "Options:", [{ id: "MY_BOOKINGS", title: "\u{1F4CB} My Bookings" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
       if (wantReducePeople) {
-        const redBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (redBkr.data) {
-          const redBk = redBkr.data; const redRef = redBk.id.substring(0, 8).toUpperCase();
-          const redSlot = (redBk as any).slots; const redTour = (redBk as any).tours;
-          const redHrs = redSlot ? (new Date(redSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-          const refundNote = redHrs >= 24 ? "You\u2019ll get a refund for the difference." : "As it\u2019s within 24 hours, the refund policy applies.";
-          await sendText(tenant, phone, "Your booking *" + redRef + "* has " + redBk.qty + " people on " + (redTour?.name || "Tour") + ".\n\n" + refundNote + "\n\nHow many people total would you like? (Currently " + redBk.qty + ")");
-          await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: redBk.id, slot_id: redBk.slot_id, tour_id: redBk.tour_id, current_qty: redBk.qty, unit_price: redBk.unit_price, max_avail: 30, hours_before: redHrs } });
-        } else {
-          await sendText(tenant, phone, "No active booking found. Try My Bookings.");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
       if (wantChangeTour) {
-        const ctBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (ctBkr.data) {
-          const ctBk = ctBkr.data; const ctRef = ctBk.id.substring(0, 8).toUpperCase();
-          const ctTour = (ctBk as any).tours;
-          const ctSlot = (ctBk as any).slots;
-          const tours = await getActiveTours(tenant);
-          const otherTours = tours.filter(function (t: any) { return t.id !== ctBk.tour_id; });
-          if (otherTours.length > 0) {
-            await sendText(tenant, phone, "Your booking *" + ctRef + "* is for *" + (ctTour?.name || "Tour") + "* on " + (ctSlot ? fmtTime(tenant, ctSlot.start_time) : "TBC") + ".\n\nWhich tour would you like to switch to?");
-            const ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + formatDuration(t.duration_minutes) }; });
-            await sendList(tenant, phone, "Pick a new tour:", "Choose Tour", [{ title: "Available Tours", rows: ctRows }]);
-            await setConvo(convo.id, { current_state: "CHANGE_TOUR_PICK", state_data: { booking_id: ctBk.id, slot_id: ctBk.slot_id, tour_id: ctBk.tour_id, qty: ctBk.qty, current_tour: ctTour?.name } });
-          } else {
-            await sendText(tenant, phone, "No other tours available right now.");
-            await setConvo(convo.id, { current_state: "MENU" });
-          }
-        } else {
-          await sendText(tenant, phone, "No active booking found.");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
@@ -2824,137 +2770,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (wantReschedule || wantCancel || wantMyBooking) {
-        // Look up their bookings
-        const askBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, tour_id, created_at, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(5);
-        const askBookings = askBkr.data || [];
-
-        if (askBookings.length === 0) {
-          await sendText(tenant, phone, "I couldn\u2019t find any active bookings linked to this phone number. If you booked with a different number, try the My Bookings page on our website with your email.");
-          await sendButtons(tenant, phone, "What else?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "ASK", title: "\u2753 Another Question" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-          return;
-        }
-
-        // If they want to reschedule
-        if (wantReschedule) {
-          if (askBookings.length === 1) {
-            const rb = askBookings[0]; const rbSlot = (rb as any).slots; const rbTour = (rb as any).tours;
-            const rbRef = rb.id.substring(0, 8).toUpperCase();
-            const rbHrs = rbSlot ? (new Date(rbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-
-            if (rbHrs < 24) {
-              await sendText(tenant, phone, "Your booking *" + rbRef + "* for " + (rbTour?.name || "the tour") + " on " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + " is within 24 hours, so rescheduling isn\u2019t available anymore. You can contact our team for help.");
-              await sendButtons(tenant, phone, "Options:", [{ id: "HUMAN", title: "\u{1F4AC} Speak to Team" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-              await setConvo(convo.id, { current_state: "MENU" });
-              return;
-            }
-
-            // Check reschedule count
-            const rCount = await supabase.from("bookings").select("reschedule_count").eq("id", rb.id).single();
-            if (rCount.data && rCount.data.reschedule_count >= 2) {
-              await sendText(tenant, phone, "You\u2019ve already rescheduled this booking twice. Let me connect you to our team.");
-              await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
-              return;
-            }
-
-            // Load slots for reschedule
-            const askRSlots = rb.tour_id ? await getAvailSlotsForTour(tenant, rb.tour_id, 60) : await getAvailSlots(tenant, 60);
-            const askRFitting = askRSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= rb.qty && s.id !== rb.slot_id; });
-
-            if (askRFitting.length === 0) {
-              await sendText(tenant, phone, "No alternative slots with enough space right now. Let me connect you to our team.");
-              await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
-              return;
-            }
-
-            await sendText(tenant, phone, "Sure! I found your booking:\n\n\u{1F6F6} *" + (rbTour?.name || "Tour") + "*\n\u{1F4C5} " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + "\n\u{1F465} " + rb.qty + " people\n\nPick a new date:");
-
-            // Group by week
-            const askRGroups: any = {};
-            for (let ari = 0; ari < askRFitting.length; ari++) {
-              const ars = askRFitting[ari]; const arsDate = new Date(ars.start_time);
-              const arwStart = new Date(arsDate); arwStart.setDate(arwStart.getDate() - arwStart.getDay());
-              const arwLabel = formatDateOnly(tenant, arwStart.toISOString(), { day: "numeric", month: "short" });
-              const arwKey = arwStart.toISOString().split("T")[0];
-              if (!askRGroups[arwKey]) askRGroups[arwKey] = { label: "Week of " + arwLabel, rows: [] };
-              if (askRGroups[arwKey].rows.length < 10) {
-                askRGroups[arwKey].rows.push({ id: "RSLOT_" + ars.id, title: fmtTime(tenant, ars.start_time).substring(0, 24), description: (ars.capacity_total - ars.booked - (ars.held || 0)) + " spots" });
-              }
-            }
-            const askRSecs: any[] = []; const askRKeys = Object.keys(askRGroups).sort(); let askRTotal = 0;
-            for (let ark = 0; ark < askRKeys.length && askRTotal < 10; ark++) {
-              const arg = askRGroups[askRKeys[ark]]; const arRem = 10 - askRTotal;
-              if (arg.rows.length > arRem) arg.rows = arg.rows.slice(0, arRem);
-              askRTotal += arg.rows.length; askRSecs.push({ title: arg.label.substring(0, 24), rows: arg.rows });
-            }
-            await sendList(tenant, phone, "Scroll through weeks:", "View Dates", askRSecs);
-            await setConvo(convo.id, { current_state: "RESCHEDULE_PICK", state_data: { booking_id: rb.id, slot_id: rb.slot_id, qty: rb.qty, total: rb.total_amount, tour_id: rb.tour_id, reschedule_count: rCount.data?.reschedule_count || 0 } });
-            return;
-          } else {
-            // Multiple bookings — let them pick
-            let rbMsg = "I found " + askBookings.length + " active bookings. Which one do you want to reschedule?\n\n";
-            const rbRows: any[] = [];
-            for (let rbi = 0; rbi < askBookings.length; rbi++) {
-              const rbb = askBookings[rbi]; const rbbSlot = (rbb as any).slots; const rbbTour = (rbb as any).tours;
-              const rbbRef = rbb.id.substring(0, 8).toUpperCase();
-              rbMsg += (rbi + 1) + ". *" + rbbRef + "* \u2014 " + (rbbTour?.name || "Tour") + "\n   " + (rbbSlot ? fmtTime(tenant, rbbSlot.start_time) : "TBC") + "\n\n";
-              rbRows.push({ id: "BK_" + rbb.id, title: rbbRef + " - " + (rbbTour?.name || "").substring(0, 15), description: rbbSlot ? fmtTime(tenant, rbbSlot.start_time).substring(0, 24) : "TBC" });
-            }
-            await sendList(tenant, phone, rbMsg, "Select Booking", [{ title: "Your Bookings", rows: rbRows }]);
-            await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-            return;
-          }
-        }
-
-        // If they want to cancel
-        if (wantCancel) {
-          if (askBookings.length === 1) {
-            const cb = askBookings[0]; const cbSlot = (cb as any).slots; const cbTour = (cb as any).tours;
-            const cbRef = cb.id.substring(0, 8).toUpperCase();
-            const cbHrs = cbSlot ? (new Date(cbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-            let cbDetail = "I found your booking:\n\n\u{1F6F6} *" + (cbTour?.name || "Tour") + "*\n\u{1F4C5} " + (cbSlot ? fmtTime(tenant, cbSlot.start_time) : "TBC") + "\n\u{1F465} " + cb.qty + " people\n\n";
-            if (cbHrs >= 24) {
-              // M4: Transition to CANCEL_CHOICE so user can pick voucher vs refund
-              const cbRefund = Math.round(Number(cb.total_amount) * 0.95 * 100) / 100;
-              cbDetail += "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + cb.total_amount + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + cbRefund + " (5% processing fee) \u2022 5-7 business days";
-              await sendButtons(tenant, phone, cbDetail, [
-                { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
-                { id: "CANCEL_REFUND", title: "\u{1F4B8} Refund" },
-                { id: "IDLE", title: "\u274C Keep Booking" },
-              ]);
-              await setConvo(convo.id, { current_state: "CANCEL_CHOICE", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
-            } else {
-              cbDetail += "This is within 24 hours so *no refund* is available. Still cancel?";
-              await sendButtons(tenant, phone, cbDetail, [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
-              await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
-            }
-            return;
-          } else {
-            // Multiple — show list
-            const cbMsg = "Which booking do you want to cancel?\n\n";
-            const cbRows: any[] = [];
-            for (let cbi = 0; cbi < askBookings.length; cbi++) {
-              const cbb = askBookings[cbi]; const cbbSlot = (cbb as any).slots; const cbbTour = (cbb as any).tours;
-              const cbbRef = cbb.id.substring(0, 8).toUpperCase();
-              cbRows.push({ id: "BK_" + cbb.id, title: cbbRef + " - " + (cbbTour?.name || "").substring(0, 15), description: cbbSlot ? fmtTime(tenant, cbbSlot.start_time).substring(0, 24) : "TBC" });
-            }
-            await sendList(tenant, phone, cbMsg, "Select Booking", [{ title: "Your Bookings", rows: cbRows }]);
-            await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-            return;
-          }
-        }
-
-        // General booking inquiry
-        let bMsg = "Here are your active bookings:\n\n";
-        for (let abi = 0; abi < askBookings.length; abi++) {
-          const ab = askBookings[abi]; const abSlot = (ab as any).slots; const abTour = (ab as any).tours;
-          bMsg += "\u{1F6F6} *" + (abTour?.name || "Tour") + "*\n\u{1F4C5} " + (abSlot ? fmtTime(tenant, abSlot.start_time) : "TBC") + "\n\u{1F465} " + ab.qty + " people \u2022 " + ab.status + "\nRef: " + ab.id.substring(0, 8).toUpperCase() + "\n\n";
-        }
-        bMsg += "Need to change anything?";
-        await sendButtons(tenant, phone, bMsg, [{ id: "MY_BOOKINGS", title: "\u{1F4CB} Manage Bookings" }, { id: "ASK", title: "\u2753 Another Question" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-        await setConvo(convo.id, { current_state: "MENU" });
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 

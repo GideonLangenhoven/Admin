@@ -352,6 +352,46 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
   return { companyName, addressLines, reg, vat, logoUrl, bank };
 }
 
+// BookingTours' own logo + bank details (platform_settings singleton) — used
+// only by PLATFORM_INVOICE_OUTSTANDING, which must look like it's FROM
+// BookingTours TO the operator, never resolving the operator's own branding.
+type PlatformInvoiceContext = {
+  logoUrl: string;
+  bank: InvoiceContext["bank"];
+};
+
+async function getPlatformInvoiceContext(): Promise<PlatformInvoiceContext> {
+  const empty: PlatformInvoiceContext = {
+    logoUrl: "",
+    bank: { account_owner: null, account_number: null, account_type: null, bank_name: null, branch_code: null },
+  };
+  if (!supabase) return empty;
+
+  const { data: settings } = await supabase.from("platform_settings").select("logo_url").eq("id", true).maybeSingle();
+  const logoUrl = String(settings?.logo_url || "");
+
+  let bank = empty.bank;
+  if (SETTINGS_ENCRYPTION_KEY) {
+    try {
+      const { data: bankRows } = await supabase.rpc("get_platform_bank_details", { p_key: SETTINGS_ENCRYPTION_KEY });
+      const row = Array.isArray(bankRows) ? bankRows[0] : bankRows;
+      if (row) {
+        bank = {
+          account_owner: row.account_owner || null,
+          account_number: row.account_number || null,
+          account_type: row.account_type || null,
+          bank_name: row.bank_name || null,
+          branch_code: row.branch_code || null,
+        };
+      }
+    } catch (bankErr) {
+      console.error("PLATFORM_INVOICE_BANK_DETAILS_ERR:", bankErr);
+    }
+  }
+
+  return { logoUrl, bank };
+}
+
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
   // Platform ICON images, not names. Inline <svg> is stripped by Gmail/
   // Outlook/Yahoo, and data: URIs are blocked by Gmail — so we use hosted
@@ -1059,6 +1099,71 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
     </html>`;
 }
 
+function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: PlatformInvoiceContext) {
+  const amountStr = Number(d.amount_zar || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const bank = platCtx.bank;
+  const hasBank = !!(bank.account_number || bank.bank_name);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            ${platCtx.logoUrl ? `<img src="${platCtx.logoUrl}" alt="BookingTours" style="max-height: 40px; margin-bottom: 12px;" />` : ""}
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">BookingTours</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.platform_invoice_number}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 30px 40px 10px;">
+            <p style="font-size: 14px; color: #555; margin: 0 0 4px;">Hi ${d.name || ""},</p>
+            <p style="font-size: 14px; color: #555; line-height: 1.6; margin: 0;">
+              Your ${d.plan_name || "subscription"} invoice for <strong>${d.business_name}</strong>
+              (${d.period_start} to ${d.period_end}) is outstanding.
+              ${d.pro_rated ? `<br><span style="color: #B45309;">${d.pause_note || "This invoice was pro-rated."}</span>` : ""}
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 40px 20px; text-align: center;">
+            <p style="font-size: 32px; font-weight: bold; color: #1b3b36; margin: 0;">R${amountStr}</p>
+            <p style="font-size: 12px; color: #888; margin: 4px 0 0;">Amount due</p>
+          </td>
+        </tr>
+        ${d.yoco_payment_link_url ? `
+        <tr>
+          <td style="padding: 0 40px 20px; text-align: center;">
+            <a href="${d.yoco_payment_link_url}" style="display: inline-block; background-color: #0c8a59; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Pay Now</a>
+          </td>
+        </tr>` : ""}
+        ${hasBank ? `
+        <tr>
+          <td style="padding: 0 40px 30px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px; padding: 16px; font-size: 13px; color: #555; line-height: 1.7;">
+              <tr><td style="padding: 16px;">
+                <strong style="color: #1b3b36;">Or pay via EFT:</strong><br>
+                ${bank.account_owner ? `Account owner: ${bank.account_owner}<br>` : ""}
+                ${bank.bank_name ? `Bank: ${bank.bank_name}<br>` : ""}
+                ${bank.account_number ? `Account number: ${bank.account_number}<br>` : ""}
+                ${bank.account_type ? `Account type: ${bank.account_type}<br>` : ""}
+                ${bank.branch_code ? `Branch code: ${bank.branch_code}` : ""}
+              </td></tr>
+            </table>
+          </td>
+        </tr>` : ""}
+        <tr>
+          <td style="background-color: #1b3b36; color: #A8C2B8; text-align: center; padding: 30px; font-size: 12px; line-height: 1.5;">
+            BookingTours — thank you for partnering with us.
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
 
 function giftVoucherHtml(d: Record<string, unknown>) {
   // Redesigned as a premium, celebratory gift-card experience instead of a
@@ -1077,68 +1182,90 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 
   const introHtml = mode === "recipient"
     ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${recipientName},</h2>
-       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift — an adventure, on them.</p>`
+       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift — an adventure, on them. Your voucher is below.</p>`
     : mode === "buyer_receipt"
       ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
          <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift for <strong>${recipientName}</strong> is on its way to their inbox right now. Here's a copy for your records.</p>`
       : `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below — forward this email (or just share the code) to give it to them.</p>`;
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below — <strong>forward this email</strong> to give it to them, or print it as a card to hand over in person.</p>`;
 
+  // Elegant quote card in the brand palette (applyBranding recolors #1b3b36).
   const messageBlock = d.gift_message
     ? (mode === "recipient"
-        ? `<tr><td style="padding: 0 40px 24px;">
-            <div style="background: linear-gradient(135deg, #fdf4ff 0%, #f5f3ff 100%); border-radius: 14px; padding: 24px; text-align: center;">
-              <p style="margin: 0 0 10px 0; font-size: 17px; line-height: 1.6; font-style: italic; color: #4c1d95;">&ldquo;${d.gift_message}&rdquo;</p>
-              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #7c3aed;">&mdash; ${buyerName}</p>
+        ? `<tr><td style="padding: 0 32px 24px;">
+            <div style="background: #F7F7F6; border-radius: 14px; padding: 24px; text-align: center; border: 1px solid #e6e6e3;">
+              <p style="margin: 0 0 10px 0; font-size: 17px; line-height: 1.6; font-style: italic; color: #1b3b36;">&ldquo;${d.gift_message}&rdquo;</p>
+              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #6b7280;">&mdash; ${buyerName}</p>
             </div>
           </td></tr>`
-        : `<tr><td style="padding: 0 40px 20px;">
-            <div style="background: #fafafa; border-radius: 10px; padding: 16px 20px; font-size: 13px; color: #6b7280;">Your message to ${recipientName}: <em>&ldquo;${d.gift_message}&rdquo;</em></div>
+        : `<tr><td style="padding: 0 32px 20px;">
+            <div style="background: #F7F7F6; border-radius: 10px; padding: 16px 20px; font-size: 13px; color: #6b7280;">Your message to ${recipientName}: <em>&ldquo;${d.gift_message}&rdquo;</em></div>
           </td></tr>`)
     : "";
 
+  // How to give / redeem the gift, tailored to who's reading.
+  const forwardNote = mode === "recipient"
+    ? `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Quote your code above when you book online or over WhatsApp — the balance is applied to your trip.</p></td></tr>`
+    : mode === "buyer_receipt"
+      ? ""
+      : `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;"><strong>To gift it:</strong> forward this email to ${recipientName}, or print this page as a card. They redeem the code when booking online or over WhatsApp.</p></td></tr>`;
+
   const ctaLabel = mode === "recipient" ? "Redeem Your Gift" : "View Booking Site";
-  const ctaBlock = `<tr><td style="padding: 0 40px 40px; text-align: center;">
+  const ctaBlock = `<tr><td style="padding: 20px 40px 12px; text-align: center;">
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
-        <td align="center" bgcolor="#7c3aed" style="border-radius: 999px;">
+        <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
           <a href="{{BOOKING_URL}}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">${ctaLabel}</a>
         </td>
       </tr></table>
     </td></tr>`;
+
+  // Deliverability nudge — recipient gift emails often land in Promotions/Spam.
+  const spamNote = mode === "buyer_receipt"
+    ? ""
+    : `<tr><td style="padding: 0 40px 24px; text-align: center;"><p style="margin: 0; font-size: 12px; color: #9ca3af;">Don't see it in your inbox? Check your <strong>spam / promotions</strong> folder.</p></td></tr>`;
 
   return `
     <!DOCTYPE html>
     <html>
     <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
     <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 45px -10px rgba(76,29,149,0.25);">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 45px -12px rgba(27,59,54,0.28);">
         <tr>
           <td style="background: linear-gradient(135deg, #1b3b36 0%, #2d5a4f 100%); padding: 36px 30px 28px; text-align: center;">
-            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 3px; color: #A8C2B8;">${heroEyebrow}</p>
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${heroEyebrow}</p>
             <h1 style="margin: 12px 0 0 0; font-size: 32px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${heroTitle}</h1>
           </td>
         </tr>
         ${heroImg("IMG_GIFT", "Cape Kayak")}
         <tr>
-          <td style="padding: 40px 40px 10px; text-align: center;">
+          <td style="padding: 36px 40px 10px; text-align: center;">
             ${introHtml}
           </td>
         </tr>
         <tr>
-          <td style="padding: 0 40px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 55%, #a855f7 100%); border-radius: 20px;">
-              <tr><td style="padding: 32px 24px; text-align: center;">
-                <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.75);">Gift Voucher Code</p>
-                <p style="margin: 14px 0; font-size: 40px; font-weight: 800; letter-spacing: 6px; color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.15);">${d.code}</p>
-                <div style="margin: 18px auto 0; width: 60px; border-top: 1px solid rgba(255,255,255,0.3);"></div>
-                <p style="margin: 18px 0 0; font-size: 15px; color: rgba(255,255,255,0.95);">${d.tour_name} &middot; <strong>R${d.value}</strong></p>
-                <p style="margin: 8px 0 0; font-size: 12px; color: rgba(255,255,255,0.7);">Valid until ${d.expires_at}</p>
+          <td style="padding: 0 32px 8px;">
+            <!-- The voucher itself, styled as a physical gift card / ticket. -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: #ffffff; border: 2px dashed #1b3b36; border-radius: 20px;">
+              <tr><td style="padding: 30px 24px 8px; text-align: center;">
+                <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Gift Voucher</p>
+                <p style="margin: 10px 0 0; font-size: 52px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.value}</p>
+                <p style="margin: 8px 0 0; font-size: 14px; color: #6b7280;">${d.tour_name}</p>
+              </td></tr>
+              <tr><td style="padding: 18px 24px 6px;">
+                <div style="border-top: 2px dashed #d7ddd9;"></div>
+              </td></tr>
+              <tr><td style="padding: 6px 24px 30px; text-align: center;">
+                <p style="margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #9ca3af;">Voucher Code</p>
+                <p style="margin: 10px 0 0; font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #1b3b36;">${d.code}</p>
+                <p style="margin: 14px 0 0; font-size: 12px; color: #9ca3af;">Valid until ${d.expires_at}</p>
               </td></tr>
             </table>
           </td>
         </tr>
         ${messageBlock}
+        ${forwardNote}
         ${ctaBlock}
+        ${spamNote}
         <tr>
           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
@@ -2272,7 +2399,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     let d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
 
     // Escape user-controlled fields to prevent HTML injection in email templates
-    const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email"];
+    const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email", "business_name", "plan_name"];
     for (let fi = 0; fi < fieldsToEscape.length; fi++) {
       const fk = fieldsToEscape[fi];
       if (d[fk] && typeof d[fk] === "string") d[fk] = escHtml(d[fk] as string);
@@ -2306,6 +2433,18 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     d._manageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : "");
     d._siteUrl = branding.bookingSiteUrl || "";
     d._emailTagline = branding.emailTagline || "";
+    // Per-tour tagline wins over the account-wide one. Every BOOKING_CONFIRM
+    // caller passes booking_id, and send-email already does bookings→tours
+    // joins by id (see below), so this needs no changes on the sending side.
+    if (type === "BOOKING_CONFIRM" && d.booking_id && supabase) {
+      try {
+        const tt = await supabase.from("bookings").select("tours(confirmation_tagline)").eq("id", String(d.booking_id)).maybeSingle();
+        const tag = (tt.data as { tours?: { confirmation_tagline?: string } } | null)?.tours?.confirmation_tagline;
+        if (tag && String(tag).trim()) d._emailTagline = String(tag).trim();
+      } catch (tagErr) {
+        console.error("TOUR_TAGLINE_LOOKUP_ERR:", tagErr);
+      }
+    }
 
     // Central guard: senders should pass tenant-formatted date strings, but a
     // raw ISO timestamp still slips through from older callers — format it
@@ -2391,6 +2530,16 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = (invCtxHtml.companyName || "Tax Invoice") + " - Tax Invoice " + d.invoice_number;
         html = invoiceHtml(d, invCtxHtml);
         bcc = d.admin_email as string;
+        break;
+      }
+      case "PLATFORM_INVOICE_OUTSTANDING": {
+        // Uses BookingTours' own branding (platform_settings), never the
+        // operator's — deliberately does NOT reuse the `invoice_number` field
+        // name (see `platform_invoice_number` in the payload) so this never
+        // triggers resolveBrandingBusinessId's tenant-invoice lookup above.
+        const platCtx = await getPlatformInvoiceContext();
+        subject = "BookingTours — Invoice " + d.platform_invoice_number + " outstanding";
+        html = platformInvoiceOutstandingHtml(d, platCtx);
         break;
       }
       case "GIFT_VOUCHER": {

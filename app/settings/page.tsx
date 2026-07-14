@@ -5,6 +5,8 @@ import { formatDuration } from "../lib/duration";
 import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
+import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
+import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
@@ -162,17 +164,6 @@ function HelpAssistantSection() {
 }
 
 // Settings sections that MAIN_ADMIN can grant to regular admins
-const SETTINGS_SECTIONS = [
-    { key: "tours", label: "Tours & Activities" },
-    { key: "addons", label: "Booking Add-Ons" },
-    { key: "external", label: "External Booking" },
-    { key: "site", label: "Booking Site Config" },
-    { key: "email", label: "Email Customisation" },
-    { key: "invoice", label: "Invoice Details" },
-    // "credentials" (payment + WhatsApp secrets) is intentionally NOT delegatable:
-    // the /api/credentials routes hard-require MAIN_ADMIN/SUPER_ADMIN, so granting
-    // a sub-admin the permission only produced a visible-but-unsaveable section.
-] as const;
 type SettingsSectionKey = typeof SETTINGS_SECTIONS[number]["key"];
 
 // Default Booking App URLs (separate from Admin Dashboard: https://admin-tawny-delta-92.vercel.app)
@@ -231,6 +222,7 @@ interface Tour {
     sort_order: number | null;
     image_url: string | null;
     hidden: boolean;
+    confirmation_tagline: string | null;
 }
 
 interface AddOn {
@@ -269,7 +261,7 @@ export default function SettingsPage() {
     // Tours state
     const [tours, setTours] = useState<Tour[]>([]);
     const [editingTour, setEditingTour] = useState<Tour | null>(null);
-    const [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
     const [tourSaving, setTourSaving] = useState(false);
     const [tourError, setTourError] = useState("");
     const [slotMessage, setSlotMessage] = useState("");
@@ -425,7 +417,7 @@ export default function SettingsPage() {
     async function fetchAdmins() {
         setLoading(true);
         const { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
-        if (data) setAdmins(data);
+        if (data) setAdmins(data.filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
         setLoading(false);
     }
 
@@ -543,7 +535,7 @@ export default function SettingsPage() {
 
     function resetTourForm() {
         setEditingTour(null);
-        setTourForm({ name: "", description: "", price: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
+        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
         setTourError("");
     }
 
@@ -561,6 +553,7 @@ export default function SettingsPage() {
         setTourForm({
             name: t.name,
             description: t.description || "",
+            confirmationTagline: t.confirmation_tagline || "",
             price: String(t.base_price_per_person || ""),
             ...minutesToDurationForm(t.duration_minutes),
             sort_order: String(t.sort_order || 0),
@@ -671,6 +664,7 @@ export default function SettingsPage() {
         const payload = {
             name: tourForm.name.trim(),
             description: tourForm.description.trim() || null,
+            confirmation_tagline: tourForm.confirmationTagline.trim() || null,
             base_price_per_person: Number(tourForm.price),
             duration_minutes: Number(tourForm.duration) * DURATION_UNIT_MINUTES[tourForm.durationUnit],
             sort_order: Number(tourForm.sort_order) || 0,
@@ -1888,6 +1882,13 @@ export default function SettingsPage() {
                                 <textarea required value={tourForm.description} onChange={e => setTourForm({ ...tourForm, description: e.target.value })}
                                     rows={3} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none resize-none"
                                     placeholder="Describe this activity..." />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Confirmation email tagline</label>
+                                <input type="text" value={tourForm.confirmationTagline} onChange={e => setTourForm({ ...tourForm, confirmationTagline: e.target.value })}
+                                    maxLength={200} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. Lace up your boots for an unforgettable day on the trail." />
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">The excitement line in this tour&apos;s confirmation email, after &quot;Your spots are officially locked in.&quot; Overrides your account tagline. Leave blank to fall back to the account default.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Tour Image</label>
