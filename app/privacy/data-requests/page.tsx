@@ -160,9 +160,16 @@ export default function DataRequestsPage() {
           <p className="ui-mono-label mb-2">Admin · Privacy</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>POPIA Data Requests</h1>
         </div>
-        <span className="ui-status ui-pill-success">
-          {requests.filter(r => ["CONFIRMED", "IN_REVIEW"].includes(r.status)).length} actionable
-        </span>
+        <div className="flex items-center gap-2">
+          {requests.filter(r => r.status === "PENDING_CONFIRMATION").length > 0 && (
+            <button type="button" onClick={() => setTab("PENDING_CONFIRMATION")} className="ui-status ui-pill-amber" title="New requests awaiting the customer's email confirmation">
+              {requests.filter(r => r.status === "PENDING_CONFIRMATION").length} awaiting confirmation
+            </button>
+          )}
+          <span className="ui-status ui-pill-success">
+            {requests.filter(r => ["CONFIRMED", "IN_REVIEW"].includes(r.status)).length} actionable
+          </span>
+        </div>
       </div>
 
       <p className="anim-fade-up anim-d1 text-sm" style={{ color: "var(--ck-text-muted)" }}>

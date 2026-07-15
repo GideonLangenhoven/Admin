@@ -397,6 +397,29 @@ Deno.serve(withSentry("web-chat", async (req) => {
       }
     }
 
+    // Web-chat visitor identity: the widget sends a stable per-visitor id in
+    // state.vid, so we key the conversation on "web:<vid>" instead of a shared
+    // "web" row (which collided every anonymous visitor into one thread).
+    const webPhone = state.vid ? "web:" + String(state.vid) : (state.phone || body.phone || "web");
+
+    // Live web-chat poll: while a human agent is connected, the widget polls
+    // for the agent's replies. Return admin messages for THIS visitor since
+    // `since`, plus the conversation status. Scoped by business_id (resolved
+    // from the origin) + the visitor's phone key — no cross-visitor/tenant leak.
+    if (body.action === "poll") {
+      const since = typeof body.since === "string" && body.since ? body.since : new Date(0).toISOString();
+      const { data: convoRow } = await db.from("conversations")
+        .select("status").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
+      const { data: adminMsgs } = await db.from("chat_messages")
+        .select("body, created_at").eq("business_id", requestedBusinessId).eq("phone", webPhone)
+        .eq("direction", "OUT").eq("sender", "Admin").gt("created_at", since)
+        .order("created_at", { ascending: true }).limit(20);
+      return new Response(JSON.stringify({
+        messages: (adminMsgs || []).map((m) => ({ text: m.body, at: m.created_at })),
+        status: convoRow?.status || "BOT",
+      }), { status: 200, headers: gCors(req) });
+    }
+
     // SECURITY: tours query is now ALWAYS scoped to the requesting business.
     const toursQuery = db.from("tours").select("*").eq("business_id", requestedBusinessId).eq("active", true).neq("hidden", true).order("sort_order", { ascending: true });
     const { data: allT } = await toursQuery;
@@ -457,6 +480,23 @@ Deno.serve(withSentry("web-chat", async (req) => {
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
+    // Once a human agent has taken over (status HUMAN), the bot stays silent:
+    // the visitor's messages are logged for the agent (inbox) and the widget
+    // shows agent replies via the poll above. Without this the bot talks over
+    // the human. Button clicks are ignored here (rare post-handoff).
+    if (msg && !isBtnClick) {
+      const { data: humanConvo } = await db.from("conversations")
+        .select("status").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
+      if (humanConvo?.status === "HUMAN") {
+        await db.from("chat_messages").insert({
+          business_id: requestedBusinessId, phone: webPhone, direction: "IN",
+          body: msg, sender: state.name || "Website visitor", sender_type: "CUSTOMER",
+        });
+        await db.from("conversations").update({ updated_at: new Date().toISOString() }).eq("business_id", requestedBusinessId).eq("phone", webPhone);
+        return new Response(JSON.stringify({ reply: "", human: true, state: { ...state, status: "HUMAN" } }), { status: 200, headers: gCors(req) });
+      }
+    }
+
     // Real human handoff: land the conversation in the operator inbox
     // (status HUMAN, same table the WhatsApp bot uses) and record the
     // exchange in chat_messages so the operator sees what was asked. The
@@ -464,7 +504,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // web-chat never set that key, so escalations were invisible to operators.
     async function flagHumanHandoff(intent: string, customerMsg: string, botReply: string) {
       try {
-        const phoneKey = state.phone || body.phone || "web";
+        const phoneKey = webPhone;
         const name = body.name || state.name || "Website visitor";
         const emailAddr = body.email || state.email || null;
         const nowIso = new Date().toISOString();
@@ -498,7 +538,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         await flagHumanHandoff(esc.intent, msg, esc.reply);
         return new Response(JSON.stringify({
           reply: esc.reply,
-          state: { ...state, escalated: true, escalation_intent: esc.intent },
+          state: { ...state, escalated: true, escalation_intent: esc.intent, status: "HUMAN" },
           buttons: null,
         }), { status: 200, headers: gCors(req) });
       }
@@ -509,7 +549,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       await flagHumanHandoff("ESCALATE_HUMAN", "[Requested a human]", humanReply);
       return new Response(JSON.stringify({
         reply: humanReply,
-        state: { ...state, escalated: true, escalation_intent: "ESCALATE_HUMAN" },
+        state: { ...state, escalated: true, escalation_intent: "ESCALATE_HUMAN", status: "HUMAN" },
         buttons: null,
       }), { status: 200, headers: gCors(req) });
     }
@@ -1428,7 +1468,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     if (classification.intent !== "OTHER" || classification.confidence > 0) {
       db.from("chat_messages").insert({
         business_id: requestedBusinessId,
-        phone: state.phone || body.phone || "web",
+        phone: webPhone,
         direction: "IN",
         body: msg,
         sender: body.name || "Website visitor",
@@ -1472,7 +1512,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     if (faqAnswer) {
       db.from("chat_messages").insert({
         business_id: requestedBusinessId,
-        phone: state.phone || body.phone || "web",
+        phone: webPhone,
         direction: "OUT",
         body: faqAnswer,
         sender: "Bot",

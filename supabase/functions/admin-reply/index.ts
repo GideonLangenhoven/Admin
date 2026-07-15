@@ -115,6 +115,22 @@ Deno.serve(async (req: Request) => {
         if (!actualBusinessId) {
             return new Response(JSON.stringify({ ok: false, error: "Conversation is not associated with a business" }), { status: 200, headers: getCors(req) });
         }
+
+        // Web-chat conversations have no WhatsApp number — their phone is the
+        // literal "web" or "web:<visitor-id>". Deliver through the web-chat
+        // channel (store the reply; the widget polls for it) instead of Meta,
+        // which 400s with "The parameter to is required" on the empty number.
+        const isWebChat = /^web(:|$)/.test(String(to));
+        if (isWebChat) {
+            const { error: webInsErr } = await supabase.from("chat_messages").insert({
+                business_id: actualBusinessId, phone: to, direction: "OUT",
+                body: message, sender: "Admin", sender_type: "ADMIN",
+            });
+            if (webInsErr) return new Response(JSON.stringify({ ok: false, error: "Failed to log message", details: webInsErr }), { status: 200, headers: getCors(req) });
+            await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
+            return new Response(JSON.stringify({ ok: true, channel: "web" }), { status: 200, headers: getCors(req) });
+        }
+
         const tenant = await getTenantByBusinessId(supabase, actualBusinessId);
 
         // Guard: return a structured error instead of a malformed WA API call
