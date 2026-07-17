@@ -408,6 +408,13 @@ async function getActiveTours(tenant: TenantContext) {
     .eq("business_id", tenant.business.id).eq("active", true).order("sort_order", { ascending: true });
   return (r.data || []).filter(function (t: any) { return !t.name.includes("Private") && !t.hidden; });
 }
+async function getBookableTours(tenant: TenantContext) {
+  // Booking flows only offer tours with at least one open slot in the next 14
+  // days — gift vouchers still use getActiveTours (no slot needed to buy one).
+  const [tours, slots] = await Promise.all([getActiveTours(tenant), getAvailSlots(tenant, 14)]);
+  const withSlots = new Set(slots.map(function (s: any) { return s.tour_id; }));
+  return tours.filter(function (t: any) { return withSlots.has(t.id); });
+}
 async function getBookingCustomFields(tenant: TenantContext) {
   const r = await supabase.from("businesses").select("booking_custom_fields").eq("id", tenant.business.id).maybeSingle();
   return Array.isArray(r.data?.booking_custom_fields) ? r.data.booking_custom_fields.filter(function (f: any) { return f && f.key && f.label; }) : [];
@@ -1104,7 +1111,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // MY_BOOKINGS branch below.
       const cManage = /\b(change|resched\w*|cancel\w*|move|edit|manage|update|view)\b/.test(c);
       if (c === "BOOK" || (c.includes("book") && !cManage)) {
-        const tours = await getActiveTours(tenant);
+        const tours = await getBookableTours(tenant);
         if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment. Check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         if (tours.length === 1) {
           await sendText(tenant, phone, "How many people will be joining? (1\u201330)");
@@ -1295,7 +1302,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // of tapping the list (and some WhatsApp clients don't render lists). The
       // rid-only version trapped them in "Please pick a tour from the list above."
       if (!tourId && rawText) {
-        const tours = await getActiveTours(tenant);
+        const tours = await getBookableTours(tenant);
         const typed = rawText.toLowerCase().trim();
         const num = typed.match(/^(\d{1,2})\.?$/);
         if (num && Number(num[1]) >= 1 && Number(num[1]) <= tours.length) {
@@ -2289,7 +2296,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
         await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: verifiedSd.voucher_code }, booking.id);
         // Upsell second trip
-        const otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
+        const otherTours2 = (await getBookableTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
         if (otherTours2.length > 0) {
           const upsellTour = otherTours2[0];
           setTimeout(async function () {
@@ -2538,7 +2545,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const vType = vr2.data.type || "CREDIT";
       const vPaxLimit = vr2.data.pax_limit || 1;
       const vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
-      const tours3 = await getActiveTours(tenant);
+      const tours3 = await getBookableTours(tenant);
+      if (tours3.length === 0) { await sendText(tenant, phone, "Your voucher is valid, but there are no open dates right now. Check back soon and we’ll get you booked in!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       if (tours3.length === 1) {
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nHow many people will be joining?");
         await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
