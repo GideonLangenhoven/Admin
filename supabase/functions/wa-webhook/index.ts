@@ -862,6 +862,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       return;
     }
 
+    // Data-deletion keyword (Meta ToS / POPIA) — same always-on path as STOP.
+    // Confirm first, then anonymize: chat history is redacted and personal
+    // details are wiped from bookings; financial records keep their amounts
+    // (5-year tax retention, per the published privacy policy).
+    if (input === "delete") {
+      await sendText(tenant, phone,
+        "Your data deletion request is confirmed. Your messages and personal details will be removed from our records within 30 days. Invoices and payment records are retained for 5 years as required by South African tax law."
+      );
+      const { error: delErr } = await supabase.rpc("anonymize_customer", {
+        p_customer_id: null,
+        p_business_id: tenant.business.id,
+        p_request_id: null,
+        p_admin_id: null,
+        p_email: null,
+        p_phone: phone,
+      });
+      if (delErr) await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
+      return;
+    }
+
     // ── Bot mode gate ─────────────────────────────────────────────────────────
     // Check tenant's whatsapp_bot_mode setting. If the bot is disabled (OFF or
     // inside business hours for OUTSIDE_HOURS mode), skip all auto-reply logic.
