@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { computeActiveDays } from "../../app/lib/platform-billing";
+import { computeActiveDays, computeEmailOverage } from "../../app/lib/platform-billing";
+
+describe("computeEmailOverage (platform invoice email line)", () => {
+  it("under quota is zero", () => {
+    expect(computeEmailOverage(400, 500, 0.4)).toEqual({ overageEmails: 0, overageZar: 0 });
+  });
+  it("charges only emails beyond the included quota", () => {
+    expect(computeEmailOverage(650, 500, 0.4)).toEqual({ overageEmails: 150, overageZar: 60 });
+  });
+  it("rounds to cents", () => {
+    expect(computeEmailOverage(503, 500, 0.333)).toEqual({ overageEmails: 3, overageZar: 1 });
+  });
+  it("no configured rate means no charge", () => {
+    expect(computeEmailOverage(9999, 0, 0)).toEqual({ overageEmails: 9999, overageZar: 0 });
+  });
+});
 
 // Pro-rata math for platform (BookingTours -> operator) monthly invoices.
 // Fixed, hand-computed dates throughout (not "N days before today") so these

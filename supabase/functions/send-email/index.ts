@@ -1101,7 +1101,10 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
 }
 
 function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: PlatformInvoiceContext) {
-  const amountStr = Number(d.amount_zar || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtZar = (n: unknown) => Number(n || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const amountStr = fmtZar(d.amount_zar);
+  const emailOverageZar = Number(d.email_overage_zar || 0);
+  const subscriptionZar = Number(d.amount_zar || 0) - emailOverageZar;
   const bank = platCtx.bank;
   const hasBank = !!(bank.account_number || bank.bank_name);
   return `
@@ -1129,6 +1132,21 @@ function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: Pla
             </p>
           </td>
         </tr>
+        ${emailOverageZar > 0 ? `
+        <tr>
+          <td style="padding: 10px 40px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #555; border-top: 1px solid #eee;">
+              <tr>
+                <td style="padding: 10px 0 4px;">${d.plan_name || "Subscription"} (monthly fee${d.pro_rated ? ", pro-rated" : ""})</td>
+                <td style="padding: 10px 0 4px; text-align: right;">R${fmtZar(subscriptionZar)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 0 10px;">Marketing emails over included quota (${d.email_overage_count || 0})</td>
+                <td style="padding: 4px 0 10px; text-align: right;">R${fmtZar(emailOverageZar)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : ""}
         <tr>
           <td style="padding: 10px 40px 20px; text-align: center;">
             <p style="font-size: 32px; font-weight: bold; color: #1b3b36; margin: 0;">R${amountStr}</p>

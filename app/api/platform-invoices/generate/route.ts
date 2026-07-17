@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
-import { computeActiveDays, monthBounds } from "@/app/lib/platform-billing";
+import { computeActiveDays, computeEmailOverage, monthBounds } from "@/app/lib/platform-billing";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
 
   // Monthly total = plan base + R-per-seat for every seat beyond what the plan
   // includes. Seats live on businesses.max_admin_seats (the enforced count).
-  const { data: biz } = await db.from("businesses").select("max_admin_seats").eq("id", businessId).maybeSingle();
+  const { data: biz } = await db.from("businesses")
+    .select("max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+    .eq("id", businessId).maybeSingle();
   const seats = Math.max(1, Number(biz?.max_admin_seats || 1));
   const extraSeats = Math.max(0, seats - Number(plan?.seat_limit || 1));
   const monthlyPriceZar = Number(plan?.monthly_price_zar || 0) + extraSeats * Number(plan?.extra_seat_price_zar || 0);
@@ -61,7 +63,22 @@ export async function POST(req: NextRequest) {
     (pauseRows || []) as any, sub.status, asOfDate,
   );
   const proRated = activeDays !== totalDays;
-  const amountZar = Math.round(monthlyPriceZar * (activeDays / totalDays) * 100) / 100;
+  const subscriptionZar = Math.round(monthlyPriceZar * (activeDays / totalDays) * 100) / 100;
+
+  // Email overage for the invoiced month — same formula as the tenant's own
+  // billing page (/api/billing/subscription), so the invoice matches what the
+  // operator already sees there. Usage-based: never pro-rated.
+  const { data: usage } = await db.from("marketing_usage_monthly")
+    .select("emails_sent")
+    .eq("business_id", businessId)
+    .eq("period", period)
+    .maybeSingle();
+  const { overageEmails, overageZar } = computeEmailOverage(
+    Number(usage?.emails_sent || 0),
+    Number(biz?.marketing_included_emails || 0),
+    Number(biz?.marketing_overage_rate_zar || 0),
+  );
+  const amountZar = Math.round((subscriptionZar + overageZar) * 100) / 100;
 
   const { data: invoice, error: insertErr } = await db.from("platform_invoices").insert({
     business_id: businessId,
@@ -74,6 +91,8 @@ export async function POST(req: NextRequest) {
     total_days: totalDays,
     pro_rated: proRated,
     pause_note: buildPauseNote(pauseWindows),
+    email_overage_count: overageEmails,
+    email_overage_zar: overageZar,
     amount_zar: amountZar,
     status: "DRAFT",
   }).select("*").single();
@@ -91,7 +110,7 @@ export async function POST(req: NextRequest) {
     action_type: "PLATFORM_INVOICE_GENERATED",
     target_entity: "platform_invoices",
     target_id: invoice.id,
-    after_state: { amount_zar: amountZar, active_days: activeDays, total_days: totalDays, pro_rated: proRated },
+    after_state: { amount_zar: amountZar, email_overage_zar: overageZar, active_days: activeDays, total_days: totalDays, pro_rated: proRated },
   });
 
   return NextResponse.json({ ok: true, invoice });

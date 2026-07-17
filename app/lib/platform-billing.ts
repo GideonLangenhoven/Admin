@@ -27,6 +27,16 @@ export function monthBounds(period: string): { periodStart: string; periodEnd: s
   return { periodStart, periodEnd };
 }
 
+// Email overage for a billed month: emails sent beyond the included quota,
+// charged at the per-email rate. Same formula as /api/billing/subscription's
+// tenant-facing panel so the invoice always matches what the operator sees.
+// Usage-based, so never pro-rated.
+export function computeEmailOverage(sent: number, included: number, ratePerEmailZar: number): { overageEmails: number; overageZar: number } {
+  const overageEmails = Math.max(0, Math.floor(sent) - Math.floor(included));
+  const overageZar = Math.round(overageEmails * ratePerEmailZar * 100) / 100;
+  return { overageEmails, overageZar };
+}
+
 function toUtcDate(isoLike: string): Date {
   const d = new Date(isoLike);
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

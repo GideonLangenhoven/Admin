@@ -522,10 +522,14 @@ Deno.serve(withSentry("web-chat", async (req) => {
             priority: "HIGH", current_intent: intent, updated_at: nowIso,
           });
         }
-        await db.from("chat_messages").insert([
-          { business_id: requestedBusinessId, phone: phoneKey, direction: "IN", body: customerMsg, sender: name, sender_type: "CUSTOMER", intent },
+        // PostgREST bulk inserts require identical keys on every row (PGRST102),
+        // so both rows must carry auto_replied — a mismatch silently dropped the
+        // whole pair and operators got empty handoff threads.
+        const { error: handoffMsgErr } = await db.from("chat_messages").insert([
+          { business_id: requestedBusinessId, phone: phoneKey, direction: "IN", body: customerMsg, sender: name, sender_type: "CUSTOMER", auto_replied: false, intent },
           { business_id: requestedBusinessId, phone: phoneKey, direction: "OUT", body: botReply, sender: "Bot", sender_type: "BOT", auto_replied: true, intent },
         ]);
+        if (handoffMsgErr) console.error("WEBCHAT_HANDOFF_MSG_ERR", handoffMsgErr);
       } catch (e) { console.error("WEBCHAT_HANDOFF_ERR", e); }
     }
 
