@@ -36,9 +36,10 @@ describe("item 17 — request change reaches the operator", () => {
 describe("item 19 — broadcast WhatsApp 24h-window routing", () => {
   const broadcast = readFileSync("supabase/functions/broadcast/index.ts", "utf8");
   const waText = readFileSync("supabase/functions/send-whatsapp-text/index.ts", "utf8");
-  it("broadcast passes the approved admin_outreach template as out-of-window fallback", () => {
+  it("broadcast passes the approved reopener template as out-of-window fallback", () => {
     expect(broadcast).toContain("template_fallback");
-    expect(broadcast).toContain('name: "admin_outreach"');
+    expect(broadcast).toContain("name: reopenerName");
+    expect(broadcast).toContain('"booking_update_reopener"');
   });
   it("broadcast logs per-recipient channel routing and falls back to email", () => {
     expect(broadcast).toContain("channelCounts");
