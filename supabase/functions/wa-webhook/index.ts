@@ -3,10 +3,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
+  getBusinessDisplayName,
   resolveBusinessSiteUrls,
   resolveManageBookingsUrl,
   resolveTenantByWhatsappPayload,
   sendWhatsappFreeformOrSignal,
+  sendWhatsappTemplate,
   recordWaMessage,
   type TenantContext,
 } from "../_shared/tenant.ts";
@@ -3097,7 +3099,83 @@ Deno.serve(async (req: any) => {
 
       const body = JSON.parse(rawBody);
       const tenant = await resolveTenantByWhatsappPayload(supabase, body);
-      const message = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0];
+      const value = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value;
+      const message = value && value.messages && value.messages[0];
+
+      // ── Delivery-status callbacks (value.statuses) ──────────────────────
+      // Meta ACCEPTS an out-of-window free-form send (we log SENT with a
+      // message id) and only reports the failure here, asynchronously, as a
+      // "failed" status with error 131047/131026. These used to be silently
+      // dropped: the admin saw "sent", the customer got nothing, and the
+      // reopener fallback in admin-reply never fired because it only catches
+      // the synchronous form of the error. Recover the same way admin-reply
+      // does: flip the audit row to FAILED, queue the undelivered message in
+      // outbox (drained on the customer's next reply), and send the
+      // pre-approved reopener template so the customer knows to reply.
+      if (!message && Array.isArray(value?.statuses) && value.statuses.length) {
+        for (const st of value.statuses) {
+          try {
+            if (st?.status !== "failed") continue;
+            const errCode = Number(st?.errors?.[0]?.code || 0);
+            const errMsg = String(st?.errors?.[0]?.message || st?.errors?.[0]?.title || "delivery failed");
+            const providerId = String(st?.id || "");
+            if (!providerId) continue;
+            const { data: original } = await supabase.from("wa_messages")
+              .select("id, kind, body, booking_id, to_phone, status")
+              .eq("business_id", tenant.business.id)
+              .eq("provider_message_id", providerId)
+              .maybeSingle();
+            // Already FAILED = this status was processed before (Meta retries
+            // webhooks) — skip so we don't queue/reopen twice.
+            if (!original || original.status === "FAILED") continue;
+            await supabase.from("wa_messages")
+              .update({ status: "FAILED", error: errCode + ": " + errMsg })
+              .eq("id", original.id);
+            const windowClosed = errCode === 131047 || errCode === 131026;
+            // Only recover free-form text. A failed TEMPLATE send must never
+            // trigger another template — that would loop.
+            if (!windowClosed || original.kind !== "text" || !original.body) continue;
+            const failedPhone = String(original.to_phone || st?.recipient_id || "");
+            if (!failedPhone) continue;
+            await supabase.from("outbox").insert({
+              business_id: tenant.business.id,
+              booking_id: original.booking_id || null,
+              phone: failedPhone,
+              message_type: "WINDOW_CLOSED_RETRY",
+              message_body: original.body,
+              scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
+              status: "WAITING_WINDOW",
+            });
+            // At most one reopener per phone per hour — a burst of failed
+            // sends queues every message but pings the customer once.
+            const reopenerName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+            const { data: recentReopener } = await supabase.from("wa_messages")
+              .select("id")
+              .eq("business_id", tenant.business.id)
+              .eq("to_phone", failedPhone)
+              .eq("kind", "template")
+              .eq("template_name", reopenerName)
+              .eq("status", "SENT")
+              .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+              .limit(1);
+            if (!(recentReopener || []).length) {
+              let firstName = "there";
+              const { data: convo } = await supabase.from("conversations")
+                .select("customer_name")
+                .eq("business_id", tenant.business.id)
+                .eq("phone", failedPhone)
+                .maybeSingle();
+              if (convo?.customer_name) firstName = String(convo.customer_name).split(" ")[0];
+              await sendWhatsappTemplate(tenant, failedPhone, reopenerName, [firstName, getBusinessDisplayName(tenant.business)]);
+            }
+            console.log("WA_STATUS_RECOVERY: msg " + providerId + " failed (" + errCode + ") — queued + reopener for " + failedPhone);
+          } catch (stErr) {
+            console.error("WA_STATUS_HANDLER_ERR:", stErr);
+          }
+        }
+        return new Response("OK", { status: 200 });
+      }
+
       if (!message) return new Response("OK", { status: 200 });
 
       // ── 2. Idempotency: dedup via processed_wa_messages (id TEXT PK) ──
