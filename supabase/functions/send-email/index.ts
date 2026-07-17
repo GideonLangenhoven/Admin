@@ -1310,7 +1310,7 @@ function cancellationHtml(d: Record<string, unknown>) {
     ? `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. As the cancellation falls within 24 hours of the trip start, the booking amount is forfeited in line with our cancellation policy. If you believe this is a mistake, just reply to this email.`
     : isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
-    : `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. We sincerely apologise for the inconvenience.`;
+    : "Unfortunately, your trip has been cancelled. We sincerely apologise for the inconvenience.";
 
   const amountRow = d.total_amount ? `<tr>
                 <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Amount Paid:</td>

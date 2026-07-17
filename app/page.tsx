@@ -40,77 +40,77 @@ const DEFAULT_LOCATIONS: WeatherLocation[] = [
     { id: "8", name: "Camps Bay", lat: -33.95, lon: 18.38, wgSpot: 635326 },
     { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 331265 },
     // Western Cape
-    { id: "10", name: "Cape Town", lat: -33.9249, lon: 18.4241 },
-    { id: "11", name: "Stellenbosch & Winelands", lat: -33.9321, lon: 18.8602 },
-    { id: "12", name: "Franschhoek", lat: -33.9107, lon: 19.1229 },
-    { id: "13", name: "Hermanus", lat: -34.4187, lon: 19.2345 },
-    { id: "14", name: "Gansbaai", lat: -34.5825, lon: 19.3527 },
-    { id: "15", name: "Mossel Bay", lat: -34.1830, lon: 22.1460 },
-    { id: "16", name: "Wilderness", lat: -33.9967, lon: 22.5827 },
-    { id: "17", name: "Knysna", lat: -34.0363, lon: 23.0471 },
-    { id: "18", name: "Plettenberg Bay", lat: -34.0527, lon: 23.3716 },
-    { id: "19", name: "Oudtshoorn", lat: -33.5906, lon: 22.2014 },
-    { id: "20", name: "Cederberg", lat: -32.4500, lon: 19.0333 },
-    { id: "21", name: "Langebaan & West Coast", lat: -33.0930, lon: 18.0342 },
-    { id: "22", name: "Paternoster", lat: -32.8118, lon: 17.8955 },
-    { id: "23", name: "Swellendam & Overberg", lat: -34.0231, lon: 20.4380 },
+    { id: "10", name: "Cape Town", lat: -33.9249, lon: 18.4241, wgSpot: 91 },
+    { id: "11", name: "Stellenbosch & Winelands", lat: -33.9321, lon: 18.8602, wgSpot: 1335686 },
+    { id: "12", name: "Franschhoek", lat: -33.9107, lon: 19.1229, wgSpot: 1235816 },
+    { id: "13", name: "Hermanus", lat: -34.4187, lon: 19.2345, wgSpot: 962669 },
+    { id: "14", name: "Gansbaai", lat: -34.5825, lon: 19.3527, wgSpot: 1063835 },
+    { id: "15", name: "Mossel Bay", lat: -34.1830, lon: 22.1460, wgSpot: 51683 },
+    { id: "16", name: "Wilderness", lat: -33.9967, lon: 22.5827, wgSpot: 146934 },
+    { id: "17", name: "Knysna", lat: -34.0363, lon: 23.0471, wgSpot: 51685 },
+    { id: "18", name: "Plettenberg Bay", lat: -34.0527, lon: 23.3716, wgSpot: 288275 },
+    { id: "19", name: "Oudtshoorn", lat: -33.5906, lon: 22.2014, wgSpot: 240562 },
+    { id: "20", name: "Cederberg", lat: -32.4500, lon: 19.0333, wgSpot: 569377 },
+    { id: "21", name: "Langebaan & West Coast", lat: -33.0930, lon: 18.0342, wgSpot: 21691 },
+    { id: "22", name: "Paternoster", lat: -32.8118, lon: 17.8955, wgSpot: 268656 },
+    { id: "23", name: "Swellendam & Overberg", lat: -34.0231, lon: 20.4380, wgSpot: 90737 },
     // Eastern Cape
-    { id: "24", name: "Tsitsikamma & Storms River", lat: -33.9667, lon: 23.8833 },
-    { id: "25", name: "Jeffreys Bay", lat: -34.0507, lon: 24.9307 },
-    { id: "26", name: "Gqeberha (Port Elizabeth)", lat: -33.9608, lon: 25.6022 },
-    { id: "27", name: "Addo", lat: -33.4833, lon: 25.7500 },
-    { id: "28", name: "Hogsback", lat: -32.5967, lon: 26.9500 },
-    { id: "29", name: "Coffee Bay & Wild Coast", lat: -32.1833, lon: 29.1333 },
-    { id: "30", name: "East London", lat: -33.0153, lon: 27.9116 },
-    { id: "31", name: "Graaff-Reinet & Karoo Heartland", lat: -32.2522, lon: 24.5308 },
+    { id: "24", name: "Tsitsikamma & Storms River", lat: -33.9667, lon: 23.8833, wgSpot: 269360 },
+    { id: "25", name: "Jeffreys Bay", lat: -34.0507, lon: 24.9307, wgSpot: 943842 },
+    { id: "26", name: "Gqeberha (Port Elizabeth)", lat: -33.9608, lon: 25.6022, wgSpot: 51679 },
+    { id: "27", name: "Addo", lat: -33.4833, lon: 25.7500, wgSpot: 1136214 },
+    { id: "28", name: "Hogsback", lat: -32.5967, lon: 26.9500, wgSpot: 188928 },
+    { id: "29", name: "Coffee Bay & Wild Coast", lat: -32.1833, lon: 29.1333, wgSpot: 1011788 },
+    { id: "30", name: "East London", lat: -33.0153, lon: 27.9116, wgSpot: 402607 },
+    { id: "31", name: "Graaff-Reinet & Karoo Heartland", lat: -32.2522, lon: 24.5308, wgSpot: 794980 },
     // KwaZulu-Natal
-    { id: "32", name: "Durban", lat: -29.8587, lon: 31.0218 },
-    { id: "33", name: "Umhlanga & Ballito", lat: -29.7248, lon: 31.0873 },
-    { id: "34", name: "Drakensberg", lat: -29.0000, lon: 29.4167 },
-    { id: "35", name: "Sani Pass & Southern Berg", lat: -29.5833, lon: 29.2833 },
-    { id: "36", name: "Midlands Meander", lat: -29.4833, lon: 30.1500 },
-    { id: "37", name: "St Lucia & iSimangaliso", lat: -28.3833, lon: 32.4167 },
-    { id: "38", name: "Sodwana Bay", lat: -27.5333, lon: 32.6833 },
-    { id: "39", name: "Hluhluwe–iMfolozi", lat: -28.2000, lon: 31.9333 },
-    { id: "40", name: "Umkomaas & Aliwal Shoal", lat: -30.2000, lon: 30.7833 },
-    { id: "41", name: "Margate & South Coast", lat: -30.8667, lon: 30.3667 },
+    { id: "32", name: "Durban", lat: -29.8587, lon: 31.0218, wgSpot: 208311 },
+    { id: "33", name: "Umhlanga & Ballito", lat: -29.7248, lon: 31.0873, wgSpot: 1113775 },
+    { id: "34", name: "Drakensberg", lat: -29.0000, lon: 29.4167, wgSpot: 779873 },
+    { id: "35", name: "Sani Pass & Southern Berg", lat: -29.5833, lon: 29.2833, wgSpot: 380948 },
+    { id: "36", name: "Midlands Meander", lat: -29.4833, lon: 30.1500, wgSpot: 541246 },
+    { id: "37", name: "St Lucia & iSimangaliso", lat: -28.3833, lon: 32.4167, wgSpot: 51053 },
+    { id: "38", name: "Sodwana Bay", lat: -27.5333, lon: 32.6833, wgSpot: 111152 },
+    { id: "39", name: "Hluhluwe–iMfolozi", lat: -28.2000, lon: 31.9333, wgSpot: 706381 },
+    { id: "40", name: "Umkomaas & Aliwal Shoal", lat: -30.2000, lon: 30.7833, wgSpot: 722020 },
+    { id: "41", name: "Margate & South Coast", lat: -30.8667, lon: 30.3667, wgSpot: 1079383 },
     // Gauteng
-    { id: "42", name: "Johannesburg", lat: -26.2041, lon: 28.0473 },
-    { id: "43", name: "Soweto", lat: -26.2485, lon: 27.8540 },
-    { id: "44", name: "Pretoria", lat: -25.7479, lon: 28.2293 },
-    { id: "45", name: "Cradle of Humankind", lat: -25.9019, lon: 27.7364 },
-    { id: "46", name: "Magaliesberg & Hartbeespoort", lat: -25.7469, lon: 27.8674 },
-    { id: "47", name: "Vaal River & Parys", lat: -26.8965, lon: 27.4614 },
+    { id: "42", name: "Johannesburg", lat: -26.2041, lon: 28.0473, wgSpot: 85097 },
+    { id: "43", name: "Soweto", lat: -26.2485, lon: 27.8540, wgSpot: 279047 },
+    { id: "44", name: "Pretoria", lat: -25.7479, lon: 28.2293, wgSpot: 353639 },
+    { id: "45", name: "Cradle of Humankind", lat: -25.9019, lon: 27.7364, wgSpot: 1144781 },
+    { id: "46", name: "Magaliesberg & Hartbeespoort", lat: -25.7469, lon: 27.8674, wgSpot: 736570 },
+    { id: "47", name: "Vaal River & Parys", lat: -26.8965, lon: 27.4614, wgSpot: 111339 },
     // Mpumalanga
-    { id: "48", name: "Kruger National Park (South)", lat: -24.9945, lon: 31.5892 },
-    { id: "49", name: "Hazyview", lat: -25.0448, lon: 31.1315 },
-    { id: "50", name: "Sabie & Graskop", lat: -24.9333, lon: 30.8333 },
-    { id: "51", name: "Blyde River Canyon", lat: -24.5833, lon: 30.8167 },
-    { id: "52", name: "Mbombela (Nelspruit)", lat: -25.4753, lon: 30.9700 },
-    { id: "53", name: "Dullstroom", lat: -25.4167, lon: 30.1058 },
+    { id: "48", name: "Kruger National Park (South)", lat: -24.9945, lon: 31.5892, wgSpot: 394498 },
+    { id: "49", name: "Hazyview", lat: -25.0448, lon: 31.1315, wgSpot: 146938 },
+    { id: "50", name: "Sabie & Graskop", lat: -24.9333, lon: 30.8333, wgSpot: 121369 },
+    { id: "51", name: "Blyde River Canyon", lat: -24.5833, lon: 30.8167, wgSpot: 79015 },
+    { id: "52", name: "Mbombela (Nelspruit)", lat: -25.4753, lon: 30.9700, wgSpot: 450015 },
+    { id: "53", name: "Dullstroom", lat: -25.4167, lon: 30.1058, wgSpot: 272288 },
     // Limpopo
-    { id: "54", name: "Hoedspruit & Kruger (Central)", lat: -24.3547, lon: 30.9581 },
-    { id: "55", name: "Phalaborwa & Kruger (North)", lat: -23.9425, lon: 31.1400 },
-    { id: "56", name: "Waterberg", lat: -24.1517, lon: 28.1170 },
-    { id: "57", name: "Bela-Bela", lat: -24.8833, lon: 28.2833 },
-    { id: "58", name: "Tzaneen & Magoebaskloof", lat: -23.8333, lon: 30.1667 },
+    { id: "54", name: "Hoedspruit & Kruger (Central)", lat: -24.3547, lon: 30.9581, wgSpot: 815368 },
+    { id: "55", name: "Phalaborwa & Kruger (North)", lat: -23.9425, lon: 31.1400, wgSpot: 540529 },
+    { id: "56", name: "Waterberg", lat: -24.1517, lon: 28.1170, wgSpot: 127207 },
+    { id: "57", name: "Bela-Bela", lat: -24.8833, lon: 28.2833, wgSpot: 400504 },
+    { id: "58", name: "Tzaneen & Magoebaskloof", lat: -23.8333, lon: 30.1667, wgSpot: 737300 },
     // North West
-    { id: "59", name: "Pilanesberg", lat: -25.2333, lon: 27.1167 },
-    { id: "60", name: "Sun City", lat: -25.3400, lon: 27.0950 },
-    { id: "61", name: "Madikwe", lat: -24.7833, lon: 26.2667 },
-    { id: "62", name: "Rustenburg & Kgaswane", lat: -25.6672, lon: 27.2424 },
+    { id: "59", name: "Pilanesberg", lat: -25.2333, lon: 27.1167, wgSpot: 85507 },
+    { id: "60", name: "Sun City", lat: -25.3400, lon: 27.0950, wgSpot: 1173168 },
+    { id: "61", name: "Madikwe", lat: -24.7833, lon: 26.2667, wgSpot: 307029 },
+    { id: "62", name: "Rustenburg & Kgaswane", lat: -25.6672, lon: 27.2424, wgSpot: 122357 },
     // Free State
-    { id: "63", name: "Clarens", lat: -28.5167, lon: 28.4167 },
-    { id: "64", name: "Golden Gate Highlands", lat: -28.5167, lon: 28.6167 },
-    { id: "65", name: "Gariep Dam", lat: -30.6167, lon: 25.5000 },
-    { id: "66", name: "Bloemfontein", lat: -29.0852, lon: 26.1596 },
+    { id: "63", name: "Clarens", lat: -28.5167, lon: 28.4167, wgSpot: 214022 },
+    { id: "64", name: "Golden Gate Highlands", lat: -28.5167, lon: 28.6167, wgSpot: 1327626 },
+    { id: "65", name: "Gariep Dam", lat: -30.6167, lon: 25.5000, wgSpot: 283149 },
+    { id: "66", name: "Bloemfontein", lat: -29.0852, lon: 26.1596, wgSpot: 151425 },
     // Northern Cape
-    { id: "67", name: "Augrabies Falls", lat: -28.5883, lon: 20.3486 },
-    { id: "68", name: "Upington & Orange River", lat: -28.4478, lon: 21.2561 },
-    { id: "69", name: "Kgalagadi", lat: -26.4833, lon: 20.6167 },
-    { id: "70", name: "Namaqualand & Springbok", lat: -29.6644, lon: 17.8865 },
-    { id: "71", name: "Sutherland", lat: -32.3833, lon: 20.6667 },
-    { id: "72", name: "Kimberley", lat: -28.7282, lon: 24.7499 },
+    { id: "67", name: "Augrabies Falls", lat: -28.5883, lon: 20.3486, wgSpot: 985104 },
+    { id: "68", name: "Upington & Orange River", lat: -28.4478, lon: 21.2561, wgSpot: 540496 },
+    { id: "69", name: "Kgalagadi", lat: -26.4833, lon: 20.6167, wgSpot: 183544 },
+    { id: "70", name: "Namaqualand & Springbok", lat: -29.6644, lon: 17.8865, wgSpot: 607288 },
+    { id: "71", name: "Sutherland", lat: -32.3833, lon: 20.6667, wgSpot: 228811 },
+    { id: "72", name: "Kimberley", lat: -28.7282, lon: 24.7499, wgSpot: 454036 },
 ];
 
 /* ── Windguru Widget (lazy-loaded to reduce initial bundle) ── */
@@ -336,19 +336,24 @@ export default function Dashboard() {
                             { headers: { Accept: "application/json", Referer: "https://www.windguru.cz/" } }
                         );
                         const wgData = await wgRes.json();
-                        if (Array.isArray(wgData) && wgData.length > 0) {
-                            // Pick closest by distance if coordinates are present, otherwise first result
-                            let best = wgData[0];
-                            if (wgData[0].lat != null && wgData[0].lon != null) {
-                                let minDist = Infinity;
-                                for (const spot of wgData) {
-                                    if (spot.lat == null || spot.lon == null) continue;
-                                    const d = (spot.lat - lat) ** 2 + (spot.lon - lon) ** 2;
-                                    if (d < minDist) { minDist = d; best = spot; }
-                                }
-                            }
-                            if (best?.id_spot) setNewLocWg(String(best.id_spot));
+                        // The API returns {count, spots:[...]} without coordinates
+                        // (the old bare-array + lat/lon parsing never matched, so
+                        // auto-fill silently did nothing). Fetch details for the
+                        // first few results and pick the closest to the geocode.
+                        const spots: Array<{ id_spot?: string }> = Array.isArray(wgData?.spots) ? wgData.spots : [];
+                        let best: string | null = null;
+                        let minDist = Infinity;
+                        for (const spot of spots.slice(0, 5)) {
+                            if (!spot.id_spot) continue;
+                            try {
+                                const detRes = await fetch(`https://www.windguru.cz/int/iapi.php?q=spot&id_spot=${spot.id_spot}`, { headers: { Accept: "application/json", Referer: "https://www.windguru.cz/" } });
+                                const det = await detRes.json();
+                                if (det?.lat == null || det?.lon == null) continue;
+                                const d = (det.lat - lat) ** 2 + (det.lon - lon) ** 2;
+                                if (d < minDist) { minDist = d; best = String(spot.id_spot); }
+                            } catch { /* skip unfetchable spot */ }
                         }
+                        if (best) setNewLocWg(best);
                     } catch {
                         // Windguru search failed (CORS or network) — silently skip, user can enter manually
                     }

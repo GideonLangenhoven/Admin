@@ -50,6 +50,13 @@ describe("item 19 — broadcast WhatsApp 24h-window routing", () => {
     expect(waText).toContain("ok: false");
     expect(waText).toContain("via_template");
   });
+  it("broadcast email nests business_id inside data so tenant branding resolves", () => {
+    // send-email's branding resolver only reads data.business_id; a top-level
+    // business_id makes broadcasts send from the platform instead of the operator.
+    const sendEmailCall = broadcast.slice(broadcast.indexOf('type: "BROADCAST"'));
+    const dataBlock = sendEmailCall.slice(sendEmailCall.indexOf("data: {"), sendEmailCall.indexOf("}"));
+    expect(dataBlock).toContain("business_id");
+  });
 });
 
 describe("item 20 — Close vs Cancel are distinct slot actions", () => {

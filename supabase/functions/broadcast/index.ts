@@ -225,8 +225,12 @@ Deno.serve(async (req: Request) => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
             body: JSON.stringify({
               type: "BROADCAST",
-              business_id,
               data: {
+                // business_id must live INSIDE data — send-email's branding
+                // resolver only reads data.business_id, so the old top-level
+                // placement made every broadcast fall back to the platform
+                // sender instead of the operator's brand.
+                business_id,
                 email: b.email,
                 customer_name: b.customer_name,
                 message: parsedMessage,
