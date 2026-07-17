@@ -153,6 +153,13 @@ function tenantTodayKey(tenant: TenantContext): string {
   }).format(new Date());
 }
 
+function tenantDateKey(tenant: TenantContext, iso: any): string {
+  // en-CA gives YYYY-MM-DD (same trick as tenantTodayKey)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tenantTimeZone(tenant), year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(iso));
+}
+
 function addDaysToKey(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d, 12)); // noon UTC avoids DST edges
@@ -1841,46 +1848,65 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
       let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + ", nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      const dateMap: any = {};
       try {
         const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
           .lte("start_time", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
           .order("start_time", { ascending: true });
         const pvSlots = previewSlots.data || [];
-        // Group by date
+        // Group by tenant-local date key (chronological via slot ordering)
         const pvDays: any = {};
         for (let pvi = 0; pvi < pvSlots.length; pvi++) {
           const pvs = pvSlots[pvi];
-          const pvDate = formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" });
-          if (!pvDays[pvDate]) pvDays[pvDate] = { open: 0, closed: 0, full: 0 };
-          if (pvs.status !== "OPEN") { pvDays[pvDate].closed++; }
-          else if (pvs.capacity_total - pvs.booked - (pvs.held || 0) < qty) { pvDays[pvDate].full++; }
-          else { pvDays[pvDate].open++; }
+          const pvKey = tenantDateKey(tenant, pvs.start_time);
+          if (!pvDays[pvKey]) pvDays[pvKey] = { label: formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" }), open: 0, closed: 0, full: 0 };
+          if (pvs.status !== "OPEN") { pvDays[pvKey].closed++; }
+          else if (pvs.capacity_total - pvs.booked - (pvs.held || 0) < qty) { pvDays[pvKey].full++; }
+          else { pvDays[pvKey].open++; }
         }
         const pvKeys = Object.keys(pvDays);
         let pvShown = 0;
+        // Numbered list + date_map so a customer replying "2" picks option 2
+        // (a bare "2" used to fall through to the LLM date extractor, which
+        // hallucinated "02 Feb" \u2014 see PICK_DATE bare-number guard).
         for (let pvk = 0; pvk < pvKeys.length && pvShown < 5; pvk++) {
           const pvd = pvDays[pvKeys[pvk]];
-          if (pvd.open > 0) { previewMsg += "\u2022 " + pvKeys[pvk] + ": " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
-          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += "\u2022 " + pvKeys[pvk] + ": \u274C Closed (weather)\n"; }
-          else { previewMsg += "\u2022 " + pvKeys[pvk] + ": Fully booked\n"; }
           pvShown++;
+          dateMap[pvShown] = pvKeys[pvk];
+          if (pvd.open > 0) { previewMsg += pvShown + ". " + pvd.label + ": " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
+          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += pvShown + ". " + pvd.label + ": \u274C Closed (weather)\n"; }
+          else { previewMsg += pvShown + ". " + pvd.label + ": Fully booked\n"; }
         }
-        if (pvShown > 0) { previewMsg += "\nType a date to see times!"; }
+        if (pvShown > 0) { previewMsg += "\nReply with a number, or type a date (e.g. 'Saturday' or '20 Jul')"; }
         else { previewMsg += "No upcoming trips in the next week. Type any date to check!"; }
       } catch (pvErr) { previewMsg += "\nType a date to see times! (e.g., 'Tomorrow' or '1 September')"; }
       await sendText(tenant, phone, previewMsg);
-      await setConvo(convo.id, { current_state: "PICK_DATE", state_data: { ...sd, qty: qty } });
+      await setConvo(convo.id, { current_state: "PICK_DATE", state_data: { ...sd, qty: qty, date_map: dateMap } });
     }
 
     // ===== PICK DATE (new step) =====
     else if (state === "PICK_DATE") {
       let pickedDate = "";
 
+      // Bare number = pick from the numbered date list (date_map set in ASK_QTY).
+      // A bare number must NEVER reach the LLM date extractor: a customer who
+      // replied "2" to the list had it hallucinated into "02 Feb".
+      const bareNum = rawText ? rawText.trim().match(/^(\d{1,2})\.?$/) : null;
+      if (bareNum) {
+        const bn = Number(bareNum[1]);
+        if (sd.date_map && sd.date_map[bn]) {
+          pickedDate = sd.date_map[bn];
+        } else {
+          await sendText(tenant, phone, "Just to be sure I book the right day, please type the full date. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+          return;
+        }
+      }
+
       // Local parsing FIRST — the bot must understand "tomorrow"/"monday"/"6 july"
       // even when the LLM is down (a silent Gemini outage used to reject every
       // date and trap customers in a loop here).
-      if (rawText) {
+      if (!pickedDate && rawText) {
         pickedDate = parseLocalDate(tenant, rawText) || "";
       }
 
@@ -1902,6 +1928,19 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       if (!pickedDate) {
         await sendText(tenant, phone, "Sorry, I didn't catch that date. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+        return;
+      }
+
+      // Sanity guard: the LLM fallback (and explicit typed years) can produce
+      // past or absurdly distant dates. Catch them here instead of replying
+      // "no trips scheduled for 02 Feb".
+      const pdTodayKey = tenantTodayKey(tenant);
+      if (pickedDate < pdTodayKey) {
+        await sendText(tenant, phone, "That date has already passed. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+        return;
+      }
+      if (pickedDate > addDaysToKey(pdTodayKey, 365)) {
+        await sendText(tenant, phone, "We can only take bookings up to a year ahead. Try a closer date!");
         return;
       }
 
@@ -2000,7 +2039,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (!isNaN(num) && sd.slot_map && sd.slot_map[num]) {
         slotId = sd.slot_map[num];
       }
-      if (!slotId) { await sendText(tenant, phone, "Please reply with a valid number from the list."); return; }
+      if (!slotId) {
+        // Forgive a typed date here (customers often answer the time list with
+        // a new date) — redispatch to PICK_DATE instead of trapping them.
+        const psDate = rawText ? parseLocalDate(tenant, rawText) : null;
+        if (psDate) { await setConvo(convo.id, { current_state: "PICK_DATE" }); await handleMsg(tenant, phone, rawText, "text"); return; }
+        await sendText(tenant, phone, "Please reply with a number from the list, or type a different date.");
+        return;
+      }
       const sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
       const slot = sr2.data;
       if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date. Type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
@@ -2010,7 +2056,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time from the list (reply with its number), or type *menu* to start over."); return; }
       const slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
       const slotAvail = Number(slotAvailRes.data || 0);
-      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      // Stay in PICK_SLOT: "another option from the list" must keep working
+      // (this used to reset to PICK_DATE, so replying "3" hit the date parser).
+      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); return; }
 
       if (sd.is_reschedule) {
         await sendText(tenant, phone, "Processing your change... \u23F3");
@@ -2530,9 +2578,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Check if redeemed
         const vUsed = await supabase.from("vouchers").select("status").eq("code", code).eq("business_id", tenant.business.id).single();
         if (vUsed.data && vUsed.data.status === "REDEEMED") {
+          // No booking in progress here (this state is entered from the menu),
+          // so never route to CONFIRM_BOOKING \u2014 its buttons led to a phantom
+          // booking flow with no slot/qty in state_data.
           await sendText(tenant, phone, "This voucher has already been redeemed. Each voucher code can only be used once.");
-          await sendButtons(tenant, phone, "Options:", [{ id: "ADD_VOUCHER", title: "\u{1F39F} Try Another" }, { id: "CONFIRM", title: "\u2705 Continue" }, { id: "IDLE", title: "\u2B05 Back" }]);
-          await setConvo(convo.id, { current_state: "CONFIRM_BOOKING" }); return;
+          await sendButtons(tenant, phone, "Options:", [{ id: "REDEEM_VOUCHER", title: "\u{1F39F} Try Another Code" }, { id: "HUMAN", title: "\u{1F4AC} Get Help" }, { id: "IDLE", title: "\u2B05 Back" }]);
+          await setConvo(convo.id, { current_state: "MENU" }); return;
         }
         await sendText(tenant, phone, "Hmm, that code doesn\u2019t seem to be valid. Check for typos and try again, or type *speak to us* for help.");
         await sendButtons(tenant, phone, "Options:", [{ id: "VOUCHER", title: "\u{1F39F} Try Again" }, { id: "HUMAN", title: "\u{1F4AC} Get Help" }, { id: "IDLE", title: "\u2B05 Back" }]);
