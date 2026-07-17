@@ -8031,7 +8031,7 @@
       "policyname": "tenant_health_superadmin_select",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
       "with_check": null
     },
     {
