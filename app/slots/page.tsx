@@ -11,7 +11,6 @@ import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
-import { CloudRain, LockKeyOpen, Lock, WarningCircle, Plus, Stack, PencilSimple } from "@phosphor-icons/react";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -90,7 +89,7 @@ function Slots() {
   async function cancelSlotWeather(slot: Slot) {
     const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
-    }) + " — " + (slot.tours?.name || "Tour");
+    }) + ": " + (slot.tours?.name || "Tour");
 
     if (!await confirmAction({
       title: "Cancel slot due to weather",
@@ -138,7 +137,7 @@ function Slots() {
     if (!await confirmAction({
       title: "Close this slot?",
       message: bookedSeats > 0
-        ? `This stops NEW bookings only. The ${bookedSeats} seat(s) already booked keep their trip — nobody is notified. To cancel those trips instead, use "Cancel & notify guests".`
+        ? `This stops NEW bookings only. The ${bookedSeats} seat(s) already booked keep their trip; nobody is notified. To cancel those trips instead, use "Cancel & notify guests".`
         : "This stops new bookings for this slot. It has no bookings yet, so nothing else changes. You can reopen it any time.",
       tone: "info",
       confirmLabel: "Close slot",
@@ -179,7 +178,7 @@ function Slots() {
     const bookedSeats = slot.booked || 0;
     const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
-    }) + " — " + (slot.tours?.name || "Tour");
+    }) + ": " + (slot.tours?.name || "Tour");
     if (!await confirmAction({
       title: isWeather ? "Weather-cancel this trip?" : "Cancel this trip for all guests?",
       message: bookedSeats > 0
@@ -704,7 +703,7 @@ function Slots() {
             }}
             className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-danger" : "ui-btn-ghost"}`}
           >
-            <CloudRain size={15} weight="bold" /> Cancel Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
+            Cancel Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
             onClick={() => {
@@ -720,25 +719,25 @@ function Slots() {
             }}
             className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-soft" : "ui-btn-ghost"}`}
           >
-            <LockKeyOpen size={15} weight="bold" /> Reopen Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
+            Reopen Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
             onClick={() => { if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours[0].id })); setShowAddSlot(true); }}
             className="ui-btn ui-btn-primary"
           >
-            <Plus size={15} weight="bold" /> Add Slot
+            Add Slot
           </button>
           <button
             onClick={() => setBulkGenOpen(true)}
             className="ui-btn ui-btn-soft"
           >
-            <Stack size={15} weight="bold" /> Bulk Generate
+            Bulk Generate
           </button>
           <button
             onClick={() => setShowBulkEdit(true)}
             className="ui-btn ui-btn-ghost"
           >
-            <PencilSimple size={15} weight="bold" /> Bulk Edit
+            Bulk Edit
           </button>
         </div>
       </div>
@@ -785,7 +784,7 @@ function Slots() {
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               {new Date(selectedSlot.start_time).toLocaleString("en-ZA", {
                 weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone()
-              })} — {selectedSlot.tours?.name}
+              })}: {selectedSlot.tours?.name}
             </p>
 
             <div className="mb-4 rounded-xl p-3 text-sm" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
@@ -795,7 +794,7 @@ function Slots() {
 
             <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
               style={{ background: selectedSlot.status === "OPEN" ? "var(--ck-success-soft, #e7f5ec)" : "var(--ck-surface-sunken)", color: selectedSlot.status === "OPEN" ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
-              {selectedSlot.status === "OPEN" ? "● Open — accepting bookings" : "○ Closed — not accepting new bookings"}
+              {selectedSlot.status === "OPEN" ? "● Open: accepting bookings" : "○ Closed: not accepting new bookings"}
             </div>
 
             <div className="space-y-4">
@@ -854,7 +853,6 @@ function Slots() {
                     className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
                     style={{ borderColor: "var(--ck-border-strong)" }}
                   >
-                    <Lock size={15} weight="bold" />
                     <span className="font-semibold">Close slot</span>
                   </button>
                 ) : (
@@ -864,7 +862,6 @@ function Slots() {
                     className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
                     style={{ borderColor: "var(--ck-border-strong)" }}
                   >
-                    <LockKeyOpen size={15} weight="bold" />
                     <span className="font-semibold">Reopen slot</span>
                   </button>
                 )}
@@ -873,7 +870,6 @@ function Slots() {
                   disabled={cancellingSlot || slotStatusSaving}
                   className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  <WarningCircle size={15} weight="bold" />
                   <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Cancel & notify guests"}</span>
                 </button>
                 <button
@@ -881,7 +877,6 @@ function Slots() {
                   disabled={cancellingSlot || slotStatusSaving}
                   className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  <CloudRain size={15} weight="bold" />
                   <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Weather cancel"}</span>
                 </button>
               </div>

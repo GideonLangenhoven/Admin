@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
-import { Boat, CaretRight, Check, Images, Phone, WhatsappLogo } from "@phosphor-icons/react";
+import { Check } from "@phosphor-icons/react";
 
 type Booking = {
   id: string;
@@ -98,7 +98,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     const token = session?.access_token || null;
     if (!token) {
       revert();
-      notify({ tone: "error", message: "Session expired — please sign in again to check in guests." });
+      notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
       return;
     }
 
@@ -115,7 +115,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         // Auth/validation failures are not retryable — revert and surface, never queue.
         if (r.status >= 400 && r.status < 500) {
           revert();
-          notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in — please sign in again." : "Check-in was rejected. Please refresh and try again." });
+          notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in. Please sign in again." : "Check-in was rejected. Please refresh and try again." });
           return;
         }
         throw new Error("server_error");
@@ -150,9 +150,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
           </div>
           <div className="flex items-center justify-between mt-2.5 text-[12px]">
             <span className="font-medium" style={{ color: "rgba(246,243,234,0.75)" }}>{totalPax} guest{totalPax !== 1 ? "s" : ""} aboard</span>
-            <Link href={"/guide/photos/" + slotId} className="font-semibold text-white inline-flex items-center gap-1">Trip photos
-              <CaretRight size={14} weight="bold" />
-            </Link>
+            <Link href={"/guide/photos/" + slotId} className="font-semibold text-white inline-flex items-center gap-1">Trip photos</Link>
           </div>
         </div>
       )}
@@ -163,9 +161,6 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
       {!loading && bookings.length === 0 && (
         <div className="ui-empty mt-6">
-          <div className="ui-icon-chip">
-            <Boat size={20} />
-          </div>
           <p className="text-[14px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No passengers on this trip yet.</p>
         </div>
       )}
@@ -189,12 +184,10 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                   {b.phone && (
                     <>
                       <a href={"tel:" + b.phone} className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-ocean)" }}>
-                        <Phone size={14} />
                         Call
                       </a>
                       <a href={"https://wa.me/" + b.phone.replace(/\D/g, "").replace(/^0/, "27")} target="_blank" rel="noreferrer"
                         className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-success)" }}>
-                        <WhatsappLogo size={14} />
                         WhatsApp
                       </a>
                     </>
@@ -229,7 +222,6 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         <Link href={"/guide/photos/" + slotId}
           className="ui-card ui-card-hover flex items-center justify-center gap-2 mt-6 p-4 font-semibold text-[14px] active:scale-[0.99]"
           style={{ color: "var(--ck-text-strong)" }}>
-          <Images size={20} style={{ color: "var(--ck-accent)" }} />
           Upload trip photos &amp; send thank-you
         </Link>
       )}

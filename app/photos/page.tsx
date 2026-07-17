@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Camera, CalendarBlank } from "@phosphor-icons/react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -91,7 +90,7 @@ export default function PhotosPage() {
       // Create a trip subfolder
       const tourName = (selectedSlot as any).tours?.name || "Trip";
       const tripDate = fmtDate(selectedSlot.start_time);
-      const folderName = tripDate + " — " + tourName;
+      const folderName = tripDate + " - " + tourName;
 
       const { data: folderData, error: folderErr } = await supabase.functions.invoke("google-drive", {
         body: { action: "create_folder", business_id: businessId, folder_name: folderName },
@@ -299,9 +298,7 @@ export default function PhotosPage() {
         <div className="ui-card p-4">
           <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Select Trip (Last 7 Days)</h2>
           {slots.length === 0 ? (
-            <div className="ui-empty">
-              <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
-              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No recent trips</p>
+            <div className="ui-empty">              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No recent trips</p>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Trips with bookings from the last 7 days show up here.</p>
             </div>
           ) : (
@@ -483,9 +480,7 @@ export default function PhotosPage() {
           <span className="ui-mono-label !text-[10px]"><span className="tabular-nums">{sentHistory.length}</span> items</span>
         </div>
         {sentHistory.length === 0 ? (
-          <div className="ui-empty mt-3">
-            <span className="ui-icon-chip"><Camera size={19} /></span>
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing sent yet</p>
+          <div className="ui-empty mt-3">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing sent yet</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Photo batches you send to guests will appear here.</p>
           </div>
         ) : (

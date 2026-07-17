@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
         .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
         .neq("id", targetId);
       if ((count ?? 0) < 1) {
-        return NextResponse.json({ error: "This is the last admin with full access — promote another admin first." }, { status: 400 });
+        return NextResponse.json({ error: "This is the last admin with full access. Promote another admin first." }, { status: 400 });
       }
     }
 

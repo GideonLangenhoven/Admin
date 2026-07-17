@@ -5,7 +5,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { DatePicker } from "../../components/DatePicker";
-import { Coins, DownloadSimple, Printer, PaperPlaneTilt, CheckCircle, Receipt, Warning, CaretRight } from "@phosphor-icons/react";
+import { Warning, CaretRight } from "@phosphor-icons/react";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -552,7 +552,6 @@ export default function Invoices() {
       )}
 
       <div className="anim-fade-up anim-d1 ui-card ui-card-hover flex items-center gap-3 p-4">
-        <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><Coins size={19} /></span>
         <div>
           <p className="ui-mono-label !text-[10px]">Outstanding total</p>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(totalOutstanding)}</p>
@@ -593,7 +592,6 @@ export default function Invoices() {
       ) : dayGroups.length === 0 ? (
         <div className="ui-card">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><Receipt size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No invoices found</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing matches the selected date or filter.</p>
           </div>
@@ -640,9 +638,9 @@ export default function Invoices() {
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50"><DownloadSimple size={13} /> Download</button>
-                        <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50"><Printer size={13} /> Print</button>
-                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={13} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={13} /> Resend</>)}</button>
+                        <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Download</button>
+                        <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Print</button>
+                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                       </div>
                     </div>
                   );
@@ -682,9 +680,9 @@ export default function Invoices() {
                             </button>
                             {openActions === inv.id && (
                               <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
-                                <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><DownloadSimple size={14} /> Download</button>
-                                <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><Printer size={14} /> Print / PDF</button>
-                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={14} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={14} /> Resend</>)}</button>
+                                <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
+                                <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
+                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                               </div>
                             )}
                           </td>
@@ -698,9 +696,9 @@ export default function Invoices() {
                           <td className="hidden p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>{formatDate(inv.created_at)}</td>
                           <td className="hidden p-3 lg:table-cell">
                             <div className="flex flex-wrap gap-2">
-                              <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><DownloadSimple size={14} /> Download</button>
-                              <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50"><Printer size={14} /> Print / PDF</button>
-                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? (<><CheckCircle size={14} weight="fill" /> Sent</>) : (<><PaperPlaneTilt size={14} /> Resend</>)}</button>
+                              <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
+                              <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
+                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                             </div>
                           </td>
                         </tr>

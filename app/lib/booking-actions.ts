@@ -56,8 +56,8 @@ export async function refundBookingAction(bookingId: string): Promise<ActionResu
       status: "CANCELLED",
       refund_status: "PROCESSED",
       refund_amount: amount,
-      refund_notes: "Full manual refund via bulk action — R" + amount.toFixed(2),
-      cancellation_reason: "Auto-cancelled — refund processed by admin (bulk)",
+      refund_notes: "Full manual refund via bulk action: R" + amount.toFixed(2),
+      cancellation_reason: "Auto-cancelled: refund processed by admin (bulk)",
       cancelled_at: new Date().toISOString(),
     }).eq("id", bookingId);
     if (error) return { ok: false, error: error.message };

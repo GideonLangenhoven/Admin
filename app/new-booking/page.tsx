@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { CaretDown, Check, CalendarBlank } from "@phosphor-icons/react";
+import { CaretDown, Check } from "@phosphor-icons/react";
 import * as Sentry from "@sentry/nextjs";
 
 interface Tour {
@@ -711,7 +711,7 @@ export default function NewBookingPage() {
             try {
               const errBody = await (checkoutRes.error as any).context?.json?.();
               if (errBody?.error) checkoutErrDetail = errBody.error;
-              if (errBody?.reason) checkoutErrDetail += " — " + errBody.reason;
+              if (errBody?.reason) checkoutErrDetail += ": " + errBody.reason;
             } catch { /* ignore parse error */ }
             console.error("Auto payment link failed (checkout):", checkoutErrDetail);
             notify({ title: "Payment link failed", message: "Could not create checkout: " + checkoutErrDetail + ". You can resend from the bookings page.", tone: "error", duration: 8000 });
@@ -1005,7 +1005,6 @@ export default function NewBookingPage() {
           ) : availabilityTimeRows.length === 0 ? (
             <div className="ui-card">
               <div className="ui-empty">
-                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
                 <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No open availability</p>
                 <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing open for the next 5 days on this activity.</p>
               </div>
@@ -1333,7 +1332,7 @@ export default function NewBookingPage() {
         {discountType === "promo" && promoResult?.valid && (
           <div className="mb-4 flex items-center gap-3 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
             <span className="font-semibold">{promoResult.code}</span>
-            <span>— {promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : "R" + promoResult.discount_value + " off"}</span>
+            <span>{promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : "R" + promoResult.discount_value + " off"}</span>
             <button type="button" onClick={() => { setDiscountType("none"); setPromoCode(""); setPromoResult(null); }} className="ml-auto text-xs hover:underline" style={{ color: "var(--ck-danger)" }}>Remove</button>
           </div>
         )}

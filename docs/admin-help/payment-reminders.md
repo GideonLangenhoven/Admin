@@ -16,4 +16,4 @@ The page lists upcoming bookings that are unpaid but hold a payment link. Bookin
 
 ## Letting a specific booking through
 
-Sometimes you want a booking to stand without payment — a corporate client paying on invoice, or a regular you trust. Use **Allow without payment** on that booking; it's excluded from reminders and auto-cancel. **Require payment** puts it back under the normal rules.
+Sometimes you want a booking to stand without payment — a corporate client paying on invoice, or a regular you trust. Use **Allow without payment** on that booking; it's excluded from reminders and auto-cancel, its seats stay reserved on the slot, and its guests count toward the slot's pax total on the Bookings page. **Require payment** puts it back under the normal rules.

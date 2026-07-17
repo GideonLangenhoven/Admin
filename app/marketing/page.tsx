@@ -8,7 +8,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
-import { UsersThree, Article, PaperPlaneTilt, Megaphone, ChartBar, Plus } from "@phosphor-icons/react";
 
 interface CampaignRow {
   id: string;
@@ -190,14 +189,13 @@ export default function MarketingOverview() {
       {/* ── KPI Cards ── */}
       <div className="anim-fade-up grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: "Active Contacts", value: contacts.toLocaleString(), delta: unsubscribed > 0 ? `${unsubscribed} unsub` : undefined, chipBg: "var(--ck-ocean-soft)", chipColor: "var(--ck-ocean)", icon: <UsersThree size={18} weight="fill" /> },
-          { label: "Templates", value: templates, delta: undefined, chipBg: "rgba(62, 124, 166, 0.12)", chipColor: "var(--ck-fjord)", icon: <Article size={18} weight="fill" /> },
-          { label: "Emails Sent", value: emailsSent.toLocaleString(), delta: monthlyUsage > 0 ? `${monthlyUsage} this month` : undefined, chipBg: "var(--ck-accent-soft)", chipColor: "var(--ck-accent)", icon: <PaperPlaneTilt size={18} weight="fill" /> },
-          { label: "Campaigns", value: campaigns.length, delta: campaigns.filter(c => c.status === "done").length > 0 ? `${campaigns.filter(c => c.status === "done").length} completed` : undefined, chipBg: "var(--ck-amber-soft)", chipColor: "var(--ck-amber)", icon: <Megaphone size={18} weight="fill" /> },
+          { label: "Active Contacts", value: contacts.toLocaleString(), delta: unsubscribed > 0 ? `${unsubscribed} unsub` : undefined },
+          { label: "Templates", value: templates, delta: undefined },
+          { label: "Emails Sent", value: emailsSent.toLocaleString(), delta: monthlyUsage > 0 ? `${monthlyUsage} this month` : undefined },
+          { label: "Campaigns", value: campaigns.length, delta: campaigns.filter(c => c.status === "done").length > 0 ? `${campaigns.filter(c => c.status === "done").length} completed` : undefined },
         ].map((kpi) => (
           <div key={kpi.label} className="ui-card ui-card-hover p-5">
             <div className="mb-4 flex items-center gap-2.5">
-              <span className="ui-icon-chip" style={{ background: kpi.chipBg, color: kpi.chipColor }}>{kpi.icon}</span>
               <span className="ui-mono-label !text-[10px]">{kpi.label}</span>
             </div>
             <p className="font-display text-[30px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{kpi.value}</p>
@@ -254,7 +252,6 @@ export default function MarketingOverview() {
             </div>
           ) : (
             <div className="ui-empty !py-8">
-              <span className="ui-icon-chip"><ChartBar size={19} /></span>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Send your first campaign to see engagement data</p>
             </div>
           )}
@@ -277,7 +274,6 @@ export default function MarketingOverview() {
             </ResponsiveContainer>
           ) : (
             <div className="ui-empty">
-              <span className="ui-icon-chip"><ChartBar size={19} /></span>
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No campaign data yet</p>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Charts will appear after your first send</p>
             </div>
@@ -319,7 +315,6 @@ export default function MarketingOverview() {
             </div>
           ) : (
             <div className="ui-empty !py-6">
-              <span className="ui-icon-chip"><UsersThree size={19} /></span>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Import contacts to see audience breakdown</p>
             </div>
           )}
@@ -347,7 +342,6 @@ export default function MarketingOverview() {
             </ResponsiveContainer>
           ) : (
             <div className="ui-empty !py-6">
-              <span className="ui-icon-chip"><ChartBar size={19} /></span>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Need 2+ campaigns to show trends</p>
             </div>
           )}
@@ -357,10 +351,10 @@ export default function MarketingOverview() {
       {/* ── Quick Actions ── */}
       <div className="flex flex-wrap gap-3">
         <Link href="/marketing/contacts" className="ui-btn ui-btn-primary">
-          <Plus size={15} weight="bold" /> Add Contacts
+          Add Contacts
         </Link>
         <Link href="/marketing/templates" className="ui-btn ui-btn-ghost">
-          <Plus size={15} weight="bold" /> Create Template
+          Create Template
         </Link>
       </div>
 
@@ -370,7 +364,6 @@ export default function MarketingOverview() {
         {campaigns.length === 0 ? (
           <div className="ui-card">
             <div className="ui-empty">
-              <span className="ui-icon-chip"><PaperPlaneTilt size={19} /></span>
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No campaigns yet</p>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create a template, then send your first campaign</p>
             </div>

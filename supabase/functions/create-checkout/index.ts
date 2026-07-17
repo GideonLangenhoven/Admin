@@ -187,6 +187,45 @@ Deno.serve(async (req: any) => {
         serverTotal = Math.max(0, serverTotal);
         // Subtract any voucher portion already applied
         const voucherApplied = Number(bk.voucher_amount_paid || 0);
+
+        // Vouchers are operator-specific: verify the claimed voucher credit is
+        // backed by ACTIVE, unexpired vouchers belonging to THIS booking's
+        // business (or by a voucher already redeemed against this booking —
+        // the admin console deducts up front). Without this, a client-written
+        // voucher_amount_paid could discount the cash due using another
+        // operator's voucher — or no voucher at all.
+        if (voucherApplied > 0) {
+          const redeemedRes = await supabase.from("vouchers")
+            .select("id")
+            .eq("business_id", bk.business_id)
+            .eq("redeemed_booking_id", bookingId)
+            .limit(1);
+          if (!(redeemedRes.data || []).length) {
+            const claimedIds = Array.isArray(body.voucher_ids) ? body.voucher_ids.filter(Boolean) : [];
+            const claimedCodes = Array.isArray(body.voucher_codes) ? body.voucher_codes.filter(Boolean) : [];
+            let available = 0;
+            if (claimedIds.length || claimedCodes.length) {
+              let vq = supabase.from("vouchers")
+                .select("current_balance, value, purchase_amount, expires_at")
+                .eq("business_id", bk.business_id)
+                .eq("status", "ACTIVE");
+              vq = claimedIds.length ? vq.in("id", claimedIds) : vq.in("code", claimedCodes);
+              const vres = await vq;
+              const nowMs = Date.now();
+              available = (vres.data || [])
+                .filter((v: any) => !v.expires_at || new Date(v.expires_at).getTime() > nowMs)
+                .reduce((s: number, v: any) => s + Number(v.current_balance ?? v.value ?? v.purchase_amount ?? 0), 0);
+            }
+            if (available + 0.01 < voucherApplied) {
+              console.warn("VOUCHER_TENANT_MISMATCH: booking=" + bookingId + " claimed=" + voucherApplied + " available=" + available);
+              return new Response(JSON.stringify({
+                error: "VOUCHER_INVALID",
+                reason: "The voucher(s) applied are not valid for this operator or no longer cover the amount. Please remove them and try again.",
+              }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+            }
+          }
+        }
+
         let serverCashDue = Math.max(0, serverTotal - voucherApplied);
         // Round to 2 decimals
         serverCashDue = Math.round(serverCashDue * 100) / 100;

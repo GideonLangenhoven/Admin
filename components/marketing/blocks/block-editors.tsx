@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Image as ImageIcon, Plus, Trash, X, TextB, TextItalic, TextUnderline, TextAlignLeft, TextAlignCenter, TextAlignRight } from "@phosphor-icons/react";
+import { Trash, TextB, TextItalic, TextUnderline, TextAlignLeft, TextAlignCenter, TextAlignRight } from "@phosphor-icons/react";
 import type {
   Block,
   TextBlock,
@@ -244,7 +244,7 @@ function TextEditor({ block, onUpdate }: { block: TextBlock; onUpdate: (u: Parti
       />
 
       <p className="mt-1 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
-        Type directly — use the toolbar for formatting. Variables: {"{first_name}"}, {"{promo_code}"}, {"{voucher_code}"}
+        Type directly. Use the toolbar for formatting. Variables: {"{first_name}"}, {"{promo_code}"}, {"{voucher_code}"}
       </p>
     </div>
   );
@@ -260,7 +260,7 @@ function ImageEditor({ block, onUpdate, onUpload }: { block: ImageBlock; onUpdat
         ) : (
           <div className="flex h-24 items-center justify-center rounded-lg border border-dashed" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <button onClick={() => onUpload?.(block.id)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ color: "var(--ck-accent)" }}>
-              <ImageIcon size={14} /> Upload Image
+              Upload Image
             </button>
           </div>
         )}
@@ -409,11 +409,11 @@ function QuoteEditor({ block, onUpdate, onUpload }: { block: QuoteBlock; onUpdat
           {block.photoUrl ? (
             <>
               <img src={block.photoUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
-              <button onClick={() => onUpdate({ photoUrl: "" })} className="text-xs" style={{ color: "var(--ck-text-muted)" }}><X size={12} /> Remove</button>
+              <button onClick={() => onUpdate({ photoUrl: "" })} className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Remove</button>
             </>
           ) : (
             <button onClick={() => onUpload?.(block.id)} className="text-xs font-medium" style={{ color: "var(--ck-accent)" }}>
-              <ImageIcon size={12} className="inline mr-1" />Add photo
+              Add photo
             </button>
           )}
         </div>
@@ -485,7 +485,7 @@ function ColumnsEditor({ block, onUpdate }: { block: ColumnsBlock; onUpdate: (u:
             <div className="flex gap-1">
               {ALLOWED_TYPES.map((t) => (
                 <button key={t} onClick={() => addSubBlock(ci, t)} className="rounded border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
-                  <Plus size={8} className="inline" /> {t}
+                  {t}
                 </button>
               ))}
             </div>
@@ -520,7 +520,7 @@ function TourCardEditor({ block, onUpdate, onUpload }: { block: TourCardBlock; o
           </div>
         ) : (
           <button onClick={() => onUpload?.(block.id)} className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-accent)" }}>
-            <ImageIcon size={14} /> Upload Tour Image
+            Upload Tour Image
           </button>
         )}
         <div className="grid grid-cols-2 gap-2">

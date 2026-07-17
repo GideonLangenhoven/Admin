@@ -39,35 +39,35 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
   if (/\b(chest pain|heart attack|having a stroke|seizure|can'?t breathe|cannot breathe|drowning|drown(ed|ing)|bleeding (badly|heavily)|unconscious|fainted|collapsed|allergic reaction|anaphylaxis|severe pain)\b/.test(lo)) {
     return {
       intent: "MEDICAL_EMERGENCY",
-      reply: "Please call emergency services right now — 10177 in South Africa. I'm flagging this to our team — please keep your phone on. If you can, message us back once you're safe.",
+      reply: "Please call emergency services right now: 10177 in South Africa. I'm flagging this to our team. Please keep your phone on. If you can, message us back once you're safe.",
     };
   }
   // Legal threat
   if (/\b(get(ting)? (a |my )?lawyer|attorney|i'?ll sue|going to sue|small claims|file (a )?(suit|lawsuit)|legal action|legal team)\b/.test(lo)) {
     return {
       intent: "LEGAL_THREAT",
-      reply: "I'm sorry it's reached this point. I'm flagging this for a human to handle directly — they'll be in touch within an hour during business hours. Please share your booking reference (8 characters from your confirmation email) when they reach out so they can find your details.",
+      reply: "I'm sorry it's reached this point. I'm flagging this for a human to handle directly. They'll be in touch within an hour during business hours. Please share your booking reference (8 characters from your confirmation email) when they reach out so they can find your details.",
     };
   }
   // POPIA / data deletion
   if (/\b(delete (my )?(data|account|personal info|details)|gdpr|popia|data subject (request|access)|right to (be )?forgotten|erase (my )?data|forget me)\b/.test(lo)) {
     return {
       intent: "DATA_REQUEST",
-      reply: "Thanks — under POPIA you have the right to ask us to delete your data. I'm raising a formal data-subject request now. You'll get a confirmation email within an hour with the next steps and a reference number; please reply to that email so we can verify your identity before processing.",
+      reply: "Thanks. Under POPIA you have the right to ask us to delete your data. I'm raising a formal data-subject request now. You'll get a confirmation email within an hour with the next steps and a reference number; please reply to that email so we can verify your identity before processing.",
     };
   }
   // Fraud allegation / unauthorized charge
   if (/\b(fraud|fraudulent|unauthori[sz]ed charge|didn'?t (make|authori[sz]e) (this )?(booking|payment|charge)|stolen card|chargeback)\b/.test(lo)) {
     return {
       intent: "FRAUD_REVIEW",
-      reply: "I'm escalating this immediately to our team — they'll review the booking and payment. Please do not cancel through your bank yet; we can usually resolve faster directly. Please share the booking reference (8 characters in the email) and the last 4 digits of the card used.",
+      reply: "I'm escalating this immediately to our team. They'll review the booking and payment. Please do not cancel through your bank yet; we can usually resolve faster directly. Please share the booking reference (8 characters in the email) and the last 4 digits of the card used.",
     };
   }
   // Press / media
   if (/\b(press (enquiry|inquiry|request)|i'?m (a )?(journalist|reporter|from .* news)|media (request|enquiry))\b/.test(lo)) {
     return {
       intent: "PRESS",
-      reply: "Thanks for getting in touch. For press enquiries please email press@bookingtours.co.za — I've flagged this for the right person here.",
+      reply: "Thanks for getting in touch. For press enquiries please email press@bookingtours.co.za. I've flagged this for the right person here.",
     };
   }
   // Explicit human-handoff request
@@ -81,7 +81,7 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
   ) {
     return {
       intent: "ESCALATE_HUMAN",
-      reply: "Of course — let me get a human on this. Drop your booking reference (8 characters in your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours. You can also WhatsApp us via the number on the booking site footer.",
+      reply: "Of course. Let me get a human on this. Drop your booking reference (8 characters in your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours. You can also WhatsApp us via the number on the booking site footer.",
     };
   }
   // Accessibility / service animal / medical condition questions
@@ -98,7 +98,7 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
   ) {
     return {
       intent: "ACCESSIBILITY_QUESTION",
-      reply: "Great question — accessibility and medical considerations are always best handled by a human so we can confirm what's safe and possible for your specific situation. I'm flagging this to our team now; they'll come back to you within an hour during business hours. If you'd like to share details (mobility needs, service animal, medical condition), feel free to type them here and they'll see them too.",
+      reply: "Great question. Accessibility and medical considerations are always best handled by a human so we can confirm what's safe and possible for your specific situation. I'm flagging this to our team now; they'll come back to you within an hour during business hours. If you'd like to share details (mobility needs, service animal, medical condition), feel free to type them here and they'll see them too.",
     };
   }
   return null;
@@ -179,7 +179,7 @@ function tryFaqOrToursReply(lo: string, faq: any, tsText: string, business: any)
     /\bwheelchair\b/.test(lo) ||
     /\b(disabled|disability|accessib(le|ility))\b/.test(lo)
   ) {
-    return "That's a good one to check with a person — accessibility and service animal questions vary by tour and conditions. I'm flagging this for our team; they'll be in touch shortly with a clear answer.";
+    return "That's a good one to check with a person. Accessibility and service animal questions vary by tour and conditions. I'm flagging this for our team; they'll be in touch shortly with a clear answer.";
   }
   if (lo.includes("bring") || lo.includes("wear") || lo.includes("need to have") || lo.includes("pack")) {
     const wtb = String(business?.what_to_bring || "").trim();
@@ -347,7 +347,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (rateLimited(clientIp)) {
-    return new Response(JSON.stringify({ reply: "You\u2019re sending messages a little fast \u2014 give me a few seconds and try again." }), { status: 429, headers: gCors(req) });
+    return new Response(JSON.stringify({ reply: "You\u2019re sending messages a little fast. Give me a few seconds and try again." }), { status: 429, headers: gCors(req) });
   }
   const url = new URL(req.url);
   if (url.searchParams.get("__sentry_test") === "1") {
@@ -456,11 +456,11 @@ Deno.serve(withSentry("web-chat", async (req) => {
         const minI = Math.round(effMin);
         const maxI = Math.round(effMax);
         (t as any).priceLabel = minI === maxI ? "R" + minI : "From R" + minI;
-        (t as any).priceNote = minI === maxI ? "" : " (rates vary by date — see calendar for the exact price)";
+        (t as any).priceNote = minI === maxI ? "" : " (rates vary by date, see calendar for the exact price)";
       }
     }
     function tourPriceLabel(t: any): string { return (t && t.priceLabel) ? t.priceLabel : ("R" + Number(t?.base_price_per_person || 0)); }
-    function tourBtn(t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: t.id }; }
+    function tourBtn(t: any) { return { label: t.name + ": " + tourPriceLabel(t), value: t.id }; }
     // Only ever offer tours that actually have an open slot — offering a
     // sold-out tour sends the customer into a "Nothing open, try the other
     // tour" loop. One RPC for the whole business, memoized per request,
@@ -475,7 +475,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       }
       return tours.filter(function (t) { return _availableTourIds!.has(t.id) && t.id !== exceptId; });
     }
-    const NO_AVAILABILITY_REPLY = "We're fully booked right now — no open spots on any tour 😔 New dates open regularly, so please check back soon.";
+    const NO_AVAILABILITY_REPLY = "We're fully booked right now, no open spots on any tour 😔 New dates open regularly, so please check back soon.";
     const NO_AVAILABILITY_BUTTONS = [{ label: "❓ Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }];
     const lo = msg.toLowerCase().trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
@@ -545,7 +545,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     // Handle persistent "Talk to a human" button anywhere in the flow.
     if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
-      const humanReply = "No problem — I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.";
+      const humanReply = "No problem. I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.";
       await flagHumanHandoff("ESCALATE_HUMAN", "[Requested a human]", humanReply);
       return new Response(JSON.stringify({
         reply: humanReply,
@@ -616,11 +616,11 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (wRedeem) {
         const rdTours = await bookableTours();
         if (rdTours.length === 0) { reply = NO_AVAILABILITY_REPLY; buttons = NO_AVAILABILITY_BUTTONS; }
-        else { ns = { step: "PICK_TOUR" }; reply = "You can redeem a voucher or gift code at checkout — I'll ask for it near the end of the booking. Let's get started: which tour would you like?"; buttons = rdTours.map(tourBtn); }
+        else { ns = { step: "PICK_TOUR" }; reply = "You can redeem a voucher or gift code at checkout. I'll ask for it near the end of the booking. Let's get started: which tour would you like?"; buttons = rdTours.map(tourBtn); }
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
       const wGift = !wRedeem && (lo.includes("gift") || lo.includes("voucher") && (lo.includes("buy") || lo.includes("purchase") || lo.includes("get")));
-      if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + " \u2014 " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (wGift) { ns = { step: "GIFT_PICK_TOUR" }; reply = "Awesome, gift vouchers make great presents! 🎁 Which tour should the voucher be for?"; buttons = tours.map(function (t9) { return { label: t9.name + ": " + tourPriceLabel(t9), value: t9.id }; }); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       if (wLook) {
         // Chat self-service for existing bookings (view/reschedule/cancel) is retired —
         // bugs there (duplicate sends, lock-ups) led to routing everything through the
@@ -659,7 +659,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           else { ns = { step: "PICK_TOUR" }; reply = pick(["Which tour are you keen on?", "Let's get you booked! Which tour?"]); buttons = wbTours.map(tourBtn); }
         }
       }
-      else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one — I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
+      else { const gem = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id); if (gem) { reply = gem; } else { reply = "I'm not sure on that one. I can help with tours, bookings, vouchers, and trip questions. Want me to flag this for a human?"; buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }, { label: "\u{1F464} Talk to a human", value: "btn:human" }]; } }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, calendar: calendar }), { status: 200, headers: gCors(req) });
     }
     // ===== Mid-booking side-question escape hatch =====
@@ -676,7 +676,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (sideQuestion && !answersCurrentStep) {
         const ans = await gemChat(hist, msg, tours, requestedBusinessId || tours[0]?.business_id);
         const stepPrompt = step === "PICK_TOUR" ? "which tour are you keen on?" : "how many people will be joining?";
-        reply = (ans ? ans + "\n\n" : "") + "Back to your booking — " + stepPrompt;
+        reply = (ans ? ans + "\n\n" : "") + "Back to your booking: " + stepPrompt;
         if (step === "PICK_TOUR") buttons = (await bookableTours()).map(tourBtn);
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
@@ -790,7 +790,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       if (slotId && slotTime) {
         ns = { ...ns, step: "ASK_QTY", slotId: slotId, slotTime: slotTime, tprice: slotUnitPrice };
         const priceNote = slotUnitPrice !== basePrice ? " (peak rate R" + slotUnitPrice + " per person)" : "";
-        reply = pick([fmt(slotTime) + " — great pick!" + priceNote + " How many people?", fmt(slotTime) + " it is! 🙌" + priceNote + " How many of you are coming?"]);
+        reply = pick([fmt(slotTime) + ", great pick!" + priceNote + " How many people?", fmt(slotTime) + " it is! 🙌" + priceNote + " How many of you are coming?"]);
       } else {
         const slots5 = await getSlots(ns.tid, now);
         const daySlots2 = slots5.filter(function (s6) { return dateKey(s6.start_time) === ns.selectedDate; });
@@ -832,8 +832,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
         reply = "This slot only has " + mx + " spot" + (mx === 1 ? "" : "s") + " left, so " + n + " won't fit. Could you do " + mx + " or fewer? For a bigger group, ask us about a private tour.";
       } else {
         let tot = n * ns.tprice; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05); tot = tot - disc; } ns = { ...ns, step: "ASK_DETAILS", qty: n, total: tot, baseTotal: n * ns.tprice, discount: disc };
-        if (disc > 0) reply = n + " people — nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time — whatever works!)*";
-        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time — whatever works!)*"]);
+        if (disc > 0) reply = n + " people. Nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time, whatever works!)*";
+        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time, whatever works!)*"]);
       }
       return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
     }
@@ -863,7 +863,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
       ns = { ...ns, name: dName, email: dEmail, phone: dPhone };
       if (!dName || !dEmail || !dPhone) {
         const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address"); if (!dPhone) dMiss.push("phone number (with country code, e.g. +27)");
-        reply = (dName || dEmail || dPhone ? "Thanks! " : "") + "I still just need your " + dMiss.join(" and ") + " — send it whenever you're ready.";
+        reply = (dName || dEmail || dPhone ? "Thanks! " : "") + "I still just need your " + dMiss.join(" and ") + ". Send it whenever you're ready.";
         return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
       }
       const customDefs = await getBookingCustomFields(requestedBusinessId);
@@ -916,9 +916,9 @@ Deno.serve(withSentry("web-chat", async (req) => {
           // C2: Filter vouchers by business_id to prevent cross-tenant usage
           const { data: vd } = await db.from("vouchers").select("*").eq("code", vc).eq("business_id", requestedBusinessId).single();
           if (vd && vd.status === "ACTIVE") { const vv = Number(vd.current_balance || vd.value || vd.purchase_amount || 0); let dd = vv; if (vd.type === "FREE_TRIP") { const ftPax = Math.min(vd.pax_limit || 1, ns.qty); const ftSlotCost = ns.tprice * ftPax; const ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, ns.total); } else { dd = Math.min(vv, ftSlotCost, ns.total); } } else { dd = Math.min(vv, ns.total); } const nt = Math.max(0, ns.total - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
-          else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
-          else { reply = "Can't find that code — double-check it?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
-        } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
+          else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
+          else { reply = "Can't find that code. Double-check it?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
+        } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
       }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
@@ -931,8 +931,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
         // C2: Filter vouchers by business_id to prevent cross-tenant usage
         const { data: vd2 } = await db.from("vouchers").select("*").eq("code", vc2).eq("business_id", requestedBusinessId).single();
         if (vd2 && vd2.status === "ACTIVE") { const vv2 = Number(vd2.current_balance || vd2.value || vd2.purchase_amount || 0); let dd2 = vv2; if (vd2.type === "FREE_TRIP") { const ft2Pax = Math.min(vd2.pax_limit || 1, ns.qty); const ft2SlotCost = ns.tprice * ft2Pax; const ft2PurchaseVal = Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0); if (ft2SlotCost > ft2PurchaseVal) { dd2 = Math.min(ft2PurchaseVal, ns.total); } else { dd2 = Math.min(vv2, ft2SlotCost, ns.total); } } else { dd2 = Math.min(vv2, ns.total); } const nt2 = Math.max(0, ns.total - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type, vpaxlimit: vd2.pax_limit || 1, vpurchasevalue: Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0) }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
-        else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
-        else { reply = "Code not found. Check and try again?"; buttons = [{ label: "No voucher — continue", value: "no_voucher" }]; }
+        else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
+        else { reply = "Code not found. Check and try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
       } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
@@ -1026,7 +1026,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
         // is the displayed evidence that the customer was told before paying.
         const ckSiteUrls = bk ? await getBusinessSiteUrls(businessId) : null;
         const termsNotice = ckSiteUrls?.termsUrl ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + ckSiteUrls.termsUrl : "";
-        if (!bk) { reply = "Something went wrong — try the Book Now page?"; ns = { step: "IDLE" }; }
+        if (!bk) { reply = "Something went wrong. Try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {
           // H1 (MVP fix): capacity check MUST run BEFORE voucher deduction.
           // Otherwise a sold-out slot would still drain the voucher balance.
@@ -1101,7 +1101,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
             const cancelRes = await db.from("bookings").update({ status: "CANCELLED", cancellation_reason: "Chat checkout failed: " + errReason }).eq("id", bk.id);
             if (cancelRes.error) console.error("WEB_CHAT_CANCEL_MARK_FAILED booking=" + bk.id + " err=" + cancelRes.error.message);
             const refShort = bk.id.substring(0, 8).toUpperCase();
-            reply = "Sorry — something stopped me generating your payment link (" + errReason + ").\n\nYour booking reference is " + refShort + ". I've flagged a human to follow up — they'll send you a payment link within 30 minutes. Or you can use the Book Now page directly to retry.";
+            reply = "Sorry, something stopped me generating your payment link (" + errReason + ").\n\nYour booking reference is " + refShort + ". I've flagged a human to follow up, and they'll send you a payment link within 30 minutes. Or you can use the Book Now page directly to retry.";
             // Set conversation priority HIGH so admin sees the abandoned checkout
             if (state.conversation_id) {
               try {
@@ -1238,12 +1238,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
         } else {
           const chTours = await bookableTours(b.tour_id);
           if (chTours.length === 0) {
-            reply = "No other tours have open spots right now — contact our team and we'll see what we can do.";
+            reply = "No other tours have open spots right now. Contact our team and we'll see what we can do.";
             ns = { step: "IDLE" };
           } else {
             ns = { ...ns, step: "CHANGE_TOUR", booking_id: b.id, slot_id: b.slot_id, tour_id: b.tour_id, qty: b.qty };
             reply = "Which tour would you like to switch to?";
-            buttons = chTours.map(function (t: any) { return { label: t.name + " — " + tourPriceLabel(t), value: "chtour_" + t.id }; });
+            buttons = chTours.map(function (t: any) { return { label: t.name + ": " + tourPriceLabel(t), value: "chtour_" + t.id }; });
           }
         }
       }

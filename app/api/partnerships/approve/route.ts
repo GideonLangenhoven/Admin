@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 }
 
 function htmlPage(title: string, message: string) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — BookingTours</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} | BookingTours</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f7f7f6;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
 .card{background:#fff;border-radius:16px;padding:48px;max-width:480px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.08)}
 h1{color:#1b3b36;font-size:24px;margin:0 0 16px}p{color:#555;line-height:1.6;margin:0}</style>

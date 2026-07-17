@@ -15,7 +15,7 @@ const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", axes
 
 export const metadata: Metadata = {
   title: "BookingTours Admin",
-  description: "BookingTours Admin Dashboard — Built for adventure operators",
+  description: "BookingTours Admin Dashboard: built for adventure operators",
 };
 
 const nav = [

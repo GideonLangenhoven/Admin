@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { CaretLeft, Waves } from "@phosphor-icons/react";
+import { CaretLeft } from "@phosphor-icons/react";
 
 /**
  * Standalone app chrome for the Guide PWA. Deliberately NOT the admin AppShell —
@@ -24,7 +24,7 @@ export default function GuideShell({ children }: { children: React.ReactNode }) 
       <header className="relative overflow-hidden bg-bt-dark text-white">
         <div className="relative max-w-md mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-5">
           <div className="flex items-center gap-3">
-            {!isHome ? (
+            {!isHome && (
               <button
                 onClick={() => router.back()}
                 aria-label="Back"
@@ -33,10 +33,6 @@ export default function GuideShell({ children }: { children: React.ReactNode }) 
               >
                 <CaretLeft size={20} weight="bold" />
               </button>
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0" style={{ boxShadow: "inset 0 0 0 1px rgba(244,241,232,0.14)" }}>
-                <Waves size={24} weight="regular" style={{ color: "var(--ck-amber-bright)" }} />
-              </div>
             )}
             <div className="min-w-0">
               <p className="ui-mono-label" style={{ color: "var(--ck-amber-bright)" }}>Field Console</p>

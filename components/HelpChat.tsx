@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChatCircleDots, PaperPlaneRight, X, ArrowSquareOut } from "@phosphor-icons/react";
+import { ChatCircleDots, PaperPlaneRight, X } from "@phosphor-icons/react";
 import { supabase } from "../app/lib/supabase";
 import { useBusinessContext } from "./BusinessContext";
 
@@ -26,7 +26,7 @@ const SUGGESTED: { q: string; privilegedOnly?: boolean }[] = [
 ];
 
 const GREETING =
-  "Hi! I can help you find features and explain how the dashboard works. Ask me anything — or try one of these:";
+  "Hi! I can help you find features and explain how the dashboard works. Ask me anything, or try one of these:";
 
 const LINK_SPLIT_RE = /(\[[^\]]+\]\(\/[a-zA-Z0-9\-/_?=&]*\))/g;
 const LINK_MATCH_RE = /^\[([^\]]+)\]\((\/[a-zA-Z0-9\-/_?=&]*)\)$/;
@@ -122,7 +122,7 @@ export default function HelpChat() {
     } catch {
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: "Sorry — I couldn't reach the help service just now. Please try again in a moment.",
+        content: "Sorry, I couldn't reach the help service just now. Please try again in a moment.",
       }]);
     } finally {
       setBusy(false);
@@ -154,7 +154,6 @@ export default function HelpChat() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3" style={{ background: "var(--ck-accent)", color: "#fff" }}>
             <div className="flex items-center gap-2">
-              <ChatCircleDots size={20} weight="fill" />
               <div>
                 <div className="text-sm font-semibold leading-tight">Help assistant</div>
                 <div className="text-[11px] opacity-80 leading-tight">Ask how anything works</div>
@@ -202,7 +201,6 @@ export default function HelpChat() {
                           className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
                           style={{ background: "var(--ck-success-soft, rgba(18,94,64,0.1))", color: "var(--ck-accent)" }}
                         >
-                          <ArrowSquareOut size={12} weight="bold" />
                           {s.title}
                         </Link>
                       ))}

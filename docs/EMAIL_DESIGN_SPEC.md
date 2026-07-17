@@ -1,6 +1,7 @@
 # Transactional Email Design Spec — BookingTours
 
-**Purpose:** implementation brief for redesigning every customer-facing email in `supabase/functions/send-email/index.ts`. The current templates work but read as bland early-2010s transactional mail: flat single-column tables, washed-out greys, inconsistent spacing, Georgia headings on system-font bodies, and buttons that vary per template. This spec defines one visual system to be applied to all types.
+**Purpose:** implementation brief for redesigning every customer-facing email in `supabase/functions/send-email/index.ts`. The current templates work but read as bland early-2010s trans
+actional mail: flat single-column tables, washed-out greys, inconsistent spacing, Georgia headings on system-font bodies, and buttons that vary per template. This spec defines one visual system to be applied to all types.
 
 **Non-negotiable constraints (do not break these):**
 1. **Everything stays in `send-email/index.ts` as template-literal HTML** — no external templating engine, no build step.

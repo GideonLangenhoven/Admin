@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { CalendarBlank, CaretRight, LockSimple, UsersThree, Waves } from "@phosphor-icons/react";
 
 type Slot = {
   id: string;
@@ -65,9 +64,6 @@ export default function GuideHomePage() {
   if (role && !["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"].includes(role)) {
     return (
       <div className="ui-empty min-h-[60vh]">
-        <div className="ui-icon-chip">
-          <LockSimple size={20} />
-        </div>
         <p className="text-sm ui-text-muted">Guide access requires an OPERATOR role or above.</p>
       </div>
     );
@@ -87,8 +83,7 @@ export default function GuideHomePage() {
         </div>
         <label className="relative shrink-0">
           <input type="date" value={day} onChange={e => setDay(e.target.value)}
-            className="ui-control text-[13px] font-semibold pl-9 pr-3 py-2.5 rounded-xl outline-none" />
-          <CalendarBlank size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--ck-text-muted)" }} />
+            className="ui-control text-[13px] font-semibold px-3 py-2.5 rounded-xl outline-none" />
         </label>
       </div>
 
@@ -113,9 +108,6 @@ export default function GuideHomePage() {
 
       {!loading && slots.length === 0 && (
         <div className="ui-empty mt-8">
-          <div className="ui-icon-chip">
-            <Waves size={20} />
-          </div>
           <p className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No tours scheduled</p>
           <p className="text-[13px] ui-text-muted">Nothing on the water for {dayLabel}.</p>
         </div>
@@ -139,7 +131,6 @@ export default function GuideHomePage() {
                     <h3 className="ui-title-md text-[15px] leading-tight truncate">{s.tour_name}</h3>
                     <div className="flex items-center gap-3 mt-1.5 text-[12px]">
                       <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-text)" }}>
-                        <UsersThree size={14} style={{ color: "var(--ck-accent)" }} />
                         {s.pax_total} guest{s.pax_total !== 1 ? "s" : ""}
                       </span>
                       <span className="ui-text-muted">{s.booking_count} booking{s.booking_count !== 1 ? "s" : ""}</span>
@@ -151,7 +142,6 @@ export default function GuideHomePage() {
                       <span className="text-[11px] font-semibold shrink-0 ui-text-muted">{spotsLeft} left</span>
                     </div>
                   </div>
-                  <CaretRight size={18} weight="bold" className="shrink-0 transition-colors" style={{ color: "var(--ck-text-muted)" }} />
                 </div>
               </Link>
             </li>

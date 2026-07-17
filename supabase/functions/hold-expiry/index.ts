@@ -37,7 +37,7 @@ Deno.serve(async () => {
       }
 
       await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", bk.phone).eq("business_id", BUSINESS_ID);
-      if (bk.phone) await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment was not received.\n\nNo worries \u2014 type *menu* to book again!", hold.booking_id);
+      if (bk.phone) await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment was not received.\n\nNo worries! Type *menu* to book again!", hold.booking_id);
       await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: hold.booking_id, event: "hold_expired", payload: { hold_id: hold.id } });
     }
     return new Response(JSON.stringify({ expired: holds.length }), { status: 200 });

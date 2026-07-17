@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getTenantByBusinessId, getAdminAppOrigins, isAllowedOrigin, recordWaMessage } from "../_shared/tenant.ts";
+import { getTenantByBusinessId, getAdminAppOrigins, isAllowedOrigin, recordWaMessage, sendWhatsappTemplate, getBusinessDisplayName } from "../_shared/tenant.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -168,10 +168,44 @@ Deno.serve(async (req: Request) => {
 
             // 131047 = outside 24h customer service window
             // 131026 = recipient hasn't messaged this number before
-            // Fall back to the approved admin_outreach template so the message still reaches the customer.
             if (errCode === 131047 || errCode === 131026 || errMsg.toLowerCase().includes("24 hour")) {
-                console.log("Outside 24h window — trying admin_outreach template for:", normalizedTo);
                 const firstName = String(convo?.customer_name || "").split(" ")[0] || "there";
+
+                // Preferred path: send the pre-approved reopener template ("please
+                // reply") and queue the actual message in the outbox — wa-webhook
+                // drains it the moment the customer replies, which also reopens
+                // the 24h window so the admin can chat live from the Inbox.
+                const reopenerName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+                try {
+                    await sendWhatsappTemplate(tenant, normalizedTo, reopenerName, [firstName, getBusinessDisplayName(tenant.business)]);
+                    await supabase.from("outbox").insert({
+                        business_id: actualBusinessId,
+                        phone: normalizedTo,
+                        message_type: "ADMIN_FOLLOWUP",
+                        message_body: message,
+                        scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
+                        status: "WAITING_WINDOW",
+                    });
+                    await supabase.from("chat_messages").insert({
+                        business_id: actualBusinessId,
+                        phone: to,
+                        direction: "OUT",
+                        body: "⏳ (window closed, sent them a 'please reply' message; this delivers when they respond) " + message,
+                        sender: "Admin",
+                    });
+                    await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
+                    return new Response(JSON.stringify({
+                        ok: true,
+                        via_reopener: true,
+                        message: "Their 24-hour WhatsApp window is closed, so we sent a pre-approved message asking them to reply. Your message delivers the moment they do. Then you can chat normally from the Inbox.",
+                    }), { status: 200, headers: getCors(req) });
+                } catch (reopenErr: any) {
+                    // Template missing / not approved for this tenant — fall through
+                    // to the legacy admin_outreach → email chain below.
+                    console.error("Reopener template failed (" + reopenerName + "):", reopenErr?.message || reopenErr);
+                }
+
+                console.log("Outside 24h window — trying admin_outreach template for:", normalizedTo);
                 const templateRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
                     method: "POST",
                     headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
@@ -210,7 +244,7 @@ Deno.serve(async (req: Request) => {
                 console.error("admin_outreach template failed:", templateData);
                 const emailedA = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
                 if (emailedA) {
-                    await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email — WhatsApp window closed) " + message, sender: "Admin" });
+                    await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp window closed) " + message, sender: "Admin" });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                     return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp's 24-hour window is closed, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
                 }
@@ -226,7 +260,7 @@ Deno.serve(async (req: Request) => {
             // Guaranteed-communication fallback: try email regardless of the WA error cause.
             const emailedB = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
             if (emailedB) {
-                await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email — WhatsApp failed) " + message, sender: "Admin" });
+                await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp failed) " + message, sender: "Admin" });
                 await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                 return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp couldn't deliver this, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
             }

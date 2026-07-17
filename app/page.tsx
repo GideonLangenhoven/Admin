@@ -10,9 +10,8 @@ import { isSectionHidden } from "./lib/operator-sections";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
-    Plus, CaretLeft, CaretRight, ArrowUpRight, Check,
-    CheckCircle, GearSix, X, Trash, MapPin, ArrowsClockwise,
-    CurrencyCircleDollar, ChatText, Camera, CalendarBlank,
+    CaretLeft, CaretRight, Check,
+    X, Trash, MapPin, ArrowsClockwise,
 } from "@phosphor-icons/react";
 
 /* ── helpers ── */
@@ -570,7 +569,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Link href="/new-booking" className="ui-btn ui-btn-primary">
-                        <Plus size={15} weight="bold" /> Add Booking
+                        Add Booking
                     </Link>
                 </div>
             </div>
@@ -590,7 +589,6 @@ export default function Dashboard() {
                             <span className="h-[5px] w-[5px] rounded-full bg-[#D9822F]" aria-hidden="true" />
                             <span className="font-mono text-[12px] font-medium text-white/90">{todayBookings}</span>
                             trips · {tomorrowPax} pax tomorrow
-                            <ArrowUpRight size={14} className="ml-auto text-white/35 transition-all group-hover:text-white/80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                         </div>
                     </div>
                 </Link>
@@ -601,7 +599,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-5">
                         <h3 className="ui-mono-label">Revenue</h3>
                         <span className="ui-mono-label !tracking-[0.06em] flex items-center gap-1.5 transition-colors group-hover:!text-[var(--ck-text-strong)]">
-                            View reports <ArrowUpRight size={12} />
+                            View reports
                         </span>
                     </div>
                     <div className="grid grid-cols-3 divide-x" style={{ borderColor: "var(--ck-border-subtle)" }}>
@@ -634,12 +632,8 @@ export default function Dashboard() {
                 <Link href="/refunds" className="ui-card ui-card-hover group block p-5">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
-                                <CurrencyCircleDollar size={19} weight="fill" />
-                            </span>
                             <span className="ui-mono-label">Pending Refunds</span>
                         </div>
-                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
                     </div>
                     <div className="font-display mb-3 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                         {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
@@ -655,12 +649,8 @@ export default function Dashboard() {
                 <Link href="/inbox" className="ui-card ui-card-hover group block p-5">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
-                                <ChatText size={19} weight="fill" />
-                            </span>
                             <span className="ui-mono-label">Inbox Action</span>
                         </div>
-                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
                     </div>
                     <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                         {inboxCount} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>msgs</span>
@@ -676,12 +666,8 @@ export default function Dashboard() {
                 <Link href="/photos" className="ui-card ui-card-hover group block p-5">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <span className="ui-icon-chip" style={{ background: "rgba(62, 124, 166, 0.12)", color: "var(--ck-fjord)" }}>
-                                <Camera size={19} weight="fill" />
-                            </span>
                             <span className="ui-mono-label">Photos Out</span>
                         </div>
-                        <ArrowUpRight size={15} className="transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: "var(--ck-text-muted)" }} />
                     </div>
                     <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                         {photosOutstanding} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>trips</span>
@@ -725,14 +711,13 @@ export default function Dashboard() {
                             <p className="ui-mono-label !text-[10px] mt-1">Pax per slot</p>
                         </div>
                         <Link href="/new-booking" className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px] hidden sm:inline-flex">
-                            <Plus size={13} weight="bold" /> Add Booking
+                            Add Booking
                         </Link>
                     </div>
 
                     <div className="flex-1 overflow-x-auto">
                         {slotGroups.length === 0 ? (
                             <div className="ui-empty">
-                                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
                                 <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
                                     {manifestDate === "TODAY" ? "No bookings today" : "No bookings tomorrow"}
                                 </p>
@@ -811,7 +796,7 @@ export default function Dashboard() {
                         <div>
                             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
                             <p className="text-[12px] font-medium mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-                                {activeSlot ? `${activeSlot.time} — ${activeSlot.tourName}` : "No slots today"}
+                                {activeSlot ? `${activeSlot.time} · ${activeSlot.tourName}` : "No slots today"}
                             </p>
                         </div>
                         {slotGroups.length > 1 && (
@@ -851,7 +836,6 @@ export default function Dashboard() {
                     <div className="flex-1 overflow-x-auto">
                         {!activeSlot ? (
                             <div className="ui-empty">
-                                <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
                                 <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings today</p>
                                 <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Roll call opens when the first booking lands.</p>
                             </div>
@@ -935,7 +919,7 @@ export default function Dashboard() {
                                         </span>
                                         {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 ? (
                                             <span className="flex items-center gap-1.5 text-[12px] font-bold shrink-0" style={{ color: "var(--ck-success)" }}>
-                                                <CheckCircle size={15} weight="fill" /> All present
+                                                All present
                                             </span>
                                         ) : (
                                             <div className="ui-progress w-28">
@@ -959,7 +943,7 @@ export default function Dashboard() {
                             <p className="ui-mono-label !text-[10px] mt-0.5">Wind &amp; sea conditions</p>
                         </div>
                         <button onClick={() => setEditingLocs(!editingLocs)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
-                            Manage Locations <GearSix size={13} weight="bold" />
+                            Manage Locations
                         </button>
                     </div>
 
@@ -985,7 +969,7 @@ export default function Dashboard() {
                         {/* Windguru */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` — ${location.name}` : ""}</span>
+                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` · ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setWgRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
                                     {location && <a href={`https://www.windguru.cz/${location.wgSpot}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}
@@ -1011,7 +995,7 @@ export default function Dashboard() {
                         {/* Windy */}
                         <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` — ${location.name}` : ""}</span>
+                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` · ${location.name}` : ""}</span>
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setWindyRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
                                     {location && <a href={`https://www.windy.com/${location.lat}/${location.lon}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}

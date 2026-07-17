@@ -33,7 +33,11 @@ Bulk runs show per-row progress so you can see exactly which succeeded.
 
 ## Cancelling a paid booking
 
-Cancelling a paid booking releases the seats back to the slot and starts the refund flow according to your cancellation policy — the customer may be offered a refund, a voucher, or a reschedule depending on how close to departure it is. Refund amounts follow the time-based tiers configured in Settings.
+Cancelling a paid booking releases the seats back to the slot and emails the customer so **they choose** how to handle it: reschedule, voucher, or full refund (managed from their My Bookings page) — the same workflow as an operator/weather cancellation.
+
+**Within 24 hours of the trip start** the booking is forfeited instead: the customer is notified but gets no refund options. When you cancel inside that window, the confirm dialog lets you override this and still offer the reschedule/voucher/refund choice — use it for goodwill cases.
+
+Voucher-paid bookings are the exception: cancelling one re-issues a voucher for the full amount rather than offering the three options.
 
 ## Exporting
 

@@ -66,7 +66,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-[color:var(--ck-bg)] border border-[color:var(--ck-border-subtle)] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         <header className="p-4 border-b border-[color:var(--ck-border-subtle)] flex items-center justify-between">
-          <h2 className="font-bold text-[color:var(--ck-text)]">Bulk generate — Step {step}/4</h2>
+          <h2 className="font-bold text-[color:var(--ck-text)]">Bulk generate: Step {step}/4</h2>
           <button onClick={onClose} className="text-[color:var(--ck-text-muted)] hover:text-[color:var(--ck-text)]" aria-label="Close">&times;</button>
         </header>
 

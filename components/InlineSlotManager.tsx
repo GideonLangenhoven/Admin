@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../app/lib/supabase";
 import { notify, confirmAction } from "../app/lib/app-notify";
-import { Trash, PencilSimple } from "@phosphor-icons/react";
 
 interface SlotItem {
   id: string;
@@ -172,14 +171,14 @@ export default function InlineSlotManager({
                        <div className="flex flex-col items-end">
                          <span className="text-xs text-[var(--ck-text-strong)] font-semibold">{commonCap} capacity</span>
                          <button type="button" onClick={() => { setEditCap(commonCap); setEditingBundleTime(timeKey); }} className="text-[10px] text-[var(--ck-accent)] font-semibold hover:underline flex items-center gap-1">
-                           <PencilSimple size={12} weight="bold" /> Edit capacity
+                           Edit capacity
                          </button>
                        </div>
                        
                        <div className="w-px h-6 bg-[var(--ck-border-strong)] hidden sm:block"></div>
                        
                        <button type="button" onClick={() => handleBundleDelete(timeKey, items)} disabled={openItems.length === 0 || editingBundleTime === timeKey} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-red-50" title={openItems.length === 0 ? "Cannot delete times that only contain booked slots" : "Delete all upcoming empty slots at this time"}>
-                         <Trash size={14} weight="bold" /> Delete Open 
+                         Delete Open
                        </button>
                      </div>
                    )}

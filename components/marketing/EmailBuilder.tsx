@@ -3,9 +3,7 @@ import { useState, useRef } from "react";
 import { supabase } from "../../app/lib/supabase";
 import { notify } from "../../app/lib/app-notify";
 import {
-  Trash, DotsSixVertical, TextT, Image as ImageIcon, Minus, ArrowUp, ArrowDown,
-  Eye, Code, FloppyDisk, CursorClick, ArrowsDownUp, TextH, ShareNetwork, Play,
-  Quotes, Columns, Timer, MapPin, FileText, Monitor, DeviceMobile,
+  Trash, DotsSixVertical, ArrowUp, ArrowDown,
 } from "@phosphor-icons/react";
 import type { Block } from "./blocks/block-types";
 import { uid, createBlock } from "./blocks/block-types";
@@ -14,20 +12,20 @@ import { BlockEditor } from "./blocks/block-editors";
 
 /* ── Toolbar block definitions ── */
 
-const BLOCK_DEFS: { type: Block["type"]; label: string; icon: React.ReactNode }[] = [
-  { type: "text", label: "Text", icon: <TextT size={12} /> },
-  { type: "image", label: "Image", icon: <ImageIcon size={12} /> },
-  { type: "button", label: "Button", icon: <CursorClick size={12} /> },
-  { type: "divider", label: "Divider", icon: <Minus size={12} /> },
-  { type: "spacer", label: "Spacer", icon: <ArrowsDownUp size={12} /> },
-  { type: "header", label: "Header", icon: <TextH size={12} /> },
-  { type: "social", label: "Social", icon: <ShareNetwork size={12} /> },
-  { type: "video", label: "Video", icon: <Play size={12} /> },
-  { type: "quote", label: "Quote", icon: <Quotes size={12} /> },
-  { type: "columns", label: "Columns", icon: <Columns size={12} /> },
-  { type: "countdown", label: "Countdown", icon: <Timer size={12} /> },
-  { type: "tourcard", label: "Tour Card", icon: <MapPin size={12} /> },
-  { type: "footer", label: "Footer", icon: <FileText size={12} /> },
+const BLOCK_DEFS: { type: Block["type"]; label: string }[] = [
+  { type: "text", label: "Text" },
+  { type: "image", label: "Image" },
+  { type: "button", label: "Button" },
+  { type: "divider", label: "Divider" },
+  { type: "spacer", label: "Spacer" },
+  { type: "header", label: "Header" },
+  { type: "social", label: "Social" },
+  { type: "video", label: "Video" },
+  { type: "quote", label: "Quote" },
+  { type: "columns", label: "Columns" },
+  { type: "countdown", label: "Countdown" },
+  { type: "tourcard", label: "Tour Card" },
+  { type: "footer", label: "Footer" },
 ];
 
 /* ── Props ── */
@@ -164,7 +162,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         {BLOCK_DEFS.map((def) => (
           <button key={def.type} onClick={() => addBlock(def.type)}
             className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
-            {def.icon} {def.label}
+            {def.label}
           </button>
         ))}
 
@@ -172,18 +170,18 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
           {preview && (
             <div className="ui-seg">
               <button onClick={() => setPreviewMode("desktop")} className="ui-seg-item" data-active={previewMode === "desktop"}>
-                <Monitor size={12} /> Desktop
+                Desktop
               </button>
               <button onClick={() => setPreviewMode("mobile")} className="ui-seg-item" data-active={previewMode === "mobile"}>
-                <DeviceMobile size={12} /> Mobile
+                Mobile
               </button>
             </div>
           )}
           <button onClick={() => setPreview(!preview)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
-            {preview ? <><Code size={12} /> Editor</> : <><Eye size={12} /> Preview</>}
+            {preview ? "Editor" : "Preview"}
           </button>
           <button onClick={handleSave} className="ui-btn ui-btn-primary !h-8 !px-3 text-xs gap-1">
-            <FloppyDisk size={12} /> Save Template
+            Save Template
           </button>
         </div>
       </div>
@@ -201,7 +199,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         /* Preview */
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)", background: "#f3f4f6" }}>
           <div className="p-2 text-xs font-medium" style={{ background: "var(--ck-surface)", color: "var(--ck-text-muted)", borderBottom: "1px solid var(--ck-border-subtle)" }}>
-            Preview ({previewMode === "desktop" ? "Desktop 600px" : "Mobile 375px"}) — Subject: {subject || "(none)"}
+            Preview ({previewMode === "desktop" ? "Desktop 600px" : "Mobile 375px"}). Subject: {subject || "(none)"}
           </div>
           <div className="flex justify-center p-4" style={{ background: "#e5e7eb" }}>
             <iframe

@@ -19,7 +19,7 @@ export default function BotStatusBanner() {
       if (!r.ok) return;
       const data = await r.json();
       if (data.mode === "OFF") {
-        setBannerText("WhatsApp bot is off — every message goes to this inbox.");
+        setBannerText("WhatsApp bot is off. Every message goes to this inbox.");
       } else if (data.mode === "OUTSIDE_HOURS" && !data.currentlyActive) {
         setBannerText("WhatsApp bot is paused during business hours.");
       }

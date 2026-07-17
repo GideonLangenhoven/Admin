@@ -4,7 +4,6 @@ import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { CHAT_INTENTS, INTENT_LABELS, type ChatIntent } from "../../lib/intent-types";
-import { Plus, ChatText } from "@phosphor-icons/react";
 
 type FaqEntry = {
   id: string;
@@ -93,7 +92,7 @@ export default function ChatFaqPage() {
     const label = entry?.question_pattern ? `"${entry.question_pattern}"` : "this quick answer";
     if (!await confirmAction({
       title: "Delete quick answer",
-      message: `Remove ${label}? Customers will no longer get an automatic reply for this question. This can't be undone — add it back later if you change your mind.`,
+      message: `Remove ${label}? Customers will no longer get an automatic reply for this question. This can't be undone, though you can add it back later if you change your mind.`,
       tone: "warning",
       confirmLabel: "Delete quick answer",
     })) return;
@@ -140,14 +139,14 @@ export default function ChatFaqPage() {
           <p className="ui-mono-label mb-2">Chat Automation</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: "var(--ck-text-muted)" }}>
-            Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly — no waiting for you to type it.
+            Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly, with no waiting for you to type it.
           </p>
         </div>
         <button
           onClick={() => { setShowAdd(true); setEditId(null); setForm({ intent: "BOOKING_QUESTION", question_pattern: "", keywords: "", answer: "" }); }}
           className="ui-btn ui-btn-primary shrink-0"
         >
-          <Plus size={15} weight="bold" /> Add a quick answer
+          Add a quick answer
         </button>
       </div>
 
@@ -170,7 +169,7 @@ export default function ChatFaqPage() {
             </label>
           </div>
           <label className="block">
-            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words (separate with commas) — if a message contains these words, this answer is sent</span>
+            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words (separate with commas). If a message contains these words, this answer is sent.</span>
             <input value={form.keywords} onChange={e => setForm({ ...form, keywords: e.target.value })}
               placeholder="e.g. time, start, when, schedule, what time" className="ui-control w-full text-sm" />
           </label>

@@ -82,7 +82,7 @@ async function collectChunks(businessId: string): Promise<ChunkInput[]> {
       chunk_key: "tour:" + t.id,
       source: "tour",
       title: t.name,
-      content: t.name + " — " + String(t.description || "").trim() +
+      content: t.name + ": " + String(t.description || "").trim() +
         " Duration: " + t.duration_minutes + " minutes. Price: R" + t.base_price_per_person + " per person.",
     });
   }

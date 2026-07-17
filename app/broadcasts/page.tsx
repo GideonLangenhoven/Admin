@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CaretLeft, CaretRight, Check, CloudRain, PaperPlaneTilt } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Check } from "@phosphor-icons/react";
 import { confirmAction } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -314,7 +314,7 @@ export default function BroadcastsPage() {
         </div>
         <button onClick={() => { setWeatherMode(!weatherMode); setWeatherResult(null); }}
           className={"ui-btn w-full sm:w-auto " + (weatherMode ? "ui-btn-danger" : "ui-btn-ghost")}>
-          <CloudRain size={15} /> {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
+          {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
         </button>
       </div>
 
@@ -411,9 +411,6 @@ export default function BroadcastsPage() {
         <div className="lg:col-span-8 space-y-4">
           {/* Selected summary */}
           <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
-              <PaperPlaneTilt size={19} />
-            </span>
             <div className="flex-1">
               <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
                 <span className="font-display tabular-nums">{selectedSlotIds.length}</span> slot{selectedSlotIds.length !== 1 ? "s" : ""} selected
@@ -501,9 +498,6 @@ export default function BroadcastsPage() {
           {weatherMode ? (
             <div className="ui-card p-5" style={{ borderColor: "var(--ck-danger-soft)" }}>
               <div className="flex items-center gap-2.5 mb-2">
-                <span className="ui-icon-chip" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-                  <CloudRain size={19} />
-                </span>
                 <h2 className="text-lg font-semibold" style={{ color: "var(--ck-danger)" }}>Weather Cancellation</h2>
               </div>
               <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>Cancels selected slots, sends refund/reschedule options via WhatsApp, and a professional cancellation email.</p>
@@ -548,7 +542,7 @@ export default function BroadcastsPage() {
                 </div>
                 <button onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
                   className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
-                  <PaperPlaneTilt size={15} /> {sending ? "Sending..." : "Send to " + bookings.length + " Customers — email + WhatsApp where possible"}
+                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers (email + WhatsApp where possible)"}
                 </button>
                 {result && (() => {
                   if (result.error) {
@@ -588,7 +582,6 @@ export default function BroadcastsPage() {
             <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Recent Broadcasts</h2>
             {history.length === 0 ? (
               <div className="ui-empty !py-8">
-                <span className="ui-icon-chip"><PaperPlaneTilt size={19} /></span>
                 <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No broadcasts sent yet.</p>
               </div>
             ) : (

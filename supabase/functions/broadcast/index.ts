@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { getAdminAppOrigins, isAllowedOrigin, getTenantByBusinessId, getBusinessDisplayName } from "../_shared/tenant.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -92,11 +92,23 @@ Deno.serve(async (req: Request) => {
     const errors: string[] = [];
     // Per-recipient channel accounting (item 19). WhatsApp's 24h free-form
     // window is enforced by Meta: inside the window we can send free-form text;
-    // outside it we must use an approved template. sendWhatsappTextForTenant
-    // handles that routing reactively (free-form → catch 131047/131026 → the
-    // admin_outreach template), and reports back which channel it used.
+    // outside it we must use an approved template. send-whatsapp-text handles
+    // that routing reactively (free-form → catch 131047/131026 → template) and
+    // reports back which channel it used. Out-of-window recipients get the
+    // pre-approved reopener template ("please reply") and the actual broadcast
+    // message is queued in outbox — wa-webhook drains it the moment they reply.
     const channelCounts = { wa_freeform: 0, wa_template: 0, email: 0, email_fallback: 0, failed: 0 };
     const channelLog: Array<{ to: string; channel: string }> = [];
+    const reopenerName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+    let brandName = "";
+    if (send_whatsapp) {
+      try {
+        const tenant = await getTenantByBusinessId(supabase, business_id);
+        brandName = getBusinessDisplayName(tenant.business);
+      } catch (e) {
+        console.error("BROADCAST_TENANT_LOOKUP_ERR:", e);
+      }
+    }
 
     for (const b of bookings) {
       let sentToCustomer = false;
@@ -120,7 +132,7 @@ Deno.serve(async (req: Request) => {
               to: b.phone,
               message: parsedMessage,
               business_id,
-              template_fallback: { name: "admin_outreach", params: [firstName, parsedMessage], language: "en" },
+              template_fallback: { name: reopenerName, params: [firstName, brandName || "our team"], language: "en" },
             }),
           });
           const waBody = await waRes.json().catch(() => ({} as any));
@@ -130,6 +142,23 @@ Deno.serve(async (req: Request) => {
             sentToCustomer = true;
             channelUsed = waBody.channel === "template" ? "wa_template" : "wa_freeform";
             channelCounts[channelUsed === "wa_template" ? "wa_template" : "wa_freeform"]++;
+            // Out-of-window: the recipient only got the reopener ("please
+            // reply") — queue the real broadcast message so wa-webhook
+            // delivers it the moment they respond.
+            if (channelUsed === "wa_template") {
+              let normalizedTo = String(b.phone || "").replace(/\D/g, "");
+              if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
+              const { error: qErr } = await supabase.from("outbox").insert({
+                business_id,
+                booking_id: b.id,
+                phone: normalizedTo,
+                message_type: "BROADCAST_FOLLOWUP",
+                message_body: parsedMessage,
+                scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
+                status: "WAITING_WINDOW",
+              });
+              if (qErr) console.error("BROADCAST_QUEUE_ERR for", b.phone, ":", qErr.message);
+            }
           } else {
             errors.push(`WA to ${b.phone}: ${waBody?.error || ("HTTP " + waRes.status)}`);
           }
@@ -187,7 +216,7 @@ Deno.serve(async (req: Request) => {
           // mass commercial email. This used to send anyway with a blank
           // unsubscribe link whenever token creation failed above.
           if (!unsubscribeUrl) {
-            errors.push(`Email to ${b.email}: skipped — could not generate an unsubscribe token`);
+            errors.push(`Email to ${b.email}: skipped, could not generate an unsubscribe token`);
             continue;
           }
 

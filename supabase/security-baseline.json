@@ -8202,7 +8202,7 @@
       "policyname": "vouchers_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "((upper(regexp_replace(code, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(bt_request_header('x-voucher-code'::text), '\\s+'::text, ''::text, 'g'::text))) AND (bt_request_header('x-voucher-code'::text) <> ''::text))",
+      "qual": "((upper(regexp_replace(code, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(bt_request_header('x-voucher-code'::text), '\\s+'::text, ''::text, 'g'::text))) AND (bt_request_header('x-voucher-code'::text) <> ''::text) AND ((business_id)::text = bt_request_header('x-tenant-business-id'::text)))",
       "with_check": null
     },
     {

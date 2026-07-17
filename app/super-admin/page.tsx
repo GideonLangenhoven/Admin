@@ -7,7 +7,6 @@ import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { EnvelopeSimple, WarningCircle, Receipt, Buildings, Robot } from "@phosphor-icons/react";
 
 type OnboardForm = {
   businessName: string;
@@ -40,6 +39,15 @@ const DEFAULT_FORM: OnboardForm = {
 };
 
 const BOOKING_DOMAIN = "booking.bookingtours.co.za";
+
+// Single pricing model — mirrors the 'standard' row in the plans table:
+// R2000/month includes 1 admin seat, R500/month per additional seat.
+const PLAN_BASE_ZAR = 2000;
+const PLAN_INCLUDED_SEATS = 1;
+const PLAN_EXTRA_SEAT_ZAR = 500;
+function monthlyCostZar(seats: number) {
+  return PLAN_BASE_ZAR + Math.max(0, (seats || 1) - PLAN_INCLUDED_SEATS) * PLAN_EXTRA_SEAT_ZAR;
+}
 
 type BusinessRow = {
   id: string;
@@ -160,7 +168,7 @@ export default function SuperAdminPage() {
     if (error) {
       notify({ title: "Failed", message: error.code === "23505" ? "This subdomain is already taken." : error.message, tone: "error" });
     } else {
-      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN} — all 6 booking URLs regenerated`, tone: "success" });
+      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN}: all 6 booking URLs regenerated`, tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === businessId ? { ...b, subdomain: slug } : b));
       // Refresh expanded detail if this is the open one
       if (expandedBiz === businessId) await loadBizDetail(businessId);
@@ -609,9 +617,7 @@ export default function SuperAdminPage() {
         </div>
 
         {businesses.length === 0 && !loadingBiz && (
-          <div className="ui-empty">
-            <span className="ui-icon-chip"><Buildings size={19} /></span>
-            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No businesses yet</p>
+          <div className="ui-empty">            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No businesses yet</p>
             <p className="text-xs text-[var(--ck-text-muted)]">New tenants you onboard will appear here.</p>
           </div>
         )}
@@ -698,6 +704,18 @@ export default function SuperAdminPage() {
                 {/* ── Expanded Detail Panel ── */}
                 {expandedBiz === b.id && (
                   <div className="mt-3 border-t pt-4 space-y-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    {/* ── Monthly cost (single pricing model) ── */}
+                    <div className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                      <span className="font-semibold text-[var(--ck-text-strong)]">
+                        Monthly cost: R{monthlyCostZar(b.max_admin_seats).toLocaleString("en-ZA")}/month
+                      </span>
+                      <span className="ml-2 text-xs text-[var(--ck-text-muted)]">
+                        R{PLAN_BASE_ZAR.toLocaleString("en-ZA")} base (1 seat included)
+                        {b.max_admin_seats > PLAN_INCLUDED_SEATS
+                          ? ` + ${b.max_admin_seats - PLAN_INCLUDED_SEATS} extra seat${b.max_admin_seats - PLAN_INCLUDED_SEATS === 1 ? "" : "s"} × R${PLAN_EXTRA_SEAT_ZAR}`
+                          : ""}
+                      </span>
+                    </div>
                     {bizDetailLoading ? (
                       <div className="space-y-2 py-2"><div className="ui-skeleton h-4 w-3/4" /><div className="ui-skeleton h-4 w-1/2" /></div>
                     ) : bizDetail ? (
@@ -859,7 +877,7 @@ export default function SuperAdminPage() {
                           <div className="grid grid-cols-3 gap-3">
                             {[
                               ["activity_noun", "Activity noun (e.g. 'tour', 'dive', 'flight')"],
-                              ["activity_verb_past", "Activity verb — past (e.g. 'kayaked')"],
+                              ["activity_verb_past", "Activity verb in the past tense (e.g. 'kayaked')"],
                               ["location_phrase", "Location phrase (e.g. 'in Cape Town')"],
                             ].map(([key, label]) => (
                               <label key={key} className="text-xs text-[var(--ck-text-muted)]">
@@ -906,7 +924,7 @@ export default function SuperAdminPage() {
                         {/* ── FAQs ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>
-                            FAQs ({bizFaqs.length}) — Powers chatbot responses
+                            FAQs ({bizFaqs.length}): powers chatbot responses
                           </legend>
                           <div className="space-y-2">
                             {bizFaqs.map((faq, i) => (
@@ -1198,7 +1216,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       setShowPreview(true);
       setFirebaseSite(biz.subdomain || biz.business_name?.toLowerCase().replace(/[^a-z0-9]/g, "-") || "site");
       setCustomDomain("");
-      notify({ title: "Landing page generated", message: `${ctx.business_name} — ${selectedTemplate} template`, tone: "success" });
+      notify({ title: "Landing page generated", message: `${ctx.business_name}: ${selectedTemplate} template`, tone: "success" });
     } catch (err: any) {
       notify({ title: "Generation failed", message: err.message, tone: "error" });
     }
@@ -1271,7 +1289,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Template</label>
           <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}
             className="w-full ui-control rounded-lg px-3 py-2 text-sm">
-            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.desc}</option>)}
+            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}: {t.desc}</option>)}
           </select>
         </div>
       </div>
@@ -1300,7 +1318,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           {/* Preview iframe */}
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>
-              <span>Preview — {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
+              <span>Preview: {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
               <div className="flex gap-2">
                 <button onClick={() => setShowPreview(!showPreview)} className="hover:underline">{showPreview ? "Hide" : "Show"}</button>
               </div>
@@ -1499,7 +1517,7 @@ function EmailUsageBilling() {
 
       notify({
         title: "Invoice created",
-        message: `Invoice ${inv.invoice_number} for R${row.overage_cost.toFixed(2)} — ${row.overage} overage emails in ${periodLabel}`,
+        message: `Invoice ${inv.invoice_number} for R${row.overage_cost.toFixed(2)} covers ${row.overage} overage emails in ${periodLabel}`,
         tone: "success",
       });
     } catch (err: any) {
@@ -1535,25 +1553,19 @@ function EmailUsageBilling() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-5">
         <div className="ui-card p-4">
-          <div className="flex items-center gap-2">
-            <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}><EnvelopeSimple size={19} /></span>
-            <span className="ui-mono-label">Emails Sent</span>
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Emails Sent</span>
           </div>
           <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{totalSent.toLocaleString()}</div>
           <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">in {periodLabel}</div>
         </div>
         <div className="ui-card p-4">
-          <div className="flex items-center gap-2">
-            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><WarningCircle size={19} /></span>
-            <span className="ui-mono-label">Over Limit</span>
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Over Limit</span>
           </div>
           <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{rows.filter((r) => r.overage > 0).length}</div>
           <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">businesses over their plan</div>
         </div>
         <div className="ui-card p-4">
-          <div className="flex items-center gap-2">
-            <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}><Receipt size={19} /></span>
-            <span className="ui-mono-label">Overage Owed</span>
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Overage Owed</span>
           </div>
           <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: totalOverageCost > 0 ? "var(--ck-amber)" : "var(--ck-text-strong)" }}>R{totalOverageCost.toFixed(2)}</div>
           <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">total for {periodLabel}</div>
@@ -1715,7 +1727,7 @@ function PlatformInvoicesBilling() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to generate");
-      notify({ title: "Invoice generated", message: `${row.business_name} — R${Number(data.invoice.amount_zar).toFixed(2)}`, tone: "success" });
+      notify({ title: "Invoice generated", message: `${row.business_name}: R${Number(data.invoice.amount_zar).toFixed(2)}`, tone: "success" });
       loadInvoices();
     } catch (err: any) {
       notify({ title: "Generate failed", message: err.message, tone: "error" });

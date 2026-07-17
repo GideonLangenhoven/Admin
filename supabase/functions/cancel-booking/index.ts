@@ -63,6 +63,10 @@ async function verifyAdminSession(req: any) {
  * refund_status = ACTION_REQUIRED so the customer chooses their preferred
  * compensation (reschedule / voucher / refund) from /my-bookings.
  *
+ * 24h forfeit rule: if the cancellation happens within 24 hours of the trip
+ * start, the customer forfeits the booking (no compensation choice) unless
+ * the admin passes allow_late_choice: true to grant it anyway.
+ *
  * Customer notification uses the two-step WhatsApp flow (reopener template +
  * queued full message when the 24h service window is closed) — see
  * sendWhatsappWithWindowReopen in _shared/tenant.ts.
@@ -79,7 +83,7 @@ Deno.serve(async (req: any) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { booking_id, reason } = body as { booking_id?: string; reason?: string };
+    const { booking_id, reason, allow_late_choice } = body as { booking_id?: string; reason?: string; allow_late_choice?: boolean };
 
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: getCors(req) });
@@ -117,15 +121,26 @@ Deno.serve(async (req: any) => {
     const refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
     const nowIso = new Date().toISOString();
 
+    // 24h forfeit rule: a cancellation within 24 hours of the trip start (or
+    // after it) forfeits the booking — no reschedule/voucher/refund choice —
+    // unless the admin explicitly grants it via allow_late_choice.
+    const slotStartIso = (booking as any).slots?.start_time as string | undefined;
+    const isLate = !!slotStartIso && new Date(slotStartIso).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+    const offerChoice = isPaid && refundAmount > 0 && (!isLate || allow_late_choice === true);
+    const isForfeit = isPaid && refundAmount > 0 && !offerChoice;
+
     // Update booking row (mirrors weather-cancel's refund_status=ACTION_REQUIRED pattern)
     const { error: updErr } = await supabase.from("bookings").update({
       status: "CANCELLED",
       cancellation_reason: cancelReason,
       cancelled_at: nowIso,
-      ...(isPaid && refundAmount > 0 ? {
+      ...(offerChoice ? {
         refund_status: "ACTION_REQUIRED",
         refund_amount: refundAmount,
-        refund_notes: "Admin cancellation — customer to choose: reschedule, voucher, or refund via My Bookings",
+        refund_notes: "Admin cancellation. Customer to choose: reschedule, voucher, or refund via My Bookings",
+      } : {}),
+      ...(isForfeit ? {
+        refund_notes: "Cancelled within 24h of trip start. Booking forfeited per cancellation policy",
       } : {}),
     }).eq("id", booking_id);
 
@@ -160,7 +175,7 @@ Deno.serve(async (req: any) => {
     if (booking.phone) {
       try {
         const firstName = String(booking.customer_name || "").split(" ")[0] || "there";
-        const waMessage = isPaid
+        const waMessage = offerChoice
           ? "Booking Cancelled\n\n" +
             "Hi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
             " has been cancelled.\n\n" +
@@ -168,14 +183,22 @@ Deno.serve(async (req: any) => {
             "Ref: " + ref + "\n\n" +
             "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
             manageBookingUrl + "\n\n" +
-            "We're sorry for the inconvenience \u2014 " + brandName
+            "We're sorry for the inconvenience. " + brandName
+          : isForfeit
+          ? "Booking Cancelled\n\n" +
+            "Hi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
+            " has been cancelled.\n\n" +
+            "Reason: " + cancelReason + "\n" +
+            "Ref: " + ref + "\n\n" +
+            "As the cancellation is within 24 hours of the trip start, the booking amount is forfeited per our cancellation policy. If you have any questions, just reply to this message.\n\n" +
+            brandName
           : "Booking Cancelled\n\n" +
             "Hi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
             " has been cancelled.\n\n" +
             "Reason: " + cancelReason + "\n" +
             "Ref: " + ref + "\n\n" +
             "No payment was taken, so no action is needed.\n\n" +
-            "Thanks \u2014 " + brandName;
+            "Thanks. " + brandName;
 
         await sendWhatsappWithWindowReopen(supabase, tenant, {
           to: booking.phone,
@@ -207,6 +230,7 @@ Deno.serve(async (req: any) => {
               total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
               is_weather: false,
               is_unpaid: !isPaid,
+              is_forfeit: isForfeit,
             },
           }),
         });
@@ -228,7 +252,9 @@ Deno.serve(async (req: any) => {
         admin_role: session.role,
         reason: cancelReason,
         was_paid: isPaid,
-        refund_amount_action_required: isPaid ? refundAmount : 0,
+        refund_amount_action_required: offerChoice ? refundAmount : 0,
+        late_forfeit: isForfeit,
+        allow_late_choice: allow_late_choice === true,
       },
     });
     if (logErr) console.error("LOG_ERR:", logErr.message);
@@ -236,8 +262,9 @@ Deno.serve(async (req: any) => {
     return new Response(JSON.stringify({
       ok: true,
       booking_id,
-      refund_action_required: isPaid,
-      refund_amount: isPaid ? refundAmount : 0,
+      refund_action_required: offerChoice,
+      refund_amount: offerChoice ? refundAmount : 0,
+      late_forfeit: isForfeit,
     }), { status: 200, headers: getCors(req) });
 
   } catch (err: any) {

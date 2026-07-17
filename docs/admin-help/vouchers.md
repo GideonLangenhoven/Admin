@@ -4,7 +4,7 @@ route: /vouchers
 required_role: OPERATOR
 ---
 
-Vouchers cover gifts, credits, and free trips. Each voucher has an 8-character code the recipient redeems when booking.
+Vouchers cover gifts, credits, and free trips. Each voucher has an 8-character code the recipient redeems when booking. Vouchers are specific to your business — a voucher you issue can only be redeemed on your own tours, never with another operator.
 
 ## Creating a voucher
 

@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/app-notify";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { FloppyDisk, TrendUp, Trash, Warning, Tag, CheckCircle } from "@phosphor-icons/react";
+import { Warning } from "@phosphor-icons/react";
 
 export default function PeakPricingPage() {
   const { businessId } = useBusinessContext();
@@ -169,7 +169,7 @@ export default function PeakPricingPage() {
 
     if (updated === 0) {
       notify({
-        title: "Peak period saved — but 0 slots existed",
+        title: "Peak period saved, but 0 slots existed",
         message: "No slots existed in " + startDate + " to " + endDate + " yet. The pricing rule is stored and will apply automatically when slots are created for these dates.",
         tone: "warning",
         duration: 7000,
@@ -285,7 +285,7 @@ export default function PeakPricingPage() {
             <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Base pricing is your always-on rate. Peak pricing is used when you apply a seasonal range below.</p>
           </div>
           <button onClick={saveTourPricing} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
-            <FloppyDisk size={15} /> {saving ? "Saving..." : "Save tour prices"}
+            {saving ? "Saving..." : "Save tour prices"}
           </button>
         </div>
 
@@ -383,9 +383,9 @@ export default function PeakPricingPage() {
 
         <button onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
           className="ui-btn ui-btn-primary w-full disabled:opacity-50">
-          <TrendUp size={15} /> {saving ? "Applying..." : "Apply Peak Pricing"}
+          {saving ? "Applying..." : "Apply Peak Pricing"}
         </button>
-        {result && <p className="mt-3 flex items-center gap-1.5 text-sm" style={{ color: "var(--ck-success)" }}><CheckCircle size={15} weight="fill" /> {result}</p>}
+        {result && <p className="mt-3 flex items-center gap-1.5 text-sm" style={{ color: "var(--ck-success)" }}>{result}</p>}
       </div>
 
       {/* Active Peak Periods (from peak_periods table) */}
@@ -401,7 +401,7 @@ export default function PeakPricingPage() {
                     <span className="ui-status ui-pill-amber">Priority {p.priority}</span>
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-                    {new Date(p.start_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} — {new Date(p.end_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(p.start_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} to {new Date(p.end_date + "T00:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   {(p.peak_period_prices || []).length > 0 && (
                     <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
@@ -414,7 +414,7 @@ export default function PeakPricingPage() {
                 </div>
                 <button onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
                   className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
-                  <Trash size={14} /> Remove
+                  Remove
                 </button>
               </div>
             ))}
@@ -427,7 +427,6 @@ export default function PeakPricingPage() {
         <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>Active Peak Slots</h2>
         {peakRanges.length === 0 ? (
           <div className="ui-empty">
-            <span className="ui-icon-chip"><Tag size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No peak pricing set</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Apply a seasonal range above to mark slots as peak.</p>
           </div>
@@ -437,13 +436,13 @@ export default function PeakPricingPage() {
               <div key={i} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 22%, transparent)" }}>
                 <div>
                   <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>
-                    {new Date(r.startDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} — {new Date(r.endDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(r.startDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} to {new Date(r.endDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{r.count} slots {r.price ? "@ R" + r.price : ""}</p>
                 </div>
                 <button onClick={() => removePeakRange(r.startDate, r.endDate)}
                   className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
-                  <Trash size={14} /> Remove
+                  Remove
                 </button>
               </div>
             ))}

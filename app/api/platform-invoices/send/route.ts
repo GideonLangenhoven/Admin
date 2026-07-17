@@ -26,20 +26,45 @@ export async function POST(req: NextRequest) {
   if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   if (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") {
-    return NextResponse.json({ error: "This invoice is already paid — nothing to send." }, { status: 400 });
+    return NextResponse.json({ error: "This invoice is already paid, so there is nothing to send." }, { status: 400 });
   }
 
-  const { data: business } = await db.from("businesses").select("business_name").eq("id", invoice.business_id).maybeSingle();
+  const { data: business } = await db.from("businesses").select("business_name, billing_admin_user_id").eq("id", invoice.business_id).maybeSingle();
 
-  const { data: recipients, error: recErr } = await db.from("admin_users")
-    .select("email, name")
-    .eq("business_id", invoice.business_id)
-    .in("role", ["MAIN_ADMIN", "ADMIN"]);
-  if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 });
-
-  const targets = (recipients || []).filter((a) => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email));
-  if (targets.length === 0) {
+  // Billing goes to ONE person: the operator's chosen billing contact if set,
+  // otherwise the first admin account ever created on the business (any role).
+  let target: { email: string; name: string } | null = null;
+  if (business?.billing_admin_user_id) {
+    const { data: chosen } = await db.from("admin_users")
+      .select("email, name")
+      .eq("id", business.billing_admin_user_id)
+      .eq("business_id", invoice.business_id)
+      .maybeSingle();
+    if (chosen && !HIDDEN_SUPERADMIN_EMAILS.includes(chosen.email)) target = chosen;
+  }
+  if (!target) {
+    const { data: recipients, error: recErr } = await db.from("admin_users")
+      .select("email, name")
+      .eq("business_id", invoice.business_id)
+      .order("created_at", { ascending: true });
+    if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 });
+    target = (recipients || []).find((a) => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)) || null;
+  }
+  if (!target) {
     return NextResponse.json({ error: "This business has no admins to email." }, { status: 400 });
+  }
+
+  // An outstanding-invoice email must always carry a Pay Now link — create the
+  // Yoco checkout up front if the invoice doesn't have one yet.
+  let payUrl = invoice.yoco_payment_link_url as string | null;
+  if (!payUrl) {
+    const { data: linkData, error: linkErr } = await db.functions.invoke("platform-invoice-checkout", {
+      body: { platform_invoice_id: invoiceId },
+    });
+    if (linkErr || linkData?.error || !linkData?.yoco_payment_link_url) {
+      return NextResponse.json({ error: "Couldn't create the Yoco payment link: " + (linkData?.error || linkErr?.message || "unknown error") + ". The invoice was not sent." }, { status: 502 });
+    }
+    payUrl = linkData.yoco_payment_link_url;
   }
 
   const emailData = {
@@ -51,14 +76,15 @@ export async function POST(req: NextRequest) {
     amount_zar: invoice.amount_zar,
     pro_rated: invoice.pro_rated,
     pause_note: invoice.pause_note,
-    yoco_payment_link_url: invoice.yoco_payment_link_url,
+    yoco_payment_link_url: payUrl,
   };
 
-  for (const target of targets) {
-    const { error: sendErr } = await db.functions.invoke("send-email", {
-      body: { type: "PLATFORM_INVOICE_OUTSTANDING", data: { ...emailData, email: target.email, name: target.name } },
-    });
-    if (sendErr) console.error("PLATFORM_INVOICE_SEND_ERR invoice=" + invoiceId + " to=" + target.email + ": " + sendErr.message);
+  const { error: sendErr } = await db.functions.invoke("send-email", {
+    body: { type: "PLATFORM_INVOICE_OUTSTANDING", data: { ...emailData, email: target.email, name: target.name } },
+  });
+  if (sendErr) {
+    console.error("PLATFORM_INVOICE_SEND_ERR invoice=" + invoiceId + " to=" + target.email + ": " + sendErr.message);
+    return NextResponse.json({ error: "Email send failed: " + sendErr.message }, { status: 502 });
   }
 
   const { error: updateErr } = await db.from("platform_invoices").update({
@@ -67,5 +93,5 @@ export async function POST(req: NextRequest) {
   }).eq("id", invoiceId);
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, sent_to: targets.map((t) => t.email) });
+  return NextResponse.json({ ok: true, sent_to: [target.email] });
 }

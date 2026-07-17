@@ -4,7 +4,6 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
 import { formatDuration } from "../../lib/duration";
-import { ArrowLeft, ArrowCounterClockwise, PaperPlaneTilt } from "@phosphor-icons/react";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
 
@@ -204,7 +203,7 @@ function buildTimeline(
       case "payment_confirmed_but_status_update_failed":
         events.push({
           time: log.created_at,
-          label: "Payment received — status update failed",
+          label: "Payment received, but status update failed",
           detail: `Error: ${p.error || "Unknown"} | Payment ID: ${p.yoco_payment_id || "—"}`,
         });
         break;
@@ -394,7 +393,7 @@ export default function BookingDetailPage() {
     return (
       <div className="max-w-3xl space-y-4 py-10">
         <button onClick={() => router.push("/bookings")} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs w-fit">
-          <ArrowLeft size={16} /> Back to bookings
+          Back to bookings
         </button>
         <div className="rounded-xl border p-6 text-center text-sm" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 28%, transparent)", color: "var(--ck-danger)" }}>
           {error || "Booking not found"}
@@ -734,7 +733,7 @@ export default function BookingDetailPage() {
           onClick={() => router.push("/bookings")}
           className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs"
         >
-          <ArrowLeft size={14} /> Bookings
+          Bookings
         </button>
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[24px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Booking {ref}</h1>
@@ -755,7 +754,6 @@ export default function BookingDetailPage() {
               disabled={resendingPayment}
               className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
             >
-              <PaperPlaneTilt size={14} />
               {resendingPayment ? "Sending..." : "Resend Payment Link"}
             </button>
           </div>
@@ -1094,7 +1092,6 @@ export default function BookingDetailPage() {
                   className="ui-btn w-full mt-3 disabled:opacity-50"
                   style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}
                 >
-                  <PaperPlaneTilt size={14} />
                   {resendingPayment ? "Sending..." : `Resend Payment Link (${fmtCurrency(Number(booking.total_amount))})`}
                 </button>
               )}
@@ -1242,7 +1239,7 @@ export default function BookingDetailPage() {
                     <span className={`font-medium ${h.status === "CONVERTED" ? "text-green-600" : h.status === "ACTIVE" ? "text-amber-600" : "text-gray-500"}`}>
                       {h.status}
                     </span>
-                    {" "} &mdash; expires {fmtDateTime(h.expires_at)} | qty: {h.qty}
+                    {" "}(expires {fmtDateTime(h.expires_at)}, qty: {h.qty})
                   </div>
                 ))}
               </>
@@ -1283,8 +1280,7 @@ export default function BookingDetailPage() {
       <Card title="Activity Timeline" className="anim-fade-up anim-d2 mt-2">
         {timeline.length === 0 ? (
           <div className="ui-empty">
-            <span className="ui-icon-chip"><ArrowCounterClockwise size={19} /></span>
-            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No activity recorded</p>
+                        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No activity recorded</p>
           </div>
         ) : (
           <div className="relative">

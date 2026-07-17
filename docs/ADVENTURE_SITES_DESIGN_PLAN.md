@@ -14,7 +14,8 @@
 - Whitespace budget: minimum 20vh between narrative sections. When in doubt, remove a section rather than shrink the gaps (the Niarra lesson).
 
 ### 1.2 Motion system (functional only, one library)
-- Scroll-triggered reveals: text rises 12px + fades over 500ms; images scale 1.04→1.00. One easing curve platform-wide: `cubic-bezier(0.2, 0.7, 0.2, 1)` (already the product's `--ck-ease`).
+- Scroll-triggered reveals: text rises 12px + fades over 500ms; images scale 1.04→1.00. One easing curve pl
+atform-wide: `cubic-bezier(0.2, 0.7, 0.2, 1)` (already the product's `--ck-ease`).
 - Hero: slow Ken-Burns drift (scale 1.0→1.06 over the section's scroll length), parallax capped at 8% — awe, not seasickness.
 - The **hover-mask reveal** (Niarra's device) is the system's flagship: destination/tour names in a large editorial list; hovering paints cinematic imagery inside an organic mask shape. The mask SHAPE is per-brand (see packs).
 - Hard rules: `prefers-reduced-motion` collapses everything to opacity fades; no animation may block interaction; LCP < 2.5s on 4G is a design constraint, not an engineering afterthought.

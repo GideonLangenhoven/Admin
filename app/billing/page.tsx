@@ -353,7 +353,7 @@ export default function BillingPage() {
               <div className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
                 {emailUsage.overage_emails > 0
                   ? emailUsage.overage_emails.toLocaleString() + " over @ R" + emailUsage.overage_rate_zar.toFixed(2) + "/email"
-                  : "Under quota — no overage charge"}
+                  : "Under quota: no overage charge"}
               </div>
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function BillingPage() {
         <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>
           {sub.payment_method_last4
             ? <>Card ending in <strong>{sub.payment_method_last4}</strong> via {sub.payment_provider}</>
-            : "No card on file — invoices are sent manually. Contact support to set up automatic payments."}
+            : "No card on file. Invoices are sent manually; contact support to set up automatic payments."}
         </p>
       </section>
 

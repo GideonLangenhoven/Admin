@@ -16,7 +16,7 @@ export default function LiveStatusBadge({ active, mode }: Props) {
   }
 
   if (active) {
-    const label = mode === "OUTSIDE_HOURS" ? "Outside hours — bot active" : "Bot is replying now";
+    const label = mode === "OUTSIDE_HOURS" ? "Outside hours: bot active" : "Bot is replying now";
     const dotColor = mode === "OUTSIDE_HOURS" ? "bg-amber-400" : "bg-emerald-500";
     const bgColor = mode === "OUTSIDE_HOURS" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700";
     return (

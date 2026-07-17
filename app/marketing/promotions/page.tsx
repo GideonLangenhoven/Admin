@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, Trash, Copy, ArrowsClockwise, Ticket } from "@phosphor-icons/react";
+import { Trash, Copy, ArrowsClockwise } from "@phosphor-icons/react";
 
 interface Promotion {
   id: string;
@@ -109,7 +109,7 @@ export default function PromotionsPage() {
     if (!validUntil) {
       const ok = await confirmAction({
         title: "No expiry set",
-        message: "This promo has no end date — it will keep applying forever unless you set max_uses or deactivate it. Continue?",
+        message: "This promo has no end date. It will keep applying forever unless you set max_uses or deactivate it. Continue?",
         tone: "warning",
         confirmLabel: "Save without expiry",
         cancelLabel: "Go back",
@@ -217,7 +217,7 @@ export default function PromotionsPage() {
           onClick={() => { resetForm(); setShowForm(true); }}
           className="ui-btn ui-btn-primary"
         >
-          <Plus size={16} /> New Promo
+          New Promo
         </button>
       </div>
 
@@ -345,7 +345,6 @@ export default function PromotionsPage() {
       {promos.length === 0 && !showForm ? (
         <div className="ui-card anim-fade-up anim-d1">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><Ticket size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No promo codes yet</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first discount code.</p>
           </div>
@@ -390,7 +389,7 @@ export default function PromotionsPage() {
                         {p.valid_until ? (
                           " → " + new Date(p.valid_until).toLocaleDateString()
                         ) : (
-                          <span className="ui-status ui-pill-amber ml-1" title="This promo has no end date — it will keep applying unless deactivated or capped by max_uses">→ No expiry</span>
+                          <span className="ui-status ui-pill-amber ml-1" title="This promo has no end date. It will keep applying unless deactivated or capped by max_uses.">→ No expiry</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>

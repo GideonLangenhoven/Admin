@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   if (token === "preview") {
     return htmlRes(`
       <h2>This was a test email</h2>
-      <p>The unsubscribe link works in real campaign emails — each recipient gets their own secure link, and clicking it removes them from your marketing list.</p>
+      <p>The unsubscribe link works in real campaign emails. Each recipient gets their own secure link, and clicking it removes them from your marketing list.</p>
       <p style="margin-top:12px;font-size:13px;color:#6b7280;">No action was taken. Test emails are only sent to you, the admin.</p>
     `, 200);
   }

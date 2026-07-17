@@ -7,6 +7,7 @@ import { Webhook } from "npm:standardwebhooks";
 import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { tourEndDate } from "../_shared/duration.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -1084,7 +1085,7 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 13px; color: #888; margin: 0;">Payment Method: <strong>${d.payment_method}</strong> &nbsp;|&nbsp; Ref: <strong>${String(d.payment_reference || "").substring(0, 8).toUpperCase()}</strong></p>
-            ${fullyPaid ? "" : `<p style="font-size: 13px; color: #B45309; margin: 8px 0 0; font-weight: 600;">Payment outstanding — this invoice has not been paid yet.</p>`}
+            ${fullyPaid ? "" : `<p style="font-size: 13px; color: #B45309; margin: 8px 0 0; font-weight: 600;">Payment outstanding: this invoice has not been paid yet.</p>`}
           </td>
         </tr>
         <!-- Footer -->
@@ -1157,7 +1158,7 @@ function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: Pla
         </tr>` : ""}
         <tr>
           <td style="background-color: #1b3b36; color: #A8C2B8; text-align: center; padding: 30px; font-size: 12px; line-height: 1.5;">
-            BookingTours — thank you for partnering with us.
+            BookingTours. Thank you for partnering with us.
           </td>
         </tr>
       </table>
@@ -1182,12 +1183,12 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 
   const introHtml = mode === "recipient"
     ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${recipientName},</h2>
-       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift — an adventure, on them. Your voucher is below.</p>`
+       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift: an adventure, on them. Your voucher is below.</p>`
     : mode === "buyer_receipt"
       ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
          <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift for <strong>${recipientName}</strong> is on its way to their inbox right now. Here's a copy for your records.</p>`
       : `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below — <strong>forward this email</strong> to give it to them, or print it as a card to hand over in person.</p>`;
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below. <strong>Forward this email</strong> to give it to them, or print it as a card to hand over in person.</p>`;
 
   // Elegant quote card in the brand palette (applyBranding recolors #1b3b36).
   const messageBlock = d.gift_message
@@ -1195,7 +1196,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
         ? `<tr><td style="padding: 0 32px 24px;">
             <div style="background: #F7F7F6; border-radius: 14px; padding: 24px; text-align: center; border: 1px solid #e6e6e3;">
               <p style="margin: 0 0 10px 0; font-size: 17px; line-height: 1.6; font-style: italic; color: #1b3b36;">&ldquo;${d.gift_message}&rdquo;</p>
-              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #6b7280;">&mdash; ${buyerName}</p>
+              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #6b7280;">From ${buyerName}</p>
             </div>
           </td></tr>`
         : `<tr><td style="padding: 0 32px 20px;">
@@ -1205,7 +1206,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 
   // How to give / redeem the gift, tailored to who's reading.
   const forwardNote = mode === "recipient"
-    ? `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Quote your code above when you book online or over WhatsApp — the balance is applied to your trip.</p></td></tr>`
+    ? `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Quote your code above when you book online or over WhatsApp. The balance is applied to your trip.</p></td></tr>`
     : mode === "buyer_receipt"
       ? ""
       : `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;"><strong>To gift it:</strong> forward this email to ${recipientName}, or print this page as a card. They redeem the code when booking online or over WhatsApp.</p></td></tr>`;
@@ -1282,8 +1283,13 @@ function cancellationHtml(d: Record<string, unknown>) {
   // When a voucher was issued (customer chose it, or voucher-paid booking),
   // the email confirms the voucher — it must NOT re-offer the three options.
   const hasVoucher = Boolean(d.voucher_code);
+  // Cancelled within 24h of the trip start: booking is forfeited, so the
+  // email must NOT offer reschedule/voucher/refund options.
+  const isForfeit = d.is_forfeit === true;
   const cancelText = hasVoucher
-    ? "Your booking has been cancelled and its value converted to a voucher — the code is below. Use it any time on your next booking."
+    ? "Your booking has been cancelled and its value converted to a voucher. The code is below; use it any time on your next booking."
+    : isForfeit
+    ? `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. As the cancellation falls within 24 hours of the trip start, the booking amount is forfeited in line with our cancellation policy. If you believe this is a mistake, just reply to this email.`
     : isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
     : `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. We sincerely apologise for the inconvenience.`;
@@ -1308,7 +1314,9 @@ function cancellationHtml(d: Record<string, unknown>) {
   }
 
   // Weather cancellations get a prominent self-service block
-  const optionsBlock = hasVoucher
+  const optionsBlock = isForfeit
+    ? ""
+    : hasVoucher
     ? `
         <tr>
           <td style="padding: 0 40px 28px;">
@@ -1720,7 +1728,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 20px; text-align: center;">
             <p style="font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 15px 0;">
-              Had a great time? We'd love it if you could leave us a quick review on Google — it means the world to our small team!
+              Had a great time? We'd love it if you could leave us a quick review on Google. It means the world to our small team!
             </p>
             <a href="https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ" style="display: inline-block; background-color: #ffffff; color: #2a5a52; border: 2px solid #2a5a52; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: bold;">⭐ Leave a Google Review</a>
           </td>
@@ -2463,10 +2471,9 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
           const row = bres.data as { slots?: { start_time?: string }; tours?: { duration_minutes?: number } } | null;
           const durMin = Number(row?.tours?.duration_minutes || 0);
           const startIso = row?.slots?.start_time;
-          if (startIso && durMin >= 1440) {
-            const days = Math.ceil(durMin / 1440);
-            const endIso = new Date(new Date(startIso).getTime() + (days - 1) * 86400000).toISOString();
-            const endStr = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, endIso, { hour: undefined, minute: undefined });
+          const end = startIso ? tourEndDate(startIso, durMin) : null;
+          if (end && durMin >= 1440) {
+            const endStr = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, end.toISOString(), { hour: undefined, minute: undefined });
             d.tour_date = d.tour_date + " – " + endStr;
           }
         }
@@ -2506,7 +2513,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         html = paymentLinkHtml({
           ...d,
           heading: "Your trip is coming up",
-          intro: "Just a friendly reminder — your <strong>" + (d.tour_name || "booking") + "</strong> is coming up soon and we haven't received your payment yet. You can pay securely below to keep your spot.",
+          intro: "Just a friendly reminder: your <strong>" + (d.tour_name || "booking") + "</strong> is coming up soon and we haven't received your payment yet. You can pay securely below to keep your spot.",
         });
         break;
       case "RESCHEDULE_PAYMENT_LINK":
@@ -2538,7 +2545,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         // name (see `platform_invoice_number` in the payload) so this never
         // triggers resolveBrandingBusinessId's tenant-invoice lookup above.
         const platCtx = await getPlatformInvoiceContext();
-        subject = "BookingTours — Invoice " + d.platform_invoice_number + " outstanding";
+        subject = "BookingTours: Invoice " + d.platform_invoice_number + " outstanding";
         html = platformInvoiceOutstandingHtml(d, platCtx);
         break;
       }
@@ -2595,7 +2602,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         break;
       case "OPERATOR_ALERT":
         // Internal alert TO the operator (notification_email), not a customer.
-        subject = String(d.heading || "New alert") + (d.ref ? " — " + d.ref : "");
+        subject = String(d.heading || "New alert") + (d.ref ? ": " + d.ref : "");
         html = operatorAlertHtml(d);
         break;
       case "CUSTOMER_MESSAGE":

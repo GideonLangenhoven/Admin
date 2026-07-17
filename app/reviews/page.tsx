@@ -82,9 +82,7 @@ export default function ReviewsPage() {
                 <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="ui-skeleton h-24" />)}</div>
             ) : reviews.length === 0 ? (
                 <div className="ui-card">
-                    <div className="ui-empty">
-                        <span className="ui-icon-chip"><Star size={19} /></span>
-                        <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No {filter.toLowerCase()} reviews</p>
+                    <div className="ui-empty">                        <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No {filter.toLowerCase()} reviews</p>
                         <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{filter === "PENDING" ? "Submitted reviews awaiting moderation will appear here." : "Reviews with this status will appear here."}</p>
                     </div>
                 </div>

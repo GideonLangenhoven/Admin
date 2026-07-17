@@ -211,13 +211,13 @@ function waiverPage(data: any, business: any, message?: string) {
             <p style="margin:0 0 12px;font-weight:700;font-size:1rem;color:#0f172a;">Indemnity, Assumption of Risk &amp; Release of Liability</p>
 
             <p style="margin:0 0 10px;"><strong>1. Nature of Activity &amp; Inherent Risks</strong><br/>
-            I understand that adventure and outdoor activities — including but not limited to kayaking, paddling, hiking, water-based excursions, and associated transfers — involve inherent risks and dangers that cannot be eliminated. These include, without limitation: adverse or unpredictable weather and sea conditions; collision with vessels, rocks, or other obstacles; capsizing or falling into water; exhaustion; hypothermia; marine wildlife encounters; equipment failure; and the physical demands of the activity. I voluntarily and knowingly accept these risks.</p>
+            I understand that adventure and outdoor activities, including but not limited to kayaking, paddling, hiking, water-based excursions, and associated transfers, involve inherent risks and dangers that cannot be eliminated. These include, without limitation: adverse or unpredictable weather and sea conditions; collision with vessels, rocks, or other obstacles; capsizing or falling into water; exhaustion; hypothermia; marine wildlife encounters; equipment failure; and the physical demands of the activity. I voluntarily and knowingly accept these risks.</p>
 
             <p style="margin:0 0 10px;"><strong>2. Assumption of Risk</strong><br/>
             I freely and voluntarily accept and assume all risks of injury, loss, damage, or death arising from my participation and the participation of the guests listed on this booking, whether caused by the negligence of the operator, its employees, guides, or agents, or by any other cause. I acknowledge that no assurance of safety has been given to me.</p>
 
             <p style="margin:0 0 10px;"><strong>3. Release and Indemnity</strong><br/>
-            In consideration of being permitted to participate, I hereby release, indemnify and hold harmless the operator, its owners, directors, employees, guides, contractors and agents (collectively "the Operator") from any and all claims, actions, damages, liability, costs and expenses — including legal fees — arising from or relating to my participation or the participation of any guest on this booking, even if such loss or damage arises from the Operator's negligence, to the fullest extent permitted by applicable law.</p>
+            In consideration of being permitted to participate, I hereby release, indemnify and hold harmless the operator, its owners, directors, employees, guides, contractors and agents (collectively "the Operator") from any and all claims, actions, damages, liability, costs and expenses (including legal fees) arising from or relating to my participation or the participation of any guest on this booking, even if such loss or damage arises from the Operator's negligence, to the fullest extent permitted by applicable law.</p>
 
             <p style="margin:0 0 10px;"><strong>4. Medical Fitness</strong><br/>
             I confirm that I and all guests on this booking are in good physical health and are not aware of any medical condition, disability, or impairment that would increase the risk of participation or endanger themselves or others. I accept full responsibility for disclosing any relevant medical information to the Operator's guides before the activity commences. I authorise the Operator to seek emergency medical treatment on my behalf or on behalf of any guest if deemed necessary, and I accept responsibility for any associated costs.</p>
@@ -252,7 +252,7 @@ function waiverPage(data: any, business: any, message?: string) {
               <input type="date" name="date_of_birth" style="border:1px solid var(--line);border-radius:16px;padding:14px 16px;font:inherit;width:100%;" />
             </label>
             <label>
-              SA ID number or passport number <span style="font-weight:400;color:#64748b;">(optional — strengthens identity verification)</span>
+              SA ID number or passport number <span style="font-weight:400;color:#64748b;">(optional, strengthens identity verification)</span>
               <input type="text" name="id_number" placeholder="e.g. 8001015009087 or A12345678" autocomplete="off" />
             </label>
             <label>

@@ -777,7 +777,7 @@ Deno.serve(async (req: Request) => {
         console.error("ck_external_create_booking error:", error);
         const pgCode = String((error as any).code || "");
         const detail = String((error as any).message || (error as any).details || "RPC error");
-        if (pgCode === "23502") return await send(400, "BOOKING_FIELD_REQUIRED", detail, { hint: "A required booking field is missing — check customer_name, email, or total_amount." }, "REJECTED");
+        if (pgCode === "23502") return await send(400, "BOOKING_FIELD_REQUIRED", detail, { hint: "A required booking field is missing. Check customer_name, email, or total_amount." }, "REJECTED");
         if (pgCode === "23505") return await send(409, "DUPLICATE_BOOKING", detail, { hint: "A booking with this external_ref already exists for this source." }, "REJECTED");
         if (pgCode === "23503") return await send(400, "INVALID_REFERENCE", detail, { hint: "A referenced business_id, tour_id, or slot_id is invalid for this source." }, "REJECTED");
         if (pgCode === "23514") return await send(400, "INVALID_VALUE", detail, { hint: "One of the supplied values violates a DB check constraint (status, qty, amount)." }, "REJECTED");

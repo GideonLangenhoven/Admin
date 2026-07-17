@@ -106,18 +106,18 @@ export const starterTemplates: StarterTemplate[] = [
     name: "Welcome · The Story",
     category: "follow-up",
     description: "First touch: who you are, what makes the experience unforgettable, what to expect.",
-    subject: "Welcome to {business_name} — your adventure starts here",
+    subject: "Welcome to {business_name}: your adventure starts here",
     blocks: () =>
       shell({
         eyebrow: "Welcome aboard",
         title: "The best stories start outside",
         body: [
-          para(`<p>Hi {first_name},</p><p>Welcome — we're genuinely glad you're here. Every trip we run is built around one idea: an hour outside beats a day of scrolling.</p>`),
+          para(`<p>Hi {first_name},</p><p>Welcome, we're genuinely glad you're here. Every trip we run is built around one idea: an hour outside beats a day of scrolling.</p>`),
           para(`<p>Here's what you can expect from us (and nothing else):</p>`),
           factList([
             "Insider tips on the best conditions, seasons and secret spots",
             "First access to new experiences before they're public",
-            "Photos and stories from recent trips — the real thing, unfiltered",
+            "Photos and stories from recent trips: the real thing, unfiltered",
           ]),
         ],
         ctaText: "Browse experiences",
@@ -127,14 +127,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "welcome-series-2",
     name: "Welcome · Guest Favourites",
     category: "follow-up",
-    description: "Second touch: social proof — the most-loved experiences with a real guest quote.",
+    description: "Second touch: social proof, the most-loved experiences with a real guest quote.",
     subject: "The experiences our guests can't stop talking about",
     blocks: () => [
       eyebrow("Guest favourites"),
       h1("Loved by people like you"),
       para(`<p>Hi {first_name},</p><p>Not sure where to start? These are the trips our guests rebook, gift, and tell their friends about.</p>`),
       { type: "quote", id: uid(), text: "I've lived here my whole life and never seen the coast like this. Booked again before we'd even dried off.", attribution: "Recent guest review", photoUrl: "" } as Block,
-      para(`<p>Every experience is small-group, guided, and beginner-friendly — no experience needed, just a sense of adventure.</p>`),
+      para(`<p>Every experience is small-group, guided, and beginner-friendly. No experience needed, just a sense of adventure.</p>`),
       gap(4),
       cta("See what's on"),
       signoff(),
@@ -154,7 +154,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "A gift from us",
         title: "Your first adventure, on better terms",
         body: [
-          para(`<p>Hi {first_name},</p><p>Talk is cheap — so here's something real. A personal voucher for your first booking with us:</p>`),
+          para(`<p>Hi {first_name},</p><p>Talk is cheap, so here's something real. A personal voucher for your first booking with us:</p>`),
           voucherPanel("Apply it at checkout. It's yours alone, and it won't wait forever."),
         ],
         ctaText: "Use my voucher",
@@ -173,7 +173,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Trip complete",
         title: "That was a good one",
         body: [
-          para(`<p>Hi {first_name},</p><p>Thank you for coming out with us today — trips like that are exactly why we do this.</p><p>If you have 30 seconds, a short review makes an outsized difference to a small team like ours. It's how the next adventurer finds us.</p>`),
+          para(`<p>Hi {first_name},</p><p>Thank you for coming out with us today. Trips like that are exactly why we do this.</p><p>If you have 30 seconds, a short review makes an outsized difference to a small team like ours. It's how the next adventurer finds us.</p>`),
         ],
         ctaText: "Leave a quick review",
       }),
@@ -182,14 +182,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "post-tour-review-2",
     name: "Review · Gentle Nudge",
     category: "follow-up",
-    description: "Follow-up for guests who opened but didn't review — different angle, zero pressure.",
+    description: "Follow-up for guests who opened but didn't review: different angle, zero pressure.",
     subject: "One small favour, {first_name}",
     blocks: () =>
       shell({
         eyebrow: "While it's fresh",
         title: "Help the next person take the leap",
         body: [
-          para(`<p>Hi {first_name},</p><p>Most people hesitate before booking something new — a review from someone who's actually done it is what tips them over.</p><p>Two sentences is plenty. What you saw, how it felt.</p>`),
+          para(`<p>Hi {first_name},</p><p>Most people hesitate before booking something new. A review from someone who's actually done it is what tips them over.</p><p>Two sentences is plenty. What you saw, how it felt.</p>`),
         ],
         ctaText: "Write two sentences",
       }),
@@ -207,7 +207,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Since you've been gone",
         title: "The water hasn't forgotten you",
         body: [
-          para(`<p>Hi {first_name},</p><p>It's been a while since your last trip with us — and a lot has changed:</p>`),
+          para(`<p>Hi {first_name},</p><p>It's been a while since your last trip with us, and a lot has changed:</p>`),
           factList([
             "New routes and experiences added this season",
             "Upgraded gear across the fleet",
@@ -229,7 +229,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Welcome-back offer",
         title: "Let's make it easy to come back",
         body: [
-          para(`<p>Hi {first_name},</p><p>No long story — we'd love to have you back, so here's a personal voucher to make the decision simple:</p>`),
+          para(`<p>Hi {first_name},</p><p>No long story. We'd love to have you back, so here's a personal voucher to make the decision simple:</p>`),
           voucherPanel("Valid on any experience. Bring a friend; the ocean's big enough."),
         ],
         ctaText: "Book with my voucher",
@@ -246,7 +246,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Final call",
         title: "It expires. The memories don't.",
         body: [
-          para(`<p>Hi {first_name},</p><p>Quick reminder — your personal voucher is in its final days:</p>`),
+          para(`<p>Hi {first_name},</p><p>Quick reminder. Your personal voucher is in its final days:</p>`),
           voucherPanel("After it expires, it's gone for good. One booking is all it takes."),
         ],
         ctaText: "Use it before it's gone",
@@ -258,15 +258,15 @@ export const starterTemplates: StarterTemplate[] = [
     key: "birthday-special-1",
     name: "Birthday · The Gift",
     category: "promotional",
-    description: "Birthday greeting with an exclusive voucher — warm, personal, zero corporate.",
-    subject: "Happy birthday, {first_name} — gift inside",
+    description: "Birthday greeting with an exclusive voucher: warm, personal, zero corporate.",
+    subject: "Happy birthday, {first_name}: gift inside",
     blocks: () =>
       shell({
         eyebrow: "It's your day",
         title: "Happy birthday, {first_name}",
         body: [
           para(`<p>Another year older, another year braver. We think that calls for open water and a bit of salt in the air.</p><p>Our gift to you:</p>`),
-          voucherPanel("Valid for 30 days — a birthday should last at least that long."),
+          voucherPanel("Valid for 30 days. A birthday should last at least that long."),
         ],
         ctaText: "Claim my birthday trip",
       }),
@@ -282,7 +282,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Don't leave it unwrapped",
         title: "Your birthday gift expires soon",
         body: [
-          para(`<p>Hi {first_name},</p><p>Just a friendly nudge — the birthday voucher we sent you is still unused, and it won't keep forever:</p>`),
+          para(`<p>Hi {first_name},</p><p>Just a friendly nudge. The birthday voucher we sent you is still unused, and it won't keep forever:</p>`),
           voucherPanel("Belated birthday adventures are still birthday adventures."),
         ],
         ctaText: "Book before it expires",
@@ -294,15 +294,15 @@ export const starterTemplates: StarterTemplate[] = [
     key: "referral-program-1",
     name: "Referral · Share the Adventure",
     category: "promotional",
-    description: "After a positive review: a shareable reward code — they win, their friend wins.",
-    subject: "{first_name}, share the adventure — get rewarded",
+    description: "After a positive review: a shareable reward code. They win, their friend wins.",
+    subject: "{first_name}, share the adventure: get rewarded",
     blocks: () =>
       shell({
         eyebrow: "For our favourite people",
         title: "Good stories are better shared",
         body: [
-          para(`<p>Hi {first_name},</p><p>Thank you for that review — it made the team's week. Since you clearly get it, here's a reward for spreading the word:</p>`),
-          voucherPanel("Use it yourself, or share the code with a friend — when they book, you both win."),
+          para(`<p>Hi {first_name},</p><p>Thank you for that review. It made the team's week. Since you clearly get it, here's a reward for spreading the word:</p>`),
+          voucherPanel("Use it yourself, or share the code with a friend. When they book, you both win."),
         ],
         ctaText: "Plan the next one",
       }),
@@ -321,7 +321,7 @@ export const starterTemplates: StarterTemplate[] = [
         title: "Don't let a good voucher go to waste",
         body: [
           para(`<p>Hi {first_name},</p><p>A heads-up from your calendar's best friend: your voucher has 30 days left on the clock.</p>`),
-          voucherPanel("Fully redeemable against any experience. Weekends fill first — book early."),
+          voucherPanel("Fully redeemable against any experience. Weekends fill first, so book early."),
         ],
         ctaText: "Browse and book",
       }),
@@ -330,14 +330,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "voucher-expiry-2",
     name: "Voucher Expiry · 7 Days",
     category: "promotional",
-    description: "One week left — urgency rising, concrete suggestions.",
+    description: "One week left: urgency rising, concrete suggestions.",
     subject: "7 days left on your voucher",
     blocks: () =>
       shell({
         eyebrow: "One week left",
         title: "Seven days. One decision.",
         body: [
-          para(`<p>Hi {first_name},</p><p>Your voucher expires in 7 days. That's one weekend — enough time to do something worth telling people about.</p>`),
+          para(`<p>Hi {first_name},</p><p>Your voucher expires in 7 days. That's one weekend, enough time to do something worth telling people about.</p>`),
           voucherPanel("Any experience, any available date inside the week."),
         ],
         ctaText: "Pick my date",
@@ -347,14 +347,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "voucher-expiry-3",
     name: "Voucher Expiry · Final Day",
     category: "promotional",
-    description: "Expiry-day email — direct, short, one job.",
+    description: "Expiry-day email: direct, short, one job.",
     subject: "Final day: your voucher expires tonight",
     blocks: () =>
       shell({
         eyebrow: "Expires today",
         title: "Last call",
         body: [
-          para(`<p>Hi {first_name},</p><p>Short and honest: your voucher expires at midnight tonight. Book now and pick any future date — the value is locked in the moment you book.</p>`),
+          para(`<p>Hi {first_name},</p><p>Short and honest: your voucher expires at midnight tonight. Book now and pick any future date. The value is locked in the moment you book.</p>`),
           voucherPanel("Book today, paddle whenever. After midnight it's gone."),
         ],
         ctaText: "Redeem it now",
@@ -373,7 +373,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "VIP status unlocked",
         title: "Welcome to the inner circle",
         body: [
-          para(`<p>Hi {first_name},</p><p>Some guests come once. You keep coming back — and we notice. As of today you're a {business_name} VIP. Concretely, that means:</p>`),
+          para(`<p>Hi {first_name},</p><p>Some guests come once. You keep coming back, and we notice. As of today you're a {business_name} VIP. Concretely, that means:</p>`),
           factList([
             "Priority booking on high-demand dates",
             "Early access to new experiences before public release",
@@ -389,14 +389,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "vip-treatment-2",
     name: "VIP · Exclusive Offer",
     category: "promotional",
-    description: "The VIP-only voucher — generous, personal, time-boxed.",
+    description: "The VIP-only voucher: generous, personal, time-boxed.",
     subject: "Your VIP offer is here, {first_name}",
     blocks: () =>
       shell({
         eyebrow: "VIP only",
         title: "This one isn't public",
         body: [
-          para(`<p>Hi {first_name},</p><p>As promised — a VIP-only thank you. This code doesn't appear on the site, in ads, or anywhere else:</p>`),
+          para(`<p>Hi {first_name},</p><p>As promised, a VIP-only thank you. This code doesn't appear on the site, in ads, or anywhere else:</p>`),
           voucherPanel("VIP-exclusive. Use it on any experience, any group size."),
         ],
         ctaText: "Book as a VIP",
@@ -408,7 +408,7 @@ export const starterTemplates: StarterTemplate[] = [
     key: "seasonal-launch-1",
     name: "Season · Sneak Peek",
     category: "newsletter",
-    description: "Season preview — new routes, gear, and dates before booking opens.",
+    description: "Season preview: new routes, gear, and dates before booking opens.",
     subject: "The new season is almost here",
     blocks: () =>
       shell({
@@ -421,7 +421,7 @@ export const starterTemplates: StarterTemplate[] = [
             "Upgraded gear across every experience",
             "Extended seasonal tours while conditions are at their best",
           ]),
-          para(`<p>Early birds get first pick — an exclusive pre-season offer lands in your inbox soon.</p>`),
+          para(`<p>Early birds get first pick. An exclusive pre-season offer lands in your inbox soon.</p>`),
         ],
         ctaText: "Preview the season",
       }),
@@ -437,7 +437,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Before the crowds",
         title: "First pick goes to the early birds",
         body: [
-          para(`<p>Hi {first_name},</p><p>You opened the preview — so you get the head start. Book with this code before the season opens to everyone else:</p>`),
+          para(`<p>Hi {first_name},</p><p>You opened the preview, so you get the head start. Book with this code before the season opens to everyone else:</p>`),
           voucherPanel("Valid on all pre-season bookings. Prime dates go first."),
         ],
         ctaText: "Claim my early-bird spot",
@@ -456,7 +456,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "One year ago today",
         title: "Some days deserve a sequel",
         body: [
-          para(`<p>Hi {first_name},</p><p>Exactly a year ago, you were out there with us. We think that day deserves an anniversary — and traditions have to start somewhere.</p><p>Same trip, new season? Or something you haven't tried yet?</p>`),
+          para(`<p>Hi {first_name},</p><p>Exactly a year ago, you were out there with us. We think that day deserves an anniversary, and traditions have to start somewhere.</p><p>Same trip, new season? Or something you haven't tried yet?</p>`),
         ],
         ctaText: "Book the sequel",
       }),
@@ -467,14 +467,14 @@ export const starterTemplates: StarterTemplate[] = [
     key: "photo-share-1",
     name: "Photos · Your Trip Photos Are Ready",
     category: "follow-up",
-    description: "Delivers the trip photo gallery link — the email guests actually want.",
+    description: "Delivers the trip photo gallery link: the email guests actually want.",
     subject: "Your trip photos are ready, {first_name} 📸",
     blocks: () =>
       shell({
         eyebrow: "Fresh from the water",
         title: "You look good out there",
         body: [
-          para(`<p>Hi {first_name},</p><p>Your photos from the trip are edited and ready. Download them, keep them, print the good ones — they're yours.</p>`),
+          para(`<p>Hi {first_name},</p><p>Your photos from the trip are edited and ready. Download them, keep them, print the good ones. They're yours.</p>`),
         ],
         ctaText: "View my photos",
       }),
@@ -490,7 +490,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Show it off",
         title: "Don't let them sit in your camera roll",
         body: [
-          para(`<p>Hi {first_name},</p><p>The best trip photos are the ones that make someone else book their own. If you post yours, tag us — we share our favourites every week, and yours is a contender.</p>`),
+          para(`<p>Hi {first_name},</p><p>The best trip photos are the ones that make someone else book their own. If you post yours, tag us. We share our favourites every week, and yours is a contender.</p>`),
         ],
         ctaText: "Book your next shot",
       }),
@@ -500,7 +500,7 @@ export const starterTemplates: StarterTemplate[] = [
   {
     name: "Blank Canvas",
     category: "general",
-    description: "A clean, branded starting point — eyebrow, headline, body, button.",
+    description: "A clean, branded starting point: eyebrow, headline, body, button.",
     subject: "",
     blocks: () =>
       shell({
@@ -518,7 +518,7 @@ export const starterTemplates: StarterTemplate[] = [
     blocks: () => [
       eyebrow("The monthly dispatch"),
       h1("News from out there"),
-      para(`<p>Hi {first_name},</p><p>Here's what's been happening — the short version, no fluff.</p>`),
+      para(`<p>Hi {first_name},</p><p>Here's what's been happening, the short version, no fluff.</p>`),
       h2("What's new"),
       factList([
         "New experience or route announcement",
@@ -543,7 +543,7 @@ export const starterTemplates: StarterTemplate[] = [
         eyebrow: "Limited window",
         title: "Blink and it's gone",
         body: [
-          para(`<p>Hi {first_name},</p><p>For the next 48 hours, every experience is {promo_discount} off with the code below. No fine print — pick a date and go.</p>`),
+          para(`<p>Hi {first_name},</p><p>For the next 48 hours, every experience is {promo_discount} off with the code below. No fine print. Pick a date and go.</p>`),
           para(
             `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0;"><tr>` +
               `<td style="background:#FDF6EE;border:1px dashed ${AMBER};border-radius:14px;padding:22px 24px;text-align:center;">` +

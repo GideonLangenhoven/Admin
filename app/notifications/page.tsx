@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
-import { ArrowClockwise, BellSlash, Clock, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
 // AM3/AM5: minimal admin surface for inspecting failed outbox messages and
 // retrying them. The outbox table is the project's notification queue —
@@ -73,9 +72,7 @@ export default function NotificationsPage() {
         <p className="ui-mono-label mb-2">Outbox queue</p>
         <h1 className="font-display text-[28px] font-semibold leading-none mb-4" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
         <div className="ui-card p-6">
-          <div className="ui-empty">
-            <span className="ui-icon-chip" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}><WarningCircle size={19} /></span>
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Restricted area</p>
+          <div className="ui-empty">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Restricted area</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>You need MAIN_ADMIN access to view failed notifications.</p>
           </div>
         </div>
@@ -114,9 +111,7 @@ export default function NotificationsPage() {
       {loading ? (
         <div className="space-y-3 py-2"><div className="ui-skeleton h-16 !rounded-xl" /><div className="ui-skeleton h-16 !rounded-xl" /><div className="ui-skeleton h-16 !rounded-xl" /></div>
       ) : rows.length === 0 ? (
-        <div className="ui-empty anim-fade-up anim-d2">
-          <span className="ui-icon-chip">{tab === "waiting" ? <Clock size={19} /> : tab === "recent" ? <CheckCircle size={19} /> : <BellSlash size={19} />}</span>
-          <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+        <div className="ui-empty anim-fade-up anim-d2">          <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             {tab === "failed" ? "No failed messages" : tab === "waiting" ? "Nothing waiting" : "No recent sends"}
           </p>
           <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
@@ -172,7 +167,7 @@ export default function NotificationsPage() {
                       disabled={retrying === r.id}
                       className="ui-btn ui-btn-primary !h-8 !px-3 text-xs disabled:opacity-50"
                     >
-                      <ArrowClockwise size={14} /> {retrying === r.id ? "Queuing…" : "Retry"}
+                      {retrying === r.id ? "Queuing…" : "Retry"}
                     </button>
                   </div>
                 )}

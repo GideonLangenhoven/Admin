@@ -5,7 +5,6 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { buildAdminVoucherPurchase } from "./voucher-purchase";
-import { Ticket, CheckCircle, Clock, Prohibit, MagnifyingGlass, ArrowsClockwise } from "@phosphor-icons/react";
 
 const STATUS_PILL: Record<string, string> = {
   ACTIVE: "ui-pill-success",
@@ -237,7 +236,7 @@ export default function Vouchers() {
               <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Send the buyer a payment link. The code activates only after payment.</p>
             </div>
             <button type="button" onClick={() => setForm((current) => ({ ...current, code: generateVoucherCode() }))} className="ui-btn ui-btn-ghost h-8 shrink-0 px-3 text-xs">
-              <ArrowsClockwise size={13} weight="bold" /> Regenerate
+              Regenerate
             </button>
           </div>
 
@@ -248,14 +247,14 @@ export default function Vouchers() {
             </label>
             <div className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Expiry
-              <p className="mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>Auto — 3 years from purchase</p>
+              <p className="mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>Automatic: 3 years from purchase</p>
             </div>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Recipient
               <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              Recipient's email (optional — sends the gift straight to them instead of the buyer)
+              Recipient's email (optional; sends the gift straight to them instead of the buyer)
               <input type="email" value={form.recipient_email} onChange={(e) => setForm({ ...form, recipient_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
@@ -301,14 +300,13 @@ export default function Vouchers() {
           <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Status overview</h3>
           <div className="mt-4 grid grid-cols-2 gap-3">
             {[
-              { key: "ACTIVE", label: "Active", chipBg: "var(--ck-success-soft)", chipColor: "var(--ck-success)", icon: <Ticket size={16} weight="fill" /> },
-              { key: "REDEEMED", label: "Redeemed", chipBg: "var(--ck-ocean-soft)", chipColor: "var(--ck-ocean)", icon: <CheckCircle size={16} weight="fill" /> },
-              { key: "PENDING", label: "Pending", chipBg: "var(--ck-amber-soft)", chipColor: "var(--ck-amber)", icon: <Clock size={16} weight="fill" /> },
-              { key: "EXPIRED", label: "Expired", chipBg: "var(--ck-surface)", chipColor: "var(--ck-text-muted)", icon: <Prohibit size={16} weight="bold" /> },
+              { key: "ACTIVE", label: "Active" },
+              { key: "REDEEMED", label: "Redeemed" },
+              { key: "PENDING", label: "Pending" },
+              { key: "EXPIRED", label: "Expired" },
             ].map((tile) => (
               <div key={tile.key} className="rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)" }}>
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="ui-icon-chip !h-8 !w-8" style={{ background: tile.chipBg, color: tile.chipColor }}>{tile.icon}</span>
                   <span className="ui-mono-label !text-[9.5px]">{tile.label}</span>
                 </div>
                 <p className="font-display text-[26px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{statusCounts[tile.key] || 0}</p>
@@ -334,12 +332,11 @@ export default function Vouchers() {
           </button>
         )}
         <div className="relative min-w-0 flex-1">
-          <MagnifyingGlass size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vouchers..."
-            className="ui-control w-full pl-9"
+            className="ui-control w-full"
           />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="ui-control">
@@ -359,7 +356,6 @@ export default function Vouchers() {
       ) : groups.length === 0 ? (
         <div className="ui-card">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><Ticket size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No vouchers found</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No vouchers match this filter. Try clearing the date or status.</p>
           </div>

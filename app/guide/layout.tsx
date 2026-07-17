@@ -3,7 +3,7 @@ import GuideServiceWorker from "@/components/GuideServiceWorker";
 import GuideShell from "./GuideShell";
 
 export const metadata: Metadata = {
-  title: "Guide — BookingTours",
+  title: "Guide · BookingTours",
   manifest: "/guide/manifest.webmanifest",
 };
 

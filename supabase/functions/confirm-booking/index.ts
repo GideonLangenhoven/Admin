@@ -142,7 +142,7 @@ Deno.serve(async (req: any) => {
             ? (isLastMinute ? "\u26A0\uFE0F Please sign your waiver before the trip:\n" : "\u{1F4DD} Waiver: ") + waiver.waiverLink + "\n\n"
             : "") +
           "Manage your booking anytime:\n" + myBookingsUrl + "\n\n" +
-          "Thanks for booking with " + brandName + " \u2014 see you on the water!",
+          "Thanks for booking with " + brandName + ". See you on the water!",
           {
             name: "booking_confirmed1",
             params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount, myBookingsUrl],

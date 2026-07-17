@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, MagnifyingGlass, UploadSimple, Trash, X, PencilSimple, Check, UsersThree } from "@phosphor-icons/react";
+import { MagnifyingGlass, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
 import * as XLSX from "xlsx";
 
 interface Contact {
@@ -257,7 +257,7 @@ export default function ContactsPage() {
     { key: "date_of_birth", label: "Date of Birth" },
     { key: "anniversary_date", label: "Anniversary Date" },
     { key: "notes", label: "Notes" },
-    { key: "_skip", label: "— Skip Column —" },
+    { key: "_skip", label: "Skip this column" },
   ];
 
   function cleanVal(raw: string): string {
@@ -646,20 +646,20 @@ export default function ContactsPage() {
         <div className="flex flex-wrap gap-2">
           {contacts.length > 0 && (
             <button onClick={() => setShowDeleteAll(true)} className="ui-btn ui-btn-danger">
-              <Trash size={14} /> Delete All
+              Delete All
             </button>
           )}
           <button onClick={() => setShowValidate(true)} className="ui-btn ui-btn-ghost">
             Validate &amp; Segment
           </button>
           <button onClick={previewCleanList} className="ui-btn ui-btn-ghost">
-            <Trash size={14} /> Clean List
+            Clean List
           </button>
           <button onClick={() => { setShowImport(true); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="ui-btn ui-btn-ghost">
-            <UploadSimple size={14} /> Import CSV
+            Import CSV
           </button>
           <button onClick={() => setShowAdd(true)} className="ui-btn ui-btn-primary">
-            <Plus size={14} /> Add Contact
+            Add Contact
           </button>
         </div>
       </div>
@@ -702,7 +702,6 @@ export default function ContactsPage() {
       {filtered.length === 0 ? (
         <div className="ui-card">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><UsersThree size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{contacts.length === 0 ? "No contacts yet" : "No matching contacts"}</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{contacts.length === 0 ? "Add your first contact or import a CSV." : "Try a different search or filter."}</p>
           </div>
@@ -924,14 +923,13 @@ export default function ContactsPage() {
               {csvStep === "upload" && (
                 <div className="space-y-4">
                   <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-strong)" }}>
-                    <UploadSimple size={32} className="mx-auto mb-3" style={{ color: "var(--ck-text-muted)" }} />
                     <p className="mb-2 text-sm font-medium" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
                     <input type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
                     <p className="mt-2 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
-                      Any columns accepted — you&apos;ll map them in the next step. Gaps in data are fine.
+                      Any columns are accepted. You&apos;ll map them in the next step, and gaps in data are fine.
                     </p>
                   </div>
-                  <div className="text-center text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>— or paste data —</div>
+                  <div className="text-center text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>or paste data</div>
                   <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6}
                     placeholder={"email, first_name, last_name, phone, company, city\njohn@example.com, John, Doe, 0821234567, Acme, Cape Town\njane@example.com, Jane, , , , Johannesburg"}
                     className="ui-control w-full font-mono" />
@@ -1107,15 +1105,15 @@ export default function ContactsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  <span><strong>Tag "unengaged"</strong> — received 5+ emails, never opened any</span>
+                  <span><strong>Tag "unengaged"</strong>: received 5+ emails, never opened any</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span><strong>Tag "vip"</strong> — high engagement (opens + clicks)</span>
+                  <span><strong>Tag "vip"</strong>: high engagement (opens + clicks)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  <span><strong>Tag "new"</strong> — active contacts never emailed yet</span>
+                  <span><strong>Tag "new"</strong>: active contacts never emailed yet</span>
                 </div>
               </div>
               <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>

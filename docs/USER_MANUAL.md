@@ -335,22 +335,7 @@ This is your outbound WhatsApp queue. The system retries failed messages automat
 
 **Where:** **Reviews** in the menu (Operator and above).
 
-**How it works, end to end:**
-
-1. **Collection** — a few hours after each trip ends, the guest automatically receives a WhatsApp message with a personal review link. The link opens a short form (star rating, name, optional comment) on your booking site. Guests who haven't responded get one gentle reminder about a week later.
-2. **Moderation** — submitted reviews appear on the Reviews page as **Pending**. Filter by **Pending, Approved, Hidden, Spam**. For each review you can **Approve** (publish), **Hide**, or mark **Spam**. Nothing a guest writes is public until you approve it.
-3. **Display** — approved reviews show on your public booking site on the relevant tour, together with your Google reviews, sorted newest first.
-
-**Google reviews:** if you connect your **Google Place ID** (Settings → Integration Credentials → Google Reviews, Main Admin only), your Google reviews are imported automatically every night and shown alongside your own. Google reviews are already public on Google, so they appear as Approved without moderation.
-
-**Finding your Google Place ID:**
-
-1. Open Google's Place ID Finder: <https://developers.google.com/maps/documentation/places/web-service/place-id>
-2. In the "Find the ID of a particular place" map, search for your business name exactly as it appears on Google Maps.
-3. Click your business in the search results — an info window shows your Place ID (it usually starts with `ChIJ`).
-4. Copy it into **Settings → Integration Credentials → Google Reviews → Google Place ID** and click Save.
-
-If your business doesn't appear in the finder, make sure your Google Business Profile is verified and published at <https://business.google.com> first.
+Moderate customer reviews before they go public. Filter by **Pending, Approved, Hidden, Spam**. For each review you can **Approve** (publish), **Hide**, or mark **Spam**. Review requests are sent automatically after trips; replies appear here as Pending for your approval.
 
 ## 19. Photos
 

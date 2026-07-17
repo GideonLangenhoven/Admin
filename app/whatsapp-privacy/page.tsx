@@ -113,7 +113,7 @@ export default function WhatsappPrivacyPage() {
           </section>
 
           <section className="pt-4 border-t border-[var(--ck-border-subtle)] text-center text-xs" style={{ color: "var(--ck-text-muted)" }}>
-            <p>BookingTours © {new Date().getFullYear()} — All rights reserved.</p>
+            <p>BookingTours © {new Date().getFullYear()}. All rights reserved.</p>
           </section>
         </div>
       </div>

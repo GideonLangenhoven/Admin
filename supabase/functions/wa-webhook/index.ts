@@ -659,7 +659,7 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
     const s = displaySlots[si]; const tour = (s as any).tours;
     const avail = s.capacity_total - s.booked - (s.held || 0);
     msg += "\u{1F6F6} *" + (tour?.name || "Tour") + "*\n";
-    msg += "   " + fmtTime(tenant, s.start_time) + " \u2014 " + avail + " spots \u2014 R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
+    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + " spots, R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
   }
 
   if (slots.length > 8) {
@@ -804,12 +804,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
 
-    // ── Drain any queued cancellation follow-ups ────────────────────────────
-    // When weather-cancel (or any cancel flow using sendWhatsappWithWindowReopen)
-    // couldn't send a free-form message because the 24h window was closed, it
-    // queued the full message in outbox with status='WAITING_WINDOW' and sent a
-    // reopener template. The customer just replied → window is now open → send
-    // the queued messages right away using this tenant's own WA credentials.
+    // ── Drain any queued window-closed follow-ups ───────────────────────────
+    // When a sender (weather-cancel/cancel-booking via sendWhatsappWithWindowReopen,
+    // admin-reply, broadcast) couldn't send a free-form message because the 24h
+    // window was closed, it queued the full message in outbox with
+    // status='WAITING_WINDOW' and sent a reopener template. The customer just
+    // replied → window is now open → send the queued messages right away using
+    // this tenant's own WA credentials.
     try {
       const { data: queuedMsgs } = await supabase
         .from("outbox")
@@ -1082,7 +1083,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const cManage = /\b(change|resched\w*|cancel\w*|move|edit|manage|update|view)\b/.test(c);
       if (c === "BOOK" || (c.includes("book") && !cManage)) {
         const tours = await getActiveTours(tenant);
-        if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment \u2014 check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
+        if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment. Check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         if (tours.length === 1) {
           await sendText(tenant, phone, "How many people will be joining? (1\u201330)");
           await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tours[0].id } });
@@ -1104,12 +1105,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const tours2 = await getActiveTours(tenant);
         if (tours2.length <= 1) {
           const slots = await getAvailSlots(tenant, 8);
-          if (slots.length === 0) { await sendText(tenant, phone, "Nothing open right now, but check back soon \u2014 we add new slots regularly!"); await setConvo(convo.id, { current_state: "IDLE" }); }
+          if (slots.length === 0) { await sendText(tenant, phone, "Nothing open right now, but check back soon. We add new slots regularly!"); await setConvo(convo.id, { current_state: "IDLE" }); }
           else {
             let msg = "Here\u2019s what\u2019s coming up:\n\n";
             for (let ai = 0; ai < slots.length; ai++) {
               const as2 = slots[ai]; const aav = as2.capacity_total - as2.booked - (as2.held || 0); const apr = await getSlotPrice(as2);
-              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + " \u2014 " + aav + " spots \u2014 R" + apr + "/pp\n";
+              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + ", " + aav + " spots, R" + apr + "/pp\n";
             }
             await sendButtons(tenant, phone, msg, [{ id: "BOOK", title: "\u{1F6F6} Book Now" }, { id: "IDLE", title: "\u2B05 Back" }]);
           }
@@ -1122,7 +1123,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             if (atSlots.length === 0) { availMsg += "  Fully booked for now\n\n"; }
             else {
               for (let asi = 0; asi < atSlots.length; asi++) {
-                const ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + " \u2014 " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
+                const ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + ", " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
               }
               availMsg += "\n";
             }
@@ -1140,7 +1141,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // ASK A QUESTION
       else if (c === "ASK" || c === "ask" || c.includes("question")) {
         await typingDelay();
-        await sendText(tenant, phone, "Go ahead, ask me anything! \u{1F60A}\n\nI can answer things like:\n\u2022 \"What should I bring?\"\n\u2022 \"Where do we meet?\"\n\u2022 \"Is it safe for beginners?\"\n\u2022 \"Can I reschedule my booking?\"\n\u2022 \"What\'s available tomorrow?\"\n\nOr ask about your specific booking \u2014 I can look it up!");
+        await sendText(tenant, phone, "Go ahead, ask me anything! \u{1F60A}\n\nI can answer things like:\n\u2022 \"What should I bring?\"\n\u2022 \"Where do we meet?\"\n\u2022 \"Is it safe for beginners?\"\n\u2022 \"Can I reschedule my booking?\"\n\u2022 \"What\'s available tomorrow?\"\n\nOr ask about your specific booking, I can look it up!");
         await setConvo(convo.id, { current_state: "ASK_MODE" });
         return;
       }
@@ -1255,7 +1256,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             { id: "MORE", title: "\u{1F4AC} More Options" },
           ]);
         } else {
-          await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\" \u2014 or pick an option below:");
+          await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\". Or pick an option below:");
           await sendButtons(tenant, phone, "Quick actions:", [
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
             { id: "MY_BOOKINGS", title: "\u{1F4CB} My Bookings" },
@@ -1497,7 +1498,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             });
           }
         } catch (e) { console.log("cancel voucher email err"); }
-        await sendText(tenant, phone, "Done! Your booking has been cancelled and converted to a voucher:\n\n\u{1F39F} Code: *" + cvcode + "*\n\u{1F4B0} Value: *R" + cvTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await sendText(tenant, phone, "Done! Your booking has been cancelled and converted to a voucher:\n\n\u{1F39F} Code: *" + cvcode + "*\n\u{1F4B0} Value: *R" + cvTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime. Type *menu* and select *Redeem Voucher* when you\u2019re ready!");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else if (rid === "CANCEL_REFUND" || input === "refund") {
@@ -1514,11 +1515,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const crVCode = genVoucherCode();
           const crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
           if (crVResult.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
-          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled: voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
           if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_voucher_refund", { booking_id: sd.booking_id, code: crVCode, amount: crTotal }, sd.booking_id);
-          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime. Type *menu* and select *Redeem Voucher* when you\u2019re ready!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         } else {
           // M7: Split-tender refund math — check if booking has voucher_deduction > 0
@@ -1535,15 +1536,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             // Policy fee applies to the cash portion only
             const crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
             crRefund = Math.round(crCashPaid * crFrac * 100) / 100;
-            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted. Expect it within 5\u20137 business days.";
             if (crSplitVResult.data) {
               crRefundMsg += "\n\n\u{1F39F} Your voucher credit of *R" + crVoucherDeduction + "* has been restored: *" + crSplitVCode + "*";
             }
           } else {
             crRefund = Math.round(crTotal * crFrac * 100) / 100;
-            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted. Expect it within 5\u20137 business days.";
           }
-          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: crPct + "% refund via WhatsApp (refund policy)" }).eq("id", sd.booking_id);
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled: refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: crPct + "% refund via WhatsApp (refund policy)" }).eq("id", sd.booking_id);
           if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_refund", { booking_id: sd.booking_id, amount: crRefund }, sd.booking_id);
@@ -1553,7 +1554,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             if (crEmail.data?.email) {
               await fetch(SUPABASE_URL + "/functions/v1/send-email", {
                 method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp — refund requested", total_amount: crTotal.toFixed(2), is_partial: false } }),
+                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp: refund requested", total_amount: crTotal.toFixed(2), is_partial: false } }),
               });
             }
           } catch (e) { console.log("cancel refund email err"); }
@@ -1578,7 +1579,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           if (cbkData.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time || "", reason: "Cancelled within 24h — no refund", total_amount: String(sd.total), is_partial: false } }),
+              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time || "", reason: "Cancelled within 24h: no refund", total_amount: String(sd.total), is_partial: false } }),
             });
           }
         } catch (e) { console.log("cancel email err"); }
@@ -1594,7 +1595,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
         const frLoc = tenant.business.location_phrase;
-        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
+        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted. Expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else {
         await sendText(tenant, phone, "No worries, your booking remains cancelled and untouched. You can manage it again from the My Bookings menu.");
@@ -1622,7 +1623,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             });
           }
         } catch (e) { console.log("voucher email err"); }
-        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F4B0} Value: *R" + vTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nShare it with a friend or use it yourself \u2014 just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F4B0} Value: *R" + vTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nShare it with a friend or use it yourself. Just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else { await sendText(tenant, phone, "No worries, your booking stays as is! \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
     }
@@ -1810,7 +1811,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
-      let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + ", nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
       try {
         const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
@@ -1831,9 +1832,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         let pvShown = 0;
         for (let pvk = 0; pvk < pvKeys.length && pvShown < 5; pvk++) {
           const pvd = pvDays[pvKeys[pvk]];
-          if (pvd.open > 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
-          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 \u274C Closed (weather)\n"; }
-          else { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 Fully booked\n"; }
+          if (pvd.open > 0) { previewMsg += "\u2022 " + pvKeys[pvk] + ": " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
+          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += "\u2022 " + pvKeys[pvk] + ": \u274C Closed (weather)\n"; }
+          else { previewMsg += "\u2022 " + pvKeys[pvk] + ": Fully booked\n"; }
           pvShown++;
         }
         if (pvShown > 0) { previewMsg += "\nType a date to see times!"; }
@@ -1921,7 +1922,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (allClosed) {
-        await sendText(tenant, phone, "\u26C5 Unfortunately *" + pdFormatted + "* is closed due to bad weather. Please choose another date \u2014 type a new date to try again!");
+        await sendText(tenant, phone, "\u26C5 Unfortunately *" + pdFormatted + "* is closed due to bad weather. Please choose another date. Type a new date to try again!");
         return;
       }
 
@@ -1940,7 +1941,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Multiple or 1 slot — show time picker via numbered text menu (cap at 10)
       const maxDisplay = 10;
-      let timeTxt = pdFormatted + " \u2014 pick a time (reply with a number):\n\n";
+      let timeTxt = pdFormatted + ", pick a time (reply with a number):\n\n";
       const slotMap: any = {};
       const displayCount = Math.min(openSlots.length, maxDisplay);
       for (let ti = 0; ti < displayCount; ti++) {
@@ -1973,8 +1974,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (!slotId) { await sendText(tenant, phone, "Please reply with a valid number from the list."); return; }
       const sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
       const slot = sr2.data;
-      if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date \u2014 type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
-      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date \u2014 type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date. Type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date. Type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       // M5: 60-min cutoff check at slot selection
       const slotStartMs = new Date(slot.start_time).getTime();
       if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time from the list (reply with its number), or type *menu* to start over."); return; }
@@ -2030,9 +2031,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
         finalTotal = Math.max(0, finalTotal - voucherDeduction);
         if (finalTotal === 0) {
-          discountMsg = "\n\u{1F39F} *Voucher applied \u2014 this trip is on us!*";
+          discountMsg = "\n\u{1F39F} *Voucher applied, this trip is on us!*";
         } else {
-          discountMsg = "\n\u{1F39F} *Voucher applied \u2014 R" + voucherDeduction + " off!*";
+          discountMsg = "\n\u{1F39F} *Voucher applied: R" + voucherDeduction + " off!*";
         }
       }
       const tourName2 = await supabase.from("tours").select("name").eq("id", slot.tour_id).single();
@@ -2328,7 +2329,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
         await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", booking.id);
         payUrl = yocoData.redirectUrl;
-      } else { payUrl = "Payment link unavailable \u2014 type *speak to us* for help"; }
+      } else { payUrl = "Payment link unavailable. Type *speak to us* for help"; }
       const ref = booking.id.substring(0, 8).toUpperCase();
       await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
@@ -2341,7 +2342,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (sd.booking_id) {
         const awHold = await supabase.from("holds").select("status, expires_at").eq("booking_id", sd.booking_id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (awHold.data && new Date(awHold.data.expires_at) < new Date()) {
-          await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries \u2014 type *book* to start a new booking and grab fresh spots!");
+          await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries! Type *book* to start a new booking and grab fresh spots!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
@@ -2898,7 +2899,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await adjustSlotBooked(tenant.business.id, sd.slot_id, qtyDiff);
         if (sd.hours_before >= 24) {
           await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted \u2014 expect it within 5-7 business days.");
+          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted. Expect it within 5-7 business days.");
         } else {
           await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nAs this is within 24 hours, the refund policy applies for the difference.");
         }
@@ -3017,7 +3018,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Re-fetch and validate the slot
       const rSlotR = await supabase.from("slots").select("*, tours(name)").eq("id", rSlotId).single();
       const rSlot = rSlotR.data;
-      if (!rSlot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s try again — type *reschedule* to start over."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+      if (!rSlot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s try again. Type *reschedule* to start over."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (rSlot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Try *reschedule* again for updated options."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       const rAvail = rSlot.capacity_total - rSlot.booked - (rSlot.held || 0);
       if (rAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that slot for " + sd.qty + " people. Try *reschedule* again."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }

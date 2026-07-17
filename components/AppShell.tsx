@@ -113,7 +113,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   useEffect(() => {
     if (displayName && displayName !== "Admin") {
-      document.title = displayName + " — BookingTours Admin";
+      document.title = displayName + " | BookingTours Admin";
     } else {
       document.title = "BookingTours Admin";
     }
@@ -374,7 +374,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         {isSuspended && (
           <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-danger)" }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
-            <p className="text-xs font-medium" style={{ color: "var(--ck-danger)" }}>Subscription suspended — only Reports, Invoices, Refunds, and Settings are accessible. Contact support to reactivate.</p>
+            <p className="text-xs font-medium" style={{ color: "var(--ck-danger)" }}>Subscription suspended. Only Reports, Invoices, Refunds, and Settings are accessible. Contact support to reactivate.</p>
           </div>
         )}
         {subscriptionStatus === "PAUSED" && !isSuspended && (
@@ -386,16 +386,13 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         {yocoTestMode && (
           <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber-bright) 30%, transparent)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-amber)" }}><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-            <p className="text-xs font-medium" style={{ color: "var(--ck-amber)" }}>TEST MODE — Yoco payments are using sandbox keys. No real charges will be processed.</p>
+            <p className="text-xs font-medium" style={{ color: "var(--ck-amber)" }}>TEST MODE: Yoco payments are using sandbox keys. No real charges will be processed.</p>
           </div>
         )}
         <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">
           {routeBlocked ? (
             <div className="flex items-center justify-center min-h-[50vh]">
               <div className="ui-card px-10 py-9 text-center max-w-sm">
-                <div className="ui-icon-chip mx-auto mb-4" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                </div>
                 <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Feature Unavailable</h2>
                 <p className="text-sm text-[var(--ck-text-muted)]">This section is not accessible while your subscription is suspended. You can still access Reports, Invoices, Refunds, and Settings.</p>
               </div>

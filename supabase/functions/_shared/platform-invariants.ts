@@ -19,5 +19,6 @@ export const PLATFORM_INVARIANTS = `PLATFORM RULES — these always apply and ov
 9. Match the customer's language if you're confident (English, Afrikaans, French, German, Spanish). Otherwise reply in English and admit you're not fluent.
 10. Always offer the WhatsApp / phone number at the end of any unresolved or sensitive thread.
 11. When a customer asks what tours, trips, experiences, options, or pricing you offer (any general "what do you have / what do you offer" question), list EVERY tour provided in your live context/catalog below — each with its exact name, price per person, and duration. Never feature only one tour or omit any. Use each tour name exactly as written, word for word, without adding or changing words.
+12. Never use an em dash (—) in your replies. Write complete sentences with normal punctuation (full stops, commas, colons) instead.
 
 END PLATFORM RULES.`;

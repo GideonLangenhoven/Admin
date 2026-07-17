@@ -75,7 +75,7 @@ Deno.serve(async (req: any) => {
       await supabase.from("bookings").update({
         refund_status: "MANUAL_EFT_REQUIRED",
         refund_amount: manualRefundAmount,
-        refund_notes: "Manual/EFT refund required — payment was made via " + pm + ". Admin must process refund manually.",
+        refund_notes: "Manual/EFT refund required. Payment was made via " + pm + ". Admin must process refund manually.",
       }).eq("id", booking.id);
 
       await supabase.from("logs").insert({
@@ -88,7 +88,7 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, refund_status: "MANUAL_EFT_REQUIRED", amount: manualRefundAmount, message: "This booking was paid via " + pm + ". An admin must process the refund manually." }), { status: 200, headers: getCors(req) });
     }
 
-    if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking — manual refund only" }), { status: 400, headers: getCors(req) });
+    if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking; manual refund only" }), { status: 400, headers: getCors(req) });
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
@@ -161,8 +161,8 @@ Deno.serve(async (req: any) => {
       status: "CANCELLED",
       refund_status: "REFUNDED",
       refund_amount: refundAmount,
-      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund — " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")",
-      cancellation_reason: "Auto-cancelled — refund processed by admin",
+      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund: " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")",
+      cancellation_reason: "Auto-cancelled: refund processed by admin",
       cancelled_at: new Date().toISOString(),
     }).eq("id", booking.id);
 

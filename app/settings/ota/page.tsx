@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { Globe, Plus, Trash, Check, Warning, ToggleLeft, ToggleRight } from "@phosphor-icons/react";
+import { Trash, ToggleLeft, ToggleRight } from "@phosphor-icons/react";
 
 type Mapping = {
   id: string;
@@ -192,9 +192,6 @@ export default function OtaSettingsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="anim-fade-up flex items-center gap-3">
-        <span className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-          <Globe size={19} weight="fill" />
-        </span>
         <div>
           <p className="ui-mono-label mb-1">Admin · Settings</p>
           <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>OTA Integrations</h1>
@@ -271,9 +268,9 @@ export default function OtaSettingsPage() {
             <h2 className="text-[15px] font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Availability Sync</h2>
             <div className="flex items-center gap-3 text-sm">
               {status.last_sync_status === "ok" ? (
-                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-success)" }}><Check size={16} weight="bold" /> Last sync succeeded</span>
+                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-success)" }}>Last sync succeeded</span>
               ) : status.last_sync_status === "error" ? (
-                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-danger)" }}><Warning size={16} weight="bold" /> Last sync failed</span>
+                <span className="flex items-center gap-1.5" style={{ color: "var(--ck-danger)" }}>Last sync failed</span>
               ) : (
                 <span style={{ color: "var(--ck-text-muted)" }}>No sync yet</span>
               )}
@@ -312,7 +309,7 @@ export default function OtaSettingsPage() {
           )}
 
           <div className="rounded-lg p-4 border" style={{ borderColor: "var(--ck-border-subtle)", borderStyle: "dashed", background: "var(--ck-surface-sunken)" }}>
-            <p className="text-xs font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--ck-text-muted)" }}><Plus size={14} /> Add Mapping</p>
+            <p className="text-xs font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--ck-text-muted)" }}>Add Mapping</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs mb-1 block" style={{ color: "var(--ck-text-muted)" }}>Tour</label>

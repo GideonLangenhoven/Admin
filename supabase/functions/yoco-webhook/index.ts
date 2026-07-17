@@ -745,7 +745,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
                       tour_name: agBk.tours?.name || "Experience",
                       start_time: agBk.slots?.start_time ? formatTenantDateTime(agWaiverTenant.business, agBk.slots.start_time) : "TBC",
                       qty: agNewQty,
-                      message: "You've added new guests — please update your waiver",
+                      message: "You've added new guests, so please update your waiver",
                     },
                   }),
                 });
@@ -1138,11 +1138,14 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         : Number(booking.original_total || 0) - Number(booking.total_amount || 0);
       if (voucherDiscount > 0) {
         let vouchersToDeduct: any[] = [];
+        // Vouchers are operator-specific — only deduct vouchers issued by the
+        // booking's own business (create-checkout already rejects cross-tenant
+        // claims; this keeps the webhook safe on its own too).
         if (voucherIdList.length > 0) {
-          const vr = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("id", voucherIdList);
+          const vr = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").eq("business_id", booking.business_id).in("id", voucherIdList);
           vouchersToDeduct = vr.data || [];
         } else if (voucherCodeList.length > 0) {
-          const vr2 = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").in("code", voucherCodeList);
+          const vr2 = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").eq("business_id", booking.business_id).in("code", voucherCodeList);
           vouchersToDeduct = vr2.data || [];
         }
         let remainingDiscount = voucherDiscount;

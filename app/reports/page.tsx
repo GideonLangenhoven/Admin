@@ -7,9 +7,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
-import {
-  DownloadSimple, FilePdf, ArrowsClockwise, ChartLineUp, ChartBar, Table as TableIcon,
-} from "@phosphor-icons/react";
 
 function fmtCurrency(n: number) {
   return "R" + Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -622,7 +619,7 @@ export default function Reports() {
     <div className="space-y-5 max-w-[1400px] mx-auto pb-10">
       {reportTruncated && (
         <div className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-warn-soft, #fef3c7)", color: "var(--ck-warn-strong, #92400e)" }}>
-          This period has more than 20,000 bookings — totals and CSV cover the first 20,000. Narrow the date range for exact figures.
+          This period has more than 20,000 bookings. Totals and CSV cover the first 20,000; narrow the date range for exact figures.
         </div>
       )}
       {/* ── Header ── */}
@@ -634,10 +631,10 @@ export default function Reports() {
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <button onClick={downloadCSV} disabled={filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
-            <DownloadSimple size={15} weight="bold" /> CSV ({filtered.length})
+            CSV ({filtered.length})
           </button>
           <button onClick={downloadPDF} disabled={filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
-            <FilePdf size={15} weight="bold" /> PDF
+            PDF
           </button>
         </div>
       </div>
@@ -705,7 +702,7 @@ export default function Reports() {
           </select>
         </label>
         <button onClick={loadReport} className="ui-btn ui-btn-ghost sm:ml-auto">
-          <ArrowsClockwise size={14} weight="bold" /> Refresh
+          Refresh
         </button>
       </div>
 
@@ -715,7 +712,7 @@ export default function Reports() {
           {[
             { label: "Active Bookings", value: summary.total - summary.cancelled, color: "var(--ck-text-strong)", hint: "trip date in range" },
             { label: "Signed (trip in range)", value: summary.waiverSigned, color: "var(--ck-success)", hint: "signed waivers for trips in this period" },
-            { label: "Signed in this period", value: signedInPeriod, color: "var(--ck-success)", hint: "by signing date — independent of trip date" },
+            { label: "Signed in this period", value: signedInPeriod, color: "var(--ck-success)", hint: "by signing date, independent of trip date" },
             { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "trips in range, no waiver yet" },
             { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—", color: "var(--ck-text-strong)" },
           ].map(c => (
@@ -782,7 +779,6 @@ export default function Reports() {
           </ResponsiveContainer>
         ) : (
           <div className="ui-empty">
-            <span className="ui-icon-chip"><ChartLineUp size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No revenue in this period</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Paid bookings will chart here once they fall in range.</p>
           </div>
@@ -798,7 +794,6 @@ export default function Reports() {
           </div>
           {visualSeries.length === 0 ? (
             <div className="ui-empty">
-              <span className="ui-icon-chip"><ChartBar size={19} /></span>
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No chart data</p>
               <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing to break down for this filter yet.</p>
             </div>
@@ -860,7 +855,6 @@ export default function Reports() {
       ) : filtered.length === 0 ? (
         <div className="ui-card">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><TableIcon size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No records found</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing matches this period and filter.</p>
           </div>

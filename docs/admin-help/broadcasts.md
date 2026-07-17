@@ -13,7 +13,7 @@ Broadcasts sends a message to every guest booked on the slots you select — by 
 3. Compose your message — use the {name} tag to personalise with the guest's name.
 4. Send. The result reports how many were delivered per channel, with a failure breakdown.
 
-WhatsApp delivery is best-effort: it depends on the customer's number being on WhatsApp and the 24-hour messaging window. Email is sent to everyone regardless.
+WhatsApp delivery is best-effort: it depends on the customer's number being on WhatsApp and the 24-hour messaging window. Recipients whose window is closed get a pre-approved "please reply" template instead; the actual broadcast message is delivered automatically the moment they reply. Email is sent to everyone regardless.
 
 ## Weather Mode — cancelling slots
 

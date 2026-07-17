@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
-import { ShieldCheck } from "@phosphor-icons/react";
 
 type DataRequest = {
   id: string;
@@ -203,9 +202,7 @@ export default function DataRequestsPage() {
       {/* List */}
       {filtered.length === 0 ? (
         <div className="ui-card">
-          <div className="ui-empty">
-            <span className="ui-icon-chip"><ShieldCheck size={19} /></span>
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No requests in this category</p>
+          <div className="ui-empty">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No requests in this category</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Data requests will appear here as customers submit them.</p>
           </div>
         </div>
@@ -235,7 +232,7 @@ export default function DataRequestsPage() {
                         <span className="font-medium" style={{ color: "var(--ck-amber)" }}>{daysUntilDue} days until due</span>
                       )}
                       {daysUntilDue === 0 && r.status === "IN_REVIEW" && (
-                        <span className="font-medium" style={{ color: "var(--ck-danger)" }}>Overdue — ready to fulfill</span>
+                        <span className="font-medium" style={{ color: "var(--ck-danger)" }}>Overdue: ready to fulfill</span>
                       )}
                     </div>
                     {r.reason && <p className="mt-1 text-xs italic" style={{ color: "var(--ck-text-muted)" }}>"{r.reason}"</p>}

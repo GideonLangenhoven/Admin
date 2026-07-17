@@ -10,6 +10,8 @@ Settings is one page of collapsible sections covering your whole configuration. 
 
 Add dashboard users (they receive a password-setup email), resend setup links, remove admins, and grant per-section settings permissions. The Main Admin account can't be deleted. This section also lets you suspend or reactivate the subscription.
 
+The **Billing contact** selector chooses who receives BookingTours subscription invoices. By default they go to the first admin created on the account; pick any other admin to redirect them.
+
 ## Tours & Activities
 
 Create and edit your tours: name, description, duration, departure times, base and peak price. Drag to reorder how they appear on the booking site. A tour that has bookings can't be deleted.

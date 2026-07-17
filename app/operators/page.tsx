@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { useBusinessContext } from "../../components/BusinessContext";
 
-const plans = [
-  { name: "Starter", price: 1500, seats: 1 },
-  { name: "Growth", price: 3000, seats: 2 },
-  { name: "Pro", price: 6500, seats: 3 },
-];
+// Single pricing model — mirrors the 'standard' row in the plans table.
+const plan = { name: "Standard", price: 2000, seats: 1, extraSeat: 500 };
 
 function zar(v: number) {
   return "R" + v.toLocaleString("en-ZA");
@@ -27,19 +24,18 @@ function MarketingView() {
           </div>
         </header>
 
-        <section className="grid gap-5 md:grid-cols-3">
-          {plans.map((p) => (
-            <div key={p.name} className="ui-card p-6">
-              <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{p.name}</h2>
-              <p className="font-display mt-2 text-[30px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{zar(p.price)}<span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>/month</span></p>
-              <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Setup fee: {zar(3500)} once-off</p>
-              <ul className="mt-4 space-y-2 text-sm" style={{ color: "var(--ck-text)" }}>
-                <li>{p.seats} admin {p.seats === 1 ? "seat" : "seats"}</li>
-                <li>Unlimited bookings included</li>
-                <li>All core features included</li>
-              </ul>
-            </div>
-          ))}
+        <section className="mx-auto max-w-md">
+          <div className="ui-card p-6">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{plan.name}</h2>
+            <p className="font-display mt-2 text-[30px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{zar(plan.price)}<span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>/month</span></p>
+            <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Setup fee: {zar(3500)} once-off</p>
+            <ul className="mt-4 space-y-2 text-sm" style={{ color: "var(--ck-text)" }}>
+              <li>{plan.seats} admin seat included</li>
+              <li>{zar(plan.extraSeat)}/month per additional seat</li>
+              <li>Unlimited bookings included</li>
+              <li>All core features included</li>
+            </ul>
+          </div>
         </section>
 
         <section className="ui-card p-6">
@@ -53,7 +49,7 @@ function MarketingView() {
 
         <section className="ui-card p-6">
           <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing model</h3>
-          <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Each operator is billed monthly for the selected plan. The plan difference is simply the number of admin seats included: 1, 2, or 3.</p>
+          <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Each operator pays {zar(plan.price)}/month, which includes one admin seat. Every additional admin seat adds {zar(plan.extraSeat)}/month.</p>
         </section>
       </div>
     </div>

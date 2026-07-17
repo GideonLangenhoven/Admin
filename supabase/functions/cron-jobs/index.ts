@@ -59,7 +59,7 @@ async function releaseExpiredHolds() {
     }
 
     // Notify customer
-    await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment wasn\u2019t received within 15 minutes.\n\nNo worries \u2014 reply *menu* to book again!", h.booking_id);
+    await sendText(bk.phone, "\u23F0 Your booking hold has expired as payment wasn\u2019t received within 15 minutes.\n\nNo worries! Reply *menu* to book again!", h.booking_id);
 
     await supabase.from("logs").insert({ business_id: BUSINESS_ID, booking_id: h.booking_id, event: "hold_expired", payload: { hold_id: h.id } });
     console.log("CRON: Released hold " + h.id + " for booking " + h.booking_id);
@@ -147,7 +147,7 @@ async function sendThankYous() {
       "\u{1F6F6} *Thanks for paddling with us, " + (b.customer_name || "").split(" ")[0] + "!*\n\n" +
       "We hope you had an amazing time on the water! \u{1F30A}\n\n" +
       "\u2B50 *Loved it?* We\u2019d really appreciate a review:\nhttps://g.page/r/capekayakadventures/review\n\n" +
-      "Book again anytime \u2014 reply *menu*!\n\nRemember: loyal paddlers get 10% off after 2 trips in a month! \u{1F31F}",
+      "Book again anytime, reply *menu*!\n\nRemember: loyal paddlers get 10% off after 2 trips in a month! \u{1F31F}",
       b.id
     );
 

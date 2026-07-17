@@ -16,7 +16,9 @@ Select a conversation to see the full thread — bot, customer, and admin messag
 
 ## The WhatsApp 24-hour window
 
-WhatsApp only allows businesses to send free-form messages within 24 hours of the customer's last message. If the window has closed you'll see a warning — the customer needs to message you first (or the system uses an approved template where available). This is a WhatsApp platform rule, not a BookingTours limitation.
+WhatsApp only allows businesses to send free-form messages within 24 hours of the customer's last message. This is a WhatsApp platform rule, not a BookingTours limitation.
+
+If the window has closed, your message isn't lost: the system automatically sends the customer a pre-approved "please reply" template, and your message is queued (marked with ⏳ in the thread). The moment they reply, the queued message is delivered and the window reopens — from then on you can chat live in the Inbox as normal.
 
 ## Finding a conversation
 

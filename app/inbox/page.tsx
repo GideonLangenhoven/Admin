@@ -8,7 +8,7 @@ import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
-import { ChatCircleDots, PaperPlaneTilt, ArrowLeft, Robot, ArrowClockwise, Warning, X as XIcon } from "@phosphor-icons/react";
+import { Warning, X as XIcon } from "@phosphor-icons/react";
 
 function MessageList({
   messages,
@@ -319,7 +319,7 @@ function InboxContent() {
               <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="ui-mono-label !text-[10px]">{attentionCount} need attention · {convos.length} total</p>
-                  <button onClick={loadConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]"><ArrowClockwise size={13} /> Refresh</button>
+                  <button onClick={loadConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]">Refresh</button>
                 </div>
                 <input
                   type="search"
@@ -332,7 +332,6 @@ function InboxContent() {
               <div className="flex-1 overflow-auto">
                 {visibleConvos.length === 0 ? (
                   <div className="ui-empty">
-                    <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
                     <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{q ? "No matches" : "No conversations yet"}</p>
                     <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{q ? "Try a different name, number or email." : "WhatsApp and web-chat conversations will appear here."}</p>
                   </div>
@@ -355,7 +354,7 @@ function InboxContent() {
               <div className="flex-1 flex flex-col ui-card overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] p-3">
                   <button onClick={() => setSelected(null)} className="ui-btn ui-btn-ghost md:hidden shrink-0 !h-8 !px-2.5 text-xs">
-                    <ArrowLeft size={14} /> Back
+                    Back
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>{selected.customer_name || selected.phone}</p>
@@ -364,7 +363,7 @@ function InboxContent() {
                   {needsAttention(selected) && (
                     <button onClick={() => returnToBot(selected.id, selected.phone)}
                       className="ui-btn ui-btn-soft w-full !h-8 text-xs sm:w-auto">
-                      <Robot size={14} /> Return to Bot
+                      Return to Bot
                     </button>
                   )}
                 </div>
@@ -372,7 +371,6 @@ function InboxContent() {
                 <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {messages.length === 0 ? (
                     <div className="ui-empty">
-                      <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
                       <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No messages yet</p>
                       <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>The customer&apos;s next message will appear here.</p>
                     </div>
@@ -405,7 +403,7 @@ function InboxContent() {
                         className="ui-control flex-1 resize-none outline-none" />
                       <button onClick={sendReply} disabled={sending || !reply.trim()}
                         className="ui-btn ui-btn-primary self-stretch !h-auto py-2.5 disabled:opacity-50 sm:self-end sm:!h-9 sm:!py-0">
-                        <PaperPlaneTilt size={15} weight="fill" /> {sending ? "..." : "Send"}
+                        {sending ? "..." : "Send"}
                       </button>
                     </div>
                     {!needsAttention(selected) && (
@@ -417,7 +415,6 @@ function InboxContent() {
             ) : (
               <div className="hidden md:flex flex-1 items-center justify-center ui-card">
                 <div className="ui-empty">
-                  <span className="ui-icon-chip"><ChatCircleDots size={19} /></span>
                   <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No conversation selected</p>
                   <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation on the left to see its full history.</p>
                 </div>

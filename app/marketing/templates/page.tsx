@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask, EnvelopeSimple } from "@phosphor-icons/react";
+import { Trash, Copy, X } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
 import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
 
@@ -343,13 +343,13 @@ export default function TemplatesPage() {
         // zero processed. Could be RLS / cron lag. Tell the user honestly.
         notify({
           title: "Campaign queued",
-          message: `${contacts.length} recipients queued. None have been dispatched yet — the background process will pick them up. Refresh Recent Campaigns in ~1 min to see progress.`,
+          message: `${contacts.length} recipients queued. None have been dispatched yet; the background process will pick them up. Refresh Recent Campaigns in ~1 min to see progress.`,
           tone: "info",
           duration: 7000,
         });
       }
     } else {
-      notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} — ${contacts.length} recipients.`, tone: "success" });
+      notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} (${contacts.length} recipients).`, tone: "success" });
     }
 
     setSending(null);
@@ -396,14 +396,13 @@ export default function TemplatesPage() {
           <span className="font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{templates.length}</span> templates
         </p>
         <button onClick={() => setShowGallery(true)} className="ui-btn ui-btn-primary">
-          <Plus size={14} /> New Template
+          New Template
         </button>
       </div>
 
       {templates.length === 0 ? (
         <div className="ui-card anim-fade-up anim-d1">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><EnvelopeSimple size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No templates yet</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first email template.</p>
           </div>
@@ -430,13 +429,13 @@ export default function TemplatesPage() {
               </div>
               <div className="flex items-center gap-1.5 pt-1">
                 <button onClick={() => setEditing(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs">
-                  <PencilSimple size={12} /> Edit
+                  Edit
                 </button>
                 <button onClick={() => openSendModal(t)} className="ui-btn ui-btn-primary !h-8 !px-2.5 !text-xs">
-                  <PaperPlaneTilt size={12} /> Send
+                  Send
                 </button>
                 <button onClick={() => sendTestEmail(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs" title="Send test to yourself">
-                  <Flask size={12} /> Test
+                  Test
                 </button>
                 <button onClick={() => duplicateTemplate(t)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" title="Duplicate">
                   <Copy size={12} />

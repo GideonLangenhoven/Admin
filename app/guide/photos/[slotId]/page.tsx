@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { Camera, Envelope } from "@phosphor-icons/react";
 
 type Photo = { id: string; photo_url: string; gdrive_view_url: string | null; uploaded_at: string };
 
@@ -93,9 +92,6 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
           </>
         ) : (
           <>
-            <div className="ui-icon-chip w-12 h-12" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-              <Camera size={24} />
-            </div>
             <span className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Take or pick photos</span>
             <span className="text-[12px] ui-text-muted">Saved to your Google Drive, shared as a private gallery in the thank-you email.</span>
           </>
@@ -120,7 +116,6 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
           <button onClick={sendThankYou} disabled={!!emailStatus?.startsWith("Sending")}
             className="mt-6 w-full flex items-center justify-center gap-2 p-4 rounded-2xl text-white font-semibold active:scale-[0.99] transition disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #D9822F, #B4641C)", boxShadow: "var(--ck-shadow-sm)" }}>
-            <Envelope size={20} />
             Send thank-you email with photos
           </button>
         </>

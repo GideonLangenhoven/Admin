@@ -12,3 +12,16 @@ export function formatDuration(minutes: number | null | undefined): string {
   }
   return m + " min";
 }
+
+// Last calendar day of a tour. Whole-day durations end ON the last day
+// (a 3-day tour departing Mon ends Wed), not the morning after.
+// Mirrors app/lib/duration.ts tourEndDate.
+export function tourEndDate(startIso: string, minutes: number | null | undefined): Date | null {
+  if (!startIso) return null;
+  const start = new Date(startIso);
+  if (isNaN(start.getTime())) return null;
+  const m = Number(minutes || 0);
+  if (m < 1440) return start;
+  const days = Math.ceil(m / 1440);
+  return new Date(start.getTime() + (days - 1) * 86400000);
+}

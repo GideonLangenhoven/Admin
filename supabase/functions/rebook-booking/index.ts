@@ -687,7 +687,7 @@ async function handleRequestChange(req: any, booking: any, body: any) {
     hrsLabel = hrs >= 0 ? " (trip in ~" + Math.round(hrs) + "h)" : "";
   }
   const tourName = booking.tours?.name || "their tour";
-  const messageBody = "\u{1F514} CHANGE REQUEST — " + (booking.customer_name || "Customer")
+  const messageBody = "\u{1F514} CHANGE REQUEST: " + (booking.customer_name || "Customer")
     + " has requested to " + requestedAction.toUpperCase() + " booking " + ref
     + " (" + tourName + ")" + hrsLabel + "."
     + (note ? "\n\nMessage: “" + note + "”" : "");
@@ -841,7 +841,7 @@ async function handleCancelRefund(req: any, booking: any) {
 
     await supabase.from("bookings").update({
       status: "CANCELLED",
-      cancellation_reason: "Cancelled via web — manual/EFT refund required",
+      cancellation_reason: "Cancelled via web: manual/EFT refund required",
       cancelled_at: new Date().toISOString(),
       refund_status: "MANUAL_EFT_REQUIRED",
       refund_amount: manualRefundAmount,
@@ -936,7 +936,7 @@ async function handleCancelRefund(req: any, booking: any) {
             ref: ref,
             tour_name: tourName,
             start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
-            reason: "Cancelled via web — refund requested",
+            reason: "Cancelled via web: refund requested",
             refund_amount: refundAmount.toFixed(2),
             total_amount: String(totalAmount.toFixed(2)),
             is_partial: false,
@@ -969,7 +969,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
 
   await supabase.from("bookings").update({
     status: "CANCELLED",
-    cancellation_reason: "Cancelled via web — voucher-paid, converted back to voucher",
+    cancellation_reason: "Cancelled via web: voucher-paid, converted back to voucher",
     cancelled_at: new Date().toISOString(),
     converted_to_voucher_id: voucherId,
   }).eq("id", booking.id);
@@ -1003,7 +1003,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
   if (booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
-        "Booking cancelled — voucher issued\n\n" +
+        "Booking cancelled, voucher issued\n\n" +
         "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") + ", your booking " +
         tourName + " (Ref: " + ref + ") has been cancelled.\n\n" +
         "Since you paid with a voucher, a new voucher has been issued:\n" +
@@ -1028,7 +1028,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
             ref: ref,
             tour_name: tourName,
             start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
-            reason: "Cancelled via web — voucher issued (original payment was voucher)",
+            reason: "Cancelled via web: voucher issued (original payment was voucher)",
             voucher_code: vcode,
             voucher_amount: totalAmount.toFixed(2),
             total_amount: String(totalAmount.toFixed(2)),
@@ -1076,7 +1076,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   // refund actually executes; pre-counting made the queue see 0 refundable.
   await supabase.from("bookings").update({
     status: "CANCELLED",
-    cancellation_reason: "Cancelled via web — split-tender refund (voucher restored + Yoco refund minus 5% fee)",
+    cancellation_reason: "Cancelled via web: split-tender refund (voucher restored + Yoco refund minus 5% fee)",
     cancelled_at: new Date().toISOString(),
     refund_status: yocoRefundAmount > 0 ? "REQUESTED" : "REFUNDED",
     refund_amount: yocoRefundAmount,
@@ -1122,7 +1122,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   if (booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
-        "Booking cancelled — split refund\n\n" +
+        "Booking cancelled, split refund\n\n" +
         "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") + ", your booking " +
         tourName + " (Ref: " + ref + ") has been cancelled.\n\n" +
         "Voucher restored: " + vcode + " (" + currency + " " + split.voucherPortion.toFixed(2) + ")\n" +
@@ -1146,7 +1146,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
             ref: ref,
             tour_name: tourName,
             start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
-            reason: "Cancelled via web — split-tender refund",
+            reason: "Cancelled via web: split-tender refund",
             refund_amount: yocoRefundAmount.toFixed(2),
             voucher_code: vcode,
             voucher_amount: split.voucherPortion.toFixed(2),
@@ -1383,7 +1383,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
               ref: ref,
               tour_name: tourName,
               start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
-              reason: "Credit claimed — voucher issued",
+              reason: "Credit claimed: voucher issued",
               voucher_code: vcode,
               voucher_amount: creditAmount.toFixed(2),
               total_amount: String(creditAmount.toFixed(2)),

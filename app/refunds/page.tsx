@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { Receipt, CurrencyCircleDollar, ArrowCounterClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { CaretDown, CaretRight } from "@phosphor-icons/react";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
@@ -70,7 +70,7 @@ export default function Refunds() {
       // process-refund authorizes the caller — send the admin's session JWT.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setResults(prev => ({ ...prev, [id]: { error: "Session expired — please sign in again." } }));
+        setResults(prev => ({ ...prev, [id]: { error: "Session expired. Please sign in again." } }));
         setProcessing(null);
         return;
       }
@@ -95,7 +95,7 @@ export default function Refunds() {
     await saveRefundAmount(id, amount);
     await supabase.from("bookings").update({
       refund_status: "PROCESSED",
-      refund_notes: isPartial ? `Partial manual refund — R${amount.toFixed(2)} of R${Number(booking.total_amount).toFixed(2)}` : "Manual refund",
+      refund_notes: isPartial ? `Partial manual refund: R${amount.toFixed(2)} of R${Number(booking.total_amount).toFixed(2)}` : "Manual refund",
     }).eq("id", id);
     load();
   }
@@ -228,7 +228,7 @@ export default function Refunds() {
         </div>
         {refunds.length > 1 && (
           <button onClick={refundAll} className="ui-btn ui-btn-danger w-full sm:w-auto">
-            <ArrowCounterClockwise size={15} weight="bold" /> Refund All ({refunds.length})
+            Refund All ({refunds.length})
           </button>
         )}
       </div>
@@ -237,18 +237,12 @@ export default function Refunds() {
         <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 sm:max-w-md">
           <div className="ui-card p-4">
             <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-icon-chip" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
-                <Receipt size={18} weight="fill" />
-              </span>
               <span className="ui-mono-label !text-[10px]">Pending</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{refunds.length}</p>
           </div>
           <div className="ui-card p-4">
             <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-icon-chip" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-                <CurrencyCircleDollar size={18} weight="fill" />
-              </span>
               <span className="ui-mono-label !text-[10px]">To Refund</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{totalRefund.toLocaleString()}</p>
@@ -259,7 +253,6 @@ export default function Refunds() {
       {refunds.length === 0 ? (
         <div className="ui-card">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><Receipt size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No pending refunds</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Refund requests awaiting action will appear here.</p>
           </div>
@@ -278,7 +271,7 @@ export default function Refunds() {
                     <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"} · {b.qty} pax</p>
                     <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone} · {b.email}</p>
                     {b.cancellation_reason && <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Reason: {b.cancellation_reason}</p>}
-                    {!hasCheckout && <p className="mt-1 text-xs" style={{ color: "var(--ck-warning)" }}>No Yoco checkout ID — manual refund only</p>}
+                    {!hasCheckout && <p className="mt-1 text-xs" style={{ color: "var(--ck-warning)" }}>No Yoco checkout ID: manual refund only</p>}
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="sm:text-right">
@@ -325,7 +318,7 @@ export default function Refunds() {
                 </div>
                 {res && (
                   <div className="mt-3 rounded-lg p-3 text-sm" style={res.ok ? { background: "var(--ck-success-soft)", color: "var(--ck-success)" } : { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-                    {res.ok ? "Refund processed — customer notified via WhatsApp & email" : (res.error || res.message || "Failed")}
+                    {res.ok ? "Refund processed. The customer was notified via WhatsApp & email." : (res.error || res.message || "Failed")}
                   </div>
                 )}
               </div>

@@ -1,14 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UsersThree, Layout, ChartBar, Lightning, Tag } from "@phosphor-icons/react";
 
 const tabs = [
-  { href: "/marketing", label: "Overview", icon: ChartBar, exact: true },
-  { href: "/marketing/contacts", label: "Contacts", icon: UsersThree },
-  { href: "/marketing/templates", label: "Templates", icon: Layout },
-  { href: "/marketing/automations", label: "Automations", icon: Lightning },
-  { href: "/marketing/promotions", label: "Promos", icon: Tag },
+  { href: "/marketing", label: "Overview", exact: true },
+  { href: "/marketing/contacts", label: "Contacts" },
+  { href: "/marketing/templates", label: "Templates" },
+  { href: "/marketing/automations", label: "Automations" },
+  { href: "/marketing/promotions", label: "Promos" },
 ];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +24,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <nav className="flex gap-1 border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
         {tabs.map((t) => {
           const isActive = t.exact ? pathname === t.href : pathname.startsWith(t.href);
-          const Icon = t.icon;
           return (
             <Link
               key={t.href}
@@ -37,7 +35,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               }`}
               style={isActive ? {} : { color: "var(--ck-text-muted)" }}
             >
-              <Icon size={16} weight={isActive ? "fill" : "regular"} />
               {t.label}
             </Link>
           );

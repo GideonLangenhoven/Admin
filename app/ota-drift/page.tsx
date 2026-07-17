@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
-import { Warning, ArrowsClockwise, Check, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
 
 type Run = {
   id: string;
@@ -52,9 +52,7 @@ export default function OtaDriftPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Warning size={28} weight="duotone" className="text-amber-500" />
-        <h1 className="text-2xl font-bold text-[color:var(--text)]">OTA Drift Monitor</h1>
+      <div className="flex items-center gap-3 mb-6">        <h1 className="text-2xl font-bold text-[color:var(--text)]">OTA Drift Monitor</h1>
         <button onClick={refresh} className="ml-auto p-2 rounded-lg hover:bg-[color:var(--surface2)] text-[color:var(--textMuted)]">
           <ArrowsClockwise size={20} />
         </button>
@@ -79,9 +77,7 @@ export default function OtaDriftPage() {
       {loading && <p className="text-sm text-[color:var(--textMuted)]">Loading...</p>}
 
       {!loading && runs.length === 0 && (
-        <div className="text-center py-12">
-          <Check size={40} className="mx-auto mb-3 text-emerald-400" />
-          <p className="text-[color:var(--textMuted)]">No reconciliation runs yet. The nightly cron runs at 02:37 UTC.</p>
+        <div className="text-center py-12">          <p className="text-[color:var(--textMuted)]">No reconciliation runs yet. The nightly cron runs at 02:37 UTC.</p>
         </div>
       )}
 
@@ -99,9 +95,9 @@ export default function OtaDriftPage() {
                 {run.our_count} ours · {run.ota_count} OTA · {run.matched} matched
               </span>
               {hasDrifts ? (
-                <span className="text-xs font-semibold text-amber-600 flex items-center gap-1"><Warning size={14} /> {drifts.length} drift{drifts.length !== 1 ? "s" : ""}</span>
+                <span className="text-xs font-semibold text-amber-600 flex items-center gap-1">{drifts.length} drift{drifts.length !== 1 ? "s" : ""}</span>
               ) : (
-                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1"><Check size={14} /> clean</span>
+                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">clean</span>
               )}
             </button>
             {isExpanded && (
@@ -141,7 +137,7 @@ export default function OtaDriftPage() {
                   </div>
                 )}
                 <p className="text-xs text-[color:var(--textMuted)] mt-2">
-                  Period: {new Date(run.period_start).toLocaleString()} — {new Date(run.period_end).toLocaleString()}
+                  Period: {new Date(run.period_start).toLocaleString()} to {new Date(run.period_end).toLocaleString()}
                 </p>
               </div>
             )}

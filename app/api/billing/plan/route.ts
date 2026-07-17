@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       source_type: "SUBSCRIPTION",
       source_id: sub.id,
       kind: "PLAN_CHANGE",
-      description: "Plan change to " + newPlan.name + " — prorated",
+      description: "Plan change to " + newPlan.name + ", prorated",
       amount_zar: proration,
       status: "PENDING",
       period_key: billing_cycle_start,

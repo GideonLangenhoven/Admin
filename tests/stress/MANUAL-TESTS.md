@@ -125,3 +125,4 @@ DELETE FROM slots  WHERE tour_id IN (SELECT id FROM tours WHERE name LIKE 'STRES
 DELETE FROM tours  WHERE name LIKE 'STRESS %';
 DELETE FROM businesses WHERE name LIKE 'STRESS %';
 ```
+

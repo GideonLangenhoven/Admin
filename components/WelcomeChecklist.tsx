@@ -8,7 +8,7 @@
 // "Set up later" closes for this session; "Don't show this again" persists.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle, Circle, MapTrifold, CalendarPlus, CreditCard, PaintBrush, Ticket, ChatCircleDots, Tray, CloudRain } from "@phosphor-icons/react";
+import { CheckCircle, Circle } from "@phosphor-icons/react";
 import { supabase } from "../app/lib/supabase";
 import { useBusinessContext } from "./BusinessContext";
 
@@ -17,7 +17,6 @@ type ChecklistItem = {
   title: string;
   detail: string;
   href: string;
-  icon: React.ReactNode;
   done?: boolean;
 };
 
@@ -46,18 +45,18 @@ export default function WelcomeChecklist() {
         supabase.from("bookings").select("id", { count: "exact", head: true }).eq("business_id", businessId),
       ]);
       setItems([
-        { key: "tours", title: "Create your tours", detail: "Names, descriptions, durations and prices — the products customers book.", href: "/settings", icon: <MapTrifold size={20} />, done: (tours.count || 0) > 0 },
-        { key: "slots", title: "Open bookable slots", detail: "Departures with dates, times and capacity. No slots, no bookings.", href: "/slots", icon: <CalendarPlus size={20} />, done: (slots.count || 0) > 0 },
-        { key: "payments", title: "Connect payments & WhatsApp", detail: "Add your Yoco and WhatsApp credentials under Integration Credentials.", href: "/settings", icon: <CreditCard size={20} /> },
-        { key: "branding", title: "Brand your booking site", detail: "Logo, colours, policies and FAQ under Booking Site Configuration.", href: "/settings", icon: <PaintBrush size={20} /> },
-        { key: "booking", title: "Take your first booking", detail: "Create one manually or share your booking site link.", href: "/new-booking", icon: <Ticket size={20} />, done: (bookings.count || 0) > 0 },
+        { key: "tours", title: "Create your tours", detail: "Names, descriptions, durations and prices: the products customers book.", href: "/settings", done: (tours.count || 0) > 0 },
+        { key: "slots", title: "Open bookable slots", detail: "Departures with dates, times and capacity. No slots, no bookings.", href: "/slots", done: (slots.count || 0) > 0 },
+        { key: "payments", title: "Connect payments & WhatsApp", detail: "Add your Yoco and WhatsApp credentials under Integration Credentials.", href: "/settings" },
+        { key: "branding", title: "Brand your booking site", detail: "Logo, colours, policies and FAQ under Booking Site Configuration.", href: "/settings" },
+        { key: "booking", title: "Take your first booking", detail: "Create one manually or share your booking site link.", href: "/new-booking", done: (bookings.count || 0) > 0 },
       ]);
     } else {
       setItems([
-        { key: "bookings", title: "Bookings", detail: "Every booking, grouped by day — check in, rebook, refund, message.", href: "/bookings", icon: <Ticket size={20} /> },
-        { key: "inbox", title: "Inbox", detail: "WhatsApp and web chat in one place. Chats needing you float to the top.", href: "/inbox", icon: <Tray size={20} /> },
-        { key: "slots", title: "Slots", detail: "Your departures: create, close, or cancel days for weather.", href: "/slots", icon: <CloudRain size={20} /> },
-        { key: "help", title: "Help assistant", detail: "The chat bubble in the corner answers questions about any feature.", href: "/", icon: <ChatCircleDots size={20} /> },
+        { key: "bookings", title: "Bookings", detail: "Every booking, grouped by day: check in, rebook, refund, message.", href: "/bookings" },
+        { key: "inbox", title: "Inbox", detail: "WhatsApp and web chat in one place. Chats needing you float to the top.", href: "/inbox" },
+        { key: "slots", title: "Slots", detail: "Your departures: create, close, or cancel days for weather.", href: "/slots" },
+        { key: "help", title: "Help assistant", detail: "The chat bubble in the corner answers questions about any feature.", href: "/" },
       ]);
     }
     setShow(true);
@@ -112,9 +111,11 @@ export default function WelcomeChecklist() {
               className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:border-transparent"
               style={{ borderColor: "var(--ck-border-subtle)", background: item.done ? "var(--ck-success-soft, rgba(18,94,64,0.06))" : "var(--ck-surface-warm)" }}
             >
-              <span className="mt-0.5 shrink-0" style={{ color: item.done ? "var(--ck-success, var(--ck-accent))" : "var(--ck-accent)" }}>
-                {hasProgress ? (item.done ? <CheckCircle size={20} weight="fill" /> : <Circle size={20} />) : item.icon}
-              </span>
+              {hasProgress && (
+                <span className="mt-0.5 shrink-0" style={{ color: item.done ? "var(--ck-success, var(--ck-accent))" : "var(--ck-accent)" }}>
+                  {item.done ? <CheckCircle size={20} weight="fill" /> : <Circle size={20} />}
+                </span>
+              )}
               <span>
                 <span className="block text-sm font-semibold" style={{ color: "var(--ck-text-strong)", textDecoration: item.done ? "line-through" : "none", opacity: item.done ? 0.7 : 1 }}>
                   {item.title}
@@ -124,7 +125,7 @@ export default function WelcomeChecklist() {
             </Link>
           ))}
           <p className="px-1 pt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-            Stuck at any point? The <ChatCircleDots size={13} className="inline" /> help assistant in the corner can explain every feature.
+            Stuck at any point? The help assistant in the corner can explain every feature.
           </p>
         </div>
 

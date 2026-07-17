@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { confirmAction, notify } from "../../../lib/app-notify";
 import { useBusinessContext } from "../../../../components/BusinessContext";
-import { ArrowLeft, Plus, Trash, CaretUp, CaretDown, MagnifyingGlass, Play, Pause } from "@phosphor-icons/react";
+import { Plus, Trash, CaretUp, CaretDown, MagnifyingGlass } from "@phosphor-icons/react";
 
 interface Step {
   id?: string;
@@ -343,7 +343,7 @@ export default function AutomationBuilderPage() {
       }
       if (issues.length > 0) {
         notify({
-          title: "Cannot activate — fix " + issues.length + " issue" + (issues.length === 1 ? "" : "s"),
+          title: "Cannot activate: fix " + issues.length + " issue" + (issues.length === 1 ? "" : "s"),
           message: issues.slice(0, 4).join(" · ") + (issues.length > 4 ? " · …" : ""),
           tone: "warning",
           duration: 8000,
@@ -488,7 +488,7 @@ export default function AutomationBuilderPage() {
         className="anim-fade-up flex items-center gap-1.5 text-sm font-medium"
         style={{ color: "var(--ck-text-muted)" }}
       >
-        <ArrowLeft size={14} /> Back to automations
+        Back to automations
       </button>
 
       {/* Automation metadata */}
@@ -609,11 +609,7 @@ export default function AutomationBuilderPage() {
               onClick={toggleAutomationStatus}
               className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"}`}
             >
-              {automation.status === "active" ? (
-                <><Pause size={14} /> Pause</>
-              ) : (
-                <><Play size={14} /> Activate</>
-              )}
+              {automation.status === "active" ? "Pause" : "Activate"}
             </button>
           )}
           <span
@@ -638,7 +634,7 @@ export default function AutomationBuilderPage() {
                 onClick={runDispatchNow}
                 disabled={dispatching}
                 className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
-                title="Manually fire the dispatch worker — useful for date_field triggers and stalled enrollments"
+                title="Manually fire the dispatch worker (useful for date_field triggers and stalled enrollments)"
               >
                 {dispatching ? "Dispatching…" : "Run dispatch now"}
               </button>
@@ -665,7 +661,7 @@ export default function AutomationBuilderPage() {
               className="ui-btn ui-btn-danger !h-9"
               title="Delete permanently"
             >
-              <Trash size={14} /> Delete
+              Delete
             </button>
           </div>
         </div>
@@ -753,7 +749,7 @@ export default function AutomationBuilderPage() {
                         <option value="">Select template...</option>
                         {templates.map((t) => (
                           <option key={t.id} value={t.id}>
-                            {t.name} — {t.subject_line}
+                            {t.name}: {t.subject_line}
                           </option>
                         ))}
                       </select>
@@ -1131,7 +1127,7 @@ export default function AutomationBuilderPage() {
         </div>
         {logs.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
-            No events yet. Activate the automation and trigger an enrollment — the dispatcher will populate this log on its next run.
+            No events yet. Activate the automation and trigger an enrollment. The dispatcher will populate this log on its next run.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>

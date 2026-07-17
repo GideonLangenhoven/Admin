@@ -40,9 +40,15 @@ export async function POST(req: NextRequest) {
   if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 });
   if (!sub) return NextResponse.json({ error: "No subscription found for this business" }, { status: 404 });
 
-  const { data: plan } = await db.from("plans").select("name, monthly_price_zar").eq("id", sub.plan_id).maybeSingle();
+  const { data: plan } = await db.from("plans").select("name, monthly_price_zar, seat_limit, extra_seat_price_zar").eq("id", sub.plan_id).maybeSingle();
   const planName = plan?.name || sub.plan_id;
-  const monthlyPriceZar = Number(plan?.monthly_price_zar || 0);
+
+  // Monthly total = plan base + R-per-seat for every seat beyond what the plan
+  // includes. Seats live on businesses.max_admin_seats (the enforced count).
+  const { data: biz } = await db.from("businesses").select("max_admin_seats").eq("id", businessId).maybeSingle();
+  const seats = Math.max(1, Number(biz?.max_admin_seats || 1));
+  const extraSeats = Math.max(0, seats - Number(plan?.seat_limit || 1));
+  const monthlyPriceZar = Number(plan?.monthly_price_zar || 0) + extraSeats * Number(plan?.extra_seat_price_zar || 0);
 
   const { data: pauseRows } = await db.from("audit_logs")
     .select("action_type, created_at")

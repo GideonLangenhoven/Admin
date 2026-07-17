@@ -7,7 +7,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { customerNotesTooltip } from "../lib/customer-notes";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { PaperPlaneTilt, DownloadSimple, ArrowSquareOut, SpinnerGap, CheckCircle, XCircle, Spinner, CalendarBlank, Timer } from "@phosphor-icons/react";
+import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
 import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
@@ -236,7 +236,7 @@ export default function Bookings() {
     if (ids.length === 0) return;
 
     const confirmText: Record<BulkAction, string> = {
-      cancel: "Cancel " + ids.length + " booking(s)? Each customer will be notified and refund calculated per the cancellation policy.",
+      cancel: "Cancel " + ids.length + " booking(s)? Each paid customer gets an email to choose reschedule, voucher, or refund. Bookings within 24h of the trip are forfeited instead.",
       refund: "Refund " + ids.length + " booking(s)? Each will be processed via Yoco or marked as manual refund.",
       markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
       checkin: "Check in " + ids.length + " guest(s)?",
@@ -515,7 +515,9 @@ export default function Bookings() {
         // Only PAID / CONFIRMED / COMPLETED / PENDING count toward pax + price.
         // EXPIRED (hold timer ran out) and CANCELLED rows still appear in the
         // expanded list for diagnostics, but they don't inflate the slot total.
-        const activeBks = bks.filter((b) => b.status === "PAID" || b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "PENDING");
+        // Exception: allow_unpaid (pay-on-arrival) bookings always count —
+        // those guests are coming regardless of payment state.
+        const activeBks = bks.filter((b) => b.status === "PAID" || b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "PENDING" || (b.allow_unpaid && b.status !== "CANCELLED"));
         const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
         const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
         const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
@@ -911,7 +913,7 @@ export default function Bookings() {
     notify({
       title: next ? "Allowed without payment" : "Payment now required",
       message: next
-        ? (b.customer_name || "This booking") + " can go ahead unpaid — reminders and auto-cancel are off for it."
+        ? (b.customer_name || "This booking") + " can go ahead unpaid. Reminders and auto-cancel are off for it."
         : "Reminders and auto-cancel are back on for " + (b.customer_name || "this booking") + ".",
       tone: "success",
     });
@@ -924,21 +926,34 @@ export default function Bookings() {
     const isCardPaid = !isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status);
     const ref = b.id.substring(0, 8).toUpperCase();
 
-    // For card-paid bookings, give the admin an explicit refund-method choice:
-    // primary = refund-to-card (95%), alt = issue voucher (100%). For voucher-paid
-    // bookings the path is fixed (CANCEL_VOUCHER) so a single confirm is fine.
-    let issueVoucherInstead = false;
+    // Card-paid bookings follow the operator-cancellation workflow: the
+    // CUSTOMER chooses reschedule / voucher / refund via the email we send.
+    // Exception: within 24h of the trip start the booking is forfeited by
+    // default — the admin may explicitly grant the choice anyway.
+    let allowLateChoice = false;
     if (isCardPaid) {
-      const choice = await confirmAction({
-        title: "Cancel booking",
-        message: `Cancel booking ${ref}? Choose how to refund the customer.`,
-        tone: "warning",
-        confirmLabel: "Cancel → Refund to card",
-        altLabel: "Cancel → Issue voucher (100%)",
-        cancelLabel: "Keep booking",
-      });
-      if (!choice) return;
-      if (choice === "alt") issueVoucherInstead = true;
+      const startIso = b.slots?.start_time;
+      const isLate = !!startIso && new Date(startIso).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+      if (isLate) {
+        const choice = await confirmAction({
+          title: "Cancel booking",
+          message: `Cancel booking ${ref}? The trip starts within 24 hours, so the customer forfeits the booking (no refund options). You can still choose to offer them reschedule / voucher / refund.`,
+          tone: "warning",
+          confirmLabel: "Cancel and forfeit",
+          altLabel: "Cancel but offer options anyway",
+          cancelLabel: "Keep booking",
+        });
+        if (!choice) return;
+        if (choice === "alt") allowLateChoice = true;
+      } else {
+        if (!await confirmAction({
+          title: "Cancel booking",
+          message: `Cancel booking ${ref}? The customer will receive an email to choose how to handle it: reschedule, voucher, or refund.`,
+          tone: "warning",
+          confirmLabel: "Cancel booking",
+          cancelLabel: "Keep booking",
+        })) return;
+      }
     } else {
       const msg = isVoucherPaid
         ? `Cancel booking ${ref}? A new voucher will be issued for the full amount.`
@@ -948,8 +963,7 @@ export default function Bookings() {
     setActionBookingId(b.id);
 
     // For voucher-paid bookings, use rebook-booking CANCEL_VOUCHER to issue a voucher instead of Yoco refund.
-    // Also use this path when admin explicitly chose "issue voucher" for a card-paid booking.
-    if ((isVoucherPaid || issueVoucherInstead) && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
+    if (isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
       try {
         // rebook-booking authorizes the caller: admins must send their session
         // JWT (the anon key gets 401 and the voucher is never issued).
@@ -968,7 +982,7 @@ export default function Bookings() {
         setActionBookingId(null);
         if (data.ok) {
           notify({
-            title: "Booking cancelled — voucher issued",
+            title: "Booking cancelled, voucher issued",
             message: `Voucher ${data.voucher_code} for R${Number(data.voucher_amount).toFixed(2)} issued to customer.`,
             tone: "success",
           });
@@ -1001,7 +1015,7 @@ export default function Bookings() {
           "Content-Type": "application/json",
           Authorization: "Bearer " + session.access_token,
         },
-        body: JSON.stringify({ booking_id: b.id, reason: "Cancelled by admin" }),
+        body: JSON.stringify({ booking_id: b.id, reason: "Cancelled by admin", allow_late_choice: allowLateChoice }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.error) {
@@ -1013,6 +1027,8 @@ export default function Bookings() {
         title: "Booking cancelled",
         message: (data as any)?.refund_action_required
           ? `Customer notified. Refund of R${Number((data as any).refund_amount || 0).toFixed(2)} pending their choice.`
+          : (data as any)?.late_forfeit
+          ? "Customer notified. Booking forfeited (cancelled within 24h of the trip)."
           : "Customer notified.",
         tone: "success",
       });
@@ -1116,8 +1132,8 @@ export default function Bookings() {
           status: "CANCELLED",
           refund_status: "PROCESSED",
           refund_amount: amount,
-          refund_notes: `${isPartial ? "Partial" : "Full"} manual refund from bookings page — R${amount.toFixed(2)} of R${Number(b.total_amount || 0).toFixed(2)}`,
-          cancellation_reason: "Auto-cancelled — refund processed by admin",
+          refund_notes: `${isPartial ? "Partial" : "Full"} manual refund from bookings page: R${amount.toFixed(2)} of R${Number(b.total_amount || 0).toFixed(2)}`,
+          cancellation_reason: "Auto-cancelled: refund processed by admin",
           cancelled_at: new Date().toISOString(),
         }).eq("id", b.id);
 
@@ -1317,7 +1333,7 @@ export default function Bookings() {
 
     if (data?.diff > 0) {
       notify({
-        title: "Booking changed — payment due",
+        title: "Booking changed: payment due",
         message: (rebookHasNoCredit(rebookBooking) ? "No credit remains on this cancelled booking. " : "Cost increased by R" + data.diff + ". ") + "A payment link for R" + data.diff + " was sent to the customer's email and WhatsApp.",
         tone: "success",
       });
@@ -1386,7 +1402,7 @@ export default function Bookings() {
       }
 
       setWaDialog(null);
-      notify({ title: "WhatsApp sent", message: "The message was sent and the conversation was opened in Inbox.", tone: "success" });
+      notify({ title: "WhatsApp sent", message: res.data?.message || "The message was sent and the conversation was opened in Inbox.", tone: "success" });
       router.push("/inbox?phone=" + encodeURIComponent(phone));
     } catch (err: any) {
       notify({ title: "WhatsApp send failed", message: err.message, tone: "error" });
@@ -1462,7 +1478,7 @@ export default function Bookings() {
             className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]"
             title="Export CSV (special requests masked)"
           >
-            <DownloadSimple className="h-4 w-4" /> Export CSV
+            Export CSV
           </button>
           {isPrivilegedRole && (
             <button
@@ -1471,7 +1487,7 @@ export default function Bookings() {
               style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}
               title="Export with sensitive data (special requests visible)"
             >
-              <DownloadSimple className="h-4 w-4" /> Export with Sensitive Data
+              Export with Sensitive Data
             </button>
           )}
         </div>
@@ -1548,7 +1564,7 @@ export default function Bookings() {
           ← Prev Week
         </button>
         <span className="text-sm font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>
-          {rangeStart.toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} —{" "}
+          {rangeStart.toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} to{" "}
           {rangeEnd.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
         </span>
         <button onClick={() => shiftRange(7)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
@@ -1624,7 +1640,6 @@ export default function Bookings() {
       ) : dayGroups.length === 0 ? (
         <div className="ui-card anim-fade-up anim-d3">
           <div className="ui-empty">
-            <span className="ui-icon-chip"><CalendarBlank size={19} /></span>
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings found</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
               {statusFilter !== "ALL" ? `No ${statusFilter.toLowerCase()} bookings in this date range.` : "No bookings in this date range."}
@@ -1788,7 +1803,7 @@ export default function Bookings() {
                   {p.status === "pending" && <Spinner className="w-4 h-4 shrink-0 animate-spin" style={{ color: "var(--ck-text-muted)" }} />}
                   <span className="font-medium text-gray-800 truncate">{p.name}</span>
                   <span className="font-mono text-[10px] text-gray-400">{p.id.slice(0, 8)}</span>
-                  {p.error && <span className="text-[11px] text-red-700 truncate ml-auto">— {p.error}</span>}
+                  {p.error && <span className="text-[11px] text-red-700 truncate ml-auto">{p.error}</span>}
                 </div>
               ))}
             </div>
@@ -1968,7 +1983,7 @@ export default function Bookings() {
                       <span className="text-gray-600">Total due ({rebookBooking.qty} pax)</span>
                       <span className="font-semibold tabular-nums">{fmtCurrency(newUnitPrice * rebookBooking.qty)}</span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">This booking was cancelled and its refund/voucher already issued, so no credit remains — the customer pays the full price.</p>
+                    <p className="mt-2 text-xs text-gray-500">This booking was cancelled and its refund/voucher already issued, so no credit remains. The customer pays the full price.</p>
                   </div>
                 );
               }
@@ -2258,10 +2273,10 @@ function SlotRows({
                     return (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5 pl-[18px] lg:pl-0">
                         <span
-                          title={label + " — customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
+                          title={label + ". The customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
                           className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
                         >
-                          <Timer size={11} weight="bold" className="shrink-0" /> {label}
+                          {label}
                         </span>
                         <button
                           type="button"
@@ -2270,7 +2285,7 @@ function SlotRows({
                           onClick={(e) => { e.stopPropagation(); onSendRescheduleLink(b); }}
                           className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
                         >
-                          {quickResendingId === b.id ? <SpinnerGap className="h-3 w-3 animate-spin" /> : <PaperPlaneTilt className="h-3 w-3" />}
+                          {quickResendingId === b.id && <SpinnerGap className="h-3 w-3 animate-spin" />}
                           Send link
                         </button>
                       </span>
@@ -2305,7 +2320,7 @@ function SlotRows({
                         label="Refund"
                         onClick={() => onRefund(b)}
                         disabled={isLoading || !isPaid(b.status)}
-                        title={!isPaid(b.status) ? "Nothing to refund — no payment received" : undefined}
+                        title={!isPaid(b.status) ? "Nothing to refund: no payment received" : undefined}
                         tone="amber"
                       />
                       <ActionButton label="Cancel" onClick={() => onCancel(b)} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
@@ -2313,7 +2328,7 @@ function SlotRows({
                         label={isResending ? "Sending…" : "Resend Inv"}
                         onClick={() => onResendInvoice(b.id)}
                         disabled={isResending || !isPaid(b.status)}
-                        title={!isPaid(b.status) ? "Payment still outstanding — send a payment link instead" : undefined}
+                        title={!isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined}
                         tone="blue"
                       />
                       <RefundBadge status={b.refund_status} />
@@ -2361,20 +2376,20 @@ function SlotRows({
                           label="Payment Reminder"
                           onClick={() => { onPaymentReminder(b); setOpenActions(null); }}
                           disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED" || !b.payment_url}
-                          title={!b.payment_url ? "No payment link on this booking — send a Payment Link first" : "Send a friendly 'payment outstanding' reminder with the payment link"}
+                          title={!b.payment_url ? "No payment link on this booking. Send a Payment Link first." : "Send a friendly 'payment outstanding' reminder with the payment link"}
                           tone="amber"
                         />
                         <ActionMenuItem
                           label={b.allow_unpaid ? "Require Payment" : "Allow Without Payment"}
                           onClick={() => { onToggleAllowUnpaid(b); setOpenActions(null); }}
                           disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED"}
-                          title={b.allow_unpaid ? "Re-enable reminders + auto-cancel for this booking" : "Let this trip go ahead unpaid — skips reminders and auto-cancel"}
+                          title={b.allow_unpaid ? "Re-enable reminders + auto-cancel for this booking" : "Let this trip go ahead unpaid (skips reminders and auto-cancel)"}
                         />
                         <ActionMenuItem
                           label="Refund"
                           onClick={() => { onRefund(b); setOpenActions(null); }}
                           disabled={isLoading || !isPaid(b.status)}
-                          title={!isPaid(b.status) ? "Nothing to refund — no payment received" : undefined}
+                          title={!isPaid(b.status) ? "Nothing to refund: no payment received" : undefined}
                           tone="amber"
                         />
                         <ActionMenuItem label="Cancel" onClick={() => { onCancel(b); setOpenActions(null); }} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
@@ -2382,7 +2397,7 @@ function SlotRows({
                           label={isResending ? "Resending..." : "Resend Invoice"}
                           onClick={() => { onResendInvoice(b.id); setOpenActions(null); }}
                           disabled={isResending || !isPaid(b.status)}
-                          title={!isPaid(b.status) ? "Payment still outstanding — send a payment link instead" : undefined}
+                          title={!isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined}
                           tone="blue"
                         />
                       </div>

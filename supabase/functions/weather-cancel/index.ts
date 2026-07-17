@@ -100,7 +100,7 @@ Deno.serve(async (req: any) => {
         ...(isPaid && refundAmount > 0 ? {
           refund_status: "ACTION_REQUIRED",
           refund_amount: refundAmount,
-          refund_notes: "Weather cancellation — customer to choose: reschedule, voucher, or refund via My Bookings",
+          refund_notes: "Weather cancellation. Customer to choose: reschedule, voucher, or refund via My Bookings",
         } : {}),
       }).eq("business_id", business_id).eq("id", b.id);
 
@@ -161,8 +161,8 @@ Deno.serve(async (req: any) => {
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
-              "You booked through a travel platform (e.g. Viator/GetYourGuide) \u2014 they will handle your refund or rebooking. Please contact them directly.\n\n" +
-              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName
+              "You booked through a travel platform (e.g. Viator/GetYourGuide). They will handle your refund or rebooking. Please contact them directly.\n\n" +
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
             : isPaid
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
@@ -170,13 +170,13 @@ Deno.serve(async (req: any) => {
               "Ref: " + ref + "\n\n" +
               "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
               manageBookingUrl + "\n\n" +
-              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
             : "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
               "No payment was taken, so no action is needed on your side.\n\n" +
-              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName;
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName;
           // Two-step flow: if 24h window is closed, send reopener template and queue
           // the full cancellation message for drain on next customer reply.
           await sendWhatsappWithWindowReopen(supabase, tenant, {

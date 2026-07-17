@@ -7,7 +7,7 @@ import { useBusinessContext } from "../../../components/BusinessContext";
 import { getStarterTemplateByKey } from "../../../components/marketing/starter-templates";
 import { blocksToHtml } from "../../../components/marketing/blocks/blocks-to-html";
 import {
-  Plus, Trash, Play, Pause, Sparkle, CaretRight, X, ArrowRight,
+  Trash, Play, Pause,
 } from "@phosphor-icons/react";
 
 interface Automation {
@@ -62,9 +62,9 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "contact_added",
     triggerConfig: {},
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "Welcome to {business_name} — Your Adventure Starts Here" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Welcome to {business_name}: Your Adventure Starts Here" } },
       { step_type: "delay", config: { duration: 3, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Our Most Popular Tours — See Why Guests Love Us" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Our Most Popular Tours: See Why Guests Love Us" } },
       { step_type: "delay", config: { duration: 4, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "WELCOME", valid_days: 30 } },
       { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 10% Off Your First Booking" } },
@@ -74,15 +74,15 @@ const TEMPLATES: AutomationTemplate[] = [
       "Immediately sends a welcome email with your brand story and what makes you unique",
       "After 3 days, sends a showcase of your most popular tours with guest reviews",
       "After 4 more days, generates a unique 10% discount voucher and sends a conversion email",
-      "Contacts who book within 30 days use their voucher — those who don't, you can re-engage later",
+      "Contacts who book within 30 days use their voucher; those who don't, you can re-engage later",
     ],
-    exampleEmail: "Subject: Welcome to Cape Kayak — Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt Cape Kayak, we believe everyone deserves to experience the ocean from a different perspective. Whether it's paddling alongside dolphins at sunrise or exploring hidden sea caves, every trip is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to paddle\n- Exclusive offers and early access to new tours\n- Stories and photos from the water\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
+    exampleEmail: "Subject: Welcome to Cape Kayak: Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt Cape Kayak, we believe everyone deserves to experience the ocean from a different perspective. Whether it's paddling alongside dolphins at sunrise or exploring hidden sea caves, every trip is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to paddle\n- Exclusive offers and early access to new tours\n- Stories and photos from the water\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
   },
   {
     key: "post-tour-review",
     name: "Post-Tour Review Request",
     description: "Automatically ask for Google/TripAdvisor reviews while the experience is still fresh. Includes a follow-up nudge for those who didn't respond.",
-    benefit: "Guests asked for reviews are 3x more likely to leave one. Reviews are your #1 marketing asset — they directly drive new bookings.",
+    benefit: "Guests asked for reviews are 3x more likely to leave one. Reviews are your #1 marketing asset. They directly drive new bookings.",
 
     tier: "must-have",
     triggerType: "tag_added",
@@ -92,7 +92,7 @@ const TEMPLATES: AutomationTemplate[] = [
       { step_type: "send_email", config: { template_id: "", subject_override: "How Was Your Experience, {first_name}?" } },
       { step_type: "delay", config: { duration: 5, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Quick Favour — Your Review Helps Other Adventurers" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Quick Favour: Your Review Helps Other Adventurers" } },
     ],
     howItWorks: [
       "When a booking is completed, the contact gets tagged 'completed-tour' (via auto-messages or manual)",
@@ -113,13 +113,13 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "lapsed-90-days" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "We Miss You, {first_name} — See What's New" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "We Miss You, {first_name}! See What's New" } },
       { step_type: "delay", config: { duration: 14, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 15, code_prefix: "COMEBACK", valid_days: 30 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 15% Off — Just for You" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 15% Off Just for You" } },
       { step_type: "delay", config: { duration: 21, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Last Chance — Your Exclusive Discount Expires Soon" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Last Chance: Your Exclusive Discount Expires Soon" } },
     ],
     howItWorks: [
       "Contacts tagged 'lapsed-90-days' enter the flow (tag via re-engagement cron or manual)",
@@ -128,7 +128,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "If they opened it, generates a 15% off voucher and sends a personalized offer",
       "After 21 more days, sends a final 'last chance' email with urgency on the expiring voucher",
     ],
-    exampleEmail: "Subject: We Miss You, James — See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- Sunrise Paddle — our most popular new tour\n- Upgraded gear for maximum comfort\n- New routes along the coastline\n\nWe'd love to see you back on the water. Ready for your next trip?\n\n[Browse Tours]",
+    exampleEmail: "Subject: We Miss You, James! See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- Sunrise Paddle, our most popular new tour\n- Upgraded gear for maximum comfort\n- New routes along the coastline\n\nWe'd love to see you back on the water. Ready for your next trip?\n\n[Browse Tours]",
   },
   {
     key: "birthday-special",
@@ -143,21 +143,21 @@ const TEMPLATES: AutomationTemplate[] = [
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 15, code_prefix: "BDAY", valid_days: 30 } },
       { step_type: "send_email", config: { template_id: "", subject_override: "Happy Birthday, {first_name}! Here's a Gift From Us" } },
       { step_type: "delay", config: { duration: 14, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Birthday Voucher Expires Soon — Don't Miss Out" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Birthday Voucher Expires Soon. Don't Miss Out!" } },
     ],
     howItWorks: [
       "On each contact's birthday (requires date_of_birth field), the automation triggers",
       "Generates a unique 15% off voucher code with 'BDAY' prefix, valid for 30 days",
       "Immediately sends a birthday greeting email with the voucher details",
       "After 14 days, sends a reminder that the birthday voucher is expiring soon",
-      "Runs every year automatically — no manual effort needed",
+      "Runs every year automatically, with no manual effort needed",
     ],
-    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as amazing as a sunrise on the water.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo paddle, a trip with friends, or a gift for someone special — this one's on us.\n\n[Book Now With Your Discount]",
+    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as amazing as a sunrise on the water.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo paddle, a trip with friends, or a gift for someone special, this one's on us.\n\n[Book Now With Your Discount]",
   },
   {
     key: "referral-program",
     name: "Referral Request",
-    description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive — they get a voucher, their friend gets a discount.",
+    description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive: they get a voucher, their friend gets a discount.",
     benefit: "Referred customers convert 25-30% better and have 16% higher lifetime value. Delivers new customers at 1/5th the cost of ads.",
 
     tier: "high-value",
@@ -166,7 +166,7 @@ const TEMPLATES: AutomationTemplate[] = [
     steps: [
       { step_type: "delay", config: { duration: 2, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "fixed_amount", amount: 100, code_prefix: "REFER", valid_days: 90 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Share the Adventure — Get R100 Off" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Share the Adventure and Get R100 Off" } },
     ],
     howItWorks: [
       "When a contact is tagged 'left-review' (after leaving a Google/TripAdvisor review), they enter the flow",
@@ -175,7 +175,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "Sends a 'share the adventure' email with their unique voucher code to share with friends",
       "Tip: Mention that their friend also gets 10% off to boost sharing motivation",
     ],
-    exampleEmail: "Subject: Share the Adventure — Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review — it truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a day on the water. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
+    exampleEmail: "Subject: Share the Adventure and Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review. It truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a day on the water. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
   },
   {
     key: "voucher-expiry",
@@ -187,11 +187,11 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "voucher-expiring-30d" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Voucher Expires in 30 Days — Don't Let It Go to Waste" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Voucher Expires in 30 Days. Don't Let It Go to Waste" } },
       { step_type: "delay", config: { duration: 23, unit: "days" } },
       { step_type: "send_email", config: { template_id: "", subject_override: "Only 7 Days Left to Use Your Voucher" } },
       { step_type: "delay", config: { duration: 6, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Final Day — Your Voucher Expires Today!" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Final Day: Your Voucher Expires Today!" } },
     ],
     howItWorks: [
       "Contacts are tagged 'voucher-expiring-30d' when their voucher hits 30 days before expiry",
@@ -200,7 +200,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 6 more days, sends a final-day urgency email",
       "Tip: Set up a cron job to auto-tag contacts whose vouchers are 30 days from expiry",
     ],
-    exampleEmail: "Subject: Your Voucher Expires in 30 Days — Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up — your Cape Kayak voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nHere are some popular experiences to choose from:\n- Sunrise Dolphin Paddle (2hrs)\n- Coastal Explorer Tour (3hrs)\n- Sunset Sea Cave Adventure (2.5hrs)\n\nDon't let this go to waste — book your adventure today!\n\n[Book Now]",
+    exampleEmail: "Subject: Your Voucher Expires in 30 Days. Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up: your Cape Kayak voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nHere are some popular experiences to choose from:\n- Sunrise Dolphin Paddle (2hrs)\n- Coastal Explorer Tour (3hrs)\n- Sunset Sea Cave Adventure (2.5hrs)\n\nDon't let this go to waste. Book your adventure today!\n\n[Book Now]",
   },
   {
     key: "vip-treatment",
@@ -212,10 +212,10 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "vip" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, You're Now a VIP — Here's What That Means" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, You're Now a VIP. Here's What That Means" } },
       { step_type: "delay", config: { duration: 7, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 20, code_prefix: "VIP", valid_days: 60 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Exclusive VIP Offer — 20% Off Any Tour" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Exclusive VIP Offer: 20% Off Any Tour" } },
     ],
     howItWorks: [
       "When a contact is tagged 'vip' (e.g., 3+ bookings, high spend, or manual selection), they enter the flow",
@@ -224,7 +224,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "The generous discount encourages another booking and reinforces loyalty",
       "Tip: Tag customers as 'vip' after their 3rd booking or when total spend exceeds a threshold",
     ],
-    exampleEmail: "Subject: You're Now a VIP — Here's What That Means\n\nHi {first_name},\n\nWe wanted to say something important: THANK YOU.\n\nYou're one of our most valued guests, and we're upgrading you to VIP status. Here's what that means:\n\n- Priority booking on popular tours\n- Early access to new experiences\n- Exclusive discounts just for VIPs\n- Direct line to our team for special requests\n\nAn exclusive offer is heading your way soon. Keep an eye on your inbox!\n\nThank you for being part of our story.",
+    exampleEmail: "Subject: You're Now a VIP. Here's What That Means\n\nHi {first_name},\n\nWe wanted to say something important: THANK YOU.\n\nYou're one of our most valued guests, and we're upgrading you to VIP status. Here's what that means:\n\n- Priority booking on popular tours\n- Early access to new experiences\n- Exclusive discounts just for VIPs\n- Direct line to our team for special requests\n\nAn exclusive offer is heading your way soon. Keep an eye on your inbox!\n\nThank you for being part of our story.",
   },
   {
     key: "seasonal-launch",
@@ -236,20 +236,20 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "manual",
     triggerConfig: {},
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "The New Season is Almost Here — Sneak Peek Inside" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "The New Season is Almost Here: Sneak Peek Inside" } },
       { step_type: "delay", config: { duration: 7, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "EARLYBIRD", valid_days: 45 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Early Bird Special — 10% Off Before Anyone Else" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Early Bird Special: 10% Off Before Anyone Else" } },
     ],
     howItWorks: [
       "You manually enrol your contact list when you're ready to announce the new season",
       "Email 1 sends a season preview: new tours, route changes, gear upgrades, exciting dates",
       "After 7 days, checks who opened the preview email (those are your warmest leads)",
       "For openers, generates a 10% early-bird discount voucher",
-      "Sends the early-bird offer — creating urgency with a 45-day expiry window",
+      "Sends the early-bird offer, creating urgency with a 45-day expiry window",
     ],
-    exampleEmail: "Subject: The New Season is Almost Here — Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New Sunset Paddle route along the cliffs\n- Extended whale-season tours (June-November)\n- Brand new double kayaks for couples\n- Upgraded photo packages with drone footage\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned — an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
+    exampleEmail: "Subject: The New Season is Almost Here: Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New Sunset Paddle route along the cliffs\n- Extended whale-season tours (June-November)\n- Brand new double kayaks for couples\n- Upgraded photo packages with drone footage\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned: an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
   },
   {
     key: "booking-anniversary",
@@ -285,7 +285,7 @@ const TEMPLATES: AutomationTemplate[] = [
     steps: [
       { step_type: "send_email", config: { template_id: "", subject_override: "Your Trip Photos Are Ready, {first_name}!" } },
       { step_type: "delay", config: { duration: 3, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure — Tag Us @capekayak" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure and Tag Us @capekayak" } },
     ],
     howItWorks: [
       "When trip photos are uploaded and the contact is tagged 'photos-ready', they enter the flow",
@@ -294,13 +294,13 @@ const TEMPLATES: AutomationTemplate[] = [
       "Social shares create free organic marketing that reaches the customer's entire network",
       "Tip: Include direct WhatsApp share and Instagram story share links",
     ],
-    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news — your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag @capekayak — we'd love to see it!\n\n#CapeKayak #PaddleLife",
+    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news: your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag @capekayak. We'd love to see it!\n\n#CapeKayak #PaddleLife",
   },
 ];
 
 const TIER_INFO: Record<string, { label: string; pill: string; description: string }> = {
-  "must-have": { label: "Must-Have", pill: "ui-pill-danger", description: "Highest ROI — implement these first" },
-  "high-value": { label: "High-Value", pill: "ui-pill-amber", description: "Strong returns — implement after core" },
+  "must-have": { label: "Must-Have", pill: "ui-pill-danger", description: "Highest ROI: implement these first" },
+  "high-value": { label: "High-Value", pill: "ui-pill-amber", description: "Strong returns: implement after core" },
   "growth": { label: "Growth", pill: "ui-pill-ocean", description: "Long-term engagement and scale" },
 };
 
@@ -428,7 +428,7 @@ export default function AutomationsPage() {
 
     notify({
       message: linkedTemplates > 0
-        ? `"${template.name}" created with ${linkedTemplates} designed email${linkedTemplates === 1 ? "" : "s"} already linked — review and activate.`
+        ? `"${template.name}" created with ${linkedTemplates} designed email${linkedTemplates === 1 ? "" : "s"} already linked. Review and activate.`
         : `"${template.name}" automation created! Customize your email templates and activate.`,
       tone: "success",
     });
@@ -521,7 +521,7 @@ export default function AutomationsPage() {
           className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-80"
           style={{ color: "var(--ck-text-muted)" }}
         >
-          <X size={14} /> Back to templates
+          Back to templates
         </button>
 
         {/* Header */}
@@ -544,7 +544,6 @@ export default function AutomationsPage() {
               className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               {creating ? "Creating..." : "Use This Template"}
-              {!creating && <ArrowRight size={14} />}
             </button>
           </div>
         </div>
@@ -630,7 +629,7 @@ export default function AutomationsPage() {
             {t.exampleEmail}
           </div>
           <p className="text-xs mt-2" style={{ color: "var(--ck-text-muted)" }}>
-            This is a sample — you'll customise the actual email in your template editor after creating the automation.
+            This is a sample. You'll customise the actual email in your template editor after creating the automation.
           </p>
         </div>
 
@@ -642,7 +641,6 @@ export default function AutomationsPage() {
             className="ui-btn ui-btn-primary !px-5 disabled:opacity-50"
           >
             {creating ? "Creating..." : "Use This Template"}
-            {!creating && <ArrowRight size={14} />}
           </button>
           <button
             onClick={() => setSelectedTemplate(null)}
@@ -672,7 +670,7 @@ export default function AutomationsPage() {
             onClick={() => setShowGallery(false)}
             className="ui-btn ui-btn-ghost"
           >
-            <X size={14} /> Close
+            Close
           </button>
         </div>
 
@@ -703,7 +701,6 @@ export default function AutomationsPage() {
                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
                               {t.name}
                             </h3>
-                            <CaretRight size={14} style={{ color: "var(--ck-text-muted)" }} />
                           </div>
                           <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--ck-text-muted)" }}>
                             {t.description}
@@ -736,9 +733,6 @@ export default function AutomationsPage() {
             className="flex items-center gap-3 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:border-[var(--ck-border-strong)] hover:bg-[var(--ck-surface-warm)]"
             style={{ borderColor: "var(--ck-border-strong)" }}
           >
-            <div className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-              <Plus size={20} />
-            </div>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Start From Scratch</h3>
               <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
@@ -763,7 +757,7 @@ export default function AutomationsPage() {
                 Your automations run 24/7 in the background
               </h3>
               <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
-                Tags are automatically applied to your contacts based on their booking behaviour — like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
+                Tags are automatically applied to your contacts based on their booking behaviour, like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
               </p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {["completed-tour", "lapsed-90-days", "vip", "new-booker", "voucher-expiring"].map(tag => (
@@ -788,13 +782,13 @@ export default function AutomationsPage() {
             onClick={() => setShowGallery(true)}
             className="ui-btn ui-btn-ghost"
           >
-            <Sparkle size={14} /> Browse Templates
+            Browse Templates
           </button>
           <button
             onClick={createBlankAutomation}
             className="ui-btn ui-btn-primary"
           >
-            <Plus size={14} /> New Automation
+            New Automation
           </button>
         </div>
       </div>
@@ -803,20 +797,17 @@ export default function AutomationsPage() {
       {automations.length === 0 ? (
         <div className="space-y-6 anim-fade-up">
           <div className="ui-card ui-empty">
-            <div className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-              <Sparkle size={19} />
-            </div>
             <h2 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               No automations yet
             </h2>
             <p className="text-sm mb-4 max-w-lg" style={{ color: "var(--ck-text-muted)" }}>
-              Automations send emails automatically when things happen — a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
+              Automations send emails automatically when things happen: a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
             </p>
             <button
               onClick={() => setShowGallery(true)}
               className="ui-btn ui-btn-primary"
             >
-              <Sparkle size={14} /> Browse Templates to Get Started
+              Browse Templates to Get Started
             </button>
           </div>
 
@@ -855,7 +846,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Trigger Fires</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  Something happens — a new contact signs up, a booking completes, a tag is added, or a date arrives (like a birthday).
+                  Something happens: a new contact signs up, a booking completes, a tag is added, or a date arrives (like a birthday).
                 </p>
               </div>
               <div>
@@ -864,7 +855,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Steps Execute</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  The workflow runs: send emails, wait for a period, check conditions, or generate discount vouchers — all automatically.
+                  The workflow runs: send emails, wait for a period, check conditions, or generate discount vouchers, all automatically.
                 </p>
               </div>
               <div>
@@ -873,7 +864,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Results Grow</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  More reviews, more rebookings, more referrals, recovered revenue — all while you focus on running great tours.
+                  More reviews, more rebookings, more referrals, and recovered revenue, all while you focus on running great tours.
                 </p>
               </div>
             </div>

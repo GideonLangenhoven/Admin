@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { supabase } from "@/app/lib/supabase";
-import { UsersThree, MagnifyingGlass, Check } from "@phosphor-icons/react";
+import { MagnifyingGlass, Check } from "@phosphor-icons/react";
 
 type Customer = {
   id: string;
@@ -79,20 +79,12 @@ export default function CustomersPage() {
       {!loading && rows.length > 0 && (
         <div className="anim-fade-up anim-d1 mb-5 grid grid-cols-2 gap-3 sm:max-w-md">
           <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-icon-chip" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
-                <UsersThree size={18} weight="fill" />
-              </span>
-              <span className="ui-mono-label !text-[10px]">Total</span>
+            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label !text-[10px]">Total</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{rows.length}</p>
           </div>
           <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-icon-chip" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-                <Check size={18} weight="bold" />
-              </span>
-              <span className="ui-mono-label !text-[10px]">Opted In</span>
+            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label !text-[10px]">Opted In</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{rows.filter((r) => r.marketing_consent).length}</p>
           </div>
@@ -106,9 +98,7 @@ export default function CustomersPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="ui-card">
-          <div className="ui-empty">
-            <span className="ui-icon-chip"><UsersThree size={19} /></span>
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{search ? "No matching customers" : "No customers yet"}</p>
+          <div className="ui-empty">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{search ? "No matching customers" : "No customers yet"}</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{search ? "Try a different name, email, or phone." : "Customers appear here after their first booking."}</p>
           </div>
         </div>

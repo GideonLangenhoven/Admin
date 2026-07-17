@@ -425,7 +425,7 @@ async function autoExpireBookingsForBusiness(businessId: string) {
           tenant,
           booking.phone,
           firstName + ", looks like you didn't finish booking your " +
-            (booking?.tours?.name || "trip") + ". No worries — spots are still available!\n\n" +
+            (booking?.tours?.name || "trip") + ". No worries, spots are still available!\n\n" +
             "Book again here: " + bookingSiteUrl,
           undefined,
         );
@@ -505,7 +505,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
           await sendWhatsappTextForTenant(tenant, b.phone,
             "Hi " + firstName + ", unfortunately your booking for " + tourName + " on " + timeStr +
             " has been cancelled because payment wasn't received in time, and the spot has been released.\n\n" +
-            "Would still love to have you — you can rebook anytime here: " + myBookingsUrl);
+            "Would still love to have you. You can rebook anytime here: " + myBookingsUrl);
         } catch (_e) { /* best effort */ }
       }
       await logSent(businessId, b.id, b.phone || "", "PAYMENT_CANCEL");

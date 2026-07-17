@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       source_type: "SUBSCRIPTION",
       source_id: sub.id,
       kind: "SEAT_PRORATION",
-      description: (delta > 0 ? "Added " : "Removed ") + Math.abs(delta) + " seat(s) — prorated",
+      description: (delta > 0 ? "Added " : "Removed ") + Math.abs(delta) + " seat(s), prorated",
       amount_zar: proration,
       status: "PENDING",
       period_key: billing_cycle_start,

@@ -61,7 +61,7 @@ Deno.serve(async () => {
     for (let j = 0; j < thanks.length; j++) {
       const tb = thanks[j]; const ttour = (tb as any).tours;
       const firstName = (tb.customer_name || "").split(" ")[0] || "there";
-      const tyMsg = "\u{1F31F} *Thanks for paddling with us, " + firstName + "!*\n\nWe hope you loved the " + (ttour?.name || "tour") + "! \u{1F6F6}\n\n\u2B50 Leave a review: https://g.page/r/CWabH9a6u5DbEB0/review\n\nWant to paddle again? Type *menu* and hit *Book Again* \u{1F6F6}\n\nBook again anytime \u2014 type *menu* \u{1F30A}";
+      const tyMsg = "\u{1F31F} *Thanks for paddling with us, " + firstName + "!*\n\nWe hope you loved the " + (ttour?.name || "tour") + "! \u{1F6F6}\n\n\u2B50 Leave a review: https://g.page/r/CWabH9a6u5DbEB0/review\n\nWant to paddle again? Type *menu* and hit *Book Again* \u{1F6F6}\n\nBook again anytime, type *menu* \u{1F30A}";
       await supabase.from("outbox").insert({ business_id: BUSINESS_ID, booking_id: tb.id, phone: tb.phone, message_type: "THANK_YOU", message_body: tyMsg, scheduled_for: now.toISOString() });
       await supabase.from("bookings").update({ thankyou_queued: true, status: "COMPLETED" }).eq("id", tb.id);
     }

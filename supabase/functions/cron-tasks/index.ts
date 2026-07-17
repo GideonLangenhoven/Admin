@@ -23,7 +23,7 @@ async function cleanupExpiredHolds() {
   const cutoffIso = new Date(Date.now() - graceMs).toISOString();
   const { data: expiredHolds } = await supabase
     .from("holds")
-    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url), slots(start_time), tours(name)")
+    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url, allow_unpaid), slots(start_time), tours(name)")
     .eq("status", "ACTIVE")
     .lt("expires_at", cutoffIso)
     .order("expires_at", { ascending: true })
@@ -52,6 +52,26 @@ async function cleanupExpiredHolds() {
       }
       await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
       console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id + " status=" + bookingStatus);
+      results.skipped_paid += 1;
+      continue;
+    }
+
+    // Pay-on-arrival: the admin allowed this booking to go ahead unpaid, so
+    // keep the seats — convert the hold (held → booked) exactly like a
+    // payment would, instead of expiring it and releasing capacity.
+    if ((hold as any).hold_type !== "RESCHEDULE" && (hold.bookings as any)?.allow_unpaid === true) {
+      await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
+      const unpaidQty = Number((hold.bookings as any)?.qty || 0);
+      if (unpaidQty > 0 && hold.slot_id && hold.business_id) {
+        const rpcRes = await supabase.rpc("adjust_slot_capacity", {
+          p_slot_id: hold.slot_id,
+          p_business_id: hold.business_id,
+          p_booked_delta: unpaidQty,
+          p_held_delta: -unpaidQty,
+        });
+        if (rpcRes.error) console.error("ADJUST_CONVERT_RPC_ERR (allow_unpaid) slot=" + hold.slot_id + " err=" + rpcRes.error.message);
+      }
+      console.log("HOLD_EXPIRY_SKIP_ALLOW_UNPAID hold=" + hold.id + " booking=" + hold.booking_id);
       results.skipped_paid += 1;
       continue;
     }
@@ -171,6 +191,9 @@ async function cleanupExpiredManualBookings() {
     .select("id, slot_id, qty, business_id, customer_name, phone, email, tours(name), slots(start_time)")
     .eq("status", "PENDING")
     .eq("source", "ADMIN")
+    // allow_unpaid = admin let this booking go ahead unpaid (pay on arrival)
+    // — the deadline sweep must not cancel it.
+    .eq("allow_unpaid", false)
     .not("payment_deadline", "is", null)
     .lt("payment_deadline", new Date().toISOString())
     .order("payment_deadline", { ascending: true })
@@ -229,7 +252,7 @@ async function cleanupExpiredManualBookings() {
         await sendWhatsappTextForTenant(tenant, adminUser.phone,
           "Manual booking expired\n\n" +
           "Ref: " + ref + "\n" +
-          tourName + " — " + slotLabel + "\n" +
+          tourName + ": " + slotLabel + "\n" +
           "Customer: " + (booking.customer_name || "Unknown") + "\n" +
           booking.qty + " spot" + (booking.qty === 1 ? "" : "s") + " released.\n\n" +
           "Payment was not received before the deadline."

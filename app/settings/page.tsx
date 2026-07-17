@@ -11,7 +11,7 @@ import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-tim
 import { useBusinessContext } from "../../components/BusinessContext";
 import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
 import dynamic from "next/dynamic";
-import { CaretDown, Lock } from "@phosphor-icons/react";
+import { CaretDown } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
 
@@ -71,7 +71,7 @@ function BookingSitePreview({ siteSettings }: { siteSettings: Record<string, any
     return (
         <div>
             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Preview</h3>
-            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview — text colors are solved automatically so any palette stays readable.</p>
+            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview. Text colors are solved automatically so any palette stays readable.</p>
             <div
                 className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden"
                 style={{
@@ -146,7 +146,7 @@ function HelpAssistantSection() {
             <div>
                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Help assistant bubble</h3>
                 <p className="mt-1 text-xs text-[var(--ck-text-muted)]">
-                    The floating chat bubble that answers questions about the dashboard. This only affects your own account — other team members keep their own setting.
+                    The floating chat bubble that answers questions about the dashboard. This only affects your own account. Other team members keep their own setting.
                 </p>
             </div>
             <label className="flex shrink-0 cursor-pointer items-center gap-2">
@@ -239,6 +239,7 @@ interface AddOn {
 export default function SettingsPage() {
     const { businessId, refreshBusiness } = useBusinessContext();
     const [admins, setAdmins] = useState<any[]>([]);
+    const [billingAdminId, setBillingAdminId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
     const [myEmail, setMyEmail] = useState<string | null>(null);
@@ -418,7 +419,17 @@ export default function SettingsPage() {
         setLoading(true);
         const { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
         if (data) setAdmins(data.filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
+        const { data: biz } = await supabase.from("businesses").select("billing_admin_user_id").eq("id", businessId).maybeSingle();
+        setBillingAdminId(biz?.billing_admin_user_id || "");
         setLoading(false);
+    }
+
+    async function saveBillingContact(adminId: string) {
+        setBillingAdminId(adminId);
+        const { error } = await supabase.from("businesses").update({ billing_admin_user_id: adminId || null }).eq("id", businessId);
+        notify(error
+            ? { message: "Failed to update billing contact: " + error.message, tone: "error" }
+            : { message: adminId ? "Billing contact updated. BookingTours invoices go to them now." : "Billing contact reset. Invoices go to the first admin on the account.", tone: "success" });
     }
 
     async function fetchPlanUsage() {
@@ -467,7 +478,7 @@ export default function SettingsPage() {
             console.error("Welcome email failed:", emailErr);
             const emailErrMsg = String(emailErr?.message || "");
             if (emailErrMsg.includes("onboarding@resend.dev") || emailErrMsg.includes("sandbox") || emailErrMsg.includes("Sandbox")) {
-                setError("Admin added, but email couldn't be delivered: " + emailErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
+                setError("Admin added, but email couldn't be delivered: " + emailErrMsg + ". Set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
                 setError("Admin added, but the password setup email failed to send." + (emailErrMsg ? " (" + emailErrMsg + ")" : ""));
             }
@@ -492,7 +503,7 @@ export default function SettingsPage() {
             console.error("Failed to resend password setup link:", resendError);
             const resendErrMsg = String(resendError?.message || "");
             if (resendErrMsg.includes("onboarding@resend.dev") || resendErrMsg.includes("sandbox") || resendErrMsg.includes("Sandbox")) {
-                setError("Setup link was saved, but the email couldn't be delivered: " + resendErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
+                setError("Setup link was saved, but the email couldn't be delivered: " + resendErrMsg + ". Set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
                 setError("Failed to send a password setup email to " + admin.email + "." + (resendErrMsg ? " (" + resendErrMsg + ")" : ""));
             }
@@ -619,7 +630,7 @@ export default function SettingsPage() {
         }
 
         if (slots.length === 0) {
-            setTourError("No slots to create — no matching days in the selected date range.");
+            setTourError("No slots to create: there are no matching days in the selected date range.");
             return { created: 0, skipped: 0 };
         }
 
@@ -645,7 +656,7 @@ export default function SettingsPage() {
             const parts: string[] = [];
             if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
             if (skipped > 0) parts.push(`${skipped} already existed and were skipped`);
-            setSlotMessage(parts.join(" — ") + " for " + editingTour.name + ".");
+            setSlotMessage(parts.join("; ") + " for " + editingTour.name + ".");
             setTimeout(() => setSlotMessage(""), 6000);
             if (created > 0) fetchSlotCounts(tours.map(t => t.id));
         }
@@ -687,7 +698,7 @@ export default function SettingsPage() {
                     const parts: string[] = [];
                     if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
                     if (skipped > 0) parts.push(`${skipped} already existed`);
-                    setSlotMessage("Tour created — " + parts.join(", ") + ".");
+                    setSlotMessage("Tour created: " + parts.join(", ") + ".");
                     setTimeout(() => setSlotMessage(""), 6000);
                 }
             }
@@ -729,7 +740,7 @@ export default function SettingsPage() {
         if ((bookingCount || 0) > 0) {
             notify({
                 title: "Cannot delete tour",
-                message: bookingCount + " booking(s) exist for \"" + name + "\". Deactivate the tour instead — deleting it would abandon that booking history.",
+                message: bookingCount + " booking(s) exist for \"" + name + "\". Deactivate the tour instead; deleting it would abandon that booking history.",
                 tone: "warning",
             });
             return;
@@ -1256,7 +1267,7 @@ export default function SettingsPage() {
             });
             const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
-            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled — sandbox keys will be used for payments." : "Yoco TEST MODE disabled — live keys are active." });
+            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled. Sandbox keys will be used for payments." : "Yoco TEST MODE disabled. Live keys are active." });
             fetchCredStatus();
             window.location.reload();
         } catch (err: any) {
@@ -1482,7 +1493,7 @@ export default function SettingsPage() {
             if (error) { notify("Upload failed: " + error.message); return; }
             const { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
             setEmailImgs(prev => ({ ...prev, [key]: urlData.publicUrl }));
-            notify("Image uploaded — click Save Email Images to persist.");
+            notify("Image uploaded. Click Save Email Images to persist.");
         } catch (err: any) {
             notify("Upload failed: " + (err?.message || "Unknown error"));
         } finally {
@@ -1547,7 +1558,6 @@ export default function SettingsPage() {
                 </div>
                 <div className="ui-card anim-fade-up anim-d1">
                     <div className="ui-empty">
-                        <span className="ui-icon-chip"><Lock size={18} /></span>
                         <p className="text-[14px] font-medium" style={{ color: "var(--ck-text-strong)" }}>No settings access</p>
                         <p className="text-[13px] ui-text-muted">You do not have permission to view or manage admin settings.</p>
                     </div>
@@ -1570,7 +1580,7 @@ export default function SettingsPage() {
                     site header, every customer email, and on invoices. Saves
                     immediately on upload/remove. */}
                 <div className="mb-8 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
-                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Business Logo <span className="text-[var(--ck-accent)]">— appears on the dashboard sidebar, booking site, all emails, and invoices</span></label>
+                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Business Logo <span className="text-[var(--ck-accent)]">(appears on the dashboard sidebar, booking site, all emails, and invoices)</span></label>
                     <div className="flex items-center gap-3">
                         {siteSettings.logo_url && (
                             <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
@@ -1606,6 +1616,13 @@ export default function SettingsPage() {
                             <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{admins.length}</span>
                             <span className="ui-mono-label !text-[9.5px]">/ {usageSnapshot?.seat_limit || 10} seats</span>
                         </span>
+                        <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Who receives BookingTours subscription invoices. Defaults to the first admin created on this account.">
+                            Billing contact
+                            <select value={billingAdminId} onChange={e => saveBillingContact(e.target.value)} className="ui-control px-2 py-1.5 text-xs rounded-lg outline-none max-w-[180px]">
+                                <option value="">First admin (default)</option>
+                                {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+                            </select>
+                        </label>
                     </div>
 
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
@@ -2058,7 +2075,7 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
                         <p className="text-xs text-[var(--ck-text-muted)]">
                             Extra questions asked when a booking is taken (e.g. allergies, hotel pickup, experience level).
-                            Add your own or start from a template below — no code needed.
+                            Add your own or start from a template below. No code needed.
                         </p>
                     </div>
 
@@ -2299,7 +2316,7 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] mb-4">The <strong>Business Name</strong> and <strong>Logo</strong> below control: the admin dashboard sidebar, the browser tab title, all outgoing emails, and the public booking site header.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">— appears in the dashboard header &amp; all emails</span></label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">(appears in the dashboard header &amp; all emails)</span></label>
                                 <input type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Cape Kayak Adventures" />
                             </div>
@@ -2327,8 +2344,8 @@ export default function SettingsPage() {
                                 (same pattern as the logo). Falls back to the first active
                                 tour's photo, then a palette gradient, when empty. */}
                             <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">— the photo behind the glass panels on your booking site</span></label>
-                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB — it&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind the glass panels on your booking site)</span></label>
+                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB. It&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
                                 <div className="flex items-center gap-3">
                                     {siteSettings.hero_image && (
                                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -2349,7 +2366,7 @@ export default function SettingsPage() {
                                             await handleImageUpload(optimised, "email-images", businessId + "/branding", async (url) => {
                                                 setSiteSettings(prev => ({ ...prev, hero_image: url }));
                                                 const { error } = await supabase.from("businesses").update({ hero_image: url }).eq("id", businessId);
-                                                notify(error ? { message: "Background uploaded but failed to persist: " + error.message, tone: "error" } : { message: "Background image updated — reload your booking site to see it.", tone: "success" });
+                                                notify(error ? { message: "Background uploaded but failed to persist: " + error.message, tone: "error" } : { message: "Background image updated. Reload your booking site to see it.", tone: "success" });
                                             });
                                             setUploadingField(null);
                                             e.target.value = "";
@@ -2359,7 +2376,7 @@ export default function SettingsPage() {
                                         <button type="button" onClick={async () => {
                                             setSiteSettings(prev => ({ ...prev, hero_image: "" }));
                                             const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
-                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed — the site falls back to your first tour photo.", tone: "success" });
+                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. The site falls back to your first tour photo.", tone: "success" });
                                         }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
                                     )}
                                 </div>
@@ -2720,7 +2737,7 @@ export default function SettingsPage() {
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
                         <label className="block">
                             <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
-                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours) — set your own if the guess doesn&apos;t fit your activity.</p>
+                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours). Set your own if the guess doesn&apos;t fit your activity.</p>
                             <input type="text" value={emailTagline} onChange={e => setEmailTagline(e.target.value)}
                                 maxLength={200}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
@@ -2883,7 +2900,7 @@ export default function SettingsPage() {
                             </button>
                         </div>
                         {faqEntries.length === 0 && (
-                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask — these power the AI chatbot.</p>
+                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask. These power the AI chatbot.</p>
                         )}
                         <div className="space-y-3">
                             {faqEntries.map((faq, i) => (
@@ -2931,7 +2948,7 @@ export default function SettingsPage() {
                     notify({ message: "Automation tag rules saved.", tone: "success" });
                 }} className="space-y-6">
                     <p className="text-xs text-[var(--ck-text-muted)]">
-                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations — for example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
+                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations. For example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
                     </p>
 
                     {/* VIP Rules */}
@@ -2986,12 +3003,12 @@ export default function SettingsPage() {
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" checked={autoTagConfig.completed_tour_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, completed_tour_enabled: e.target.checked })}
                                     className="rounded border-[var(--ck-border-subtle)]" />
-                                <span className="text-sm text-[var(--ck-text)]"><strong>completed-tour</strong> — after a booked tour date has passed</span>
+                                <span className="text-sm text-[var(--ck-text)]"><strong>completed-tour</strong>: applied after a booked tour date has passed</span>
                             </label>
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" checked={autoTagConfig.new_booker_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, new_booker_enabled: e.target.checked })}
                                     className="rounded border-[var(--ck-border-subtle)]" />
-                                <span className="text-sm text-[var(--ck-text)]"><strong>new-booker</strong> — first-time customers (removed after 2nd booking)</span>
+                                <span className="text-sm text-[var(--ck-text)]"><strong>new-booker</strong>: first-time customers (removed after 2nd booking)</span>
                             </label>
                         </div>
                         <label className="block max-w-xs">
@@ -3133,7 +3150,7 @@ export default function SettingsPage() {
                                 value={waForm.token}
                                 onChange={e => setWaForm({ ...waForm, token: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "EAAG..."}
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "EAAG..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3144,7 +3161,7 @@ export default function SettingsPage() {
                                 value={waForm.phoneId}
                                 onChange={e => setWaForm({ ...waForm, phoneId: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "123456789012345"}
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "123456789012345"}
                                 autoComplete="off"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in Meta Business Manager → WhatsApp → API Setup → Phone number ID.</p>
@@ -3178,7 +3195,7 @@ export default function SettingsPage() {
                                 value={yocoForm.secretKey}
                                 onChange={e => setYocoForm({ ...yocoForm, secretKey: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "sk_live_..."}
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set; enter a new value to replace)" : "sk_live_..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3189,7 +3206,7 @@ export default function SettingsPage() {
                                 value={yocoForm.webhookSecret}
                                 onChange={e => setYocoForm({ ...yocoForm, webhookSecret: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "whsec_..."}
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set; enter a new value to replace)" : "whsec_..."}
                                 autoComplete="new-password"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Webhooks → Signing secret.</p>
@@ -3254,7 +3271,7 @@ export default function SettingsPage() {
                                 value={yocoTestForm.secretKey}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, secretKey: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "sk_test_..."}
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set; enter a new value to replace)" : "sk_test_..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3265,7 +3282,7 @@ export default function SettingsPage() {
                                 value={yocoTestForm.webhookSecret}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, webhookSecret: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "whsec_test_..."}
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set; enter a new value to replace)" : "whsec_test_..."}
                                 autoComplete="new-password"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Test environment → Webhooks.</p>
@@ -3342,7 +3359,7 @@ export default function SettingsPage() {
                                 autoComplete="off"
                             />
                             <div className="mt-2 space-y-2 text-xs leading-relaxed text-[var(--ck-text-muted)]">
-                                <p><strong className="text-[var(--ck-text-strong)]">How reviews work:</strong> guests automatically get a WhatsApp review link a few hours after their trip. Their reviews land on your <a href="/reviews" className="underline">Reviews</a> page as <em>Pending</em> — approve them to publish on your booking site, or hide them. Connecting your Google Place ID also imports your Google reviews overnight; they display alongside your own (they&apos;re already public on Google, so they skip moderation).</p>
+                                <p><strong className="text-[var(--ck-text-strong)]">How reviews work:</strong> guests automatically get a WhatsApp review link a few hours after their trip. Their reviews land on your <a href="/reviews" className="underline">Reviews</a> page as <em>Pending</em>. Approve them to publish on your booking site, or hide them. Connecting your Google Place ID also imports your Google reviews overnight; they display alongside your own (they&apos;re already public on Google, so they skip moderation).</p>
                                 <p><strong className="text-[var(--ck-text-strong)]">Find your Place ID:</strong> open <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>, search for your business name exactly as it appears on Google Maps, click your business on the map, and copy the ID shown (it usually starts with &quot;ChIJ&quot;). No Google account needed. Reviews sync daily at 03:17 UTC.</p>
                             </div>
                         </div>
