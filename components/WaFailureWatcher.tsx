@@ -47,7 +47,17 @@ export default function WaFailureWatcher() {
           if (seen.current.has(f.id)) continue;
           seen.current.add(f.id);
           if (cancelled) return;
-          notify({
+          // 131047/131026 = outside the 24h window. wa-webhook auto-recovers
+          // these: it sends the pre-approved reopener template and queues the
+          // original message to deliver the moment the customer replies — so
+          // tell the operator that, not that delivery failed outright.
+          const windowClosed = /131047|131026/.test(f.error || "");
+          notify(windowClosed ? {
+            title: "WhatsApp queued (outside 24h window)",
+            message: "The customer at " + (f.to_phone || "this number") + " hasn't messaged recently, so WhatsApp blocks direct texts. We sent them a pre-approved \"please reply\" message; your full message delivers automatically as soon as they respond.",
+            tone: "info",
+            duration: 9000,
+          } : {
             title: "WhatsApp couldn't be delivered",
             message: "A WhatsApp message to " + (f.to_phone || "a customer") + " failed"
               + (f.error ? " (" + f.error.slice(0, 80) + ")" : "")
