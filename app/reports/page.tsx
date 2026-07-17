@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, LabelList,
@@ -59,6 +60,7 @@ const STATUS_PILL: Record<string, string> = {
   PENDING: "ui-pill-warning",
   HELD: "ui-pill-amber",
   CANCELLED: "ui-pill-neutral",
+  EXPIRED: "ui-pill-neutral",
 };
 function statusPill(status: string) {
   return `ui-status ${STATUS_PILL[status] || "ui-pill-neutral"}`;
@@ -171,7 +173,7 @@ export default function Reports() {
     for (let from = 0; from < CEILING; from += PAGE) {
       let query = supabase
         .from("bookings")
-        .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, tours(name), slots(start_time)")
+        .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), slots(start_time)")
         .eq("business_id", businessId);
       if (filterBy === "slot" && slotIds) {
         query = query.in("slot_id", slotIds);
@@ -244,6 +246,10 @@ export default function Reports() {
       waiverPending: active.filter(b => b.waiver_status !== "SIGNED").length,
     };
   }, [filtered]);
+
+  // Accounting truth for the Financials tab: cash actually received/refunded
+  // per the captured/refund columns, not booked totals by status.
+  const fin = useMemo(() => financialTotals(filtered), [filtered]);
 
   const visualSeries = useMemo(() => {
     if (activeTab === "marketing") {
@@ -412,18 +418,69 @@ export default function Reports() {
     }
 
     if (activeTab === "financials") {
-      const headers = ["Transaction Date", "Booking Ref", "Gateway Ref", "Customer Name", "Subtotal", "Discount", "Total Amount", "Status"];
-      const rows = filtered.map(b => [
-        fmtDateTime(b.created_at, activeTimezone),
-        b.id.substring(0, 8).toUpperCase(),
-        b.yoco_payment_id || "",
-        b.customer_name || "",
-        Number(b.original_total || b.total_amount || 0).toFixed(2),
-        Number((b.original_total || b.total_amount || 0) - (b.total_amount || 0)).toFixed(2),
-        Number(b.total_amount || 0).toFixed(2),
-        b.status || ""
-      ]);
-      triggerDownload(buildCSV("Financial Report", headers, rows), `${csvPrefix}-financials-${startDate}-to-${endDate}.csv`);
+      // Full transaction ledger: every money column an accountant needs to
+      // reconcile receipts, refunds and outstanding balances per booking,
+      // with the references to trace each amount to the payment gateway.
+      const headers = [
+        "Transaction Date", "Booking Ref", "Booking ID", "Status", "Customer Name", "Customer VAT No",
+        "Tour", "Tour Date", "Source", "Qty", "Unit Price",
+        "Subtotal", "Discount", "Discount Type", "Promo Code", "Total Due",
+        "Voucher Code", "Voucher Applied", "Amount Received", "Refunded", "Net Received", "Outstanding",
+        "Payment Method", "Gateway Ref (Yoco)", "Gateway Ref (PayFast)", "OTA Channel", "OTA Gross", "OTA Net",
+        "Refund Status", "Refund Processed At", "Cancelled At", "Cancellation Reason", "Booked By",
+      ];
+      const rows = filtered.map(b => {
+        const due = Number(b.total_amount || 0);
+        const received = amountReceived(b);
+        const refunded = amountRefunded(b);
+        return [
+          fmtDateTime(b.created_at, activeTimezone),
+          b.id.substring(0, 8).toUpperCase(),
+          b.id,
+          b.status || "",
+          b.customer_name || "",
+          b.customer_vat_number || "",
+          b.tours?.name || "",
+          b.slots?.start_time ? fmtDateTime(b.slots.start_time, activeTimezone) : "",
+          b.source || "",
+          b.qty || 0,
+          Number(b.unit_price || 0).toFixed(2),
+          Number(b.original_total || b.total_amount || 0).toFixed(2),
+          Number((b.original_total || b.total_amount || 0) - due).toFixed(2),
+          b.discount_type || "",
+          b.promo_code || "",
+          due.toFixed(2),
+          b.voucher_code || "",
+          Number(b.voucher_amount_paid || 0).toFixed(2),
+          received.toFixed(2),
+          refunded.toFixed(2),
+          (received - refunded).toFixed(2),
+          (["CANCELLED", "EXPIRED"].includes(b.status) ? 0 : Math.max(0, due - received)).toFixed(2),
+          derivePaymentMethod(b),
+          b.yoco_payment_id || "",
+          b.payfast_m_payment_id || "",
+          b.ota_channel || "",
+          b.ota_gross_amount != null ? Number(b.ota_gross_amount).toFixed(2) : "",
+          b.ota_net_amount != null ? Number(b.ota_net_amount).toFixed(2) : "",
+          b.refund_status || "",
+          b.refund_processed_at ? fmtDateTime(b.refund_processed_at, activeTimezone) : "",
+          b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : "",
+          b.cancellation_reason || "",
+          b.created_by_admin_name || "",
+        ];
+      });
+      const totals = [
+        [],
+        ["TOTALS"],
+        ["Gross booked (live bookings)", fin.grossBooked.toFixed(2)],
+        ["Discounts given", fin.discounts.toFixed(2)],
+        ["Amount received", fin.received.toFixed(2)],
+        ["of which voucher redemptions", fin.voucherApplied.toFixed(2)],
+        ["Refunded", fin.refunded.toFixed(2)],
+        ["Net received", fin.net.toFixed(2)],
+        ["Outstanding", fin.outstanding.toFixed(2)],
+      ];
+      triggerDownload(buildCSV("Financial Ledger", headers, [...rows, ...totals]), `${csvPrefix}-financial-ledger-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -502,6 +559,178 @@ export default function Reports() {
     triggerDownload(buildCSV("Bookings Report", headers, rows), `${csvPrefix}-bookings-${startDate}-to-${endDate}.csv`);
   }
 
+  // ── Accounting registers (on-demand fetch + CSV; financials tab only) ──
+  const [registerBusy, setRegisterBusy] = useState<string | null>(null);
+
+  async function downloadRefundRegister() {
+    setRegisterBusy("refunds");
+    const startIso = startDate + "T00:00:00+02:00";
+    const endIso = endDate + "T23:59:59+02:00";
+    // Money truth lives on bookings; refund_requests is workflow. A refund
+    // belongs to this period when it was PROCESSED in it (or, for legacy rows
+    // without a processed date, when the booking was cancelled in it).
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("id, created_at, customer_name, email, total_amount, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, refund_notes, cancelled_at, cancellation_reason, yoco_payment_id, status, tours(name)")
+      .eq("business_id", businessId)
+      .or("total_refunded.gt.0,refund_processed_at.not.is.null")
+      .limit(5000);
+    setRegisterBusy(null);
+    if (error) { console.error("Refund register error:", error); return; }
+    const inRange = (iso: string | null) => !!iso && iso >= startIso && iso <= endIso;
+    const rows = (data || [])
+      .filter((b: any) => inRange(b.refund_processed_at) || (Number(b.total_refunded || 0) > 0 && !b.refund_processed_at && inRange(b.cancelled_at)))
+      .map((b: any) => ({ ...b, tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours }))
+      .sort((a: any, z: any) => String(a.refund_processed_at || a.cancelled_at || "").localeCompare(String(z.refund_processed_at || z.cancelled_at || "")));
+    const headers = ["Refund Date", "Booking Ref", "Booking ID", "Customer", "Tour", "Booking Status", "Amount Received", "Amount Refunded", "Refund Status", "Gateway Ref", "Cancelled At", "Reason", "Notes"];
+    const csvRows = rows.map((b: any) => [
+      b.refund_processed_at ? fmtDateTime(b.refund_processed_at, activeTimezone) : (b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : ""),
+      b.id.substring(0, 8).toUpperCase(),
+      b.id,
+      b.customer_name || "",
+      b.tours?.name || "",
+      b.status || "",
+      amountReceived(b).toFixed(2),
+      amountRefunded(b).toFixed(2),
+      b.refund_status || "",
+      b.yoco_payment_id || "",
+      b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : "",
+      b.cancellation_reason || "",
+      b.refund_notes || "",
+    ]);
+    const total = rows.reduce((s: number, b: any) => s + amountRefunded(b), 0);
+    triggerDownload(buildCSV("Refund Register", headers, [...csvRows, [], ["Total refunded", total.toFixed(2)]]), `${csvPrefix}-refund-register-${startDate}-to-${endDate}.csv`);
+  }
+
+  async function downloadInvoiceRegister() {
+    setRegisterBusy("invoices");
+    const startIso = startDate + "T00:00:00+02:00";
+    const endIso = endDate + "T23:59:59+02:00";
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("invoice_number, created_at, customer_name, customer_email, customer_company_name, customer_vat_number, tour_name, tour_date, qty, unit_price, subtotal, discount_type, discount_amount, total_amount, payment_method, payment_reference, voucher_code, status, booking_id")
+      .eq("business_id", businessId)
+      .gte("created_at", startIso)
+      .lte("created_at", endIso)
+      .order("invoice_number", { ascending: true })
+      .limit(10000);
+    setRegisterBusy(null);
+    if (error) { console.error("Invoice register error:", error); return; }
+    const rows = data || [];
+    const headers = ["Invoice No", "Issued At", "Customer", "Company", "VAT No", "Email", "Tour", "Tour Date", "Qty", "Unit Price", "Subtotal", "Discount", "Total", "Payment Method", "Payment Reference", "Voucher", "Status", "Booking Ref"];
+    const csvRows = rows.map((inv: any) => [
+      inv.invoice_number || "",
+      fmtDateTime(inv.created_at, activeTimezone),
+      inv.customer_name || "",
+      inv.customer_company_name || "",
+      inv.customer_vat_number || "",
+      inv.customer_email || "",
+      inv.tour_name || "",
+      inv.tour_date || "",
+      inv.qty || 0,
+      Number(inv.unit_price || 0).toFixed(2),
+      Number(inv.subtotal || 0).toFixed(2),
+      Number(inv.discount_amount || 0).toFixed(2),
+      Number(inv.total_amount || 0).toFixed(2),
+      inv.payment_method || "",
+      inv.payment_reference || "",
+      inv.voucher_code || "",
+      inv.status || "",
+      inv.booking_id ? String(inv.booking_id).substring(0, 8).toUpperCase() : "",
+    ]);
+    const total = rows.reduce((s: number, inv: any) => s + Number(inv.total_amount || 0), 0);
+    triggerDownload(buildCSV("Invoice Register", headers, [...csvRows, [], ["Invoices", rows.length], ["Total invoiced", total.toFixed(2)]]), `${csvPrefix}-invoice-register-${startDate}-to-${endDate}.csv`);
+  }
+
+  async function downloadVoucherRegister() {
+    setRegisterBusy("vouchers");
+    const startIso = startDate + "T00:00:00+02:00";
+    const endIso = endDate + "T23:59:59+02:00";
+    // Three sections in one register: sold in period (income received),
+    // redeemed in period (liability released), and the open-balance snapshot
+    // (current liability, as of now, independent of the date range).
+    const [sold, redeemed, open] = await Promise.all([
+      supabase.from("vouchers")
+        .select("code, created_at, buyer_name, buyer_email, recipient_name, purchase_amount, value, current_balance, status, expires_at")
+        .eq("business_id", businessId).gte("created_at", startIso).lte("created_at", endIso)
+        .order("created_at").limit(5000),
+      supabase.from("vouchers")
+        .select("code, redeemed_at, buyer_name, recipient_name, value, current_balance, status, redeemed_booking_id")
+        .eq("business_id", businessId).gte("redeemed_at", startIso).lte("redeemed_at", endIso)
+        .order("redeemed_at").limit(5000),
+      supabase.from("vouchers")
+        .select("code, created_at, buyer_name, recipient_name, value, current_balance, status, expires_at")
+        .eq("business_id", businessId).gt("current_balance", 0).eq("status", "ACTIVE")
+        .order("created_at").limit(5000),
+    ]);
+    setRegisterBusy(null);
+    if (sold.error || redeemed.error || open.error) {
+      console.error("Voucher register error:", sold.error || redeemed.error || open.error);
+      return;
+    }
+    const headers = ["Section", "Code", "Date", "Buyer", "Recipient", "Face Value", "Purchase Amount", "Current Balance", "Status", "Expires / Booking"];
+    const csvRows: any[][] = [];
+    for (const v of sold.data || []) {
+      csvRows.push(["SOLD", v.code, fmtDateTime(v.created_at, activeTimezone), v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), Number(v.purchase_amount || v.value || 0).toFixed(2), Number(v.current_balance || 0).toFixed(2), v.status || "", v.expires_at ? fmtDate(v.expires_at, activeTimezone) : ""]);
+    }
+    for (const v of redeemed.data || []) {
+      csvRows.push(["REDEEMED", v.code, v.redeemed_at ? fmtDateTime(v.redeemed_at, activeTimezone) : "", v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), "", Number(v.current_balance || 0).toFixed(2), v.status || "", v.redeemed_booking_id ? String(v.redeemed_booking_id).substring(0, 8).toUpperCase() : ""]);
+    }
+    for (const v of open.data || []) {
+      csvRows.push(["OPEN BALANCE", v.code, fmtDateTime(v.created_at, activeTimezone), v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), "", Number(v.current_balance || 0).toFixed(2), v.status || "", v.expires_at ? fmtDate(v.expires_at, activeTimezone) : ""]);
+    }
+    const soldTotal = (sold.data || []).reduce((s: number, v: any) => s + Number(v.purchase_amount || v.value || 0), 0);
+    const liability = (open.data || []).reduce((s: number, v: any) => s + Number(v.current_balance || 0), 0);
+    triggerDownload(
+      buildCSV("Voucher Register", headers, [...csvRows, [], ["Sold in period (received)", soldTotal.toFixed(2)], ["Open voucher liability (as of today)", liability.toFixed(2)]]),
+      `${csvPrefix}-voucher-register-${startDate}-to-${endDate}.csv`,
+    );
+  }
+
+  async function downloadSettlementRegister() {
+    setRegisterBusy("settlements");
+    const { data, error } = await supabase
+      .from("combo_settlements")
+      .select("period_start, period_end, collector_business_id, owed_business_id, total_collected, amount_owed, combo_booking_count, status, settled_at, notes, created_at")
+      .or(`collector_business_id.eq.${businessId},owed_business_id.eq.${businessId}`)
+      .gte("period_end", startDate)
+      .lte("period_start", endDate)
+      .order("period_start")
+      .limit(2000);
+    if (error) { setRegisterBusy(null); console.error("Settlement register error:", error); return; }
+    const rows = data || [];
+    // Resolve counterparty names in one lookup.
+    const otherIds = Array.from(new Set(rows.flatMap((r: any) => [r.collector_business_id, r.owed_business_id]).filter((id: string) => id && id !== businessId)));
+    let names: Record<string, string> = {};
+    if (otherIds.length > 0) {
+      const { data: biz } = await supabase.from("businesses").select("id, name").in("id", otherIds);
+      names = Object.fromEntries((biz || []).map((b: any) => [b.id, b.name]));
+    }
+    setRegisterBusy(null);
+    const headers = ["Period", "Direction", "Counterparty", "Combo Bookings", "Total Collected", "Amount Owed", "Status", "Settled At", "Notes"];
+    const csvRows = rows.map((r: any) => {
+      const iCollect = r.collector_business_id === businessId;
+      const counterpartyId = iCollect ? r.owed_business_id : r.collector_business_id;
+      return [
+        r.period_start + " to " + r.period_end,
+        iCollect ? "PAYABLE (we collected)" : "RECEIVABLE (they collected)",
+        names[counterpartyId] || counterpartyId || "",
+        r.combo_booking_count || 0,
+        Number(r.total_collected || 0).toFixed(2),
+        Number(r.amount_owed || 0).toFixed(2),
+        r.status || "",
+        r.settled_at ? fmtDateTime(r.settled_at, activeTimezone) : "",
+        r.notes || "",
+      ];
+    });
+    const payable = rows.filter((r: any) => r.collector_business_id === businessId).reduce((s: number, r: any) => s + Number(r.amount_owed || 0), 0);
+    const receivable = rows.filter((r: any) => r.owed_business_id === businessId).reduce((s: number, r: any) => s + Number(r.amount_owed || 0), 0);
+    triggerDownload(
+      buildCSV("Combo Settlement Register", headers, [...csvRows, [], ["Total payable to partners", payable.toFixed(2)], ["Total receivable from partners", receivable.toFixed(2)]]),
+      `${csvPrefix}-settlement-register-${startDate}-to-${endDate}.csv`,
+    );
+  }
+
   async function downloadPDF() {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
@@ -527,17 +756,19 @@ export default function Reports() {
       ]);
     } else if (activeTab === "financials") {
       title = `Financial Report (${startDate} to ${endDate})`;
-      headers = ["Date", "Booking Ref", "Gateway Ref", "Customer", "Subtotal", "Discount", "Net Paid", "Status"];
+      headers = ["Date", "Booking Ref", "Customer", "Method", "Total Due", "Received", "Refunded", "Net", "Status"];
       rows = filtered.map(b => [
         fmtDateTime(b.created_at, activeTimezone),
         b.id.substring(0, 8).toUpperCase(),
-        b.yoco_payment_id || "—",
         b.customer_name || "—",
-        fmtCurrency(Number(b.original_total || b.total_amount || 0)),
-        fmtCurrency(Number((b.original_total || b.total_amount || 0) - (b.total_amount || 0))),
+        derivePaymentMethod(b) || "—",
         fmtCurrency(Number(b.total_amount || 0)),
+        fmtCurrency(amountReceived(b)),
+        fmtCurrency(amountRefunded(b)),
+        fmtCurrency(netReceived(b)),
         b.status
       ]);
+      rows.push(["", "", "", "TOTALS", fmtCurrency(fin.grossBooked), fmtCurrency(fin.received), fmtCurrency(fin.refunded), fmtCurrency(fin.net), ""]);
     } else if (activeTab === "marketing") {
       title = `Marketing Report (${startDate} to ${endDate})`;
       headers = ["Source", "Bookings", "Total Pax", "Revenue", "Avg. Order Value"];
@@ -699,6 +930,7 @@ export default function Reports() {
             <option value="PENDING">PENDING</option>
             <option value="HELD">HELD</option>
             <option value="CANCELLED">CANCELLED</option>
+            <option value="EXPIRED">EXPIRED</option>
           </select>
         </label>
         <button onClick={loadReport} className="ui-btn ui-btn-ghost sm:ml-auto">
@@ -721,6 +953,44 @@ export default function Reports() {
               <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
+        </div>
+      ) : activeTab === "financials" ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {[
+              { label: "Gross Booked", value: fmtCurrency(fin.grossBooked), color: "var(--ck-text-strong)", hint: "total due on live bookings (excl. cancelled/expired)" },
+              { label: "Received", value: fmtCurrency(fin.received), color: "var(--ck-success)", hint: "cash + voucher value actually captured" },
+              { label: "Refunded", value: fmtCurrency(fin.refunded), color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-strong)", hint: "processed refunds" },
+              { label: "Net Received", value: fmtCurrency(fin.net), color: "var(--ck-success)", hint: "received minus refunded" },
+              { label: "Outstanding", value: fmtCurrency(fin.outstanding), color: fin.outstanding > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "due but not yet received on live bookings" },
+            ].map(c => (
+              <div key={c.label} className="ui-card p-4" title={c.hint}>
+                <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
+              </div>
+            ))}
+          </div>
+          {(fin.voucherApplied > 0 || fin.missingGatewayRef > 0) && (
+            <p className="px-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+              {fin.voucherApplied > 0 && <>Includes {fmtCurrency(fin.voucherApplied)} paid by voucher redemption. </>}
+              {fin.missingGatewayRef > 0 && <span style={{ color: "var(--ck-warning)" }}>{fin.missingGatewayRef} paid booking{fin.missingGatewayRef === 1 ? " has" : "s have"} no payment reference recorded (audit flag).</span>}
+            </p>
+          )}
+          <div className="ui-card flex flex-wrap items-center gap-2 p-3">
+            <span className="ui-mono-label !text-[10px] mr-1">Accounting registers</span>
+            <button onClick={downloadRefundRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "refunds" ? "Building…" : "Refunds CSV"}
+            </button>
+            <button onClick={downloadInvoiceRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "invoices" ? "Building…" : "Invoices CSV"}
+            </button>
+            <button onClick={downloadVoucherRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "vouchers" ? "Building…" : "Vouchers CSV"}
+            </button>
+            <button onClick={downloadSettlementRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "settlements" ? "Building…" : "Combo Settlements CSV"}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -863,30 +1133,30 @@ export default function Reports() {
         <>
         <div className="space-y-3 md:hidden">
           {filtered.map(b => {
-            const sub = Number(b.original_total || b.total_amount || 0);
-            const tot = Number(b.total_amount || 0);
-            const disc = sub - tot;
+            const received = amountReceived(b);
+            const refunded = amountRefunded(b);
+            const method = derivePaymentMethod(b);
             return (
               <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
                     <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtDateTime(b.created_at, activeTimezone)}</p>
-                    <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</p>
+                    <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}{method ? ` · ${method}` : ""}</p>
                   </div>
                   <span className={statusPill(b.status)}>{b.status}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Subtotal</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(sub)}</p>
+                    <p className="ui-mono-label !text-[9.5px]">Received</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(received)}</p>
                   </div>
                   <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Net Paid</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(tot)}</p>
+                    <p className="ui-mono-label !text-[9.5px]">Net</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>{disc > 0 ? `Discount ${fmtCurrency(disc)}` : "No discount"}</p>
+                {refunded > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-danger)" }}>Refunded {fmtCurrency(refunded)}</p>}
               </div>
             );
           })}
@@ -897,28 +1167,31 @@ export default function Reports() {
               <tr>
                 <Th>Transaction Date</Th>
                 <Th>Booking Ref</Th>
-                <Th>Gateway Ref</Th>
                 <Th>Customer</Th>
-                <Th className="text-right">Subtotal</Th>
-                <Th className="text-right">Discounts</Th>
-                <Th className="text-right">Net Paid</Th>
+                <Th>Method</Th>
+                <Th className="text-right">Total Due</Th>
+                <Th className="text-right">Received</Th>
+                <Th className="text-right">Refunded</Th>
+                <Th className="text-right">Net</Th>
                 <Th className="text-center">Status</Th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(b => {
-                const sub = Number(b.original_total || b.total_amount || 0);
-                const tot = Number(b.total_amount || 0);
-                const disc = sub - tot;
+                const due = Number(b.total_amount || 0);
+                const received = amountReceived(b);
+                const refunded = amountRefunded(b);
+                const method = derivePaymentMethod(b);
                 return (
                   <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
                     <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text)" }}>{fmtDateTime(b.created_at, activeTimezone)}</td>
-                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.yoco_payment_id || "—"}</td>
+                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }} title={b.yoco_payment_id || b.payfast_m_payment_id || ""}>{b.id.substring(0, 8).toUpperCase()}</td>
                     <td className="min-w-[150px] p-3" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(sub)}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-warning)" }}>{disc > 0 ? "-" + fmtCurrency(disc) : "—"}</td>
-                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(tot)}</td>
+                    <td className="p-3 text-xs" style={{ color: method === "Unrecorded" ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{method || "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(due)}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: received > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{received > 0 ? fmtCurrency(received) : "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : "—"}</td>
+                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</td>
                     <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                   </tr>
                 );
@@ -926,8 +1199,11 @@ export default function Reports() {
             </tbody>
             <tfoot>
               <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
-                <td colSpan={6} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Total Net Revenue</td>
-                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
+                <td colSpan={4} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(fin.grossBooked)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(fin.received)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{fin.refunded > 0 ? "-" + fmtCurrency(fin.refunded) : "—"}</td>
+                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(fin.net)}</td>
                 <td></td>
               </tr>
             </tfoot>

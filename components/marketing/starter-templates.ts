@@ -1,4 +1,5 @@
 import { Block, uid } from "./blocks/block-types";
+import { formatDuration } from "../../app/lib/duration";
 
 /* ── Starter template library ─────────────────────────────────────────────
    One designed email per automation step (see AUTOMATION recipe keys in
@@ -133,7 +134,7 @@ export const starterTemplates: StarterTemplate[] = [
       eyebrow("Guest favourites"),
       h1("Loved by people like you"),
       para(`<p>Hi {first_name},</p><p>Not sure where to start? These are the trips our guests rebook, gift, and tell their friends about.</p>`),
-      { type: "quote", id: uid(), text: "I've lived here my whole life and never seen the coast like this. Booked again before we'd even dried off.", attribution: "Recent guest review", photoUrl: "" } as Block,
+      { type: "quote", id: uid(), text: "I've done a lot of tours in my life and never had a guide like this. Booked again before I'd even left the parking lot.", attribution: "Recent guest review", photoUrl: "" } as Block,
       para(`<p>Every experience is small-group, guided, and beginner-friendly. No experience needed, just a sense of adventure.</p>`),
       gap(4),
       cta("See what's on"),
@@ -205,7 +206,7 @@ export const starterTemplates: StarterTemplate[] = [
     blocks: () =>
       shell({
         eyebrow: "Since you've been gone",
-        title: "The water hasn't forgotten you",
+        title: "The adventure hasn't forgotten you",
         body: [
           para(`<p>Hi {first_name},</p><p>It's been a while since your last trip with us, and a lot has changed:</p>`),
           factList([
@@ -355,7 +356,7 @@ export const starterTemplates: StarterTemplate[] = [
         title: "Last call",
         body: [
           para(`<p>Hi {first_name},</p><p>Short and honest: your voucher expires at midnight tonight. Book now and pick any future date. The value is locked in the moment you book.</p>`),
-          voucherPanel("Book today, paddle whenever. After midnight it's gone."),
+          voucherPanel("Book today, go whenever. After midnight it's gone."),
         ],
         ctaText: "Redeem it now",
       }),
@@ -559,4 +560,99 @@ export const starterTemplates: StarterTemplate[] = [
 
 export function getStarterTemplateByKey(key: string): StarterTemplate | undefined {
   return starterTemplates.find((t) => t.key === key);
+}
+
+/* ── Install-time materialization ──────────────────────────────────────────
+   Send-time {tokens} above are per-recipient. These fields are per-operator
+   and known at install, so they're baked into the blocks once here instead
+   of being resolved on every send. */
+
+export interface BusinessBranding {
+  email_color?: string | null;
+  logo_url?: string | null;
+  business_address?: string | null;
+  public_phone?: string | null;
+  social_facebook?: string | null;
+  social_instagram?: string | null;
+  social_tiktok?: string | null;
+  social_youtube?: string | null;
+  social_twitter?: string | null;
+  social_linkedin?: string | null;
+  social_tripadvisor?: string | null;
+  social_google_reviews?: string | null;
+}
+
+export interface TourSummary {
+  id: string;
+  name: string;
+  duration_minutes?: number | null;
+  image_url?: string | null;
+}
+
+function socialsFromBiz(biz: BusinessBranding): Record<string, string> {
+  const pairs: [string, string | null | undefined][] = [
+    ["facebook", biz.social_facebook],
+    ["instagram", biz.social_instagram],
+    ["tiktok", biz.social_tiktok],
+    ["youtube", biz.social_youtube],
+    ["twitter", biz.social_twitter],
+    ["linkedin", biz.social_linkedin],
+  ];
+  const socials: Record<string, string> = {};
+  for (const [key, url] of pairs) if (url) socials[key] = url;
+  return socials;
+}
+
+// Google review link if set, else TripAdvisor, else fall back to the {site_url}
+// token (resolved at send time) so the button always goes somewhere useful.
+function reviewUrl(biz: BusinessBranding): string {
+  return biz.social_google_reviews || biz.social_tripadvisor || "{site_url}";
+}
+
+function tourCard(t: TourSummary): Block {
+  return {
+    type: "tourcard",
+    id: uid(),
+    imageUrl: t.image_url || "",
+    title: t.name,
+    price: formatDuration(t.duration_minutes),
+    ctaText: "Book this one",
+    ctaUrl: "{site_url}/book?tour=" + t.id,
+  };
+}
+
+export function materializeStarterTemplate(starter: StarterTemplate, biz: BusinessBranding, tours: TourSummary[] = []): Block[] {
+  const accent = biz.email_color || PINE;
+  const socials = socialsFromBiz(biz);
+  const isReviewRequest = !!starter.key?.startsWith("post-tour-review");
+
+  let blocks = starter.blocks().map((b): Block => {
+    if (b.type === "button") return { ...b, color: accent, url: isReviewRequest ? reviewUrl(biz) : b.url };
+    if (b.type === "social") return Object.keys(socials).length ? { ...b, platforms: socials } : b;
+    if (b.type === "footer") {
+      return {
+        ...b,
+        address: biz.business_address || b.address,
+        phone: biz.public_phone || b.phone,
+        socials: Object.keys(socials).length ? socials : b.socials,
+      };
+    }
+    return b;
+  });
+
+  // Real tours as social proof right after a testimonial quote (currently only
+  // the "Guest Favourites" welcome email, but this applies to any future
+  // template that pairs a quote with a tour showcase).
+  if (tours.length > 0) {
+    const quoteIdx = blocks.findIndex((b) => b.type === "quote");
+    if (quoteIdx !== -1) {
+      blocks = [...blocks.slice(0, quoteIdx + 1), ...tours.slice(0, 3).map(tourCard), ...blocks.slice(quoteIdx + 1)];
+    }
+  }
+
+  if (biz.logo_url) {
+    blocks = [{ type: "image", id: uid(), src: biz.logo_url, alt: "", width: "140px" } as Block, ...blocks];
+  }
+
+  return blocks;
 }

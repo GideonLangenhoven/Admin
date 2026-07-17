@@ -3,8 +3,10 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { confirmAction, notify } from "../../../lib/app-notify";
+import { resolveMarketingTestRecipient } from "../../../lib/marketing-test-recipient";
+import { stepSentence, triggerSentence, validateAutomation } from "../../../lib/automation-copy";
 import { useBusinessContext } from "../../../../components/BusinessContext";
-import { Plus, Trash, CaretUp, CaretDown, MagnifyingGlass } from "@phosphor-icons/react";
+import { Plus, Trash, CaretUp, CaretDown, MagnifyingGlass, X, Envelope, CheckCircle, Circle } from "@phosphor-icons/react";
 
 interface Step {
   id?: string;
@@ -94,6 +96,19 @@ export default function AutomationBuilderPage() {
   const [logs, setLogs] = useState<AutomationLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
+
+  // Which steps have their raw config form expanded — the plain-language
+  // sentence is the primary label, the form is opt-in detail.
+  const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
+  // Inline email preview (activation checklist rows + per-step "Preview").
+  const [previewTemplate, setPreviewTemplate] = useState<{ name: string; subject: string; html: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  // Session-local "I opened this email's preview" signal for the checklist —
+  // not persisted (no new DB column), resets on reload, which is fine: it's
+  // a nudge to look before activating, not an audit trail.
+  const [reviewedSteps, setReviewedSteps] = useState<Set<string>>(new Set());
+  const [testSending, setTestSending] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     if (businessId && automationId) {
@@ -310,6 +325,31 @@ export default function AutomationBuilderPage() {
     router.push("/marketing/automations");
   }
 
+  // One sentence stating who enrolls the moment this automation goes active,
+  // so "Activate" isn't a leap of faith. Tag triggers get a real count off
+  // marketing_contacts; other triggers get fixed copy (no count to run).
+  async function enrollmentPreviewSentence(): Promise<string> {
+    if (!automation) return "";
+    if (automation.trigger_type === "tag_added") {
+      const tag = String(automation.trigger_config?.tag || "").trim();
+      if (!tag) return "No tag is set, so no one will enroll until you add one.";
+      const { count } = await supabase
+        .from("marketing_contacts")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .eq("status", "active")
+        .contains("tags", [tag]);
+      const existing = count || 0;
+      return existing > 0
+        ? `${existing} existing contact${existing === 1 ? "" : "s"} tagged "${tag}" will enroll immediately, plus anyone tagged "${tag}" from now on.`
+        : `No contacts are currently tagged "${tag}" — they'll enroll automatically as soon as they get that tag.`;
+    }
+    if (automation.trigger_type === "contact_added") return "Every new contact from now on will enroll.";
+    if (automation.trigger_type === "post_booking") return "Every completed booking from now on will enroll.";
+    if (automation.trigger_type === "date_field") return "Contacts will enroll automatically as their date approaches.";
+    return "No one enrolls automatically — you enroll contacts yourself below.";
+  }
+
   async function toggleAutomationStatus() {
     if (!automation) return;
     const newStatus = automation.status === "active" ? "paused" : "active";
@@ -318,29 +358,7 @@ export default function AutomationBuilderPage() {
     // if the automation isn't actually runnable. Without this the operator
     // sees "Active" and waits for emails that can't ever fire.
     if (newStatus === "active") {
-      if (steps.length === 0) {
-        notify({ title: "Cannot activate", message: "Add at least one step before activating.", tone: "warning" });
-        return;
-      }
-      const issues: string[] = [];
-      steps.forEach((s, i) => {
-        const label = "Step " + (i + 1);
-        if (s.step_type === "send_email") {
-          if (!s.config?.template_id) issues.push(label + ": Send Email has no template selected");
-        } else if (s.step_type === "delay") {
-          const dur = Number(s.config?.duration);
-          if (!Number.isFinite(dur) || dur <= 0) issues.push(label + ": Delay duration must be > 0");
-        } else if (s.step_type === "generate_voucher") {
-          if (!Number(s.config?.amount)) issues.push(label + ": Voucher amount must be > 0");
-          if (!String(s.config?.code_prefix || "").trim()) issues.push(label + ": Voucher code prefix is required");
-        } else if (s.step_type === "generate_promo") {
-          if (!Number(s.config?.discount_value)) issues.push(label + ": Promo discount value must be > 0");
-          if (!String(s.config?.code_prefix || "").trim()) issues.push(label + ": Promo code prefix is required");
-        }
-      });
-      if (automation.trigger_type === "tag_added" && !String(automation.trigger_config?.tag || "").trim()) {
-        issues.push("Trigger: tag_added requires a tag value in trigger_config");
-      }
+      const issues = validateAutomation(automation, steps);
       if (issues.length > 0) {
         notify({
           title: "Cannot activate: fix " + issues.length + " issue" + (issues.length === 1 ? "" : "s"),
@@ -350,6 +368,17 @@ export default function AutomationBuilderPage() {
         });
         return;
       }
+
+      setActivating(true);
+      const enrollMsg = await enrollmentPreviewSentence();
+      setActivating(false);
+      const confirmed = await confirmAction({
+        title: "Activate \"" + automation.name + "\"?",
+        message: enrollMsg,
+        tone: "info",
+        confirmLabel: "Activate",
+      });
+      if (!confirmed) return;
     }
 
     // Save first, then toggle
@@ -366,6 +395,82 @@ export default function AutomationBuilderPage() {
     }
     setAutomation({ ...automation!, status: newStatus });
     notify({ message: newStatus === "active" ? "Automation activated." : "Automation paused.", tone: "success" });
+  }
+
+  function stepKey(step: Step, index: number): string {
+    return step.id ?? "idx-" + index;
+  }
+
+  function templateRef(templateId: string): { name: string } | undefined {
+    const t = templates.find((tpl) => tpl.id === templateId);
+    return t ? { name: t.name } : undefined;
+  }
+
+  async function openTemplatePreview(templateId: string, reviewKey?: string) {
+    if (!templateId) return;
+    setPreviewLoading(true);
+    const { data, error } = await supabase
+      .from("marketing_templates")
+      .select("name, subject_line, html_content")
+      .eq("id", templateId)
+      .maybeSingle();
+    setPreviewLoading(false);
+    if (error || !data) {
+      notify({ message: error?.message || "Could not load this email.", tone: "error" });
+      return;
+    }
+    setPreviewTemplate({ name: data.name, subject: data.subject_line, html: data.html_content || "<p>No content</p>" });
+    if (reviewKey) setReviewedSteps((prev) => new Set(prev).add(reviewKey));
+  }
+
+  // Sends every linked template to the signed-in admin, one email per step,
+  // subject-prefixed with the step number so a full inbox of test sends is
+  // still easy to match back to the workflow.
+  async function testSendAllSteps() {
+    const emailSteps = steps
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => s.step_type === "send_email" && s.config?.template_id);
+    if (emailSteps.length === 0) {
+      notify({ title: "Nothing to send", message: "Add a Send Email step with a template selected first.", tone: "warning" });
+      return;
+    }
+    setTestSending(true);
+    const { email: testEmail, name: testName } = await resolveMarketingTestRecipient(supabase, businessId);
+    if (!testEmail) {
+      notify({ message: "Could not determine your email address. Please log out and back in.", tone: "error" });
+      setTestSending(false);
+      return;
+    }
+    let sent = 0;
+    const failures: string[] = [];
+    for (const { s, i } of emailSteps) {
+      const { data: tpl } = await supabase
+        .from("marketing_templates")
+        .select("subject_line, html_content")
+        .eq("id", s.config.template_id)
+        .maybeSingle();
+      if (!tpl) { failures.push("Step " + (i + 1)); continue; }
+      const { data: sendResult, error: sendErr } = await supabase.functions.invoke("send-email", {
+        body: {
+          type: "MARKETING_TEST",
+          data: {
+            business_id: businessId,
+            email: testEmail,
+            first_name: testName.split(" ")[0] || "Admin",
+            subject_line: "[TEST Step " + (i + 1) + "] " + (s.config.subject_override || tpl.subject_line),
+            html_content: tpl.html_content || "<p>No content</p>",
+          },
+        },
+      });
+      if (sendErr || sendResult?.error) failures.push("Step " + (i + 1));
+      else sent++;
+    }
+    setTestSending(false);
+    if (sent > 0) {
+      notify({ message: `Sent ${sent} test email${sent === 1 ? "" : "s"} to ${testEmail}${failures.length > 0 ? " (" + failures.join(", ") + " failed)" : ""}.`, tone: failures.length > 0 ? "warning" : "success" });
+    } else {
+      notify({ message: "Test send failed for " + failures.join(", ") + ".", tone: "error" });
+    }
   }
 
   function addStep(index: number, type: string) {
@@ -607,9 +712,10 @@ export default function AutomationBuilderPage() {
           {automation.status !== "archived" && (
             <button
               onClick={toggleAutomationStatus}
-              className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"}`}
+              disabled={activating}
+              className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"} disabled:opacity-50`}
             >
-              {automation.status === "active" ? "Pause" : "Activate"}
+              {activating ? "Checking…" : automation.status === "active" ? "Pause" : "Activate"}
             </button>
           )}
           <span
@@ -629,6 +735,16 @@ export default function AutomationBuilderPage() {
               with paused / abandoned automations because the list-page
               Actions column wasn't discoverable on narrow viewports. */}
           <div className="ml-auto flex items-center gap-2">
+            {steps.some((s) => s.step_type === "send_email" && s.config?.template_id) && (
+              <button
+                onClick={testSendAllSteps}
+                disabled={testSending}
+                className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
+                title="Send every linked email in this workflow to your own inbox"
+              >
+                {testSending ? "Sending…" : "Email me all steps"}
+              </button>
+            )}
             {automation.status === "active" && (
               <button
                 onClick={runDispatchNow}
@@ -667,8 +783,68 @@ export default function AutomationBuilderPage() {
         </div>
       </div>
 
+      {/* Activation checklist — only matters before the automation is live.
+          Completion is derived from data already loaded (steps, trigger
+          config) plus a session-local "opened the preview" signal; nothing
+          here is persisted, so there's no new DB column to maintain. */}
+      {automation.status === "draft" && (
+        <div className="anim-fade-up anim-d2 ui-card p-5 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+              Before you activate
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+              Review each email and confirm the trigger, then activate when you're ready.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {steps.filter((s) => s.step_type === "send_email").map((s, emailIdx) => {
+              const idx = steps.indexOf(s);
+              const key = stepKey(s, idx);
+              const reviewed = reviewedSteps.has(key);
+              const name = templateRef(s.config?.template_id)?.name || s.config?.subject_override || "an email (no template selected)";
+              return (
+                <div key={key} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {reviewed ? <CheckCircle size={16} weight="fill" style={{ color: "var(--ck-success, var(--ck-accent))" }} /> : <Circle size={16} style={{ color: "var(--ck-text-muted)" }} />}
+                    <span className="text-xs truncate" style={{ color: "var(--ck-text)" }}>
+                      Email {emailIdx + 1}: &quot;{name}&quot;
+                    </span>
+                  </div>
+                  {s.config?.template_id ? (
+                    <button
+                      onClick={() => openTemplatePreview(s.config.template_id, key)}
+                      disabled={previewLoading}
+                      className="ui-btn ui-btn-ghost !h-7 !px-2 !text-[11px] shrink-0"
+                    >
+                      Preview
+                    </button>
+                  ) : (
+                    <span className="text-[11px] shrink-0" style={{ color: "var(--ck-danger, #b91c1c)" }}>No template</span>
+                  )}
+                </div>
+              );
+            })}
+            {steps.filter((s) => s.step_type === "send_email").length === 0 && (
+              <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>No emails in this workflow yet.</p>
+            )}
+            <div className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <CheckCircle size={16} weight="fill" style={{ color: "var(--ck-success, var(--ck-accent))" }} />
+              <span className="text-xs" style={{ color: "var(--ck-text)" }}>{triggerSentence(automation)}</span>
+            </div>
+          </div>
+          <button
+            onClick={toggleAutomationStatus}
+            disabled={activating}
+            className="ui-btn ui-btn-primary disabled:opacity-50"
+          >
+            {activating ? "Checking…" : "Activate"}
+          </button>
+        </div>
+      )}
+
       {/* Step builder */}
-      <div className="anim-fade-up anim-d2 space-y-2">
+      <div className="anim-fade-up anim-d3 space-y-2">
         <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
           Workflow Steps
         </h2>
@@ -680,6 +856,7 @@ export default function AutomationBuilderPage() {
           >
             Trigger: {automation.trigger_type.replace(/_/g, " ")}
           </div>
+          <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{triggerSentence(automation)}</span>
         </div>
 
         {/* Add step button at start */}
@@ -688,6 +865,7 @@ export default function AutomationBuilderPage() {
         {/* Steps */}
         {steps.map((step, idx) => {
           const info = stepTypeInfo[step.step_type] || stepTypeInfo.send_email;
+          const expanded = !!expandedSteps[idx];
           return (
             <div key={step.id ?? `step-${idx}`}>
               {/* Connecting line */}
@@ -696,19 +874,37 @@ export default function AutomationBuilderPage() {
               </div>
 
               <div className="ui-card p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
+                      className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white shrink-0"
                       style={{ background: "var(--ck-accent)" }}
                     >
                       {idx + 1}
                     </span>
-                    <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>
-                      {info.label}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--ck-text-strong)" }}>
+                        {stepSentence(step, idx, steps, templateRef)}
+                      </p>
+                      <p className="text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{info.label}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
+                    {step.step_type === "send_email" && step.config?.template_id && (
+                      <button
+                        onClick={() => openTemplatePreview(step.config.template_id, stepKey(step, idx))}
+                        disabled={previewLoading}
+                        className="ui-btn ui-btn-ghost !h-7 !px-2 !text-[11px]"
+                      >
+                        Preview
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setExpandedSteps((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                      className="ui-btn ui-btn-ghost !h-7 !px-2 !text-[11px]"
+                    >
+                      {expanded ? "Hide details" : "Edit details"}
+                    </button>
                     <button
                       onClick={() => moveStep(idx, -1)}
                       disabled={idx === 0}
@@ -734,7 +930,10 @@ export default function AutomationBuilderPage() {
                   </div>
                 </div>
 
-                {/* Step config */}
+                {/* Step config — collapsed by default; the sentence above is
+                    the primary label, this is opt-in detail. */}
+                {expanded && (
+                <>
                 {step.step_type === "send_email" && (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -948,6 +1147,8 @@ export default function AutomationBuilderPage() {
                       />
                     </div>
                   </div>
+                )}
+                </>
                 )}
               </div>
 
@@ -1185,6 +1386,32 @@ export default function AutomationBuilderPage() {
           </div>
         )}
       </div>
+
+      {/* Inline email preview — read-only render of the linked template so
+          reviewing a step doesn't mean losing this page's context. */}
+      {previewTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" role="dialog" aria-modal="true" aria-label="Email preview">
+          <div className="ui-card w-full max-w-2xl max-h-[85vh] p-5 overflow-y-auto">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <Envelope size={18} style={{ color: "var(--ck-text-muted)" }} />
+                <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>{previewTemplate.name}</h3>
+              </div>
+              <button onClick={() => setPreviewTemplate(null)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close preview"><X size={16} /></button>
+            </div>
+            <p className="text-xs mb-3" style={{ color: "var(--ck-text-muted)" }}>Subject: {previewTemplate.subject}</p>
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)", background: "#e5e7eb" }}>
+              <iframe
+                srcDoc={previewTemplate.html}
+                sandbox="allow-same-origin"
+                className="border-0 bg-white w-full"
+                style={{ height: 500 }}
+                title="Email preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { getStarterTemplateByKey } from "../../../components/marketing/starter-templates";
+import { getStarterTemplateByKey, materializeStarterTemplate } from "../../../components/marketing/starter-templates";
 import { blocksToHtml } from "../../../components/marketing/blocks/blocks-to-html";
+import { stepSentence, triggerSentence, flowSummary, type AutomationStep } from "../../lib/automation-copy";
 import {
   Trash, Play, Pause,
 } from "@phosphor-icons/react";
@@ -14,11 +15,14 @@ interface Automation {
   id: string;
   name: string;
   trigger_type: string;
+  trigger_config: any;
   status: string;
   enrolled_count: number;
   completed_count: number;
   created_at: string;
   description: string | null;
+  steps: AutomationStep[];
+  sentLast7Days: number;
 }
 
 const triggerBadge: Record<string, { pill: string; label: string }> = {
@@ -76,7 +80,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 4 more days, generates a unique 10% discount voucher and sends a conversion email",
       "Contacts who book within 30 days use their voucher; those who don't, you can re-engage later",
     ],
-    exampleEmail: "Subject: Welcome to Cape Kayak: Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt Cape Kayak, we believe everyone deserves to experience the ocean from a different perspective. Whether it's paddling alongside dolphins at sunrise or exploring hidden sea caves, every trip is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to paddle\n- Exclusive offers and early access to new tours\n- Stories and photos from the water\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
+    exampleEmail: "Subject: Welcome to {business_name}: Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt {business_name}, we believe everyone deserves a real experience, not another day of scrolling. Every trip we run is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to go\n- Exclusive offers and early access to new tours\n- Stories and photos from recent trips\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
   },
   {
     key: "post-tour-review",
@@ -101,7 +105,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 5 days, checks if the first email was opened",
       "If opened but no review yet, sends a gentle reminder with a different angle",
     ],
-    exampleEmail: "Subject: How Was Your Experience, Sarah?\n\nHi Sarah,\n\nThank you for joining us today! We hope you had an amazing time on the water.\n\nWe'd love to hear what you thought. A quick review helps other adventurers discover us and means the world to our small team.\n\nIt only takes 30 seconds:\n\n[Leave a Google Review] [Leave a TripAdvisor Review]\n\nThank you for being part of our story!",
+    exampleEmail: "Subject: How Was Your Experience, Sarah?\n\nHi Sarah,\n\nThank you for joining us today! We hope you had an amazing time.\n\nWe'd love to hear what you thought. A quick review helps other adventurers discover us and means the world to our small team.\n\nIt only takes 30 seconds:\n\n[Leave a Google Review] [Leave a TripAdvisor Review]\n\nThank you for being part of our story!",
   },
   {
     key: "win-back",
@@ -128,7 +132,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "If they opened it, generates a 15% off voucher and sends a personalized offer",
       "After 21 more days, sends a final 'last chance' email with urgency on the expiring voucher",
     ],
-    exampleEmail: "Subject: We Miss You, James! See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- Sunrise Paddle, our most popular new tour\n- Upgraded gear for maximum comfort\n- New routes along the coastline\n\nWe'd love to see you back on the water. Ready for your next trip?\n\n[Browse Tours]",
+    exampleEmail: "Subject: We Miss You, James! See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- A new tour that's already our most popular\n- Upgraded gear for maximum comfort\n- New routes and experiences added this season\n\nWe'd love to see you back. Ready for your next trip?\n\n[Browse Tours]",
   },
   {
     key: "birthday-special",
@@ -152,7 +156,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 14 days, sends a reminder that the birthday voucher is expiring soon",
       "Runs every year automatically, with no manual effort needed",
     ],
-    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as amazing as a sunrise on the water.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo paddle, a trip with friends, or a gift for someone special, this one's on us.\n\n[Book Now With Your Discount]",
+    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as good as your best trip with us.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo trip, an outing with friends, or a gift for someone special, this one's on us.\n\n[Book Now With Your Discount]",
   },
   {
     key: "referral-program",
@@ -175,7 +179,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "Sends a 'share the adventure' email with their unique voucher code to share with friends",
       "Tip: Mention that their friend also gets 10% off to boost sharing motivation",
     ],
-    exampleEmail: "Subject: Share the Adventure and Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review. It truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a day on the water. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
+    exampleEmail: "Subject: Share the Adventure and Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review. It truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a trip like yours. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
   },
   {
     key: "voucher-expiry",
@@ -200,7 +204,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 6 more days, sends a final-day urgency email",
       "Tip: Set up a cron job to auto-tag contacts whose vouchers are 30 days from expiry",
     ],
-    exampleEmail: "Subject: Your Voucher Expires in 30 Days. Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up: your Cape Kayak voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nHere are some popular experiences to choose from:\n- Sunrise Dolphin Paddle (2hrs)\n- Coastal Explorer Tour (3hrs)\n- Sunset Sea Cave Adventure (2.5hrs)\n\nDon't let this go to waste. Book your adventure today!\n\n[Book Now]",
+    exampleEmail: "Subject: Your Voucher Expires in 30 Days. Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up: your {business_name} voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nBrowse our most popular experiences and pick a date.\n\nDon't let this go to waste. Book your adventure today!\n\n[Book Now]",
   },
   {
     key: "vip-treatment",
@@ -249,7 +253,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "For openers, generates a 10% early-bird discount voucher",
       "Sends the early-bird offer, creating urgency with a 45-day expiry window",
     ],
-    exampleEmail: "Subject: The New Season is Almost Here: Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New Sunset Paddle route along the cliffs\n- Extended whale-season tours (June-November)\n- Brand new double kayaks for couples\n- Upgraded photo packages with drone footage\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned: an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
+    exampleEmail: "Subject: The New Season is Almost Here: Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New routes and experiences we scouted in the off-season\n- Upgraded gear across the fleet\n- Extended seasonal tours while conditions are at their best\n- Upgraded photo packages\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned: an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
   },
   {
     key: "booking-anniversary",
@@ -262,16 +266,16 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerConfig: { tag: "anniversary-1yr" },
     steps: [
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "ANNIV", valid_days: 30 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, This Time Last Year You Were on the Water..." } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, This Time Last Year You Were Out There With Us" } },
     ],
     howItWorks: [
       "Contacts are tagged 'anniversary-1yr' when their booking anniversary approaches (via cron)",
       "Generates a 10% off anniversary voucher",
-      "Sends a nostalgic email: 'this time last year you were paddling with us'",
+      "Sends a nostalgic email: 'this time last year you were out there with us'",
       "Includes a 'Try something new this year' CTA with different tour suggestions",
       "Tip: Include photos from their tour type to trigger positive memories",
     ],
-    exampleEmail: "Subject: This Time Last Year You Were on the Water...\n\nHi {first_name},\n\nOne year ago today, you joined us for an unforgettable adventure on the water.\n\nWe'd love to create another great memory with you. This time, why not try something new?\n\nHere's a special anniversary gift:\n10% OFF any tour\nCode: ANNIV-{first_name}-K4M2\n\n[Rebook Your Favourite] [Try Something New]",
+    exampleEmail: "Subject: This Time Last Year, You Were Out There With Us\n\nHi {first_name},\n\nOne year ago today, you joined us for an unforgettable adventure.\n\nWe'd love to create another great memory with you. This time, why not try something new?\n\nHere's a special anniversary gift:\n10% OFF any tour\nCode: ANNIV-{first_name}-K4M2\n\n[Rebook Your Favourite] [Try Something New]",
   },
   {
     key: "photo-share",
@@ -285,7 +289,7 @@ const TEMPLATES: AutomationTemplate[] = [
     steps: [
       { step_type: "send_email", config: { template_id: "", subject_override: "Your Trip Photos Are Ready, {first_name}!" } },
       { step_type: "delay", config: { duration: 3, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure and Tag Us @capekayak" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure and Tag Us" } },
     ],
     howItWorks: [
       "When trip photos are uploaded and the contact is tagged 'photos-ready', they enter the flow",
@@ -294,7 +298,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "Social shares create free organic marketing that reaches the customer's entire network",
       "Tip: Include direct WhatsApp share and Instagram story share links",
     ],
-    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news: your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag @capekayak. We'd love to see it!\n\n#CapeKayak #PaddleLife",
+    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news: your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag us. We'd love to see it!",
   },
 ];
 
@@ -327,10 +331,39 @@ export default function AutomationsPage() {
     setLoading(true);
     const { data } = await supabase
       .from("marketing_automations")
-      .select("id, name, trigger_type, status, enrolled_count, completed_count, created_at, description")
+      .select("id, name, trigger_type, trigger_config, status, enrolled_count, completed_count, created_at, description")
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
-    setAutomations((data as Automation[]) || []);
+    const base = (data as any[]) || [];
+    const ids = base.map((a) => a.id);
+    if (ids.length === 0) {
+      setAutomations([]);
+      setLoading(false);
+      return;
+    }
+
+    // One query for every automation's steps (flow summary + step sentences
+    // on the list) and one for the last 7 days of successful sends, instead
+    // of N+1 per-row round trips.
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const [stepsRes, logsRes] = await Promise.all([
+      supabase.from("marketing_automation_steps").select("automation_id, position, step_type, config").in("automation_id", ids).order("position", { ascending: true }),
+      supabase.from("marketing_automation_logs").select("automation_id").eq("action", "email_sent").gte("created_at", since).in("automation_id", ids),
+    ]);
+    const stepsByAutomation: Record<string, AutomationStep[]> = {};
+    for (const s of (stepsRes.data as any[]) || []) {
+      (stepsByAutomation[s.automation_id] ||= []).push({ step_type: s.step_type, config: s.config });
+    }
+    const sentByAutomation: Record<string, number> = {};
+    for (const l of (logsRes.data as any[]) || []) {
+      sentByAutomation[l.automation_id] = (sentByAutomation[l.automation_id] || 0) + 1;
+    }
+
+    setAutomations(base.map((a) => ({
+      ...a,
+      steps: stepsByAutomation[a.id] || [],
+      sentLast7Days: sentByAutomation[a.id] || 0,
+    })));
     setLoading(false);
   }
 
@@ -386,6 +419,18 @@ export default function AutomationsPage() {
     // ready to activate without hunting for the right template.
     let linkedTemplates = 0;
     if (template.steps.length > 0) {
+      // Fetched once per automation (not per step) since every email in it
+      // materializes against the same operator branding and tour list.
+      const [{ data: bizRow }, { data: topTours }] = await Promise.all([
+        supabase.from("businesses").select(
+          "email_color, logo_url, business_address, public_phone, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews"
+        ).eq("id", businessId).maybeSingle(),
+        supabase.from("tours").select("id, name, image_url, duration_minutes")
+          .eq("business_id", businessId).eq("active", true).order("sort_order", { ascending: true }).limit(3),
+      ]);
+      const biz = bizRow || {};
+      const tours = topTours || [];
+
       const stepRows: { automation_id: string; position: number; step_type: string; config: Record<string, any> }[] = [];
       let emailOrdinal = 0;
       for (let i = 0; i < template.steps.length; i++) {
@@ -399,7 +444,7 @@ export default function AutomationsPage() {
               .eq("business_id", businessId).eq("name", starter.name).limit(1).maybeSingle();
             let tplId: string | undefined = existing.data?.id;
             if (!tplId) {
-              const blocks = starter.blocks();
+              const blocks = materializeStarterTemplate(starter, biz, tours);
               const ins = await supabase.from("marketing_templates").insert({
                 business_id: businessId,
                 name: starter.name,
@@ -508,12 +553,6 @@ export default function AutomationsPage() {
   if (selectedTemplate) {
     const t = selectedTemplate;
     const tier = TIER_INFO[t.tier];
-    const stepLabels: Record<string, string> = {
-      send_email: "Send Email",
-      delay: "Wait",
-      condition: "Check",
-      generate_voucher: "Create Voucher",
-    };
     return (
       <div className="space-y-6">
         <button
@@ -587,23 +626,14 @@ export default function AutomationsPage() {
               {t.triggerConfig.field && <span className="opacity-70">({t.triggerConfig.field})</span>}
             </div>
           </div>
+          <p className="text-xs mb-3" style={{ color: "var(--ck-text-muted)" }}>
+            {triggerSentence({ trigger_type: t.triggerType, trigger_config: t.triggerConfig })}
+          </p>
 
           {/* Steps */}
           <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border-strong)" }}>
             {t.steps.map((step, i) => {
-              let label = stepLabels[step.step_type] || "Send Email";
-              if (step.step_type === "delay") {
-                label = `Wait ${step.config.duration} ${step.config.unit}`;
-              } else if (step.step_type === "send_email") {
-                label = step.config.subject_override || "Send Email";
-              } else if (step.step_type === "condition") {
-                label = `Check: ${step.config.condition_type?.replace(/_/g, " ")}`;
-              } else if (step.step_type === "generate_voucher") {
-                label = `Create ${step.config.amount}% off voucher (${step.config.code_prefix})`;
-                if (step.config.voucher_type === "fixed_amount") {
-                  label = `Create R${step.config.amount} voucher (${step.config.code_prefix})`;
-                }
-              }
+              const label = stepSentence(step, i, t.steps);
               return (
                 <div key={i} className="flex items-center gap-2 py-1.5">
                   <span
@@ -887,14 +917,16 @@ export default function AutomationsPage() {
             </div>
           )}
         <div className="ui-card overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[1050px]">
             <thead>
               <tr style={{ background: "var(--ck-surface-sunken)" }}>
                 <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Name</th>
                 <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Trigger</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Flow</th>
                 <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Status</th>
                 <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Enrolled</th>
                 <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Completed</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Sent (7d)</th>
                 <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Created</th>
                 <th className="text-right px-4 py-3 ui-mono-label !text-[10px]">Actions</th>
               </tr>
@@ -923,6 +955,12 @@ export default function AutomationsPage() {
                       <span className={"ui-status " + tb.pill}>
                         {tb.label}
                       </span>
+                      <p className="text-xs mt-1 max-w-[200px]" style={{ color: "var(--ck-text-muted)" }}>
+                        {triggerSentence({ trigger_type: a.trigger_type, trigger_config: a.trigger_config })}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs max-w-[180px]" style={{ color: "var(--ck-text-muted)" }}>
+                      {flowSummary(a.steps || [])}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={"ui-status " + sb.pill}>
@@ -934,6 +972,9 @@ export default function AutomationsPage() {
                     </td>
                     <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                       {a.completed_count}
+                    </td>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                      {a.sentLast7Days ?? 0}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                       {new Date(a.created_at).toLocaleDateString("en-ZA")}

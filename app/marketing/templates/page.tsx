@@ -2,10 +2,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
+import { resolveMarketingTestRecipient } from "../../lib/marketing-test-recipient";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Trash, Copy, X } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
-import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
+import { starterTemplates, StarterTemplate, materializeStarterTemplate } from "../../../components/marketing/starter-templates";
+import type { Block } from "../../../components/marketing/blocks/block-types";
 
 interface Template {
   id: string;
@@ -34,6 +36,7 @@ export default function TemplatesPage() {
   const [creating, setCreating] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [initialTemplate, setInitialTemplate] = useState<StarterTemplate | null>(null);
+  const [initialBlocks, setInitialBlocks] = useState<Block[] | null>(null);
   const [sending, setSending] = useState<Template | null>(null);
   const [sendForm, setSendForm] = useState<SendFormState>({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
   const [sendingInProgress, setSendingInProgress] = useState(false);
@@ -86,6 +89,20 @@ export default function TemplatesPage() {
     setAudienceCount(count || 0);
   }
 
+  async function selectStarterTemplate(tmpl: StarterTemplate) {
+    const [{ data: bizRow }, { data: topTours }] = await Promise.all([
+      supabase.from("businesses").select(
+        "email_color, logo_url, business_address, public_phone, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews"
+      ).eq("id", businessId).maybeSingle(),
+      supabase.from("tours").select("id, name, image_url, duration_minutes")
+        .eq("business_id", businessId).eq("active", true).order("sort_order", { ascending: true }).limit(3),
+    ]);
+    setShowGallery(false);
+    setInitialTemplate(tmpl);
+    setInitialBlocks(materializeStarterTemplate(tmpl, bizRow || {}, topTours || []));
+    setCreating(true);
+  }
+
   async function handleSave(name: string, subjectLine: string, category: string, blocks: any[], html: string) {
     if (editing) {
       const { error } = await supabase.from("marketing_templates").update({
@@ -133,53 +150,7 @@ export default function TemplatesPage() {
 
   async function sendTestEmail(t: Template) {
     try {
-      // Priority for the test recipient:
-      //  1. The currently logged-in admin (localStorage) — most likely
-      //     what an operator clicking "Send test" actually wants.
-      //  2. businesses.marketing_test_email — explicit per-tenant override
-      //     for unattended automation (e.g. a shared marketing inbox).
-      //  3. First admin on the business as a last resort.
-      // Previously (1) and (2) were swapped, which leaked test emails to a
-      // stale dev address seeded into Aonyx's marketing_test_email row.
-      let testEmail = localStorage.getItem("ck_admin_email") || "";
-      let testName = localStorage.getItem("ck_admin_name") || "Admin";
-
-      if (!testEmail) {
-        const { data: biz, error: bizErr } = await supabase
-          .from("businesses")
-          .select("marketing_test_email")
-          .eq("id", businessId)
-          .maybeSingle();
-        if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
-        if (biz?.marketing_test_email) {
-          testEmail = biz.marketing_test_email;
-          const { data: adminRow } = await supabase
-            .from("admin_users")
-            .select("name")
-            .eq("email", testEmail)
-            .eq("business_id", businessId)
-            .maybeSingle();
-          testName = adminRow?.name || "Admin";
-        }
-      }
-
-      // If still no email, look up the first admin for this business
-      if (!testEmail) {
-        const { data: fallbackAdmin } = await supabase
-          .from("admin_users")
-          .select("email, name")
-          .eq("business_id", businessId)
-          .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
-          .order("created_at")
-          .limit(1)
-          .maybeSingle();
-        if (fallbackAdmin?.email) {
-          testEmail = fallbackAdmin.email;
-          testName = fallbackAdmin.name || "Admin";
-          localStorage.setItem("ck_admin_email", testEmail);
-          if (fallbackAdmin.name) localStorage.setItem("ck_admin_name", fallbackAdmin.name);
-        }
-      }
+      const { email: testEmail, name: testName } = await resolveMarketingTestRecipient(supabase, businessId);
 
       if (!testEmail) {
         notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
@@ -369,7 +340,7 @@ export default function TemplatesPage() {
   if (creating || editing) {
     return (
       <div className="space-y-4">
-        <button onClick={() => { setCreating(false); setEditing(null); setInitialTemplate(null); }}
+        <button onClick={() => { setCreating(false); setEditing(null); setInitialTemplate(null); setInitialBlocks(null); }}
           className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>
           &larr; Back to templates
         </button>
@@ -378,7 +349,7 @@ export default function TemplatesPage() {
           initialName={editing?.name || initialTemplate?.name || ""}
           initialSubject={editing?.subject_line || initialTemplate?.subject || ""}
           initialCategory={editing?.category || initialTemplate?.category || "general"}
-          initialBlocks={editing?.editor_json || (initialTemplate ? initialTemplate.blocks() : [])}
+          initialBlocks={editing?.editor_json || initialBlocks || (initialTemplate ? initialTemplate.blocks() : [])}
           onSave={handleSave}
         />
       </div>
@@ -464,11 +435,7 @@ export default function TemplatesPage() {
               {starterTemplates.map((tmpl, i) => (
                 <button
                   key={i}
-                  onClick={() => {
-                    setShowGallery(false);
-                    setInitialTemplate(tmpl);
-                    setCreating(true);
-                  }}
+                  onClick={() => selectStarterTemplate(tmpl)}
                   className="text-left ui-card ui-card-hover p-4"
                 >
                   <div className="flex items-center gap-2 mb-2">

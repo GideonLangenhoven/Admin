@@ -20,7 +20,11 @@ Design reusable email templates under Marketing → Templates, then send campaig
 
 ## Automations
 
-Under Marketing → Automations you can set up triggered emails — for example a message a number of days before or after a booking date, birthday offers, or win-back campaigns. Automations support date-field triggers with day offsets and can generate one-off promo codes per recipient.
+Under Marketing → Automations you can set up triggered emails — for example a message a number of days before or after a booking date, birthday offers, or win-back campaigns. Browse Templates for ready-made flows (welcome series, post-tour review requests, win-back campaigns and more) that come with designed emails already linked, or start from scratch. Automations support date-field triggers with day offsets and can generate one-off vouchers or promo codes per recipient.
+
+Every step in a workflow is shown as a plain sentence (for example "Immediately: send Welcome Email" or "Wait 3 days") instead of raw configuration, consistently on the editor, the automations list, and the template gallery preview. Click a Send Email step's **Edit details** to change its settings, or **Preview** to see the actual email that will go out.
+
+New automations start as drafts. Before you activate one, the editor shows a checklist: review each linked email (with an inline preview), confirm the trigger in plain language, then activate. Activating shows a one-line preview of who enrolls, for example how many existing contacts already carry the trigger tag. Use **Email me all steps** to send every linked email in the workflow to your own inbox before it goes live.
 
 ## Promotions
 

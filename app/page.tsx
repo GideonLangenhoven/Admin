@@ -26,91 +26,104 @@ function localDayKey(d: Date) {
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-type WeatherLocation = { id: string; name: string; lat: number; lon: number; wgSpot?: number; isDefault?: boolean; };
+type WeatherLocation = { id: string; name: string; lat: number; lon: number; wgSpot?: number; isDefault?: boolean; province?: string; };
+
+// Group locations by province for the picker, preserving list order of both
+// provinces and their locations. Tenant-added locations without a province
+// land under "Custom".
+function groupByProvince(locs: WeatherLocation[]): Array<[string, WeatherLocation[]]> {
+    const groups = new Map<string, WeatherLocation[]>();
+    for (const l of locs) {
+        const key = l.province || "Custom";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(l);
+    }
+    return [...groups.entries()];
+}
 
 /* ── preset locations ── */
 const DEFAULT_LOCATIONS: WeatherLocation[] = [
-    { id: "1", name: "Three Anchor Bay, Sea Point", lat: -33.908, lon: 18.396, wgSpot: 137629, isDefault: true },
-    { id: "2", name: "Simon's Town", lat: -34.19, lon: 18.45, wgSpot: 115767 },
-    { id: "3", name: "Hout Bay", lat: -34.05, lon: 18.35, wgSpot: 51651 },
-    { id: "4", name: "Table Bay", lat: -33.90, lon: 18.43, wgSpot: 32831 },
-    { id: "5", name: "False Bay (Muizenberg)", lat: -34.10, lon: 18.47, wgSpot: 131594 },
-    { id: "6", name: "Kalk Bay", lat: -34.13, lon: 18.45, wgSpot: 551041 },
-    { id: "7", name: "Cape Point", lat: -34.35, lon: 18.50, wgSpot: 128493 },
-    { id: "8", name: "Camps Bay", lat: -33.95, lon: 18.38, wgSpot: 635326 },
-    { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 331265 },
+    { id: "1", name: "Three Anchor Bay, Sea Point", lat: -33.908, lon: 18.396, wgSpot: 137629, isDefault: true, province: "Cape Town & Peninsula" },
+    { id: "2", name: "Simon's Town", lat: -34.19, lon: 18.45, wgSpot: 115767, province: "Cape Town & Peninsula" },
+    { id: "3", name: "Hout Bay", lat: -34.05, lon: 18.35, wgSpot: 51651, province: "Cape Town & Peninsula" },
+    { id: "4", name: "Table Bay", lat: -33.90, lon: 18.43, wgSpot: 32831, province: "Cape Town & Peninsula" },
+    { id: "5", name: "False Bay (Muizenberg)", lat: -34.10, lon: 18.47, wgSpot: 131594, province: "Cape Town & Peninsula" },
+    { id: "6", name: "Kalk Bay", lat: -34.13, lon: 18.45, wgSpot: 551041, province: "Cape Town & Peninsula" },
+    { id: "7", name: "Cape Point", lat: -34.35, lon: 18.50, wgSpot: 128493, province: "Cape Town & Peninsula" },
+    { id: "8", name: "Camps Bay", lat: -33.95, lon: 18.38, wgSpot: 635326, province: "Cape Town & Peninsula" },
+    { id: "9", name: "Gordon's Bay", lat: -34.16, lon: 18.87, wgSpot: 331265, province: "Cape Town & Peninsula" },
     // Western Cape
-    { id: "10", name: "Cape Town", lat: -33.9249, lon: 18.4241, wgSpot: 91 },
-    { id: "11", name: "Stellenbosch & Winelands", lat: -33.9321, lon: 18.8602, wgSpot: 1335686 },
-    { id: "12", name: "Franschhoek", lat: -33.9107, lon: 19.1229, wgSpot: 1235816 },
-    { id: "13", name: "Hermanus", lat: -34.4187, lon: 19.2345, wgSpot: 962669 },
-    { id: "14", name: "Gansbaai", lat: -34.5825, lon: 19.3527, wgSpot: 1063835 },
-    { id: "15", name: "Mossel Bay", lat: -34.1830, lon: 22.1460, wgSpot: 51683 },
-    { id: "16", name: "Wilderness", lat: -33.9967, lon: 22.5827, wgSpot: 146934 },
-    { id: "17", name: "Knysna", lat: -34.0363, lon: 23.0471, wgSpot: 51685 },
-    { id: "18", name: "Plettenberg Bay", lat: -34.0527, lon: 23.3716, wgSpot: 288275 },
-    { id: "19", name: "Oudtshoorn", lat: -33.5906, lon: 22.2014, wgSpot: 240562 },
-    { id: "20", name: "Cederberg", lat: -32.4500, lon: 19.0333, wgSpot: 569377 },
-    { id: "21", name: "Langebaan & West Coast", lat: -33.0930, lon: 18.0342, wgSpot: 21691 },
-    { id: "22", name: "Paternoster", lat: -32.8118, lon: 17.8955, wgSpot: 268656 },
-    { id: "23", name: "Swellendam & Overberg", lat: -34.0231, lon: 20.4380, wgSpot: 90737 },
+    { id: "10", name: "Cape Town", lat: -33.9249, lon: 18.4241, wgSpot: 91, province: "Western Cape" },
+    { id: "11", name: "Stellenbosch & Winelands", lat: -33.9321, lon: 18.8602, wgSpot: 1335686, province: "Western Cape" },
+    { id: "12", name: "Franschhoek", lat: -33.9107, lon: 19.1229, wgSpot: 1235816, province: "Western Cape" },
+    { id: "13", name: "Hermanus", lat: -34.4187, lon: 19.2345, wgSpot: 962669, province: "Western Cape" },
+    { id: "14", name: "Gansbaai", lat: -34.5825, lon: 19.3527, wgSpot: 1063835, province: "Western Cape" },
+    { id: "15", name: "Mossel Bay", lat: -34.1830, lon: 22.1460, wgSpot: 51683, province: "Western Cape" },
+    { id: "16", name: "Wilderness", lat: -33.9967, lon: 22.5827, wgSpot: 146934, province: "Western Cape" },
+    { id: "17", name: "Knysna", lat: -34.0363, lon: 23.0471, wgSpot: 51685, province: "Western Cape" },
+    { id: "18", name: "Plettenberg Bay", lat: -34.0527, lon: 23.3716, wgSpot: 288275, province: "Western Cape" },
+    { id: "19", name: "Oudtshoorn", lat: -33.5906, lon: 22.2014, wgSpot: 240562, province: "Western Cape" },
+    { id: "20", name: "Cederberg", lat: -32.4500, lon: 19.0333, wgSpot: 569377, province: "Western Cape" },
+    { id: "21", name: "Langebaan & West Coast", lat: -33.0930, lon: 18.0342, wgSpot: 21691, province: "Western Cape" },
+    { id: "22", name: "Paternoster", lat: -32.8118, lon: 17.8955, wgSpot: 268656, province: "Western Cape" },
+    { id: "23", name: "Swellendam & Overberg", lat: -34.0231, lon: 20.4380, wgSpot: 90737, province: "Western Cape" },
     // Eastern Cape
-    { id: "24", name: "Tsitsikamma & Storms River", lat: -33.9667, lon: 23.8833, wgSpot: 269360 },
-    { id: "25", name: "Jeffreys Bay", lat: -34.0507, lon: 24.9307, wgSpot: 943842 },
-    { id: "26", name: "Gqeberha (Port Elizabeth)", lat: -33.9608, lon: 25.6022, wgSpot: 51679 },
-    { id: "27", name: "Addo", lat: -33.4833, lon: 25.7500, wgSpot: 1136214 },
-    { id: "28", name: "Hogsback", lat: -32.5967, lon: 26.9500, wgSpot: 188928 },
-    { id: "29", name: "Coffee Bay & Wild Coast", lat: -32.1833, lon: 29.1333, wgSpot: 1011788 },
-    { id: "30", name: "East London", lat: -33.0153, lon: 27.9116, wgSpot: 402607 },
-    { id: "31", name: "Graaff-Reinet & Karoo Heartland", lat: -32.2522, lon: 24.5308, wgSpot: 794980 },
+    { id: "24", name: "Tsitsikamma & Storms River", lat: -33.9667, lon: 23.8833, wgSpot: 269360, province: "Eastern Cape" },
+    { id: "25", name: "Jeffreys Bay", lat: -34.0507, lon: 24.9307, wgSpot: 943842, province: "Eastern Cape" },
+    { id: "26", name: "Gqeberha (Port Elizabeth)", lat: -33.9608, lon: 25.6022, wgSpot: 51679, province: "Eastern Cape" },
+    { id: "27", name: "Addo", lat: -33.4833, lon: 25.7500, wgSpot: 1136214, province: "Eastern Cape" },
+    { id: "28", name: "Hogsback", lat: -32.5967, lon: 26.9500, wgSpot: 188928, province: "Eastern Cape" },
+    { id: "29", name: "Coffee Bay & Wild Coast", lat: -32.1833, lon: 29.1333, wgSpot: 1011788, province: "Eastern Cape" },
+    { id: "30", name: "East London", lat: -33.0153, lon: 27.9116, wgSpot: 402607, province: "Eastern Cape" },
+    { id: "31", name: "Graaff-Reinet & Karoo Heartland", lat: -32.2522, lon: 24.5308, wgSpot: 794980, province: "Eastern Cape" },
     // KwaZulu-Natal
-    { id: "32", name: "Durban", lat: -29.8587, lon: 31.0218, wgSpot: 208311 },
-    { id: "33", name: "Umhlanga & Ballito", lat: -29.7248, lon: 31.0873, wgSpot: 1113775 },
-    { id: "34", name: "Drakensberg", lat: -29.0000, lon: 29.4167, wgSpot: 779873 },
-    { id: "35", name: "Sani Pass & Southern Berg", lat: -29.5833, lon: 29.2833, wgSpot: 380948 },
-    { id: "36", name: "Midlands Meander", lat: -29.4833, lon: 30.1500, wgSpot: 541246 },
-    { id: "37", name: "St Lucia & iSimangaliso", lat: -28.3833, lon: 32.4167, wgSpot: 51053 },
-    { id: "38", name: "Sodwana Bay", lat: -27.5333, lon: 32.6833, wgSpot: 111152 },
-    { id: "39", name: "Hluhluwe–iMfolozi", lat: -28.2000, lon: 31.9333, wgSpot: 706381 },
-    { id: "40", name: "Umkomaas & Aliwal Shoal", lat: -30.2000, lon: 30.7833, wgSpot: 722020 },
-    { id: "41", name: "Margate & South Coast", lat: -30.8667, lon: 30.3667, wgSpot: 1079383 },
+    { id: "32", name: "Durban", lat: -29.8587, lon: 31.0218, wgSpot: 208311, province: "KwaZulu-Natal" },
+    { id: "33", name: "Umhlanga & Ballito", lat: -29.7248, lon: 31.0873, wgSpot: 1113775, province: "KwaZulu-Natal" },
+    { id: "34", name: "Drakensberg", lat: -29.0000, lon: 29.4167, wgSpot: 779873, province: "KwaZulu-Natal" },
+    { id: "35", name: "Sani Pass & Southern Berg", lat: -29.5833, lon: 29.2833, wgSpot: 380948, province: "KwaZulu-Natal" },
+    { id: "36", name: "Midlands Meander", lat: -29.4833, lon: 30.1500, wgSpot: 541246, province: "KwaZulu-Natal" },
+    { id: "37", name: "St Lucia & iSimangaliso", lat: -28.3833, lon: 32.4167, wgSpot: 51053, province: "KwaZulu-Natal" },
+    { id: "38", name: "Sodwana Bay", lat: -27.5333, lon: 32.6833, wgSpot: 111152, province: "KwaZulu-Natal" },
+    { id: "39", name: "Hluhluwe–iMfolozi", lat: -28.2000, lon: 31.9333, wgSpot: 706381, province: "KwaZulu-Natal" },
+    { id: "40", name: "Umkomaas & Aliwal Shoal", lat: -30.2000, lon: 30.7833, wgSpot: 722020, province: "KwaZulu-Natal" },
+    { id: "41", name: "Margate & South Coast", lat: -30.8667, lon: 30.3667, wgSpot: 1079383, province: "KwaZulu-Natal" },
     // Gauteng
-    { id: "42", name: "Johannesburg", lat: -26.2041, lon: 28.0473, wgSpot: 85097 },
-    { id: "43", name: "Soweto", lat: -26.2485, lon: 27.8540, wgSpot: 279047 },
-    { id: "44", name: "Pretoria", lat: -25.7479, lon: 28.2293, wgSpot: 353639 },
-    { id: "45", name: "Cradle of Humankind", lat: -25.9019, lon: 27.7364, wgSpot: 1144781 },
-    { id: "46", name: "Magaliesberg & Hartbeespoort", lat: -25.7469, lon: 27.8674, wgSpot: 736570 },
-    { id: "47", name: "Vaal River & Parys", lat: -26.8965, lon: 27.4614, wgSpot: 111339 },
+    { id: "42", name: "Johannesburg", lat: -26.2041, lon: 28.0473, wgSpot: 85097, province: "Gauteng" },
+    { id: "43", name: "Soweto", lat: -26.2485, lon: 27.8540, wgSpot: 279047, province: "Gauteng" },
+    { id: "44", name: "Pretoria", lat: -25.7479, lon: 28.2293, wgSpot: 353639, province: "Gauteng" },
+    { id: "45", name: "Cradle of Humankind", lat: -25.9019, lon: 27.7364, wgSpot: 1144781, province: "Gauteng" },
+    { id: "46", name: "Magaliesberg & Hartbeespoort", lat: -25.7469, lon: 27.8674, wgSpot: 736570, province: "Gauteng" },
+    { id: "47", name: "Vaal River & Parys", lat: -26.8965, lon: 27.4614, wgSpot: 111339, province: "Gauteng" },
     // Mpumalanga
-    { id: "48", name: "Kruger National Park (South)", lat: -24.9945, lon: 31.5892, wgSpot: 394498 },
-    { id: "49", name: "Hazyview", lat: -25.0448, lon: 31.1315, wgSpot: 146938 },
-    { id: "50", name: "Sabie & Graskop", lat: -24.9333, lon: 30.8333, wgSpot: 121369 },
-    { id: "51", name: "Blyde River Canyon", lat: -24.5833, lon: 30.8167, wgSpot: 79015 },
-    { id: "52", name: "Mbombela (Nelspruit)", lat: -25.4753, lon: 30.9700, wgSpot: 450015 },
-    { id: "53", name: "Dullstroom", lat: -25.4167, lon: 30.1058, wgSpot: 272288 },
+    { id: "48", name: "Kruger National Park (South)", lat: -24.9945, lon: 31.5892, wgSpot: 394498, province: "Mpumalanga" },
+    { id: "49", name: "Hazyview", lat: -25.0448, lon: 31.1315, wgSpot: 146938, province: "Mpumalanga" },
+    { id: "50", name: "Sabie & Graskop", lat: -24.9333, lon: 30.8333, wgSpot: 121369, province: "Mpumalanga" },
+    { id: "51", name: "Blyde River Canyon", lat: -24.5833, lon: 30.8167, wgSpot: 79015, province: "Mpumalanga" },
+    { id: "52", name: "Mbombela (Nelspruit)", lat: -25.4753, lon: 30.9700, wgSpot: 450015, province: "Mpumalanga" },
+    { id: "53", name: "Dullstroom", lat: -25.4167, lon: 30.1058, wgSpot: 272288, province: "Mpumalanga" },
     // Limpopo
-    { id: "54", name: "Hoedspruit & Kruger (Central)", lat: -24.3547, lon: 30.9581, wgSpot: 815368 },
-    { id: "55", name: "Phalaborwa & Kruger (North)", lat: -23.9425, lon: 31.1400, wgSpot: 540529 },
-    { id: "56", name: "Waterberg", lat: -24.1517, lon: 28.1170, wgSpot: 127207 },
-    { id: "57", name: "Bela-Bela", lat: -24.8833, lon: 28.2833, wgSpot: 400504 },
-    { id: "58", name: "Tzaneen & Magoebaskloof", lat: -23.8333, lon: 30.1667, wgSpot: 737300 },
+    { id: "54", name: "Hoedspruit & Kruger (Central)", lat: -24.3547, lon: 30.9581, wgSpot: 815368, province: "Limpopo" },
+    { id: "55", name: "Phalaborwa & Kruger (North)", lat: -23.9425, lon: 31.1400, wgSpot: 540529, province: "Limpopo" },
+    { id: "56", name: "Waterberg", lat: -24.1517, lon: 28.1170, wgSpot: 127207, province: "Limpopo" },
+    { id: "57", name: "Bela-Bela", lat: -24.8833, lon: 28.2833, wgSpot: 400504, province: "Limpopo" },
+    { id: "58", name: "Tzaneen & Magoebaskloof", lat: -23.8333, lon: 30.1667, wgSpot: 737300, province: "Limpopo" },
     // North West
-    { id: "59", name: "Pilanesberg", lat: -25.2333, lon: 27.1167, wgSpot: 85507 },
-    { id: "60", name: "Sun City", lat: -25.3400, lon: 27.0950, wgSpot: 1173168 },
-    { id: "61", name: "Madikwe", lat: -24.7833, lon: 26.2667, wgSpot: 307029 },
-    { id: "62", name: "Rustenburg & Kgaswane", lat: -25.6672, lon: 27.2424, wgSpot: 122357 },
+    { id: "59", name: "Pilanesberg", lat: -25.2333, lon: 27.1167, wgSpot: 85507, province: "North West" },
+    { id: "60", name: "Sun City", lat: -25.3400, lon: 27.0950, wgSpot: 1173168, province: "North West" },
+    { id: "61", name: "Madikwe", lat: -24.7833, lon: 26.2667, wgSpot: 307029, province: "North West" },
+    { id: "62", name: "Rustenburg & Kgaswane", lat: -25.6672, lon: 27.2424, wgSpot: 122357, province: "North West" },
     // Free State
-    { id: "63", name: "Clarens", lat: -28.5167, lon: 28.4167, wgSpot: 214022 },
-    { id: "64", name: "Golden Gate Highlands", lat: -28.5167, lon: 28.6167, wgSpot: 1327626 },
-    { id: "65", name: "Gariep Dam", lat: -30.6167, lon: 25.5000, wgSpot: 283149 },
-    { id: "66", name: "Bloemfontein", lat: -29.0852, lon: 26.1596, wgSpot: 151425 },
+    { id: "63", name: "Clarens", lat: -28.5167, lon: 28.4167, wgSpot: 214022, province: "Free State" },
+    { id: "64", name: "Golden Gate Highlands", lat: -28.5167, lon: 28.6167, wgSpot: 1327626, province: "Free State" },
+    { id: "65", name: "Gariep Dam", lat: -30.6167, lon: 25.5000, wgSpot: 283149, province: "Free State" },
+    { id: "66", name: "Bloemfontein", lat: -29.0852, lon: 26.1596, wgSpot: 151425, province: "Free State" },
     // Northern Cape
-    { id: "67", name: "Augrabies Falls", lat: -28.5883, lon: 20.3486, wgSpot: 985104 },
-    { id: "68", name: "Upington & Orange River", lat: -28.4478, lon: 21.2561, wgSpot: 540496 },
-    { id: "69", name: "Kgalagadi", lat: -26.4833, lon: 20.6167, wgSpot: 183544 },
-    { id: "70", name: "Namaqualand & Springbok", lat: -29.6644, lon: 17.8865, wgSpot: 607288 },
-    { id: "71", name: "Sutherland", lat: -32.3833, lon: 20.6667, wgSpot: 228811 },
-    { id: "72", name: "Kimberley", lat: -28.7282, lon: 24.7499, wgSpot: 454036 },
+    { id: "67", name: "Augrabies Falls", lat: -28.5883, lon: 20.3486, wgSpot: 985104, province: "Northern Cape" },
+    { id: "68", name: "Upington & Orange River", lat: -28.4478, lon: 21.2561, wgSpot: 540496, province: "Northern Cape" },
+    { id: "69", name: "Kgalagadi", lat: -26.4833, lon: 20.6167, wgSpot: 183544, province: "Northern Cape" },
+    { id: "70", name: "Namaqualand & Springbok", lat: -29.6644, lon: 17.8865, wgSpot: 607288, province: "Northern Cape" },
+    { id: "71", name: "Sutherland", lat: -32.3833, lon: 20.6667, wgSpot: 228811, province: "Northern Cape" },
+    { id: "72", name: "Kimberley", lat: -28.7282, lon: 24.7499, wgSpot: 454036, province: "Northern Cape" },
 ];
 
 /* ── Windguru Widget (lazy-loaded to reduce initial bundle) ── */
@@ -1037,8 +1050,12 @@ export default function Dashboard() {
                                 disabled={locations.length === 0}
                             >
                                 {locations.length === 0 && <option value="">No locations available</option>}
-                                {locations.map(l => (
-                                    <option key={l.id} value={l.id}>{l.name} {l.isDefault ? "(Default)" : ""}</option>
+                                {groupByProvince(locations).map(([province, locs]) => (
+                                    <optgroup key={province} label={province}>
+                                        {locs.map(l => (
+                                            <option key={l.id} value={l.id}>{l.name} {l.isDefault ? "(Default)" : ""}</option>
+                                        ))}
+                                    </optgroup>
                                 ))}
                             </select>
                         </div>
@@ -1103,15 +1120,22 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex-1 overflow-y-auto pr-1 mb-4">
                                     <div className="space-y-2">
-                                        {locations.map(l => (
-                                            <div key={l.id} className="flex items-center justify-between rounded-lg border p-3 text-sm" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)", boxShadow: "var(--ck-shadow-sm)" }}>
-                                                <div>
-                                                    <span className="font-semibold text-[13px]" style={{ color: "var(--ck-text-strong)" }}>{l.name}</span>
-                                                    <div className="text-[11px] font-medium mt-0.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{l.lat}, {l.lon} <span className="ml-2">WG: {l.wgSpot || "None"}</span></div>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    {l.isDefault && <span className="ui-status ui-pill-success">Default</span>}
-                                                    <button onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
+                                        {groupByProvince(locations).map(([province, locs]) => (
+                                            <div key={province}>
+                                                <p className="text-[11px] font-semibold uppercase tracking-wider mt-3 mb-1.5 first:mt-0" style={{ color: "var(--ck-text-muted)" }}>{province}</p>
+                                                <div className="space-y-2">
+                                                    {locs.map(l => (
+                                                        <div key={l.id} className="flex items-center justify-between rounded-lg border p-3 text-sm" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)", boxShadow: "var(--ck-shadow-sm)" }}>
+                                                            <div>
+                                                                <span className="font-semibold text-[13px]" style={{ color: "var(--ck-text-strong)" }}>{l.name}</span>
+                                                                <div className="text-[11px] font-medium mt-0.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{l.lat}, {l.lon} <span className="ml-2">WG: {l.wgSpot || "None"}</span></div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                {l.isDefault && <span className="ui-status ui-pill-success">Default</span>}
+                                                                <button onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ))}
