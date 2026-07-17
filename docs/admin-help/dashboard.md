@@ -25,3 +25,7 @@ The **Manifest** panel lists passengers per slot for today or tomorrow (use the 
 ## Weather
 
 The Weather panel shows conditions for your location — useful when deciding whether to run, and pairs with the weather-cancel tools under Slots and Broadcasts.
+
+## Welcome tour
+
+On your first login a short welcome tour walks through each section of the dashboard, and for main admins it ends with a getting-started checklist that ticks itself off as you create tours, open slots and take your first booking. Click "Finish" or "Don't show this again" and it will not reappear. You can replay the tour at any time: open the help assistant (the chat bubble in the corner) and choose "Show me around the dashboard".

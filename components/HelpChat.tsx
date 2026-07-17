@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { ChatCircleDots, PaperPlaneRight, X } from "@phosphor-icons/react";
 import { supabase } from "../app/lib/supabase";
 import { useBusinessContext } from "./BusinessContext";
+import { WELCOME_TOUR_EVENT } from "./WelcomeChecklist";
 
 type Msg = {
   role: "user" | "assistant";
@@ -59,6 +60,11 @@ export default function HelpChat() {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
+
+  function replayTour() {
+    setOpen(false);
+    window.dispatchEvent(new Event(WELCOME_TOUR_EVENT));
+  }
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -169,6 +175,14 @@ export default function HelpChat() {
             <div className="text-sm" style={{ color: "var(--ck-text)" }}>{GREETING}</div>
             {messages.length === 0 && (
               <div className="flex flex-col items-start gap-2">
+                <button
+                  type="button"
+                  onClick={replayTour}
+                  className="rounded-full border px-3 py-1.5 text-left text-[13px] font-semibold transition-colors hover:border-transparent"
+                  style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)", background: "var(--ck-success-soft, rgba(18,94,64,0.06))" }}
+                >
+                  Show me around the dashboard
+                </button>
                 {suggestions.map((s) => (
                   <button
                     key={s.q}
