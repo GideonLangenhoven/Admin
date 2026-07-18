@@ -1850,10 +1850,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + ", nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
       const dateMap: any = {};
       try {
-        const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
+        let previewQ = supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
           .lte("start_time", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
           .order("start_time", { ascending: true });
+        // Only count the selected tour's slots — the preview used to count ALL
+        // tours, so "1 trip available" could be a different activity entirely.
+        if (sd.tour_id) previewQ = previewQ.eq("tour_id", sd.tour_id);
+        const previewSlots = await previewQ;
         const pvSlots = previewSlots.data || [];
         // Group by tenant-local date key (chronological via slot ordering)
         const pvDays: any = {};
@@ -1948,13 +1952,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const startIso = zonedDateTimeToUtcIso(tenant, pickedDate, 0, 0);
       const endIso = zonedDateTimeToUtcIso(tenant, pickedDate, 24, 0);
 
-      const slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
+      let slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
         .eq("business_id", tenant.business.id)
         .gte("start_time", startIso)
         .lt("start_time", endIso)
         .order("start_time", { ascending: true });
 
-      // Don't filter by tour_id — show ALL activities for the date so user can see all options
+      // New bookings: only offer the tour the customer picked. Reschedules stay
+      // unfiltered — rebook-booking supports cross-tour moves.
+      if (sd.tour_id && !sd.is_reschedule) slotQ = slotQ.eq("tour_id", sd.tour_id);
 
       const { data: dbSlots } = await slotQ;
 
