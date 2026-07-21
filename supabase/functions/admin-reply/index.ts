@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
         }
 
         const to = body.phone || body.to || body.to_phone;
-        const message = body.message;
+        let message = body.message;
         const action = body.action;
         const reqBusinessId = body.business_id || body.businessId || "";
 
@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
         // Get conversation to ensure correct business ID and state
         let convoQuery = supabase
             .from("conversations")
-            .select("business_id, customer_name, email")
+            .select("business_id, customer_name, email, status")
             .eq("phone", to);
         if (reqBusinessId) convoQuery = convoQuery.eq("business_id", reqBusinessId);
         const { data: convo } = await convoQuery.limit(1).single();
@@ -132,6 +132,14 @@ Deno.serve(async (req: Request) => {
         const actualBusinessId = convo?.business_id;
         if (!actualBusinessId) {
             return new Response(JSON.stringify({ ok: false, error: "Conversation is not associated with a business" }), { status: 200, headers: getCors(req) });
+        }
+
+        // First human turn: the conversation was bot-handled (or waiting) and an
+        // operator is now taking over. Tell the customer a human has joined, once,
+        // by prepending to this reply — it then rides every delivery path below
+        // (web insert, WA text, template, email fallback) with no extra send.
+        if (convo?.status !== "HUMAN") {
+            message = "👤 A human has joined the chat.\n\n" + message;
         }
 
         // Web-chat conversations have no WhatsApp number — their phone is the
