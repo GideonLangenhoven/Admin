@@ -1590,7 +1590,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             if (crEmail.data?.email) {
               await fetch(SUPABASE_URL + "/functions/v1/send-email", {
                 method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp: refund requested", total_amount: crTotal.toFixed(2), is_partial: false } }),
+                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp: refund requested", refund_amount: crRefund.toFixed(2), total_amount: crTotal.toFixed(2), is_partial: false } }),
               });
             }
           } catch (e) { console.log("cancel refund email err"); }

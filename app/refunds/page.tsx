@@ -44,7 +44,9 @@ export default function Refunds() {
     const { data: done } = await supabase.from("bookings")
       .select("id, customer_name, phone, email, qty, total_amount, refund_status, refund_amount, refund_notes, cancelled_at, slots(start_time), tours(name)")
       .eq("business_id", businessId)
-      .in("refund_status", ["PROCESSED", "FAILED", "DECLINED"])
+      // REFUNDED is the Yoco auto-refund's terminal status; PROCESSED is the
+      // manual-EFT one. Both mean "refund made" and must show in this list.
+      .in("refund_status", ["PROCESSED", "REFUNDED", "FAILED", "DECLINED"])
       .order("cancelled_at", { ascending: false })
       .limit(20);
     setProcessed(done || []);
@@ -341,8 +343,8 @@ export default function Refunds() {
                   <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name} <span className="font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>({b.id.substring(0, 8).toUpperCase()})</span></p>
                   <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"}</p>
                 </div>
-                <span className={"ui-status " + (b.refund_status === "PROCESSED" ? "ui-pill-success" : b.refund_status === "DECLINED" ? "ui-pill-neutral" : "ui-pill-danger")}>
-                  {b.refund_status === "PROCESSED" ? "Refunded" : b.refund_status === "DECLINED" ? "Declined" : "Failed"}
+                <span className={"ui-status " + (b.refund_status === "PROCESSED" || b.refund_status === "REFUNDED" ? "ui-pill-success" : b.refund_status === "DECLINED" ? "ui-pill-neutral" : "ui-pill-danger")}>
+                  {b.refund_status === "PROCESSED" || b.refund_status === "REFUNDED" ? "Refunded" : b.refund_status === "DECLINED" ? "Declined" : "Failed"}
                 </span>
                 <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text)" }}>R{b.refund_amount}</p>
               </div>

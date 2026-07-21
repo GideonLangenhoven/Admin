@@ -81,7 +81,7 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
   ) {
     return {
       intent: "ESCALATE_HUMAN",
-      reply: "Of course. Let me get a human on this. Drop your booking reference (8 characters in your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours. You can also WhatsApp us via the number on the booking site footer.",
+      reply: "Of course. Let me get a human on this. You can also WhatsApp us via the number on the booking site footer.",
     };
   }
   // Accessibility / service animal / medical condition questions
@@ -409,7 +409,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
     if (body.action === "poll") {
       const since = typeof body.since === "string" && body.since ? body.since : new Date(0).toISOString();
       const { data: convoRow } = await db.from("conversations")
-        .select("status").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
+        .select("status, current_state").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
       const { data: adminMsgs } = await db.from("chat_messages")
         .select("body, created_at").eq("business_id", requestedBusinessId).eq("phone", webPhone)
         .eq("direction", "OUT").eq("sender", "Admin").gt("created_at", since)
@@ -417,7 +417,27 @@ Deno.serve(withSentry("web-chat", async (req) => {
       return new Response(JSON.stringify({
         messages: (adminMsgs || []).map((m) => ({ text: m.body, at: m.created_at })),
         status: convoRow?.status || "BOT",
+        // Agent clicked "End chat" in the inbox — prompt the visitor to rate.
+        rate: convoRow?.current_state === "AWAIT_RATING",
       }), { status: 200, headers: gCors(req) });
+    }
+
+    // Visitor submitted a 1-5 star rating of how the chat was handled. Upsert
+    // so a bot-only chat (which may have no conversations row yet) still records
+    // it. handled_by marks whether a human was ever involved for bot-vs-human review.
+    if (body.action === "rate") {
+      const r = Math.round(Number(body.rating) || 0);
+      if (r >= 1 && r <= 5) {
+        const { data: convoRow } = await db.from("conversations")
+          .select("status, handled_by").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
+        const handledBy = (convoRow?.handled_by === "HUMAN" || convoRow?.status === "HUMAN") ? "HUMAN" : "BOT";
+        await db.from("conversations").upsert({
+          business_id: requestedBusinessId, phone: webPhone,
+          rating: r, rating_at: new Date().toISOString(), handled_by: handledBy,
+          current_state: "IDLE", updated_at: new Date().toISOString(),
+        }, { onConflict: "business_id,phone" });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: gCors(req) });
     }
 
     // SECURITY: tours query is now ALWAYS scoped to the requesting business.
@@ -549,11 +569,25 @@ Deno.serve(withSentry("web-chat", async (req) => {
     }
     // Handle persistent "Talk to a human" button anywhere in the flow.
     if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
-      const humanReply = "No problem. I'll get a real person on this. Drop your booking reference (8 characters from your confirmation email) or your phone number, and we'll be in touch within 30 minutes during business hours.";
+      const humanReply = "Of course. Let me get a human on this. You can also WhatsApp us via the number on the booking site footer.";
       await flagHumanHandoff("ESCALATE_HUMAN", "[Requested a human]", humanReply);
       return new Response(JSON.stringify({
         reply: humanReply,
         state: { ...state, escalated: true, escalation_intent: "ESCALATE_HUMAN", status: "HUMAN" },
+        buttons: null,
+      }), { status: 200, headers: gCors(req) });
+    }
+
+    // End-of-chat: when the visitor signals they're done and no booking flow is
+    // mid-way (step IDLE), close warmly and ask them to rate. Gated on IDLE so a
+    // "no thanks" inside a booking flow isn't hijacked. `rate: true` tells the
+    // widget to show the star picker.
+    if (!isBtnClick && step === "IDLE" &&
+        /^(?:ok(?:ay)?|cool|great|perfect|awesome|alright)?[\s,.!]*(?:thanks?|thank you|thanx|ta|cheers|bye|goodbye|good ?bye|that'?s (?:all|it)|thats (?:all|it)|nothing else|no,? (?:thanks?|thank you|that'?s all))[\s,.!]*$/i.test(lo)) {
+      return new Response(JSON.stringify({
+        reply: "Glad I could help! 🙌 Before you go, how would you rate this chat?",
+        rate: true,
+        state: { ...state, step: "IDLE" },
         buttons: null,
       }), { status: 200, headers: gCors(req) });
     }

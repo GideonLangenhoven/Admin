@@ -95,6 +95,24 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
         }
 
+        // Agent ends a web chat: post a closing message and flag the conversation
+        // for a rating prompt (current_state AWAIT_RATING — the widget poll reads
+        // this and shows the star picker). handled_by=HUMAN so the rating is
+        // attributed to human handling even though status returns to BOT.
+        if (action === "end_chat") {
+            if (!reqBusinessId) return new Response(JSON.stringify({ ok: false, error: "business_id is required" }), { status: 400, headers: getCors(req) });
+            await supabase.from("chat_messages").insert({
+                business_id: reqBusinessId, phone: to, direction: "OUT",
+                body: message || "Thanks for chatting with us! 🙏 Before you go, please rate how we did.",
+                sender: "Admin", sender_type: "ADMIN",
+            });
+            const { error: ecErr } = await supabase.from("conversations").update({
+                status: "BOT", current_state: "AWAIT_RATING", handled_by: "HUMAN", updated_at: new Date().toISOString(),
+            }).eq("phone", to).eq("business_id", reqBusinessId);
+            if (ecErr) return new Response(JSON.stringify({ ok: false, error: ecErr.message }), { status: 200, headers: getCors(req) });
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
+        }
+
         if (!to || !message) {
             return new Response(JSON.stringify({
                 ok: false,
@@ -127,7 +145,7 @@ Deno.serve(async (req: Request) => {
                 body: message, sender: "Admin", sender_type: "ADMIN",
             });
             if (webInsErr) return new Response(JSON.stringify({ ok: false, error: "Failed to log message", details: webInsErr }), { status: 200, headers: getCors(req) });
-            await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
+            await supabase.from("conversations").update({ status: "HUMAN", handled_by: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
             return new Response(JSON.stringify({ ok: true, channel: "web" }), { status: 200, headers: getCors(req) });
         }
 

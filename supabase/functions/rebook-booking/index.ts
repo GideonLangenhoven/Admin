@@ -774,7 +774,12 @@ async function handleRequestChange(req: any, booking: any, body: any) {
 // ───── Helper: check if booking was paid via voucher ─────
 function isVoucherPayment(booking: any): boolean {
   const pm = (booking.payment_method || "").toUpperCase();
-  return pm === "VOUCHER" || pm === "GIFT_VOUCHER";
+  if (pm === "VOUCHER" || pm === "GIFT_VOUCHER") return true;
+  // confirm_voucher_booking RPC stamps yoco_payment_id but never payment_method
+  if (String(booking.yoco_payment_id || "") === "VOUCHER_WEB") return true;
+  // payment_method is not reliably written — detect full-voucher funding from the data
+  const voucherPaid = Number(booking.voucher_amount_paid || 0);
+  return voucherPaid > 0 && voucherPaid >= Number(booking.total_amount || 0);
 }
 
 // ───── Helper: check if booking was paid via manual method (cash/EFT) ─────
@@ -786,13 +791,23 @@ function isManualPayment(booking: any): boolean {
 // ───── Helper: check if booking was paid via split tender (voucher + cash/Yoco) ─────
 function isSplitTenderPayment(booking: any): boolean {
   const pm = (booking.payment_method || "").toUpperCase();
-  return pm === "SPLIT" || pm === "SPLIT_TENDER" || pm === "VOUCHER_PARTIAL";
+  if (pm === "SPLIT" || pm === "SPLIT_TENDER" || pm === "VOUCHER_PARTIAL") return true;
+  // payment_method is not reliably written — detect a voucher+cash mix from the data.
+  // Without this, mixed bookings fell through to the pure-cash branch and the
+  // voucher portion was paid out as a Yoco cash refund.
+  const voucherPaid = Number(booking.voucher_amount_paid || 0);
+  return voucherPaid > 0 && voucherPaid < Number(booking.total_amount || 0);
 }
 
 // ───── Helper: derive voucher and cash portions from a booking ─────
 function getSplitTenderAmounts(booking: any): { voucherPortion: number; cashPortion: number } {
   let voucherPortion = Number(booking.voucher_amount_paid || 0);
   let cashPortion = Number(booking.cash_amount_paid || 0);
+  // cash_amount_paid is not reliably written — the cash portion is whatever the
+  // voucher didn't cover of the full total.
+  if (cashPortion === 0 && voucherPortion > 0) {
+    cashPortion = Math.max(0, Number(booking.total_amount || 0) - voucherPortion);
+  }
   // If split amounts are not explicitly stored, try to derive from total
   if (voucherPortion === 0 && cashPortion === 0) {
     const totalAmount = Number(booking.total_amount || 0);
@@ -1430,6 +1445,32 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
         "Thanks for choosing " + brandName + "."
       );
     } catch (e) { console.error("CLAIM_CREDIT_REFUND_WA_ERR:", e); }
+  }
+
+  if (booking.email) {
+    try {
+      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({
+          type: "CANCELLATION",
+          data: {
+            business_id: booking.business_id,
+            email: booking.email,
+            customer_name: booking.customer_name,
+            ref: ref,
+            tour_name: tourName,
+            start_time: (booking.slots && booking.slots.start_time) ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "",
+            // No "weather" in the reason: this confirms the customer's refund
+            // choice, so the email must show the refund confirmation, not options.
+            reason: "Credit claimed: refund requested",
+            refund_amount: refundAmount.toFixed(2),
+            total_amount: String(refundAmount.toFixed(2)),
+            is_partial: false,
+          },
+        }),
+      });
+    } catch (e) { console.error("CLAIM_CREDIT_REFUND_EMAIL_ERR:", e); }
   }
 
   return ok(req, { ok: true, action: "CLAIM_CREDIT", refund_status: refundStatus, refund_amount: refundAmount });

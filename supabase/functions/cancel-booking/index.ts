@@ -231,6 +231,8 @@ Deno.serve(async (req: any) => {
               is_weather: false,
               is_unpaid: !isPaid,
               is_forfeit: isForfeit,
+              // Only the offer-choice cancel re-offers reschedule/voucher/refund.
+              offer_choice: offerChoice,
             },
           }),
         });

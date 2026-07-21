@@ -61,7 +61,10 @@ Deno.serve(async (req: any) => {
     if (bErr || !booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
 
     const authz = await authorizeRefund(req, booking);
-    if (!authz.ok) return new Response(JSON.stringify({ error: authz.message }), { status: authz.status, headers: getCors(req) });
+    if (authz.ok !== true) {
+      const denied = authz as { status: number; message: string };
+      return new Response(JSON.stringify({ error: denied.message }), { status: denied.status, headers: getCors(req) });
+    }
 
     // Guard: voucher-paid bookings must not hit Yoco — they should be refunded via voucher
     const pm = (booking.payment_method || "").toUpperCase();
@@ -98,6 +101,16 @@ Deno.serve(async (req: any) => {
     const totalAmount = Number(booking.total_amount || 0);
     const totalCaptured = Number(booking.total_captured || totalAmount);
     const totalRefunded = Number(booking.total_refunded || 0);
+
+    // Voucher-funded portion must never be paid out as cash. Older bookings
+    // recorded total_captured as the full total (incl. voucher portion), so cap
+    // at whichever is lower: recorded capture, or total minus voucher.
+    const voucherPaid = Number(booking.voucher_amount_paid || 0);
+    const maxCashRefund = Math.max(0, Math.min(totalCaptured, totalAmount - voucherPaid) - totalRefunded);
+    if (refundAmount > maxCashRefund) refundAmount = maxCashRefund;
+    if (refundAmount <= 0) {
+      return new Response(JSON.stringify({ error: "Nothing cash-refundable: " + (voucherPaid > 0 ? "voucher-funded portion (" + voucherPaid + ") must be reissued as a voucher, not cash." : "already fully refunded.") }), { status: 400, headers: getCors(req) });
+    }
 
     // S2: reserve BEFORE calling Yoco. reserve_refund locks the booking row and
     // atomically increments total_refunded by the clamped reservable amount,

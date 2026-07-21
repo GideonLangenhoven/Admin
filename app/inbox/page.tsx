@@ -272,6 +272,28 @@ function InboxContent() {
     }
   }
 
+  // Web chats only: end the conversation and ask the visitor to rate it. The
+  // widget shows a star picker on its next poll (current_state AWAIT_RATING).
+  async function endChat(phone: string) {
+    if (!phone) return;
+    try {
+      const res = await supabase.functions.invoke("admin-reply", {
+        body: { action: "end_chat", phone, message: "Thanks for chatting with us! 🙏 Before you go, please rate how we did.", business_id: businessId },
+      });
+      if (res.error || (res.data && res.data.ok === false)) {
+        notify({ title: "End chat failed", message: res.error?.message || res.data?.error, tone: "error" });
+      } else {
+        setSelected(null);
+        setMessages([]);
+        loadConvos();
+        window.dispatchEvent(new Event("inbox-updated"));
+        notify({ title: "Chat ended", message: "The visitor was asked to rate the chat.", tone: "success" });
+      }
+    } catch (err: any) {
+      notify({ title: "End chat failed", message: err.message, tone: "error" });
+    }
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -361,10 +383,18 @@ function InboxContent() {
                     <p className="text-xs truncate" style={{ color: "var(--ck-text-muted)" }}>{selected.phone} · {selected.email || "no email"}</p>
                   </div>
                   {needsAttention(selected) && (
-                    <button onClick={() => returnToBot(selected.id, selected.phone)}
-                      className="ui-btn ui-btn-soft w-full !h-8 text-xs sm:w-auto">
-                      Return to Bot
-                    </button>
+                    <div className="flex w-full gap-2 sm:w-auto">
+                      {/^web(:|$)/.test(String(selected.phone)) && (
+                        <button onClick={() => endChat(selected.phone)}
+                          className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
+                          End chat &amp; rate
+                        </button>
+                      )}
+                      <button onClick={() => returnToBot(selected.id, selected.phone)}
+                        className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
+                        Return to Bot
+                      </button>
+                    </div>
                   )}
                 </div>
 

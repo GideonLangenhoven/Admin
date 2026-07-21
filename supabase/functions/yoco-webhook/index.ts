@@ -1096,7 +1096,10 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Atomically update to PAID — if already updated by a concurrent webhook, skip
-    const upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: booking.total_amount, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
+    // total_captured = cash Yoco actually charged (voucher portion was never captured
+    // by Yoco and must never be refundable as cash)
+    const cashCaptured = Math.max(0, Number(booking.total_amount || 0) - Number(booking.voucher_amount_paid || 0));
+    const upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: cashCaptured, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
     if (upd.error) {
       console.log("BOOKING_PAID_UPDATE_FAILED booking=" + booking.id + " err=" + upd.error.message);
       await supabase.from("logs").insert({

@@ -1095,6 +1095,85 @@ export default function SuperAdminPage() {
 
       {/* ── Chatbot Avatars (global catalog) ── */}
       <ChatbotAvatarManager />
+
+      {/* ── Chatbot Ratings (visitor feedback across all tenants) ── */}
+      <ChatbotRatingsPanel />
+    </div>
+  );
+}
+
+// Visitor ratings (1-5 stars) of how well web chats were handled, across every
+// tenant. Reads conversations directly — SUPER_ADMIN's current_business_ids()
+// returns all businesses so RLS lets this see every tenant's rated chats.
+function ChatbotRatingsPanel() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const [{ data: convos }, { data: biz }] = await Promise.all([
+      supabase.from("conversations")
+        .select("id, business_id, rating, rating_at, handled_by, customer_name")
+        .not("rating", "is", null)
+        .order("rating_at", { ascending: false })
+        .limit(200),
+      supabase.from("businesses").select("id, name"),
+    ]);
+    setNames(Object.fromEntries((biz || []).map((b: any) => [b.id, b.name])));
+    setRows(convos || []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  const count = rows.length;
+  const avg = count ? (rows.reduce((s, r) => s + Number(r.rating || 0), 0) / count) : 0;
+  const botRows = rows.filter((r) => r.handled_by !== "HUMAN");
+  const humanRows = rows.filter((r) => r.handled_by === "HUMAN");
+  const avgOf = (rs: any[]) => rs.length ? (rs.reduce((s, r) => s + Number(r.rating || 0), 0) / rs.length).toFixed(1) : "—";
+
+  return (
+    <div className="ui-card">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Ratings</h2>
+        <button onClick={load} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-6 mb-4 text-sm">
+        <div><span className="text-[var(--ck-text-muted)]">Rated chats</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{count}</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Overall avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{count ? avg.toFixed(1) : "—"} ★</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Bot avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{avgOf(botRows)} ★</span> <span className="text-xs text-[var(--ck-text-muted)]">({botRows.length})</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Human avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{avgOf(humanRows)} ★</span> <span className="text-xs text-[var(--ck-text-muted)]">({humanRows.length})</span></div>
+      </div>
+      {count === 0 ? (
+        <p className="text-sm text-[var(--ck-text-muted)]">No chat ratings yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[var(--ck-text-muted)] border-b border-[var(--ck-border-subtle)]">
+                <th className="py-2 pr-3 font-medium">Rating</th>
+                <th className="py-2 pr-3 font-medium">Handled by</th>
+                <th className="py-2 pr-3 font-medium">Business</th>
+                <th className="py-2 pr-3 font-medium">Visitor</th>
+                <th className="py-2 font-medium">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-[var(--ck-border-subtle)]">
+                  <td className="py-2 pr-3 whitespace-nowrap" style={{ color: "var(--ck-accent)" }}>{"★".repeat(r.rating)}<span className="text-[var(--ck-text-muted)]">{"★".repeat(5 - r.rating)}</span></td>
+                  <td className="py-2 pr-3">{r.handled_by === "HUMAN" ? "Human" : "Bot"}</td>
+                  <td className="py-2 pr-3">{names[r.business_id] || r.business_id?.slice(0, 8) || "—"}</td>
+                  <td className="py-2 pr-3">{r.customer_name || "Website visitor"}</td>
+                  <td className="py-2 whitespace-nowrap text-[var(--ck-text-muted)]">{r.rating_at ? new Date(r.rating_at).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

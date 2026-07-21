@@ -1304,10 +1304,19 @@ function cancellationHtml(d: Record<string, unknown>) {
   // Cancelled within 24h of the trip start: booking is forfeited, so the
   // email must NOT offer reschedule/voucher/refund options.
   const isForfeit = d.is_forfeit === true;
+  // The reschedule/voucher/refund choice is OPT-IN: only operator-initiated
+  // cancellations that still need a customer decision set offer_choice. Every
+  // other cancellation email (refund already chosen or processed) must confirm
+  // the outcome, never re-offer the three options.
+  const offerChoice = d.offer_choice === true;
+  const refundAmt = d.refund_amount != null && d.refund_amount !== "" ? String(d.refund_amount) : "";
+  const isRefundConfirmed = !hasVoucher && !isForfeit && !offerChoice && refundAmt !== "";
   const cancelText = hasVoucher
     ? "Your booking has been cancelled and its value converted to a voucher. The code is below; use it any time on your next booking."
     : isForfeit
     ? `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. As the cancellation falls within 24 hours of the trip start, the booking amount is forfeited in line with our cancellation policy. If you believe this is a mistake, just reply to this email.`
+    : isRefundConfirmed
+    ? "Your booking has been cancelled and your refund is on its way. The details are below."
     : isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
     : "Unfortunately, your trip has been cancelled. We sincerely apologise for the inconvenience.";
@@ -1334,6 +1343,22 @@ function cancellationHtml(d: Record<string, unknown>) {
   // Weather cancellations get a prominent self-service block
   const optionsBlock = isForfeit
     ? ""
+    : isRefundConfirmed
+    ? `
+        <tr>
+          <td style="padding: 0 40px 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
+              <tr>
+                <td style="padding: 24px; text-align: center;">
+                  <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #047857;">Refund confirmed</p>
+                  <p style="margin: 0 0 10px 0; font-size: 26px; font-weight: 700; color: #1b3b36;">R${refundAmt}</p>
+                  <p style="margin: 0; font-size: 14px; color: #166534; line-height: 1.5;">Your refund is being processed. Please allow 5 to 10 business days for it to reflect in your account.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `
     : hasVoucher
     ? `
         <tr>
@@ -1372,7 +1397,8 @@ function cancellationHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `
-    : `
+    : offerChoice
+    ? `
         <tr>
           <td style="padding: 10px 40px 8px; text-align: center;">
             <p style="font-size: 15px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 16px 0;">What would you like to do?</p>
@@ -1386,7 +1412,8 @@ function cancellationHtml(d: Record<string, unknown>) {
             <p style="font-size: 12px; color: #999; margin: 12px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>
-      `;
+      `
+    : "";
 
   return `
     <!DOCTYPE html>
