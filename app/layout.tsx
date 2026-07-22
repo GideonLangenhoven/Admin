@@ -31,6 +31,7 @@ const nav = [
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
+  { href: "/partnerships", label: "Partners", icon: "Users", privilegedOnly: true },
   { href: "/reviews", label: "Reviews", icon: "Star" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },

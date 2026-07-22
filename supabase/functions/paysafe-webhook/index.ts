@@ -1,11 +1,10 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient } from "../_shared/tenant.ts";
+import { confirmComboAndNotify, releaseFailedCombo } from "../_shared/combo.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PAYSAFE_WEBHOOK_SECRET = Deno.env.get("PAYSAFE_WEBHOOK_SECRET") || "";
 const supabase = createServiceClient();
 
@@ -24,128 +23,24 @@ async function verifyPaysafeSignature(rawBody: string, signatureHeader: string |
   // Constant-time comparison
   const receivedHex = signatureHeader.toLowerCase();
   if (receivedHex.length !== expectedHex.length) return false;
-  const mismatch = 0;
+  let mismatch = 0;
   for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
 
-async function createComboInvoice(booking: any, tourName: string, slotTime: string, paymentRef: string, paymentMethod: string) {
-  const existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
-  if (existing.data) {
-    if (existing.data.payment_reference !== paymentRef) {
-      await supabase.from("invoices").update({ payment_method: paymentMethod, payment_reference: paymentRef }).eq("id", existing.data.id);
-    }
-    return existing.data;
-  }
-
-  const invNumR = await supabase.rpc("next_invoice_number", { p_business_id: booking.business_id }).catch(function () { return { data: null, error: { message: "RPC not found" } }; });
-  if (invNumR.error) {
-    console.warn("next_invoice_number RPC failed (using fallback):", invNumR.error.message);
-  }
-  const invNum = invNumR.data || ("INV-" + Date.now());
-  const subtotal = Number(booking.total_amount);
-
-  const inv = await supabase.from("invoices").insert({
-    business_id: booking.business_id,
-    booking_id: booking.id,
-    invoice_number: invNum,
-    customer_name: booking.customer_name,
-    customer_email: booking.email,
-    customer_phone: booking.phone,
-    tour_name: tourName,
-    tour_date: booking.slots?.start_time || null,
-    qty: booking.qty,
-    unit_price: booking.unit_price,
-    subtotal: subtotal,
-    discount_type: null,
-    discount_percent: 0,
-    discount_amount: 0,
-    total_amount: booking.total_amount,
-    payment_method: paymentMethod,
-    payment_reference: paymentRef,
-  }).select().single();
-
-  if (inv.data) {
-    await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
-  }
-  return { ...inv.data, invoice_number: invNum };
-}
-
-async function sendComboConfirmation(booking: any, comboBookingId: string, paymentId: string) {
-  let tenant: any = null;
-  try {
-    tenant = await getTenantByBusinessId(supabase, booking.business_id);
-  } catch (tenantErr) {
-    console.error("COMBO_CONFIRM_TENANT_ERR:", tenantErr);
-  }
-
-  const ref = booking.id.substring(0, 8).toUpperCase();
-  const tourName = booking.tours?.name || "Booking";
-  const slotTime = booking.slots?.start_time
-    ? (tenant ? formatTenantDateTime(tenant.business, booking.slots.start_time) : new Date(booking.slots.start_time).toLocaleString())
-    : "See email";
-  const brandName = tenant ? getBusinessDisplayName(tenant.business) : "Your Booking";
-  const currency = tenant?.business?.currency || "ZAR";
-
-  let invoice: any = null;
-  try {
-    invoice = await createComboInvoice(booking, tourName, slotTime, paymentId, "Paysafe (Combo)");
-  } catch (invErr) {
-    console.error("COMBO_INVOICE_ERR (continuing):", invErr);
-  }
-
-  // WhatsApp notification
-  if (booking.phone && tenant) {
-    try {
-      await sendWhatsappTextForTenant(
-        tenant,
-        booking.phone,
-        "Combo booking confirmed\n\n" +
-        "Ref: " + ref + "\n" +
-        tourName + "\n" +
-        slotTime + "\n" +
-        booking.qty + " guest" + (booking.qty === 1 ? "" : "s") + "\n" +
-        currency + " " + booking.total_amount + " paid\n" +
-        "Invoice: " + (invoice?.invoice_number || "pending") + "\n\n" +
-        "Thanks for booking with " + brandName + ".",
-      );
-    } catch (e) {
-      console.error("COMBO_WA_CONFIRM_ERR:", e);
-    }
-  }
-
-  // Email notification via send-email function
-  if (booking.email) {
-    try {
-      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-        body: JSON.stringify({
-          type: "BOOKING_CONFIRM",
-          data: {
-            email: booking.email,
-            booking_id: booking.id,
-            business_id: booking.business_id,
-            customer_name: booking.customer_name,
-            customer_email: booking.email,
-            ref: ref,
-            payment_reference: invoice?.payment_reference || paymentId,
-            tour_name: tourName,
-            tour_date: slotTime,
-            start_time: slotTime,
-            qty: booking.qty,
-            total_amount: booking.total_amount,
-            invoice_number: invoice?.invoice_number || "",
-            invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
-          },
-        }),
-      });
-    } catch (e) {
-      console.error("COMBO_EMAIL_CONFIRM_ERR:", e);
-    }
-  }
-
-  return { invoice };
+async function findCombo(paymentId: string, merchantRefNum: string) {
+  // merchantRefNum is the combo_bookings.id (uuid); guard the uuid filter so a
+  // non-uuid ref can't 400 the whole query.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(merchantRefNum);
+  const filter = isUuid
+    ? "paysafe_payment_id.eq." + paymentId + ",id.eq." + merchantRefNum
+    : "paysafe_payment_id.eq." + paymentId;
+  const { data } = await supabase
+    .from("combo_bookings")
+    .select("*, combo_offers(*)")
+    .or(filter)
+    .maybeSingle();
+  return data;
 }
 
 async function handlePaymentCompleted(paymentId: string, merchantRefNum: string) {
@@ -157,150 +52,64 @@ async function handlePaymentCompleted(paymentId: string, merchantRefNum: string)
     return;
   }
 
-  // Look up combo_booking by paysafe_payment_id or merchantRefNum (which is combo_booking_id)
-  const { data: combo } = await supabase
-    .from("combo_bookings")
-    .select("*, combo_offers(*)")
-    .or("paysafe_payment_id.eq." + paymentId + ",id.eq." + merchantRefNum)
-    .maybeSingle();
-
+  const combo = await findCombo(paymentId, merchantRefNum);
   if (!combo) {
     console.error("PAYSAFE_WEBHOOK: No combo_booking found for payment=" + paymentId + " merchantRef=" + merchantRefNum);
     return;
   }
-
   if (combo.payment_status === "PAID") {
     console.log("PAYSAFE_WEBHOOK: combo_booking already PAID: " + combo.id);
     return;
   }
 
-  // Update combo booking payment status
-  await supabase.from("combo_bookings").update({
-    paysafe_payment_id: paymentId,
-    payment_status: "PAID",
-  }).eq("id", combo.id);
+  await supabase.from("combo_bookings").update({ paysafe_payment_id: paymentId }).eq("id", combo.id);
 
-  // ── Atomic N-party confirmation via server-side RPC ────────────────────────
-  // confirm_combo_payment_atomic iterates combo_booking_items (or legacy
-  // booking_a_id/booking_b_id for older 2-party combos), confirms every leg
-  // in a single transaction, and flips the combo_bookings parent row. Any
-  // error rolls back the entire combo — no more "A confirmed, B orphaned".
-  const confirmRes = await supabase.rpc("confirm_combo_payment_atomic", {
-    p_combo_booking_id: combo.id,
-    p_paysafe_payment_id: "PAYSAFE_" + paymentId,
-    p_payment_method: "PAYSAFE_COMBO",
-  });
-  if (confirmRes.error) {
-    console.error("COMBO_CONFIRM_ATOMIC_ERR:", confirmRes.error.message);
-    await supabase.from("logs").insert({
+  // Atomic N-party confirmation + per-operator invoices/notifications.
+  const confirm = await confirmComboAndNotify(supabase, combo.id, "PAYSAFE_" + paymentId, "PAYSAFE_COMBO");
+  if (!confirm.ok) {
+    console.error("COMBO_CONFIRM_ATOMIC_ERR:", confirm.error);
+    const lg = await supabase.from("logs").insert({
       business_id: combo?.combo_offers?.business_a_id || null,
       event: "combo_payment_confirm_failed",
-      payload: { combo_booking_id: combo.id, paysafe_payment_id: paymentId, error: confirmRes.error.message },
-    }).catch(function (e: any) { console.error("LOG_ERR:", e); });
+      payload: { combo_booking_id: combo.id, paysafe_payment_id: paymentId, error: confirm.error },
+    });
+    if (lg.error) console.error("LOG_ERR:", lg.error.message);
     return;
   }
 
-  // Load the confirmed bookings so we can send confirmations — supports N-party
-  // via combo_booking_items, with legacy booking_a_id/booking_b_id as fallback.
-  const bookingsToNotify: any[] = [];
-  const confirmPath = (confirmRes.data && (confirmRes.data as any).path) || "legacy";
-  if (confirmPath === "items") {
-    const { data: items } = await supabase
-      .from("combo_booking_items")
-      .select("booking_id")
-      .eq("combo_booking_id", combo.id);
-    for (const it of (items || [])) {
-      const { data: bk } = await supabase
-        .from("bookings")
-        .select("*, slots(start_time, booked, held), tours(name)")
-        .eq("id", (it as any).booking_id)
-        .single();
-      if (bk) bookingsToNotify.push(bk);
-    }
-  } else {
-    if (combo.booking_a_id) {
-      const { data: bA } = await supabase
-        .from("bookings")
-        .select("*, slots(start_time, booked, held), tours(name)")
-        .eq("id", combo.booking_a_id)
-        .single();
-      if (bA) bookingsToNotify.push(bA);
-    }
-    if (combo.booking_b_id) {
-      const { data: bB } = await supabase
-        .from("bookings")
-        .select("*, slots(start_time, booked, held), tours(name)")
-        .eq("id", combo.booking_b_id)
-        .single();
-      if (bB) bookingsToNotify.push(bB);
-    }
-  }
-
-  // Log
-  await supabase.from("logs").insert({
+  const lg = await supabase.from("logs").insert({
     business_id: combo?.combo_offers?.business_a_id || null,
     event: "combo_payment_completed",
-    payload: {
-      combo_booking_id: combo.id,
-      paysafe_payment_id: paymentId,
-      bookings_confirmed: (confirmRes.data as any)?.bookings_confirmed,
-      path: confirmPath,
-    },
-  }).catch(function (e: any) { console.error("LOG_ERR:", e); });
-
-  // Send confirmation emails/WhatsApp for every operator whose leg we just confirmed
-  for (const nb of bookingsToNotify) {
-    await sendComboConfirmation(nb, combo.id, paymentId);
-  }
+    payload: { combo_booking_id: combo.id, paysafe_payment_id: paymentId, bookings_confirmed: confirm.bookingsConfirmed },
+  });
+  if (lg.error) console.error("LOG_ERR:", lg.error.message);
 }
 
 async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
-  // Look up combo booking
-  const { data: combo } = await supabase
-    .from("combo_bookings")
-    .select("*, combo_offers(*)")
-    .or("paysafe_payment_id.eq." + paymentId + ",id.eq." + merchantRefNum)
-    .maybeSingle();
+  // Idempotency: a replayed PAYMENT_FAILED must not release capacity twice.
+  // (releaseFailedCombo is also hold-guarded — belt and braces.)
+  const idempotencyKey = "paysafe_payment_failed:" + (paymentId || merchantRefNum);
+  const idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
+  if (idempInsert.error && idempInsert.error.code === "23505") {
+    console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
+    return;
+  }
 
+  const combo = await findCombo(paymentId, merchantRefNum);
   if (!combo) {
     console.error("PAYSAFE_WEBHOOK_FAILED: No combo_booking found for payment=" + paymentId);
     return;
   }
-
-  // Load both bookings
-  const { data: bookingA } = await supabase
-    .from("bookings")
-    .select("*, slots(held)")
-    .eq("id", combo.booking_a_id)
-    .single();
-  const { data: bookingB } = await supabase
-    .from("bookings")
-    .select("*, slots(held)")
-    .eq("id", combo.booking_b_id)
-    .single();
-
-  // Release held capacity on both slots (S3: atomic; combo spans two tenants so
-  // each slot is adjusted with its own business_id).
-  if (bookingA?.slot_id && Number(bookingA.qty) > 0) {
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: bookingA.slot_id, p_business_id: bookingA.business_id, p_booked_delta: 0, p_held_delta: -Number(bookingA.qty) });
-  }
-  if (bookingB?.slot_id && Number(bookingB.qty) > 0) {
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: bookingB.slot_id, p_business_id: bookingB.business_id, p_booked_delta: 0, p_held_delta: -Number(bookingB.qty) });
+  if (combo.payment_status === "PAID") {
+    // A late FAILED after a successful payment must not tear anything down.
+    console.log("PAYSAFE_WEBHOOK_FAILED: combo already PAID, ignoring: " + combo.id);
+    return;
   }
 
-  // Mark both bookings as PENDING PAYMENT
-  if (bookingA) {
-    await supabase.from("bookings").update({ status: "PENDING PAYMENT" }).eq("id", bookingA.id);
-  }
-  if (bookingB) {
-    await supabase.from("bookings").update({ status: "PENDING PAYMENT" }).eq("id", bookingB.id);
-  }
+  await releaseFailedCombo(supabase, combo);
 
-  // Update combo booking status
-  await supabase.from("combo_bookings").update({ payment_status: "FAILED" }).eq("id", combo.id);
-
-  await supabase.from("logs").insert({
-    business_id: combo.combo_offers.business_a_id,
+  const lg = await supabase.from("logs").insert({
+    business_id: combo.combo_offers?.business_a_id || null,
     event: "combo_payment_failed",
     payload: {
       combo_booking_id: combo.id,
@@ -308,7 +117,8 @@ async function handlePaymentFailed(paymentId: string, merchantRefNum: string) {
       booking_a_id: combo.booking_a_id,
       booking_b_id: combo.booking_b_id,
     },
-  }).catch(function (e: any) { console.error("LOG_ERR:", e); });
+  });
+  if (lg.error) console.error("LOG_ERR:", lg.error.message);
 }
 
 Deno.serve(withSentry("paysafe-webhook", async (req: any) => {

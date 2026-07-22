@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
 
     // Verify all businesses have active partnerships with the creator
     const businessIds = [...new Set(items.map((i: any) => i.business_id).filter((id: string) => id !== business_id))];
+    const partnershipIds: Record<string, string> = {};
     for (const partnerId of businessIds) {
       const aId = business_id < partnerId ? business_id : partnerId;
       const bId = business_id < partnerId ? partnerId : business_id;
@@ -106,6 +107,30 @@ export async function POST(req: NextRequest) {
         .eq("status", "ACTIVE")
         .maybeSingle();
       if (!p) return NextResponse.json({ error: "No active partnership with business " + partnerId }, { status: 403 });
+      partnershipIds[partnerId] = p.id;
+    }
+
+    // 2-party offers also populate the legacy A/B columns — the customer
+    // checkout (create-paysafe-checkout) and booking site sell through those.
+    // A = the creator (they collect payment in the manual-settlement model).
+    // Items-only offers (3+) are stored but not yet sellable.
+    let legacyCols: Record<string, unknown> = {};
+    if (items.length === 2 && businessIds.length === 1) {
+      const mine = items.find((i: any) => i.business_id === business_id);
+      const theirs = items.find((i: any) => i.business_id !== business_id);
+      if (mine && theirs) {
+        legacyCols = {
+          partnership_id: partnershipIds[theirs.business_id],
+          business_a_id: business_id,
+          business_b_id: theirs.business_id,
+          tour_a_id: mine.tour_id,
+          tour_b_id: theirs.tour_id,
+          split_a_percent: split_type === "PERCENT" ? Number(mine.split_percent) : null,
+          split_b_percent: split_type === "PERCENT" ? Number(theirs.split_percent) : null,
+          split_a_fixed: split_type === "FIXED" ? Number(mine.split_fixed) : null,
+          split_b_fixed: split_type === "FIXED" ? Number(theirs.split_fixed) : null,
+        };
+      }
     }
 
     // Create the combo offer
@@ -122,6 +147,7 @@ export async function POST(req: NextRequest) {
         active: true,
         created_by: business_id,
         created_by_business_id: business_id,
+        ...legacyCols,
       })
       .select()
       .single();
@@ -226,20 +252,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ combo_offer: full });
   }
 
-  // --- DEACTIVATE ---
-  if (action === "deactivate") {
+  // --- ACTIVATE / DEACTIVATE ---
+  if (action === "deactivate" || action === "activate") {
     const { combo_offer_id } = body;
     if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
-    const { data, error } = await supabase.from("combo_offers").update({ active: false }).eq("id", combo_offer_id).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ combo_offer: data });
-  }
-
-  // --- ACTIVATE ---
-  if (action === "activate") {
-    const { combo_offer_id } = body;
-    if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
-    const { data, error } = await supabase.from("combo_offers").update({ active: true }).eq("id", combo_offer_id).select().single();
+    // Tenant check: only a business that's party to the offer may toggle it.
+    if (caller.role !== "SUPER_ADMIN") {
+      const { data: off } = await supabase.from("combo_offers").select("business_a_id, business_b_id, created_by_business_id").eq("id", combo_offer_id).single();
+      const { data: item } = await supabase.from("combo_offer_items").select("id").eq("combo_offer_id", combo_offer_id).eq("business_id", caller.business_id).limit(1).maybeSingle();
+      const isParty = off && [off.business_a_id, off.business_b_id, off.created_by_business_id].includes(caller.business_id);
+      if (!isParty && !item) return NextResponse.json({ error: "Not authorized to change this combo offer" }, { status: 403 });
+    }
+    const { data, error } = await supabase.from("combo_offers").update({ active: action === "activate" }).eq("id", combo_offer_id).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ combo_offer: data });
   }

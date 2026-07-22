@@ -44,10 +44,11 @@ export async function GET(req: NextRequest) {
     return new Response(htmlPage("Expired", "This partnership invite has been revoked or is no longer valid."), { status: 400, headers: { "Content-Type": "text/html" } });
   }
 
-  // Accept the partnership
+  // Accept the partnership. invite_token is cleared so the emailed link is
+  // single-use — same rule as the POST accept_token path.
   const { error: updateErr } = await supabase
     .from("business_partnerships")
-    .update({ status: "ACTIVE", accepted_at: new Date().toISOString() })
+    .update({ status: "ACTIVE", accepted_at: new Date().toISOString(), invite_token: null })
     .eq("id", partnership.id)
     .eq("status", "PENDING");
 

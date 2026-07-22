@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Webhook } from "npm:standardwebhooks";
 import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant, sendWhatsappFreeformOrSignal } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
+import { confirmComboAndNotify, releaseFailedCombo } from "../_shared/combo.ts";
 import { withSentry } from "../_shared/sentry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -363,6 +364,52 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
         return new Response("OK", { status: 200 });
       }
+    }
+
+    // ── COMBO (manual-settlement model) ──
+    // Operator A collected the FULL combo amount via their own Yoco account.
+    // Confirm every leg atomically; operators settle shares between themselves
+    // (combo_bookings.settled + combo_settlements register).
+    if (metaType === "COMBO") {
+      const comboId = String(payload.metadata?.combo_booking_id || "");
+      let combo: any = null;
+      if (comboId) {
+        const r = await supabase.from("combo_bookings").select("*, combo_offers(business_a_id)").eq("id", comboId).maybeSingle();
+        combo = r.data;
+      }
+      if (!combo && checkoutId) {
+        const r = await supabase.from("combo_bookings").select("*, combo_offers(business_a_id)").eq("yoco_checkout_id", checkoutId).maybeSingle();
+        combo = r.data;
+      }
+      if (!combo) {
+        console.error("YOCO_COMBO: no combo_booking found for combo_id=" + comboId + " checkout=" + checkoutId);
+        return new Response("OK", { status: 200 });
+      }
+
+      if (type === "payment.succeeded") {
+        if (combo.payment_status === "PAID") return new Response("OK", { status: 200 });
+        await supabase.from("combo_bookings").update({ yoco_payment_id: yocoPaymentId }).eq("id", combo.id);
+        const confirm = await confirmComboAndNotify(supabase, combo.id, yocoPaymentId || checkoutId, "YOCO_COMBO");
+        const lg = await supabase.from("logs").insert({
+          business_id: combo.combo_offers?.business_a_id || businessId || null,
+          event: confirm.ok ? "combo_payment_completed" : "combo_payment_confirm_failed",
+          payload: { combo_booking_id: combo.id, yoco_payment_id: yocoPaymentId, provider: "yoco", bookings_confirmed: confirm.bookingsConfirmed, error: confirm.error || null },
+        });
+        if (lg.error) console.error("LOG_ERR:", lg.error.message);
+        return new Response("OK", { status: 200 });
+      }
+
+      // payment.failed — release both legs (hold-guarded, replay-safe)
+      if (combo.payment_status !== "PAID") {
+        await releaseFailedCombo(supabase, combo);
+        const lg = await supabase.from("logs").insert({
+          business_id: combo.combo_offers?.business_a_id || businessId || null,
+          event: "combo_payment_failed",
+          payload: { combo_booking_id: combo.id, yoco_payment_id: yocoPaymentId, provider: "yoco" },
+        });
+        if (lg.error) console.error("LOG_ERR:", lg.error.message);
+      }
+      return new Response("OK", { status: 200 });
     }
 
     if (type === "payment.failed") {

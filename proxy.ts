@@ -175,6 +175,7 @@ const PAGE_GATES: Array<{ pattern: RegExp; requirement: RoleRequirement }> = [
   // readable from this cookie), and AppShell shows them the Settings link.
   // The page renders its own "no permission" state for everyone else.
   { pattern: /^\/privacy\/data-requests(\/|$)/, requirement: "PRIVILEGED" },
+  { pattern: /^\/partnerships(\/|$)/, requirement: "PRIVILEGED" },
 ];
 
 // MVP: temporarily hidden routes. Direct URL access redirects to `/`.

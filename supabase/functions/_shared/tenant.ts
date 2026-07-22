@@ -42,6 +42,8 @@ export type TenantCredentials = {
   yocoTestWebhookSecret: string;
   activeYocoSecretKey: string;
   activeYocoWebhookSecret: string;
+  paysafeApiKey: string;
+  paysafeApiSecret: string;
 };
 
 export type TenantContext = {
@@ -126,6 +128,10 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     yocoTestWebhookSecret: testWebhook,
     activeYocoSecretKey: testMode && testKey ? testKey : liveKey,
     activeYocoWebhookSecret: testMode && testWebhook ? testWebhook : liveWebhook,
+    // The get_business_credentials RPC has returned these since 20260323100400;
+    // they were never mapped here, which made the Paysafe combo path dead code.
+    paysafeApiKey: String(row.paysafe_api_key || ""),
+    paysafeApiSecret: String(row.paysafe_api_secret || ""),
   };
 }
 
