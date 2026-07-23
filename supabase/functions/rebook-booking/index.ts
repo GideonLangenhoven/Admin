@@ -1413,25 +1413,64 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
   }
 
   // REFUND — request against the amount set at cancellation time (weather = 100%)
+  // Split-tender: the voucher-funded portion can never be cash-refunded (it was
+  // never captured by Yoco), so reissue it as a voucher first and only refund
+  // the cash portion. Without this the voucher value was silently lost.
+  const voucherPortion = isSplitTenderPayment(booking)
+    ? Math.min(getSplitTenderAmounts(booking).voucherPortion, creditAmount)
+    : 0;
+  let splitVoucherCode: string | null = null;
+  let splitVoucherId: string | null = null;
+  if (voucherPortion > 0) {
+    const svCode = genVoucherCode();
+    const svr = await insertVoucherWithRetry({
+      business_id: booking.business_id,
+      code: svCode,
+      status: "ACTIVE",
+      type: "CREDIT",
+      value: voucherPortion,
+      current_balance: voucherPortion,
+      source_booking_id: booking.id,
+      expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    if (svr.error) return fail(req, "Voucher creation failed: " + svr.error.message, 500);
+    splitVoucherCode = svCode;
+    splitVoucherId = (svr.data && svr.data.id) ? svr.data.id : null;
+  }
+
+  const cashCredit = Math.max(0, creditAmount - voucherPortion);
   const totalCaptured = Number(booking.total_captured || booking.total_amount || 0);
   const totalRefunded = Number(booking.total_refunded || 0);
   const refundAmount = isManualPayment(booking)
-    ? creditAmount
-    : Math.min(creditAmount, Math.max(0, totalCaptured - totalRefunded));
-  if (refundAmount <= 0) return fail(req, "No refundable amount remaining on this booking", 400);
-  const refundStatus = isManualPayment(booking) ? "MANUAL_EFT_REQUIRED" : "REQUESTED";
+    ? cashCredit
+    : Math.min(cashCredit, Math.max(0, totalCaptured - totalRefunded));
+  if (refundAmount <= 0 && !splitVoucherCode) {
+    return fail(req, "No refundable amount remaining on this booking", 400);
+  }
+  const refundStatus = refundAmount <= 0 ? null : isManualPayment(booking) ? "MANUAL_EFT_REQUIRED" : "REQUESTED";
 
   // total_refunded is NOT bumped here — process-refund adds it on success
   await supabase.from("bookings").update({
     refund_status: refundStatus,
     refund_amount: refundAmount,
+    ...(splitVoucherId ? {
+      converted_to_voucher_id: splitVoucherId,
+      refund_notes: "Voucher portion reissued as " + splitVoucherCode + "; cash portion " + (refundAmount > 0 ? "refund requested" : "already refunded"),
+    } : {}),
   }).eq("id", booking.id);
 
   await supabase.from("logs").insert({
     business_id: booking.business_id,
     booking_id: booking.id,
     event: "credit_claimed_refund",
-    payload: { refund_amount: refundAmount, refund_status: refundStatus, payment_method: booking.payment_method || null },
+    payload: {
+      refund_amount: refundAmount,
+      refund_status: refundStatus,
+      payment_method: booking.payment_method || null,
+      voucher_restored: voucherPortion,
+      voucher_code: splitVoucherCode,
+      voucher_id: splitVoucherId,
+    },
   });
 
   if (booking.phone) {
@@ -1442,6 +1481,11 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
         currency + " " + refundAmount.toFixed(2) + " has been requested for your cancelled booking " +
         tourName + " (Ref: " + ref + ").\n" +
         "Please allow 5 to 10 business days for it to reflect.\n\n" +
+        (splitVoucherCode
+          ? "The " + currency + " " + voucherPortion.toFixed(2) + " you paid by voucher has been restored as a new voucher:\n" +
+            "Voucher code: " + splitVoucherCode + "\n" +
+            "Use it on your next booking with " + brandName + ".\n\n"
+          : "") +
         "Thanks for choosing " + brandName + "."
       );
     } catch (e) { console.error("CLAIM_CREDIT_REFUND_WA_ERR:", e); }
@@ -1465,7 +1509,11 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
             // choice, so the email must show the refund confirmation, not options.
             reason: "Credit claimed: refund requested",
             refund_amount: refundAmount.toFixed(2),
-            total_amount: String(refundAmount.toFixed(2)),
+            ...(splitVoucherCode ? {
+              voucher_code: splitVoucherCode,
+              voucher_amount: voucherPortion.toFixed(2),
+            } : {}),
+            total_amount: String(creditAmount.toFixed(2)),
             is_partial: false,
           },
         }),
@@ -1473,7 +1521,13 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
     } catch (e) { console.error("CLAIM_CREDIT_REFUND_EMAIL_ERR:", e); }
   }
 
-  return ok(req, { ok: true, action: "CLAIM_CREDIT", refund_status: refundStatus, refund_amount: refundAmount });
+  return ok(req, {
+    ok: true,
+    action: "CLAIM_CREDIT",
+    refund_status: refundStatus,
+    refund_amount: refundAmount,
+    ...(splitVoucherCode ? { voucher_code: splitVoucherCode, voucher_amount: voucherPortion } : {}),
+  });
 }
 
 // ───── Main handler ─────
