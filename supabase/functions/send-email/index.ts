@@ -1268,7 +1268,7 @@ function giftVoucherHtml(d: Record<string, unknown>) {
               <tr><td style="padding: 30px 24px 8px; text-align: center;">
                 <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Gift Voucher</p>
                 <p style="margin: 10px 0 0; font-size: 52px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.value}</p>
-                <p style="margin: 8px 0 0; font-size: 14px; color: #6b7280;">${d.tour_name}</p>
+                ${d.tour_name ? `<p style="margin: 8px 0 0; font-size: 14px; color: #6b7280;">${d.tour_name}</p>` : ""}
               </td></tr>
               <tr><td style="padding: 18px 24px 6px;">
                 <div style="border-top: 2px dashed #d7ddd9;"></div>
