@@ -1634,8 +1634,8 @@ export default function SettingsPage() {
                                 const isExpanded = expandedPermsAdmin === a.id;
                                 return (
                                     <div key={a.id}>
-                                        <div className="p-4 flex items-center justify-between transition-colors hover:bg-[var(--ck-surface-warm)]">
-                                            <div>
+                                        <div className="p-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 transition-colors hover:bg-[var(--ck-surface-warm)]">
+                                            <div className="min-w-0">
                                                 <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">
@@ -1650,7 +1650,7 @@ export default function SettingsPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
+                                            <div className="flex flex-wrap items-center gap-3">
                                                 {a.role !== "SUPER_ADMIN" && a.email !== myEmail && (
                                                     <button
                                                         onClick={() => handleChangeRole(a, a.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
