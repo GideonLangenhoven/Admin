@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
-import { groupSettlements } from "../../lib/combo-settlements";
+import { groupSettlements, groupWeeklyOwed } from "../../lib/combo-settlements";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -42,15 +42,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Fetch all PAID combo bookings in the period where this business is involved
-  const { data: combos, error } = await supabase
-    .from("combo_bookings")
-    .select("id, combo_total, split_a_amount, split_b_amount, payment_status, settled, created_at, combo_offers(name, business_a_id, business_b_id, business_a:businesses!combo_offers_business_a_id_fkey(business_name), business_b:businesses!combo_offers_business_b_id_fkey(business_name))")
-    .in("payment_status", ["PAID", "VOUCHER_ISSUED"])
-    .gte("created_at", startDate.toISOString())
-    .lte("created_at", endDate.toISOString());
-
+  // Owed totals must tally EVERYTHING outstanding, so unsettled combos are
+  // fetched regardless of age; settled ones only within the selected period
+  // (recent history for the table).
+  const comboSel = "id, combo_total, split_a_amount, split_b_amount, payment_status, settled, created_at, combo_offers(name, business_a_id, business_b_id, business_a:businesses!combo_offers_business_a_id_fkey(business_name), business_b:businesses!combo_offers_business_b_id_fkey(business_name))";
+  const [unsettledRes, settledRes] = await Promise.all([
+    supabase.from("combo_bookings").select(comboSel)
+      .in("payment_status", ["PAID", "VOUCHER_ISSUED"])
+      .eq("settled", false),
+    supabase.from("combo_bookings").select(comboSel)
+      .in("payment_status", ["PAID", "VOUCHER_ISSUED"])
+      .eq("settled", true)
+      .gte("created_at", startDate.toISOString())
+      .lte("created_at", endDate.toISOString()),
+  ]);
+  const error = unsettledRes.error || settledRes.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const combos = [...(unsettledRes.data || []), ...(settledRes.data || [])];
 
   // Filter to combos involving this business
   const relevant = (combos || []).filter((c: any) => {
@@ -76,6 +84,7 @@ export async function GET(req: NextRequest) {
         total_owed_to_me: 0,       // amount partner owes this business
         unsettled_count: 0,
         bookings: [],
+        _weeklyItems: [],
       };
     }
 
@@ -93,6 +102,15 @@ export async function GET(req: NextRequest) {
       s.total_owed_to_me += Number(combo.split_b_amount);
     }
 
+    // Weekly owed report (unsettled only — settled combos are no longer owed)
+    if (!combo.settled) {
+      s._weeklyItems.push({
+        created_at: combo.created_at,
+        owed_to_me: isA ? 0 : Number(combo.split_b_amount),
+        owed_to_partner: isA ? Number(combo.split_b_amount) : 0,
+      });
+    }
+
     s.bookings.push({
       id: combo.id,
       combo_name: offer.name,
@@ -102,6 +120,32 @@ export async function GET(req: NextRequest) {
       settled: combo.settled,
       date: combo.created_at,
     });
+  }
+
+  for (const s of Object.values(settlements)) {
+    s.weekly = groupWeeklyOwed(s._weeklyItems);
+    delete s._weeklyItems;
+  }
+
+  // Latest payment-link request per partner (either direction) so the UI can
+  // show "awaiting payment" / "Paid" and give operator A a Pay-now button.
+  const { data: payReqs } = await supabase
+    .from("combo_settlements")
+    .select("id, collector_business_id, owed_business_id, amount_owed, status, payment_url, created_at, paid_at")
+    .or(`collector_business_id.eq.${businessId},owed_business_id.eq.${businessId}`)
+    .in("status", ["PENDING_PAYMENT", "PAID"])
+    .order("created_at", { ascending: false })
+    .limit(100);
+  for (const s of Object.values(settlements)) {
+    const reqRow = (payReqs || []).find(
+      (r: any) => r.collector_business_id === s.partner_id || r.owed_business_id === s.partner_id,
+    );
+    if (reqRow) {
+      s.payment_request = {
+        ...reqRow,
+        direction: reqRow.owed_business_id === businessId ? "OWED_TO_ME" : "I_OWE",
+      };
+    }
   }
 
   return NextResponse.json({

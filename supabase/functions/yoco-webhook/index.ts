@@ -36,12 +36,23 @@ async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
     if (voucherLookup.data?.business_id) return String(voucherLookup.data.business_id);
   }
 
+  // Settlement payment links: the checkout was created on the OWED business's
+  // Yoco account (operator B), so their webhook secret must verify it.
+  const metaSettlementId = String(metadata.settlement_id || "");
+  if (metaSettlementId) {
+    const settlementLookup = await supabase.from("combo_settlements").select("owed_business_id").eq("id", metaSettlementId).maybeSingle();
+    if (settlementLookup.data?.owed_business_id) return String(settlementLookup.data.owed_business_id);
+  }
+
   if (checkoutId) {
     const bookingByCheckout = await supabase.from("bookings").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
     if (bookingByCheckout.data?.business_id) return String(bookingByCheckout.data.business_id);
 
     const voucherByCheckout = await supabase.from("vouchers").select("business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
     if (voucherByCheckout.data?.business_id) return String(voucherByCheckout.data.business_id);
+
+    const settlementByCheckout = await supabase.from("combo_settlements").select("owed_business_id").eq("yoco_checkout_id", checkoutId).maybeSingle();
+    if (settlementByCheckout.data?.owed_business_id) return String(settlementByCheckout.data.owed_business_id);
   }
 
   return "";
@@ -364,6 +375,69 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
         return new Response("OK", { status: 200 });
       }
+    }
+
+    // ── COMBO SETTLEMENT payment link (operator A pays operator B's share) ──
+    // The checkout was created on B's Yoco account by combo-settlement-link.
+    // On success: settlement row → PAID and the underlying combo bookings are
+    // marked settled. Signature was verified against B's webhook secret above.
+    if (metaType === "COMBO_SETTLEMENT") {
+      const settlementId = String(payload.metadata?.settlement_id || "");
+      let settlement: any = null;
+      if (settlementId) {
+        const r = await supabase.from("combo_settlements").select("*").eq("id", settlementId).maybeSingle();
+        settlement = r.data;
+      }
+      if (!settlement && checkoutId) {
+        const r = await supabase.from("combo_settlements").select("*").eq("yoco_checkout_id", checkoutId).maybeSingle();
+        settlement = r.data;
+      }
+      if (!settlement) {
+        console.error("YOCO_SETTLEMENT: no combo_settlements row for settlement_id=" + settlementId + " checkout=" + checkoutId);
+        return new Response("OK", { status: 200 });
+      }
+
+      if (type === "payment.succeeded") {
+        if (settlement.status === "PAID") return new Response("OK", { status: 200 });
+        const nowIso = new Date().toISOString();
+        await supabase.from("combo_settlements").update({
+          status: "PAID",
+          paid_at: nowIso,
+          settled_at: nowIso,
+          notes: ((settlement.notes ? settlement.notes + " · " : "") + "Paid via Yoco " + (yocoPaymentId || checkoutId)),
+        }).eq("id", settlement.id);
+
+        const comboIds: string[] = Array.isArray(settlement.combo_booking_ids) ? settlement.combo_booking_ids : [];
+        if (comboIds.length > 0) {
+          await supabase.from("combo_bookings").update({
+            settled: true,
+            settled_at: nowIso,
+            settlement_notes: "Paid via Yoco settlement link",
+          }).in("id", comboIds).eq("settled", false);
+        }
+
+        await supabase.from("logs").insert({
+          business_id: settlement.owed_business_id,
+          event: "combo_settlement_paid",
+          payload: {
+            settlement_id: settlement.id,
+            collector_business_id: settlement.collector_business_id,
+            amount_owed: Number(settlement.amount_owed || 0),
+            combo_booking_count: comboIds.length,
+            yoco_payment_id: yocoPaymentId || null,
+          },
+        });
+        console.log("YOCO_SETTLEMENT PAID settlement=" + settlement.id + " amount=" + settlement.amount_owed);
+        return new Response("OK", { status: 200 });
+      }
+
+      // payment.failed — leave the link live (retryable), just record it.
+      await supabase.from("logs").insert({
+        business_id: settlement.owed_business_id,
+        event: "combo_settlement_payment_failed",
+        payload: { settlement_id: settlement.id, yoco_payment_id: yocoPaymentId || null },
+      });
+      return new Response("OK", { status: 200 });
     }
 
     // ── COMBO (manual-settlement model) ──

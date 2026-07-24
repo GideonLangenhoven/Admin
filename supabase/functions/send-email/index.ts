@@ -1882,6 +1882,60 @@ function partnershipInviteHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function settlementRequestHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 28px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Combo Settlement Request</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 34px 40px 6px;">
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;">Hi ${d.partner_name || "there"},</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;"><strong>${d.requester_name || "Your partner"}</strong> has requested settlement of their share of combo bookings you collected payment for.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 32px 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 12px;">
+              <tr><td style="padding: 26px 24px 6px; text-align: center;">
+                <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Amount Owed</p>
+                <p style="margin: 10px 0 0; font-size: 44px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.amount}</p>
+                <p style="margin: 10px 0 20px; font-size: 13px; color: #6b7280;">${d.combo_count} combo booking${Number(d.combo_count) === 1 ? "" : "s"} · ${d.period_label || ""}</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 20px 40px 12px; text-align: center;">
+            <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
+              <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
+                <a href="${d.payment_url}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">Pay R${d.amount} Now</a>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 40px 30px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #9ca3af;">Payment is processed securely by Yoco and goes directly to ${d.requester_name || "your partner"}. The settlement is marked as paid automatically on both dashboards, and the full breakdown is on your Partners page.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 24px;">
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Powered by BookingTours.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
 function operatorAlertHtml(d: Record<string, unknown>) {
   const row = (label: string, value: unknown) => value
     ? `<tr><td width="35%" style="padding: 14px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 14px;">${label}</td><td width="65%" style="padding: 14px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 14px; text-align: right;">${value}</td></tr>`
@@ -2688,6 +2742,11 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       case "TRIP_PHOTOS":
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
         html = tripPhotosHtml(d);
+        break;
+      case "SETTLEMENT_REQUEST":
+        // Operator B asks operator A to pay their combo share via Yoco link.
+        subject = (d.requester_name || "Your partner") + " requested combo settlement: R" + d.amount;
+        html = settlementRequestHtml(d);
         break;
       case "PARTNERSHIP_INVITE":
         // Operator-to-operator combo partnership invite (Partners dashboard).

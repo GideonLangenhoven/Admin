@@ -21,6 +21,30 @@ export type SettlementRow = {
   combo_booking_count: number;
 };
 
+// Monday-based week bucket (UTC) for the weekly owed report.
+export function weekStartISO(dateIso: string): string {
+  const d = new Date(dateIso);
+  const day = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+
+export type WeeklyOwedRow = { week_start: string; owed_to_me: number; owed_to_partner: number; count: number };
+
+export function groupWeeklyOwed(
+  items: Array<{ created_at: string; owed_to_me: number; owed_to_partner: number }>,
+): WeeklyOwedRow[] {
+  const byWeek: Record<string, WeeklyOwedRow> = {};
+  for (const it of items) {
+    const ws = weekStartISO(it.created_at);
+    const row = (byWeek[ws] = byWeek[ws] || { week_start: ws, owed_to_me: 0, owed_to_partner: 0, count: 0 });
+    row.owed_to_me += Number(it.owed_to_me || 0);
+    row.owed_to_partner += Number(it.owed_to_partner || 0);
+    row.count++;
+  }
+  return Object.values(byWeek).sort((a, b) => (a.week_start < b.week_start ? 1 : -1));
+}
+
 export function groupSettlements(eligible: SettleableCombo[]): SettlementRow[] {
   const byPartnership: Record<string, SettleableCombo[]> = {};
   for (const c of eligible) {

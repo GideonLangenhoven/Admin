@@ -48,6 +48,7 @@ export default function PartnershipsPage() {
   // Settlement notes per partner
   const [settleNotes, setSettleNotes] = useState<Record<string, string>>({});
   const [settling, setSettling] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -202,6 +203,30 @@ export default function PartnershipsPage() {
       load();
     }
     setSettling(null);
+  }
+
+  async function generatePaymentLink(partner: any) {
+    setLinkBusy(partner.partner_id);
+    const { data, error } = await supabase.functions.invoke("combo-settlement-link", {
+      body: { partner_business_id: partner.partner_id },
+    });
+    let msg: string | undefined = error?.message || data?.error;
+    if (error && (error as any).context?.json) {
+      try { msg = (await (error as any).context.json())?.error || msg; } catch { /* keep generic */ }
+    }
+    if (error || data?.error) {
+      notify({ title: "Could not create payment link", message: msg || "Unknown error", tone: "error" });
+    } else {
+      notify({
+        title: data.reused ? "Payment link already active" : "Payment link created",
+        message: data.email_sent
+          ? "R" + Number(data.amount).toFixed(2) + " payment link emailed to your partner. It will flip to Paid automatically once they pay."
+          : "Link created for R" + Number(data.amount).toFixed(2) + ". Your partner has no notification email on file — copy the link and send it to them.",
+        tone: "success",
+      });
+      load();
+    }
+    setLinkBusy(null);
   }
 
   if (!/MAIN_ADMIN|SUPER_ADMIN/.test(role)) {
@@ -395,10 +420,10 @@ export default function PartnershipsPage() {
       {/* ── Settlements ── */}
       <section className="anim-fade-up anim-d3 ui-card p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Settlements (last 7 days)</h3>
+          <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Settlements</h3>
         </div>
         <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-          For combos paid into one operator&rsquo;s account, this ledger tracks each side&rsquo;s share. When you&rsquo;ve paid your partner (or been paid), mark it settled — it&rsquo;s stamped into the settlement register (Reports → Settlement Register).
+          For combos paid into one operator&rsquo;s account, this ledger tracks each side&rsquo;s share — everything unsettled, broken down by week, plus the last 7 days of settled history. If you&rsquo;re owed money, generate a Yoco payment link: it&rsquo;s emailed to your partner and flips to Paid automatically when they pay. You can also mark bookings settled manually (e.g. EFT). Everything is stamped into the settlement register (Reports → Settlement Register).
         </p>
 
         {settlements === null ? (
@@ -428,6 +453,31 @@ export default function PartnershipsPage() {
                 <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_owed_to_me).toLocaleString()}</p>
               </div>
             </div>
+            {(s.weekly || []).length > 0 && (
+              <div className="overflow-x-auto">
+                <p className="ui-mono-label !text-[10px] mb-1">Owed by week (all unsettled combos)</p>
+                <table className="w-full text-left text-[12.5px]">
+                  <thead>
+                    <tr className="ui-mono-label !text-[10px]">
+                      <th className="py-1 pr-3">Week starting</th>
+                      <th className="py-1 pr-3 text-right">Partner owes me</th>
+                      <th className="py-1 pr-3 text-right">I owe partner</th>
+                      <th className="py-1 text-right">Combos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.weekly.map((w: any) => (
+                      <tr key={w.week_start} style={{ color: "var(--ck-text)" }}>
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(w.week_start)}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_me).toLocaleString()}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_partner).toLocaleString()}</td>
+                        <td className="py-1.5 text-right tabular-nums">{w.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {(s.bookings || []).length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-[12.5px]">
@@ -456,6 +506,54 @@ export default function PartnershipsPage() {
                 </table>
               </div>
             )}
+            {(() => {
+              const pr = s.payment_request;
+              const owedToMe = Number(s.total_owed_to_me || 0);
+              const pendingToMe = pr?.status === "PENDING_PAYMENT" && pr.direction === "OWED_TO_ME";
+              const pendingIOwe = pr?.status === "PENDING_PAYMENT" && pr.direction === "I_OWE";
+              const amountChanged = pendingToMe && Number(pr.amount_owed) !== owedToMe;
+              if (!pr && owedToMe <= 0) return null;
+              return (
+                <div className="flex flex-wrap items-center gap-2">
+                  {pr?.status === "PAID" && (
+                    <span className="ui-status ui-pill-success">
+                      Paid · R{Number(pr.amount_owed).toLocaleString()}{pr.paid_at ? " · " + fmtDate(pr.paid_at) : ""}
+                    </span>
+                  )}
+                  {pendingToMe && (
+                    <>
+                      <span className="ui-status ui-pill-warning">
+                        Payment link sent · R{Number(pr.amount_owed).toLocaleString()} · awaiting payment
+                      </span>
+                      {pr.payment_url && (
+                        <button
+                          className="ui-btn !py-1.5 text-[12px]"
+                          onClick={() => { navigator.clipboard.writeText(pr.payment_url); notify({ title: "Link copied", message: "Paste it anywhere your partner can click it.", tone: "success" }); }}
+                        >
+                          Copy link
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {pendingIOwe && pr.payment_url && (
+                    <a className="ui-btn ui-btn-primary !py-1.5 text-[12px]" href={pr.payment_url} target="_blank" rel="noreferrer">
+                      Pay R{Number(pr.amount_owed).toLocaleString()} now
+                    </a>
+                  )}
+                  {owedToMe > 0 && (!pendingToMe || amountChanged) && (
+                    <button
+                      onClick={() => generatePaymentLink(s)}
+                      disabled={linkBusy === s.partner_id}
+                      className="ui-btn ui-btn-primary !py-1.5 text-[12px]"
+                    >
+                      {linkBusy === s.partner_id
+                        ? "Creating…"
+                        : (amountChanged ? "Regenerate link · R" : "Generate payment link · R") + owedToMe.toLocaleString()}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {s.unsettled_count > 0 && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
