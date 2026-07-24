@@ -31,18 +31,19 @@ export default function PartnershipsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
 
-  // Offer create form
+  // Offer create form — row 0 is always one of my tours; further rows are
+  // partner tours (2–10 legs, so a combo can span several operators).
   const [showOfferForm, setShowOfferForm] = useState(false);
-  const [offerPartnerId, setOfferPartnerId] = useState("");
   const [myTours, setMyTours] = useState<any[]>([]);
-  const [partnerTours, setPartnerTours] = useState<any[]>([]);
-  const [myTourId, setMyTourId] = useState("");
-  const [partnerTourId, setPartnerTourId] = useState("");
+  const [partnerToursCache, setPartnerToursCache] = useState<Record<string, any[]>>({});
+  const [offerRows, setOfferRows] = useState<Array<{ partner_id: string; tour_id: string; share: string }>>([
+    { partner_id: "", tour_id: "", share: "50" },
+    { partner_id: "", tour_id: "", share: "50" },
+  ]);
   const [offerName, setOfferName] = useState("");
   const [comboPrice, setComboPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [splitType, setSplitType] = useState<"PERCENT" | "FIXED">("PERCENT");
-  const [myShare, setMyShare] = useState("50");
   const [savingOffer, setSavingOffer] = useState(false);
 
   // Settlement notes per partner
@@ -83,16 +84,18 @@ export default function PartnershipsPage() {
     })();
   }, [showOfferForm, businessId]);
 
-  useEffect(() => {
-    if (!offerPartnerId) { setPartnerTours([]); return; }
-    (async () => {
-      const headers = await authHeaders();
-      const r = await fetch(`/api/partner-tours?partner_id=${offerPartnerId}`, { headers });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) { notify({ title: "Could not load partner tours", message: d.error || "", tone: "error" }); return; }
-      setPartnerTours(d.tours || []);
-    })();
-  }, [offerPartnerId]);
+  async function loadPartnerTours(partnerId: string) {
+    if (!partnerId || partnerToursCache[partnerId]) return;
+    const headers = await authHeaders();
+    const r = await fetch(`/api/partner-tours?partner_id=${partnerId}`, { headers });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { notify({ title: "Could not load partner tours", message: d.error || "", tone: "error" }); return; }
+    setPartnerToursCache((c) => ({ ...c, [partnerId]: d.tours || [] }));
+  }
+
+  function updateOfferRow(idx: number, patch: Partial<{ partner_id: string; tour_id: string; share: string }>) {
+    setOfferRows((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
 
   async function invitePartner() {
     if (!inviteEmail.trim()) return;
@@ -131,18 +134,26 @@ export default function PartnershipsPage() {
 
   async function createOffer() {
     const price = Number(comboPrice);
-    const share = Number(myShare);
-    if (!offerPartnerId || !myTourId || !partnerTourId || !offerName.trim() || !price) {
-      notify({ title: "Missing fields", message: "Partner, both tours, a name and a combo price are required.", tone: "error" });
+    if (!offerName.trim() || !price) {
+      notify({ title: "Missing fields", message: "A name and a combo price are required.", tone: "error" });
       return;
     }
-    const partnerShare = splitType === "PERCENT" ? 100 - share : Math.round((price - share) * 100) / 100;
-    if (splitType === "PERCENT" && (share <= 0 || share >= 100)) {
-      notify({ title: "Invalid split", message: "Your percentage must be between 0 and 100.", tone: "error" });
+    if (offerRows.some((r, i) => !r.tour_id || (i > 0 && !r.partner_id))) {
+      notify({ title: "Missing fields", message: "Every row needs a partner (except your own tour) and a tour.", tone: "error" });
       return;
     }
-    if (splitType === "FIXED" && (share <= 0 || share >= price)) {
-      notify({ title: "Invalid split", message: "Your fixed share must be between 0 and the combo price.", tone: "error" });
+    const shares = offerRows.map((r) => Number(r.share));
+    if (shares.some((s) => !(s > 0))) {
+      notify({ title: "Invalid split", message: "Every share must be greater than 0.", tone: "error" });
+      return;
+    }
+    const shareSum = Math.round(shares.reduce((a, b) => a + b, 0) * 100) / 100;
+    if (splitType === "PERCENT" && Math.abs(shareSum - 100) > 0.01) {
+      notify({ title: "Invalid split", message: `Percentages must total 100% (currently ${shareSum}%).`, tone: "error" });
+      return;
+    }
+    if (splitType === "FIXED" && Math.abs(shareSum - price) > 0.01) {
+      notify({ title: "Invalid split", message: `Fixed shares must total the combo price of R${price} (currently R${shareSum}).`, tone: "error" });
       return;
     }
     setSavingOffer(true);
@@ -156,10 +167,12 @@ export default function PartnershipsPage() {
         combo_price: price,
         original_price: Number(originalPrice) || price,
         split_type: splitType,
-        items: [
-          { business_id: businessId, tour_id: myTourId, split_percent: splitType === "PERCENT" ? share : undefined, split_fixed: splitType === "FIXED" ? share : undefined },
-          { business_id: offerPartnerId, tour_id: partnerTourId, split_percent: splitType === "PERCENT" ? partnerShare : undefined, split_fixed: splitType === "FIXED" ? partnerShare : undefined },
-        ],
+        items: offerRows.map((row) => ({
+          business_id: row.partner_id || businessId,
+          tour_id: row.tour_id,
+          split_percent: splitType === "PERCENT" ? Number(row.share) : undefined,
+          split_fixed: splitType === "FIXED" ? Number(row.share) : undefined,
+        })),
       }),
     });
     const d = await r.json().catch(() => ({}));
@@ -167,7 +180,8 @@ export default function PartnershipsPage() {
     else {
       notify({ title: "Combo offer created", message: "It is live on your booking site's combo section.", tone: "success" });
       setShowOfferForm(false);
-      setOfferName(""); setComboPrice(""); setOriginalPrice(""); setMyTourId(""); setPartnerTourId("");
+      setOfferName(""); setComboPrice(""); setOriginalPrice("");
+      setOfferRows([{ partner_id: "", tour_id: "", share: "50" }, { partner_id: "", tour_id: "", share: "50" }]);
       load();
     }
     setSavingOffer(false);
@@ -193,7 +207,7 @@ export default function PartnershipsPage() {
     const headers = await authHeaders();
     const r = await fetch("/api/combo-settlements", {
       method: "POST", headers,
-      body: JSON.stringify({ combo_booking_ids: ids, notes: settleNotes[partner.partner_id] || null }),
+      body: JSON.stringify({ combo_booking_ids: ids, partner_business_id: partner.partner_id, notes: settleNotes[partner.partner_id] || null }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.error) notify({ title: "Settlement failed", message: d.error || "Unknown error", tone: "error" });
@@ -334,31 +348,10 @@ export default function PartnershipsPage() {
 
         {showOfferForm && (
           <div className="space-y-3 rounded-xl border p-4" style={{ borderColor: "var(--ck-border)" }}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                Partner
-                <select className="ui-control w-full text-sm" value={offerPartnerId} onChange={(e) => { setOfferPartnerId(e.target.value); setPartnerTourId(""); }}>
-                  <option value="">Select partner…</option>
-                  {activePartners.map((p) => <option key={p.id} value={p.partner_id}>{p.partner_name}</option>)}
-                </select>
-              </label>
+            <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
                 Offer name
                 <input className="ui-control w-full text-sm" value={offerName} onChange={(e) => setOfferName(e.target.value)} placeholder="e.g. Paddle & Peaks Combo" />
-              </label>
-              <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                Your tour
-                <select className="ui-control w-full text-sm" value={myTourId} onChange={(e) => setMyTourId(e.target.value)}>
-                  <option value="">Select your tour…</option>
-                  {myTours.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </label>
-              <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                Partner&rsquo;s tour
-                <select className="ui-control w-full text-sm" value={partnerTourId} onChange={(e) => setPartnerTourId(e.target.value)} disabled={!offerPartnerId}>
-                  <option value="">{offerPartnerId ? "Select their tour…" : "Pick a partner first"}</option>
-                  {partnerTours.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
               </label>
               <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
                 Combo price (per person, R)
@@ -368,24 +361,80 @@ export default function PartnershipsPage() {
                 Normal combined price (optional, shows the saving)
                 <input className="ui-control w-full text-sm" type="number" min="0" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} />
               </label>
-              <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+              <label className="space-y-1 text-[12px] sm:col-span-3" style={{ color: "var(--ck-text-muted)" }}>
                 Split type
-                <select className="ui-control w-full text-sm" value={splitType} onChange={(e) => setSplitType(e.target.value as "PERCENT" | "FIXED")}>
+                <select className="ui-control w-full text-sm sm:max-w-[260px]" value={splitType} onChange={(e) => setSplitType(e.target.value as "PERCENT" | "FIXED")}>
                   <option value="PERCENT">Percentage</option>
                   <option value="FIXED">Fixed amounts (per person)</option>
                 </select>
               </label>
-              <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                Your share ({splitType === "PERCENT" ? "%" : "R per person"})
-                <input className="ui-control w-full text-sm" type="number" min="0" value={myShare} onChange={(e) => setMyShare(e.target.value)} />
-              </label>
             </div>
-            {comboPrice && myShare && (
+
+            {/* One row per tour in the combo — row 0 is yours, rows below are partner tours */}
+            <div className="space-y-2">
+              {offerRows.map((row, idx) => {
+                const rowTours = idx === 0 ? myTours : (partnerToursCache[row.partner_id] || []);
+                return (
+                  <div key={idx} className="grid gap-2 sm:grid-cols-[1fr_1fr_120px_36px] items-end">
+                    {idx === 0 ? (
+                      <p className="text-[12px] pb-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Your tour</p>
+                    ) : (
+                      <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                        Partner
+                        <select
+                          className="ui-control w-full text-sm"
+                          value={row.partner_id}
+                          onChange={(e) => { updateOfferRow(idx, { partner_id: e.target.value, tour_id: "" }); loadPartnerTours(e.target.value); }}
+                        >
+                          <option value="">Select partner…</option>
+                          {activePartners.map((p) => <option key={p.id} value={p.partner_id}>{p.partner_name}</option>)}
+                        </select>
+                      </label>
+                    )}
+                    <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                      Tour
+                      <select
+                        className="ui-control w-full text-sm"
+                        value={row.tour_id}
+                        onChange={(e) => updateOfferRow(idx, { tour_id: e.target.value })}
+                        disabled={idx > 0 && !row.partner_id}
+                      >
+                        <option value="">{idx > 0 && !row.partner_id ? "Pick a partner first" : "Select tour…"}</option>
+                        {rowTours.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                      Share ({splitType === "PERCENT" ? "%" : "R pp"})
+                      <input className="ui-control w-full text-sm" type="number" min="0" value={row.share} onChange={(e) => updateOfferRow(idx, { share: e.target.value })} />
+                    </label>
+                    {idx >= 2 ? (
+                      <button
+                        onClick={() => setOfferRows((rows) => rows.filter((_, i) => i !== idx))}
+                        className="ui-btn !px-0 !py-2 text-[12px] text-[var(--ck-danger)]"
+                        title="Remove this tour"
+                      >
+                        &times;
+                      </button>
+                    ) : <span />}
+                  </div>
+                );
+              })}
+              {offerRows.length < 10 && (
+                <button
+                  onClick={() => setOfferRows((rows) => [...rows, { partner_id: "", tour_id: "", share: "" }])}
+                  className="ui-btn !py-1.5 text-[12px]"
+                >
+                  + Add another partner tour
+                </button>
+              )}
+            </div>
+
+            {comboPrice && (
               <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
                 {splitType === "PERCENT"
-                  ? `You ${myShare}% · Partner ${100 - Number(myShare)}%`
-                  : `You R${myShare} · Partner R${Math.round((Number(comboPrice) - Number(myShare)) * 100) / 100} per person`}
-                {" — you collect the full payment and settle your partner's share (unless Paysafe auto-split is configured)."}
+                  ? `Shares total ${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100}% (must be 100%)`
+                  : `Shares total R${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100} of R${comboPrice} per person`}
+                {" — you collect the full payment and settle each partner's share (unless Paysafe auto-split is configured for a 2-tour combo)."}
               </p>
             )}
             <button onClick={createOffer} disabled={savingOffer} className="ui-btn ui-btn-primary">{savingOffer ? "Creating…" : "Create Offer"}</button>

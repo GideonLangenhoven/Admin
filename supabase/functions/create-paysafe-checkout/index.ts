@@ -40,10 +40,10 @@ async function logEvent(businessId: string, bookingId: string | null, event: str
 
 async function handleCreate(body: any, cors: Record<string, string>) {
   const { combo_offer_id, slot_a_id, slot_b_id, customer_name, customer_email, customer_phone, promo_code } = body;
-  if (!combo_offer_id || !slot_a_id || !slot_b_id || !body.qty) {
-    return jsonRes({ error: "combo_offer_id, slot_a_id, slot_b_id, and qty are required" }, 400, cors);
-  }
   const qty = Number(body.qty);
+  if (!combo_offer_id || !body.qty) {
+    return jsonRes({ error: "combo_offer_id and qty are required" }, 400, cors);
+  }
   if (!Number.isFinite(qty) || qty < 1) {
     return jsonRes({ error: "qty must be a positive number" }, 400, cors);
   }
@@ -59,25 +59,62 @@ async function handleCreate(body: any, cors: Record<string, string>) {
     return jsonRes({ error: "Combo offer not found or inactive" }, 404, cors);
   }
 
-  // Verify both slots have capacity
-  const { data: slotA } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_a_id).single();
-  const { data: slotB } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", slot_b_id).single();
-  if (!slotA || !slotB) {
-    return jsonRes({ error: "One or both slots not found" }, 404, cors);
-  }
-  const availA = (slotA.capacity_total || 0) - (slotA.booked || 0) - (slotA.held || 0);
-  const availB = (slotB.capacity_total || 0) - (slotB.booked || 0) - (slotB.held || 0);
-  if (availA < qty) return jsonRes({ error: "Slot A does not have enough capacity (available: " + availA + ")" }, 400, cors);
-  if (availB < qty) return jsonRes({ error: "Slot B does not have enough capacity (available: " + availB + ")" }, 400, cors);
+  // Build the leg list: N-party via combo_offer_items, legacy 2-party via the
+  // A/B columns. slot_ids maps item id → chosen slot; legacy slot_a_id/slot_b_id
+  // are accepted for 2-leg offers (older booking-app builds).
+  const { data: offerItems } = await supabase
+    .from("combo_offer_items")
+    .select("id, tour_id, business_id, position, split_percent, split_fixed")
+    .eq("combo_offer_id", offer.id)
+    .order("position", { ascending: true });
+  const slotIdMap: Record<string, string> = (body.slot_ids && typeof body.slot_ids === "object") ? body.slot_ids : {};
 
-  // Validate and apply promo code if provided
+  type LegSpec = { item_id: string | null; tour_id: string; business_id: string; slot_id: string; split_percent: number | null; split_fixed: number | null };
+  let legSpecs: LegSpec[];
+  if (offerItems && offerItems.length >= 2) {
+    legSpecs = offerItems.map((it: any, idx: number) => ({
+      item_id: it.id,
+      tour_id: it.tour_id,
+      business_id: it.business_id,
+      slot_id: String(slotIdMap[it.id] || (idx === 0 ? slot_a_id : idx === 1 ? slot_b_id : "") || ""),
+      split_percent: it.split_percent != null ? Number(it.split_percent) : null,
+      split_fixed: it.split_fixed != null ? Number(it.split_fixed) : null,
+    }));
+  } else {
+    if (!offer.business_a_id || !offer.business_b_id) {
+      return jsonRes({ error: "Combo offer has no sellable items" }, 400, cors);
+    }
+    legSpecs = [
+      { item_id: null, tour_id: offer.tour_a_id, business_id: offer.business_a_id, slot_id: String(slot_a_id || ""), split_percent: offer.split_a_percent != null ? Number(offer.split_a_percent) : null, split_fixed: offer.split_a_fixed != null ? Number(offer.split_a_fixed) : null },
+      { item_id: null, tour_id: offer.tour_b_id, business_id: offer.business_b_id, slot_id: String(slot_b_id || ""), split_percent: offer.split_b_percent != null ? Number(offer.split_b_percent) : null, split_fixed: offer.split_b_fixed != null ? Number(offer.split_b_fixed) : null },
+    ];
+  }
+  if (legSpecs.some((l) => !l.slot_id)) {
+    return jsonRes({ error: "A slot must be selected for every tour in the combo" }, 400, cors);
+  }
+
+  // Verify every slot exists, belongs to its leg's tour, and has capacity
+  for (const leg of legSpecs) {
+    const { data: slot } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", leg.slot_id).single();
+    if (!slot || String(slot.tour_id) !== String(leg.tour_id)) {
+      return jsonRes({ error: "Selected slot not found for one of the tours" }, 404, cors);
+    }
+    const avail = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
+    if (avail < qty) return jsonRes({ error: "One of the tours does not have enough capacity (available: " + avail + ")" }, 400, cors);
+  }
+
+  // The collector is the operator who receives the customer's payment (and
+  // settles the other legs). Offer creator = first leg by construction.
+  const collectorId = String(offer.business_a_id || offer.created_by_business_id || legSpecs[0].business_id);
+
+  // Validate and apply promo code if provided (collector's promo codes)
   let promoDiscount = 0;
   let appliedPromoCode = "";
   let comboTotal = Number(offer.combo_price) * qty;
 
   if (promo_code) {
     const promoResult = await supabase.rpc("validate_promo_code", {
-      p_business_id: offer.business_a_id,
+      p_business_id: collectorId,
       p_code: promo_code,
       p_order_amount: comboTotal,
       p_customer_email: customer_email || null,
@@ -98,167 +135,186 @@ async function handleCreate(body: any, cors: Record<string, string>) {
     }
   }
 
-  // Calculate totals based on split type
-  let splitA: number;
-  let splitB: number;
+  // Per-leg split amounts. PERCENT: shares of the (possibly discounted) total,
+  // last leg absorbs the rounding remainder so the splits always sum exactly.
+  // FIXED: split_fixed × qty per leg (promo discounts come off the collector's
+  // take implicitly, matching the original 2-party behaviour).
+  const splits: number[] = [];
   if (offer.split_type === "PERCENT") {
-    splitA = Number(offer.split_a_percent) / 100 * comboTotal;
-    splitB = comboTotal - splitA;
+    let allocated = 0;
+    legSpecs.forEach((leg, i) => {
+      if (i === legSpecs.length - 1) {
+        splits.push(Math.round((comboTotal - allocated) * 100) / 100);
+      } else {
+        const amt = Math.round(comboTotal * (Number(leg.split_percent || 0) / 100) * 100) / 100;
+        splits.push(amt);
+        allocated += amt;
+      }
+    });
   } else {
-    // FIXED split
-    splitA = Number(offer.split_a_fixed) * qty;
-    splitB = Number(offer.split_b_fixed) * qty;
-  }
-  // Round to 2 decimals
-  splitA = Math.round(splitA * 100) / 100;
-  splitB = Math.round(splitB * 100) / 100;
-
-  // Create booking A (business_a)
-  const { data: bookingA, error: bookAErr } = await supabase.from("bookings").insert({
-    business_id: offer.business_a_id,
-    tour_id: offer.tour_a_id,
-    slot_id: slot_a_id,
-    status: "HELD",
-    is_combo: true,
-    customer_name: customer_name || "",
-    email: customer_email || "",
-    phone: customer_phone || "",
-    qty: qty,
-    total_amount: splitA,
-    unit_price: splitA / qty,
-    source: "WEB",
-    payment_method: "PAYSAFE_COMBO",
-    ...(appliedPromoCode ? { promo_code: appliedPromoCode, discount_amount: promoDiscount } : {}),
-  }).select("id").single();
-  if (bookAErr || !bookingA) {
-    return jsonRes({ error: "Failed to create booking A: " + (bookAErr?.message || "unknown") }, 500, cors);
+    legSpecs.forEach((leg) => splits.push(Math.round(Number(leg.split_fixed || 0) * qty * 100) / 100));
   }
 
-  // Create booking B (business_b)
-  const { data: bookingB, error: bookBErr } = await supabase.from("bookings").insert({
-    business_id: offer.business_b_id,
-    tour_id: offer.tour_b_id,
-    slot_id: slot_b_id,
-    status: "HELD",
-    is_combo: true,
-    customer_name: customer_name || "",
-    email: customer_email || "",
-    phone: customer_phone || "",
-    qty: qty,
-    total_amount: splitB,
-    unit_price: splitB / qty,
-    source: "WEB",
-    payment_method: "PAYSAFE_COMBO",
-  }).select("id").single();
-  if (bookBErr || !bookingB) {
-    // Rollback booking A
-    await supabase.from("bookings").delete().eq("id", bookingA.id);
-    return jsonRes({ error: "Failed to create booking B: " + (bookBErr?.message || "unknown") }, 500, cors);
+  // One HELD booking per leg; any failure rolls back everything created so far
+  const bookingIds: string[] = [];
+  const rollbackBookings = async () => {
+    for (const id of bookingIds) await supabase.from("bookings").delete().eq("id", id);
+  };
+  for (let i = 0; i < legSpecs.length; i++) {
+    const leg = legSpecs[i];
+    const { data: bk, error: bkErr } = await supabase.from("bookings").insert({
+      business_id: leg.business_id,
+      tour_id: leg.tour_id,
+      slot_id: leg.slot_id,
+      status: "HELD",
+      is_combo: true,
+      customer_name: customer_name || "",
+      email: customer_email || "",
+      phone: customer_phone || "",
+      qty: qty,
+      total_amount: splits[i],
+      unit_price: splits[i] / qty,
+      source: "WEB",
+      payment_method: "PAYSAFE_COMBO",
+      ...(i === 0 && appliedPromoCode ? { promo_code: appliedPromoCode, discount_amount: promoDiscount } : {}),
+    }).select("id").single();
+    if (bkErr || !bk) {
+      await rollbackBookings();
+      return jsonRes({ error: "Failed to create booking: " + (bkErr?.message || "unknown") }, 500, cors);
+    }
+    bookingIds.push(bk.id);
   }
 
-  // Create combo_bookings record
+  // Parent combo row. The legacy A/B columns mirror the first two legs so
+  // every existing lookup keeps working; split_b_amount = everything the
+  // collector owes the other operators.
+  const collectorSum = legSpecs.reduce((s, leg, i) => leg.business_id === collectorId ? s + splits[i] : s, 0);
   const { data: comboBooking, error: comboErr } = await supabase.from("combo_bookings").insert({
     combo_offer_id: offer.id,
-    booking_a_id: bookingA.id,
-    booking_b_id: bookingB.id,
+    booking_a_id: bookingIds[0],
+    booking_b_id: bookingIds[1] || null,
     combo_total: comboTotal,
-    split_a_amount: splitA,
-    split_b_amount: splitB,
+    split_a_amount: Math.round(collectorSum * 100) / 100,
+    split_b_amount: Math.round((comboTotal - collectorSum) * 100) / 100,
     payment_status: "PENDING",
     customer_name: customer_name || "",
     customer_email: customer_email || "",
     customer_phone: customer_phone || "",
   }).select("id").single();
   if (comboErr || !comboBooking) {
-    // Rollback both bookings
-    await supabase.from("bookings").delete().eq("id", bookingA.id);
-    await supabase.from("bookings").delete().eq("id", bookingB.id);
+    await rollbackBookings();
     return jsonRes({ error: "Failed to create combo booking: " + (comboErr?.message || "unknown") }, 500, cors);
   }
 
-  // Link bookings back to combo record
-  await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingA.id);
-  await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", bookingB.id);
+  // Per-leg items — the authoritative N-party record (confirm RPC, settlement
+  // aggregation and payment links all read these).
+  const { error: itemsErr } = await supabase.from("combo_booking_items").insert(
+    legSpecs.map((leg, i) => ({
+      combo_booking_id: comboBooking.id,
+      booking_id: bookingIds[i],
+      business_id: leg.business_id,
+      tour_id: leg.tour_id,
+      position: i + 1,
+      split_amount: splits[i],
+    })),
+  );
+  if (itemsErr) {
+    await supabase.from("combo_bookings").delete().eq("id", comboBooking.id);
+    await rollbackBookings();
+    return jsonRes({ error: "Failed to create combo items: " + itemsErr.message }, 500, cors);
+  }
 
-  // S8: reserve capacity on both slots with an atomic capacity CHECK (prevents
-  // combo overbooking under concurrency). If either slot is full, roll back
-  // everything created so far and return 409.
+  // Link bookings back to combo record
+  for (const id of bookingIds) {
+    await supabase.from("bookings").update({ combo_booking_id: comboBooking.id }).eq("id", id);
+  }
+
+  // S8: reserve capacity on every slot with an atomic capacity CHECK (prevents
+  // combo overbooking under concurrency). If any slot is full, release what we
+  // reserved, roll back everything created so far and return 409.
   const rollbackCombo = async () => {
-    await supabase.from("bookings").delete().eq("id", bookingA.id);
-    await supabase.from("bookings").delete().eq("id", bookingB.id);
+    await supabase.from("combo_booking_items").delete().eq("combo_booking_id", comboBooking.id);
+    await rollbackBookings();
     await supabase.from("combo_bookings").delete().eq("id", comboBooking.id);
   };
-  const resA = await supabase.rpc("reserve_combo_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_qty: qty });
-  if (resA.error || resA.data !== true) {
-    await rollbackCombo();
-    return jsonRes({ error: "Those spots were just taken on the first tour. Please pick another time." }, 409, cors);
-  }
-  const resB = await supabase.rpc("reserve_combo_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_qty: qty });
-  if (resB.error || resB.data !== true) {
-    // release the slot-A reservation we just took, then roll back
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: -qty });
-    await rollbackCombo();
-    return jsonRes({ error: "Those spots were just taken on the second tour. Please pick another time." }, 409, cors);
+  const reserved: LegSpec[] = [];
+  const releaseReserved = async () => {
+    for (const leg of reserved) {
+      await supabase.rpc("adjust_slot_capacity", { p_slot_id: leg.slot_id, p_business_id: leg.business_id, p_booked_delta: 0, p_held_delta: -qty });
+    }
+  };
+  for (const leg of legSpecs) {
+    const res = await supabase.rpc("reserve_combo_capacity", { p_slot_id: leg.slot_id, p_business_id: leg.business_id, p_qty: qty });
+    if (res.error || res.data !== true) {
+      await releaseReserved();
+      await rollbackCombo();
+      return jsonRes({ error: "Those spots were just taken on one of the tours. Please pick another time." }, 409, cors);
+    }
+    reserved.push(leg);
   }
 
-  // Hold rows for both legs: gives abandoned combo checkouts the standard
+  // Hold rows for every leg: gives abandoned combo checkouts the standard
   // 15-min-expiry lifecycle via cron-tasks (release held capacity, expire the
   // bookings). confirm_combo_payment_atomic CONSUMEs these on payment.
   const holdExpiry = new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString();
-  const holdIns = await supabase.from("holds").insert([
-    { booking_id: bookingA.id, slot_id: slot_a_id, qty: qty, status: "ACTIVE", hold_type: "COMBO", expires_at: holdExpiry },
-    { booking_id: bookingB.id, slot_id: slot_b_id, qty: qty, status: "ACTIVE", hold_type: "COMBO", expires_at: holdExpiry },
-  ]);
+  const holdIns = await supabase.from("holds").insert(
+    legSpecs.map((leg, i) => ({ booking_id: bookingIds[i], slot_id: leg.slot_id, qty: qty, status: "ACTIVE", hold_type: "COMBO", expires_at: holdExpiry })),
+  );
   if (holdIns.error) console.error("COMBO_HOLDS_ERR (capacity still reserved, reconcile heals):", holdIns.error.message);
 
   // ── Payment provider selection ──────────────────────────────────────────
-  // Paysafe SplitPay needs: business A API creds + BOTH linked account IDs.
-  // Otherwise fall back to the manual-settlement model: business A collects
-  // the full amount via their own Yoco account.
-  const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, paysafe_linked_account_id, currency").eq("id", offer.business_a_id).single();
-  const { data: bizB } = await supabase.from("businesses").select("paysafe_linked_account_id").eq("id", offer.business_b_id).single();
+  // Paysafe SplitPay needs: collector API creds + both linked account IDs —
+  // and stays 2-party only (handleProcess splits pairwise).
+  // ponytail: 3+ operator combos always use the Yoco manual-settlement model;
+  // generalize the Paysafe path when a 3-way SplitPay combo actually exists.
+  const distinctBusinessIds = [...new Set(legSpecs.map((l) => l.business_id))];
+  const paysafeEligible = legSpecs.length === 2 && distinctBusinessIds.length === 2;
+  const otherBusinessId = distinctBusinessIds.find((id) => id !== collectorId) || "";
+
+  const { data: bizA } = await supabase.from("businesses").select("paysafe_account_id, paysafe_linked_account_id, currency").eq("id", collectorId).single();
+  const { data: bizB } = paysafeEligible && otherBusinessId
+    ? await supabase.from("businesses").select("paysafe_linked_account_id").eq("id", otherBusinessId).single()
+    : { data: null };
 
   let credsA;
   try {
-    credsA = await getBusinessCredentials(supabase, offer.business_a_id);
+    credsA = await getBusinessCredentials(supabase, collectorId);
   } catch (credErr: any) {
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: -qty });
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_booked_delta: 0, p_held_delta: -qty });
+    await releaseReserved();
     await rollbackCombo();
     return jsonRes({ error: "Payment configuration error: " + (credErr?.message || "credentials unavailable") }, 503, cors);
   }
 
-  const paysafeConfigured = Boolean(
+  const paysafeConfigured = paysafeEligible && Boolean(
     credsA.paysafeApiKey && credsA.paysafeApiSecret &&
     bizA?.paysafe_account_id && bizA?.paysafe_linked_account_id && bizB?.paysafe_linked_account_id,
   );
 
   const baseResponse = {
     combo_booking_id: comboBooking.id,
-    booking_a_id: bookingA.id,
-    booking_b_id: bookingB.id,
+    booking_a_id: bookingIds[0],
+    booking_b_id: bookingIds[1] || null,
+    booking_ids: bookingIds,
     combo_total: comboTotal,
     currency: bizA?.currency || offer.currency || "ZAR",
   };
 
   if (paysafeConfigured) {
-    await logEvent(offer.business_a_id, bookingA.id, "combo_checkout_created", {
+    await logEvent(collectorId, bookingIds[0], "combo_checkout_created", {
       combo_booking_id: comboBooking.id, combo_offer_id: offer.id,
-      booking_a_id: bookingA.id, booking_b_id: bookingB.id,
-      total: comboTotal, split_a: splitA, split_b: splitB, provider: "paysafe",
+      booking_ids: bookingIds, total: comboTotal, splits, provider: "paysafe",
     });
     return jsonRes({ ...baseResponse, provider: "paysafe", paysafe_api_key: bizA?.paysafe_account_id || "" }, 200, cors);
   }
 
-  // ── Yoco fallback (manual settlement) ──
+  // ── Yoco fallback (manual settlement): the collector takes the full amount ──
   if (!credsA.activeYocoSecretKey) {
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: -qty });
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_booked_delta: 0, p_held_delta: -qty });
+    await releaseReserved();
     await rollbackCombo();
     return jsonRes({ error: "No payment provider configured for this combo. The primary operator needs either Paysafe (with linked accounts) or Yoco credentials." }, 503, cors);
   }
 
-  const tenantA = await getTenantByBusinessId(supabase, offer.business_a_id);
+  const tenantA = await getTenantByBusinessId(supabase, collectorId);
   const siteUrl = resolveBookingSiteUrl(tenantA.business);
   const successUrl = (tenantA.business.booking_success_url || (siteUrl ? siteUrl + "/success" : "https://bookingtours.co.za")) + "?combo=" + comboBooking.id;
   const cancelUrl = tenantA.business.booking_cancel_url || (siteUrl ? siteUrl + "/cancelled" : "https://bookingtours.co.za");
@@ -275,28 +331,26 @@ async function handleCreate(body: any, cors: Record<string, string>) {
       metadata: {
         type: "COMBO",
         combo_booking_id: comboBooking.id,
-        booking_id: bookingA.id,
-        business_id: offer.business_a_id,
+        booking_id: bookingIds[0],
+        business_id: collectorId,
       },
     }),
   });
   const yocoData = await yocoRes.json();
   if (!yocoRes.ok || !yocoData?.id || !yocoData?.redirectUrl) {
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_a_id, p_business_id: offer.business_a_id, p_booked_delta: 0, p_held_delta: -qty });
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: slot_b_id, p_business_id: offer.business_b_id, p_booked_delta: 0, p_held_delta: -qty });
+    await releaseReserved();
     await rollbackCombo();
     return jsonRes({ error: "Unable to create checkout: " + (yocoData?.message || yocoData?.error?.message || "Yoco error") }, 502, cors);
   }
 
-  // yoco_checkout_id on booking A makes the webhook's checkoutId→business
-  // resolver work; the combo row carries it for combo lookup.
+  // yoco_checkout_id on the collector's booking makes the webhook's
+  // checkoutId→business resolver work; the combo row carries it for combo lookup.
   await supabase.from("combo_bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", comboBooking.id);
-  await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", bookingA.id);
+  await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", bookingIds[0]);
 
-  await logEvent(offer.business_a_id, bookingA.id, "combo_checkout_created", {
+  await logEvent(collectorId, bookingIds[0], "combo_checkout_created", {
     combo_booking_id: comboBooking.id, combo_offer_id: offer.id,
-    booking_a_id: bookingA.id, booking_b_id: bookingB.id,
-    total: comboTotal, split_a: splitA, split_b: splitB, provider: "yoco",
+    booking_ids: bookingIds, total: comboTotal, splits, provider: "yoco",
   });
 
   return jsonRes({ ...baseResponse, provider: "yoco", redirect_url: yocoData.redirectUrl }, 200, cors);

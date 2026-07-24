@@ -407,13 +407,29 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           notes: ((settlement.notes ? settlement.notes + " · " : "") + "Paid via Yoco " + (yocoPaymentId || checkoutId)),
         }).eq("id", settlement.id);
 
+        // Settle per pair: only the owed operator's legs are marked settled;
+        // the combo-wide flag flips once no non-collector leg remains open.
+        // Legacy combos without items rows settle whole (2-party, one pair).
         const comboIds: string[] = Array.isArray(settlement.combo_booking_ids) ? settlement.combo_booking_ids : [];
-        if (comboIds.length > 0) {
-          await supabase.from("combo_bookings").update({
-            settled: true,
-            settled_at: nowIso,
-            settlement_notes: "Paid via Yoco settlement link",
-          }).in("id", comboIds).eq("settled", false);
+        for (const cid of comboIds) {
+          const { data: legItems } = await supabase.from("combo_booking_items")
+            .select("id, business_id, settled_at").eq("combo_booking_id", cid);
+          if (!legItems || legItems.length === 0) {
+            await supabase.from("combo_bookings").update({
+              settled: true, settled_at: nowIso, settlement_notes: "Paid via Yoco settlement link",
+            }).eq("id", cid).eq("settled", false);
+            continue;
+          }
+          await supabase.from("combo_booking_items").update({ settled_at: nowIso })
+            .eq("combo_booking_id", cid).eq("business_id", settlement.owed_business_id).is("settled_at", null);
+          const stillOpen = legItems.some((it: any) =>
+            it.business_id !== settlement.collector_business_id &&
+            it.business_id !== settlement.owed_business_id && !it.settled_at);
+          if (!stillOpen) {
+            await supabase.from("combo_bookings").update({
+              settled: true, settled_at: nowIso, settlement_notes: "Paid via Yoco settlement link",
+            }).eq("id", cid).eq("settled", false);
+          }
         }
 
         await supabase.from("logs").insert({

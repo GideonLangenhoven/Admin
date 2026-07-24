@@ -110,10 +110,10 @@ export async function POST(req: NextRequest) {
       partnershipIds[partnerId] = p.id;
     }
 
-    // 2-party offers also populate the legacy A/B columns — the customer
-    // checkout (create-paysafe-checkout) and booking site sell through those.
+    // 2-party offers also populate the legacy A/B columns for older lookups.
     // A = the creator (they collect payment in the manual-settlement model).
-    // Items-only offers (3+) are stored but not yet sellable.
+    // 3+ party offers are items-only; checkout and the booking site read
+    // combo_offer_items directly.
     let legacyCols: Record<string, unknown> = {};
     if (items.length === 2 && businessIds.length === 1) {
       const mine = items.find((i: any) => i.business_id === business_id);

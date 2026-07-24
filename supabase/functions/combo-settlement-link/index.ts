@@ -87,18 +87,41 @@ Deno.serve(async (req: any) => {
     const myBizId = session.business_id;
     if (partnerBusinessId === myBizId) return fail(req, "Cannot settle with yourself", 400);
 
-    // Everything partner A has collected and not yet settled with me (B).
+    // Everything partner A has collected and not yet settled with me.
+    // N-party via combo_booking_items (my unsettled legs on combos the partner
+    // collected); legacy 2-party via the offer's A/B columns.
     const combosRes = await supabase
       .from("combo_bookings")
-      .select("id, combo_total, split_b_amount, created_at, combo_offers!inner(partnership_id, business_a_id, business_b_id)")
+      .select("id, combo_total, split_b_amount, created_at, combo_booking_items(business_id, split_amount, settled_at, position), combo_offers(partnership_id, business_a_id, business_b_id, created_by_business_id)")
       .eq("settled", false)
-      .in("payment_status", ["PAID", "VOUCHER_ISSUED"])
-      .eq("combo_offers.business_a_id", partnerBusinessId)
-      .eq("combo_offers.business_b_id", myBizId);
+      .in("payment_status", ["PAID", "VOUCHER_ISSUED"]);
     if (combosRes.error) return fail(req, combosRes.error.message, 500);
-    const combos = combosRes.data || [];
 
-    const amountOwed = Math.round(combos.reduce((s: number, c: any) => s + Number(c.split_b_amount || 0), 0) * 100) / 100;
+    const combos: any[] = [];
+    let amountOwed = 0;
+    for (const c of (combosRes.data || []) as any[]) {
+      const cOffer = c.combo_offers;
+      if (!cOffer) continue;
+      const items = c.combo_booking_items || [];
+      if (items.length > 0) {
+        const collector = cOffer.business_a_id || cOffer.created_by_business_id
+          || items.find((it: any) => it.position === 1)?.business_id;
+        if (String(collector) !== partnerBusinessId) continue;
+        const owed = items
+          .filter((it: any) => it.business_id === myBizId && !it.settled_at)
+          .reduce((s: number, it: any) => s + Number(it.split_amount || 0), 0);
+        if (owed <= 0) continue;
+        combos.push(c);
+        amountOwed += owed;
+      } else {
+        if (cOffer.business_a_id !== partnerBusinessId || cOffer.business_b_id !== myBizId) continue;
+        const owed = Number(c.split_b_amount || 0);
+        if (owed <= 0) continue;
+        combos.push(c);
+        amountOwed += owed;
+      }
+    }
+    amountOwed = Math.round(amountOwed * 100) / 100;
     if (combos.length === 0 || amountOwed <= 0) {
       return fail(req, "Nothing is currently owed to you by this partner.", 400);
     }
@@ -141,8 +164,20 @@ Deno.serve(async (req: any) => {
     const dates = combos.map((c: any) => String(c.created_at).slice(0, 10)).sort();
     const nowIso = new Date().toISOString();
 
+    // N-party offers store no pairwise partnership on the offer row — resolve
+    // the canonical (collector, me) pair from business_partnerships.
+    let partnershipId = (combos[0] as any).combo_offers?.partnership_id || null;
+    if (!partnershipId) {
+      const aId = myBizId < partnerBusinessId ? myBizId : partnerBusinessId;
+      const bId = myBizId < partnerBusinessId ? partnerBusinessId : myBizId;
+      const { data: pRow } = await supabase.from("business_partnerships").select("id")
+        .eq("business_a_id", aId).eq("business_b_id", bId).maybeSingle();
+      partnershipId = pRow?.id || null;
+    }
+    if (!partnershipId) return fail(req, "No partnership found with this operator.", 400);
+
     const insertRes = await supabase.from("combo_settlements").insert({
-      partnership_id: (combos[0] as any).combo_offers.partnership_id,
+      partnership_id: partnershipId,
       period_start: dates[0],
       period_end: dates[dates.length - 1],
       collector_business_id: partnerBusinessId,
