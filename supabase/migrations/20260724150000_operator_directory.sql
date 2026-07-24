@@ -3,27 +3,31 @@
 -- businesses_anon_select deliberately blocks tenant enumeration, so the
 -- directory reads through a dedicated owner-rights view that exposes ONLY
 -- public marketing fields for operators that opted in (directory_visible,
--- default true — new operators appear automatically). Styling/copy lives in
--- platform_settings ('directory' row): anon-readable, super-admin-writable.
+-- default true — new operators appear automatically).
+--
+-- Page copy/styling lives in platform_public_settings ('directory' row):
+-- anon-readable, super-admin-writable. NOTE: deliberately a NEW table — the
+-- existing platform_settings holds the platform's ENCRYPTED BANKING details
+-- and must never carry an anon-read policy.
 -- Expand-only.
 
 ALTER TABLE businesses
   ADD COLUMN IF NOT EXISTS directory_visible boolean NOT NULL DEFAULT true;
 
-CREATE TABLE IF NOT EXISTS platform_settings (
+CREATE TABLE IF NOT EXISTS platform_public_settings (
   key text PRIMARY KEY,
   value jsonb NOT NULL DEFAULT '{}'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_public_settings ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS platform_settings_public_read ON platform_settings;
-CREATE POLICY platform_settings_public_read ON platform_settings
+DROP POLICY IF EXISTS platform_public_settings_public_read ON platform_public_settings;
+CREATE POLICY platform_public_settings_public_read ON platform_public_settings
   FOR SELECT TO anon, authenticated USING (true);
 
-DROP POLICY IF EXISTS platform_settings_super_admin_all ON platform_settings;
-CREATE POLICY platform_settings_super_admin_all ON platform_settings
+DROP POLICY IF EXISTS platform_public_settings_super_admin_all ON platform_public_settings;
+CREATE POLICY platform_public_settings_super_admin_all ON platform_public_settings
   FOR ALL TO authenticated
   USING (EXISTS (
     SELECT 1 FROM admin_users au
@@ -36,7 +40,7 @@ CREATE POLICY platform_settings_super_admin_all ON platform_settings
       AND upper(COALESCE(au.role, '')) LIKE 'SUPER%'
   ));
 
-INSERT INTO platform_settings (key, value) VALUES ('directory', '{}'::jsonb)
+INSERT INTO platform_public_settings (key, value) VALUES ('directory', '{}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 -- Owner-rights view: intentionally bypasses businesses RLS to expose only

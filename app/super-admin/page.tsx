@@ -2224,7 +2224,7 @@ function DirectoryPanel() {
   async function load() {
     setLoading(true);
     const [{ data: settingsRow }, { data: biz }] = await Promise.all([
-      supabase.from("platform_settings").select("value").eq("key", "directory").maybeSingle(),
+      supabase.from("platform_public_settings").select("value").eq("key", "directory").maybeSingle(),
       supabase.from("businesses").select("id, name, business_name, subdomain, directory_visible").order("name"),
     ]);
     setCfg(settingsRow?.value || {});
@@ -2241,7 +2241,7 @@ function DirectoryPanel() {
 
   async function save() {
     setSaving(true);
-    const { error } = await supabase.from("platform_settings").upsert({
+    const { error } = await supabase.from("platform_public_settings").upsert({
       key: "directory",
       value: cfg,
       updated_at: new Date().toISOString(),
