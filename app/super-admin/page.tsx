@@ -1098,6 +1098,9 @@ export default function SuperAdminPage() {
 
       {/* ── Chatbot Ratings (visitor feedback across all tenants) ── */}
       <ChatbotRatingsPanel />
+
+      {/* ── Operator Directory (central landing page copy + visibility) ── */}
+      <DirectoryPanel />
     </div>
   );
 }
@@ -2203,5 +2206,141 @@ function ChatbotAvatarManager() {
         </div>
       </div>
     </section>
+  );
+}
+
+// Central operator-directory landing page (bare booking domain): edit the
+// hero copy, styling and value props stored in platform_settings('directory'),
+// and toggle which operators are listed (businesses.directory_visible — new
+// operators default to visible). RLS: platform_settings super-admin ALL;
+// businesses_super_admin_all covers the visibility updates.
+function DirectoryPanel() {
+  const [cfg, setCfg] = useState<any>({});
+  const [operators, setOperators] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [busyBiz, setBusyBiz] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    const [{ data: settingsRow }, { data: biz }] = await Promise.all([
+      supabase.from("platform_settings").select("value").eq("key", "directory").maybeSingle(),
+      supabase.from("businesses").select("id, name, business_name, subdomain, directory_visible").order("name"),
+    ]);
+    setCfg(settingsRow?.value || {});
+    setOperators(biz || []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  function setField(key: string, value: any) {
+    setCfg((c: any) => ({ ...c, [key]: value }));
+  }
+
+  const valueProps: Array<{ title: string; text: string }> = Array.isArray(cfg.value_props) ? cfg.value_props : [];
+
+  async function save() {
+    setSaving(true);
+    const { error } = await supabase.from("platform_settings").upsert({
+      key: "directory",
+      value: cfg,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) notify({ title: "Save failed", message: error.message, tone: "error" });
+    else notify({ title: "Directory saved", message: "The landing page updates immediately.", tone: "success" });
+    setSaving(false);
+  }
+
+  async function toggleVisible(biz: any) {
+    setBusyBiz(biz.id);
+    const { error } = await supabase.from("businesses")
+      .update({ directory_visible: !biz.directory_visible })
+      .eq("id", biz.id);
+    if (error) notify({ title: "Update failed", message: error.message, tone: "error" });
+    else setOperators((ops) => ops.map((o) => o.id === biz.id ? { ...o, directory_visible: !biz.directory_visible } : o));
+    setBusyBiz(null);
+  }
+
+  const fields: Array<{ key: string; label: string; placeholder: string }> = [
+    { key: "eyebrow", label: "Eyebrow", placeholder: "BookingTours" },
+    { key: "headline", label: "Headline", placeholder: "Real adventures, run by real local operators" },
+    { key: "subheadline", label: "Subheadline", placeholder: "Kayaking, hiking, boats, wine routes and more…" },
+    { key: "search_placeholder", label: "Search placeholder", placeholder: "Search operators or locations…" },
+    { key: "hero_image_url", label: "Hero image URL (optional)", placeholder: "https://…" },
+    { key: "accent", label: "Accent colour (optional)", placeholder: "#0F2B1F" },
+    { key: "cta_label", label: "Card button label", placeholder: "View tours" },
+    { key: "footer_note", label: "Footer note", placeholder: "Are you a tour operator? …" },
+  ];
+
+  return (
+    <div className="ui-card">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Operator Directory</h2>
+        <a href="https://booking.bookingtours.co.za" target="_blank" rel="noreferrer" className="text-xs font-medium text-[var(--ck-accent)] hover:underline">View live page</a>
+      </div>
+      <p className="text-xs text-[var(--ck-text-muted)] mb-4">
+        The central landing page on the bare booking domain listing every operator. Blank fields fall back to the built-in defaults; new operators are listed automatically.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-[var(--ck-text-muted)]">Loading…</p>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fields.map((f) => (
+              <label key={f.key} className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                {f.label}
+                <input
+                  className="ui-control w-full text-sm"
+                  value={cfg[f.key] || ""}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <p className="text-[12px] font-semibold text-[var(--ck-text-strong)] mb-2">Value props (the &ldquo;why book here&rdquo; strip; leave empty for defaults)</p>
+            <div className="space-y-2">
+              {valueProps.map((vp, i) => (
+                <div key={i} className="grid gap-2 sm:grid-cols-[200px_1fr_36px]">
+                  <input className="ui-control text-sm" value={vp.title} placeholder="Title" onChange={(e) => setField("value_props", valueProps.map((v, j) => j === i ? { ...v, title: e.target.value } : v))} />
+                  <input className="ui-control text-sm" value={vp.text} placeholder="Text" onChange={(e) => setField("value_props", valueProps.map((v, j) => j === i ? { ...v, text: e.target.value } : v))} />
+                  <button onClick={() => setField("value_props", valueProps.filter((_, j) => j !== i))} className="text-[var(--ck-danger)] text-sm" title="Remove">&times;</button>
+                </div>
+              ))}
+              {valueProps.length < 6 && (
+                <button onClick={() => setField("value_props", [...valueProps, { title: "", text: "" }])} className="ui-btn !py-1.5 text-[12px]">+ Add value prop</button>
+              )}
+            </div>
+          </div>
+
+          <button onClick={save} disabled={saving} className="ui-btn ui-btn-primary">{saving ? "Saving…" : "Save Directory Settings"}</button>
+
+          <div>
+            <p className="text-[12px] font-semibold text-[var(--ck-text-strong)] mb-2">Listed operators</p>
+            <div className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
+              {operators.map((b) => (
+                <div key={b.id} className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--ck-text-strong)]">{b.business_name || b.name}</p>
+                    <p className="text-[11px] text-[var(--ck-text-muted)]">{b.subdomain ? b.subdomain + ".booking.bookingtours.co.za" : "No subdomain — never listed"}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleVisible(b)}
+                    disabled={busyBiz === b.id || !b.subdomain}
+                    className={"ui-status " + (b.directory_visible && b.subdomain ? "ui-pill-success" : "ui-pill-neutral")}
+                    title={b.subdomain ? "Toggle directory listing" : "Operator needs a subdomain first"}
+                  >
+                    {b.directory_visible && b.subdomain ? "Listed" : "Hidden"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
