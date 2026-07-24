@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-13T17:30:00Z",
+  "generated_at": "2026-07-24T05:58:32.367Z",
   "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition.",
   "grants": [
     {
@@ -269,6 +269,41 @@
     },
     {
       "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "operator_directory",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
       "table_name": "otp_attempts",
       "privilege_type": "DELETE"
     },
@@ -351,6 +386,41 @@
       "grantee": "anon",
       "table_name": "plans",
       "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "platform_public_settings",
+      "privilege_type": "UPDATE"
     },
     {
       "grantee": "anon",
@@ -1899,6 +1969,41 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_directory",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "ota_integrations",
       "privilege_type": "DELETE"
     },
@@ -2280,6 +2385,41 @@
     {
       "grantee": "authenticated",
       "table_name": "plans",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "platform_public_settings",
       "privilege_type": "UPDATE"
     },
     {
@@ -4629,6 +4769,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_directory",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "ota_integrations",
       "privilege_type": "DELETE"
     },
@@ -5045,6 +5220,41 @@
     {
       "grantee": "service_role",
       "table_name": "platform_invoices",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "platform_public_settings",
       "privilege_type": "UPDATE"
     },
     {
@@ -6147,6 +6357,11 @@
     {
       "schema": "public",
       "table_name": "platform_invoices",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "platform_public_settings",
       "rls_enabled": true
     },
     {
@@ -7736,6 +7951,24 @@
       "roles": "{public}",
       "qual": "true",
       "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "platform_public_settings",
+      "policyname": "platform_public_settings_public_read",
+      "cmd": "SELECT",
+      "roles": "{anon,authenticated}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "platform_public_settings",
+      "policyname": "platform_public_settings_super_admin_all",
+      "cmd": "ALL",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))"
     },
     {
       "schemaname": "public",
