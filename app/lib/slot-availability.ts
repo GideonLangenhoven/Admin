@@ -12,6 +12,7 @@ export interface AvailableSlotRecord {
   tour_name: string | null;
   base_price_per_person: number | null;
   available_capacity: number;
+  last_minute_at: string | null;
 }
 
 export async function listAvailableSlots(params: {

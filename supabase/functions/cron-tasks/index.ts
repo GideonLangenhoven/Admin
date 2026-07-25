@@ -726,6 +726,19 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  // Last-minute deals: one SQL statement stamps every tenant's discounted
+  // slots (see apply_last_minute_deals). Kept as an RPC so 2000 tenants cost
+  // one round-trip, not one per tour.
+  try {
+    const { data: lmCount, error: lmErr } = await supabase.rpc("apply_last_minute_deals");
+    if (lmErr) throw lmErr;
+    results.last_minute_deals = lmCount ?? 0;
+    if (lmCount) console.log("LAST_MINUTE_DEALS_APPLIED slots=" + lmCount);
+  } catch (error) {
+    console.error("LAST_MINUTE_DEALS_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
 

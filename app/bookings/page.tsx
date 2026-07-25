@@ -7,6 +7,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { customerNotesTooltip } from "../lib/customer-notes";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
+import { rescheduleUnitPrice } from "../lib/reschedule-price";
 import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
 import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
@@ -144,6 +145,7 @@ interface RebookSlot {
   available_capacity: number;
   price_per_person_override?: number | null;
   base_price_per_person?: number | null;
+  last_minute_at?: string | null;
 }
 
 interface EditForm {
@@ -1311,7 +1313,7 @@ export default function Bookings() {
     // by default (harmless but noisy in network panel).
     const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
     const currentUnitPrice = rebookHasNoCredit(rebookBooking) ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
-    const newUnitPrice = selectedSlot?.price_per_person_override ?? selectedSlot?.base_price_per_person ?? currentUnitPrice;
+    const newUnitPrice = rescheduleUnitPrice(selectedSlot, currentUnitPrice);
     const willBeDowngrade = newUnitPrice < currentUnitPrice;
     const { data, error } = await supabase.functions.invoke("rebook-booking", {
       body: {
@@ -1971,7 +1973,7 @@ export default function Bookings() {
             {rebookSlotId && (() => {
               const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
               if (!selectedSlot) return null;
-              const newUnitPrice = selectedSlot.price_per_person_override ?? selectedSlot.base_price_per_person ?? 0;
+              const newUnitPrice = rescheduleUnitPrice(selectedSlot, 0);
               if (rebookHasNoCredit(rebookBooking)) {
                 return (
                   <div className="mt-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
@@ -2018,7 +2020,7 @@ export default function Bookings() {
               if (!selectedSlot) return null;
               const noCredit = rebookHasNoCredit(rebookBooking);
               const currentUnitPrice = noCredit ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
-              const newUnitPrice = selectedSlot.price_per_person_override ?? selectedSlot.base_price_per_person ?? 0;
+              const newUnitPrice = rescheduleUnitPrice(selectedSlot, 0);
               const totalDiff = (newUnitPrice - currentUnitPrice) * rebookBooking.qty;
               if (totalDiff <= 0) return null;
               return (
@@ -2034,7 +2036,7 @@ export default function Bookings() {
               if (rebookHasNoCredit(rebookBooking)) return null;
               const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
               const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
-              const newUnitPrice = selectedSlot?.price_per_person_override ?? selectedSlot?.base_price_per_person ?? currentUnitPrice;
+              const newUnitPrice = rescheduleUnitPrice(selectedSlot, currentUnitPrice);
               const isDowngrade = !selectedSlot || newUnitPrice < currentUnitPrice;
               if (!isDowngrade) return null;
               return (

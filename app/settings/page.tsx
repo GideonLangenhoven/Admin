@@ -223,6 +223,8 @@ interface Tour {
     image_url: string | null;
     hidden: boolean;
     confirmation_tagline: string | null;
+    last_minute_hours: number | null;
+    last_minute_price: number | null;
 }
 
 interface AddOn {
@@ -262,7 +264,7 @@ export default function SettingsPage() {
     // Tours state
     const [tours, setTours] = useState<Tour[]>([]);
     const [editingTour, setEditingTour] = useState<Tour | null>(null);
-    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinutePrice: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
     const [tourSaving, setTourSaving] = useState(false);
     const [tourError, setTourError] = useState("");
     const [slotMessage, setSlotMessage] = useState("");
@@ -546,7 +548,7 @@ export default function SettingsPage() {
 
     function resetTourForm() {
         setEditingTour(null);
-        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
+        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinutePrice: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
         setTourError("");
     }
 
@@ -566,6 +568,8 @@ export default function SettingsPage() {
             description: t.description || "",
             confirmationTagline: t.confirmation_tagline || "",
             price: String(t.base_price_per_person || ""),
+            lastMinuteHours: t.last_minute_hours != null ? String(t.last_minute_hours) : "",
+            lastMinutePrice: t.last_minute_price != null ? String(t.last_minute_price) : "",
             ...minutesToDurationForm(t.duration_minutes),
             sort_order: String(t.sort_order || 0),
             active: t.active,
@@ -668,6 +672,13 @@ export default function SettingsPage() {
         if (!tourForm.name.trim()) return setTourError("Name is required");
         if (!tourForm.price || Number(tourForm.price) <= 0) return setTourError("Price must be greater than 0");
         if (!tourForm.duration || Number(tourForm.duration) <= 0) return setTourError("Duration is required");
+        const lmHours = tourForm.lastMinuteHours.trim() === "" ? null : Number(tourForm.lastMinuteHours);
+        const lmPrice = tourForm.lastMinutePrice.trim() === "" ? null : Number(tourForm.lastMinutePrice);
+        if ((lmHours === null) !== (lmPrice === null)) return setTourError("Last-minute deals need both a cut-off and a price. Clear both to switch the deal off.");
+        // Capped at 30 days: a mistyped 480 instead of 48 would otherwise discount
+        // a month of departures before anyone noticed.
+        if (lmHours !== null && (lmHours <= 0 || lmHours > 720)) return setTourError("Last-minute cut-off must be between 1 and 720 hours (30 days)");
+        if (lmPrice !== null && (lmPrice <= 0 || lmPrice >= Number(tourForm.price))) return setTourError("Last-minute price must be greater than 0 and lower than the normal price");
 
         setTourSaving(true);
         setTourError("");
@@ -677,6 +688,8 @@ export default function SettingsPage() {
             description: tourForm.description.trim() || null,
             confirmation_tagline: tourForm.confirmationTagline.trim() || null,
             base_price_per_person: Number(tourForm.price),
+            last_minute_hours: lmHours,
+            last_minute_price: lmPrice,
             duration_minutes: Number(tourForm.duration) * DURATION_UNIT_MINUTES[tourForm.durationUnit],
             sort_order: Number(tourForm.sort_order) || 0,
             active: tourForm.active,
@@ -1968,6 +1981,26 @@ export default function SettingsPage() {
                                             className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                         <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
                                     </label>
+                                </div>
+                            </div>
+
+                            {/* Last-minute deals */}
+                            <div className="border-t border-[var(--ck-border-subtle)] pt-4">
+                                <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">Last-minute deal (optional)</label>
+                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats inside the cut-off drop to the deal price automatically. Leave blank to switch it off.</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cut-off (hours before departure)</label>
+                                        <input type="number" min="1" max="720" step="1" value={tourForm.lastMinuteHours}
+                                            onChange={e => setTourForm({ ...tourForm, lastMinuteHours: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="48" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Deal price per person (R)</label>
+                                        <input type="number" min="1" step="1" value={tourForm.lastMinutePrice}
+                                            onChange={e => setTourForm({ ...tourForm, lastMinutePrice: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="450" />
+                                    </div>
                                 </div>
                             </div>
 

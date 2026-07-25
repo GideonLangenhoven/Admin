@@ -469,6 +469,9 @@ function Slots() {
         .update({
           capacity_total: Number(editForm.capacity) || selectedSlot.capacity_total,
           price_per_person_override: priceVal,
+          // last_minute_at means "this override is the last-minute deal price".
+          // The operator is setting the price by hand now, so the flag no longer holds.
+          last_minute_at: null,
           start_time: newUtcTime.toISOString()
         })
         .eq("id", selectedSlot.id);
@@ -537,7 +540,10 @@ function Slots() {
 
     const baseUpdates: any = {};
     if (bulkForm.capacity !== "") baseUpdates.capacity_total = Number(bulkForm.capacity);
-    if (bulkForm.price !== "") baseUpdates.price_per_person_override = bulkForm.price === "NULL" ? null : Number(bulkForm.price);
+    if (bulkForm.price !== "") {
+      baseUpdates.price_per_person_override = bulkForm.price === "NULL" ? null : Number(bulkForm.price);
+      baseUpdates.last_minute_at = null; // hand-set price is no longer a last-minute deal
+    }
 
     try {
       if (bulkForm.newTime !== "") {

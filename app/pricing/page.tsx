@@ -162,7 +162,9 @@ export default function PeakPricingPage() {
           }
         }
 
-        await supabase.from("slots").update({ is_peak: true, price_per_person_override: winningPrice }).eq("id", s.id);
+        // Clearing last_minute_at keeps the flag honest: this override is now a
+        // peak price, not a last-minute deal price.
+        await supabase.from("slots").update({ is_peak: true, price_per_person_override: winningPrice, last_minute_at: null }).eq("id", s.id);
         updated++;
       }
     }
@@ -233,7 +235,7 @@ export default function PeakPricingPage() {
     for (const s of (slots || [])) {
       // Skip manually overridden slots
       if (s.is_manually_overridden) continue;
-      await supabase.from("slots").update({ is_peak: false, price_per_person_override: null }).eq("id", s.id);
+      await supabase.from("slots").update({ is_peak: false, price_per_person_override: null, last_minute_at: null }).eq("id", s.id);
     }
 
     // Delete the peak period record
@@ -262,7 +264,7 @@ export default function PeakPricingPage() {
 
     for (const s of (slots || [])) {
       if (s.is_manually_overridden) continue;
-      await supabase.from("slots").update({ is_peak: false, price_per_person_override: null }).eq("id", s.id);
+      await supabase.from("slots").update({ is_peak: false, price_per_person_override: null, last_minute_at: null }).eq("id", s.id);
     }
     notify({ title: "Peak pricing removed", message: "The selected seasonal range has been cleared.", tone: "success" });
     load();

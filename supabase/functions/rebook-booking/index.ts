@@ -152,7 +152,7 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
 
   const slotRes = await supabase
     .from("slots")
-    .select("id, tour_id, start_time, capacity_total, booked, held, price_per_person_override")
+    .select("id, tour_id, start_time, capacity_total, booked, held, price_per_person_override, last_minute_at")
     .eq("id", newSlotId)
     .single();
   if (slotRes.error || !slotRes.data) return fail(req, "New slot not found", 404);
@@ -171,7 +171,13 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
   const oldUnitPrice = Number(booking.unit_price || 0);
   const newTourRes = await supabase.from("tours").select("base_price_per_person, name").eq("id", newSlot.tour_id).single();
   const newBasePrice = (newTourRes.data && newTourRes.data.base_price_per_person) ? Number(newTourRes.data.base_price_per_person) : oldUnitPrice;
-  const newUnitPrice = (newSlot.price_per_person_override != null) ? Number(newSlot.price_per_person_override) : newBasePrice;
+  // Last-minute deals are for filling unsold seats, not for existing customers
+  // to reschedule into and claim the difference back — price those at base.
+  // Only a genuine discount is skipped: if the flag outlived its deal (slot
+  // re-priced upward), the slot's own price stands, or we would undercharge.
+  const slotOverride = newSlot.price_per_person_override != null ? Number(newSlot.price_per_person_override) : null;
+  const isLastMinuteDeal = !!newSlot.last_minute_at && slotOverride != null && slotOverride < newBasePrice;
+  const newUnitPrice = (slotOverride != null && !isLastMinuteDeal) ? slotOverride : newBasePrice;
   const newTotalAmount = newUnitPrice * newQty;
   // A cancelled booking only carries credit while its payout is still parked
   // (refund_status ACTION_REQUIRED). Once the refund/voucher was issued the
