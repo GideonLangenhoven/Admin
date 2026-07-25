@@ -2267,7 +2267,8 @@ function DirectoryPanel() {
     { key: "subheadline", label: "Subheadline", placeholder: "Kayaking, hiking, boats, wine routes and more…" },
     { key: "search_placeholder", label: "Search placeholder", placeholder: "Search operators or locations…" },
     { key: "hero_image_url", label: "Hero image URL (optional)", placeholder: "https://…" },
-    { key: "accent", label: "Accent colour (optional)", placeholder: "#0F2B1F" },
+    { key: "accent", label: "Accent colour (optional)", placeholder: "#D9A441" },
+    { key: "review_strip", label: "Trust strip text", placeholder: "Book direct with independent local operators…" },
     { key: "cta_label", label: "Card button label", placeholder: "View tours" },
     { key: "footer_note", label: "Footer note", placeholder: "Are you a tour operator? …" },
   ];
