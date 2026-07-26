@@ -42,6 +42,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
   const [yocoTestMode, setYocoTestMode] = useState(false);
   const [notice, setNotice] = useState("");
+  // Set when the host names a different operator than the signed-in session.
+  const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
     validateSession();
@@ -91,17 +93,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     const activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
 
-    // Canonical-host redirect: wildcard DNS serves every *.admin subdomain,
-    // and tenant resolution comes from the profile — so a typo'd subdomain
-    // still logs into the caller's own business. Bounce to the real one so
-    // the URL matches the tenant. Supers roam across operators, so skip them.
+    // Host wins: the subdomain names the operator whose console you are on, and
+    // a session for a different operator is never redirected away. Every *.admin
+    // host is its own browser origin with its own localStorage, so bouncing sent
+    // people to a host where they often had no session at all — and once two
+    // hosts each held a session for the other's tenant they redirected at each
+    // other forever. The caller renders a mismatch screen instead, so the choice
+    // is the operator's. Supers roam across operators, so the host never blocks
+    // them. Tenant access itself is enforced by RLS, not by the host.
     const canonicalSub = (businessRows.find((biz) => biz.id === (activeOperator?.id || defaultBusinessId)) as any)?.subdomain || "";
     const hostMatch = window.location.hostname.match(/^([^.]+)\.admin\.bookingtours\.co\.za$/);
-    if (!isMultiOperator && canonicalSub && hostMatch && hostMatch[1] !== canonicalSub) {
-      window.location.replace("https://" + canonicalSub + ".admin.bookingtours.co.za" + window.location.pathname + window.location.search);
-    }
+    const hostMismatch = !isMultiOperator && canonicalSub && hostMatch && hostMatch[1] !== canonicalSub
+      ? { hostSub: hostMatch[1], ownSub: canonicalSub }
+      : null;
 
     return {
+      hostMismatch,
       businessId: activeOperator?.id || defaultBusinessId,
       businessName: activeOperator?.name || "",
       logoUrl: activeOperator?.logoUrl || "",
@@ -146,6 +153,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
       setYocoTestMode(context.yocoTestMode || false);
+      setHostMismatch(context.hostMismatch);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
       localStorage.setItem("ck_admin_timezone", context.timezone);
@@ -193,6 +201,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setOperators([]);
     setSubscriptionStatus("ACTIVE");
     setYocoTestMode(false);
+    setHostMismatch(null);
   }
 
   async function login() {
@@ -293,6 +302,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setOperators(context.operators);
         setSubscriptionStatus(context.subscriptionStatus);
         setYocoTestMode(context.yocoTestMode || false);
+        setHostMismatch(context.hostMismatch);
       }
 
       setAuthed(true);
@@ -450,6 +460,34 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  // Host wins: this console belongs to another operator, so show the choice
+  // rather than silently moving the operator somewhere they did not ask to go.
+  if (hostMismatch) {
+    const ownHost = hostMismatch.ownSub + ".admin.bookingtours.co.za";
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
+          <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"></path></svg>
+          </div>
+          <h1 className="font-display text-[22px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+            This console belongs to another operator
+          </h1>
+          <p className="text-sm text-[var(--ck-text-muted)]">
+            You are signed in to <strong>{businessName || "your operator"}</strong>, but this address is{" "}
+            <strong>{hostMismatch.hostSub}.admin.bookingtours.co.za</strong>. Your console is <strong>{ownHost}</strong>.
+          </p>
+          <a href={"https://" + ownHost + pathname} className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
+            Go to my console
+          </a>
+          <button onClick={clearSession} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
+            Sign out and use this one instead
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
   if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
     return (
@@ -494,6 +532,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
       setYocoTestMode(context.yocoTestMode || false);
+      setHostMismatch(context.hostMismatch);
     } catch (e) {
       console.warn("refreshBusiness failed:", e);
     }
