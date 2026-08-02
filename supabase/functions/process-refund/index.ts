@@ -188,7 +188,8 @@ Deno.serve(async (req: any) => {
 
     const ref = booking.id.substring(0, 8).toUpperCase();
     const tourName = booking.tours?.name || "Booking";
-    if (booking.phone) {
+    // Email is the canonical notice; WhatsApp only when no email on file.
+    if (!booking.email && booking.phone) {
       try {
         await sendWhatsappTextForTenant(tenant, booking.phone,
           "Refund processed\n\n" +

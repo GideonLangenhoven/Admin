@@ -107,7 +107,8 @@ async function sendComboLegConfirmation(supabase: any, booking: any, paymentRef:
     console.error("COMBO_INVOICE_ERR (continuing):", invErr);
   }
 
-  if (booking.phone && tenant) {
+  // Email is the canonical confirmation; WhatsApp only when no email on file.
+  if (!booking.email && booking.phone && tenant) {
     try {
       await sendWhatsappTextForTenant(
         tenant,

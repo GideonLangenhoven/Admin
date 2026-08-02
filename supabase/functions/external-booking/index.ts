@@ -126,7 +126,7 @@ function normalizeEmail(value: unknown): string | null {
 
 function normalizePhone(value: unknown): string | null {
   if (!value) return null;
-  const digits = String(value).replace(/[^\d]/g, "");
+  let digits = String(value).replace(/[^\d]/g, "");
   if (!digits) return null;
   if (digits.startsWith("0")) digits = "27" + digits.substring(1);
   return digits;
@@ -246,7 +246,7 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
         p_credential_id: credential.id,
         p_key: SETTINGS_ENCRYPTION_KEY,
         p_hmac_secret: credential.hmac_secret,
-      }).catch((err: unknown) => console.error("AUTO_MIGRATE_HMAC_ERR:", err));
+      }).then(undefined, (err: unknown) => console.error("AUTO_MIGRATE_HMAC_ERR:", err));
     }
   }
 
@@ -534,7 +534,7 @@ Deno.serve(async (req: Request) => {
   const requestId = crypto.randomUUID();
   let source = "UNKNOWN";
   let action = "unknown";
-  let eventId = requestId;
+  let eventId: string = requestId;
   let logId: string | null = null;
 
   const send = async (
@@ -639,7 +639,9 @@ Deno.serve(async (req: Request) => {
       logId = (await beginEventLog(auth.businessId, source, eventId, action, externalRef, body))?.id || null;
     }
     if (!auth.ok) {
-      return await send(401, auth.code, auth.message, {}, "REJECTED");
+      // deno check fails to narrow the discriminated union here; be explicit.
+      const failed = auth as VerifyAuthFailure;
+      return await send(401, failed.code, failed.message, {}, "REJECTED");
     }
 
     // Mutating actions must be HMAC-signed. An api-key-only credential (no
@@ -792,8 +794,8 @@ Deno.serve(async (req: Request) => {
 
       // Apply promo if used
       if (extPromoId && result.booking_id) {
-        await db.from("bookings").update({ promo_code: extPromoCode, discount_amount: extPromoDiscount }).eq("id", result.booking_id).catch(() => {});
-        await db.rpc("apply_promo_code", { p_promo_id: extPromoId, p_customer_email: normalizeEmail(body.email) || "", p_booking_id: result.booking_id }).catch(() => {});
+        await db.from("bookings").update({ promo_code: extPromoCode, discount_amount: extPromoDiscount }).eq("id", result.booking_id).then(undefined, () => {});
+        await db.rpc("apply_promo_code", { p_promo_id: extPromoId, p_customer_email: normalizeEmail(body.email) || "", p_booking_id: result.booking_id }).then(undefined, () => {});
       }
 
       // Calculate hold expiry based on the requested hold duration
@@ -840,8 +842,9 @@ Deno.serve(async (req: Request) => {
             console.error("EXT_BOOKING_CHECKOUT_ERR booking=" + result.booking_id + ":", checkoutErr);
           }
         } else if (bookingStatus === "PAID" || bookingStatus === "CONFIRMED") {
-          // Send confirmation for already-paid bookings
-          if (customerPhone) {
+          // Send confirmation for already-paid bookings. Email is the canonical
+          // confirmation; WhatsApp only when no email on file.
+          if (customerPhone && !customerEmail) {
             try {
               await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
                 method: "POST",

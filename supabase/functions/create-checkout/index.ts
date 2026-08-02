@@ -466,9 +466,10 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      // Send payment link via WhatsApp + email for RESCHEDULE upgrades.
-      // The customer needs to know (a) the booking was moved, (b) there's a
-      // top-up payment due, (c) the new slot is held for 15 min.
+      // Send payment link for RESCHEDULE upgrades. Email is the canonical
+      // channel; WhatsApp only when no email on file. The customer needs to
+      // know (a) the booking was moved, (b) there's a top-up payment due,
+      // (c) the new slot is held for 15 min.
       if (type === "RESCHEDULE" && bookingId && !skipNotifications) {
         try {
           const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
@@ -515,7 +516,7 @@ Deno.serve(async (req: any) => {
             const notifRef = String(bk.id || "").slice(0, 8).toUpperCase();
             const diffAmt = Number(amount || 0).toFixed(2);
 
-            if (notifPhone) {
+            if (notifPhone && !(notifEmail && notifEmail.includes("@"))) {
               try {
                 await fetch(SUPABASE_URL_ENV + "/functions/v1/send-whatsapp-text", {
                   method: "POST",

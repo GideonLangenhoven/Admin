@@ -248,13 +248,13 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   let waError = "";
   let emailError = "";
 
-  if (booking.phone && tenant) {
+  // Email is the canonical confirmation. WhatsApp fires only for bookings with
+  // no email on file, so a customer never gets the email + WhatsApp double.
+  if (!booking.email && booking.phone && tenant) {
     try {
       const currency = tenant.business.currency || "ZAR";
-      // Confirmation WhatsApp only inside the 24h window. Outside it the
-      // confirmation EMAIL (sent below) is the sole notification — no template.
-      // sendWhatsappFreeformOrSignal reports windowClosed instead of
-      // auto-falling-back to a template, so a lapsed window just means no WA.
+      // Still window-gated: outside the 24h window a phone-only booking gets no
+      // WA (sendWhatsappFreeformOrSignal reports windowClosed, no template fallback).
       const waRes = await sendWhatsappFreeformOrSignal(
         tenant,
         booking.phone,
@@ -769,7 +769,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         const rSlotTime = rBk.slots?.start_time ? formatTenantDateTime(rTenant.business, rBk.slots.start_time) : "";
         const rBrandName = getBusinessDisplayName(rTenant.business);
 
-        if (rBk.phone) {
+        if (!rBk.email && rBk.phone) {
           try {
             await sendWhatsappTextForTenant(rTenant, rBk.phone,
               "Booking rescheduled\n\n" +
@@ -897,7 +897,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
             });
           }
 
-          // Send notification (WhatsApp + email)
+          // Send notification (email canonical; WhatsApp only when no email on file)
           try {
             const agTenant = await getTenantByBusinessId(supabase, agBk.business_id);
             const agRef = agBookingId.substring(0, 8).toUpperCase();
@@ -905,7 +905,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
             const agBrandName = getBusinessDisplayName(agTenant.business);
             const agSlotTime = agBk.slots?.start_time ? formatTenantDateTime(agTenant.business, agBk.slots.start_time) : "";
 
-            if (agBk.phone) {
+            if (!agBk.email && agBk.phone) {
               try {
                 await sendWhatsappTextForTenant(agTenant, agBk.phone,
                   "Booking updated\n\n" +
@@ -995,17 +995,21 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           });
         }
       } catch (e) { console.log("gv email err"); }
-      // WhatsApp confirmation
+      // WhatsApp confirmation only when there is no buyer email — the voucher
+      // email above is the canonical confirmation. The conversation state reset
+      // stays unconditional so a bot-initiated purchase always unlocks the chat.
       if (gv.buyer_phone) {
-        const gvTenant = await getTenantByBusinessId(supabase, gv.business_id);
-        await sendWhatsappTextForTenant(gvTenant, gv.buyer_phone,
-          "Gift voucher purchased\n\n" +
-          "Code: " + gv.code + "\n" +
-          (gv.tour_name || "Any activity") + "\n" +
-          "For: " + (gv.recipient_name || "Your guest") + "\n" +
-          "Value: " + (gvTenant.business.currency || "ZAR") + " " + (gv.value || gv.purchase_amount) + "\n\n" +
-          "The voucher has been emailed to " + gv.buyer_email + "."
-        );
+        if (!gv.buyer_email) {
+          const gvTenant = await getTenantByBusinessId(supabase, gv.business_id);
+          await sendWhatsappTextForTenant(gvTenant, gv.buyer_phone,
+            "Gift voucher purchased\n\n" +
+            "Code: " + gv.code + "\n" +
+            (gv.tour_name || "Any activity") + "\n" +
+            "For: " + (gv.recipient_name || "Your guest") + "\n" +
+            "Value: " + (gvTenant.business.currency || "ZAR") + " " + (gv.value || gv.purchase_amount) + "\n\n" +
+            "Keep this code safe."
+          );
+        }
         await supabase.from("conversations").update({ current_state: "IDLE", state_data: {} }).eq("phone", gv.buyer_phone).eq("business_id", gv.business_id);
       }
       console.log("GV PAYMENT CONFIRMED voucher:" + gv.code);

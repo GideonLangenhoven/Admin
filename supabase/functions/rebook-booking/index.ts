@@ -930,7 +930,7 @@ async function handleCancelRefund(req: any, booking: any) {
   const brandName = getBusinessDisplayName(tenant.business);
   const currency = tenant.business.currency || "ZAR";
 
-  if (booking.phone) {
+  if (!booking.email && booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
         "Booking cancelled\n\n" +
@@ -1021,7 +1021,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
   const brandName = getBusinessDisplayName(tenant.business);
   const currency = tenant.business.currency || "ZAR";
 
-  if (booking.phone) {
+  if (!booking.email && booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
         "Booking cancelled, voucher issued\n\n" +
@@ -1140,7 +1140,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
   const brandName = getBusinessDisplayName(tenant.business);
   const currency = tenant.business.currency || "ZAR";
 
-  if (booking.phone) {
+  if (!booking.email && booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
         "Booking cancelled, split refund\n\n" +
@@ -1242,7 +1242,7 @@ async function handleCancelVoucher(req: any, booking: any) {
   const brandName = getBusinessDisplayName(tenant.business);
   const currency = tenant.business.currency || "ZAR";
 
-  if (booking.phone) {
+  if (!booking.email && booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
         "Booking converted to voucher\n\n" +
@@ -1294,7 +1294,7 @@ async function sendRebookNotification(booking: any, event: string, message: stri
       ? formatTenantDateTime(tenant.business, booking.slots.start_time)
       : "";
 
-    if (booking.phone) {
+    if (!booking.email && booking.phone) {
       try {
         await sendWhatsappTextForTenant(tenant, booking.phone,
           "Booking updated\n\n" +
@@ -1378,7 +1378,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
       payload: { voucher_code: vcode, voucher_amount: creditAmount, voucher_id: voucherId },
     });
 
-    if (booking.phone) {
+    if (!booking.email && booking.phone) {
       try {
         await sendWhatsappTextForTenant(tenant, booking.phone,
           "Voucher issued\n\n" +
@@ -1479,7 +1479,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
     },
   });
 
-  if (booking.phone) {
+  if (!booking.email && booking.phone) {
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone,
         "Refund requested\n\n" +

@@ -172,7 +172,8 @@ Deno.serve(async (req: Request) => {
     const waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
     const invoice = await createInvoice(supabase, booking, tenant, paymentMethod, paymentNote || paymentMethod);
 
-    if (booking.phone) {
+    // Email is the canonical confirmation; WhatsApp only when no email on file.
+    if (!booking.email && booking.phone) {
       try {
         await sendWhatsappTextForTenant(tenant, booking.phone,
           "Booking confirmed\n\n" +

@@ -126,7 +126,8 @@ Deno.serve(async (req: any) => {
     let waError = "";
     let emailError = "";
 
-    if (booking.phone) {
+    // Email is the canonical confirmation; WhatsApp only when no email on file.
+    if (!booking.email && booking.phone) {
       try {
         const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
         await sendWhatsappTextForTenant(

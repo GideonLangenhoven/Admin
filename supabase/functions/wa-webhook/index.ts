@@ -787,6 +787,7 @@ Reply ONLY with the keyword, nothing else.`,
     maxTokens: 10,
     temperature: 0.1,
     timeoutMs: 5000,
+    reasoning: "off", // one-keyword classifier — thinking would blow the 5s budget
     label: "wa-intent",
   });
   if (intentOut) {
@@ -1922,6 +1923,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           maxTokens: 15,
           temperature: 0.1,
           timeoutMs: 5000,
+          reasoning: "off", // date extractor — thinking would blow the 5s budget
           label: "wa-date",
         });
         if (dateOut) {

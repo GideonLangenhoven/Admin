@@ -767,6 +767,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
             maxTokens: 15,
             temperature: 0.1,
             timeoutMs: 5000,
+            reasoning: "off", // date extractor — thinking would blow the 5s budget
             label: "web-date",
           });
           if (pdOut) {
@@ -1100,7 +1101,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
           // Send WhatsApp confirmation if phone provided
           // L1: Use dynamic meeting point instead of hardcoded address
           const wcLoc = requestTenant?.business?.location_phrase; const wcWtb = requestTenant?.business?.what_to_bring;
-          if (ns.phone) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
+          // Email above is the canonical confirmation; WhatsApp only when no email on file.
+          if (ns.phone && !ns.email) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
           reply = "\u{1F389} You're booked!\n\nRef: " + vRef + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + termsNotice; ns = { step: "IDLE" };
         } else {
           // Atomic capacity check + hold creation to prevent overbooking

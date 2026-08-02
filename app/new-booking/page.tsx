@@ -864,7 +864,8 @@ export default function NewBookingPage() {
           }
         }
 
-        if (mobile.trim()) {
+        // Email is the canonical confirmation; WhatsApp only when no email on file.
+        if (mobile.trim() && !email.trim()) {
           try {
             await supabase.functions.invoke("send-whatsapp-text", {
               body: {
