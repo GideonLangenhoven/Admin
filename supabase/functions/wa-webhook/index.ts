@@ -16,7 +16,10 @@ import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { formatDuration } from "../_shared/duration.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
 import { llmText } from "../_shared/llm.ts";
-import { retrieveKbContext } from "../_shared/kb.ts";
+import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
+import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
+import { hashedUserKey } from "../_shared/openrouter-provider.ts";
+import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 
@@ -345,17 +348,19 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
 }
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
-async function gemFallback(tenant: TenantContext, msg: string, extraContext?: string): Promise<string | null> {
+async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extraContext?: string): Promise<string | null> {
   // Ground the answer in the tenant's vector KB (returns "" when nothing relevant)
   const kbCtx = await retrieveKbContext(supabase, tenant.business.id, msg);
   const ctx = [kbCtx, extraContext].filter(Boolean).join("\n\n") || undefined;
   return await llmText({
     system: buildGeminiInstruction(tenant, ctx),
     user: msg,
-    maxTokens: 150,
-    temperature: 0.7,
+    maxTokens: 400,
+    temperature: 0.2,
     timeoutMs: 8000,
     label: "wa-faq",
+    businessId: tenant.business.id,
+    userKey: phone ? await hashedUserKey(tenant.business.id, String(phone)) : undefined,
   });
 }
 async function getConvo(tenant: TenantContext, phone: any) {
@@ -571,10 +576,16 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     }
   }
 
+  // Pick the tenant's default spot, not merely the first one — same selection
+  // the admin weather widget uses (app/page.tsx: find(isDefault) || [0]).
+  // Falling through to hardcoded Cape Town coords means forecasting somebody
+  // else's weather, so say so loudly in the logs when it happens.
   const defaultWeatherSpot = { lat: -33.908, lon: 18.398 };
-  const configuredWeatherSpot = Array.isArray(tenant.business.weather_widget_locations) && tenant.business.weather_widget_locations.length > 0
-    ? tenant.business.weather_widget_locations[0]
-    : defaultWeatherSpot;
+  const weatherSpots = Array.isArray(tenant.business.weather_widget_locations) ? tenant.business.weather_widget_locations : [];
+  const configuredWeatherSpot = weatherSpots.find((l: any) => l?.isDefault) || weatherSpots[0];
+  if (!configuredWeatherSpot) {
+    console.warn("WEATHER_SPOT_FALLBACK business=" + tenant.business.id + " — no weather_widget_locations configured, using hardcoded Cape Town coords");
+  }
   const weatherLat = Number(configuredWeatherSpot?.lat ?? defaultWeatherSpot.lat);
   const weatherLon = Number(configuredWeatherSpot?.lon ?? defaultWeatherSpot.lon);
 
@@ -789,6 +800,8 @@ Reply ONLY with the keyword, nothing else.`,
     timeoutMs: 5000,
     reasoning: "off", // one-keyword classifier — thinking would blow the 5s budget
     label: "wa-intent",
+    businessId: tenant.business.id,
+    userKey: await hashedUserKey(tenant.business.id, String(phone)),
   });
   if (intentOut) {
     const intent = intentOut.trim().toUpperCase();
@@ -800,6 +813,145 @@ Reply ONLY with the keyword, nothing else.`,
   return null;
 }
 
+
+// ───────── v2 bot brain (three-block cached prompt + JSON contract) ─────────
+// Rollout flag WA_BOT_V2 (docs/qa/BOT_V2_ROLLOUT.md):
+//   off    → legacy path only
+//   shadow → legacy path answers as today; v2 runs after the send, logged to
+//            llm_usage, never sent (default while we compare on goldens)
+//   on     → v2 answers free-text turns (one message, no trailing buttons);
+//            legacy path is the automatic fallback whenever v2 degrades
+const WA_BOT_V2 = (Deno.env.get("WA_BOT_V2") || "shadow").toLowerCase();
+
+// Writes to the same llm_usage table _shared/llm.ts meters into (schema from
+// 20260803120000, v2 columns from 20260803130000). Best-effort, never throws.
+async function logLlmUsage(businessId: string, entry: { label: string; shadow: boolean; usage?: BotUsage | null; out?: BotOut | null; action?: string }) {
+  try {
+    await supabase.from("llm_usage").insert({
+      business_id: businessId,
+      fn: entry.label,
+      model: entry.usage?.model || "none",
+      prompt_tokens: entry.usage?.promptTokens ?? 0,
+      completion_tokens: entry.usage?.completionTokens ?? 0,
+      cached_tokens: entry.usage?.cachedTokens ?? 0,
+      action: entry.action || entry.out?.action || null,
+      intent: entry.out?.intent || null,
+      grounded: entry.out?.grounded ?? null,
+      shadow: entry.shadow,
+    });
+  } catch (e) { console.error("LLM_USAGE_ERR " + (e instanceof Error ? e.message : String(e))); }
+}
+
+async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userText: string): Promise<string> {
+  const bizId = tenant.business.id;
+  const [tours, kbHits, bkr, slots, cntRes, siteUrls] = await Promise.all([
+    getActiveTours(tenant),
+    retrieveKb(supabase, bizId, userText),
+    supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
+      .eq("phone", phone).eq("business_id", bizId).in("status", ["PAID", "HELD", "CONFIRMED"])
+      .order("created_at", { ascending: false }).limit(3),
+    getAvailSlots(tenant, 5),
+    supabase.from("wa_messages").select("id", { count: "exact", head: true })
+      .eq("business_id", bizId).eq("to_phone", String(phone)).eq("status", "SENT")
+      .gte("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
+    getBusinessSiteUrls(tenant),
+  ]);
+
+  const blockB = buildBlockB({
+    name: businessName(tenant),
+    aiPrompt: tenant.business.ai_system_prompt,
+    terminology: tenant.business.terminology,
+    faqJson: tenant.business.faq_json,
+    bookingUrl: siteUrls.bookingSiteUrl || null,
+    tours: (tours || []).map((t: any) => ({
+      name: t.name,
+      price: Number(t.base_price_per_person || 0),
+      durationMinutes: Number(t.duration_minutes || 0),
+      description: t.description,
+    })),
+  });
+
+  const bookings = bkr.data || [];
+  const openBookings = bookings.map((b: any) =>
+    (b.tours?.name || "Tour") + " on " + (b.slots ? fmtTime(tenant, b.slots.start_time) : "TBC") + " (" + b.qty + " ppl, " + b.status + ")").join("; ");
+  const avail = (slots || []).slice(0, 6).map((s: any) =>
+    fmtTime(tenant, s.start_time) + " " + (s.tours?.name || "") + " (" + Math.max(0, Number(s.capacity_total || 0) - Number(s.booked || 0) - Number(s.held || 0)) + " spots)").join("\n");
+
+  const nowIso = new Date().toISOString();
+  const blockC = buildBlockC({
+    nowText: formatDateTime(tenant, nowIso, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+    dayName: formatDateTime(tenant, nowIso, { weekday: "long" }),
+    windowOpen: true, // we are replying to an inbound message, so the 24h window is open by definition
+    outboundCount24h: cntRes.count || 0,
+    returning: bookings.length > 0,
+    openBookingsSummary: openBookings || null,
+    availabilitySummary: avail || null,
+    kbHits,
+  });
+
+  return assembleBotSystem(blockB, blockC);
+}
+
+// Returns true when the turn is fully handled (something sent, or intentionally
+// silent). false → caller falls through to the legacy path.
+async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userText: string, mode: "send" | "shadow"): Promise<boolean> {
+  try {
+    const system = await buildBotSystemForTurn(tenant, String(phone), userText);
+    const label = mode === "shadow" ? "wa-v2-shadow" : "wa-v2";
+    const r = await botReply({ system, user: userText, userKey: await hashedUserKey(tenant.business.id, String(phone)), label });
+    if (!r) {
+      await logLlmUsage(tenant.business.id, { label, shadow: mode === "shadow", action: "parse_fail" });
+      return false;
+    }
+    await logLlmUsage(tenant.business.id, { label, shadow: mode === "shadow", usage: r.usage, out: r.out });
+    if (mode === "shadow") return true;
+
+    const out = r.out;
+    // HARD RULE: only out.message may ever reach the customer. plan and
+    // escalation_reason are internal; a leaked plan is a sev-2.
+    switch (out.action) {
+      case "silent":
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      case "escalate": {
+        await typingDelay();
+        await sendText(tenant, phone, out.message || "Let me get a person on this for you. Our team will reply here shortly.");
+        await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
+        await logE(tenant, "human_takeover", { phone: phone, reason: out.escalation_reason || "bot_escalate" });
+        return true;
+      }
+      case "flow": {
+        await typingDelay();
+        if (out.message) await sendText(tenant, phone, out.message);
+        if (out.flow_id === "availability_check") {
+          const availHandled = await handleSmartAvail(tenant, phone, userText);
+          if (availHandled) { await setConvo(convo.id, { current_state: "MENU" }); return true; }
+        }
+        await handleMsg(tenant, phone, "book", "text"); // existing deterministic booking flow
+        return true;
+      }
+      case "template":
+        // ponytail: unreachable while answering an inbound (window is open by
+        // definition); the reactive 131047 fallback in sendWA owns real
+        // closed-window sends. Log it and stay quiet rather than guess.
+        console.error("BOT_V2_UNEXPECTED_TEMPLATE " + tenant.business.id);
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      case "reply":
+      default: {
+        if (!out.message) return false;
+        await typingDelay();
+        // One message, no trailing button prompt (v2 one-message rule).
+        await sendText(tenant, phone, out.message);
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error("BOT_V2_ERR " + (e instanceof Error ? e.message : String(e)));
+    return false;
+  }
+}
 
 async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any) {
   try {
@@ -1071,6 +1223,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await supabase.from("chat_messages").update({ intent: intent, auto_replied: true }).eq("id", inboundMsgId);
       }
       if (intent === "THANKS" && !rid) {
+        if (WA_BOT_V2 === "on") {
+          // v2 one-message rule: pure acknowledgements get silence, not a send.
+          await setConvo(convo.id, { current_state: "MENU" });
+          return;
+        }
         await sendText(tenant, phone, "You\u2019re welcome! \u{1F60A} Feel free to ask anything else or type *menu* to see your options.");
         await setConvo(convo.id, { current_state: "MENU" });
         return;
@@ -1284,14 +1441,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // FALLBACK — try to be helpful
       else {
+        if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, input || rawText, "send")) return;
         await typingDelay();
-        const gemReply = await gemFallback(tenant, input || rawText);
+        const gemReply = await gemFallback(tenant, input || rawText, phone);
         if (gemReply) {
           await sendText(tenant, phone, gemReply);
           await sendButtons(tenant, phone, "Anything else?", [
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
             { id: "MORE", title: "\u{1F4AC} More Options" },
           ]);
+          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, input || rawText, "shadow");
         } else {
           await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\". Or pick an option below:");
           await sendButtons(tenant, phone, "Quick actions:", [
@@ -1925,6 +2084,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           timeoutMs: 5000,
           reasoning: "off", // date extractor — thinking would blow the 5s budget
           label: "wa-date",
+          businessId: tenant.business.id,
+          userKey: await hashedUserKey(tenant.business.id, String(phone)),
         });
         if (dateOut) {
           const extracted = dateOut.trim();
@@ -2901,20 +3062,24 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Call the LLM with full context (bookings + availability + vector KB)
       {
+        if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, rawText, "send")) return;
         const askKbCtx = await retrieveKbContext(supabase, tenant.business.id, rawText);
         if (askKbCtx) gemContext = askKbCtx + "\n" + gemContext;
         const ctxOut = await llmText({
           system: buildGeminiInstruction(tenant, gemContext),
           user: rawText,
-          maxTokens: 200,
-          temperature: 0.7,
+          maxTokens: 400,
+          temperature: 0.2,
           timeoutMs: 8000,
           label: "wa-ask",
+          businessId: tenant.business.id,
+          userKey: await hashedUserKey(tenant.business.id, String(phone)),
         });
         if (ctxOut) {
           await sendText(tenant, phone, ctxOut);
           await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
           await setConvo(convo.id, { current_state: "MENU" });
+          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, rawText, "shadow");
           return;
         }
       }

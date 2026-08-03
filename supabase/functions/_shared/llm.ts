@@ -18,6 +18,7 @@
 // retired Gemini model froze both bots is the reason this module exists.
 
 import { createServiceClient } from "./tenant.ts";
+import { OPENROUTER_PROVIDER_PREFS } from "./openrouter-provider.ts";
 
 export type LlmMessage = { role: "user" | "assistant"; content: string };
 
@@ -28,7 +29,7 @@ export type LlmOpts = {
   maxTokens?: number;
   temperature?: number;
   timeoutMs?: number;
-  label?: string;           // appears in logs and as llm_usage.label
+  label?: string;           // appears in logs and as llm_usage.fn
   reasoning?: "off" | "high" | "xhigh"; // per-call override of the env/default effort
   businessId?: string;      // tenant this call belongs to, for llm_usage
   userKey?: string;         // stable per-conversation id, sent as OpenRouter `user`
@@ -60,7 +61,7 @@ async function recordUsage(opts: LlmOpts, usage: any) {
     usageDb ??= createServiceClient();
     await usageDb.from("llm_usage").insert({
       business_id: opts.businessId,
-      label: opts.label || "llm",
+      fn: opts.label || "llm",
       model: OPENROUTER_MODEL,
       prompt_tokens: usage.prompt_tokens ?? 0,
       completion_tokens: usage.completion_tokens ?? 0,
@@ -109,6 +110,8 @@ export async function llmText(opts: LlmOpts): Promise<string | null> {
           // control prompt-cache affinity; DeepSeek caching is automatic and
           // keyed on the prompt prefix.
           ...(opts.userKey ? { user: opts.userKey } : {}),
+          // POPIA provider constraints (all envs unset = no-op); see openrouter-provider.ts
+          ...(OPENROUTER_PROVIDER_PREFS ? { provider: OPENROUTER_PROVIDER_PREFS } : {}),
         }),
       });
       const d = await r.json();
