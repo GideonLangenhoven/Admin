@@ -1514,6 +1514,11 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "llm_usage",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "logs",
       "privilege_type": "DELETE"
     },
@@ -7325,6 +7330,15 @@
       "roles": "{authenticated}",
       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "llm_usage",
+      "policyname": "llm_usage_auth_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (current_business_ids()))",
+      "with_check": null
     },
     {
       "schemaname": "public",
