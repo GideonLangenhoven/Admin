@@ -26,7 +26,6 @@ type SlotData = { id: string; start_time: string; capacity_total: number; booked
 
 export default function BroadcastsPage() {
   const { businessId } = useBusinessContext();
-  const [manageBookingUrl, setManageBookingUrl] = useState("");
   const [vMonth, setVMonth] = useState(new Date().getMonth());
   const [vYear, setVYear] = useState(new Date().getFullYear());
   const [allSlots, setAllSlots] = useState<SlotData[]>([]);
@@ -44,13 +43,7 @@ export default function BroadcastsPage() {
   const [weatherResult, setWeatherResult] = useState<any>(null);
   const [cancellingWeather, setCancellingWeather] = useState(false);
 
-  useEffect(() => { loadSlots(); loadHistory(); loadBusinessLinks(); }, [businessId]);
-
-  async function loadBusinessLinks() {
-    const { data } = await supabase.from("businesses").select("booking_site_url, manage_bookings_url").eq("id", businessId).maybeSingle();
-    const bookingSiteUrl = String(data?.booking_site_url || "").replace(/\/+$/, "");
-    setManageBookingUrl(data?.manage_bookings_url || (bookingSiteUrl ? bookingSiteUrl + "/my-bookings" : ""));
-  }
+  useEffect(() => { loadSlots(); loadHistory(); }, [businessId]);
 
   async function loadSlots() {
     // Start of today in admin timezone, converted back to UTC for the query
@@ -176,10 +169,6 @@ export default function BroadcastsPage() {
     setSending(false);
   }
 
-  function fmtDateTime(iso: string) {
-    return new Date(iso).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
-  }
-
   async function sendWeatherCancel() {
     if (selectedSlotIds.length === 0) return;
     if (!await confirmAction({
@@ -190,116 +179,19 @@ export default function BroadcastsPage() {
     })) return;
     setCancellingWeather(true); setWeatherResult(null);
 
-    let totalAffected = 0;
-    let totalSent = 0;
-
     try {
-      for (const slotId of selectedSlotIds) {
-        // Close the slot
-        await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slotId);
-
-        // Fetch all active bookings on this slot
-        const { data: slotBookings } = await supabase
-          .from("bookings")
-          .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
-          .eq("business_id", businessId)
-          .eq("slot_id", slotId)
-          .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
-
-        const affected = slotBookings || [];
-
-        for (const b of affected) {
-          // Cancel booking (no auto-refund — customer chooses)
-          await supabase.from("bookings").update({
-            status: "CANCELLED",
-            cancellation_reason: "Weather cancellation: " + weatherReason,
-            cancelled_at: new Date().toISOString(),
-          }).eq("id", b.id);
-
-          // Release capacity
-          const slotData = await supabase.from("slots").select("booked, held").eq("id", slotId).single();
-          if (slotData.data) {
-            await supabase.from("slots").update({
-              booked: Math.max(0, slotData.data.booked - b.qty),
-              held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
-            }).eq("id", slotId);
-          }
-
-          // Cancel active holds
-          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-
-          const ref = b.id.substring(0, 8).toUpperCase();
-          const tourName = (b as any).tours?.name || "Tour";
-          const startTime = (b as any).slots?.start_time ? fmtDateTime((b as any).slots.start_time) : "";
-          const paidAmount = Number(b.total_amount || 0);
-
-          // WhatsApp notification — with 3 options
-          if (b.phone) {
-            try {
-              await fetch(SU + "/functions/v1/send-whatsapp-text", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-                body: JSON.stringify({
-                  business_id: businessId,
-                  to: b.phone,
-                  message: "\u26C8 *Trip Cancelled \u2014 Weather*\n\n" +
-                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                    " has been cancelled due to " + weatherReason + ".\n\n" +
-                    "\uD83D\uDCCB Ref: " + ref + "\n" +
-                    (paidAmount > 0 ? "\uD83D\uDCB0 Amount paid: R" + paidAmount + "\n" : "") +
-                    "\nPlease choose how you\u2019d like us to handle your booking:\n\n" +
-                    "1\uFE0F\u20E3 *Reschedule* \u2014 Pick a new date\n" +
-                    "2\uFE0F\u20E3 *Voucher* \u2014 Get a voucher for a future trip\n" +
-                    "3\uFE0F\u20E3 *Refund* \u2014 Request a full refund\n\n" +
-                    "\uD83D\uDC49 Manage your booking: " + manageBookingUrl + "\n\n" +
-                    "Or reply here with your choice and we\u2019ll sort it out for you \uD83D\uDEF6",
-                }),
-              });
-              totalSent++;
-            } catch (e) { console.error("WA err:", e); }
-          }
-
-          // Email notification — with 3 option buttons
-          if (b.email) {
-            try {
-              await supabase.functions.invoke("send-email", {
-                body: {
-                  type: "CANCELLATION",
-                  data: {
-                    business_id: businessId,
-                    email: b.email,
-                    customer_name: b.customer_name || "Guest",
-                    ref,
-                    tour_name: tourName,
-                    start_time: startTime,
-                    reason: weatherReason,
-                    total_amount: paidAmount > 0 ? paidAmount : null,
-                  },
-                },
-              });
-              totalSent++;
-            } catch (e) { console.error("Email err:", e); }
-          }
-
-          totalAffected++;
-        }
-      }
-
-      // Log as broadcast
-      try {
-        await supabase.from("broadcasts").insert({
-          message: "\u26C8 Weather cancellation: " + weatherReason,
-          target_group: "AFFECTED_BOOKINGS",
-          sent_count: totalSent,
-          business_id: businessId,
-        });
-      } catch (_) { }
-
-      setWeatherResult({ affected: totalAffected, sent: totalSent });
+      // Delegate to the weather-cancel edge function: the single source of truth
+      // for slot closure, tenant-scoped booking cancellation, atomic capacity
+      // release, refund_status ACTION_REQUIRED, and customer notifications.
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: { slot_ids: selectedSlotIds, business_id: businessId, reason: weatherReason, log_broadcast: true },
+      });
+      if (error) throw error;
+      setWeatherResult({ affected: (data as any)?.bookings_cancelled ?? 0, sent: (data as any)?.notified ?? 0 });
       setSelectedSlotIds([]); setBookings([]); setSelectedDate(null);
       loadSlots(); loadHistory();
     } catch (e) {
-      setWeatherResult({ error: String(e) });
+      setWeatherResult({ error: e instanceof Error ? e.message : String(e) });
     }
 
     setCancellingWeather(false);

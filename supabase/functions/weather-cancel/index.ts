@@ -140,6 +140,9 @@ Deno.serve(async (req: any) => {
     }
 
     // ── Phase 3: Send notifications (after all DB state is consistent) ──
+    // `notified` counts successful sends (one per channel), which the Broadcasts
+    // page surfaces and logs as the broadcast's sent_count.
+    let notified = 0;
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
       if (failedIds.has(b.id)) continue;
@@ -185,6 +188,7 @@ Deno.serve(async (req: any) => {
             full_message: waMessage,
             customer_first_name: firstName,
           });
+          notified++;
         } catch (e) { console.error("WA weather-cancel err:", e); }
       }
 
@@ -212,6 +216,7 @@ Deno.serve(async (req: any) => {
             }),
           });
           console.log("CANCEL_EMAIL", b.id, emailRes.status, await emailRes.text().catch(() => ""));
+          if (emailRes.ok) notified++;
         } catch (e) { console.error("Email weather-cancel err:", e); }
       } else {
         console.warn("CANCEL_EMAIL_SKIP no email on booking", b.id);
@@ -231,10 +236,26 @@ Deno.serve(async (req: any) => {
       },
     });
 
+    // Opt-in broadcast-history row. The Broadcasts page shows weather
+    // cancellations in its history feed; recorded here rather than client-side
+    // so that page keeps no direct table writes. Best-effort: a failure here
+    // must not fail a cancellation that already happened.
+    if (body.log_broadcast) {
+      try {
+        await supabase.from("broadcasts").insert({
+          business_id,
+          message: (isWeather ? "⛈ Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
+          target_group: "AFFECTED_BOOKINGS",
+          sent_count: notified,
+        });
+      } catch (e) { console.error("WEATHER_CANCEL_BROADCAST_LOG_ERR:", e); }
+    }
+
     return new Response(JSON.stringify({
       ok: true,
       slots_closed: slot_ids.length,
       bookings_cancelled: affected.length - failedCancels.length,
+      notified,
       failed_cancels: failedCancels,
     }), { status: 200, headers: getCors(req) });
   } catch (err: any) {
