@@ -7,8 +7,9 @@ import { notify } from "../lib/app-notify";
 // AM3/AM5: minimal admin surface for inspecting failed outbox messages and
 // retrying them. The outbox table is the project's notification queue —
 // status=FAILED rows are messages that exhausted their 2-attempt retry
-// budget. Retry resets status=PENDING and clears the error so the
-// outbox-send cron picks them up on its next run (every 5 minutes).
+// budget. Retry sends immediately with the tenant's own WhatsApp
+// credentials; if the 24h window is closed the row is parked as
+// WAITING_WINDOW and delivered when the customer next messages in.
 
 type OutboxRow = {
   id: string;
@@ -59,10 +60,14 @@ export default function NotificationsPage() {
     const data = await r.json();
     setRetrying(null);
     if (r.ok) {
-      notify({ title: "Queued for retry", message: "outbox-send will pick this up on the next cron run.", tone: "success" });
+      if (data.outcome === "queued_window_closed") {
+        notify({ title: "Queued", message: "WhatsApp window is closed — it will send when the customer next messages you.", tone: "success" });
+      } else {
+        notify({ title: "Sent", message: "Delivered via your WhatsApp number.", tone: "success" });
+      }
       load();
     } else {
-      notify({ title: "Retry failed", message: data.error || "Could not requeue", tone: "error" });
+      notify({ title: "Retry failed", message: data.error || "Could not send", tone: "error" });
     }
   }
 
@@ -88,7 +93,7 @@ export default function NotificationsPage() {
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
         WhatsApp messages in the outbox queue. Failed rows have exhausted their 2-attempt retry budget;
-        the Retry button requeues them at PENDING for the next outbox-send cron tick (every 5 min).
+        Retry sends immediately from your WhatsApp number (or queues until the customer next replies if the 24h window is closed).
       </p>
 
       <div className="ui-seg anim-fade-up anim-d1">

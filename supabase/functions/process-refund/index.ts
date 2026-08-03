@@ -134,10 +134,12 @@ Deno.serve(async (req: any) => {
     const yocoBody: any = {};
     if (isPartial) yocoBody.amount = refundAmountCents;
 
+    // Test-mode aware: refunds follow the tenant's CURRENT mode. A payment made
+    // in the other mode fails loud at Yoco ("not found") rather than crossing accounts.
     const yocoRes = await fetch("https://payments.yoco.com/api/checkouts/" + booking.yoco_checkout_id + "/refund", {
       method: "POST",
       headers: {
-        Authorization: "Bearer " + tenant.credentials.yocoSecretKey,
+        Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(yocoBody),
