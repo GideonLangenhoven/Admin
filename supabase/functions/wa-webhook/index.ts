@@ -15,7 +15,7 @@ import {
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { formatDuration } from "../_shared/duration.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
-import { llmText } from "../_shared/llm.ts";
+import { llmText, withinAiQuota } from "../_shared/llm.ts";
 import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
 import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
@@ -359,6 +359,7 @@ async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extr
     temperature: 0.2,
     timeoutMs: 8000,
     label: "wa-faq",
+    quota: true,
     businessId: tenant.business.id,
     userKey: phone ? await hashedUserKey(tenant.business.id, String(phone)) : undefined,
   });
@@ -896,6 +897,12 @@ async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userT
 // silent). false → caller falls through to the legacy path.
 async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userText: string, mode: "send" | "shadow"): Promise<boolean> {
   try {
+    // The v2 path calls botReply directly, bypassing llmText, so the fair-use
+    // ceiling has to be applied here too. Returning false drops the turn to the
+    // legacy bot rather than leaving the customer with nothing. Shadow runs are
+    // metering, not customer-facing, so they are not capped.
+    if (mode === "send" && !(await withinAiQuota(tenant.business.id, "wa-v2"))) return false;
+
     const system = await buildBotSystemForTurn(tenant, String(phone), userText);
     const label = mode === "shadow" ? "wa-v2-shadow" : "wa-v2";
     const r = await botReply({ system, user: userText, userKey: await hashedUserKey(tenant.business.id, String(phone)), label });
@@ -2559,8 +2566,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
       const bookingSiteUrls = await getBusinessSiteUrls(tenant);
-      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(verifiedSd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
-        method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+      console.log("YOCO_CALL: key_len=" + tenant.credentials.activeYocoSecretKey.length + " amount=" + Math.round(verifiedSd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
+        method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: Math.round(verifiedSd.total * 100), currency: tenant.business.currency || "ZAR",
           successUrl: withQuery(bookingSiteUrls.bookingSuccessUrl, { ref: booking.id }),
@@ -2698,11 +2705,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
 
         // Create Yoco checkout
-        // Uses global tenant.credentials.yocoSecretKey
+        // Uses tenant.credentials.activeYocoSecretKey (test-mode aware)
         const voucherSiteUrls = await getBusinessSiteUrls(tenant);
         const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
           method: "POST",
-          headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+          headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: Math.round(Number(sd.value) * 100), currency: tenant.business.currency || "ZAR",
             successUrl: withQuery(voucherSiteUrls.voucherSuccessUrl, { code: vcode }),
@@ -2904,7 +2911,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const rpRef = rpBk.id.substring(0, 8).toUpperCase();
           const resendSiteUrls = await getBusinessSiteUrls(tenant);
           const rpYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
             body: JSON.stringify({
               amount: Math.round(Number(rpBk.total_amount) * 100), currency: tenant.business.currency || "ZAR",
               successUrl: withQuery(resendSiteUrls.bookingSuccessUrl, { ref: rpBk.id }),
@@ -2979,7 +2986,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const depAmount = Math.round(Number(cashBkr.data.total_amount) * 0.5);
           const depositSiteUrls = await getBusinessSiteUrls(tenant);
           const depYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
             body: JSON.stringify({
               amount: Math.round(depAmount * 100), currency: tenant.business.currency || "ZAR",
               successUrl: withQuery(depositSiteUrls.bookingSuccessUrl, { ref: cashBkr.data.id }),
@@ -3072,6 +3079,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           temperature: 0.2,
           timeoutMs: 8000,
           label: "wa-ask",
+          quota: true,
           businessId: tenant.business.id,
           userKey: await hashedUserKey(tenant.business.id, String(phone)),
         });
@@ -3132,7 +3140,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Need additional payment
         const addSiteUrls = await getBusinessSiteUrls(tenant);
         const addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: Math.round(diffAmount * 100), currency: tenant.business.currency || "ZAR",
             successUrl: withQuery(addSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
@@ -3228,7 +3236,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       for (let spi = 0; spi < splitCount; spi++) {
         const splitSiteUrls = await getBusinessSiteUrls(tenant);
         const spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
+          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: Math.round(splitAmount * 100), currency: tenant.business.currency || "ZAR",
             successUrl: withQuery(splitSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),

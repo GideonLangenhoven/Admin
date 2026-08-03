@@ -267,7 +267,7 @@ async function gemChat(hist, msg, toursList, businessId) {
     // Ground in the tenant's vector KB (returns "" when nothing relevant)
     const kbCtx = businessId ? await retrieveKbContext(db, businessId, String(msg || "")) : "";
     const sysText = hardenSystemPrompt(sysBase + (kbCtx ? "\n\n" + kbCtx : ""));
-    const llmOut = await llmText({ system: sysText, messages: c, maxTokens: 400, temperature: 0.2, timeoutMs: 8000, label: "web-faq", businessId: businessId || undefined });
+    const llmOut = await llmText({ system: sysText, messages: c, maxTokens: 400, temperature: 0.2, timeoutMs: 8000, label: "web-faq", quota: true, businessId: businessId || undefined });
     if (llmOut) {
       const raw = llmOut;
       const out = gateOutbound(String(raw));

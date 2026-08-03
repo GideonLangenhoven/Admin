@@ -37,6 +37,27 @@ export function computeEmailOverage(sent: number, included: number, ratePerEmail
   return { overageEmails, overageZar };
 }
 
+// The llm_usage.fn values that count as customer-facing AI replies, and so
+// against a tenant's fair-use allowance. Micro-classifiers, the v2 shadow run
+// and the internal admin help chat are excluded on purpose — an operator's
+// allowance should not be burned by plumbing. Kept in sync with QUOTA_FNS in
+// supabase/functions/_shared/llm.ts, which enforces the ceiling; Node and Deno
+// cannot share a module.
+export const AI_QUOTA_FNS = ["wa-faq", "wa-ask", "web-faq", "wa-v2"];
+
+// The bot stops generating at this multiple of the included allowance. Between
+// the two the operator is billed overage; past it the deterministic menu takes
+// over. Mirrors HARD_CEILING_MULTIPLE in _shared/llm.ts.
+export const AI_HARD_CEILING_MULTIPLE = 3;
+
+// AI reply overage for a month, same shape as computeEmailOverage so the
+// invoice generator has one pattern to follow. Usage-based, never pro-rated.
+export function computeAiOverage(replies: number, included: number, ratePerReplyZar: number): { overageReplies: number; overageZar: number } {
+  const overageReplies = Math.max(0, Math.floor(replies) - Math.floor(included));
+  const overageZar = Math.round(overageReplies * ratePerReplyZar * 100) / 100;
+  return { overageReplies, overageZar };
+}
+
 function toUtcDate(isoLike: string): Date {
   const d = new Date(isoLike);
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

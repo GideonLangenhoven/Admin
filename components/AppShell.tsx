@@ -64,7 +64,7 @@ const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
   { label: "Customers", hrefs: ["/inbox", "/refunds", "/vouchers", "/reviews"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
-  { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships"] },
+  { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
   { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/privacy/data-requests", "/super-admin"] },
 ];
 
