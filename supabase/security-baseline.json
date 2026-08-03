@@ -4244,6 +4244,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "llm_usage",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "logs",
       "privilege_type": "DELETE"
     },
@@ -6222,6 +6257,11 @@
     {
       "schema": "public",
       "table_name": "landing_page_orders",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "llm_usage",
       "rls_enabled": true
     },
     {

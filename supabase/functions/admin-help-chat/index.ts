@@ -108,6 +108,8 @@ Deno.serve(async (req: Request) => {
       temperature: 0.3,
       timeoutMs: 15000,
       label: "admin-help",
+      businessId: auth.businessId,
+      userKey: auth.businessId + ":" + auth.userId,
     });
 
     // Deduped page links for the UI's "open the page" chips.

@@ -267,7 +267,7 @@ async function gemChat(hist, msg, toursList, businessId) {
     // Ground in the tenant's vector KB (returns "" when nothing relevant)
     const kbCtx = businessId ? await retrieveKbContext(db, businessId, String(msg || "")) : "";
     const sysText = hardenSystemPrompt(sysBase + (kbCtx ? "\n\n" + kbCtx : ""));
-    const llmOut = await llmText({ system: sysText, messages: c, maxTokens: 150, temperature: 0.7, timeoutMs: 8000, label: "web-faq" });
+    const llmOut = await llmText({ system: sysText, messages: c, maxTokens: 400, temperature: 0.2, timeoutMs: 8000, label: "web-faq", businessId: businessId || undefined });
     if (llmOut) {
       const raw = llmOut;
       const out = gateOutbound(String(raw));
@@ -769,6 +769,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
             timeoutMs: 5000,
             reasoning: "off", // date extractor — thinking would blow the 5s budget
             label: "web-date",
+            businessId: requestedBusinessId || undefined,
           });
           if (pdOut) {
             const pdExt = pdOut.trim();
