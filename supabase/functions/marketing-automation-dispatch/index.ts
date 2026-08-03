@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { nonTradingBusinessIds } from "../_shared/subscription.ts";
 
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
 // Refuse to use the Resend developer sandbox even if it's pasted into the env
@@ -48,7 +49,14 @@ Deno.serve(async (req: Request) => {
 
     const currentYear = today.getFullYear();
 
+    // Fix 3b: no new automation enrolments for a paused or suspended operator.
+    const pausedForDates = await nonTradingBusinessIds(
+      supabase,
+      ((dateAutomations || []) as any[]).map((a) => a.business_id),
+    );
+
     for (const auto of (dateAutomations || []) as any[]) {
+      if (pausedForDates.has(String(auto.business_id))) continue;
       const field = auto.trigger_config?.field || "date_of_birth";
       const daysBefore = auto.trigger_config?.days_before || 0;
 
@@ -139,8 +147,20 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true, ...results }), { status: 200, headers: cors });
     }
 
+    // Automation steps are marketing sends too, so a paused operator's in-flight
+    // enrollments hold rather than continue. next_action_at is left untouched,
+    // so they resume from where they stopped when the operator comes back.
+    const pausedForRuns = await nonTradingBusinessIds(
+      supabase,
+      (enrollments as any[]).map((e) => e.business_id),
+    );
+    if (pausedForRuns.size > 0) {
+      console.log("AUTOMATION_DISPATCH_SKIP_NON_TRADING businesses=" + [...pausedForRuns].join(","));
+    }
+
     // ── 3. Process each enrollment ──
     for (const enrollment of enrollments as any[]) {
+      if (pausedForRuns.has(String(enrollment.business_id))) continue;
       try {
         // Atomic claim: push next_action_at into the future, guarded on the row
         // still being due (next_action_at <= runStart). Only one concurrent

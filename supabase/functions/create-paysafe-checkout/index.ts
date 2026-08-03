@@ -16,6 +16,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessCredentials, getTenantByBusinessId, resolveBookingSiteUrl } from "../_shared/tenant.ts";
 import { confirmComboAndNotify } from "../_shared/combo.ts";
+import { blockIfNotTrading } from "../_shared/subscription.ts";
 
 const supabase = createServiceClient();
 const HOLD_MINUTES = 15;
@@ -91,6 +92,15 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
   if (legSpecs.some((l) => !l.slot_id)) {
     return jsonRes({ error: "A slot must be selected for every tour in the combo" }, 400, cors);
+  }
+
+  // Fix 3a: a combo is only sellable while EVERY participating operator is
+  // trading. One paused leg makes the whole package unsellable — there is no
+  // partial combo, and taking the money would commit a customer to an operator
+  // who has stopped taking business.
+  for (const businessId of new Set(legSpecs.map((l) => String(l.business_id)))) {
+    const blocked = await blockIfNotTrading(supabase, businessId, cors);
+    if (blocked) return blocked;
   }
 
   // Verify every slot exists, belongs to its leg's tour, and has capacity

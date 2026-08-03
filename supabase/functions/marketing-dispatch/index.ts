@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { nonTradingBusinessIds } from "../_shared/subscription.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
@@ -129,7 +130,23 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
       else unsubscribedContactIds = new Set((unsubContacts || []).map((c: any) => c.id));
     }
 
+    // Fix 3b: a paused or suspended operator sends no new marketing. Deferred,
+    // not failed — the rows go back to `pending`, so a campaign queued before a
+    // seasonal pause sends when the operator resumes rather than being lost.
+    const pausedBusinessIds = await nonTradingBusinessIds(
+      supabase,
+      (items as any[]).map((i) => i.business_id),
+    );
+    if (pausedBusinessIds.size > 0) {
+      console.log("MARKETING_DISPATCH_SKIP_NON_TRADING businesses=" + [...pausedBusinessIds].join(","));
+    }
+
     for (const item of items as any[]) {
+      if (pausedBusinessIds.has(String(item.business_id))) {
+        deferredIds.push(item.id);
+        continue;
+      }
+
       const camp = campaignMap[item.campaign_id];
       if (!camp) {
         failedIds.push({ id: item.id, error: "Campaign/template not found", retryable: false });

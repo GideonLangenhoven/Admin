@@ -8,6 +8,7 @@ import {
   isAllowedOrigin,
   resolveBusinessSiteUrls,
 } from "../_shared/tenant.ts";
+import { blockIfNotTrading } from "../_shared/subscription.ts";
 
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
@@ -102,6 +103,24 @@ Deno.serve(async (req: any) => {
     const sendPaymentLink = body.send_payment_link === true;
 
     if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+
+    // Fix 3a: a paused or suspended operator takes no new business. Gated here,
+    // ahead of pricing, promo application and payment, so every downstream exit
+    // is covered — including the promo-fully-covered path below, which returns
+    // a confirmed booking without ever reaching the payment provider.
+    // One extra indexed lookup per checkout; the alternative is a gate per exit.
+    {
+      const gateRow = bookingId
+        ? await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle()
+        : voucherId
+        ? await supabase.from("vouchers").select("business_id").eq("id", voucherId).maybeSingle()
+        : null;
+      const gateBusinessId = String(gateRow?.data?.business_id || "");
+      if (gateBusinessId) {
+        const blocked = await blockIfNotTrading(supabase, gateBusinessId, buildCors(req?.headers?.get("origin") || "*"));
+        if (blocked) return blocked;
+      }
+    }
 
     // FIX 4: Server-side price verification for BOOKING checkouts
     // Never trust frontend pricing — calculate from DB for standard bookings
