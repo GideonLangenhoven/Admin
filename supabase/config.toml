@@ -56,6 +56,10 @@ verify_jwt = false
 [functions.kb-sync]
 verify_jwt = false
 
+# Cron-invoked; authenticates itself (x-billing-key or service-role bearer).
+[functions.billing-enforcement]
+verify_jwt = false
+
 [functions.fetch-google-reviews]
 verify_jwt = false
 

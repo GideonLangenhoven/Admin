@@ -49,5 +49,39 @@ export async function POST(req: NextRequest) {
     after_state: { method, notes: body.notes || null },
   });
 
-  return NextResponse.json({ ok: true });
+  // Fix 4: lift a non-payment lockout now the invoice is settled. Node twin of
+  // restoreTenantIfSettled in supabase/functions/_shared/billing.ts — Node and
+  // Deno cannot share a module, so the two are kept deliberately identical.
+  //
+  // Only reverses what the billing-enforcement pass itself did: PAST_DUE, or
+  // SUSPENDED with reason NON_PAYMENT. A manually suspended tenant stays
+  // suspended, and a PAUSED (seasonal) tenant was never locked out.
+  let restored = false;
+  const { data: biz } = await db.from("businesses")
+    .select("subscription_status, suspension_reason").eq("id", invoice.business_id).maybeSingle();
+  const status = String(biz?.subscription_status || "").toUpperCase();
+  const reason = biz?.suspension_reason ?? null;
+  if (status === "PAST_DUE" || (status === "SUSPENDED" && reason === "NON_PAYMENT")) {
+    const { data: stillOwed, error: owedErr } = await db.from("platform_invoices")
+      .select("id").eq("business_id", invoice.business_id).eq("status", "SENT").neq("id", invoiceId).limit(1);
+    // Fail closed: an unreadable check leaves the tenant where they are.
+    if (!owedErr && (stillOwed || []).length === 0) {
+      await db.from("businesses")
+        .update({ subscription_status: "ACTIVE", suspension_reason: null })
+        .eq("id", invoice.business_id);
+      await db.from("audit_logs").insert({
+        actor_id: caller.id,
+        business_id: invoice.business_id,
+        action_type: "BILLING_RESTORED",
+        target_entity: "businesses",
+        target_id: invoice.business_id,
+        before_state: { subscription_status: status, suspension_reason: reason },
+        after_state: { subscription_status: "ACTIVE", suspension_reason: null },
+        source: "platform-invoices/mark-paid",
+      });
+      restored = true;
+    }
+  }
+
+  return NextResponse.json({ ok: true, restored });
 }
