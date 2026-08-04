@@ -118,8 +118,14 @@ Deno.serve(async (req: any) => {
       slotDeltas[b.slot_id].booked += Number(b.qty || 0);
       if (b.status === "HELD") slotDeltas[b.slot_id].held += Number(b.qty || 0);
 
-      // Cancel any active holds
-      await supabase.from("holds").update({ status: "CANCELLED" }).eq("business_id", business_id).eq("booking_id", b.id).eq("status", "ACTIVE");
+      // Cancel any active holds.
+      // No .eq("business_id") here: holds has no business_id column, it is
+      // scoped through booking_id. Filtering on a column that does not exist
+      // made PostgREST reject the whole statement, so weather cancellations
+      // never actually released their holds — the capacity sat reserved until
+      // the expiry cron swept it up. Tenant scoping is intact regardless:
+      // b.id comes from the business_id-filtered booking query above.
+      await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
     }
 
     const failedIds = new Set(failedCancels.map((f) => f.id));

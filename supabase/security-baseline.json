@@ -6749,15 +6749,6 @@
     {
       "schemaname": "public",
       "tablename": "bookings",
-      "policyname": "bookings_anon_select",
-      "cmd": "SELECT",
-      "roles": "{anon,authenticated}",
-      "qual": "((COALESCE(( SELECT current_setting('request.method'::text, true) AS current_setting), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (( SELECT bt_request_header('x-booking-success-token'::text) AS bt_request_header) = (id)::text) OR ((( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header) = (id)::text) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) = (waiver_token)::text)))",
-      "with_check": null
-    },
-    {
-      "schemaname": "public",
-      "tablename": "bookings",
       "policyname": "bookings_anon_update",
       "cmd": "UPDATE",
       "roles": "{anon,authenticated}",
@@ -6767,10 +6758,10 @@
     {
       "schemaname": "public",
       "tablename": "bookings",
-      "policyname": "bookings_self_read",
+      "policyname": "bookings_read",
       "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(customer_id IN ( SELECT customers.id\n   FROM customers\n  WHERE (customers.user_id = ( SELECT auth.uid() AS uid))))",
+      "roles": "{anon,authenticated}",
+      "qual": "((COALESCE(( SELECT current_setting('request.method'::text, true) AS current_setting), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (( SELECT bt_request_header('x-booking-success-token'::text) AS bt_request_header) = (id)::text) OR ((( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header) = (id)::text) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) = (waiver_token)::text)) OR (customer_id IN ( SELECT c.id\n   FROM customers c\n  WHERE (c.user_id = ( SELECT auth.uid() AS uid)))) OR (business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))",
       "with_check": null
     },
     {
@@ -6790,15 +6781,6 @@
       "roles": "{authenticated}",
       "qual": null,
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "bookings",
-      "policyname": "bookings_tenant_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
-      "with_check": null
     },
     {
       "schemaname": "public",
@@ -7229,7 +7211,7 @@
       "policyname": "holds_authenticated_delete",
       "cmd": "DELETE",
       "roles": "{authenticated}",
-      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
+      "qual": "((booking_id IN ( SELECT b.id\n   FROM bookings b\n  WHERE (b.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))) OR (slot_id IN ( SELECT s.id\n   FROM slots s\n  WHERE (s.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))))",
       "with_check": null
     },
     {
@@ -7238,7 +7220,7 @@
       "policyname": "holds_authenticated_select",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
+      "qual": "((booking_id IN ( SELECT b.id\n   FROM bookings b\n  WHERE (b.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))) OR (slot_id IN ( SELECT s.id\n   FROM slots s\n  WHERE (s.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))))",
       "with_check": null
     },
     {
@@ -7247,8 +7229,8 @@
       "policyname": "holds_authenticated_update",
       "cmd": "UPDATE",
       "roles": "{authenticated}",
-      "qual": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))",
-      "with_check": "((booking_id IS NULL) OR (booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))) OR (slot_id IN ( SELECT slots.id\n   FROM slots\n  WHERE (slots.business_id IN ( SELECT unnest(current_business_ids()) AS unnest)))))"
+      "qual": "((booking_id IN ( SELECT b.id\n   FROM bookings b\n  WHERE (b.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))) OR (slot_id IN ( SELECT s.id\n   FROM slots s\n  WHERE (s.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))))",
+      "with_check": "((booking_id IN ( SELECT b.id\n   FROM bookings b\n  WHERE (b.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))) OR (slot_id IN ( SELECT s.id\n   FROM slots s\n  WHERE (s.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))))"
     },
     {
       "schemaname": "public",
@@ -8252,10 +8234,10 @@
     {
       "schemaname": "public",
       "tablename": "slots",
-      "policyname": "slots_anon_select",
+      "policyname": "slots_read",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
+      "qual": "((((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval))) OR (business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))",
       "with_check": null
     },
     {
@@ -8275,15 +8257,6 @@
       "roles": "{authenticated}",
       "qual": null,
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "slots",
-      "policyname": "slots_tenant_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
-      "with_check": null
     },
     {
       "schemaname": "public",
@@ -8360,10 +8333,10 @@
     {
       "schemaname": "public",
       "tablename": "tours",
-      "policyname": "tours_anon_select",
+      "policyname": "tours_read",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (active = true) AND (COALESCE(hidden, false) = false))",
+      "qual": "((((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (active = true) AND (COALESCE(hidden, false) = false)) OR (business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))",
       "with_check": null
     },
     {
@@ -8383,15 +8356,6 @@
       "roles": "{authenticated}",
       "qual": null,
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
-    },
-    {
-      "schemaname": "public",
-      "tablename": "tours",
-      "policyname": "tours_tenant_select",
-      "cmd": "SELECT",
-      "roles": "{authenticated}",
-      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
-      "with_check": null
     },
     {
       "schemaname": "public",
