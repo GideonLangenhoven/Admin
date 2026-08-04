@@ -6744,7 +6744,7 @@
       "cmd": "INSERT",
       "roles": "{anon,authenticated}",
       "qual": null,
-      "with_check": "(status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))"
+      "with_check": "((status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))"
     },
     {
       "schemaname": "public",
@@ -6752,8 +6752,8 @@
       "policyname": "bookings_anon_update",
       "cmd": "UPDATE",
       "roles": "{anon,authenticated}",
-      "qual": "(status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))",
-      "with_check": "(status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text]))"
+      "qual": "((status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))",
+      "with_check": "((status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))"
     },
     {
       "schemaname": "public",
