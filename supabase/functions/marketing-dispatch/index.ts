@@ -13,7 +13,33 @@ const FROM_EMAIL = RAW_FROM_EMAIL && !/onboarding@resend\.dev|@resend\.dev/i.tes
   ? RAW_FROM_EMAIL
   : "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const BATCH_SIZE = 50;
+// Throughput budget. At 50 per run on a 5-minute cron this was 14,400 emails a
+// day for the WHOLE platform — about 7 per tenant per day at 2,000 tenants, and
+// a single 5,000-contact campaign ate a third of it. The ceiling was never
+// Resend: the send already uses the batch endpoint, so a run costs one API call
+// per 100 recipients regardless of batch size. What actually capped it was two
+// sequential DB round trips per email inside the loop, both now batched.
+//
+// 500 is the maximum claim_marketing_queue will hand out in one call. Paired
+// with a per-minute cron that is 720,000 emails/day, which is roughly 5x what
+// 2,000 tenants sending two 1,000-contact campaigns a month would need — the
+// headroom is deliberate, because campaigns burst rather than trickle.
+const BATCH_SIZE = 500;
+
+// Resend's /emails/batch accepts at most 100 messages per request, so a run's
+// claim is split into chunks of this size and the chunks go out in parallel.
+const RESEND_BATCH_MAX = 100;
+
+// Cap on simultaneous PostgREST writes when recording per-email results. High
+// enough to collapse hundreds of sequential round trips into a few, low enough
+// not to exhaust the isolate's socket pool.
+const DB_WRITE_CONCURRENCY = 50;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 const MAX_RETRIES = 3;
 
 const supabase = createServiceClient();
@@ -114,6 +140,7 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const trackingBaseUrl = SUPABASE_URL + "/functions/v1/marketing-track";
 
     const emailPayloads: Array<{ from: string; to: string[]; subject: string; html: string; queueId: string; contactId: string; campaignId: string; businessId: string; unsubscribeUrl: string }> = [];
+    const tokenRows: Array<{ business_id: string; campaign_id: string; contact_id: string; token: string }> = [];
 
     // A contact's status was only ever checked once, at queue-build time
     // (app/marketing/templates/page.tsx). Anyone who unsubscribed after being
@@ -169,18 +196,18 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
         continue;
       }
 
-      // Generate unsubscribe token (with error handling — don't send without a working unsubscribe link)
+      // Unsubscribe token. Generated locally here and written in one bulk
+      // insert after the loop — this used to be a round trip per email, which
+      // is half of what capped the batch size. The invariant is unchanged: the
+      // insert still happens before anything is handed to Resend, so no email
+      // can go out without a working unsubscribe link behind it.
       const unsubToken = crypto.randomUUID();
-      const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert({
+      tokenRows.push({
         business_id: item.business_id,
         campaign_id: item.campaign_id,
         contact_id: item.contact_id,
         token: unsubToken,
       });
-      if (tokenErr) {
-        failedIds.push({ id: item.id, error: "Failed to create unsubscribe token: " + tokenErr.message, retryable: true });
-        continue;
-      }
 
       const unsubscribeUrl = SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=" + unsubToken;
 
@@ -234,10 +261,25 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     }
 
     // ── 4. Send via Resend batch API ──
+    // Persist every unsubscribe token in one insert, before anything is sent.
+    // All-or-nothing on purpose: if this fails we do not know which links would
+    // work, so the whole batch goes back to the queue rather than risk mailing
+    // anyone a dead unsubscribe link.
+    if (tokenRows.length > 0) {
+      const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert(tokenRows);
+      if (tokenErr) {
+        console.error("MARKETING_DISPATCH_TOKEN_INSERT_ERR:", tokenErr.message);
+        for (const p of emailPayloads) {
+          failedIds.push({ id: p.queueId, error: "Failed to create unsubscribe token: " + tokenErr.message, retryable: true });
+        }
+        emailPayloads.length = 0;
+      }
+    }
+
     if (emailPayloads.length > 0) {
       // RFC 8058 one-click unsubscribe header — mailbox providers require it
       // for bulk mail. Without it Gmail / Yahoo route most of these to spam.
-      const batchBody = emailPayloads.map((p) => ({
+      const toResendMessage = (p: typeof emailPayloads[number]) => ({
         from: p.from,
         to: p.to,
         subject: p.subject,
@@ -246,47 +288,72 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
           "List-Unsubscribe": "<" + p.unsubscribeUrl + ">",
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
-      }));
-
-      const res = await fetch("https://api.resend.com/emails/batch", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + RESEND_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(batchBody),
       });
 
-      if (res.ok) {
-        const resData = await res.json();
-        const results = resData.data || resData || [];
-        if (Array.isArray(results)) {
-          for (let i = 0; i < emailPayloads.length; i++) {
-            const payload = emailPayloads[i];
-            const result = results[i];
-            if (result?.id) {
-              sentIds.push(payload.queueId);
-              businessCounts[payload.businessId] = (businessCounts[payload.businessId] || 0) + 1;
-              // Store resend email ID for later bounce matching
-              await supabase.from("marketing_queue").update({ resend_email_id: result.id }).eq("id", payload.queueId);
-            } else {
-              failedIds.push({ id: payload.queueId, error: result?.message || "Send failed", retryable: true });
+      // One request per 100 recipients (Resend's per-request maximum), all in
+      // flight together. A run of 500 is 5 requests, not 500.
+      const groups = chunk(emailPayloads, RESEND_BATCH_MAX);
+      const responses = await Promise.all(groups.map((group) =>
+        fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + RESEND_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(group.map(toResendMessage)),
+        })
+          .then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }))
+          // A network failure on one chunk must not lose the other four.
+          .catch((e) => ({ ok: false, status: 0, data: { message: e instanceof Error ? e.message : String(e) } }))
+      ));
+
+      // Recorded after the sends land, batched rather than one round trip per
+      // email — the other half of what capped the old batch size.
+      const idUpdates: Array<{ queueId: string; emailId: string }> = [];
+
+      for (let gi = 0; gi < groups.length; gi++) {
+        const group = groups[gi];
+        const res = responses[gi];
+
+        if (res.ok) {
+          const resData = res.data as any;
+          const results = resData.data || resData || [];
+          if (Array.isArray(results)) {
+            for (let i = 0; i < group.length; i++) {
+              const payload = group[i];
+              const result = results[i];
+              if (result?.id) {
+                sentIds.push(payload.queueId);
+                businessCounts[payload.businessId] = (businessCounts[payload.businessId] || 0) + 1;
+                // Store resend email ID for later bounce matching
+                idUpdates.push({ queueId: payload.queueId, emailId: result.id });
+              } else {
+                failedIds.push({ id: payload.queueId, error: result?.message || "Send failed", retryable: true });
+              }
+            }
+          } else {
+            // Unexpected response shape — mark as retryable rather than optimistically marking sent
+            console.warn("RESEND_UNEXPECTED_RESPONSE:", JSON.stringify(resData).substring(0, 500));
+            for (const p of group) {
+              failedIds.push({ id: p.queueId, error: "Unexpected Resend response shape", retryable: true });
             }
           }
         } else {
-          // Unexpected response shape — mark as retryable rather than optimistically marking sent
-          console.warn("RESEND_UNEXPECTED_RESPONSE:", JSON.stringify(resData).substring(0, 500));
-          for (const p of emailPayloads) {
-            failedIds.push({ id: p.queueId, error: "Unexpected Resend response shape", retryable: true });
+          // This chunk failed — mark retryable. Scoped to the chunk, so one bad
+          // request no longer condemns the other four hundred recipients.
+          const errMsg = (res.data as any)?.message || "Batch API error " + res.status;
+          for (const p of group) {
+            failedIds.push({ id: p.queueId, error: errMsg, retryable: res.status >= 500 || res.status === 429 || res.status === 0 });
           }
-        }
-      } else {
-        // Entire batch failed — mark retryable
-        const errBody = await res.json().catch(() => ({}));
-        const errMsg = (errBody as any)?.message || "Batch API error " + res.status;
-        for (const p of emailPayloads) {
-          failedIds.push({ id: p.queueId, error: errMsg, retryable: res.status >= 500 || res.status === 429 });
-        }
+      }
+      }
+
+      // Bounce-matching ids, written concurrently in bounded waves instead of
+      // one blocking round trip per email.
+      for (const wave of chunk(idUpdates, DB_WRITE_CONCURRENCY)) {
+        await Promise.all(wave.map((u) =>
+          supabase.from("marketing_queue").update({ resend_email_id: u.emailId }).eq("id", u.queueId)
+        ));
       }
     }
 
