@@ -5,9 +5,15 @@ import { rescheduleUnitPrice as bookingRescheduleUnitPrice, BOOKING_CUTOFF_MINUT
 
 const SLOT = { price_per_person_override: 450, base_price_per_person: 600 };
 const WINDOW_SQL = readFileSync("supabase/migrations/20260725090000_last_minute_deals.sql", "utf8");
-// apply_last_minute_deals is redefined here, so this file — not the one above —
-// is the body that actually runs. Guards have to hold in both.
-const LIVE_SQL = readFileSync("supabase/migrations/20260725130000_last_minute_deal_window.sql", "utf8");
+// The window migration adds the cut-off column and its CHECK constraint, which
+// still stand, so schema assertions keep reading it.
+const SCHEMA_SQL = readFileSync("supabase/migrations/20260725130000_last_minute_deal_window.sql", "utf8");
+// apply_last_minute_deals has been redefined three times. THIS is the body that
+// actually runs — assertions about behaviour must read the newest definition or
+// they silently guard a function Postgres no longer has.
+const LIVE_SQL = readFileSync("supabase/migrations/20260804160000_last_minute_deals_follow_config.sql", "utf8");
+const LIVE_OPEN = LIVE_SQL.slice(LIVE_SQL.indexOf("-- Open or re-price"), LIVE_SQL.indexOf("-- Close every stamped"));
+const LIVE_CLOSE = LIVE_SQL.slice(LIVE_SQL.indexOf("-- Close every stamped"));
 
 describe("last-minute deals: reschedule pricing", () => {
   it("quotes the slot price for a normal (peak) override", () => {
@@ -80,33 +86,57 @@ describe("last-minute deals: start and cut-off window", () => {
 
   it("restores the price the deal replaced rather than dropping to base", () => {
     // A peak-priced slot that goes on deal must come back at its peak price.
-    expect(LIVE_SQL).toContain("SET price_before_deal = s.price_per_person_override");
-    expect(LIVE_SQL).toContain("SET price_per_person_override = s.price_before_deal");
-    expect(LIVE_SQL).toContain("price_before_deal = NULL");
-    expect(LIVE_SQL).toContain("last_minute_at = NULL");
+    // Captured only on the FIRST stamp: re-pricing an active deal must not
+    // overwrite the original with the deal price, or it can never be restored.
+    expect(LIVE_OPEN).toContain("CASE WHEN s.last_minute_at IS NULL");
+    expect(LIVE_OPEN).toContain("ELSE s.price_before_deal END");
+    expect(LIVE_CLOSE).toContain("SET price_per_person_override = s.price_before_deal");
+    expect(LIVE_CLOSE).toContain("price_before_deal = NULL");
+    expect(LIVE_CLOSE).toContain("last_minute_at = NULL");
   });
 
-  it("closes only upcoming, un-held slots past the cut-off", () => {
+  it("closes only upcoming, un-held slots", () => {
     // create-checkout recomputes the total from price_per_person_override at pay
     // time, so closing under a live hold would charge more than the page quoted.
-    expect(LIVE_SQL).toContain("AND COALESCE(s.held, 0) = 0");
-    expect(LIVE_SQL).toContain("AND s.start_time <= now() + make_interval(hours => t.last_minute_end_hours)");
-    expect(LIVE_SQL).toContain("AND s.start_time > now()");
-    expect(LIVE_SQL).toContain("AND t.last_minute_end_hours IS NOT NULL");
+    // A departed slot keeps the price it actually sold at: history, not config.
+    expect(LIVE_CLOSE).toContain("AND COALESCE(s.held, 0) = 0");
+    expect(LIVE_CLOSE).toContain("AND s.start_time > now()");
   });
 
   it("keeps the live function under the same guards as the original", () => {
-    expect(LIVE_SQL).toContain("COALESCE(s.price_per_person_override, t.base_price_per_person) > t.last_minute_price");
-    expect(LIVE_SQL).toContain("COALESCE(s.booked, 0) + COALESCE(s.held, 0) < s.capacity_total");
-    expect(LIVE_SQL).toContain("s.status = 'OPEN'");
-    expect(LIVE_SQL).toContain("s.last_minute_at IS NULL");
+    expect(LIVE_OPEN).toContain("COALESCE(s.booked, 0) + COALESCE(s.held, 0) < s.capacity_total");
+    expect(LIVE_OPEN).toContain("s.status = 'OPEN'");
     expect(LIVE_SQL).toContain("REVOKE EXECUTE ON FUNCTION public.apply_last_minute_deals() FROM PUBLIC, anon, authenticated");
     expect(LIVE_SQL).toContain("GRANT  EXECUTE ON FUNCTION public.apply_last_minute_deals() TO service_role");
   });
 
+  // The bug this replaced: a deal was stamped once and never revisited, so
+  // editing the tour changed nothing and slots advertised a stale price
+  // indefinitely. Morning Kayak was configured at R450 over 24 hours while the
+  // storefront showed four departures at R300, two of them 40+ hours out.
+  it("re-prices an already-stamped slot instead of skipping it", () => {
+    expect(LIVE_OPEN).not.toMatch(/AND\s+s\.last_minute_at\s+IS\s+NULL/);
+    expect(LIVE_OPEN).toContain("s.price_per_person_override IS DISTINCT FROM t.last_minute_price");
+  });
+
+  it("measures the discount against the pre-deal price, not the discounted one", () => {
+    // Otherwise raising a deal from R300 to R450 reads as a price rise and is
+    // rejected, even though R450 is still below the R600 base.
+    expect(LIVE_OPEN).toContain("COALESCE(s.price_before_deal, t.base_price_per_person) > t.last_minute_price");
+  });
+
+  it("closes any stamped slot that no longer qualifies", () => {
+    // The close arm is the negation of the open arm. That symmetry is what
+    // makes removing the deal, shortening the window, selling out or closing
+    // the slot all reverse the discount.
+    expect(LIVE_CLOSE).toContain("AND NOT (");
+    expect(LIVE_CLOSE).toContain("t.last_minute_price IS NOT NULL");
+    expect(LIVE_CLOSE).toContain("s.start_time <= now() + make_interval(hours => t.last_minute_hours)");
+  });
+
   it("refuses a window that is not a window", () => {
-    expect(LIVE_SQL).toContain("last_minute_end_hours < last_minute_hours");
-    expect(LIVE_SQL).toContain("last_minute_end_hours >= 0");
+    expect(SCHEMA_SQL).toContain("last_minute_end_hours < last_minute_hours");
+    expect(SCHEMA_SQL).toContain("last_minute_end_hours >= 0");
   });
 
   it("makes the operator set all three fields or none", () => {
