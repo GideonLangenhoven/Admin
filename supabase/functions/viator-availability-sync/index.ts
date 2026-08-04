@@ -52,7 +52,7 @@ Deno.serve(withSentry("viator-availability-sync", async () => {
       for (let j = 0; j < (mappings || []).length; j++) {
         const m: any = mappings![j];
         const { data: slots } = await db.from("slots")
-          .select("start_time, capacity_total, booked, held, base_price, status")
+          .select("start_time, capacity_total, booked, held, price_per_person_override, status, tours(base_price_per_person)")
           .eq("business_id", integ.business_id)
           .eq("tour_id", m.tour_id)
           .gte("start_time", now.toISOString())
@@ -61,7 +61,10 @@ Deno.serve(withSentry("viator-availability-sync", async () => {
 
         const schedules = (slots || []).map((s: any) => {
           const available = Math.max(0, (s.capacity_total || 0) - (s.booked || 0) - (s.held || 0));
-          const basePrice = Number(s.base_price || 0);
+          // slots has no base_price: the per-slot override wins, otherwise the
+          // tour price. Selecting base_price failed the whole query, so every
+          // availability push silently sent nothing.
+          const basePrice = Number(s.price_per_person_override ?? s.tours?.base_price_per_person ?? 0);
           const markupPct = Number(m.default_markup_pct || 0);
           const listingPrice = basePrice * (1 + markupPct / 100);
           return {

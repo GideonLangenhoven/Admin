@@ -470,18 +470,24 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     .split("Cape Town<br>8005")
     .join("");
 
-  // Replace arrival instructions + what-to-bring (Prompt 23)
-  if (branding.arrivalInstructions || branding.whatToBring) {
-    brandedHtml = brandedHtml
-      .split("Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.")
-      .join((branding.arrivalInstructions || "Please arrive 15 minutes before launch.") + (branding.whatToBring ? "<br>" + branding.whatToBring : ""));
-  }
+  // Replace arrival instructions + what-to-bring (Prompt 23). Always runs:
+  // an unconfigured tenant gets a neutral line, never the kayak-specific default.
+  brandedHtml = brandedHtml
+    .split("Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.")
+    .join((branding.arrivalInstructions || "Please arrive 15 minutes early.") + (branding.whatToBring ? "<br>" + branding.whatToBring : ""));
 
-  // Replace Google Reviews URL (Prompt 23)
+  // Replace Google Reviews URL (Prompt 23) — or strip the review ask entirely
+  // for tenants with no review link configured; never ship Cape Kayak's Place ID.
   if (branding.socialGoogleReviews) {
     brandedHtml = brandedHtml
       .split("https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ")
       .join(branding.socialGoogleReviews);
+  } else {
+    brandedHtml = brandedHtml
+      .split("Had a great time? We'd love it if you could leave us a quick review on Google. It means the world to our small team!")
+      .join("We hope you had a great time — see you again soon!")
+      .split(`<a href="https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ" style="display: inline-block; background-color: #ffffff; color: #2a5a52; border: 2px solid #2a5a52; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: bold;">⭐ Leave a Google Review</a>`)
+      .join("");
   }
 
   // Operator logo in every email header: inject above the eyebrow line.
@@ -502,11 +508,18 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     .split("We hope you had an incredible time on the water")
     .join("We hope you had an incredible time");
 
-  // Replace hardcoded Google Maps URL with business directions or remove it
-  if (branding.directions) {
+  // Maps button: point at the tenant's own location, falling back through their
+  // configured address fields; tenants with no location get the button STRIPPED
+  // rather than Cape Kayak's pin.
+  const mapsQuery = branding.directions || branding.meetingPointAddress || branding.businessAddress;
+  if (mapsQuery) {
     brandedHtml = brandedHtml.split("https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005").join(
-      "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(branding.directions)
+      "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsQuery)
     );
+  } else {
+    brandedHtml = brandedHtml
+      .split(`<a href="https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>`)
+      .join("");
   }
 
   // Inject the dark-footer extras: social icons (per-operator, optional) and

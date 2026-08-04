@@ -57,11 +57,14 @@ Deno.serve(async () => {
       return new Date(new Date(b.slots.start_time).getTime() + dur * 60 * 1000) < ago2h;
     });
     console.log("THANKYOU: " + thanks.length);
+    // Tenant's own review link \u2014 the review line is omitted when none is configured.
+    const grRes = await supabase.from("businesses").select("social_google_reviews").eq("id", BUSINESS_ID).maybeSingle();
+    const reviewUrl = String(grRes.data?.social_google_reviews || "");
 
     for (let j = 0; j < thanks.length; j++) {
       const tb = thanks[j]; const ttour = (tb as any).tours;
       const firstName = (tb.customer_name || "").split(" ")[0] || "there";
-      const tyMsg = "\u{1F31F} *Thanks for paddling with us, " + firstName + "!*\n\nWe hope you loved the " + (ttour?.name || "tour") + "! \u{1F6F6}\n\n\u2B50 Leave a review: https://g.page/r/CWabH9a6u5DbEB0/review\n\nWant to paddle again? Type *menu* and hit *Book Again* \u{1F6F6}\n\nBook again anytime, type *menu* \u{1F30A}";
+      const tyMsg = "\u{1F31F} *Thanks for paddling with us, " + firstName + "!*\n\nWe hope you loved the " + (ttour?.name || "tour") + "! \u{1F6F6}\n\n" + (reviewUrl ? "\u2B50 Leave a review: " + reviewUrl + "\n\n" : "") + "Want to paddle again? Type *menu* and hit *Book Again* \u{1F6F6}\n\nBook again anytime, type *menu* \u{1F30A}";
       await supabase.from("outbox").insert({ business_id: BUSINESS_ID, booking_id: tb.id, phone: tb.phone, message_type: "THANK_YOU", message_body: tyMsg, scheduled_for: now.toISOString() });
       await supabase.from("bookings").update({ thankyou_queued: true, status: "COMPLETED" }).eq("id", tb.id);
     }

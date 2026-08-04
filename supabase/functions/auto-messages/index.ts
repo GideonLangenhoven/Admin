@@ -372,7 +372,7 @@ async function autoTimeoutHumanChatsForBusiness(businessId: string) {
 
   // Find conversations stuck in HUMAN state with no recent messages
   const { data: staleConvos } = await db.from("conversations")
-    .select("id, phone, last_message_at, updated_at")
+    .select("id, phone, last_activity_at, updated_at")
     .eq("business_id", businessId)
     .eq("status", "HUMAN")
     .lt("updated_at", fortyEightHoursAgo);
@@ -381,7 +381,7 @@ async function autoTimeoutHumanChatsForBusiness(businessId: string) {
   for (let i = 0; i < (staleConvos || []).length; i++) {
     const convo: any = staleConvos?.[i];
     // Double-check last_message_at if available
-    if (convo.last_message_at && convo.last_message_at > fortyEightHoursAgo) continue;
+    if (convo.last_activity_at && convo.last_activity_at > fortyEightHoursAgo) continue;
 
     await db.from("conversations").update({ status: "BOT", current_state: "IDLE" }).eq("id", convo.id);
     console.log("HUMAN_TIMEOUT_REVERTED convo=" + convo.id + " phone=" + convo.phone);

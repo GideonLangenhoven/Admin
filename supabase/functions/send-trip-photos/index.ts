@@ -54,6 +54,9 @@ Deno.serve(async (req: any) => {
       .eq("slot_id", slotId).eq("business_id", businessId).in("status", ["PAID", "COMPLETED"]);
 
     const customers = bookings.data || [];
+    // Tenant's own review link — the line is omitted when none is configured.
+    const grRes = await supabase.from("businesses").select("social_google_reviews").eq("id", businessId).maybeSingle();
+    const reviewUrl = String(grRes.data?.social_google_reviews || "");
     let sent = 0;
 
     for (let i = 0; i < customers.length; i++) {
@@ -66,7 +69,7 @@ Deno.serve(async (req: any) => {
         await sendText(businessId, c.phone,
           "*Your trip photos are ready, " + firstName + "!*\n\n" +
           caption + "\n\n" + photoUrl + "\n\n" +
-          "Loved it? Leave us a review: https://g.page/r/CWabH9a6u5DbEB0/review\n\n" +
+          (reviewUrl ? "Loved it? Leave us a review: " + reviewUrl + "\n\n" : "") +
           "Thanks for paddling with us!"
         );
       }

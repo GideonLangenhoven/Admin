@@ -131,12 +131,27 @@ Deno.serve(async (req: any) => {
     if (type === "BOOKING" && bookingId) {
       const bookingRow = await supabase
         .from("bookings")
-        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, customer_email, phone")
+        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, email, phone")
         .eq("id", bookingId)
         .maybeSingle();
+      // This select asked for `customer_email`, a column bookings does not
+      // have. PostgREST fails the WHOLE query on one unknown column, so
+      // bookingRow.data was always null and everything below — the price
+      // recalculation, the voucher tenant-mismatch guard, the promo maths —
+      // was skipped for every booking checkout. The client's `amount` went to
+      // the payment provider unverified.
+      //
+      // Fail loud rather than fall through: a checkout that cannot verify its
+      // own price must not proceed. Silence is what hid this.
+      if (bookingRow.error) {
+        console.error("CHECKOUT_PRICE_VERIFY_LOOKUP_ERR booking=" + bookingId + ": " + bookingRow.error.message);
+        return new Response(JSON.stringify({ error: "Could not verify booking pricing" }), {
+          status: 500, headers: buildCors(req?.headers?.get("origin") || "*"),
+        });
+      }
       if (bookingRow.data) {
         const bk = bookingRow.data;
-        const resolvedEmail = customerEmail || bk.customer_email || "";
+        const resolvedEmail = customerEmail || bk.email || "";
 
         // Look up current base price from tour
         const tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();

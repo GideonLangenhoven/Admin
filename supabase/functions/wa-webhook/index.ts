@@ -1707,7 +1707,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       else if (rid === "CANCEL_REFUND" || input === "refund") {
         const crTotal = Number(sd.total);
         // C4: Check if booking was paid by voucher — issue a new voucher instead of requesting Yoco refund
-        const crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_deduction").eq("id", sd.booking_id).single();
+        const crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_amount_paid").eq("id", sd.booking_id).single();
         const crIsVoucherPaid = crBkCheck.data && (
           (crBkCheck.data.yoco_payment_id && String(crBkCheck.data.yoco_payment_id).startsWith("VOUCHER_")) ||
           crBkCheck.data.payment_method === "VOUCHER" ||
@@ -1726,7 +1726,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         } else {
           // M7: Split-tender refund math — check if booking has voucher_deduction > 0
-          const crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
+          const crVoucherDeduction = Number(crBkCheck.data?.voucher_amount_paid || 0);
           // Policy percent computed at quote time (ACT_CANCEL_); fallback 95%.
           const crPct = sd.cancel_pct != null && Number(sd.cancel_pct) >= 0 ? Number(sd.cancel_pct) : 95;
           const crFrac = crPct / 100;

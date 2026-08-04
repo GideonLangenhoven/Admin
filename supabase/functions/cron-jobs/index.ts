@@ -134,6 +134,9 @@ async function sendThankYous() {
   });
 
   console.log("CRON: Found " + bookings.length + " trips to thank");
+  // Tenant's own review link — the review ask is omitted when none is configured.
+  const grRes = await supabase.from("businesses").select("social_google_reviews").eq("id", BUSINESS_ID).maybeSingle();
+  const reviewUrl = String(grRes.data?.social_google_reviews || "");
 
   for (let i = 0; i < bookings.length; i++) {
     const b = bookings[i];
@@ -146,7 +149,7 @@ async function sendThankYous() {
     await sendText(b.phone,
       "\u{1F6F6} *Thanks for paddling with us, " + (b.customer_name || "").split(" ")[0] + "!*\n\n" +
       "We hope you had an amazing time on the water! \u{1F30A}\n\n" +
-      "\u2B50 *Loved it?* We\u2019d really appreciate a review:\nhttps://g.page/r/capekayakadventures/review\n\n" +
+      (reviewUrl ? "\u2B50 *Loved it?* We\u2019d really appreciate a review:\n" + reviewUrl + "\n\n" : "") +
       "Book again anytime, reply *menu*!\n\nRemember: loyal paddlers get 10% off after 2 trips in a month! \u{1F31F}",
       b.id
     );

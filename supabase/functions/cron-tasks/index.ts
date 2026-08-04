@@ -23,7 +23,10 @@ async function cleanupExpiredHolds() {
   const cutoffIso = new Date(Date.now() - graceMs).toISOString();
   const { data: expiredHolds } = await supabase
     .from("holds")
-    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url, allow_unpaid), slots(start_time), tours(name)")
+    // holds has neither a business_id column nor an FK to tours, so this select
+    // failed outright (PGRST200 + 42703) and expired holds never reached the
+    // payment-link notification path. Tour name comes via the booking.
+    .select("id, booking_id, slot_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url, allow_unpaid, business_id, tours(name)), slots(start_time)")
     .eq("status", "ACTIVE")
     .lt("expires_at", cutoffIso)
     .order("expires_at", { ascending: true })
@@ -62,10 +65,13 @@ async function cleanupExpiredHolds() {
     if ((hold as any).hold_type !== "RESCHEDULE" && (hold.bookings as any)?.allow_unpaid === true) {
       await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
       const unpaidQty = Number((hold.bookings as any)?.qty || 0);
-      if (unpaidQty > 0 && hold.slot_id && hold.business_id) {
+      // business_id comes off the booking: holds has no such column, so the
+      // old `hold.business_id` was always undefined and this branch never ran.
+      const unpaidBizId = (Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as any)?.business_id;
+      if (unpaidQty > 0 && hold.slot_id && unpaidBizId) {
         const rpcRes = await supabase.rpc("adjust_slot_capacity", {
           p_slot_id: hold.slot_id,
-          p_business_id: hold.business_id,
+          p_business_id: unpaidBizId,
           p_booked_delta: unpaidQty,
           p_held_delta: -unpaidQty,
         });
@@ -124,13 +130,13 @@ async function cleanupExpiredHolds() {
     }
 
     // ── Regular booking hold expiry ──
-    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string } | null;
+    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string; business_id?: string; tours?: unknown } | null;
     // Release held capacity on the slot (mirrors the reschedule branch above)
     const heldQty = Number(holdBooking?.qty || 0);
-    if (heldQty > 0 && hold.slot_id && hold.business_id) {
+    if (heldQty > 0 && hold.slot_id && (holdBooking as any)?.business_id) {
       const rpcRes = await supabase.rpc("adjust_slot_capacity", {
         p_slot_id: hold.slot_id,
-        p_business_id: hold.business_id,
+        p_business_id: (holdBooking as any).business_id,
         p_booked_delta: 0,
         p_held_delta: -heldQty,
       });
@@ -141,16 +147,18 @@ async function cleanupExpiredHolds() {
       }
     }
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
-    const holdTour = Array.isArray(hold.tours) ? hold.tours[0] : hold.tours as { name?: string } | null;
+    // Tour name now arrives nested under the booking (holds has no FK to tours).
+    const holdTourRaw = (holdBooking as any)?.tours;
+    const holdTour = (Array.isArray(holdTourRaw) ? holdTourRaw[0] : holdTourRaw) as { name?: string } | null;
     // Abandoned-checkout follow-up: email the ORIGINAL payment link once the
     // 15-min hold lapses unpaid (this sweep runs at expiry + 5-min grace, so a
     // payment already in flight lands first and the paid-check above skips it).
     // Email only — no WhatsApp, per operator request. A late payment is safe:
     // yoco-webhook re-checks capacity and auto-refunds if the slot filled.
     const stillUnpaid = holdBooking?.status === "HELD" || holdBooking?.status === "PENDING";
-    if (stillUnpaid && holdBooking?.email && holdBooking?.payment_url && hold.business_id) {
+    if (stillUnpaid && holdBooking?.email && holdBooking?.payment_url && (holdBooking as any)?.business_id) {
       try {
-        const tenant = await getTenantByBusinessId(supabase, hold.business_id);
+        const tenant = await getTenantByBusinessId(supabase, (holdBooking as any).business_id);
         const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "";
         await fetch(SUPABASE_URL + "/functions/v1/send-email", {
           method: "POST",
@@ -158,7 +166,7 @@ async function cleanupExpiredHolds() {
           body: JSON.stringify({
             type: "PAYMENT_LINK",
             data: {
-              business_id: hold.business_id,
+              business_id: (holdBooking as any).business_id,
               email: holdBooking.email,
               booking_id: hold.booking_id,
               customer_name: holdBooking.customer_name || "there",
@@ -240,16 +248,18 @@ async function cleanupExpiredManualBookings() {
       const ref = booking.id.substring(0, 8).toUpperCase();
 
       // Notify admin (operator email lookup)
-      const { data: adminUser } = await supabase
-        .from("admin_users")
-        .select("phone")
-        .eq("business_id", booking.business_id)
-        .eq("role", "MAIN_ADMIN")
-        .limit(1)
+      // admin_users has no phone column, so this lookup used to fail and the
+      // operator was never told a manual booking had lapsed. The operator's
+      // WhatsApp number lives on businesses.
+      const { data: bizContact } = await supabase
+        .from("businesses")
+        .select("public_whatsapp, public_phone")
+        .eq("id", booking.business_id)
         .maybeSingle();
+      const operatorPhone = bizContact?.public_whatsapp || bizContact?.public_phone || "";
 
-      if (adminUser?.phone) {
-        await sendWhatsappTextForTenant(tenant, adminUser.phone,
+      if (operatorPhone) {
+        await sendWhatsappTextForTenant(tenant, operatorPhone,
           "Manual booking expired\n\n" +
           "Ref: " + ref + "\n" +
           tourName + ": " + slotLabel + "\n" +
