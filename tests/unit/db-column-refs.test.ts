@@ -71,6 +71,16 @@ function collectRefs(): Ref[] {
 
       for (const f of body.matchAll(filterRe)) refs.push({ table, column: f[1], file });
 
+      // .or("col.eq.x,col2.is.null") names columns inside a string, so none of
+      // the filter helpers above see them. Only the literal prefix is
+      // scannable when the value is concatenated ("phone.eq." + phone) — but
+      // that prefix is exactly the column name, which is the fragile part.
+      for (const o of body.matchAll(/\.or\(\s*"([^"]+)"/g)) {
+        for (const t of o[1].matchAll(/([a-z_][a-z0-9_]*)\.(?:eq|neq|gt|gte|lt|lte|like|ilike|is|in|not)\./g)) {
+          refs.push({ table, column: t[1], file });
+        }
+      }
+
       const sel = selectRe.exec(body);
       if (sel && sel[1].trim() !== "*") {
         for (const raw of topLevelParts(sel[1])) {
