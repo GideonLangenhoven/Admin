@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getTenantByBusinessId, getAdminAppOrigins, isAllowedOrigin, recordWaMessage, sendWhatsappTemplate, getBusinessDisplayName } from "../_shared/tenant.ts";
+import { requireAuth, type AuthResult } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -66,12 +67,39 @@ async function tryEmailFallback(
     }
 }
 
+// Meta rejection codes an operator can actually act on. Anything else returns
+// Meta's own wording — a code with no remedy attached is noise in a toast.
+// Used for BOTH outcomes of a failed send: the message the admin sees when we
+// diverted to email, and the hard error when we couldn't. Before this, a
+// tenant on a test number saw every message quietly become an email with no
+// explanation, so WhatsApp looked like it was working and never got fixed.
+function whatsappFailureHint(waData: any): string {
+    switch (waData?.error?.code) {
+        case 131030:
+            return "Your WhatsApp number is still a Meta test number, so it can only message the few numbers on its allowed list. Add this customer's number in Meta (WhatsApp → API Setup → To), or complete business verification to message anyone.";
+        case 190:
+            return "Your WhatsApp access token is invalid or has expired. Generate a new token in Meta (WhatsApp → API Setup) and re-save it in Settings → Integration Credentials.";
+        default:
+            return String(waData?.error?.message || "WhatsApp rejected the message.");
+    }
+}
+
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: getCors(req) });
     }
 
     try {
+        // Tenant isolation: this function writes into conversations as "Admin"
+        // and sends through the tenant's own WhatsApp credentials. It must only
+        // act for a business the caller belongs to — never a client-claimed one.
+        let auth: AuthResult;
+        try {
+            auth = await requireAuth(req);
+        } catch (authErr: unknown) {
+            return new Response(JSON.stringify({ ok: false, error: (authErr as Error)?.message || "Unauthorized" }), { status: 401, headers: getCors(req) });
+        }
+
         const bodyText = await req.text();
         console.log("admin-reply raw body:", bodyText);
         let body;
@@ -84,12 +112,18 @@ Deno.serve(async (req: Request) => {
         const to = body.phone || body.to || body.to_phone;
         let message = body.message;
         const action = body.action;
-        const reqBusinessId = body.business_id || body.businessId || "";
+        let reqBusinessId = body.business_id || body.businessId || "";
+        if (!reqBusinessId && !auth.isServiceRole) reqBusinessId = auth.businessId;
+        if (!reqBusinessId) {
+            return new Response(JSON.stringify({ ok: false, error: "business_id is required" }), { status: 400, headers: getCors(req) });
+        }
+        if (!auth.isServiceRole && auth.role !== "SUPER_ADMIN" && auth.businessId !== reqBusinessId) {
+            return new Response(JSON.stringify({ ok: false, error: "Forbidden: conversation belongs to another business" }), { status: 403, headers: getCors(req) });
+        }
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
         if (action === "return_to_bot") {
-            if (!reqBusinessId) return new Response(JSON.stringify({ ok: false, error: "business_id is required" }), { status: 400, headers: getCors(req) });
             const { error: rbErr } = await supabase.from("conversations").update({ status: "BOT", current_state: "IDLE", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", reqBusinessId);
             if (rbErr) return new Response(JSON.stringify({ ok: false, error: rbErr.message }), { status: 200, headers: getCors(req) });
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
@@ -100,7 +134,6 @@ Deno.serve(async (req: Request) => {
         // this and shows the star picker). handled_by=HUMAN so the rating is
         // attributed to human handling even though status returns to BOT.
         if (action === "end_chat") {
-            if (!reqBusinessId) return new Response(JSON.stringify({ ok: false, error: "business_id is required" }), { status: 400, headers: getCors(req) });
             await supabase.from("chat_messages").insert({
                 business_id: reqBusinessId, phone: to, direction: "OUT",
                 body: message || "Thanks for chatting with us! 🙏 Before you go, please rate how we did.",
@@ -121,13 +154,15 @@ Deno.serve(async (req: Request) => {
             }), { status: 200, headers: getCors(req) });
         }
 
-        // Get conversation to ensure correct business ID and state
-        let convoQuery = supabase
+        // Get conversation to ensure correct business ID and state. Always
+        // scoped by business_id — a bare-phone lookup would match another
+        // tenant's conversation when the same customer talks to two operators.
+        const { data: convo } = await supabase
             .from("conversations")
             .select("business_id, customer_name, email, status")
-            .eq("phone", to);
-        if (reqBusinessId) convoQuery = convoQuery.eq("business_id", reqBusinessId);
-        const { data: convo } = await convoQuery.limit(1).single();
+            .eq("phone", to)
+            .eq("business_id", reqBusinessId)
+            .limit(1).single();
 
         const actualBusinessId = convo?.business_id;
         if (!actualBusinessId) {
@@ -222,6 +257,7 @@ Deno.serve(async (req: Request) => {
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                     return new Response(JSON.stringify({
                         ok: true,
+                        channel: "reopener",
                         via_reopener: true,
                         message: "Their 24-hour WhatsApp window is closed, so we sent a pre-approved message asking them to reply. Your message delivers the moment they do. Then you can chat normally from the Inbox.",
                     }), { status: 200, headers: getCors(req) });
@@ -264,7 +300,12 @@ Deno.serve(async (req: Request) => {
                         sender: "Admin",
                     });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
-                    return new Response(JSON.stringify({ ok: true, via_template: true }), { status: 200, headers: getCors(req) });
+                    return new Response(JSON.stringify({
+                        ok: true,
+                        channel: "whatsapp",
+                        via_template: true,
+                        message: "Their 24-hour window is closed, so this went out as an approved WhatsApp template.",
+                    }), { status: 200, headers: getCors(req) });
                 }
                 // Template also failed — try email so the customer still hears from us.
                 console.error("admin_outreach template failed:", templateData);
@@ -272,7 +313,7 @@ Deno.serve(async (req: Request) => {
                 if (emailedA) {
                     await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp window closed) " + message, sender: "Admin" });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
-                    return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp's 24-hour window is closed, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
+                    return new Response(JSON.stringify({ ok: true, channel: "email", via_email: true, message: "WhatsApp's 24-hour window is closed and the approved template would not send, so we sent your message to the customer by email instead." }), { status: 200, headers: getCors(req) });
                 }
                 return new Response(JSON.stringify({
                     ok: false,
@@ -283,23 +324,23 @@ Deno.serve(async (req: Request) => {
 
             console.error("WhatsApp Error:", waData);
             await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "FAILED", error: String(waData?.error?.message || "WhatsApp API Error") });
+            const hint = whatsappFailureHint(waData);
             // Guaranteed-communication fallback: try email regardless of the WA error cause.
             const emailedB = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
             if (emailedB) {
                 await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp failed) " + message, sender: "Admin" });
                 await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
-                return new Response(JSON.stringify({ ok: true, via_email: true, message: "WhatsApp couldn't deliver this, so we sent your reply to the customer by email instead." }), { status: 200, headers: getCors(req) });
-            }
-            // OAuth 190 = invalid/expired access token — tell the admin exactly what to do
-            if (waData?.error?.code === 190) {
+                // The reason rides along even though the send succeeded by email.
+                // Reporting only the success is how a tenant stays on a broken
+                // WhatsApp number indefinitely.
                 return new Response(JSON.stringify({
-                    ok: false,
-                    error: "WhatsApp access token expired",
-                    message: "Your WhatsApp access token is invalid or has expired. Generate a new token in Meta (WhatsApp → API Setup) and re-save it in Settings → Integration Credentials. " + String(waData?.error?.message || ""),
-                    details: waData,
+                    ok: true,
+                    channel: "email",
+                    via_email: true,
+                    message: "WhatsApp could not deliver this, so we sent your message to the customer by email instead.\n\n" + hint,
                 }), { status: 200, headers: getCors(req) });
             }
-            return new Response(JSON.stringify({ ok: false, error: "WhatsApp API Error", details: waData }), { status: 200, headers: getCors(req) });
+            return new Response(JSON.stringify({ ok: false, error: "WhatsApp API Error", message: hint, details: waData }), { status: 200, headers: getCors(req) });
         }
 
         await recordWaMessage(actualBusinessId, { to: normalizedTo, kind: "text", body: message, status: "SENT", providerMessageId: waData?.messages?.[0]?.id || null });
@@ -321,7 +362,7 @@ Deno.serve(async (req: Request) => {
         // Ensure conversation status stays as HUMAN so bot doesn't reply to their next message automatically
         await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
 
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: getCors(req) });
+        return new Response(JSON.stringify({ ok: true, channel: "whatsapp" }), { status: 200, headers: getCors(req) });
 
     } catch (err: unknown) {
         console.error("admin-reply edge function error:", err);

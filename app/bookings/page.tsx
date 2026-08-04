@@ -1363,11 +1363,14 @@ export default function Bookings() {
     try {
       const phone = waDialog.phone;
 
-      // Ensure conversation exists and is set to HUMAN
+      // Ensure conversation exists and is set to HUMAN. Scoped by business_id:
+      // the same customer can have a conversation with another operator, and a
+      // bare-phone match would flip that tenant's thread instead.
       const { data: existing } = await supabase
         .from("conversations")
         .select("id, status")
         .eq("phone", phone)
+        .eq("business_id", businessId)
         .maybeSingle();
 
       if (existing) {
@@ -1396,15 +1399,26 @@ export default function Bookings() {
         return;
       }
       if (res.data?.ok === false) {
-        let errMsg = res.data.error || "Unknown error";
+        // message carries the actionable remedy (expired token, test-number
+        // allow-list); error is the bare category. Prefer the remedy.
+        let errMsg = res.data.message || res.data.error || "Unknown error";
         if (res.data.details?.error?.error_data?.details) errMsg += "\n" + res.data.details.error.error_data.details;
-        else if (res.data.details?.error?.message) errMsg += "\n" + res.data.details.error.message;
+        else if (!res.data.message && res.data.details?.error?.message) errMsg += "\n" + res.data.details.error.message;
         notify({ title: "WhatsApp send failed", message: errMsg, tone: "error" });
         return;
       }
 
       setWaDialog(null);
-      notify({ title: "WhatsApp sent", message: res.data?.message || "The message was sent and the conversation was opened in Inbox.", tone: "success" });
+      // A send that fell back to email, or that is queued behind a reopener,
+      // is not "WhatsApp sent". Reporting all three outcomes as success is how
+      // an operator ends up believing WhatsApp works while every message their
+      // customers receive arrives by email.
+      const channel = res.data?.channel;
+      notify({
+        title: channel === "email" ? "Sent by email instead" : channel === "reopener" ? "Queued for WhatsApp" : "WhatsApp sent",
+        message: res.data?.message || "The message was sent and the conversation was opened in Inbox.",
+        tone: channel === "email" || channel === "reopener" ? "warning" : "success",
+      });
       router.push("/inbox?phone=" + encodeURIComponent(phone));
     } catch (err: any) {
       notify({ title: "WhatsApp send failed", message: err.message, tone: "error" });

@@ -177,8 +177,11 @@ const DEFAULT_VOUCHER_SUCCESS_URL = "";
 const DEFAULT_SITE_SETTINGS = {
     directions: "",
     terms_conditions: "",
-    privacy_policy: "Cookies help us deliver our services. By using our services, you agree to our use of cookies. OK Kayaks Adventures Privacy Policy\nThank you for visiting our web site...",
-    cookies_policy: "COOKIES\nCookies are small text files which are downloaded to your computer...",
+    // Blank, not seeded copy: the storefront renders its own POPIA-aligned
+    // template whenever these are empty, and the old seed text named another
+    // operator and was long enough to defeat that fallback once saved.
+    privacy_policy: "",
+    cookies_policy: "",
     color_main: "#0f5dd7",
     color_secondary: "#101828",
     color_cta: "#0c8a59",

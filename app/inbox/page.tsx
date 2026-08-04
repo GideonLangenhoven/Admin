@@ -146,8 +146,13 @@ function InboxContent() {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
+        // Tenant isolation: RLS already limits delivery to businesses this
+        // admin can read, but a SUPER_ADMIN can read every tenant — without
+        // this filter a customer chatting with two operators would have the
+        // other operator's thread interleaved into this one.
+        filter: "business_id=eq." + businessId,
       }, (payload: any) => {
-        if (payload.new.phone === selected.phone) {
+        if (payload.new.phone === selected.phone && payload.new.business_id === businessId) {
           setMessages((prev) => {
             if (prev.some((m) => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
@@ -163,7 +168,7 @@ function InboxContent() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selected]);
+  }, [selected, businessId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -218,10 +223,12 @@ function InboxContent() {
         if (res.data.error === "outside_24h_window") {
           setWaWarning(res.data.message || "WhatsApp requires the customer to message you first. Ask them to send you a WhatsApp message, then you can reply here.");
         } else {
-          let msgErr = res.data.error || "Unknown Error";
+          // message carries the actionable remedy (expired token, test-number
+          // allow-list); error is the bare category. Prefer the remedy.
+          let msgErr = res.data.message || res.data.error || "Unknown Error";
           if (res.data.details?.error?.error_data?.details) {
             msgErr += "\nDetails: " + res.data.details.error.error_data.details;
-          } else if (res.data.details?.error?.message) {
+          } else if (!res.data.message && res.data.details?.error?.message) {
             msgErr += "\nDetails: " + res.data.details.error.message;
           }
           notify({ title: "Reply failed", message: msgErr, tone: "error" });
@@ -238,7 +245,15 @@ function InboxContent() {
           loadConvos();
         }
         setReply("");
-        notify({ title: "Reply sent", message: "The conversation remains in human handoff mode.", tone: "success" });
+        // Same three outcomes as the bookings-page WhatsApp action: delivered,
+        // queued behind a reopener, or diverted to email. This used to report
+        // all three as a plain "Reply sent" and drop the explanation entirely.
+        const channel = res.data?.channel;
+        notify({
+          title: channel === "email" ? "Sent by email instead" : channel === "reopener" ? "Queued for WhatsApp" : "Reply sent",
+          message: res.data?.message || "The conversation remains in human handoff mode.",
+          tone: channel === "email" || channel === "reopener" ? "warning" : "success",
+        });
       }
     } catch (err: any) {
       notify({ title: "Reply failed", message: err.message, tone: "error" });
