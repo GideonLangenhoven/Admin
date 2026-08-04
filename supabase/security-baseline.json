@@ -6527,7 +6527,7 @@
       "policyname": "add_ons_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "((active = true) AND ((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text)))",
+      "qual": "((active = true) AND ((business_id)::text = NULLIF(( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header), ''::text)))",
       "with_check": null
     },
     {
@@ -6608,7 +6608,7 @@
       "policyname": "audit_logs_service_insert",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -6752,7 +6752,7 @@
       "policyname": "bookings_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "((COALESCE(current_setting('request.method'::text, true), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (bt_request_header('x-booking-success-token'::text) = (id)::text) OR ((bt_request_header('x-booking-id'::text) = (id)::text) AND (bt_request_header('x-booking-waiver-token'::text) = (waiver_token)::text)))",
+      "qual": "((COALESCE(( SELECT current_setting('request.method'::text, true) AS current_setting), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) OR (( SELECT bt_request_header('x-booking-success-token'::text) AS bt_request_header) = (id)::text) OR ((( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header) = (id)::text) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) = (waiver_token)::text)))",
       "with_check": null
     },
     {
@@ -6851,7 +6851,7 @@
       "policyname": "businesses_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((id)::text = bt_request_header('x-tenant-business-id'::text)) OR (subdomain = bt_request_header('x-tenant-subdomain'::text)) OR (regexp_replace(COALESCE(booking_site_url, ''::text), '/+$'::text, ''::text) = regexp_replace(COALESCE(NULLIF(bt_request_header('origin'::text), ''::text), bt_request_header('x-tenant-origin'::text)), '/+$'::text, ''::text)))",
+      "qual": "(((id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) OR (subdomain = ( SELECT bt_request_header('x-tenant-subdomain'::text) AS bt_request_header)) OR (regexp_replace(COALESCE(booking_site_url, ''::text), '/+$'::text, ''::text) = regexp_replace(COALESCE(NULLIF(( SELECT bt_request_header('origin'::text) AS bt_request_header), ''::text), ( SELECT bt_request_header('x-tenant-origin'::text) AS bt_request_header)), '/+$'::text, ''::text)))",
       "with_check": null
     },
     {
@@ -6923,7 +6923,7 @@
       "policyname": "chat_messages_service_all",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7256,8 +7256,8 @@
       "policyname": "idempotency_keys_service_only",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
-      "with_check": "(auth.role() = 'service_role'::text)"
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
+      "with_check": "(( SELECT auth.role() AS role) = 'service_role'::text)"
     },
     {
       "schemaname": "public",
@@ -7337,7 +7337,7 @@
       "policyname": "llm_usage_auth_select",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
+      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": null
     },
     {
@@ -7481,7 +7481,7 @@
       "policyname": "marketing_automation_steps_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7526,7 +7526,7 @@
       "policyname": "marketing_automations_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7580,7 +7580,7 @@
       "policyname": "marketing_campaigns_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7616,7 +7616,7 @@
       "policyname": "marketing_contacts_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7643,7 +7643,7 @@
       "policyname": "marketing_events_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7670,7 +7670,7 @@
       "policyname": "marketing_queue_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7715,7 +7715,7 @@
       "policyname": "marketing_templates_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7733,7 +7733,7 @@
       "policyname": "unsub_tokens_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7751,7 +7751,7 @@
       "policyname": "marketing_usage_monthly_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -7958,8 +7958,8 @@
       "policyname": "pending_reschedules_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
-      "with_check": "(auth.role() = 'service_role'::text)"
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
+      "with_check": "(( SELECT auth.role() AS role) = 'service_role'::text)"
     },
     {
       "schemaname": "public",
@@ -7994,7 +7994,7 @@
       "policyname": "plans_modify_service",
       "cmd": "ALL",
       "roles": "{public}",
-      "qual": "(auth.role() = 'service_role'::text)",
+      "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
     },
     {
@@ -8066,7 +8066,7 @@
       "policyname": "promotions_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "((business_id)::text = NULLIF(bt_request_header('x-tenant-business-id'::text), ''::text))",
+      "qual": "((business_id)::text = NULLIF(( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header), ''::text))",
       "with_check": null
     },
     {
@@ -8255,7 +8255,7 @@
       "policyname": "slots_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
+      "qual": "(((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (status = 'OPEN'::text) AND (start_time > (now() - '7 days'::interval)))",
       "with_check": null
     },
     {
@@ -8318,7 +8318,7 @@
       "policyname": "tenant_health_superadmin_select",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = auth.uid()) AND (au.role = 'SUPER_ADMIN'::text))))",
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (au.role = 'SUPER_ADMIN'::text))))",
       "with_check": null
     },
     {
@@ -8363,7 +8363,7 @@
       "policyname": "tours_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((business_id)::text = bt_request_header('x-tenant-business-id'::text)) AND (active = true) AND (COALESCE(hidden, false) = false))",
+      "qual": "(((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (active = true) AND (COALESCE(hidden, false) = false))",
       "with_check": null
     },
     {
@@ -8481,7 +8481,7 @@
       "cmd": "INSERT",
       "roles": "{anon,authenticated}",
       "qual": null,
-      "with_check": "((status = 'PENDING'::text) AND ((business_id)::text = bt_request_header('x-tenant-business-id'::text)))"
+      "with_check": "((status = 'PENDING'::text) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))"
     },
     {
       "schemaname": "public",
@@ -8489,7 +8489,7 @@
       "policyname": "vouchers_anon_select",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "((upper(regexp_replace(code, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(bt_request_header('x-voucher-code'::text), '\\s+'::text, ''::text, 'g'::text))) AND (bt_request_header('x-voucher-code'::text) <> ''::text) AND ((business_id)::text = bt_request_header('x-tenant-business-id'::text)))",
+      "qual": "((upper(regexp_replace(code, '\\s+'::text, ''::text, 'g'::text)) = upper(regexp_replace(( SELECT bt_request_header('x-voucher-code'::text) AS bt_request_header), '\\s+'::text, ''::text, 'g'::text))) AND (( SELECT bt_request_header('x-voucher-code'::text) AS bt_request_header) <> ''::text) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))",
       "with_check": null
     },
     {
