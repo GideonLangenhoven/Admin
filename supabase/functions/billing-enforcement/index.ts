@@ -63,6 +63,26 @@ async function sendEmail(type: string, data: Record<string, unknown>) {
   }
 }
 
+// Who hears about it when a tenant is suspended. PLATFORM_BILLING_ALERT_EMAIL
+// overrides; otherwise every SUPER_ADMIN. Falling back rather than requiring a
+// secret is deliberate — this shipped with the env unset, so a suspension
+// notified the tenant and nobody on the platform side, which is the half that
+// actually needs to act on it.
+//
+// HIDDEN_SUPERADMIN_EMAILS deliberately does NOT apply: that list keeps
+// platform staff off tenant-facing mail. This is platform-facing mail, so the
+// platform's own addresses are exactly the right recipients.
+async function platformAlertRecipients(): Promise<string[]> {
+  if (PLATFORM_ALERT_EMAIL) return [PLATFORM_ALERT_EMAIL];
+  const { data, error } = await supabase
+    .from("admin_users").select("email").eq("role", "SUPER_ADMIN");
+  if (error) {
+    console.error("BILLING_ALERT_RECIPIENTS_ERR: " + error.message);
+    return [];
+  }
+  return (data || []).map((r: { email: string }) => r.email).filter(Boolean);
+}
+
 async function audit(businessId: string, action: string, before: unknown, after: unknown, metadata: unknown) {
   await supabase.from("audit_logs").insert({
     actor_id: null,
@@ -163,10 +183,12 @@ Deno.serve(async (req: Request) => {
         // OPERATOR_ALERT is the existing internal-alert type (heading + intro).
         // Inventing a new type here would 400 silently in send-email, which is
         // how the partnership-invite emails went missing for weeks.
-        if (PLATFORM_ALERT_EMAIL) {
+        const alertTo = await platformAlertRecipients();
+        if (alertTo.length === 0) console.warn("BILLING_NO_PLATFORM_ALERT_RECIPIENT business=" + businessId);
+        for (const to of alertTo) {
           await sendEmail("OPERATOR_ALERT", {
             business_id: businessId,
-            email: PLATFORM_ALERT_EMAIL,
+            email: to,
             heading: "Tenant suspended for non-payment",
             ref: inv.invoice_number,
             intro: (biz.business_name || businessId) + " has been suspended. Invoice " + inv.invoice_number +
