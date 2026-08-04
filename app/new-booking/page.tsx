@@ -16,6 +16,7 @@ interface Tour {
   business_id: string | null;
   base_price_per_person: number | null;
   peak_price_per_person: number | null;
+  meeting_point: string | null;
 }
 
 interface Slot {
@@ -258,6 +259,7 @@ export default function NewBookingPage() {
   const [result, setResult] = useState("");
   const [missingField, setMissingField] = useState<string | null>(null);
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<BookingCustomFieldDefinition[]>([]);
+  const [bizMeetingPoint, setBizMeetingPoint] = useState<string>("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [availableAddOns, setAvailableAddOns] = useState<AddOn[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
@@ -289,7 +291,7 @@ export default function NewBookingPage() {
     setLoadingTours(true);
     const { data } = await supabase
       .from("tours")
-      .select("id, name, business_id, base_price_per_person, peak_price_per_person")
+      .select("id, name, business_id, base_price_per_person, peak_price_per_person, meeting_point")
       .eq("business_id", businessId)
       .eq("active", true)
       .order("sort_order", { ascending: true });
@@ -304,10 +306,11 @@ export default function NewBookingPage() {
     if (!businessId) return;
     const { data } = await supabase
       .from("businesses")
-      .select("booking_custom_fields")
+      .select("booking_custom_fields, meeting_point, meeting_point_address")
       .eq("id", businessId)
       .maybeSingle();
 
+    setBizMeetingPoint(String(data?.meeting_point || data?.meeting_point_address || "").trim());
     const defs = Array.isArray(data?.booking_custom_fields)
       ? (data?.booking_custom_fields as BookingCustomFieldDefinition[]).filter((field) => field?.key && field?.label)
       : [];
@@ -653,7 +656,10 @@ export default function NewBookingPage() {
       const tourDateLabel = slotObj?.start_time
         ? new Date(slotObj.start_time).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: getAdminTimezone() })
         : "TBC";
-      const mapsUrl = "https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures%2C+180+Beach+Rd%2C+Three+Anchor+Bay%2C+Cape+Town%2C+8005";
+      // Tenant's real meeting point: per-tour first, business profile fallback.
+      // Empty → the meeting-point block is omitted from messages entirely.
+      const meetingPoint = String(tourObj?.meeting_point || bizMeetingPoint || "").trim();
+      const mapsUrl = meetingPoint ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(meetingPoint) : "";
 
       // ── Create invoice for every booking ──
       let invoiceNumber = ref;
@@ -877,9 +883,10 @@ export default function NewBookingPage() {
                   "\u{1F4C5} " + slotTimeLabel + "\n" +
                   "\u{1F465} " + qty + " people\n" +
                   "\u{1F4B0} R" + totalAmount.toFixed(2) + "\n\n" +
-                  "\u{1F4CD} *Meeting Point:*\nCape Kayak Adventures\n180 Beach Rd, Three Anchor Bay, Cape Town, 8005\nArrive 15 min early\n\n" +
-                  "\u{1F5FA} " + mapsUrl + "\n\n" +
-                  "\u{1F392} *Bring:* Sunscreen, hat, towel, water bottle\n\n" +
+                  (meetingPoint
+                    ? "\u{1F4CD} *Meeting Point:*\n" + meetingPoint + "\nArrive 15 min early\n\n" +
+                      "\u{1F5FA} " + mapsUrl + "\n\n"
+                    : "") +
                   "We can\u2019t wait to see you! \u{1F30A}",
               },
             });

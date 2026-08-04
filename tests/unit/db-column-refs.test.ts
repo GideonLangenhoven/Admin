@@ -102,6 +102,22 @@ describe("database column references in code exist in the schema", () => {
     expect(refs.length).toBeGreaterThan(200);
   });
 
+  // Without this, a table missing from the fixture is silently skipped rather
+  // than checked — which is exactly what happened to `businesses`, the most
+  // queried table in the codebase, when this fixture was first written by hand.
+  // A gap in the snapshot must fail, not quietly reduce coverage.
+  it("the fixture covers every table the code queries", () => {
+    const fromRe = /\.from\(\s*"([a-z_]+)"\s*\)/g;
+    const referenced = new Set<string>();
+    for (const file of ROOTS.flatMap((r) => walk(r))) {
+      const src = readFileSync(file, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      for (const m of src.matchAll(fromRe)) referenced.add(m[1]);
+    }
+    const missing = [...referenced].filter((t) => !SCHEMA[t]).sort();
+    expect(missing).toEqual([]);
+  });
+
   it("every referenced table.column exists", () => {
     const bad = refs
       .filter((r) => !SCHEMA[r.table].includes(r.column))

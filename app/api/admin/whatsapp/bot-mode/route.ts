@@ -100,12 +100,18 @@ export async function PUT(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   effectiveMode = updated?.whatsapp_bot_mode ?? mode;
 
-  // Write audit log
-  await db.from("admin_audit_log").insert({
+  // Write audit log.
+  // This wrote to `admin_audit_log` with columns admin_id/action/details —
+  // no such table or columns exist, so PostgREST rejected it and changing the
+  // bot mode, a privileged setting, was never audited at all.
+  await db.from("audit_logs").insert({
+    actor_id: caller.id,
     business_id: caller.business_id,
-    admin_id: caller.id,
-    action: "WHATSAPP_BOT_SETTINGS_CHANGE",
-    details: { mode: effectiveMode, business_hours_updated: hasBusinessHours },
+    action_type: "WHATSAPP_BOT_SETTINGS_CHANGE",
+    target_entity: "businesses",
+    target_id: caller.business_id,
+    after_state: { mode: effectiveMode, business_hours_updated: hasBusinessHours },
+    source: "admin/whatsapp/bot-mode",
   });
 
   // Return current live status

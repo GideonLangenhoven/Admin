@@ -1,10 +1,16 @@
 /**
- * Structured logger for edge functions.
- * Writes JSON to console AND persists warn/error to edge_function_logs table.
+ * Structured logger for edge functions. Writes JSON to console, which the
+ * Supabase log drain picks up and which `get_logs` queries.
+ *
+ * It used to also persist warn/error rows to an `edge_function_logs` table.
+ * No such table exists, so every one of those inserts was rejected and the
+ * .catch() swallowed it — the persistence half never worked. Removed rather
+ * than backed by a new table: Supabase already retains function logs, a second
+ * copy in Postgres would grow unbounded, and nothing imports this module yet.
  *
  * Usage:
  *   import { createLogger } from "../_shared/logger.ts";
- *   const log = createLogger("yoco-webhook", supabase);
+ *   const log = createLogger("yoco-webhook");
  *   log.info("Payment received", { booking_id, amount });
  *   log.error("Refund failed", { booking_id, error: err.message });
  */
@@ -23,13 +29,12 @@ export interface Logger {
   info: (message: string, ctx?: LogContext) => void;
   warn: (message: string, ctx?: LogContext) => void;
   error: (message: string, ctx?: LogContext) => void;
-  /** Call at the end of request handling to persist a summary log entry. */
+  /** Call at the end of request handling; logs a warning if it ran long. */
   flush: (durationMs?: number) => Promise<void>;
 }
 
-export function createLogger(functionName: string, supabase?: any): Logger {
+export function createLogger(functionName: string): Logger {
   const correlationId = crypto.randomUUID().substring(0, 8);
-  const entries: Array<{ level: LogLevel; message: string; ctx: LogContext; ts: string }> = [];
 
   function log(level: LogLevel, message: string, ctx: LogContext = {}) {
     const entry = {
@@ -44,47 +49,13 @@ export function createLogger(functionName: string, supabase?: any): Logger {
     if (level === "error") console.error(JSON.stringify(entry));
     else if (level === "warn") console.warn(JSON.stringify(entry));
     else console.log(JSON.stringify(entry));
-
-    entries.push({ level, message, ctx, ts: entry.ts });
   }
 
+  // Kept so callers can record wall-clock at the end of a request. Console
+  // only — see the note above about the removed table write.
   async function flush(durationMs?: number) {
-    if (!supabase) return;
-    // Persist warn/error entries to the database for monitoring
-    const toInsert = entries
-      .filter((e) => e.level === "warn" || e.level === "error")
-      .map((e) => ({
-        function_name: functionName,
-        level: e.level,
-        message: e.message,
-        correlation_id: correlationId,
-        business_id: e.ctx.business_id || null,
-        booking_id: e.ctx.booking_id || null,
-        duration_ms: durationMs || null,
-        metadata: e.ctx,
-      }));
-
-    // Also persist a summary info entry if there were errors
-    if (toInsert.length === 0 && durationMs !== undefined) {
-      // No errors — just log a health heartbeat if the function took > 5s
-      if (durationMs > 5000) {
-        toInsert.push({
-          function_name: functionName,
-          level: "warn",
-          message: "Slow execution: " + durationMs + "ms",
-          correlation_id: correlationId,
-          business_id: null,
-          booking_id: null,
-          duration_ms: durationMs,
-          metadata: {},
-        });
-      }
-    }
-
-    if (toInsert.length > 0) {
-      await supabase.from("edge_function_logs").insert(toInsert).catch((e: any) => {
-        console.error("LOGGER_FLUSH_ERR:" + String(e));
-      });
+    if (durationMs !== undefined && durationMs > 5000) {
+      log("warn", "Slow execution: " + durationMs + "ms", { duration_ms: durationMs });
     }
   }
 
