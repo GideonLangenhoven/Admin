@@ -12,6 +12,7 @@ import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phos
 import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
+import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -210,6 +211,16 @@ export default function Bookings() {
   const [waSending, setWaSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [quickResendingId, setQuickResendingId] = useState<string | null>(null);
+  // Month quick-view calendar (same component as the slots page). Tours are
+  // name-ordered like the slots page loads them, so each tour keeps the same
+  // colour on both calendars.
+  const [monthCalOpen, setMonthCalOpen] = useState(false);
+  const [calTours, setCalTours] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!businessId) return;
+    supabase.from("tours").select("id, name").eq("business_id", businessId).order("name")
+      .then(({ data }) => setCalTours((data || []) as Array<{ id: string; name: string }>));
+  }, [businessId]);
   const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Bulk selection
@@ -1605,12 +1616,37 @@ export default function Bookings() {
           <label className="text-sm font-medium text-gray-600">Filter Month:</label>
           <div className="min-w-0 flex-1 sm:flex-none">
             <MonthPicker
-              onChange={handleMonthChange}
+              onChange={(v) => { handleMonthChange(v); setMonthCalOpen(true); }}
               value={`${rangeStart.getFullYear()}-${String(rangeStart.getMonth() + 1).padStart(2, "0")}`}
             />
           </div>
+          <button
+            onClick={() => setMonthCalOpen((v) => !v)}
+            className={`ui-btn !h-8 !px-3 !text-[12.5px] shrink-0 ${monthCalOpen ? "ui-btn-primary" : "ui-btn-ghost"}`}
+          >
+            Calendar
+          </button>
         </div>
       </div>
+
+      {monthCalOpen && (
+        <div className="anim-fade-up">
+          <BookingsMonthCalendar
+            businessId={businessId}
+            tours={calTours}
+            selectedDate={rangeStart}
+            onSelectDate={(d) => {
+              // A day picked on the calendar narrows the list to that day.
+              const s = new Date(d); s.setHours(0, 0, 0, 0);
+              const e = new Date(d); e.setHours(23, 59, 59, 999);
+              setRangeStart(s);
+              setRangeEnd(e);
+            }}
+            onMonthChange={(m) => handleMonthChange(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`)}
+            onClose={() => setMonthCalOpen(false)}
+          />
+        </div>
+      )}
 
       {/* Status filter tabs */}
       <div className="anim-fade-up anim-d2 overflow-x-auto no-scrollbar">

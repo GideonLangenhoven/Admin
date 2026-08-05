@@ -37,6 +37,9 @@ type Props = {
   selectedDate: Date;
   onSelectDate: (d: Date) => void;
   onClose: () => void;
+  // Fired on user month navigation (never on mount) — the bookings page uses
+  // it to keep its month filter in step with the calendar.
+  onMonthChange?: (m: Date) => void;
 };
 
 function dateKeyInTz(utcIso: string, tz: string) {
@@ -44,11 +47,17 @@ function dateKeyInTz(utcIso: string, tz: string) {
   return new Date(utcIso).toLocaleDateString("en-CA", { timeZone: tz });
 }
 
-export default function BookingsMonthCalendar({ businessId, tours, selectedDate, onSelectDate, onClose }: Props) {
+export default function BookingsMonthCalendar({ businessId, tours, selectedDate, onSelectDate, onClose, onMonthChange }: Props) {
   const [displayMonth, setDisplayMonth] = useState(() => startOfMonth(selectedDate));
   const [dayMap, setDayMap] = useState<DayMap>({});
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+
+  const changeMonth = useCallback((m: Date) => {
+    const start = startOfMonth(m);
+    setDisplayMonth(start);
+    onMonthChange?.(start);
+  }, [onMonthChange]);
 
   const colorByTour = useMemo(() => {
     const m = new Map<string, string>();
@@ -184,10 +193,10 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
       <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ck-surface, #fff)" }} role="dialog" aria-modal="true" aria-label="Bookings month view">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <div className="flex items-center gap-2">
-            <button onClick={() => setDisplayMonth((m) => addMonths(m, -1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Previous month">‹</button>
+            <button onClick={() => changeMonth(addMonths(displayMonth, -1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Previous month">‹</button>
             <span className="min-w-[150px] text-center font-display text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{format(displayMonth, "MMMM yyyy")}</span>
-            <button onClick={() => setDisplayMonth((m) => addMonths(m, 1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Next month">›</button>
-            <button onClick={() => setDisplayMonth(startOfMonth(new Date()))} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">Today</button>
+            <button onClick={() => changeMonth(addMonths(displayMonth, 1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Next month">›</button>
+            <button onClick={() => changeMonth(new Date())} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">Today</button>
           </div>
           <div className="hidden md:block">{legend}</div>
           <button onClick={() => setFullscreen(false)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">Close ✕</button>
@@ -266,7 +275,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
           mode="single"
           selected={selectedDate}
           month={displayMonth}
-          onMonthChange={setDisplayMonth}
+          onMonthChange={changeMonth}
           onSelect={(d) => { if (d) { onSelectDate(d); onClose(); } }}
           components={{ Day: CompactDay as any }}
         />
