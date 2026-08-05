@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { reissueVoucherPortion } from "../_shared/vouchers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -91,13 +92,6 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, refund_status: "MANUAL_EFT_REQUIRED", amount: manualRefundAmount, message: "This booking was paid via " + pm + ". An admin must process the refund manually." }), { status: 200, headers: getCors(req) });
     }
 
-    if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking; manual refund only" }), { status: 400, headers: getCors(req) });
-
-    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
-    const brandName = getBusinessDisplayName(tenant.business);
-    let refundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
-    if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Invalid refund amount" }), { status: 400, headers: getCors(req) });
-
     const totalAmount = Number(booking.total_amount || 0);
     const totalCaptured = Number(booking.total_captured || totalAmount);
     const totalRefunded = Number(booking.total_refunded || 0);
@@ -107,9 +101,66 @@ Deno.serve(async (req: any) => {
     // at whichever is lower: recorded capture, or total minus voucher.
     const voucherPaid = Number(booking.voucher_amount_paid || 0);
     const maxCashRefund = Math.max(0, Math.min(totalCaptured, totalAmount - voucherPaid) - totalRefunded);
+
+    // Nothing cash-refundable but a voucher portion exists (fully or mostly
+    // voucher-funded booking): the refund IS the voucher reissue. Capping the
+    // cash without reissuing was a black hole — the operator saw a refund
+    // "processed", the customer's voucher value simply vanished.
+    if (maxCashRefund <= 0 && voucherPaid > 0) {
+      const reissued = await reissueVoucherPortion(supabase, booking);
+      if (!reissued) {
+        return new Response(JSON.stringify({ error: "Nothing left to refund: cash portion already refunded and the voucher portion was already reissued." }), { status: 400, headers: getCors(req) });
+      }
+      await supabase.from("bookings").update({
+        status: "CANCELLED",
+        refund_status: "REFUNDED",
+        refund_notes: "Voucher-funded booking: portion of " + reissued.amount.toFixed(2) + " reissued as voucher " + reissued.code + " (no cash movement)",
+        cancellation_reason: booking.cancellation_reason || "Auto-cancelled: refund processed by admin",
+        cancelled_at: booking.cancelled_at || new Date().toISOString(),
+      }).eq("id", booking.id);
+      await supabase.from("logs").insert({
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        event: "refund_voucher_reissued",
+        payload: { voucher_code: reissued.code, amount: reissued.amount, cash_refunded: 0 },
+      });
+      if (booking.email) {
+        try {
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({
+              type: "CANCELLATION",
+              data: {
+                business_id: booking.business_id,
+                email: booking.email,
+                customer_name: booking.customer_name,
+                ref: booking.id.substring(0, 8).toUpperCase(),
+                tour_name: booking.tours?.name || "Booking",
+                start_time: booking.slots?.start_time || "",
+                reason: "Refund processed: voucher reissued",
+                voucher_code: reissued.code,
+                voucher_amount: reissued.amount.toFixed(2),
+                total_amount: totalAmount.toFixed(2),
+                is_partial: false,
+              },
+            }),
+          });
+        } catch (e) { console.error("Email voucher-reissue notify err:", e); }
+      }
+      return new Response(JSON.stringify({ ok: true, amount: 0, voucher_code: reissued.code, voucher_amount: reissued.amount, channel: "voucher" }), { status: 200, headers: getCors(req) });
+    }
+
+    if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking; manual refund only" }), { status: 400, headers: getCors(req) });
+
+    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const brandName = getBusinessDisplayName(tenant.business);
+    let refundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
+    if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Invalid refund amount" }), { status: 400, headers: getCors(req) });
+
     if (refundAmount > maxCashRefund) refundAmount = maxCashRefund;
     if (refundAmount <= 0) {
-      return new Response(JSON.stringify({ error: "Nothing cash-refundable: " + (voucherPaid > 0 ? "voucher-funded portion (" + voucherPaid + ") must be reissued as a voucher, not cash." : "already fully refunded.") }), { status: 400, headers: getCors(req) });
+      return new Response(JSON.stringify({ error: "Nothing cash-refundable: already fully refunded." }), { status: 400, headers: getCors(req) });
     }
 
     // S2: reserve BEFORE calling Yoco. reserve_refund locks the booking row and
@@ -169,14 +220,20 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: false, error: errMsg }), { status: 200, headers: getCors(req) });
     }
 
+    // Split tender: the cash just went back via Yoco; the voucher-funded
+    // portion comes back as a fresh CREDIT voucher. Idempotent — flows that
+    // already reissued (rebook-booking, CLAIM_CREDIT) stamped
+    // converted_to_voucher_id, so this is a no-op for them.
+    const reissued = await reissueVoucherPortion(supabase, booking);
+
     // S2: total_refunded was already set atomically by reserve_refund — do NOT
     // re-add it here (that would double-count).
-    const newTotalRefunded = totalRefunded + refundAmount;
     await supabase.from("bookings").update({
       status: "CANCELLED",
       refund_status: "REFUNDED",
       refund_amount: refundAmount,
-      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund: " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")",
+      refund_notes: (isPartial ? "Partial" : "Full") + " Yoco refund: " + refundAmount.toFixed(2) + " of " + totalCaptured.toFixed(2) + " (previously refunded: " + totalRefunded.toFixed(2) + ")"
+        + (reissued ? "; voucher portion " + reissued.amount.toFixed(2) + " reissued as " + reissued.code : ""),
       cancellation_reason: "Auto-cancelled: refund processed by admin",
       cancelled_at: new Date().toISOString(),
     }).eq("id", booking.id);
@@ -185,7 +242,7 @@ Deno.serve(async (req: any) => {
       business_id: booking.business_id,
       booking_id: booking.id,
       event: "refund_processed",
-      payload: { amount: refundAmount, partial: isPartial, yoco_refund: yocoData },
+      payload: { amount: refundAmount, partial: isPartial, yoco_refund: yocoData, ...(reissued ? { voucher_code: reissued.code, voucher_amount: reissued.amount } : {}) },
     });
 
     const ref = booking.id.substring(0, 8).toUpperCase();
@@ -198,6 +255,7 @@ Deno.serve(async (req: any) => {
           "Hi " + (booking.customer_name?.split(" ")[0] || "there") + ", your " +
           (isPartial ? "partial " : "") + "refund of " + (tenant.business.currency || "ZAR") + " " + refundAmount.toFixed(2) +
           " for " + tourName + " (Ref: " + ref + ") has been processed.\n\n" +
+          (reissued ? "Your voucher portion of " + (tenant.business.currency || "ZAR") + " " + reissued.amount.toFixed(2) + " has been reissued as voucher " + reissued.code + ".\n\n" : "") +
           "Please allow 5 to 10 business days for the amount to reflect in your account.\n\n" +
           "Thanks for choosing " + brandName + "."
         );
@@ -222,13 +280,14 @@ Deno.serve(async (req: any) => {
               refund_amount: refundAmount.toFixed(2),
               total_amount: totalAmount.toFixed(2),
               is_partial: isPartial,
+              ...(reissued ? { voucher_code: reissued.code, voucher_amount: reissued.amount.toFixed(2) } : {}),
             },
           }),
         });
       } catch (e) { console.error("Email refund notify err:", e); }
     }
 
-    return new Response(JSON.stringify({ ok: true, amount: refundAmount, partial: isPartial }), { status: 200, headers: getCors(req) });
+    return new Response(JSON.stringify({ ok: true, amount: refundAmount, partial: isPartial, ...(reissued ? { voucher_code: reissued.code, voucher_amount: reissued.amount } : {}) }), { status: 200, headers: getCors(req) });
   } catch (err: any) {
     console.error("PROCESS_REFUND_ERROR:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: getCors(req) });
