@@ -9,6 +9,15 @@ function adminClient() {
   return createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 }
 
+// Same targeting rule as the collection route: only SUPER_ADMIN may operate
+// on a business other than their own (the operator switcher). See
+// ../route.ts for why this exists.
+function resolveTargetBusiness(caller: { role: string; business_id: string }, requested: string | null | undefined): string | null {
+  const target = String(requested || "").trim() || caller.business_id;
+  if (target !== caller.business_id && caller.role !== "SUPER_ADMIN") return null;
+  return target;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const caller = await getCallerAdmin(req);
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,6 +26,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
+  const target = resolveTargetBusiness(caller, typeof body.business_id === "string" ? body.business_id : "");
+  if (!target) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const db = adminClient();
   const allowed = ["intent", "question_pattern", "match_keywords", "answer", "enabled"];
@@ -34,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { error } = await db.from("chat_faq_entries")
     .update(updates)
     .eq("id", id)
-    .eq("business_id", caller.business_id);
+    .eq("business_id", target);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -46,12 +58,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!isPrivilegedRole(caller.role)) return NextResponse.json({ error: "MAIN_ADMIN required" }, { status: 403 });
 
   const { id } = await params;
+  const target = resolveTargetBusiness(caller, req.nextUrl.searchParams.get("business_id"));
+  if (!target) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const db = adminClient();
 
   const { error } = await db.from("chat_faq_entries")
     .delete()
     .eq("id", id)
-    .eq("business_id", caller.business_id);
+    .eq("business_id", target);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

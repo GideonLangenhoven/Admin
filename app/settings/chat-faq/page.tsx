@@ -30,13 +30,20 @@ export default function ChatFaqPage() {
     return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   }
 
+  // business_id rides every call so a SUPER_ADMIN pivoted to another operator
+  // reads and edits THAT operator's entries (the API previously pinned
+  // everything to the caller's home business). The bot already reads
+  // per-tenant, so what you edit here is what that operator's bot answers.
   async function load() {
     setLoading(true);
     const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const r = await fetch("/api/admin/chat-faq", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const r = await fetch(`/api/admin/chat-faq?business_id=${encodeURIComponent(businessId)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (r.ok) {
       const data = await r.json();
       setEntries(data.entries ?? []);
+    } else {
+      setEntries([]);
+      notify({ title: "Couldn't load quick answers", message: (await r.json().catch(() => ({}))).error || `Request failed (${r.status})`, tone: "error" });
     }
     setLoading(false);
   }
@@ -55,7 +62,7 @@ export default function ChatFaqPage() {
       const r = await fetch(`/api/admin/chat-faq/${editId}`, {
         method: "PATCH",
         headers: await authHeaders(),
-        body: JSON.stringify({ intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
+        body: JSON.stringify({ business_id: businessId, intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
       });
       if (r.ok) { notify({ title: "Saved", message: "Quick answer updated.", tone: "success" }); }
       else { notify({ title: "Something went wrong", message: (await r.json()).error, tone: "error" }); }
@@ -63,7 +70,7 @@ export default function ChatFaqPage() {
       const r = await fetch("/api/admin/chat-faq", {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
+        body: JSON.stringify({ business_id: businessId, intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
       });
       if (r.ok) { notify({ title: "Done", message: "Quick answer added. Customers will start getting this reply automatically.", tone: "success" }); }
       else { notify({ title: "Something went wrong", message: (await r.json()).error, tone: "error" }); }
@@ -79,9 +86,11 @@ export default function ChatFaqPage() {
     const r = await fetch(`/api/admin/chat-faq/${entry.id}`, {
       method: "PATCH",
       headers: await authHeaders(),
-      body: JSON.stringify({ enabled: !entry.enabled }),
+      body: JSON.stringify({ business_id: businessId, enabled: !entry.enabled }),
     });
     if (r.ok) load();
+    // A silent no-op here is how "the button does nothing" tickets are born.
+    else notify({ title: "Couldn't update", message: (await r.json().catch(() => ({}))).error || `Request failed (${r.status})`, tone: "error" });
   }
 
   async function handleDelete(id: string) {
@@ -96,7 +105,7 @@ export default function ChatFaqPage() {
       tone: "warning",
       confirmLabel: "Delete quick answer",
     })) return;
-    const r = await fetch(`/api/admin/chat-faq/${id}`, { method: "DELETE", headers: await authHeaders() });
+    const r = await fetch(`/api/admin/chat-faq/${id}?business_id=${encodeURIComponent(businessId)}`, { method: "DELETE", headers: await authHeaders() });
     if (r.ok) {
       notify({ title: "Deleted", message: "Quick answer removed.", tone: "success" });
       load();
