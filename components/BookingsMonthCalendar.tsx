@@ -129,11 +129,14 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
   }, [dayMap, tours]);
 
   useEffect(() => {
-    if (!fullscreen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (fullscreen) setFullscreen(false);
+      else onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen]);
+  }, [fullscreen, onClose]);
 
   /* Compact day cell: coloured dot per tour with confirmed bookings. */
   const CompactDay = useCallback(function CompactDay(props: any) {
@@ -189,8 +192,10 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
       if (weeks.length > 6) break;
     }
     const todayKey = format(new Date(), "yyyy-MM-dd");
+    // Sits inside the backdrop element, so clicks must not bubble to its
+    // close handler.
     return (
-      <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ck-surface, #fff)" }} role="dialog" aria-modal="true" aria-label="Bookings month view">
+      <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ck-surface, #fff)" }} role="dialog" aria-modal="true" aria-label="Bookings month view" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <div className="flex items-center gap-2">
             <button onClick={() => changeMonth(addMonths(displayMonth, -1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Previous month">‹</button>
@@ -244,7 +249,23 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
   })();
 
   return (
-    <div className="ui-card p-4">
+    /* Overlay, not in-flow: an inline card gets clipped or pushed below the
+       fold by the page around it. Same modal recipe as the slot editor —
+       bottom sheet on mobile, centred card on desktop; backdrop click and
+       Esc close it. Kept OUTSIDE any anim-fade-up wrapper: that animation
+       transforms an ancestor, which would hijack position:fixed. */
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirmed bookings month view"
+    >
+      <div
+        className="ui-card w-full max-h-[90vh] overflow-auto p-4 !rounded-t-2xl sm:w-auto sm:max-w-[92vw] sm:!rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="ui-mono-label !text-[10px]">Confirmed bookings · {format(displayMonth, "MMMM yyyy")}{loading ? " · loading…" : ""}</span>
         <div className="flex items-center gap-1.5">
@@ -281,6 +302,8 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
         />
         <div className="sm:pt-8">{legend}</div>
       </div>
+      </div>
+      {fullscreenView}
     </div>
   );
 }

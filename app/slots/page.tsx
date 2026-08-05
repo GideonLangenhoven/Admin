@@ -762,15 +762,13 @@ function Slots() {
       </div>
 
       {monthViewOpen && (
-        <div className="anim-fade-up">
-          <BookingsMonthCalendar
-            businessId={businessId}
-            tours={tours}
-            selectedDate={currentDate}
-            onSelectDate={setCurrentDate}
-            onClose={() => setMonthViewOpen(false)}
-          />
-        </div>
+        <BookingsMonthCalendar
+          businessId={businessId}
+          tours={tours}
+          selectedDate={currentDate}
+          onSelectDate={setCurrentDate}
+          onClose={() => setMonthViewOpen(false)}
+        />
       )}
 
       <div className="anim-fade-up anim-d2">

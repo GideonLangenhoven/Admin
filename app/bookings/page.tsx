@@ -1630,22 +1630,20 @@ export default function Bookings() {
       </div>
 
       {monthCalOpen && (
-        <div className="anim-fade-up">
-          <BookingsMonthCalendar
-            businessId={businessId}
-            tours={calTours}
-            selectedDate={rangeStart}
-            onSelectDate={(d) => {
-              // A day picked on the calendar narrows the list to that day.
-              const s = new Date(d); s.setHours(0, 0, 0, 0);
-              const e = new Date(d); e.setHours(23, 59, 59, 999);
-              setRangeStart(s);
-              setRangeEnd(e);
-            }}
-            onMonthChange={(m) => handleMonthChange(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`)}
-            onClose={() => setMonthCalOpen(false)}
-          />
-        </div>
+        <BookingsMonthCalendar
+          businessId={businessId}
+          tours={calTours}
+          selectedDate={rangeStart}
+          onSelectDate={(d) => {
+            // A day picked on the calendar narrows the list to that day.
+            const s = new Date(d); s.setHours(0, 0, 0, 0);
+            const e = new Date(d); e.setHours(23, 59, 59, 999);
+            setRangeStart(s);
+            setRangeEnd(e);
+          }}
+          onMonthChange={(m) => handleMonthChange(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`)}
+          onClose={() => setMonthCalOpen(false)}
+        />
       )}
 
       {/* Status filter tabs */}
