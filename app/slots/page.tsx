@@ -11,6 +11,7 @@ import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
+import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -33,6 +34,7 @@ function Slots() {
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [filterTourId, setFilterTourId] = useState<string | null>(() => searchParams.get("tour"));
   const [showClosedSlots, setShowClosedSlots] = useState(false);
+  const [monthViewOpen, setMonthViewOpen] = useState(false);
 
   // Individual Edit State
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -754,8 +756,22 @@ function Slots() {
           viewMode={viewMode}
           onDateChange={setCurrentDate}
           onViewModeChange={setViewMode}
+          monthViewOpen={monthViewOpen}
+          onToggleMonthView={() => setMonthViewOpen((v) => !v)}
         />
       </div>
+
+      {monthViewOpen && (
+        <div className="anim-fade-up">
+          <BookingsMonthCalendar
+            businessId={businessId}
+            tours={tours}
+            selectedDate={currentDate}
+            onSelectDate={setCurrentDate}
+            onClose={() => setMonthViewOpen(false)}
+          />
+        </div>
+      )}
 
       <div className="anim-fade-up anim-d2">
       {loading ? (

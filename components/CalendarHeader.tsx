@@ -7,9 +7,11 @@ interface CalendarHeaderProps {
   viewMode: "week" | "day";
   onDateChange: (date: Date) => void;
   onViewModeChange: (mode: "week" | "day") => void;
+  monthViewOpen?: boolean;
+  onToggleMonthView?: () => void;
 }
 
-export default function CalendarHeader({ currentDate, viewMode, onDateChange, onViewModeChange }: CalendarHeaderProps) {
+export default function CalendarHeader({ currentDate, viewMode, onDateChange, onViewModeChange, monthViewOpen, onToggleMonthView }: CalendarHeaderProps) {
   const handlePrev = () => {
     const newDate = new Date(currentDate);
     if (viewMode === "week") {
@@ -41,7 +43,7 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
   return (
     <div className="ui-card flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
       <div className="w-full md:w-auto">
-        <div className="grid w-full grid-cols-2 rounded-lg bg-gray-100 p-1 md:flex md:w-auto">
+        <div className={`grid w-full ${onToggleMonthView ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-100 p-1 md:flex md:w-auto`}>
           <button
             onClick={() => onViewModeChange("week")}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
@@ -56,6 +58,15 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
           >
             Day
           </button>
+          {onToggleMonthView && (
+            <button
+              onClick={onToggleMonthView}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${monthViewOpen ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              Month
+            </button>
+          )}
         </div>
       </div>
 
