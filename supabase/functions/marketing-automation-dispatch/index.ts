@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { nonTradingBusinessIds } from "../_shared/subscription.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
 // Refuse to use the Resend developer sandbox even if it's pasted into the env
@@ -272,26 +273,20 @@ Deno.serve(async (req: Request) => {
               break;
             }
 
-            // Variable replacement
-            let html = template.html_content
-              .replace(/\{first_name\}/g, contact.first_name || "there")
-              .replace(/\{last_name\}/g, contact.last_name || "")
-              .replace(/\{email\}/g, contact.email || "")
-              .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
-              .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
-              .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "")
-              .replace(/\{business_name\}/g, bizName)
-              .replace(/\{company_name\}/g, bizName)
-              .replace(/\{site_url\}/g, bizSiteUrl);
-
-            const subject = (config.subject_override || template.subject_line || "Update")
-              .replace(/\{first_name\}/g, contact.first_name || "there")
-              .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
-              .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
-              .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "")
-              .replace(/\{business_name\}/g, bizName);
+            // Variable replacement — shared map, see _shared/marketing-tokens.ts
+            const tokenValues = {
+              first_name: contact.first_name,
+              last_name: contact.last_name,
+              email: contact.email,
+              voucher_code: metadata.voucher_code,
+              voucher_amount: metadata.voucher_amount,
+              promo_code: metadata.promo_code,
+              promo_discount: metadata.promo_discount,
+              business_name: bizName,
+              site_url: bizSiteUrl,
+            };
+            let html = fillMarketingTokens(template.html_content, tokenValues);
+            const subject = fillMarketingTokens(config.subject_override || template.subject_line || "Update", tokenValues);
 
             // Generate unsubscribe token
             const unsubToken = crypto.randomUUID();

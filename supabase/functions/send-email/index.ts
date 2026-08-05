@@ -8,6 +8,7 @@ import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
 import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { tourEndDate } from "../_shared/duration.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -2777,16 +2778,27 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = "A message from Cape Kayak Adventures";
         html = customerMessageHtml(d);
         break;
-      case "MARKETING_TEST":
+      case "MARKETING_TEST": {
         // Admin preview of a marketing template. We do NOT touch the queue or
-        // generate per-recipient unsubscribe tokens here — the body is rendered
-        // verbatim with a [TEST] prefix and a static admin-facing unsubscribe
-        // placeholder so the rendered preview matches what real recipients see.
-        subject = String(d.subject_line || "[TEST] Marketing preview");
-        html = String(d.html_content || "<p>No content</p>")
-          .replace(/\{first_name\}/g, String(d.first_name || "Admin"))
+        // generate per-recipient unsubscribe tokens here — the body runs
+        // through the same token map real sends use (_shared/marketing-tokens)
+        // so no {token} ever reaches an inbox raw. Real business name and site
+        // URL; obviously-sample voucher/promo values, since a preview has no
+        // voucher behind it.
+        const testTokens = {
+          first_name: String(d.first_name || "Admin"),
+          business_name: branding.brandName,
+          site_url: branding.bookingSiteUrl,
+          voucher_code: "SAMPLE-CODE",
+          voucher_amount: "R500",
+          promo_code: "SAMPLE10",
+          promo_discount: "10%",
+        };
+        subject = fillMarketingTokens(String(d.subject_line || "[TEST] Marketing preview"), testTokens);
+        html = fillMarketingTokens(String(d.html_content || "<p>No content</p>"), testTokens)
           .replace(/\{\{unsubscribe_url\}\}/g, SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=preview");
         break;
+      }
       case "POPIA_CONFIRM_REQUEST":
         subject = "Confirm Your Data Request";
         html = popiaConfirmRequestHtml(d);

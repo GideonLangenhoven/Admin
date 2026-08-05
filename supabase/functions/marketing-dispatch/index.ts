@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
 import { nonTradingBusinessIds } from "../_shared/subscription.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
@@ -211,22 +212,24 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
 
       const unsubscribeUrl = SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=" + unsubToken;
 
-      // Variable replacement — including brand tokens. Older templates that
-      // were seeded with a literal "Cape Kayak" string get rewritten to the
-      // tenant's actual business_name so multi-tenant tenants don't leak the
-      // origin tenant's brand to their own customers (U-7 / U-12).
+      // Variable replacement — shared map (_shared/marketing-tokens.ts).
+      // Voucher/promo tokens have no data in a campaign context, so they
+      // resolve to "" rather than reaching customers as literal {braces}.
+      // Older templates seeded with a literal "Cape Kayak" string still get
+      // rewritten to the tenant's actual business_name so multi-tenant
+      // tenants don't leak the origin tenant's brand (U-7 / U-12).
       const brand = bizBrandMap[item.business_id] || "Our Team";
-      let html = camp.html
-        .replace(/\{first_name\}/g, item.first_name || "there")
-        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+      const tokenValues = {
+        first_name: item.first_name,
+        business_name: brand,
+        site_url: bizSiteMap[item.business_id] || "",
+      };
+      let html = fillMarketingTokens(camp.html, tokenValues)
         .replace(/Cape Kayak Adventures/g, brand)
         .replace(/Cape Kayak/g, brand)
-        .replace(/\{site_url\}/g, bizSiteMap[item.business_id] || "")
         .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
 
-      const subject = camp.subject
-        .replace(/\{first_name\}/g, item.first_name || "there")
-        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+      const subject = fillMarketingTokens(camp.subject, tokenValues)
         .replace(/Cape Kayak/g, brand);
 
       // Inject open-tracking pixel before </body>
