@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
     // PAID_MANUALLY are settled.
     const { data: invoices, error } = await supabase
       .from("platform_invoices")
-      .select("id, business_id, invoice_number, amount_zar, period_start, period_end, plan_name, sent_at, yoco_payment_link_url, email_overage_count, email_overage_zar, pro_rated, pause_note")
+      .select("id, business_id, invoice_number, amount_zar, period_start, period_end, plan_name, sent_at, yoco_payment_link_url, email_overage_count, email_overage_zar, ai_overage_count, ai_overage_zar, pro_rated, pause_note")
       .eq("status", "SENT")
       .not("sent_at", "is", null)
       .order("sent_at", { ascending: true });
@@ -173,6 +173,7 @@ Deno.serve(async (req: Request) => {
             period_start: inv.period_start, period_end: inv.period_end,
             plan_name: inv.plan_name, amount_zar: inv.amount_zar,
             email_overage_count: inv.email_overage_count, email_overage_zar: inv.email_overage_zar,
+            ai_overage_count: inv.ai_overage_count, ai_overage_zar: inv.ai_overage_zar,
             pro_rated: inv.pro_rated, pause_note: inv.pause_note,
             yoco_payment_link_url: inv.yoco_payment_link_url,
           });
@@ -224,6 +225,7 @@ Deno.serve(async (req: Request) => {
             period_start: inv.period_start, period_end: inv.period_end,
             plan_name: inv.plan_name, amount_zar: inv.amount_zar,
             email_overage_count: inv.email_overage_count, email_overage_zar: inv.email_overage_zar,
+            ai_overage_count: inv.ai_overage_count, ai_overage_zar: inv.ai_overage_zar,
             pro_rated: inv.pro_rated, pause_note: inv.pause_note,
             yoco_payment_link_url: inv.yoco_payment_link_url,
           });

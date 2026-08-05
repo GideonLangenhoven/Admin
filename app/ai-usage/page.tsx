@@ -38,6 +38,7 @@ function monthStartIso() {
 export default function AiUsage() {
   const { businessId } = useBusinessContext();
   const [rows, setRows] = useState<Row[]>([]);
+  const [replies, setReplies] = useState(0);
   const [included, setIncluded] = useState(0);
   const [rate, setRate] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -45,19 +46,28 @@ export default function AiUsage() {
 
   const load = useCallback(async () => {
     if (!businessId) return;
-    const [usageRes, bizRes] = await Promise.all([
+    const [usageRes, countRes, bizRes] = await Promise.all([
       supabase.from("llm_usage")
         .select("fn, model, prompt_tokens, completion_tokens, cached_tokens, created_at")
         .eq("business_id", businessId)
         .gte("created_at", monthStartIso())
         .order("created_at", { ascending: false })
         .limit(5000),
+      // Exact billable-reply count — the 5000-row fetch above saturates right
+      // at the included allowance, which would freeze the balance at zero and
+      // hide overage. Same fn filter the quota gate and the invoice use.
+      supabase.from("llm_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .in("fn", AI_QUOTA_FNS)
+        .gte("created_at", monthStartIso()),
       supabase.from("businesses")
         .select("ai_included_replies, ai_overage_rate_zar")
         .eq("id", businessId)
         .maybeSingle(),
     ]);
     setRows((usageRes.data || []) as Row[]);
+    setReplies(Number(countRes.count || 0));
     setIncluded(Number(bizRes.data?.ai_included_replies || 0));
     setRate(Number(bizRes.data?.ai_overage_rate_zar || 0));
     setUpdatedAt(new Date().toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
@@ -74,11 +84,10 @@ export default function AiUsage() {
     return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
-  const billable = rows.filter((r) => AI_QUOTA_FNS.includes(r.fn));
-  const replies = billable.length;
   const ceiling = included * AI_HARD_CEILING_MULTIPLE;
   const { overageReplies, overageZar } = computeAiOverage(replies, included, rate);
   const pct = included > 0 ? Math.min(100, Math.round((replies / included) * 100)) : 0;
+  const balance = Math.max(0, included - replies);
 
   const promptTokens = rows.reduce((n, r) => n + Number(r.prompt_tokens || 0), 0);
   const completionTokens = rows.reduce((n, r) => n + Number(r.completion_tokens || 0), 0);
@@ -129,12 +138,19 @@ export default function AiUsage() {
         </div>
       )}
 
-      <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="ui-card p-4">
           <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Replies</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{replies.toLocaleString()}</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
             {included > 0 ? "of " + included.toLocaleString() + " included" : "no cap set"}
+          </p>
+        </div>
+        <div className="ui-card p-4">
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Balance</span></div>
+          <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{included > 0 ? balance.toLocaleString() : "—"}</p>
+          <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+            {included <= 0 ? "no cap set" : balance > 0 ? "replies left this month" : "allowance used up"}
           </p>
         </div>
         <div className="ui-card p-4">

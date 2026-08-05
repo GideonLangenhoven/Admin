@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { computeActiveDays, computeEmailOverage } from "../../app/lib/platform-billing";
+import { computeActiveDays, computeAiOverage, computeEmailOverage } from "../../app/lib/platform-billing";
+
+describe("computeAiOverage (platform invoice AI line)", () => {
+  it("within the included allowance is zero", () => {
+    expect(computeAiOverage(4800, 5000, 0.15)).toEqual({ overageReplies: 0, overageZar: 0 });
+  });
+  it("charges only replies beyond the allowance", () => {
+    expect(computeAiOverage(5200, 5000, 0.15)).toEqual({ overageReplies: 200, overageZar: 30 });
+  });
+  it("rounds to cents", () => {
+    expect(computeAiOverage(5003, 5000, 0.155)).toEqual({ overageReplies: 3, overageZar: 0.47 });
+  });
+  it("no cap set (0 included) with no rate means no charge", () => {
+    expect(computeAiOverage(9999, 0, 0)).toEqual({ overageReplies: 9999, overageZar: 0 });
+  });
+});
 
 describe("computeEmailOverage (platform invoice email line)", () => {
   it("under quota is zero", () => {

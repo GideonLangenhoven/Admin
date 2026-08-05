@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
-import { computeActiveDays, computeEmailOverage, monthBounds } from "@/app/lib/platform-billing";
+import { AI_QUOTA_FNS, computeActiveDays, computeAiOverage, computeEmailOverage, monthBounds } from "@/app/lib/platform-billing";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   // Monthly total = plan base + R-per-seat for every seat beyond what the plan
   // includes. Seats live on businesses.max_admin_seats (the enforced count).
   const { data: biz } = await db.from("businesses")
-    .select("max_admin_seats, marketing_included_emails, marketing_overage_rate_zar")
+    .select("max_admin_seats, marketing_included_emails, marketing_overage_rate_zar, ai_included_replies, ai_overage_rate_zar")
     .eq("id", businessId).maybeSingle();
   const seats = Math.max(1, Number(biz?.max_admin_seats || 1));
   const extraSeats = Math.max(0, seats - Number(plan?.seat_limit || 1));
@@ -78,7 +78,26 @@ export async function POST(req: NextRequest) {
     Number(biz?.marketing_included_emails || 0),
     Number(biz?.marketing_overage_rate_zar || 0),
   );
-  const amountZar = Math.round((subscriptionZar + overageZar) * 100) / 100;
+
+  // AI reply overage — counted from llm_usage scoped to THIS business and the
+  // invoiced month only, and to the customer-facing reply fns (AI_QUOTA_FNS,
+  // which excludes classifiers and the v2 shadow run by label). Same shape as
+  // the email line. Usage-based: never pro-rated.
+  const [pYear, pMonth] = period.split("-").map(Number);
+  const nextMonthStartIso = new Date(Date.UTC(pYear, pMonth, 1)).toISOString();
+  const { count: aiReplies } = await db.from("llm_usage")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .in("fn", AI_QUOTA_FNS)
+    .gte("created_at", periodStart)
+    .lt("created_at", nextMonthStartIso);
+  const { overageReplies, overageZar: aiOverageZar } = computeAiOverage(
+    Number(aiReplies || 0),
+    Number(biz?.ai_included_replies || 0),
+    Number(biz?.ai_overage_rate_zar || 0),
+  );
+
+  const amountZar = Math.round((subscriptionZar + overageZar + aiOverageZar) * 100) / 100;
 
   const { data: invoice, error: insertErr } = await db.from("platform_invoices").insert({
     business_id: businessId,
@@ -93,6 +112,8 @@ export async function POST(req: NextRequest) {
     pause_note: buildPauseNote(pauseWindows),
     email_overage_count: overageEmails,
     email_overage_zar: overageZar,
+    ai_overage_count: overageReplies,
+    ai_overage_zar: aiOverageZar,
     amount_zar: amountZar,
     status: "DRAFT",
   }).select("*").single();
@@ -110,7 +131,7 @@ export async function POST(req: NextRequest) {
     action_type: "PLATFORM_INVOICE_GENERATED",
     target_entity: "platform_invoices",
     target_id: invoice.id,
-    after_state: { amount_zar: amountZar, email_overage_zar: overageZar, active_days: activeDays, total_days: totalDays, pro_rated: proRated },
+    after_state: { amount_zar: amountZar, email_overage_zar: overageZar, ai_overage_zar: aiOverageZar, active_days: activeDays, total_days: totalDays, pro_rated: proRated },
   });
 
   return NextResponse.json({ ok: true, invoice });

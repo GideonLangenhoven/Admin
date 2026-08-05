@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
     amount_zar: invoice.amount_zar,
     email_overage_count: invoice.email_overage_count,
     email_overage_zar: invoice.email_overage_zar,
+    ai_overage_count: invoice.ai_overage_count,
+    ai_overage_zar: invoice.ai_overage_zar,
     pro_rated: invoice.pro_rated,
     pause_note: invoice.pause_note,
     yoco_payment_link_url: payUrl,
