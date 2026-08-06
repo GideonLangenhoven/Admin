@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 // All six were verified dead first (no repo reference, no cron.job invoking
 // them) and their bodies replaced with a 410 tombstone. This test stops one
 // from being quietly refilled with live code.
-const DECOMMISSIONED = ["wa-send", "cron-jobs", "hold-expiry", "outbox-send", "payfast-itn", "send-trip-photos"];
+// reminder-scheduler joined them on 2026-08-06: not global-WA, but it sent a
+// WhatsApp reminder hardcoding one operator's meeting point to every tenant's
+// customers. Its cron was deleted in migration 20260502160000.
+const DECOMMISSIONED = ["wa-send", "cron-jobs", "hold-expiry", "outbox-send", "payfast-itn", "send-trip-photos", "reminder-scheduler"];
 
 describe("decommissioned edge functions stay decommissioned", () => {
   for (const fn of DECOMMISSIONED) {
