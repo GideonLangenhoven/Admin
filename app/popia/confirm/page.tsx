@@ -88,7 +88,8 @@ function ConfirmContent() {
             </div>
           )}
         </div>
-        <p className="ui-mono-label mt-5 text-center !text-[9.5px]">
+        <p className="ui-mono-label mt-5 flex items-center justify-center gap-1.5 text-center !text-[9.5px]">
+          <BrandMark size={9} className="shrink-0" />
           Powered by{" "}
           <a href="https://bookingtours.co.za" target="_blank" rel="noopener noreferrer">
             BookingTours

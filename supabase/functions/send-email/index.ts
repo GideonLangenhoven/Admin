@@ -529,7 +529,12 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   // read from any business setting, so no operator config can omit or
   // override it, and it must render even when a tenant has zero social links.
   const socialHtml = buildSocialIconsHtml(branding);
-  const poweredByHtml = `<table cellpadding="0" cellspacing="0" style="width:100%;"><tr><td style="text-align:center; padding-top:14px; margin-top:14px; border-top:1px solid rgba(255,255,255,0.14);"><p style="margin:0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:11px; letter-spacing:0.02em; color:#A8C2B8;">Powered by <a href="https://bookingtours.co.za" style="color:#ffffff; font-weight:600; text-decoration:none;">BookingTours</a></p></td></tr></table>`;
+  // The mark carries alt="" and sits beside the text rather than replacing it:
+  // most clients block remote images by default, and a blocked decorative image
+  // collapses to nothing while "Powered by BookingTours" still reads. Ivory
+  // variant because this footer is dark. Hosted on the customer-facing booking
+  // domain (4 KB asset — this ships on every transactional email).
+  const poweredByHtml = `<table cellpadding="0" cellspacing="0" style="width:100%;"><tr><td style="text-align:center; padding-top:14px; margin-top:14px; border-top:1px solid rgba(255,255,255,0.14);"><p style="margin:0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:11px; letter-spacing:0.02em; color:#A8C2B8;"><img src="https://booking.bookingtours.co.za/brand/bt-mark-email.png" alt="" width="11" height="14" style="height:14px; width:auto; vertical-align:-3px; margin-right:6px; border:0;" />Powered by <a href="https://bookingtours.co.za" style="color:#ffffff; font-weight:600; text-decoration:none;">BookingTours</a></p></td></tr></table>`;
   const footerExtras = socialHtml + poweredByHtml;
   {
     // Find the footer </td> — it's the last </td> before </body>
