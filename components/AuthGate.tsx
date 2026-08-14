@@ -31,6 +31,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [locked, setLocked] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  // Read in an effect, not during render: SSR always renders the no-hint
+  // branch, so a render-time cookie read hydration-mismatches (React #418)
+  // on every authenticated page load.
+  const [hasHint, setHasHint] = useState(false);
 
   // Business context from login/session
   const [businessId, setBusinessId] = useState("");
@@ -46,6 +50,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
+    setHasHint(document.cookie.includes("ck_session_hint=1"));
     validateSession();
     checkLockout();
   }, []);
@@ -350,7 +355,6 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (checking) {
-    const hasHint = typeof document !== "undefined" && document.cookie.includes("ck_session_hint=1");
     if (hasHint) {
       // Skeleton of the real shell: pine rail + paper content
       return (

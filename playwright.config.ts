@@ -11,7 +11,11 @@ export default defineConfig({
   expect: { timeout: 15_000 },
 
   use: {
-    baseURL: process.env.BASE_URL || "https://aonyx.booking.bookingtours.co.za",
+    // Relative page.goto() calls in the specs target the ADMIN app; the
+    // customer booking site is always addressed explicitly via helpers/env
+    // BASE_URL. (The old default pointed baseURL at a deleted tenant's
+    // booking site, which silently ran every admin spec against the wrong app.)
+    baseURL: process.env.ADMIN_URL || "http://127.0.0.1:3000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

@@ -111,6 +111,19 @@ export default function HelpChat() {
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const suggestions = SUGGESTED.filter((s) => !s.privilegedOnly || isPrivileged);
 
+  // Following a link out of the assistant used to close it unconditionally,
+  // which reads as the bot quitting on you mid-conversation. It only needs to
+  // move on mobile, where the panel is a bottom sheet over 75dvh and would
+  // hide the page you just asked to see; on desktop it's a 380px corner card
+  // that obscures nothing. The thread itself always survives either way —
+  // HelpChat is mounted in the root layout, so client-side navigation never
+  // unmounts it.
+  function handleNavigate() {
+    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) {
+      setOpen(false);
+    }
+  }
+
   async function ask(question: string) {
     const q = question.trim();
     if (!q || busy) return;
@@ -204,14 +217,14 @@ export default function HelpChat() {
                     ? { background: "var(--ck-accent)", color: "#fff", borderBottomRightRadius: 6 }
                     : { background: "var(--ck-surface-warm)", color: "var(--ck-text-strong)", border: "1px solid var(--ck-border-subtle)", borderBottomLeftRadius: 6 }}
                 >
-                  {m.role === "assistant" ? <AnswerText text={m.content} onNavigate={() => setOpen(false)} /> : m.content}
+                  {m.role === "assistant" ? <AnswerText text={m.content} onNavigate={handleNavigate} /> : m.content}
                   {m.role === "assistant" && (m.sources?.length || 0) > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.sources!.map((s) => (
                         <Link
                           key={s.route}
                           href={s.route}
-                          onClick={() => setOpen(false)}
+                          onClick={handleNavigate}
                           className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
                           style={{ background: "var(--ck-success-soft, rgba(18,94,64,0.1))", color: "var(--ck-accent)" }}
                         >

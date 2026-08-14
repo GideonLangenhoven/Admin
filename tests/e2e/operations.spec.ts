@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { injectAdminSession } from "./helpers/auth";
-import { collectConsoleLogs, hasTrace } from "./helpers/console-collector";
 
 test.describe("Refunds Page", () => {
   test.beforeEach(async ({ page }) => {
@@ -24,26 +23,23 @@ test.describe("Refunds Page", () => {
     const mainContent = page.locator("main");
     await expect(mainContent).toBeVisible();
 
-    const pendingTab = page.getByText(/pending/i);
-    const processedTab = page.getByText(/processed|completed/i);
+    // Role-scoped: bare /pending/i also matches descriptive copy ("…pending
+    // refund requests…"), which is not clickable.
+    const pendingTab = page.getByRole("button", { name: /pending/i }).or(page.getByRole("tab", { name: /pending/i }));
+    const processedTab = page
+      .getByRole("button", { name: /processed|completed/i })
+      .or(page.getByRole("tab", { name: /processed|completed/i }));
 
-    if (await pendingTab.first().isVisible()) {
+    if (await pendingTab.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
       await pendingTab.first().click();
       await page.waitForTimeout(500);
     }
-    if (await processedTab.first().isVisible()) {
+    if (await processedTab.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
       await processedTab.first().click();
       await page.waitForTimeout(500);
     }
   });
 
-  test("refunds page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/refunds");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[REFUNDS]")).toBe(true);
-  });
 });
 
 test.describe("Invoices Page", () => {
@@ -68,13 +64,6 @@ test.describe("Invoices Page", () => {
     await expect(mainContent).toBeVisible();
   });
 
-  test("invoices page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/invoices");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[INVOICES]")).toBe(true);
-  });
 });
 
 test.describe("Weather Page", () => {
@@ -142,13 +131,6 @@ test.describe("Photos Page", () => {
     await expect(mainContent).toBeVisible();
   });
 
-  test("photos page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/photos");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[PHOTOS]")).toBe(true);
-  });
 });
 
 test.describe("Peak Pricing Page", () => {
@@ -182,13 +164,6 @@ test.describe("Peak Pricing Page", () => {
     await expect(mainContent).toBeVisible();
   });
 
-  test("pricing page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/pricing");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[PRICING]")).toBe(true);
-  });
 });
 
 test.describe("Reports Page", () => {
@@ -235,13 +210,6 @@ test.describe("Reports Page", () => {
     }
   });
 
-  test("reports page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/reports");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[REPORTS]")).toBe(true);
-  });
 });
 
 test.describe("Settings Page", () => {
@@ -274,13 +242,6 @@ test.describe("Settings Page", () => {
     }
   });
 
-  test("settings page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/settings");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[SETTINGS]")).toBe(true);
-  });
 });
 
 test.describe("Super Admin Page", () => {

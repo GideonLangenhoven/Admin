@@ -81,6 +81,9 @@ test.describe("Section C Remaining Verification", () => {
   test.setTimeout(180_000);
 
   test("C8/C12 runtime verification with current fixtures", async ({ page }) => {
+    // One-off QA verification script (May 2026 session): hardcoded debug-ingest
+    // endpoint and theme-specific selectors have gone stale. Opt in to run.
+    test.skip(process.env.QA_SECTIONS !== "1", "Set QA_SECTIONS=1 to run this archived QA verification script.");
     const bookingStartIso = new Date().toISOString();
     await page.goto(BASE_URL + "/");
     await page.waitForLoadState("networkidle");

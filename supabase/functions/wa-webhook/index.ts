@@ -15,6 +15,7 @@ import {
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { formatDuration } from "../_shared/duration.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
+import { getSubscriptionState } from "../_shared/subscription.ts";
 import { llmText, withinAiQuota } from "../_shared/llm.ts";
 import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
 import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
@@ -1036,11 +1037,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       return;
     }
 
-    // Data-deletion keyword (Meta ToS / POPIA) — same always-on path as STOP.
+    // Data-deletion keywords (Meta ToS / POPIA) — same always-on path as STOP.
     // Confirm first, then anonymize: chat history is redacted and personal
     // details are wiped from bookings; financial records keep their amounts
     // (5-year tax retention, per the published privacy policy).
-    if (input === "delete") {
+    //
+    // Anchored and deliberately narrow. The risk is asymmetric: a miss falls
+    // through to the bot (which can still hand off to a human), but a false
+    // positive destroys a guest's data irreversibly. "delete my booking" is a
+    // cancellation and must never reach anonymize_customer — hence the fixed
+    // noun list rather than a loose "contains delete" check.
+    const DELETE_RE = /^(?:delete|(?:please\s+)?(?:delete|erase|remove)\s+(?:all\s+)?(?:my|our)\s+(?:personal\s+)?(?:data|info|information|details|records))\.?$/;
+    if (DELETE_RE.test(input)) {
       await sendText(tenant, phone,
         "Your data deletion request is confirmed. Your messages and personal details will be removed from our records within 30 days. Invoices and payment records are retained for 5 years as required by South African tax law."
       );
@@ -1053,6 +1061,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         p_phone: phone,
       });
       if (delErr) await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
+      return;
+    }
+
+    // ── Trading gate ──────────────────────────────────────────────────────────
+    // A suspended/paused tenant's storefront is closed and create-checkout
+    // rejects payment, so the bot must not engage customers or spend LLM quota.
+    // Placed after the DELETE handler (data-deletion stays honored) and before
+    // all auto-reply logic. Silent skip: the webhook still returns 200 to Meta.
+    const subState = await getSubscriptionState(supabase, tenant.business.id);
+    if (!subState.trading) {
+      console.warn("WA_BOT_SKIP_NOT_TRADING business=" + tenant.business.id + " status=" + subState.status);
       return;
     }
 

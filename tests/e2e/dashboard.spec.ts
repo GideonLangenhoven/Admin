@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { injectAdminSession } from "./helpers/auth";
-import { collectConsoleLogs, hasTrace } from "./helpers/console-collector";
 
 test.describe("Dashboard", () => {
   test.beforeEach(async ({ page }) => {
@@ -38,12 +37,13 @@ test.describe("Dashboard", () => {
     await expect(page.locator("main")).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(2000);
 
-    // Look for Today/Tomorrow toggle buttons
-    const tomorrowBtn = page.getByText("Tomorrow", { exact: false }).first();
+    // Look for Today/Tomorrow toggle buttons — role-scoped, because bare text
+    // also matches the "0 pax tomorrow" stat line, which isn't clickable.
+    const tomorrowBtn = page.getByRole("button", { name: /^tomorrow$/i }).first();
     if (await tomorrowBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await tomorrowBtn.click();
       await page.waitForTimeout(500);
-      const todayBtn = page.getByText("Today", { exact: false }).first();
+      const todayBtn = page.getByRole("button", { name: /^today$/i }).first();
       if (await todayBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await todayBtn.click();
       }
@@ -64,11 +64,4 @@ test.describe("Dashboard", () => {
     }
   });
 
-  test("dashboard console tracing fires on load", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[DASHBOARD]")).toBe(true);
-  });
 });

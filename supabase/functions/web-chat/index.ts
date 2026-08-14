@@ -12,6 +12,7 @@ import {
   KB_REFUSAL_REPLY,
 } from "../_shared/bot-guards.ts";
 import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } from "../_shared/intent.ts";
+import { getSubscriptionState } from "../_shared/subscription.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 import { llmText, llmAvailable } from "../_shared/llm.ts";
@@ -438,6 +439,18 @@ Deno.serve(withSentry("web-chat", async (req) => {
         }, { onConflict: "business_id,phone" });
       }
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: gCors(req) });
+    }
+
+    // Trading gate: a suspended/paused tenant's storefront is closed and
+    // create-checkout rejects payment, so the bot must not walk visitors into
+    // bookings or spend LLM quota. Poll/rate above stay live so an in-flight
+    // human handoff can finish.
+    const subState = await getSubscriptionState(db, requestedBusinessId);
+    if (!subState.trading) {
+      return new Response(
+        JSON.stringify({ reply: "Online bookings are closed at the moment. Please contact the operator directly.", state: { step: "IDLE" } }),
+        { status: 200, headers: gCors(requestOrigin) },
+      );
     }
 
     // SECURITY: tours query is now ALWAYS scoped to the requesting business.

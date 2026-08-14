@@ -49,6 +49,39 @@ async function findBookableSlot(): Promise<SlotFixture> {
   };
 }
 
+// The bots now refuse non-trading tenants (see tests/unit/bot-trading-gate.test.ts),
+// so live regressions need a trading target — point BOT_E2E_BUSINESS_ID at one.
+async function tenantTrading(): Promise<boolean> {
+  const supabase = serviceClient();
+  const { data } = await supabase
+    .from("businesses")
+    .select("subscription_status")
+    .eq("id", BUSINESS_ID)
+    .maybeSingle();
+  return ["ACTIVE", "TRIAL", "PAST_DUE"].includes(String(data?.subscription_status || "").toUpperCase());
+}
+
+// The bot deliberately hides tours with no bookable future slots (shipped
+// 2026-07-17), so the expected tour list must be derived from live data, not
+// hardcoded names.
+async function bookableTourNames(): Promise<string[]> {
+  const supabase = serviceClient();
+  const { data: slots } = await supabase
+    .from("slots")
+    .select("tour_id")
+    .eq("business_id", BUSINESS_ID)
+    .eq("status", "OPEN")
+    .gt("start_time", new Date().toISOString());
+  const tourIds = [...new Set((slots || []).map((s: any) => s.tour_id))];
+  if (tourIds.length === 0) return [];
+  const { data: tours } = await supabase
+    .from("tours")
+    .select("id,name,active,hidden")
+    .eq("business_id", BUSINESS_ID)
+    .in("id", tourIds);
+  return (tours || []).filter((t: any) => t.active && !t.hidden).map((t: any) => String(t.name));
+}
+
 async function countRecentBookingsForEmail(email: string) {
   const supabase = serviceClient();
   const { count, error } = await supabase
@@ -96,8 +129,10 @@ function whatsappPayload(phone: string, text: string) {
 test.describe("bot booking regressions", () => {
   test("webchat lists Sunset Paddle and corrects stale zero-price confirmations", async ({ request }) => {
     test.skip(!LIVE_BOT_E2E, "Set LIVE_BOT_E2E=1 to run live bot regression tests.");
+    test.skip(!(await tenantTrading()), "Target tenant is not trading — the bot trading gate refuses it. Point BOT_E2E_BUSINESS_ID at a trading tenant.");
 
     const slot = await findBookableSlot();
+    const expectedTours = await bookableTourNames();
     const email = `webchat-regression-${Date.now()}@example.com`;
 
     const bookResponse = await request.post(`${FUNCTIONS_URL}/web-chat`, {
@@ -109,12 +144,14 @@ test.describe("bot booking regressions", () => {
     });
     expect(bookResponse.ok()).toBe(true);
     const bookJson = await bookResponse.json();
-    expect(bookJson.buttons?.map((button: any) => button.label)).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/Morning Kayak/i),
-        expect.stringMatching(/Sunset Paddle/i),
-      ]),
-    );
+    const labels = (bookJson.buttons || []).map((button: any) => String(button.label));
+    expect(expectedTours.length, "Need at least one bookable tour on the target tenant").toBeGreaterThan(0);
+    for (const name of expectedTours) {
+      expect(
+        labels.some((label: string) => label.toLowerCase().includes(name.toLowerCase())),
+        `bot tour list should include bookable tour "${name}" — got: ${labels.join(" | ")}`,
+      ).toBe(true);
+    }
 
     const staleResponse = await request.post(`${FUNCTIONS_URL}/web-chat`, {
       data: {
@@ -148,6 +185,7 @@ test.describe("bot booking regressions", () => {
   test("WhatsApp webhook corrects stale zero-price confirmation before booking insert", async ({ request }) => {
     test.skip(!LIVE_BOT_E2E, "Set LIVE_BOT_E2E=1 to run live bot regression tests.");
     test.skip(!WA_APP_SECRET || !WA_PHONE_NUMBER_ID, "WA_APP_SECRET and WA_PHONE_NUMBER_ID are required to sign a live WhatsApp webhook.");
+    test.skip(!(await tenantTrading()), "Target tenant is not trading — the bot trading gate refuses it. Point BOT_E2E_BUSINESS_ID at a trading tenant.");
 
     const supabase = serviceClient();
     const slot = await findBookableSlot();

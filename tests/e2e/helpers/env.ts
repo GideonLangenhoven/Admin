@@ -1,7 +1,8 @@
 import { expect } from "@playwright/test";
 
-export const BASE_URL = process.env.BASE_URL || "https://aonyx.booking.bookingtours.co.za";
-export const ADMIN_URL = process.env.ADMIN_URL || "https://aonyx.admin.bookingtours.co.za";
+// Local-first defaults; the old aonyx tenant these pointed at is deleted.
+export const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3001";
+export const ADMIN_URL = process.env.ADMIN_URL || "http://127.0.0.1:3000";
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 export const TEST_CARD = "4242424242424242";
