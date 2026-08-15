@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist_Mono, Inter } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import AppShell from "../components/AppShell";
@@ -7,11 +8,27 @@ import AppNotifications from "../components/AppNotifications";
 import ThemeProvider from "../components/ThemeProvider";
 
 /* Brand type system (docs/BRAND.md + docs/ADMIN_REDESIGN_SPEC.md):
-   Fraunces — editorial display face for page titles and hero numerals.
-   Inter — all UI and data. Geist Mono — the instrument voice (labels, timestamps). */
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+   Satoshi — geometric display face for page titles and hero numerals.
+   Plus Jakarta Sans — all UI and data. Geist Mono — the instrument voice (labels, timestamps).
+
+   The pairing works on measured metrics, not vibes: Satoshi cap-height 0.740em vs
+   Plus Jakarta Sans 0.745em (0.7% apart), so titles, hero numerals and body text sit on
+   the same optical line with no size-adjust needed. Satoshi's x-height is 7% smaller,
+   which is why it stays on display duty only — Plus Jakarta Sans's taller lowercase is
+   what keeps the 11-13px table text legible.
+
+   Satoshi is self-hosted: it is a Fontshare (Indian Type Foundry) face, not on Google
+   Fonts, and CSP is `font-src 'self' data:`. next/font serves it same-origin, so no CSP
+   change. Licence: app/fonts/Satoshi-LICENSE.txt (free for commercial use). */
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", axes: ["opsz"] });
+// ponytail: one variable woff2 (42KB) covers 300-900. Italic axis skipped — no italic titles today.
+const satoshi = localFont({
+  src: "./fonts/Satoshi-Variable.woff2",
+  weight: "300 900",
+  display: "swap",
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "BookingTours Admin",
@@ -49,7 +66,7 @@ const nav = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`light ${inter.className} ${inter.variable} ${geistMono.variable} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`light ${jakarta.className} ${jakarta.variable} ${geistMono.variable} ${satoshi.variable}`} suppressHydrationWarning>
       <body className="bg-[var(--ck-bg)] text-[var(--ck-text)] antialiased transition-colors duration-200">
         <ThemeProvider>
           <AppNotifications />

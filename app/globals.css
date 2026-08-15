@@ -187,7 +187,9 @@ body {
     radial-gradient(900px 650px at -8% 108%, rgba(217, 130, 47, 0.05), transparent 55%),
     var(--ck-bg);
   color: var(--ck-text);
-  font-feature-settings: "cv11", "ss01", "ss03", "cv02", "calt";
+  /* cv11/cv02/ss01/ss03 were Inter-only character variants; Plus Jakarta Sans has no
+     such features, so only the universal contextual alternates remain. */
+  font-feature-settings: "calt";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -369,9 +371,9 @@ th {
 
   .ui-title-lg {
     @apply text-2xl md:text-3xl;
-    font-family: var(--font-display), Georgia, serif;
+    font-family: var(--font-display), var(--font-sans), system-ui, -apple-system, sans-serif;
     font-weight: 600;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
     color: var(--ck-text-strong);
   }
 
@@ -392,10 +394,14 @@ th {
     color: var(--ck-text-strong);
   }
 
-  /* Display face — Fraunces. Page titles and hero numerals only. */
+  /* Display face — Satoshi. Page titles and hero numerals only.
+     Falls back to the UI sans, not a serif: Plus Jakarta Sans is within 0.7% of
+     Satoshi's cap-height, so a failed font load degrades without reflowing titles.
+     Tracking is tighter than the old Fraunces setting — geometric sans reads loose
+     at the 20-56px sizes this class is actually used at. */
   .font-display {
-    font-family: var(--font-display), Georgia, "Times New Roman", serif;
-    letter-spacing: -0.015em;
+    font-family: var(--font-display), var(--font-sans), system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
   }
 
   /* ── Controls ─────────────────────────────────────────────── */
