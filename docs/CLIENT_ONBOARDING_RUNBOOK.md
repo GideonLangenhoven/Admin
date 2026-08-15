@@ -125,8 +125,11 @@ This is on top of the normal deploy runbook, and only needs doing once.
      Required. Without it the invite panel cannot build a link at all: it falls
      back to copying the bare token and warns you the variable is missing. Set
      this before generating the first invite.
-   - **`ADMIN_APP_URL`** — required, or go-live cannot send the client their
-     password setup email. Everything else still provisions.
+   - `ADMIN_DOMAIN` is optional, defaulting to `admin.bookingtours.co.za`. The
+     password setup link is built per tenant as
+     `https://{subdomain}.{ADMIN_DOMAIN}`, because each operator has their own
+     console and a shared host would land them on somebody else's. Set
+     `ADMIN_APP_URL` only if you need to override that with one fixed origin.
    - `GOOGLE_PLACES_API_KEY` if not already set. Without it the address lookup
      returns a "not configured" message and the client types their details in
      by hand; nothing else breaks.

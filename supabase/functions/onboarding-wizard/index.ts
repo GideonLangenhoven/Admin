@@ -22,7 +22,18 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
+// The admin console is per tenant: {subdomain}.admin.bookingtours.co.za, and
+// AuthGate tells an operator off for landing on someone else's console. So the
+// password setup link has to be built from the tenant's own subdomain rather
+// than one shared host. ADMIN_APP_URL stays supported as an explicit override
+// for non-standard setups.
+const ADMIN_DOMAIN = (Deno.env.get("ADMIN_DOMAIN") || "admin.bookingtours.co.za").replace(/^\.+|\/+$/g, "");
 const ADMIN_APP_URL = (Deno.env.get("ADMIN_APP_URL") || "").replace(/\/+$/, "");
+
+function adminOriginFor(subdomain?: string | null) {
+  if (ADMIN_APP_URL) return ADMIN_APP_URL;
+  return subdomain ? `https://${subdomain}.${ADMIN_DOMAIN}` : "";
+}
 const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -454,7 +465,7 @@ Deno.serve(async (req) => {
     if (action === "go-live") {
       const { data: business, error: bizErr } = await supabase
         .from("businesses")
-        .select("id, business_name, booking_site_url, subscription_status, yoco_webhook_status, yoco_secret_key_encrypted, wa_token_encrypted, wa_phone_id_encrypted")
+        .select("id, business_name, subdomain, booking_site_url, subscription_status, yoco_webhook_status, yoco_secret_key_encrypted, wa_token_encrypted, wa_phone_id_encrypted")
         .eq("id", businessId)
         .maybeSingle();
       if (bizErr) throw bizErr;
@@ -536,8 +547,9 @@ Deno.serve(async (req) => {
         }).eq("id", adminId);
         if (tokErr) throw tokErr;
 
-        if (ADMIN_APP_URL) {
-          const setupUrl = `${ADMIN_APP_URL}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
+        const adminOrigin = adminOriginFor(business.subdomain);
+        if (adminOrigin) {
+          const setupUrl = `${adminOrigin}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
           const { error: mailErr } = await supabase.functions.invoke("send-email", {
             body: {
               type: "ADMIN_WELCOME",
