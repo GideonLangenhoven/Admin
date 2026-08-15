@@ -113,3 +113,13 @@ verify_jwt = false
 # inside the function validates the JWT and rejects non-admin callers.
 [functions.admin-help-chat]
 verify_jwt = false
+
+# onboarding-wizard is driven by a client filling in the setup wizard on their
+# own machine during a CS call — an anonymous caller with no Supabase session.
+# The gateway JWT check would only prove the caller has the public anon key, so
+# it adds nothing here. The real gate is inside the function: every action
+# resolves a single-use, unexpired invite token to exactly one skeleton tenant,
+# no request may supply a business_id, and the tenant stays outside the TRADING
+# set until go-live. Per-IP rate limits back it up.
+[functions.onboarding-wizard]
+verify_jwt = false

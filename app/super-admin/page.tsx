@@ -604,6 +604,9 @@ export default function SuperAdminPage() {
         </div>
       </form>
 
+      {/* ── Onboarding Invites (client-driven wizard links) ── */}
+      <OnboardingInvitesPanel />
+
       {/* ── Business Management ── */}
       <div className="ui-card anim-fade-up anim-d2 p-6">
         <div className="flex items-center justify-between mb-4">
@@ -720,6 +723,17 @@ export default function SuperAdminPage() {
                       <div className="space-y-2 py-2"><div className="ui-skeleton h-4 w-3/4" /><div className="ui-skeleton h-4 w-1/2" /></div>
                     ) : bizDetail ? (
                       <>
+                        {/* ── Yoco webhook registration state (set by the onboarding wizard) ── */}
+                        {bizDetail.yoco_webhook_status === "PENDING_REGISTRATION" && (
+                          <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+                            <span className="font-semibold">Yoco webhook needs manual registration.</span>
+                            {" "}Payments will not confirm until the webhook is registered on this tenant's Yoco account.
+                          </div>
+                        )}
+                        {bizDetail.yoco_webhook_status === "REGISTERED" && (
+                          <div className="text-xs text-[var(--ck-text-muted)]">Yoco webhook registered.</div>
+                        )}
+
                         {/* ── Business Info ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Business Info</legend>
@@ -1101,6 +1115,278 @@ export default function SuperAdminPage() {
 
       {/* ── Operator Directory (central landing page copy + visibility) ── */}
       <DirectoryPanel />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Onboarding Invites — single-use wizard links, super-admin only
+   ══════════════════════════════════════════════════════════════ */
+
+type InviteRow = {
+  id: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+  used_by_email: string | null;
+  business_id: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  wizard_step: string | null;
+  businesses: { business_name: string; subdomain: string; subscription_status: string; yoco_webhook_status: string | null } | null;
+  status: "used" | "expired" | "active";
+  invite_link: string | null;
+};
+
+const INVITE_FORM = { clientName: "", clientEmail: "", subdomain: "", expiresInHours: "48" };
+
+function OnboardingInvitesPanel() {
+  const [requesterEmail, setRequesterEmail] = useState("");
+  const [requesterPassword, setRequesterPassword] = useState("");
+  const [form, setForm] = useState(INVITE_FORM);
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<{ businessName: string; token: string; inviteLink: string | null; expiresAt: string } | null>(null);
+  const [rows, setRows] = useState<InviteRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => { setRequesterEmail(localStorage.getItem("ck_admin_email") || ""); }, []);
+
+  // Every action re-verifies the super admin's password, so the list can only be
+  // loaded once the password field is filled in — no auto-load on mount.
+  async function callInvites(body: Record<string, unknown>) {
+    if (!requesterEmail || !requesterPassword) throw new Error("Enter your super admin email and password first.");
+    const res = await supabase.functions.invoke("generate-invite-token", {
+      body: { requester_email: requesterEmail, requester_password: requesterPassword, ...body },
+    });
+    if (res.error) {
+      // functions.invoke gives a generic "non-2xx" message; the real reason is in the response body.
+      let detail = "";
+      try {
+        const ctx = (res.error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") detail = (await ctx.json())?.error || "";
+      } catch { /* body already consumed or not JSON */ }
+      throw new Error(detail || res.error.message);
+    }
+    if (!res.data?.success) throw new Error(res.data?.error || "Unknown invite error");
+    return res.data;
+  }
+
+  async function loadInvites() {
+    setLoading(true);
+    try {
+      const data = await callInvites({ action: "list" });
+      setRows(data.tokens || []);
+    } catch (err: any) {
+      notify({ title: "Failed to load invites", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  async function generateInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setGenerating(true);
+    try {
+      const data = await callInvites({
+        action: "generate",
+        client_name: form.clientName,
+        client_email: form.clientEmail,
+        subdomain: form.subdomain,
+        expires_in_hours: Number(form.expiresInHours) || 48,
+      });
+      setGenerated({ businessName: data.business_name, token: data.token, inviteLink: data.invite_link, expiresAt: data.expires_at });
+      setForm(INVITE_FORM);
+      notify({ title: "Invite created", message: `${data.business_name} is provisioned and waiting on the wizard.`, tone: "success" });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Could not create invite", message: err.message, tone: "error" });
+    }
+    setGenerating(false);
+  }
+
+  async function reissueInvite(row: InviteRow) {
+    if (!row.business_id) { notify({ title: "No tenant", message: "This invite has no business to reissue against.", tone: "error" }); return; }
+    setBusyId(row.id);
+    try {
+      const data = await callInvites({ action: "reissue", business_id: row.business_id, expires_in_hours: Number(form.expiresInHours) || 48 });
+      setGenerated({ businessName: row.businesses?.business_name || row.client_name || "Tenant", token: data.token, inviteLink: data.invite_link, expiresAt: data.expires_at });
+      notify({ title: "Invite reissued", message: "The client keeps their half-filled tenant; send them the new link.", tone: "success" });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Reissue failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function revokeInvite(row: InviteRow) {
+    const label = row.businesses?.business_name || row.client_name || row.client_email || "this invite";
+    if (!await confirmAction({
+      title: "Revoke invite",
+      message: `Revoke the invite for ${label}? If that tenant never went live, its skeleton is deleted too and the subdomain is freed for reuse.`,
+      tone: "warning",
+      confirmLabel: "Revoke invite",
+    })) return;
+
+    setBusyId(row.id);
+    try {
+      const data = await callInvites({ action: "revoke", token_id: row.id });
+      notify({
+        title: "Invite revoked",
+        message: data.business_deleted
+          ? `The skeleton tenant was deleted and ${row.businesses?.subdomain || "its subdomain"} is free again.`
+          : "The invite link no longer works. The tenant was kept because it is already live.",
+        tone: "success",
+      });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Revoke failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  function copyLink(link: string | null, token: string) {
+    if (!link) {
+      navigator.clipboard.writeText(token);
+      notify({ title: "Token copied", message: "No wizard URL is configured, so only the raw token was copied.", tone: "warning" });
+      return;
+    }
+    navigator.clipboard.writeText(link);
+    notify({ title: "Link copied", message: "Send it to the client; it works once.", tone: "success" });
+  }
+
+  const statusPill: Record<InviteRow["status"], string> = {
+    active: "ui-pill-success",
+    used: "ui-pill-neutral",
+    expired: "ui-pill-danger",
+  };
+
+  return (
+    <div className="ui-card anim-fade-up anim-d2 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Onboarding Invites</h2>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Single-use wizard links. Generating one provisions a skeleton tenant the client fills in themselves.</p>
+        </div>
+        <button onClick={loadInvites} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+
+      <form onSubmit={generateInvite} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
+            <input value={requesterEmail} onChange={(e) => setRequesterEmail(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="superadmin@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Confirm Your Password</label>
+            <input type="password" value={requesterPassword} onChange={(e) => setRequesterPassword(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Current admin password" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Client Name</label>
+            <input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Atlas Adventures" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Client Email</label>
+            <input type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="owner@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Booking Subdomain</label>
+            <div className="flex items-center gap-0">
+              <input
+                value={form.subdomain}
+                onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                required
+                className="ui-control rounded-r-none rounded-lg px-3 py-2 text-sm outline-none flex-1"
+                placeholder="atlas-adventures"
+              />
+              <span className="inline-flex items-center rounded-r-lg border border-l-0 px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Link Valid For (hours)</label>
+            <input type="number" min={1} max={720} value={form.expiresInHours} onChange={(e) => setForm({ ...form, expiresInHours: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="48" />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={generating} className="ui-btn ui-btn-primary disabled:opacity-50">
+            {generating ? "Creating invite..." : "Generate Invite Link"}
+          </button>
+        </div>
+      </form>
+
+      {generated && (
+        <div className="mt-4 rounded-2xl border p-4 text-sm" style={{ borderColor: "var(--ck-success)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+          <div className="font-semibold">{generated.businessName}: invite ready</div>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 truncate rounded-lg px-2 py-1.5 text-xs font-mono" style={{ background: "var(--ck-bg)", color: "var(--ck-text)" }}>
+              {generated.inviteLink || generated.token}
+            </code>
+            <button type="button" onClick={() => copyLink(generated.inviteLink, generated.token)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs shrink-0">Copy</button>
+          </div>
+          {!generated.inviteLink && (
+            <div className="mt-1 text-xs">No wizard URL configured (ONBOARDING_APP_URL); this is the raw token.</div>
+          )}
+          <div className="mt-1 text-xs">Expires {new Date(generated.expiresAt).toLocaleString()}</div>
+        </div>
+      )}
+
+      <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        {rows.length === 0 ? (
+          <div className="ui-empty">
+            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No invites loaded</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">Enter your password and hit Refresh to see the 50 most recent invites.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((row) => (
+              <div key={row.id} className="rounded-lg border p-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-[var(--ck-text-strong)] truncate">
+                        {row.businesses?.business_name || row.client_name || "Unknown tenant"}
+                      </span>
+                      <span className={"ui-status " + statusPill[row.status]}>{row.status}</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">
+                      {row.client_name || "-"} · {row.client_email || "-"}
+                      {row.businesses?.subdomain ? ` · ${row.businesses.subdomain}.${BOOKING_DOMAIN}` : ""}
+                    </div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">
+                      {row.wizard_step ? `Reached: ${row.wizard_step}` : "Not started"}
+                      {row.status === "used"
+                        ? ` · used ${new Date(row.used_at!).toLocaleString()}${row.used_by_email ? ` by ${row.used_by_email}` : ""}`
+                        : ` · ${row.status === "expired" ? "expired" : "expires"} ${new Date(row.expires_at).toLocaleString()}`}
+                    </div>
+                    {row.businesses?.yoco_webhook_status === "PENDING_REGISTRATION" && (
+                      <div className="text-[10px] font-medium mt-0.5" style={{ color: "var(--ck-warning)" }}>Yoco webhook needs manual registration</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {row.status === "active" && (
+                      <button onClick={() => copyLink(row.invite_link, row.token)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs whitespace-nowrap">Copy link</button>
+                    )}
+                    <button onClick={() => reissueInvite(row)} disabled={busyId === row.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap">
+                      {busyId === row.id ? "..." : "Reissue"}
+                    </button>
+                    {!row.used_at && (
+                      <button onClick={() => revokeInvite(row)} disabled={busyId === row.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs text-[var(--ck-danger)] disabled:opacity-50 whitespace-nowrap">
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

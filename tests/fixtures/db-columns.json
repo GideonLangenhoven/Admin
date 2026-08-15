@@ -330,7 +330,8 @@
     "yoco_test_mode",
     "yoco_test_secret_key_encrypted",
     "yoco_test_webhook_secret_encrypted",
-    "yoco_webhook_secret_encrypted"
+    "yoco_webhook_secret_encrypted",
+    "yoco_webhook_status"
   ],
   "chat_faq_entries": [
     "answer",
@@ -588,6 +589,9 @@
     "key"
   ],
   "invite_tokens": [
+    "business_id",
+    "client_email",
+    "client_name",
     "created_at",
     "created_by",
     "expires_at",
@@ -595,7 +599,8 @@
     "token",
     "used_at",
     "used_by_business_id",
-    "used_by_email"
+    "used_by_email",
+    "wizard_step"
   ],
   "invoices": [
     "booking_id",
