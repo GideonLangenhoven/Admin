@@ -310,7 +310,7 @@ async function sendReEngagementForBusiness(businessId: string) {
   const fourMonthsAgo = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
 
   const { data: oldBookings } = await db.from("bookings")
-    .select("phone, customer_name")
+    .select("phone, customer_name, email")
     .eq("business_id", businessId)
     .in("status", ["COMPLETED", "PAID"])
     .lt("created_at", threeMonthsAgo.toISOString())
@@ -357,11 +357,31 @@ async function sendReEngagementForBusiness(businessId: string) {
 
     try {
       await sendWhatsappTextForTenant(tenant, booking.phone, message);
-      await db.from("auto_messages").insert({ business_id: businessId, phone: booking.phone, type: "RE_ENGAGE" });
       sent++;
     } catch (error) {
       console.error("RE_ENGAGE_ERR", businessId, booking.phone, error);
+      // WhatsApp rejected this customer (unconfigured creds, blocked or
+      // unlisted number): send the email version instead, best effort.
+      if (booking.email) {
+        try {
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+            body: JSON.stringify({
+              type: "CUSTOMER_MESSAGE",
+              data: { business_id: businessId, email: booking.email, customer_name: booking.customer_name || "there", message },
+            }),
+          });
+          sent++;
+        } catch (emailErr) {
+          console.error("RE_ENGAGE_EMAIL_ERR", businessId, booking.phone, emailErr);
+        }
+      }
     }
+    // One attempt per customer per window, delivered or not. Writing the marker
+    // only on success let the 5-minute cron retry an unreachable number forever
+    // (578 attempts over two days) and toast the operator on every one.
+    await db.from("auto_messages").insert({ business_id: businessId, phone: booking.phone, type: "RE_ENGAGE" });
   }
 
   return sent;
