@@ -243,7 +243,7 @@ export default function Vouchers() {
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Voucher code
-              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="ui-control mt-1 w-full font-mono" />
+              <input name="voucher_code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="ui-control mt-1 w-full font-mono" />
             </label>
             <div className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Expiry
@@ -251,23 +251,23 @@ export default function Vouchers() {
             </div>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Recipient
-              <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="recipient_name" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Recipient's email (optional; sends the gift straight to them instead of the buyer)
-              <input type="email" value={form.recipient_email} onChange={(e) => setForm({ ...form, recipient_email: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="recipient_email" type="email" value={form.recipient_email} onChange={(e) => setForm({ ...form, recipient_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Buyer name
-              <input value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="buyer_name" value={form.buyer_name} onChange={(e) => setForm({ ...form, buyer_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Buyer email
-              <input type="email" value={form.buyer_email} onChange={(e) => setForm({ ...form, buyer_email: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="buyer_email" type="email" value={form.buyer_email} onChange={(e) => setForm({ ...form, buyer_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Tour / activity
-              <input value={form.tour_name} onChange={(e) => setForm({ ...form, tour_name: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="tour_name" value={form.tour_name} onChange={(e) => setForm({ ...form, tour_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Voucher type
@@ -279,18 +279,18 @@ export default function Vouchers() {
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Value (ZAR)
-              <input type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className="ui-control mt-1 w-full" />
+              <input name="voucher_value" type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
           </div>
 
           <label className="mt-3 block text-sm" style={{ color: "var(--ck-text-muted)" }}>
             Gift message
-            <textarea value={form.gift_message} onChange={(e) => setForm({ ...form, gift_message: e.target.value })} rows={3} className="ui-control mt-1 w-full" />
+            <textarea name="gift_message" value={form.gift_message} onChange={(e) => setForm({ ...form, gift_message: e.target.value })} rows={3} className="ui-control mt-1 w-full" />
           </label>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm" style={{ color: createMessage.includes("sent") ? "var(--ck-success)" : "var(--ck-danger)" }}>{createMessage}</p>
-            <button type="submit" disabled={creating || !form.code.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
+            <button type="submit" data-help-submit="" disabled={creating || !form.code.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
               {creating ? "Creating..." : "Send payment link"}
             </button>
           </div>

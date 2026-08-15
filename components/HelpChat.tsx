@@ -6,9 +6,10 @@
 // Mounted once in AppShell so it's available on every admin page.
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChatCircleDots, PaperPlaneRight, X } from "@phosphor-icons/react";
 import { supabase } from "../app/lib/supabase";
+import { parseActions } from "./helpChatActions";
 import { useBusinessContext } from "./BusinessContext";
 import { WELCOME_TOUR_EVENT } from "./WelcomeChecklist";
 
@@ -21,16 +22,62 @@ type Msg = {
 const SUGGESTED: { q: string; privilegedOnly?: boolean }[] = [
   { q: "How do I cancel a day for bad weather?" },
   { q: "Where do I see refund requests?" },
-  { q: "How do I create slots for next month?" },
+  { q: "Help me add slots for next month" },
   { q: "How do I add another admin user?", privilegedOnly: true },
   { q: "Why can't I reply to a WhatsApp message?" },
 ];
 
 const GREETING =
-  "Hi! I can help you find features and explain how the dashboard works. Ask me anything, or try one of these:";
+  "Hi! I can explain how the dashboard works, open the right page for you, and even fill things in. Ask me anything, or try one of these:";
 
 const LINK_SPLIT_RE = /(\[[^\]]+\]\(\/[a-zA-Z0-9\-/_?=&]*\))/g;
 const LINK_MATCH_RE = /^\[([^\]]+)\]\((\/[a-zA-Z0-9\-/_?=&]*)\)$/;
+
+// ---- assistant-driven actions ----------------------------------------------
+// The edge function's reply may end with directives the assistant uses to
+// drive the dashboard: [[open:/route]], [[fill:name=value]], [[submit]].
+// parseActions (components/helpChatActions.ts) splits them off the prose;
+// they are executed client-side here, so everything the assistant "does"
+// goes through the app's own pages and server-side authorization, exactly
+// as if the admin clicked it themselves.
+
+/**
+ * Poll for a VISIBLE element until the page (possibly mid-navigation,
+ * possibly a modal still opening) has it. Visibility matters: hidden or
+ * collapsed duplicates must never be filled or clicked.
+ */
+function waitForVisible(selector: string, timeoutMs = 10_000): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const tick = () => {
+      const el = Array.from(document.querySelectorAll<HTMLElement>(selector)).find((e) => e.offsetParent !== null);
+      if (el) return resolve(el);
+      if (Date.now() - started > timeoutMs) return resolve(null);
+      setTimeout(tick, 250);
+    };
+    tick();
+  });
+}
+
+/** Set a field the way a user would, so React-controlled inputs notice too. */
+function setField(el: HTMLElement, value: string): void {
+  if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+    const want = value === "true" || value === "on" || value === "1";
+    if (el.checked !== want) el.click();
+    return;
+  }
+  const proto =
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : el instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  setter?.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  (el as HTMLInputElement).focus?.();
+}
 
 // Renders assistant text, turning internal markdown links [Label](/route)
 // into client-side <Link>s. Everything else is plain text — no HTML injection.
@@ -57,6 +104,7 @@ function AnswerText({ text, onNavigate }: { text: string; onNavigate: () => void
 export default function HelpChat() {
   const { businessId, role } = useBusinessContext();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -124,6 +172,50 @@ export default function HelpChat() {
     }
   }
 
+  // Execute the reply's directives: navigate, fill visible inputs the way a
+  // user would, and only press a button when the assistant was told to. All of
+  // it happens in the admin's own session on the app's own pages, so every
+  // role check and business_id scope applies exactly as for a manual click.
+  async function runActions(openPath: string | null, fills: [string, string][], submit: boolean) {
+    if (openPath && openPath.startsWith("/")) {
+      router.push(openPath);
+      handleNavigate();
+    }
+    if (fills.length === 0 && !submit) return;
+    const missed: string[] = [];
+    let form: HTMLFormElement | null = null;
+    for (const [name, value] of fills) {
+      const el = await waitForVisible(`[name="${CSS.escape(name)}"]`);
+      if (el) {
+        setField(el, value);
+        form = el.closest("form") ?? form;
+      } else missed.push(name);
+    }
+    const filled = fills.length - missed.length;
+    let status = "";
+    if (missed.length) {
+      status = `I filled what I could, but couldn't find: ${missed.join(", ")}. Make sure the right page is open and try again.`;
+    } else if (submit) {
+      let pressed = false;
+      if (form) {
+        form.requestSubmit();
+        pressed = true;
+      } else {
+        const btn = await waitForVisible("[data-help-submit]");
+        if (btn) {
+          btn.click();
+          pressed = true;
+        }
+      }
+      status = pressed
+        ? (filled ? `Filled ${filled} field${filled === 1 ? "" : "s"} and submitted it. The page is saving now.` : "Submitted it for you. The page is saving now.")
+        : "I couldn't find the button to press on this page. Please press it yourself.";
+    } else if (filled) {
+      status = `Filled ${filled} field${filled === 1 ? "" : "s"} for you. Check the values, then press the page's own button to save.`;
+    }
+    if (status) setMessages((m) => [...m, { role: "assistant", content: status }]);
+  }
+
   async function ask(question: string) {
     const q = question.trim();
     if (!q || busy) return;
@@ -137,7 +229,9 @@ export default function HelpChat() {
       });
       const answer: string = res.data?.answer || "";
       if (res.error || !answer) throw new Error(res.error?.message || "empty");
-      setMessages((prev) => [...prev, { role: "assistant", content: answer, sources: res.data?.sources || [] }]);
+      const { text, open: openPath, fills, submit } = parseActions(answer);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "On it.", sources: res.data?.sources || [] }]);
+      await runActions(openPath, fills, submit);
     } catch {
       setMessages((prev) => [...prev, {
         role: "assistant",
@@ -260,7 +354,7 @@ export default function HelpChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="e.g. How do I refund a booking?"
-              maxLength={500}
+              maxLength={1000}
               className="ui-control flex-1 text-[16px] md:text-sm"
               aria-label="Your question"
             />

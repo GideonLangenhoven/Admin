@@ -57,6 +57,14 @@ function Slots() {
   // Add Slot State
   const [showAddSlot, setShowAddSlot] = useState(false);
   const [bulkGenOpen, setBulkGenOpen] = useState(false);
+
+  // Deep-link the action dialogs (used by the help assistant's [[open]]):
+  // /slots?panel=add or /slots?panel=bulk-edit opens the dialog directly.
+  useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (panel === "add") setShowAddSlot(true);
+    else if (panel === "bulk-edit") setShowBulkEdit(true);
+  }, [searchParams]);
   const [addForm, setAddForm] = useState({
     tourId: "",
     time: "06:00",
@@ -955,6 +963,7 @@ function Slots() {
                 New Time
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times.</span>
                 <input
+                  name="bulk_new_time"
                   type="time"
                   value={bulkForm.newTime}
                   onChange={(e) => setBulkForm({ ...bulkForm, newTime: e.target.value })}
@@ -966,6 +975,7 @@ function Slots() {
                 New Max Capacity
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing capacities.</span>
                 <input
+                  name="bulk_capacity"
                   type="number"
                   min="0"
                   placeholder="e.g. 24"
@@ -979,6 +989,7 @@ function Slots() {
                 New Base Price (ZAR)
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing prices. Type "NULL" to reset to default base amount.</span>
                 <input
+                  name="bulk_price"
                   type="text"
                   placeholder="e.g. 650 or NULL"
                   value={bulkForm.price}
@@ -997,6 +1008,7 @@ function Slots() {
               </button>
               <button
                 onClick={saveBulkEdit}
+                data-help-submit=""
                 disabled={savingBulk || !bulkForm.startDate || !bulkForm.endDate}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
               >
@@ -1034,6 +1046,7 @@ function Slots() {
               <label className="block text-sm text-gray-600">
                 Time (SA Time)
                 <input
+                  name="slot_time"
                   type="time"
                   value={addForm.time}
                   onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
@@ -1079,6 +1092,7 @@ function Slots() {
               <label className="block text-sm text-gray-600">
                 Max Capacity
                 <input
+                  name="slot_capacity"
                   type="number"
                   min="1"
                   value={addForm.capacity}
@@ -1091,6 +1105,7 @@ function Slots() {
                 Price Override (ZAR)
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to use the tour&apos;s default price.</span>
                 <input
+                  name="slot_price"
                   type="number"
                   step="0.01"
                   min="0"
@@ -1111,6 +1126,7 @@ function Slots() {
               </button>
               <button
                 onClick={saveAddSlot}
+                data-help-submit=""
                 disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
               >
