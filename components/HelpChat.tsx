@@ -249,18 +249,19 @@ export default function HelpChat() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Open help assistant"
-          className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full transition-transform hover:scale-105 md:bottom-6 md:right-6"
+          aria-label="Open AI help"
+          className="fixed bottom-20 right-4 z-40 flex h-12 items-center justify-center gap-2 rounded-full px-4 transition-transform hover:scale-105 md:bottom-6 md:right-6"
           style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
         >
           <ChatCircleDots size={24} weight="fill" />
+          <span className="text-sm font-semibold">AI help</span>
         </button>
       )}
 
       {open && (
         <div
           role="dialog"
-          aria-label="Help assistant"
+          aria-label="AI help"
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl md:inset-x-auto md:bottom-6 md:right-6 md:h-[560px] md:max-h-[calc(100dvh-48px)] md:w-[380px] md:rounded-2xl"
           style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-lg)" }}
         >
@@ -268,7 +269,7 @@ export default function HelpChat() {
           <div className="flex items-center justify-between px-4 py-3" style={{ background: "var(--ck-accent)", color: "#fff" }}>
             <div className="flex items-center gap-2">
               <div>
-                <div className="text-sm font-semibold leading-tight">Help assistant</div>
+                <div className="text-sm font-semibold leading-tight">AI help</div>
                 <div className="text-[11px] opacity-80 leading-tight">Ask how anything works</div>
               </div>
             </div>
