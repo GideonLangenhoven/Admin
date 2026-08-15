@@ -86,8 +86,13 @@ type Invite = {
 
 // Resolves the token to its tenant. Unused + unexpired is the whole gate: a
 // consumed or lapsed invite is indistinguishable from a bad one to the caller.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function resolveInvite(token: string): Promise<Invite | null> {
-  if (!token) return null;
+  // A truncated or mistyped link is the common case here, and passing it
+  // straight to Postgres answers with "invalid input syntax for type uuid"
+  // rather than something a client can act on.
+  if (!token || !UUID_RE.test(token)) return null;
   const { data, error } = await supabase
     .from("invite_tokens")
     .select("id, token, business_id, client_name, client_email, wizard_step, expires_at, created_at")
