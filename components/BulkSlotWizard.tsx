@@ -12,8 +12,11 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
 
   const today = new Date();
   const ninety = new Date(); ninety.setDate(ninety.getDate() + 90);
-  const [startDate, setStartDate] = useState(today.toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(ninety.toISOString().slice(0, 10));
+  // Multiple ranges so seasonal availability (e.g. 1–3 Mar AND 20–23 Mar) is
+  // one generation run instead of several.
+  const [ranges, setRanges] = useState<Array<{ start: string; end: string }>>([
+    { start: today.toISOString().slice(0, 10), end: ninety.toISOString().slice(0, 10) },
+  ]);
   const [times, setTimes] = useState<string[]>(["06:00", "08:30"]);
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [defaultCapacity, setDefaultCapacity] = useState<number>(10);
@@ -25,39 +28,55 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
   const previewTotal = useMemo(() => {
     if (selected.size === 0) return 0;
     let total = 0;
-    const s = new Date(startDate + "T00:00:00");
-    const e = new Date(endDate + "T00:00:00");
-    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-      if (!days.includes(d.getDay())) continue;
-      total += times.length * selected.size;
+    const seen = new Set<string>(); // overlapping ranges shouldn't double-count
+    for (const range of ranges) {
+      if (!range.start || !range.end) continue;
+      const s = new Date(range.start + "T00:00:00");
+      const e = new Date(range.end + "T00:00:00");
+      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+        if (!days.includes(d.getDay())) continue;
+        const key = d.toISOString().slice(0, 10);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        total += times.length * selected.size;
+      }
     }
     return total;
-  }, [selected, startDate, endDate, times, days]);
+  }, [selected, ranges, times, days]);
 
   async function runGenerate() {
     if (!businessId) return;
-    const specs: GenSpec[] = Array.from(selected).map(tourId => {
-      const ov = overrides[tourId] ?? {};
-      const tour = tours.find(t => t.id === tourId)!;
-      return {
-        tour_id: tourId,
-        business_id: businessId,
-        start_date: ov.start_date ?? startDate,
-        end_date: ov.end_date ?? endDate,
-        times: ov.times ?? times,
-        days_of_week: ov.days_of_week ?? days,
-        capacity: ov.capacity ?? tour.default_capacity ?? defaultCapacity,
-      };
-    });
+    const validRanges = ranges.filter(r => r.start && r.end);
+    const tourIds = Array.from(selected);
 
     setRunning(true);
     setStep(4);
-    setProgress(specs.map(s => ({ tour_id: s.tour_id, slots_created: 0, slots_skipped: 0, errors: [] })));
+    setProgress(tourIds.map(id => ({ tour_id: id, slots_created: 0, slots_skipped: 0, errors: [] })));
 
-    for (let i = 0; i < specs.length; i++) {
-      const result = await generateSlotsForTour(specs[i]);
-      setProgress(prev => prev?.map((p, j) => j === i ? result : p) ?? null);
-      if (i < specs.length - 1) await new Promise(r => setTimeout(r, 100));
+    for (let i = 0; i < tourIds.length; i++) {
+      const tourId = tourIds[i];
+      const ov = overrides[tourId] ?? {};
+      const tour = tours.find(t => t.id === tourId)!;
+      // One generation per range; the upsert dedupes, so overlapping ranges
+      // are harmless (they just show up as skipped).
+      const agg: GenResult = { tour_id: tourId, slots_created: 0, slots_skipped: 0, errors: [] };
+      for (const range of validRanges) {
+        const spec: GenSpec = {
+          tour_id: tourId,
+          business_id: businessId,
+          start_date: range.start,
+          end_date: range.end,
+          times: ov.times ?? times,
+          days_of_week: ov.days_of_week ?? days,
+          capacity: ov.capacity ?? tour.default_capacity ?? defaultCapacity,
+        };
+        const result = await generateSlotsForTour(spec);
+        agg.slots_created += result.slots_created;
+        agg.slots_skipped += result.slots_skipped;
+        agg.errors.push(...result.errors);
+      }
+      setProgress(prev => prev?.map((p, j) => j === i ? agg : p) ?? null);
+      if (i < tourIds.length - 1) await new Promise(r => setTimeout(r, 100));
     }
     setRunning(false);
   }
@@ -100,17 +119,31 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
           {step === 2 && (
             <section className="space-y-3">
               <h3 className="font-semibold text-sm text-[color:var(--ck-text)]">Shared schedule</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <label>
-                  <span className="block text-xs text-[color:var(--ck-text-muted)]">Start date</span>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                    className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
-                </label>
-                <label>
-                  <span className="block text-xs text-[color:var(--ck-text-muted)]">End date</span>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                    className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
-                </label>
+              <div className="space-y-2">
+                {ranges.map((range, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1fr_24px] gap-2 items-end">
+                    <label>
+                      <span className="block text-xs text-[color:var(--ck-text-muted)]">{idx === 0 ? "Start date" : `Range ${idx + 1} start`}</span>
+                      <input type="date" value={range.start} onChange={e => setRanges(prev => prev.map((r, i) => i === idx ? { ...r, start: e.target.value } : r))}
+                        className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                    </label>
+                    <label>
+                      <span className="block text-xs text-[color:var(--ck-text-muted)]">{idx === 0 ? "End date" : `Range ${idx + 1} end`}</span>
+                      <input type="date" value={range.end} onChange={e => setRanges(prev => prev.map((r, i) => i === idx ? { ...r, end: e.target.value } : r))}
+                        className="w-full p-2 border border-[color:var(--ck-border-subtle)] rounded bg-[color:var(--ck-bg)] text-[color:var(--ck-text)]" />
+                    </label>
+                    {idx > 0 ? (
+                      <button onClick={() => setRanges(prev => prev.filter((_, i) => i !== idx))}
+                        className="pb-2 text-[15px] text-[var(--ck-danger)]" title="Remove this date range" aria-label={`Remove date range ${idx + 1}`}>
+                        &times;
+                      </button>
+                    ) : <span />}
+                  </div>
+                ))}
+                <button onClick={() => setRanges(prev => [...prev, { start: "", end: "" }])}
+                  className="text-xs text-[color:var(--ck-accent)]">
+                  + Add another date range
+                </button>
               </div>
               <div>
                 <span className="block text-xs text-[color:var(--ck-text-muted)]">Times (comma-separated)</span>
@@ -214,7 +247,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
           <div className="flex gap-2">
             {step > 1 && step < 4 && <button onClick={() => setStep((s) => (s - 1) as any)} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Back</button>}
             {step < 3 && <button disabled={step === 1 && selected.size === 0} onClick={() => setStep((s) => (s + 1) as any)} className="px-3 py-1.5 rounded bg-[var(--ck-accent)] text-white text-sm disabled:opacity-50">Next</button>}
-            {step === 3 && <button onClick={runGenerate} disabled={running} className="px-3 py-1.5 rounded bg-[var(--ck-accent-hover)] text-white text-sm disabled:opacity-50">Generate</button>}
+            {step === 3 && <button onClick={runGenerate} disabled={running || !ranges.some(r => r.start && r.end)} className="px-3 py-1.5 rounded bg-[var(--ck-accent-hover)] text-white text-sm disabled:opacity-50">Generate</button>}
             {step === 4 && !running && <button onClick={onClose} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Close</button>}
           </div>
         </footer>

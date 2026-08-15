@@ -60,8 +60,9 @@ function Slots() {
   const [addForm, setAddForm] = useState({
     tourId: "",
     time: "06:00",
-    startDate: "",
-    endDate: "",
+    // Multiple ranges so seasonal availability (e.g. 1–3 Mar AND 20–23 Mar)
+    // is one submit instead of several.
+    ranges: [{ start: "", end: "" }] as Array<{ start: string; end: string }>,
     capacity: "12",
     price: "",
   });
@@ -602,7 +603,7 @@ function Slots() {
 
   async function saveAddSlot() {
     if (!addForm.tourId) { notify({ title: "Tour required", message: "Please select a tour.", tone: "warning" }); return; }
-    if (!addForm.startDate || !addForm.endDate) { notify({ title: "Date range required", message: "Please select start and end dates.", tone: "warning" }); return; }
+    if (addForm.ranges.some((r) => !r.start || !r.end)) { notify({ title: "Date range required", message: "Every date range needs a start and an end date.", tone: "warning" }); return; }
     if (!addForm.time) { notify({ title: "Time required", message: "Please enter a time.", tone: "warning" }); return; }
     if (!addForm.capacity || Number(addForm.capacity) <= 0) { notify({ title: "Invalid capacity", message: "Please enter a valid capacity.", tone: "warning" }); return; }
 
@@ -612,26 +613,31 @@ function Slots() {
     const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
     const tz = getAdminTimezone();
 
-    const start = new Date(addForm.startDate + "T00:00:00");
-    const end = new Date(addForm.endDate + "T00:00:00");
     const rows: any[] = [];
+    const seenDates = new Set<string>(); // overlapping ranges shouldn't double-count
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
-      const localIso = `${dateStr}T${timeStr}`;
-      const utcMs = zonedToUtc(localIso, tz);
+    for (const range of addForm.ranges) {
+      const start = new Date(range.start + "T00:00:00");
+      const end = new Date(range.end + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (seenDates.has(dateStr)) continue;
+        seenDates.add(dateStr);
+        const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
+        const localIso = `${dateStr}T${timeStr}`;
+        const utcMs = zonedToUtc(localIso, tz);
 
-      rows.push({
-        tour_id: addForm.tourId,
-        start_time: new Date(utcMs).toISOString(),
-        capacity_total: Number(addForm.capacity),
-        booked: 0,
-        held: 0,
-        status: "OPEN",
-        price_per_person_override: priceOverride,
-        business_id: businessId,
-      });
+        rows.push({
+          tour_id: addForm.tourId,
+          start_time: new Date(utcMs).toISOString(),
+          capacity_total: Number(addForm.capacity),
+          booked: 0,
+          held: 0,
+          status: "OPEN",
+          price_per_person_override: priceOverride,
+          business_id: businessId,
+        });
+      }
     }
 
     if (rows.length === 0) {
@@ -652,7 +658,7 @@ function Slots() {
       const insertedCount = inserted?.length ?? 0;
       const skipped = rows.length - insertedCount;
       setShowAddSlot(false);
-      setAddForm({ tourId: "", time: "06:00", startDate: "", endDate: "", capacity: "12", price: "" });
+      setAddForm({ tourId: "", time: "06:00", ranges: [{ start: "", end: "" }], capacity: "12", price: "" });
       const message = skipped > 0
         ? `${insertedCount} slot(s) created. ${skipped} already existed and were skipped.`
         : `${insertedCount} slot(s) created successfully.`;
@@ -1035,19 +1041,39 @@ function Slots() {
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="block text-sm text-gray-600">
-                  Start Date
-                  <div className="mt-1">
-                    <DatePicker position="top" value={addForm.startDate} onChange={(val) => setAddForm({ ...addForm, startDate: val })} className="py-2.5 w-full border-gray-300" />
+              <div className="space-y-3">
+                {addForm.ranges.map((range, idx) => (
+                  <div key={idx} className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_28px] sm:items-end">
+                    <label className="block text-sm text-gray-600">
+                      {idx === 0 ? "Start Date" : `Range ${idx + 1} start`}
+                      <div className="mt-1">
+                        <DatePicker position="top" value={range.start} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, start: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                      </div>
+                    </label>
+                    <label className="block text-sm text-gray-600">
+                      {idx === 0 ? "End Date" : `Range ${idx + 1} end`}
+                      <div className="mt-1">
+                        <DatePicker position="top" value={range.end} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, end: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                      </div>
+                    </label>
+                    {idx > 0 ? (
+                      <button
+                        onClick={() => setAddForm({ ...addForm, ranges: addForm.ranges.filter((_, i) => i !== idx) })}
+                        className="pb-2.5 text-[15px] text-[var(--ck-danger)]"
+                        title="Remove this date range"
+                        aria-label={`Remove date range ${idx + 1}`}
+                      >
+                        &times;
+                      </button>
+                    ) : <span className="hidden sm:block" />}
                   </div>
-                </label>
-                <label className="block text-sm text-gray-600">
-                  End Date
-                  <div className="mt-1">
-                    <DatePicker position="top" value={addForm.endDate} onChange={(val) => setAddForm({ ...addForm, endDate: val })} className="py-2.5 w-full border-gray-300" />
-                  </div>
-                </label>
+                ))}
+                <button
+                  onClick={() => setAddForm({ ...addForm, ranges: [...addForm.ranges, { start: "", end: "" }] })}
+                  className="ui-btn !py-1.5 text-[12px]"
+                >
+                  + Add another date range
+                </button>
               </div>
 
               <label className="block text-sm text-gray-600">
@@ -1085,7 +1111,7 @@ function Slots() {
               </button>
               <button
                 onClick={saveAddSlot}
-                disabled={savingAdd || !addForm.tourId || !addForm.startDate || !addForm.endDate}
+                disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {savingAdd ? "Creating..." : "Create Slots"}

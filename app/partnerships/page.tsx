@@ -5,6 +5,7 @@ import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { isComboEnabledClient } from "../lib/feature-flags";
+import { evenPercentSplit } from "../lib/combo-splits";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "";
@@ -139,22 +140,28 @@ export default function PartnershipsPage() {
       return;
     }
     if (offerRows.some((r, i) => !r.tour_id || (i > 0 && !r.partner_id))) {
-      notify({ title: "Missing fields", message: "Every row needs a partner (except your own tour) and a tour.", tone: "error" });
+      notify({ title: "Missing fields", message: "Every row needs an operator (except your own tour) and a tour.", tone: "error" });
       return;
     }
-    const shares = offerRows.map((r) => Number(r.share));
-    if (shares.some((s) => !(s > 0))) {
-      notify({ title: "Invalid split", message: "Every share must be greater than 0.", tone: "error" });
-      return;
-    }
-    const shareSum = Math.round(shares.reduce((a, b) => a + b, 0) * 100) / 100;
-    if (splitType === "PERCENT" && Math.abs(shareSum - 100) > 0.01) {
-      notify({ title: "Invalid split", message: `Percentages must total 100% (currently ${shareSum}%).`, tone: "error" });
-      return;
-    }
-    if (splitType === "FIXED" && Math.abs(shareSum - price) > 0.01) {
-      notify({ title: "Invalid split", message: `Fixed shares must total the combo price of R${price} (currently R${shareSum}).`, tone: "error" });
-      return;
+    // Single-operator combo (all legs are my own tours): no money moves between
+    // operators, so shares are auto-distributed — nothing for the user to type.
+    const effectiveSplitType = allMine ? "PERCENT" : splitType;
+    const autoShares = allMine ? evenPercentSplit(offerRows.length) : null;
+    const shares = autoShares ?? offerRows.map((r) => Number(r.share));
+    if (!allMine) {
+      if (shares.some((s) => !(s > 0))) {
+        notify({ title: "Invalid split", message: "Every share must be greater than 0.", tone: "error" });
+        return;
+      }
+      const shareSum = Math.round(shares.reduce((a, b) => a + b, 0) * 100) / 100;
+      if (splitType === "PERCENT" && Math.abs(shareSum - 100) > 0.01) {
+        notify({ title: "Invalid split", message: `Percentages must total 100% (currently ${shareSum}%).`, tone: "error" });
+        return;
+      }
+      if (splitType === "FIXED" && Math.abs(shareSum - price) > 0.01) {
+        notify({ title: "Invalid split", message: `Fixed shares must total the combo price of R${price} (currently R${shareSum}).`, tone: "error" });
+        return;
+      }
     }
     setSavingOffer(true);
     const headers = await authHeaders();
@@ -166,12 +173,12 @@ export default function PartnershipsPage() {
         name: offerName.trim(),
         combo_price: price,
         original_price: Number(originalPrice) || price,
-        split_type: splitType,
-        items: offerRows.map((row) => ({
-          business_id: row.partner_id || businessId,
+        split_type: effectiveSplitType,
+        items: offerRows.map((row, i) => ({
+          business_id: row.partner_id && row.partner_id !== "__self" ? row.partner_id : businessId,
           tour_id: row.tour_id,
-          split_percent: splitType === "PERCENT" ? Number(row.share) : undefined,
-          split_fixed: splitType === "FIXED" ? Number(row.share) : undefined,
+          split_percent: effectiveSplitType === "PERCENT" ? shares[i] : undefined,
+          split_fixed: effectiveSplitType === "FIXED" ? shares[i] : undefined,
         })),
       }),
     });
@@ -255,6 +262,8 @@ export default function PartnershipsPage() {
   if (loading) return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[160px] !rounded-2xl" /><div className="ui-skeleton h-[280px] !rounded-2xl" /></div>;
 
   const activePartners = partnerships.filter((p) => p.status === "ACTIVE");
+  // Every leg mine? (Row 0 is always mine; later rows are mine when "__self".)
+  const allMine = offerRows.every((r, i) => i === 0 || r.partner_id === "__self" || !r.partner_id);
   const splitLabel = (o: any) => {
     if (o.items?.length) {
       return o.items.map((i: any) => (i.businesses?.business_name || "?") + " " + (o.split_type === "PERCENT" ? Number(i.split_percent) + "%" : "R" + Number(i.split_fixed))).join(" · ");
@@ -338,9 +347,8 @@ export default function PartnershipsPage() {
           <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Combo Offers</h3>
           <button
             onClick={() => setShowOfferForm((v) => !v)}
-            disabled={activePartners.length === 0}
             className="ui-btn ui-btn-primary !py-1.5 text-[12px]"
-            title={activePartners.length === 0 ? "You need an active partnership first" : ""}
+            title="Bundle your own tours, or partner tours once a partnership is active"
           >
             {showOfferForm ? "Close" : "New Combo Offer"}
           </button>
@@ -361,32 +369,37 @@ export default function PartnershipsPage() {
                 Normal combined price (optional, shows the saving)
                 <input className="ui-control w-full text-sm" type="number" min="0" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} />
               </label>
-              <label className="space-y-1 text-[12px] sm:col-span-3" style={{ color: "var(--ck-text-muted)" }}>
-                Split type
-                <select className="ui-control w-full text-sm sm:max-w-[260px]" value={splitType} onChange={(e) => setSplitType(e.target.value as "PERCENT" | "FIXED")}>
-                  <option value="PERCENT">Percentage</option>
-                  <option value="FIXED">Fixed amounts (per person)</option>
-                </select>
-              </label>
+              {!allMine && (
+                <label className="space-y-1 text-[12px] sm:col-span-3" style={{ color: "var(--ck-text-muted)" }}>
+                  Split type
+                  <select className="ui-control w-full text-sm sm:max-w-[260px]" value={splitType} onChange={(e) => setSplitType(e.target.value as "PERCENT" | "FIXED")}>
+                    <option value="PERCENT">Percentage</option>
+                    <option value="FIXED">Fixed amounts (per person)</option>
+                  </select>
+                </label>
+              )}
             </div>
 
-            {/* One row per tour in the combo — row 0 is yours, rows below are partner tours */}
+            {/* One row per tour in the combo — row 0 is yours; rows below are
+                partner tours OR more of your own ("__self"), so a combo like
+                Morning + Evening Kayak needs no partnership at all. */}
             <div className="space-y-2">
               {offerRows.map((row, idx) => {
-                const rowTours = idx === 0 ? myTours : (partnerToursCache[row.partner_id] || []);
+                const rowTours = idx === 0 || row.partner_id === "__self" ? myTours : (partnerToursCache[row.partner_id] || []);
                 return (
-                  <div key={idx} className="grid gap-2 sm:grid-cols-[1fr_1fr_120px_36px] items-end">
+                  <div key={idx} className={"grid gap-2 items-end " + (allMine ? "sm:grid-cols-[1fr_1fr_36px]" : "sm:grid-cols-[1fr_1fr_120px_36px]")}>
                     {idx === 0 ? (
                       <p className="text-[12px] pb-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Your tour</p>
                     ) : (
                       <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                        Partner
+                        Operator
                         <select
                           className="ui-control w-full text-sm"
                           value={row.partner_id}
-                          onChange={(e) => { updateOfferRow(idx, { partner_id: e.target.value, tour_id: "" }); loadPartnerTours(e.target.value); }}
+                          onChange={(e) => { updateOfferRow(idx, { partner_id: e.target.value, tour_id: "" }); if (e.target.value && e.target.value !== "__self") loadPartnerTours(e.target.value); }}
                         >
-                          <option value="">Select partner…</option>
+                          <option value="">Select operator…</option>
+                          <option value="__self">My own tours</option>
                           {activePartners.map((p) => <option key={p.id} value={p.partner_id}>{p.partner_name}</option>)}
                         </select>
                       </label>
@@ -399,14 +412,16 @@ export default function PartnershipsPage() {
                         onChange={(e) => updateOfferRow(idx, { tour_id: e.target.value })}
                         disabled={idx > 0 && !row.partner_id}
                       >
-                        <option value="">{idx > 0 && !row.partner_id ? "Pick a partner first" : "Select tour…"}</option>
+                        <option value="">{idx > 0 && !row.partner_id ? "Pick an operator first" : "Select tour…"}</option>
                         {rowTours.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </label>
-                    <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                      Share ({splitType === "PERCENT" ? "%" : "R pp"})
-                      <input className="ui-control w-full text-sm" type="number" min="0" value={row.share} onChange={(e) => updateOfferRow(idx, { share: e.target.value })} />
-                    </label>
+                    {!allMine && (
+                      <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                        Share ({splitType === "PERCENT" ? "%" : "R pp"})
+                        <input className="ui-control w-full text-sm" type="number" min="0" value={row.share} onChange={(e) => updateOfferRow(idx, { share: e.target.value })} />
+                      </label>
+                    )}
                     {idx >= 2 ? (
                       <button
                         onClick={() => setOfferRows((rows) => rows.filter((_, i) => i !== idx))}
@@ -424,19 +439,23 @@ export default function PartnershipsPage() {
                   onClick={() => setOfferRows((rows) => [...rows, { partner_id: "", tour_id: "", share: "" }])}
                   className="ui-btn !py-1.5 text-[12px]"
                 >
-                  + Add another partner tour
+                  + Add another tour
                 </button>
               )}
             </div>
 
-            {comboPrice && (
+            {comboPrice && (allMine ? (
+              <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                A combo of your own tours — you keep the full R{comboPrice} per person, paid through your Yoco account. No partnership or settlement involved.
+              </p>
+            ) : (
               <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
                 {splitType === "PERCENT"
                   ? `Shares total ${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100}% (must be 100%)`
                   : `Shares total R${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100} of R${comboPrice} per person`}
                 {" — you collect the full payment and settle each partner's share (unless Paysafe auto-split is configured for a 2-tour combo)."}
               </p>
-            )}
+            ))}
             <button onClick={createOffer} disabled={savingOffer} className="ui-btn ui-btn-primary">{savingOffer ? "Creating…" : "Create Offer"}</button>
           </div>
         )}
