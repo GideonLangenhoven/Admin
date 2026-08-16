@@ -974,7 +974,7 @@ export default function NewBookingPage() {
           </div>
 
           {/* Right: availability calendar */}
-          <div className="flex w-full flex-col items-center lg:max-w-[520px]">
+          <div className="flex w-full min-w-0 flex-col">
             <label className={`text-sm mb-1 self-start ${missingField === "date" ? "text-[var(--ck-danger)] font-medium" : "text-gray-600"}`}>Select date <span className="text-[var(--ck-danger)]">*</span></label>
             <div className={`w-full overflow-x-auto rounded-xl transition-colors ${missingField === "date" ? "ring-2 ring-[var(--ck-danger)]" : ""}`}>
               <AvailabilityCalendar

@@ -208,7 +208,14 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                 .avail-cal table { border-collapse: separate; border-spacing: 2px; }
                 @media (min-width: 640px) {
                     .avail-cal { --rdp-cell-size: 56px; }
-                    .avail-cal td button { height: 56px; padding-top: 9px; font-size: 15px; }
+                    /* Height tracks the cell width so a wide column gives taller
+                       tiles instead of squat letterboxes, bounded so it never
+                       runs away on a very wide screen. */
+                    .avail-cal td button {
+                        height: auto; aspect-ratio: 1 / 0.82;
+                        min-height: 56px; max-height: 82px;
+                        padding-top: 9px; font-size: 15px;
+                    }
                     .avail-cal-count { font-size: 11px; bottom: 6px; }
                 }
             `}</style>
