@@ -77,10 +77,25 @@ export function isBlockedHost(hostname: string) {
 
 // Parses and vets a user-supplied URL. Throws with a message safe to show the
 // client; the caller still has to check what the hostname resolves to.
+// Matches a real scheme prefix like "http:", "file:" or "javascript:". Dots are
+// deliberately excluded so "www.example.co.za:8080" reads as a host and port
+// rather than as a scheme.
+const SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+\-]*:/;
+
 export function parsePublicUrl(raw: string): URL {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) throw new Error("That does not look like a valid URL.");
+
+  // People type "www.capeweb.co.za", not "https://www.capeweb.co.za", so a bare
+  // domain gets https rather than a rejection. Input that already carries a
+  // scheme is left exactly as typed, so file:, data: and javascript: still fall
+  // through to the allowlist below instead of being rewritten into something
+  // fetchable.
+  const candidate = SCHEME_RE.test(trimmed) ? trimmed : "https://" + trimmed.replace(/^\/+/, "");
+
   let url: URL;
   try {
-    url = new URL(String(raw || "").trim());
+    url = new URL(candidate);
   } catch {
     throw new Error("That does not look like a valid URL.");
   }

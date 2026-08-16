@@ -125,6 +125,39 @@ Deno.test("a normal operator website parses", () => {
   assert(url.protocol === "https:", "protocol kept");
 });
 
+Deno.test("a bare domain is accepted and assumed https", () => {
+  // How an operator actually types their website on a support call.
+  for (const raw of ["www.capeweb.co.za", "capeweb.co.za", "  www.capeweb.co.za  ", "WWW.CapeWeb.co.za"]) {
+    const url = parsePublicUrl(raw);
+    assert(url.protocol === "https:", `${raw} -> ${url.protocol}`);
+    assert(url.hostname.endsWith("capeweb.co.za"), `${raw} -> ${url.hostname}`);
+  }
+});
+
+Deno.test("bare domain with a path or port still parses", () => {
+  assert(parsePublicUrl("capeweb.co.za/tours").pathname === "/tours", "path kept");
+  const withPort = parsePublicUrl("www.capeweb.co.za:8080");
+  assert(withPort.hostname === "www.capeweb.co.za", "host: " + withPort.hostname);
+  assert(withPort.port === "8080", "port: " + withPort.port);
+});
+
+Deno.test("scheme-less input cannot smuggle past the host checks", () => {
+  // The https default must not become a way around the private-network guard.
+  for (const raw of ["localhost", "127.0.0.1", "169.254.169.254", "10.0.0.1", "//169.254.169.254"]) {
+    let threw = false;
+    try { parsePublicUrl(raw); } catch { threw = true; }
+    assert(threw, `${raw} must still be rejected without a scheme`);
+  }
+});
+
+Deno.test("an explicit dangerous scheme is never rewritten to https", () => {
+  for (const raw of ["file:///etc/passwd", "javascript:alert(1)", "data:text/html,hi", "ftp://example.com"]) {
+    let threw = false;
+    try { parsePublicUrl(raw); } catch { threw = true; }
+    assert(threw, `${raw} must be rejected, not rewritten`);
+  }
+});
+
 Deno.test("garbage input is rejected rather than thrown raw", () => {
   let msg = "";
   try { parsePublicUrl("not a url"); } catch (e) { msg = (e as Error).message; }
