@@ -940,10 +940,13 @@ export default function NewBookingPage() {
 
       <div className="ui-card anim-fade-up anim-d1 p-5">
         <h3 className="mb-4 text-xl font-medium" style={{ color: "var(--ck-text-strong)" }}>Activity Details</h3>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto]">
-          {/* Left: tour + pax selectors */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="md:col-span-1">
+        {/* The calendar is the thing being read here, so it gets the room. The
+            three selectors stack in a narrow column beside it rather than
+            spreading across the full width above it. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+          {/* Left: tour + pax selectors, stacked */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            <div>
               <label className="text-sm font-semibold text-[var(--ck-text)] flex items-center gap-1.5">
                 To attend <span className="text-[var(--ck-danger)]">*</span>
               </label>
@@ -971,7 +974,7 @@ export default function NewBookingPage() {
           </div>
 
           {/* Right: availability calendar */}
-          <div className="flex w-full flex-col items-center lg:max-w-[340px]">
+          <div className="flex w-full flex-col items-center lg:max-w-[520px]">
             <label className={`text-sm mb-1 self-start ${missingField === "date" ? "text-[var(--ck-danger)] font-medium" : "text-gray-600"}`}>Select date <span className="text-[var(--ck-danger)]">*</span></label>
             <div className={`w-full overflow-x-auto rounded-xl transition-colors ${missingField === "date" ? "ring-2 ring-[var(--ck-danger)]" : ""}`}>
               <AvailabilityCalendar

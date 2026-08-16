@@ -72,12 +72,7 @@ const CustomDay = React.memo(function CustomDay(props: any) {
             style={{ ...(tdProps.style || {}), padding: 0, position: "relative" }}
         >
             {children}
-            {avail === "open" && (
-                <span className="avail-cal-count">
-                    {totalOpen}
-                    {openSlots.length > 1 && <span className="avail-cal-slots"> · {openSlots.length}</span>}
-                </span>
-            )}
+            {avail === "open" && <span className="avail-cal-count">{totalOpen}</span>}
             {avail === "full" && <span className="avail-cal-count">full</span>}
         </td>
     );
@@ -160,13 +155,17 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                 }
                 .avail-cal .rdp-months { font-family: inherit; }
                 .avail-cal .rdp-month { width: 100%; }
-                .avail-cal .rdp-table { width: 100%; max-width: 100%; }
+                /* table-layout:fixed + a percentage width per cell lets the grid
+                   grow to whatever column it is given, instead of staying at
+                   seven fixed-width boxes with dead space beside them. */
+                .avail-cal .rdp-table { width: 100%; max-width: 100%; table-layout: fixed; }
+                .avail-cal td { width: 14.2857%; }
                 .avail-cal .rdp-caption_label { font-weight: 700; color: var(--ck-text-strong); }
                 .avail-cal .rdp-head_cell { font-weight: 600; color: var(--ck-text-muted); font-size: 0.75rem; text-transform: uppercase; }
                 .avail-cal td { padding: 0 !important; border: 1px solid var(--ck-border-subtle); border-radius: 8px; }
                 .avail-cal td button {
                     display: flex; align-items: flex-start; justify-content: center;
-                    width: 46px; height: 46px; padding-top: 7px; border-radius: 7px; border: none;
+                    width: 100%; height: 46px; padding-top: 7px; border-radius: 7px; border: none;
                     cursor: pointer; font-weight: 500; font-size: 14px;
                     background: transparent; color: var(--ck-text);
                     transition: background 0.15s;
@@ -185,14 +184,18 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                    under the 4.5:1 needed at this size. */
                 .avail-cal td[data-avail="full"] button { background: var(--ck-surface-sunken); color: var(--ck-text); }
 
+                /* Anchored to both edges rather than centre-translated, so a
+                   wide value is clipped inside its own cell instead of spilling
+                   over the neighbouring days. */
                 .avail-cal-count {
-                    position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+                    position: absolute; bottom: 4px; left: 0; right: 0;
+                    text-align: center; padding: 0 2px;
                     font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: 0.01em;
-                    color: var(--cal-day-sub); pointer-events: none; z-index: 2; white-space: nowrap;
+                    color: var(--cal-day-sub); pointer-events: none; z-index: 2;
+                    white-space: nowrap; overflow: hidden;
                     font-variant-numeric: tabular-nums;
                 }
                 .avail-cal td[data-avail="full"] .avail-cal-count { color: var(--ck-text); font-weight: 600; }
-                .avail-cal-slots { opacity: 0.75; font-weight: 600; }
 
                 .avail-cal td[data-selected] { border-color: var(--ck-accent); }
                 .avail-cal td[data-selected] button { background: var(--ck-accent) !important; color: #fff !important; font-weight: 700; }
@@ -204,8 +207,9 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                 .avail-cal td[data-outside] button:hover { background: transparent; }
                 .avail-cal table { border-collapse: separate; border-spacing: 2px; }
                 @media (min-width: 640px) {
-                    .avail-cal { --rdp-cell-size: 50px; }
-                    .avail-cal td button { width: 50px; height: 50px; padding-top: 8px; }
+                    .avail-cal { --rdp-cell-size: 56px; }
+                    .avail-cal td button { height: 56px; padding-top: 9px; font-size: 15px; }
+                    .avail-cal-count { font-size: 11px; bottom: 6px; }
                 }
             `}</style>
                 <div className="avail-cal-wrap space-y-3">
