@@ -12,6 +12,86 @@ function fmtDate(iso?: string | null) {
   return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() });
 }
 
+// Per-offer rules. The policy sets the FORM of compensation on cancel; each
+// leg's own refund tiers still set the amount. Gap rules and ordering are
+// enforced at checkout server-side, this form only captures them.
+const DEFAULT_RULES = { policy: "VOUCHER_ONLY", min: "", max: "", order: false };
+type RuleDraft = typeof DEFAULT_RULES;
+
+const POLICY_SHORT: Record<string, string> = {
+  VOUCHER_ONLY: "Voucher-only",
+  NO_CANCEL: "Non-cancellable",
+  POLICY_REFUND: "Cash per refund policy",
+};
+
+function draftFromOffer(o: any): RuleDraft {
+  const r = o.combo_rules || {};
+  return {
+    policy: o.cancellation_policy || "VOUCHER_ONLY",
+    min: r.min_gap_days != null ? String(r.min_gap_days) : "",
+    max: r.max_gap_days != null ? String(r.max_gap_days) : "", // 0 is valid (same day)
+    order: Boolean(r.enforce_order),
+  };
+}
+
+function rulesBody(d: RuleDraft) {
+  return {
+    cancellation_policy: d.policy,
+    combo_rules: {
+      ...(d.min ? { min_gap_days: Number(d.min) } : {}),
+      ...(d.max ? { max_gap_days: Number(d.max) } : {}),
+      ...(d.order ? { enforce_order: true } : {}),
+    },
+  };
+}
+
+function gapError(d: RuleDraft) {
+  return d.min && d.max && Number(d.min) > Number(d.max)
+    ? "The minimum gap cannot be larger than the maximum gap."
+    : "";
+}
+
+function rulesSummary(o: any) {
+  const r = o.combo_rules || {};
+  const parts = [POLICY_SHORT[o.cancellation_policy] || POLICY_SHORT.VOUCHER_ONLY];
+  if (r.min_gap_days != null) parts.push(r.min_gap_days + "+ days apart");
+  if (r.max_gap_days != null) parts.push(r.max_gap_days === 0 ? "same day" : "within " + r.max_gap_days + " days");
+  if (r.enforce_order) parts.push("in order");
+  return parts.join(" · ");
+}
+
+function RuleFields({ value, onChange }: { value: RuleDraft; onChange: (patch: Partial<RuleDraft>) => void }) {
+  const err = gapError(value);
+  return (
+    <div className="space-y-2">
+      <p className="ui-mono-label !text-[10px]">Package rules</p>
+      <label className="block space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+        If a customer cancels
+        <select className="ui-control w-full text-sm" value={value.policy} onChange={(e) => onChange({ policy: e.target.value })}>
+          <option value="VOUCHER_ONLY">Voucher only (default): cancellations become a credit voucher</option>
+          <option value="NO_CANCEL">Non-cancellable: no customer self-service cancellation</option>
+          <option value="POLICY_REFUND">Cash per refund policy: cash refund at each operator&rsquo;s own tiers</option>
+        </select>
+      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+          Minimum days between tours
+          <input className="ui-control w-full text-sm" type="number" min="1" placeholder="No rule" value={value.min} onChange={(e) => onChange({ min: e.target.value })} />
+        </label>
+        <label className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+          Maximum days between tours
+          <input className="ui-control w-full text-sm" type="number" min="0" placeholder="No rule" value={value.max} onChange={(e) => onChange({ max: e.target.value })} />
+        </label>
+      </div>
+      <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+        <input type="checkbox" checked={value.order} onChange={(e) => onChange({ order: e.target.checked })} />
+        Tours must be taken in order
+      </label>
+      {err && <p className="text-[12px]" style={{ color: "var(--ck-danger)" }}>{err}</p>}
+    </div>
+  );
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token
@@ -46,6 +126,11 @@ export default function PartnershipsPage() {
   const [originalPrice, setOriginalPrice] = useState("");
   const [splitType, setSplitType] = useState<"PERCENT" | "FIXED">("PERCENT");
   const [savingOffer, setSavingOffer] = useState(false);
+  const [newRules, setNewRules] = useState<RuleDraft>(DEFAULT_RULES);
+
+  // Per-offer rules editor: which row is open, and its draft.
+  const [rulesFor, setRulesFor] = useState<string | null>(null);
+  const [rulesDraft, setRulesDraft] = useState<RuleDraft>(DEFAULT_RULES);
 
   // Settlement notes per partner
   const [settleNotes, setSettleNotes] = useState<Record<string, string>>({});
@@ -143,6 +228,10 @@ export default function PartnershipsPage() {
       notify({ title: "Missing fields", message: "Every row needs an operator (except your own tour) and a tour.", tone: "error" });
       return;
     }
+    if (gapError(newRules)) {
+      notify({ title: "Invalid rules", message: gapError(newRules), tone: "error" });
+      return;
+    }
     // Single-operator combo (all legs are my own tours): no money moves between
     // operators, so shares are auto-distributed — nothing for the user to type.
     const effectiveSplitType = allMine ? "PERCENT" : splitType;
@@ -174,6 +263,7 @@ export default function PartnershipsPage() {
         combo_price: price,
         original_price: Number(originalPrice) || price,
         split_type: effectiveSplitType,
+        ...rulesBody(newRules),
         items: offerRows.map((row, i) => ({
           business_id: row.partner_id && row.partner_id !== "__self" ? row.partner_id : businessId,
           tour_id: row.tour_id,
@@ -189,9 +279,31 @@ export default function PartnershipsPage() {
       setShowOfferForm(false);
       setOfferName(""); setComboPrice(""); setOriginalPrice("");
       setOfferRows([{ partner_id: "", tour_id: "", share: "50" }, { partner_id: "", tour_id: "", share: "50" }]);
+      setNewRules(DEFAULT_RULES);
       load();
     }
     setSavingOffer(false);
+  }
+
+  async function saveRules(offer: any) {
+    if (gapError(rulesDraft)) {
+      notify({ title: "Invalid rules", message: gapError(rulesDraft), tone: "error" });
+      return;
+    }
+    setBusy(offer.id);
+    const headers = await authHeaders();
+    const r = await fetch("/api/combo-offers", {
+      method: "POST", headers,
+      body: JSON.stringify({ action: "update", business_id: businessId, combo_offer_id: offer.id, ...rulesBody(rulesDraft) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.error) notify({ title: "Could not save rules", message: d.error || "Unknown error", tone: "error" });
+    else {
+      notify({ title: "Rules saved", message: "They apply to new bookings of this package.", tone: "success" });
+      setRulesFor(null);
+      load();
+    }
+    setBusy(null);
   }
 
   async function toggleOffer(offer: any) {
@@ -456,6 +568,9 @@ export default function PartnershipsPage() {
                 {" — you collect the full payment and settle each partner's share (unless Paysafe auto-split is configured for a 2-tour combo)."}
               </p>
             ))}
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--ck-border)" }}>
+              <RuleFields value={newRules} onChange={(patch) => setNewRules((d) => ({ ...d, ...patch }))} />
+            </div>
             <button onClick={createOffer} disabled={savingOffer} className="ui-btn ui-btn-primary">{savingOffer ? "Creating…" : "Create Offer"}</button>
           </div>
         )}
@@ -468,17 +583,34 @@ export default function PartnershipsPage() {
         ) : (
           <div className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
             {offers.map((o) => (
-              <div key={o.id} className="flex flex-wrap items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{o.name}</p>
-                  <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                    {(o.items || []).map((i: any) => i.tours?.name).filter(Boolean).join(" + ") || "Legacy offer"} · R{Number(o.combo_price)} pp · Split: {splitLabel(o)}
-                  </p>
+              <div key={o.id} className="py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{o.name}</p>
+                    <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                      {(o.items || []).map((i: any) => i.tours?.name).filter(Boolean).join(" + ") || "Legacy offer"} · R{Number(o.combo_price)} pp · Split: {splitLabel(o)}
+                    </p>
+                    <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>Rules: {rulesSummary(o)}</p>
+                  </div>
+                  <span className={"ui-status " + (o.active ? "ui-pill-success" : "ui-pill-neutral")}>{o.active ? "Live" : "Off"}</span>
+                  <button
+                    onClick={() => { setRulesFor(rulesFor === o.id ? null : o.id); setRulesDraft(draftFromOffer(o)); }}
+                    className="ui-btn !py-1.5 text-[12px]"
+                  >
+                    {rulesFor === o.id ? "Close" : "Rules"}
+                  </button>
+                  <button onClick={() => toggleOffer(o)} disabled={busy === o.id} className="ui-btn !py-1.5 text-[12px]">
+                    {o.active ? "Deactivate" : "Activate"}
+                  </button>
                 </div>
-                <span className={"ui-status " + (o.active ? "ui-pill-success" : "ui-pill-neutral")}>{o.active ? "Live" : "Off"}</span>
-                <button onClick={() => toggleOffer(o)} disabled={busy === o.id} className="ui-btn !py-1.5 text-[12px]">
-                  {o.active ? "Deactivate" : "Activate"}
-                </button>
+                {rulesFor === o.id && (
+                  <div className="mt-3 space-y-3 rounded-xl border p-3" style={{ borderColor: "var(--ck-border)" }}>
+                    <RuleFields value={rulesDraft} onChange={(patch) => setRulesDraft((d) => ({ ...d, ...patch }))} />
+                    <button onClick={() => saveRules(o)} disabled={busy === o.id} className="ui-btn ui-btn-primary !py-1.5 text-[12px]">
+                      {busy === o.id ? "Saving…" : "Save rules"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

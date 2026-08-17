@@ -18,6 +18,129 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// ── Offer-level rules ────────────────────────────────────────────────────────
+// combo_offers.combo_rules jsonb. The policy column decides the FORM of any
+// compensation on cancel; refund_policy_tiers still decide the AMOUNT.
+export type ComboRules = {
+  min_gap_days?: number | null; // consecutive legs at least N calendar days apart
+  max_gap_days?: number | null; // all legs within N calendar days of each other
+  enforce_order?: boolean;      // legs dated in position order
+};
+
+// Calendar date of an instant in a zone, as UTC-midnight millis so subtraction
+// gives whole days. Combos are a ZAR product, so a single zone (the collector
+// operator's) is the deliberate simplification here.
+function dayValue(iso: string, timeZone: string): number {
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso)); // en-CA => YYYY-MM-DD
+  return Date.parse(ymd + "T00:00:00Z");
+}
+
+const DAY_MS = 86_400_000;
+
+// Pure so it is unit-testable: takes the legs' slot start_times in POSITION
+// order and answers whether the chosen dates satisfy the offer's rules.
+// Messages are customer-facing.
+// Flat return (not a discriminated union): consumers compile with
+// strict:false, where narrowing on `ok` is unreliable — same convention as
+// YocoWebhookResult in _shared/yoco.ts.
+export function validateComboDates(
+  rules: ComboRules | null | undefined,
+  orderedStartTimes: string[],
+  timeZone = "Africa/Johannesburg",
+): { ok: boolean; error?: string } {
+  if (!rules || orderedStartTimes.length < 2) return { ok: true };
+
+  const days = orderedStartTimes.map((t) => dayValue(t, timeZone));
+
+  if (rules.enforce_order) {
+    for (let i = 1; i < days.length; i++) {
+      if (days[i] < days[i - 1]) {
+        return { ok: false, error: "The tours in this package must be taken in order. Pick a later date for the second tour." };
+      }
+    }
+  }
+
+  const minGap = Number(rules.min_gap_days);
+  if (Number.isFinite(minGap) && minGap > 0) {
+    for (let i = 1; i < days.length; i++) {
+      if (Math.abs(days[i] - days[i - 1]) < minGap * DAY_MS) {
+        return {
+          ok: false,
+          error: "The tours in this package must be at least " + minGap + " day" + (minGap === 1 ? "" : "s") + " apart.",
+        };
+      }
+    }
+  }
+
+  const maxGap = Number(rules.max_gap_days);
+  if (Number.isFinite(maxGap) && maxGap >= 0) {
+    const span = (Math.max(...days) - Math.min(...days)) / DAY_MS;
+    if (span > maxGap) {
+      return {
+        ok: false,
+        error: "The tours in this package must be taken within " + maxGap + " day" + (maxGap === 1 ? "" : "s") + " of each other.",
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+export type ComboLegPolicy = {
+  cancellation_policy: "VOUCHER_ONLY" | "NO_CANCEL" | "POLICY_REFUND";
+  combo_rules: ComboRules;
+  combo: any;
+  legs: any[]; // all sibling bookings incl. this one, with slots(start_time)
+};
+
+// Resolves the combo context a booking belongs to, or null for ordinary
+// bookings — every cancel/reschedule/refund path calls this first, so the
+// policy is enforced in one place regardless of which door the request came in.
+export async function getComboLegPolicy(supabase: any, booking: any): Promise<ComboLegPolicy | null> {
+  if (!booking) return null;
+  let comboBookingId: string | null = booking.combo_booking_id || null;
+
+  // HELD/PENDING legs carry is_combo before confirm_combo_payment_atomic
+  // stamps combo_booking_id — resolve via combo_booking_items in that window.
+  if (!comboBookingId && booking.is_combo) {
+    const { data: item } = await supabase
+      .from("combo_booking_items")
+      .select("combo_booking_id")
+      .eq("booking_id", booking.id)
+      .maybeSingle();
+    comboBookingId = item?.combo_booking_id || null;
+  }
+  if (!comboBookingId) return null;
+
+  const { data: combo } = await supabase
+    .from("combo_bookings")
+    .select("*")
+    .eq("id", comboBookingId)
+    .maybeSingle();
+  if (!combo) return null;
+
+  const { data: offer } = await supabase
+    .from("combo_offers")
+    .select("id, cancellation_policy, combo_rules, name")
+    .eq("id", combo.combo_offer_id)
+    .maybeSingle();
+
+  const legs = await loadComboLegs(supabase, combo);
+
+  const policy = String(offer?.cancellation_policy || "VOUCHER_ONLY") as ComboLegPolicy["cancellation_policy"];
+  return {
+    cancellation_policy: policy,
+    combo_rules: (offer?.combo_rules || {}) as ComboRules,
+    combo,
+    legs,
+  };
+}
+
 // Load every leg (booking) of a combo — N-party via combo_booking_items,
 // legacy 2-party via booking_a_id/booking_b_id.
 export async function loadComboLegs(supabase: any, combo: any): Promise<any[]> {

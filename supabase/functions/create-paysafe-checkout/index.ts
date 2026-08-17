@@ -15,7 +15,7 @@
 //     Tracked via combo_bookings.settled + the combo_settlements register.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessCredentials, getTenantByBusinessId, resolveBookingSiteUrl } from "../_shared/tenant.ts";
-import { confirmComboAndNotify } from "../_shared/combo.ts";
+import { confirmComboAndNotify, validateComboDates } from "../_shared/combo.ts";
 import { blockIfNotTrading } from "../_shared/subscription.ts";
 
 const supabase = createServiceClient();
@@ -104,18 +104,30 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }
 
   // Verify every slot exists, belongs to its leg's tour, and has capacity
+  const legStartTimes: string[] = [];
   for (const leg of legSpecs) {
-    const { data: slot } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held").eq("id", leg.slot_id).single();
+    const { data: slot } = await supabase.from("slots").select("id, tour_id, capacity_total, booked, held, start_time").eq("id", leg.slot_id).single();
     if (!slot || String(slot.tour_id) !== String(leg.tour_id)) {
       return jsonRes({ error: "Selected slot not found for one of the tours" }, 404, cors);
     }
     const avail = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
     if (avail < qty) return jsonRes({ error: "One of the tours does not have enough capacity (available: " + avail + ")" }, 400, cors);
+    legStartTimes.push(String(slot.start_time));
   }
 
   // The collector is the operator who receives the customer's payment (and
   // settles the other legs). Offer creator = first leg by construction.
   const collectorId = String(offer.business_a_id || offer.created_by_business_id || legSpecs[0].business_id);
+
+  // Offer-level date rules (min/max gap between legs, ordering), measured as
+  // calendar days in the collector's timezone. The booking site mirrors these
+  // in the calendar UI, but this is the enforcement.
+  {
+    const { data: collectorBiz } = await supabase
+      .from("businesses").select("timezone").eq("id", collectorId).maybeSingle();
+    const dateCheck = validateComboDates(offer.combo_rules, legStartTimes, collectorBiz?.timezone || "Africa/Johannesburg");
+    if (!dateCheck.ok) return jsonRes({ error: dateCheck.error }, 400, cors);
+  }
 
   // Validate and apply promo code if provided (collector's promo codes)
   let promoDiscount = 0;

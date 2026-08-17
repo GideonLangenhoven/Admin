@@ -430,6 +430,7 @@
     "business_b_id",
     "cancellation_policy",
     "combo_price",
+    "combo_rules",
     "created_at",
     "created_by",
     "created_by_business_id",

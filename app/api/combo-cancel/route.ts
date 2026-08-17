@@ -73,6 +73,19 @@ export async function POST(req: NextRequest) {
   if (comboErr || !combo) return NextResponse.json({ error: "Combo booking not found" }, { status: 404 });
   if (combo.payment_status !== "PAID") return NextResponse.json({ error: "Only PAID combo bookings can be cancelled" }, { status: 400 });
 
+  // The offer's cancellation policy binds customers; operators keep their
+  // override (it is their product and their prerogative to make exceptions).
+  if (initiated_by === "customer") {
+    const { data: offer } = await supabase
+      .from("combo_offers")
+      .select("cancellation_policy")
+      .eq("id", combo.combo_offer_id)
+      .maybeSingle();
+    if (String(offer?.cancellation_policy || "") === "NO_CANCEL") {
+      return NextResponse.json({ error: "This combo package is non-cancellable. Contact the operator if your plans have changed." }, { status: 400 });
+    }
+  }
+
   // ── Authentication gate ──────────────────────────────────────────────────────
   if (initiated_by === "operator") {
     const session = await verifyAdminSession(req, supabase);

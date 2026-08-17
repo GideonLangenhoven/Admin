@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
+import { CANCELLATION_POLICIES, parseComboRules } from "../../lib/combo-rules";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -82,9 +83,14 @@ export async function POST(req: NextRequest) {
 
   // --- CREATE ---
   if (action === "create") {
-    const { name, description, image_url, combo_price, original_price, split_type, currency, items } = body;
+    const { name, description, image_url, combo_price, original_price, split_type, currency, items, cancellation_policy } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (cancellation_policy !== undefined && !CANCELLATION_POLICIES.includes(cancellation_policy)) {
+      return NextResponse.json({ error: "cancellation_policy must be one of " + CANCELLATION_POLICIES.join(", ") }, { status: 400 });
+    }
+    const parsedRules = parseComboRules(body.combo_rules);
+    if (parsedRules.error) return NextResponse.json({ error: parsedRules.error }, { status: 400 });
     if (combo_price == null || combo_price < 0) return NextResponse.json({ error: "combo_price must be non-negative" }, { status: 400 });
     if (!split_type || !["PERCENT", "FIXED"].includes(split_type)) return NextResponse.json({ error: "split_type must be PERCENT or FIXED" }, { status: 400 });
     if (!Array.isArray(items) || items.length < 2) return NextResponse.json({ error: "At least 2 items required" }, { status: 400 });
@@ -150,6 +156,8 @@ export async function POST(req: NextRequest) {
         original_price: Number(original_price || combo_price),
         split_type,
         currency: currency || "ZAR",
+        cancellation_policy: cancellation_policy || "VOUCHER_ONLY",
+        combo_rules: parsedRules.rules,
         active: true,
         created_by: business_id,
         created_by_business_id: business_id,
@@ -190,8 +198,13 @@ export async function POST(req: NextRequest) {
 
   // --- UPDATE ---
   if (action === "update") {
-    const { combo_offer_id, name, description, image_url, combo_price, original_price, split_type, currency, items } = body;
+    const { combo_offer_id, name, description, image_url, combo_price, original_price, split_type, currency, items, cancellation_policy } = body;
     if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
+    if (cancellation_policy !== undefined && !CANCELLATION_POLICIES.includes(cancellation_policy)) {
+      return NextResponse.json({ error: "cancellation_policy must be one of " + CANCELLATION_POLICIES.join(", ") }, { status: 400 });
+    }
+    const parsedRules = parseComboRules(body.combo_rules);
+    if (parsedRules.error) return NextResponse.json({ error: parsedRules.error }, { status: 400 });
 
     // Verify ownership (creator or participant)
     const { data: existingItems } = await supabase
@@ -213,6 +226,9 @@ export async function POST(req: NextRequest) {
     if (original_price !== undefined) updates.original_price = Number(original_price);
     if (split_type !== undefined) updates.split_type = split_type;
     if (currency !== undefined) updates.currency = currency;
+    if (cancellation_policy !== undefined) updates.cancellation_policy = cancellation_policy;
+    // Rules are replaced wholesale, so an empty object clears them.
+    if (body.combo_rules !== undefined) updates.combo_rules = parsedRules.rules;
 
     if (Object.keys(updates).length > 0) {
       const { error: updateErr } = await supabase.from("combo_offers").update(updates).eq("id", combo_offer_id);

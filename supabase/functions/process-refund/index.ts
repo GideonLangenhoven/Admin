@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { reissueVoucherPortion } from "../_shared/vouchers.ts";
+import { getComboLegPolicy } from "../_shared/combo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -92,6 +93,17 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, refund_status: "MANUAL_EFT_REQUIRED", amount: manualRefundAmount, message: "This booking was paid via " + pm + ". An admin must process the refund manually." }), { status: 200, headers: getCors(req) });
     }
 
+    // Combo legs: the offer's cancellation policy decides the FORM of
+    // compensation. Cash only when the offer says POLICY_REFUND; the default
+    // VOUCHER_ONLY routes through the voucher flow instead.
+    const comboCtx = await getComboLegPolicy(supabase, booking);
+    if (comboCtx && comboCtx.cancellation_policy !== "POLICY_REFUND") {
+      const why = comboCtx.cancellation_policy === "NO_CANCEL"
+        ? "This booking is part of a non-cancellable combo package."
+        : "This combo package is refundable as a credit voucher only.";
+      return new Response(JSON.stringify({ error: why + " Use the cancel-to-voucher flow instead of a cash refund." }), { status: 400, headers: getCors(req) });
+    }
+
     const totalAmount = Number(booking.total_amount || 0);
     const totalCaptured = Number(booking.total_captured || totalAmount);
     const totalRefunded = Number(booking.total_refunded || 0);
@@ -151,9 +163,19 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, amount: 0, voucher_code: reissued.code, voucher_amount: reissued.amount, channel: "voucher" }), { status: 200, headers: getCors(req) });
     }
 
-    if (!booking.yoco_checkout_id) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking; manual refund only" }), { status: 400, headers: getCors(req) });
+    // Combo money is collected on ONE operator's Yoco account (the collector's
+    // leg is the only booking stamped with yoco_checkout_id), so a cash refund
+    // for any other leg must run against the collector's checkout + creds.
+    let refundCheckoutId: string = booking.yoco_checkout_id || "";
+    let refundCredsBusinessId: string = booking.business_id;
+    if (comboCtx && !refundCheckoutId) {
+      const collectorLeg = comboCtx.legs.find((l: any) => l.yoco_checkout_id);
+      refundCheckoutId = collectorLeg?.yoco_checkout_id || comboCtx.combo.yoco_checkout_id || "";
+      if (collectorLeg) refundCredsBusinessId = collectorLeg.business_id;
+    }
+    if (!refundCheckoutId) return new Response(JSON.stringify({ error: "No Yoco checkout ID on this booking; manual refund only" }), { status: 400, headers: getCors(req) });
 
-    const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+    const tenant = await getTenantByBusinessId(supabase, refundCredsBusinessId);
     const brandName = getBusinessDisplayName(tenant.business);
     let refundAmount = amount != null ? Number(amount) : Number(booking.refund_amount || booking.total_amount || 0);
     if (refundAmount <= 0) return new Response(JSON.stringify({ error: "Invalid refund amount" }), { status: 400, headers: getCors(req) });
@@ -183,11 +205,14 @@ Deno.serve(async (req: any) => {
 
     const refundAmountCents = Math.round(refundAmount * 100);
     const yocoBody: any = {};
-    if (isPartial) yocoBody.amount = refundAmountCents;
+    // Combo legs ALWAYS send an explicit amount: the checkout's Yoco total
+    // spans every leg, so a bodyless "full refund" would refund the whole
+    // combo, not this leg's share.
+    if (isPartial || comboCtx) yocoBody.amount = refundAmountCents;
 
     // Test-mode aware: refunds follow the tenant's CURRENT mode. A payment made
     // in the other mode fails loud at Yoco ("not found") rather than crossing accounts.
-    const yocoRes = await fetch("https://payments.yoco.com/api/checkouts/" + booking.yoco_checkout_id + "/refund", {
+    const yocoRes = await fetch("https://payments.yoco.com/api/checkouts/" + refundCheckoutId + "/refund", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey,

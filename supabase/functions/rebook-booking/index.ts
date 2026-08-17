@@ -11,6 +11,7 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { verifyCustomerSession } from "../_shared/customer-session.ts";
+import { getComboLegPolicy, validateComboDates } from "../_shared/combo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1564,6 +1565,48 @@ Deno.serve(async function (req: any) {
 
     const authz = await authorizeCaller(req, body, booking);
     if (authz.ok !== true) return fail(req, authz.message, authz.status);
+
+    // Combo legs: the offer's cancellation policy and date rules govern
+    // self-service changes. Ordinary bookings resolve to null and fall
+    // straight through — this is the single enforcement point for every
+    // customer-reachable cancel/reschedule door.
+    const comboCtx = (booking.is_combo || booking.combo_booking_id)
+      ? await getComboLegPolicy(supabase, booking)
+      : null;
+    if (comboCtx) {
+      const policy = comboCtx.cancellation_policy;
+      if (policy === "NO_CANCEL" && (action === "CANCEL_REFUND" || action === "CANCEL_VOUCHER")) {
+        return fail(req, "This booking is part of a non-cancellable combo package. Contact the operator if your plans have changed.", 400);
+      }
+      if (policy !== "POLICY_REFUND") {
+        if (action === "CANCEL_REFUND") {
+          return fail(req, "This combo package is refundable as a credit voucher only. Choose the voucher option instead.", 400);
+        }
+        // Operator-cancelled leg: compensation choice still excludes cash.
+        // (Voucher-paid bookings already convert REFUND to a voucher inside
+        // the handler, so they pass through untouched.)
+        if (action === "CLAIM_CREDIT" && String(body.credit_action || "") === "REFUND" && !isVoucherPayment(booking)) {
+          return fail(req, "This combo package is refundable as a credit voucher only. Choose the voucher option.", 400);
+        }
+      }
+      if (action === "RESCHEDULE" && body.new_slot_id) {
+        // The new date must still satisfy the offer's gap/order rules against
+        // the OTHER legs' current dates.
+        const { data: proposedSlot } = await supabase
+          .from("slots").select("id, start_time").eq("id", String(body.new_slot_id)).maybeSingle();
+        if (proposedSlot?.start_time) {
+          const legDates: string[] = [];
+          for (const leg of comboCtx.legs) {
+            if (String(leg.id) === String(booking.id)) legDates.push(String(proposedSlot.start_time));
+            else if (leg.slots?.start_time && leg.status !== "CANCELLED") legDates.push(String(leg.slots.start_time));
+          }
+          const dateCheck = validateComboDates(comboCtx.combo_rules, legDates);
+          if (!dateCheck.ok) {
+            return fail(req, dateCheck.error + " Your other combo booking stays as it is, so pick a date that fits.", 400);
+          }
+        }
+      }
+    }
 
     // Weather/admin-cancelled bookings awaiting a customer decision may claim
     // their credit (voucher/refund) or pick a new date with it.
