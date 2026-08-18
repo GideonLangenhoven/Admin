@@ -11,6 +11,7 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { verifyCustomerSession } from "../_shared/customer-session.ts";
+import { getPaidPortions } from "../_shared/vouchers.ts";
 import { getComboLegPolicy, validateComboDates } from "../_shared/combo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -183,7 +184,14 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
   // A cancelled booking only carries credit while its payout is still parked
   // (refund_status ACTION_REQUIRED). Once the refund/voucher was issued the
   // money already left — rebooking charges the full new price.
-  const credit = isCreditClaim && !claimEligible ? 0 : Number(booking.total_amount || 0);
+  // Credit counts what the customer actually paid: cash AND voucher portions.
+  // Counting total_amount alone made voucher-paid bookings owe the full new
+  // price on reschedule. A booking whose voucher portion was already reissued
+  // as a CREDIT voucher (converted_to_voucher_id, stamped by cancel flows) no
+  // longer holds that money — it never counts as credit twice.
+  const portions = getPaidPortions(booking);
+  const liveVoucherPaid = booking.converted_to_voucher_id ? 0 : portions.voucherPaid;
+  const credit = isCreditClaim && !claimEligible ? 0 : portions.cashPaid + liveVoucherPaid;
   const diff = newTotalAmount - credit;
 
   const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
@@ -197,7 +205,9 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
       slot_id: newSlotId,
       tour_id: newSlot.tour_id,
       unit_price: newUnitPrice,
-      total_amount: newTotalAmount,
+      // total_amount is the cash still due — any voucher already applied
+      // keeps covering its share of the new price.
+      total_amount: Math.max(0, newTotalAmount - liveVoucherPaid),
       yoco_checkout_id: null,
       payment_url: null,
     }).eq("id", booking.id);
@@ -317,14 +327,24 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
     // Increment new slot booked count (S3: atomic)
     await supabase.rpc("adjust_slot_capacity", { p_slot_id: newSlotId, p_business_id: booking.business_id, p_booked_delta: Number(newQty), p_held_delta: 0 });
 
-    // Update booking
+    // Update booking. Keep the cash/voucher split intact: total_amount stays
+    // the cash portion and the voucher-funded portion rides along. A
+    // downgrade's excess draws down the voucher portion first — it is
+    // returned as voucher credit (never cash) in the excess handling below.
+    const swapExcess = Math.max(0, -diff);
+    const swapVoucherShare = Math.min(swapExcess, liveVoucherPaid);
+    const swapCashShare = swapExcess - swapVoucherShare;
+    const newVoucherPaid = liveVoucherPaid - swapVoucherShare;
     const updateData: any = {
       slot_id: newSlotId,
       tour_id: newSlot.tour_id,
       unit_price: newUnitPrice,
-      total_amount: newTotalAmount,
+      total_amount: Math.max(0, newTotalAmount - newVoucherPaid),
       qty: newQty,
     };
+    if (portions.voucherPaid > 0) {
+      updateData.voucher_amount_paid = newVoucherPaid;
+    }
     if (isCreditClaim) {
       updateData.status = "CONFIRMED";
       updateData.refund_status = null;
@@ -350,16 +370,37 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
     let rebookNotifyMsg = "Your booking has been moved to a new date/time.";
 
     if (diff < 0 && body.excess_action === "REFUND") {
-      // If paid via voucher, block cash refund — must use voucher credit
-      if (isVoucherPayment(booking)) {
-        return fail(req, "Cannot issue a cash refund on a voucher-paid booking. Use VOUCHER as the excess_action instead.", 400);
+      // The voucher-funded share of the excess always comes back as a
+      // full-value CREDIT voucher (never cash); only the cash share is
+      // refunded. Legacy voucher-paid rows without voucher_amount_paid
+      // stamped treat the whole excess as voucher-funded.
+      let diffVoucherCredit = swapVoucherShare;
+      let diffCashRefund = swapCashShare;
+      if (diffVoucherCredit === 0 && isVoucherPayment(booking)) {
+        diffVoucherCredit = swapExcess;
+        diffCashRefund = 0;
       }
-      // If paid via manual method, flag for manual refund
       // Credit-claim excess refunds are fee-free: the operator cancelled the
       // trip, so the customer never absorbs the 5% processing fee.
       const diffFeeFactor = isCreditClaim ? 1 : 0.95;
-      if (isManualPayment(booking)) {
-        const manualDiffRefund = Math.abs(diff) * diffFeeFactor;
+      if (diffVoucherCredit > 0) {
+        const vResult = await insertVoucherWithRetry({
+          business_id: booking.business_id,
+          code: genVoucherCode(),
+          status: "ACTIVE",
+          type: "CREDIT",
+          value: diffVoucherCredit,
+          current_balance: diffVoucherCredit,
+          source_booking_id: booking.id,
+          expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        if (vResult.error) return fail(req, "Voucher creation failed: " + vResult.error.message, 500);
+        result.voucher_amount = diffVoucherCredit;
+        result.voucher_code = vResult.data.code;
+        rebookNotifyMsg = "Your booking has been moved to a new date/time. Since the new slot costs less, we've issued you a credit voucher for the difference. Voucher code: " + vResult.data.code + " (valid for 3 years).";
+      }
+      if (diffCashRefund > 0 && isManualPayment(booking)) {
+        const manualDiffRefund = diffCashRefund * diffFeeFactor;
         await supabase.from("bookings").update({
           refund_status: "MANUAL_EFT_REQUIRED",
           refund_amount: manualDiffRefund,
@@ -367,11 +408,11 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
         }).eq("id", booking.id);
         result.refund_amount = manualDiffRefund;
         result.refund_status = "MANUAL_EFT_REQUIRED";
-      } else {
+      } else if (diffCashRefund > 0) {
         const rescheduleTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
         const rescheduleTotalRefunded = Number(booking.total_refunded || 0);
         const rescheduleRefundable = rescheduleTotalCaptured - rescheduleTotalRefunded;
-        const refundAmount = Math.min(Math.abs(diff) * diffFeeFactor, rescheduleRefundable);
+        const refundAmount = Math.min(diffCashRefund * diffFeeFactor, rescheduleRefundable);
         // total_refunded is NOT bumped here — process-refund adds it when the
         // money actually moves; pre-counting made the queue see 0 refundable.
         await supabase.from("bookings").update({
@@ -505,12 +546,18 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   if (newQty >= booking.qty) return fail(req, "new_qty must be less than current qty (" + booking.qty + ")", 400);
 
   const removedGuests = booking.qty - newQty;
-  // Use pro-rata discount math: divide total_amount by current guest count
-  // to find the true discounted per-person price (not the base unit_price)
-  const totalAmountPaid = Number(booking.total_amount || 0);
-  const discountedUnitPrice = booking.qty > 0 ? totalAmountPaid / booking.qty : Number(booking.unit_price || 0);
+  // Use pro-rata discount math over the booking's full paid value: the cash
+  // portion (total_amount = cash due after voucher) PLUS the voucher-funded
+  // portion (voucher_amount_paid). Pricing off total_amount alone priced the
+  // excess at R0 on voucher-paid bookings and the voucher money vanished.
+  const { cashPaid, voucherPaid, paidValue } = getPaidPortions(booking);
+  const discountedUnitPrice = booking.qty > 0 ? paidValue / booking.qty : Number(booking.unit_price || 0);
   const excessAmount = removedGuests * discountedUnitPrice;
-  const newTotal = totalAmountPaid - excessAmount;
+  // The excess draws down the voucher-funded portion first; voucher money
+  // comes back as voucher credit, never cash.
+  const voucherShare = Math.min(excessAmount, voucherPaid);
+  const cashShare = excessAmount - voucherShare;
+  const newTotal = cashPaid - cashShare;
 
   // Removing guests close to the trip used to be blocked outright, because a full
   // refund here would undercut the cancellation policy (remove-all-but-one to dodge
@@ -551,6 +598,7 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
   await supabase.from("bookings").update({
     qty: newQty,
     total_amount: newTotal,
+    ...(voucherPaid > 0 ? { voucher_amount_paid: voucherPaid - voucherShare } : {}),
   }).eq("id", booking.id);
 
   // Decrement slot booked count (S3: atomic)
@@ -560,31 +608,40 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
     business_id: booking.business_id,
     booking_id: booking.id,
     event: "guests_removed",
-    payload: { old_qty: booking.qty, new_qty: newQty, excess_amount: excessAmount, excess_action: body.excess_action },
+    payload: { old_qty: booking.qty, new_qty: newQty, excess_amount: excessAmount, voucher_share: voucherShare, cash_share: cashShare, excess_action: body.excess_action },
   });
 
   const result: any = { ok: true, action: "REMOVE_GUESTS" };
 
   if (body.excess_action === "REFUND") {
-    // If paid via voucher, issue voucher at full value (no 5% penalty) instead of Yoco refund
-    if (isVoucherPayment(booking)) {
+    // The voucher-funded share always comes back as a full-value CREDIT voucher
+    // (no penalty), never cash. Legacy voucher-paid rows without
+    // voucher_amount_paid stamped treat the whole excess as voucher-funded.
+    let voucherCredit = voucherShare;
+    let cashRefund = cashShare;
+    if (voucherCredit === 0 && isVoucherPayment(booking)) {
+      voucherCredit = excessAmount;
+      cashRefund = 0;
+    }
+    if (voucherCredit > 0) {
       const vcode = genVoucherCode();
       const vResult = await insertVoucherWithRetry({
         business_id: booking.business_id,
         code: vcode,
         status: "ACTIVE",
         type: "CREDIT",
-        value: excessAmount,
-        current_balance: excessAmount,
+        value: voucherCredit,
+        current_balance: voucherCredit,
         source_booking_id: booking.id,
         expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
       });
       if (vResult.error) return fail(req, "Voucher creation failed: " + vResult.error.message, 500);
-      result.voucher_amount = excessAmount;
+      result.voucher_amount = voucherCredit;
       result.voucher_code = vResult.data.code;
       result.payment_method = booking.payment_method;
-    } else if (isManualPayment(booking)) {
-      const manualRefund = excessAmount * removePolicyFraction;
+    }
+    if (cashRefund > 0 && isManualPayment(booking)) {
+      const manualRefund = cashRefund * removePolicyFraction;
       await supabase.from("bookings").update({
         refund_status: "MANUAL_EFT_REQUIRED",
         refund_amount: manualRefund,
@@ -592,11 +649,11 @@ async function handleRemoveGuests(req: any, booking: any, body: any) {
       }).eq("id", booking.id);
       result.refund_amount = manualRefund;
       result.refund_status = "MANUAL_EFT_REQUIRED";
-    } else {
+    } else if (cashRefund > 0) {
       const guestTotalCaptured = Number(booking.total_captured || booking.total_amount || 0);
       const guestTotalRefunded = Number(booking.total_refunded || 0);
       const guestRefundable = guestTotalCaptured - guestTotalRefunded;
-      const refundAmount = Math.min(excessAmount * removePolicyFraction, guestRefundable);
+      const refundAmount = Math.min(cashRefund * removePolicyFraction, guestRefundable);
       // No total_refunded bump at request time — see process-refund
       await supabase.from("bookings").update({
         refund_status: "REQUESTED",

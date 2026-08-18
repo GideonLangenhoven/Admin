@@ -27,6 +27,23 @@ export async function insertVoucherWithRetry(supabase: any, payload: any, maxRet
   return { data: null, error: { message: "Failed to generate unique voucher code after " + maxRetries + " attempts" } };
 }
 
+// ───── Split a booking's paid value into cash + voucher portions ─────
+// Convention: total_amount = cash due after voucher; voucher_amount_paid = the
+// voucher-funded portion; value = sum of both. One legacy write-path stored
+// total_amount voucher-inclusive — when cash + voucher exceeds the pre-voucher
+// original_total, derive the true cash portion from original_total instead.
+export function getPaidPortions(
+  booking: { total_amount?: number | string | null; voucher_amount_paid?: number | string | null; original_total?: number | string | null },
+): { cashPaid: number; voucherPaid: number; paidValue: number } {
+  const voucherPaid = Number(booking.voucher_amount_paid || 0);
+  let cashPaid = Number(booking.total_amount || 0);
+  const originalTotal = Number(booking.original_total || 0);
+  if (originalTotal > 0 && cashPaid + voucherPaid > originalTotal) {
+    cashPaid = Math.max(0, originalTotal - voucherPaid);
+  }
+  return { cashPaid, voucherPaid, paidValue: cashPaid + voucherPaid };
+}
+
 /**
  * Reissue a booking's voucher-funded portion (voucher_amount_paid) as a fresh
  * CREDIT voucher, once. Returns { code, amount } when a voucher was created,

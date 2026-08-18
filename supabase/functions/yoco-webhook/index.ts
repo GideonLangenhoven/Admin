@@ -712,12 +712,15 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         await supabase.rpc("adjust_slot_capacity", { p_slot_id: pr.new_slot_id, p_business_id: pr.business_id, p_booked_delta: finalQty, p_held_delta: -finalQty });
       }
 
-      // 3. Update booking to new slot
+      // 3. Update booking to new slot. total_amount is the CASH portion
+      // (cash due after voucher) — any voucher-funded portion rides along in
+      // voucher_amount_paid and keeps covering its share of the new price.
+      const rVoucherPaid = Number(rBooking.voucher_amount_paid || 0);
       await supabase.from("bookings").update({
         slot_id: pr.new_slot_id,
         tour_id: pr.new_tour_id,
         unit_price: pr.new_unit_price,
-        total_amount: pr.new_total_amount,
+        total_amount: Math.max(0, Number(pr.new_total_amount || 0) - rVoucherPaid),
         qty: finalQty,
         ...(wasCancelled ? {
           status: "PAID",
@@ -828,7 +831,9 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           const agBk = agBooking.data;
           const agDelta = agNewQty - agBk.qty;
           const agUnitPrice = Number(agBk.unit_price || 0);
-          const agNewTotal = agNewQty * agUnitPrice;
+          // Add the paid uplift to the existing cash portion. Recomputing
+          // qty * unit_price clobbered voucher- and discount-adjusted totals.
+          const agNewTotal = Number(agBk.total_amount || 0) + agDelta * agUnitPrice;
 
           // Update booking qty and total
           await supabase.from("bookings").update({

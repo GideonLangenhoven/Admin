@@ -22,6 +22,7 @@ import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prom
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
@@ -1873,6 +1874,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           return;
         }
         const addNewTotal = newQty * Number(sd.unit_price);
+        // DB writes keep total_amount as the CASH portion: existing cash total
+        // plus the uplift. newQty * unit_price clobbered voucher/discount-
+        // adjusted totals (addNewTotal stays display-only).
+        const addNewCashTotal = Number(sd.total || 0) + addCost;
         // M8: Invalidate waiver on guest addition
         await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
         await logE(tenant, "guests_added_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: newQty, additional_cost: addCost }, sd.booking_id);
@@ -1888,12 +1893,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             await sendText(tenant, phone, "\u{1F465} *" + addCount + " extra guest" + (addCount !== 1 ? "s" : "") + " reserved!*\n\nNew total will be: " + newQty + " people (R" + addNewTotal + ")\n\nPlease pay the extra *R" + addCost + "* to confirm:\n" + coData.redirectUrl + "\n\n\u23F0 Spots held for 15 minutes.");
           } else {
             // Fallback: update booking directly since checkout failed
-            await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
+            await supabase.from("bookings").update({ qty: newQty, total_amount: addNewCashTotal }).eq("id", sd.booking_id);
             await sendText(tenant, phone, "\u2705 *" + addCount + " guest" + (addCount !== 1 ? "s" : "") + " added!*\n\nNew total: " + newQty + " people (R" + addNewTotal + ")\n\nA payment link for R" + addCost + " will be sent to your email.");
           }
         } catch (e) {
           // Fallback: update booking directly since checkout failed
-          await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
+          await supabase.from("bookings").update({ qty: newQty, total_amount: addNewCashTotal }).eq("id", sd.booking_id);
           await sendText(tenant, phone, "\u2705 Guests added! A payment link for R" + addCost + " will be sent shortly.");
         }
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
@@ -1902,7 +1907,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Removing guests
         if (!sd.can_remove) { await sendText(tenant, phone, "Removing guests is only available more than 24 hours before the trip. You can add more guests, or contact our team for help."); return; }
         const rmCount = sd.qty - newQty;
-        const rmAmount = rmCount * (Number(sd.total) / Number(sd.qty));
+        // Price the freed seats from the booking's full paid value (cash +
+        // voucher portions) — sd.total is only the cash portion and reads R0
+        // on voucher-paid bookings.
+        const rmBkRes = await supabase.from("bookings").select("qty, total_amount, voucher_amount_paid, original_total").eq("id", sd.booking_id).single();
+        const rmPortions = getPaidPortions(rmBkRes.data || { total_amount: sd.total });
+        const rmUnitValue = rmPortions.paidValue / Number(rmBkRes.data?.qty || sd.qty || 1);
+        const rmAmount = Math.round(rmCount * rmUnitValue * 100) / 100;
         await sendText(tenant, phone, "Removing " + rmCount + " guest" + (rmCount !== 1 ? "s" : "") + " frees up *R" + rmAmount + "*.\n\nHow would you like your credit?");
         await sendButtons(tenant, phone, "Choose an option:", [
           { id: "GUEST_VOUCHER", title: "\u{1F39F} Voucher (R" + rmAmount + ")" },
@@ -1915,27 +1926,32 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== EDIT GUESTS — refund or voucher for removed guests =====
     else if (state === "EDIT_GUESTS_EXCESS") {
-      if (rid === "GUEST_VOUCHER" || input === "voucher") {
-        const gvNewTotal = sd.new_qty * Number(sd.unit_price);
-        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: gvNewTotal }).eq("id", sd.booking_id);
-        // Release slot capacity
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
-        // Create voucher
-        let gvCode = genVoucherCode();
-        const gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
-        if (gvResult.data) gvCode = gvResult.data.code;
-        await logE(tenant, "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode, amount: sd.rm_amount }, sd.booking_id);
-        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + gvCode + "*\n\u{1F4B0} Value: *R" + sd.rm_amount + "*\n\u{1F4C5} Valid for 3 years");
-        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
-      }
-      else if (rid === "GUEST_REFUND" || input === "refund") {
-        const grNewTotal = sd.new_qty * Number(sd.unit_price);
-        // Full removed-guest excess, matching the web rebook-booking path (no fee)
-        const grRefund = Math.round(Number(sd.rm_amount) * 100) / 100;
-        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund" }).eq("id", sd.booking_id);
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
-        await logE(tenant, "guests_removed_refund_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, refund: grRefund }, sd.booking_id);
-        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted. Expect it within 5\u20137 business days.");
+      if (rid === "GUEST_VOUCHER" || input === "voucher" || rid === "GUEST_REFUND" || input === "refund") {
+        const wantRefund = rid === "GUEST_REFUND" || input === "refund";
+        // Route through rebook-booking — the canonical money door for guest
+        // removal. It reprices cash + voucher portions, returns voucher-funded
+        // value as a CREDIT voucher, refunds only the cash share, releases
+        // seats and logs. The hand-rolled copy here was voucher-blind.
+        let rd: any = null;
+        try {
+          const rr = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ booking_id: sd.booking_id, action: "REMOVE_GUESTS", new_qty: sd.new_qty, excess_action: wantRefund ? "REFUND" : "VOUCHER" }),
+          });
+          rd = await rr.json();
+        } catch (e) {
+          console.error("WA_REMOVE_GUESTS_ERR:", e);
+        }
+        if (!rd || rd.error || rd.ok === false) {
+          await sendText(tenant, phone, "Sorry, something went wrong updating your booking. Please try again or contact our team.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
+        await logE(tenant, wantRefund ? "guests_removed_refund_wa" : "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: rd.voucher_code, voucher_amount: rd.voucher_amount, refund: rd.refund_amount }, sd.booking_id);
+        let rmMsg = "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*";
+        if (rd.voucher_code) rmMsg += "\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + rd.voucher_code + "*\n\u{1F4B0} Value: *R" + rd.voucher_amount + "*\n\u{1F4C5} Valid for 3 years";
+        if (rd.refund_amount) rmMsg += "\n\n\u{1F4B8} Refund of *R" + rd.refund_amount + "* submitted. Expect it within 5\u20137 business days.";
+        await sendText(tenant, phone, rmMsg);
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else { await sendText(tenant, phone, "No changes made. Your booking stays at " + sd.qty + " people. \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }

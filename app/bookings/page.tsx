@@ -72,6 +72,13 @@ function isPaid(status: string) {
   return ["PAID", "CONFIRMED", "COMPLETED"].includes(status);
 }
 
+// A booking's value = cash portion (total_amount, i.e. what's due after any
+// voucher) + the voucher-funded portion. Reading total_amount alone shows
+// R0.00 for voucher-paid bookings.
+function bookingValue(b: { total_amount: number; voucher_amount_paid?: number | null }) {
+  return Number(b.total_amount || 0) + Number(b.voucher_amount_paid || 0);
+}
+
 type TourRel = { id?: string; name?: string } | null;
 type SlotRel = {
   id?: string;
@@ -90,6 +97,7 @@ interface Booking {
   email: string;
   qty: number;
   total_amount: number;
+  voucher_amount_paid: number | null;
   status: string;
   source: string;
   external_ref: string | null;
@@ -339,7 +347,7 @@ export default function Bookings() {
         const batch = slotIds.slice(i, i + BATCH);
         const { data, error } = await supabase
           .from("bookings")
-          .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
           .eq("business_id", businessId)
           .in("slot_id", batch)
           .order("created_at", { ascending: true })
@@ -355,7 +363,7 @@ export default function Bookings() {
     if (page === 0) {
       const { data: unslotted } = await supabase
         .from("bookings")
-        .select("id, slot_id, customer_name, phone, email, qty, total_amount, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+        .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
         .eq("business_id", businessId)
         .is("slot_id", null)
         .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
@@ -532,8 +540,8 @@ export default function Bookings() {
         // those guests are coming regardless of payment state.
         const activeBks = bks.filter((b) => b.status === "PAID" || b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "PENDING" || (b.allow_unpaid && b.status !== "CANCELLED"));
         const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
-        const totalPrice = activeBks.reduce((s, b) => s + Number(b.total_amount || 0), 0);
-        const totalPaid = activeBks.filter((b) => isPaid(b.status)).reduce((s, b) => s + Number(b.total_amount || 0), 0);
+        const totalPrice = activeBks.reduce((s, b) => s + bookingValue(b), 0);
+        const totalPaid = activeBks.reduce((s, b) => s + (isPaid(b.status) ? bookingValue(b) : Number(b.voucher_amount_paid || 0)), 0);
         // Unpaid reschedule-upgrade fees are outstanding funds too
         const rescheduleDue = activeBks.reduce((s, b) => s + Math.max(0, Number(b.pending_reschedule?.diff || 0)), 0);
         slots.push({
@@ -639,8 +647,12 @@ export default function Bookings() {
       const ref = b.id.substring(0, 8).toUpperCase();
       const tourName = b.tours?.name || "Kayak Booking";
       const startTime = b.slots?.start_time ? fmtDate(b.slots.start_time) : "-";
-      const total = Number(b.total_amount || 0);
+      const voucherPaid = Number(b.voucher_amount_paid || 0);
+      const total = Number(b.total_amount || 0) + voucherPaid;
       const unitPrice = b.qty > 0 ? (total / b.qty).toFixed(2) : total.toFixed(2);
+      const paidMethod = voucherPaid > 0
+        ? (Number(b.total_amount || 0) > 0 ? "Voucher + Card" : "Voucher")
+        : "Admin (Manual)";
 
       // Check if an invoice already exists for this booking
       let invoiceNumber = ref;
@@ -677,7 +689,7 @@ export default function Bookings() {
             unit_price: Number(unitPrice),
             subtotal: total,
             total_amount: total,
-            payment_method: isPaid(b.status) ? "Admin (Manual)" : "Pending",
+            payment_method: isPaid(b.status) ? paidMethod : "Pending",
           }).select("id").single();
 
           if (invData?.id) {
@@ -704,8 +716,8 @@ export default function Bookings() {
             unit_price: unitPrice,
             subtotal: total.toFixed(2),
             total_amount: total.toFixed(2),
-            amount_paid: isPaid(b.status) ? total.toFixed(2) : "0.00",
-            payment_method: isPaid(b.status) ? "Admin (Manual)" : "Pending",
+            amount_paid: isPaid(b.status) ? total.toFixed(2) : voucherPaid.toFixed(2),
+            payment_method: isPaid(b.status) ? paidMethod : "Pending",
             payment_reference: ref,
           },
         },
@@ -735,6 +747,17 @@ export default function Bookings() {
     console.log("[BOOKINGS] saveEditBooking", { bookingId: editBooking.id, editForm });
     const qty = Math.max(1, Number(editForm.qty) || 1);
     const total = Number(editForm.total_amount) || 0;
+    // Guest-count changes on a paid booking move money (refund/voucher credit)
+    // and seats — this raw update handles neither. Route through the proper flows.
+    if (isPaid(editBooking.status) && qty !== editBooking.qty) {
+      notify({
+        title: "Guest count locked on paid bookings",
+        message: "Open the booking and use Reduce guests / Add guests — those handle the refund or voucher credit and release the seats.",
+        tone: "warning",
+        duration: 8000,
+      });
+      return;
+    }
     setActionBookingId(editBooking.id);
 
     const isChangingToPaid = editForm.status === "PAID" && editBooking.status !== "PAID";
@@ -2256,9 +2279,9 @@ function SlotRows({
       {isOpen &&
         slot.bookings.map((b) => {
           const refundAmt = b.status === "CANCELLED" && b.refund_amount ? Number(b.refund_amount) : 0;
-          const paid = isPaid(b.status) ? Number(b.total_amount) : 0;
+          const paid = isPaid(b.status) ? bookingValue(b) : Number(b.voucher_amount_paid || 0);
           const rescheduleDue = Math.max(0, Number(b.pending_reschedule?.diff || 0));
-          const due = (refundAmt > 0 ? refundAmt : Number(b.total_amount || 0) - paid) + rescheduleDue;
+          const due = (refundAmt > 0 ? refundAmt : bookingValue(b) - paid) + rescheduleDue;
           const isLoading = actionBookingId === b.id;
           const isResending = resendingInvoiceId === b.id;
           const isGeneratingLink = paymentLinkBookingId === b.id;
@@ -2394,7 +2417,7 @@ function SlotRows({
                 </div>
               </td>
               <td className="hidden p-3 align-top md:table-cell">{b.tours?.name || "—"}</td>
-              <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(Number(b.total_amount || 0))}</td>
+              <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(bookingValue(b))}</td>
               <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(paid)}</td>
               <td className={`p-1.5 lg:p-3 text-right align-top font-medium text-[11px] lg:text-sm ${refundAmt > 0 ? "text-amber-600" : due > 0 ? "text-red-600" : "text-green-600"}`}>
                 {refundAmt > 0 ? <span title="Refunded">↩ {fmtCurrency(due)}</span> : fmtCurrency(due)}
