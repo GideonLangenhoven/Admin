@@ -54,4 +54,4 @@ WhatsApp (access token and phone number ID), Yoco payments (live keys plus a tes
 
 ## Chat FAQ (Quick Answers)
 
-At Settings → Chat FAQ you maintain Quick Answers — verified question-and-answer pairs the customer chat assistant uses before anything else. Keep these accurate; the bot treats them as ground truth.
+Quick Answers for the customer chatbot are NOT managed inside Settings. They live on their own Chat FAQ page in the sidebar, under the Admin group. See the Chat FAQ article.
