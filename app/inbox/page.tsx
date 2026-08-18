@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -37,7 +38,7 @@ function MessageList({
               </div>
             )}
             <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isOut
+              <div className={`max-w-[75%] [overflow-wrap:anywhere] px-3 py-2 rounded-2xl text-sm ${isOut
                 ? (isBot
                   ? "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] rounded-br-md"
                   : "bg-[var(--ck-accent-soft)] text-[var(--ck-text-strong)] rounded-br-md")
@@ -99,6 +100,24 @@ function InboxContent() {
 
   // WhatsApp send warning (cleared when conversation changes)
   const [waWarning, setWaWarning] = useState<string | null>(null);
+
+  // Bookings linked to this customer — matched by phone (bot bookings store the
+  // WA phone verbatim) with email as the fallback for web chats.
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+
+  useEffect(() => {
+    setCustomerBookings([]);
+    if (!selected) return;
+    const filters = [`phone.eq.${selected.phone}`];
+    if (selected.email) filters.push(`email.eq.${selected.email}`);
+    supabase.from("bookings")
+      .select("id, status, slots(start_time), tours(name)")
+      .eq("business_id", businessId)
+      .or(filters.join(","))
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .then(({ data }) => setCustomerBookings(data || []));
+  }, [selected, businessId]);
 
   const loadConvos = useCallback(async () => {
     const { data } = await supabase.from("conversations")
@@ -326,6 +345,10 @@ function InboxContent() {
     return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: getAdminTimezone() });
   }
 
+  function fmtSlot(iso: string) {
+    return new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
+  }
+
   const attentionCount = convos.filter(needsAttention).length;
   const q = search.trim().toLowerCase();
   const qDigits = q.replace(/\D/g, "");
@@ -412,6 +435,19 @@ function InboxContent() {
                     </div>
                   )}
                 </div>
+
+                {customerBookings.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto border-b border-[var(--ck-border-subtle)] px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    {customerBookings.map((b: any) => (
+                      <Link key={b.id} href={`/bookings/${b.id}`}
+                        className="shrink-0 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-2.5 py-1.5 text-[11px] leading-tight transition-colors hover:border-[var(--ck-accent)]">
+                        {/* Same 6-char ref the customer sees in /my-bookings, so both sides quote the same number */}
+                        <span className="font-mono font-semibold" style={{ color: "var(--ck-text-strong)" }}>#{b.id.substring(0, 6).toUpperCase()}</span>
+                        <span style={{ color: "var(--ck-text-muted)" }}> · {b.tours?.name || "Tour"} · {b.slots?.start_time ? fmtSlot(b.slots.start_time) : "no date"} · {b.status}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {messages.length === 0 ? (

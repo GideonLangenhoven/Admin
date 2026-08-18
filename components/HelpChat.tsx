@@ -307,7 +307,7 @@ export default function HelpChat() {
             {messages.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
                 <div
-                  className="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed"
+                  className="max-w-[85%] [overflow-wrap:anywhere] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed"
                   style={m.role === "user"
                     ? { background: "var(--ck-accent)", color: "#fff", borderBottomRightRadius: 6 }
                     : { background: "var(--ck-surface-warm)", color: "var(--ck-text-strong)", border: "1px solid var(--ck-border-subtle)", borderBottomLeftRadius: 6 }}
