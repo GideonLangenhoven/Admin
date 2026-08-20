@@ -47,57 +47,107 @@ When a customer messages an operator's WhatsApp number:
 
 ## 2. Step-by-Step Setup Runbook
 
-Follow these four steps to onboard a new operator to the WhatsApp Bot.
-
-### Step A: Configure the Meta Developer Portal
-To connect the operator's phone number to Meta's Cloud API:
-
-1. **Create a Meta Developer App**:
-   * Go to the [Meta Developer Portal](https://developers.facebook.com/).
-   * Create a new app (select **Business** or **Other** type).
-2. **Add the WhatsApp Product**:
-   * Under App Setup, click **Set Up** next to the **WhatsApp** product.
-   * Link it to the operator's Meta Business Manager.
-3. **Register/Verify Phone Number**:
-   * Under WhatsApp > **API Setup**, add the operator's phone number.
-   * Note the **Phone Number ID** (a long string of digits, e.g., `105948375920384`).
-4. **Generate a System User Access Token**:
-   * In your Meta Business Manager under **System Users**, create a system user.
-   * Generate an access token with the **`whatsapp_business_messaging`** and **`whatsapp_business_management`** permissions.
-   * Save this token as it will act as the permanent `wa_token`.
+Adding an operator is three jobs: connect their number on the Meta side, store
+their credentials on the tenant, then prove it on a real phone.
 
 > [!IMPORTANT]
-> Do NOT use the temporary 24-hour access token generated in the API Setup tab. You must create a System User in Business Manager to get a permanent token.
+> **There is one Meta app for the whole platform** — CapeKayakBookings, App ID
+> `1643815853336960`, under the CapeWeb business. Do **not** create a second app
+> per operator. `wa-webhook` verifies every inbound signature against a single
+> `WA_APP_SECRET` (`supabase/functions/wa-webhook/index.ts:31`) and answers the
+> verification handshake with a single `WA_VERIFY_TOKEN` (line 28), so a number
+> living under a different app would have its webhooks rejected with a 401.
+> Per-operator separation is the *token*, not the app.
+
+### Step A: Add the operator's number to the shared app
+
+The operator needs their own WhatsApp Business Account (WABA) and phone number,
+shared into the CapeKayakBookings app:
+
+1. **Get access to their WABA.** Either they add CapeWeb as a partner in their
+   Meta Business Manager (Business settings → Partners → share the WABA with
+   business ID `2304217393358934`), or you create the WABA on their behalf. The
+   number must not already be registered to a personal WhatsApp or WhatsApp
+   Business app account — it has to be freed up first.
+2. **Register the phone number** under WhatsApp → API Setup and complete the SMS
+   or voice verification. Note the **Phone Number ID** (digits, e.g.
+   `105948375920384`). This is *not* the phone number itself.
+3. **Generate a System User access token** in Business Manager → System Users,
+   with **`whatsapp_business_messaging`** and **`whatsapp_business_management`**,
+   scoped to that operator's WABA. This is the permanent `wa_token`.
+4. **Subscribe the app to their WABA** so their inbound messages actually reach
+   the webhook — WhatsApp → Configuration, or
+   `POST /{waba-id}/subscribed_apps`. Skipping this is the most common cause of
+   "I sent a message and nothing happened": the number works, the token works,
+   and Meta simply never calls us.
+
+> [!IMPORTANT]
+> Do NOT use the temporary 24-hour token from the API Setup tab. It expires
+> overnight and every send starts failing with an opaque error the next morning.
+
+**Access level matters.** Acting on a WABA the app does not own requires
+**Advanced Access** on both permissions. Check App Review → Permissions and
+Features before onboarding, not after — Standard Access will pass every step
+here and then fail on the first real send.
 
 ---
 
-### Step B: Configure the Webhook in Meta
-Point Meta's incoming notifications to the platform's Supabase Edge Function:
+### Step B: Point the app at the webhook (once for the platform)
 
-1. In the Meta Developer Portal, go to **WhatsApp > Configuration**.
-2. Click **Edit** under Webhooks:
-   * **Callback URL**: `https://<supabase-project-ref>.supabase.co/functions/v1/wa-webhook`
-   * **Verify Token**: Enter the value of `WA_VERIFY_TOKEN` (located in your Supabase environment secrets).
-3. Click **Verify and Save**.
-4. Under **Webhook Fields**, click **Manage** and subscribe to **`messages`** (this is critical to receive inbound chat messages).
+This is app-level configuration. It is already done, and is only repeated if the
+callback URL or app secret changes — **not** per operator.
+
+1. Meta Developer Portal → **WhatsApp → Configuration**, Edit under Webhooks:
+   * **Callback URL**: `https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/wa-webhook`
+   * **Verify Token**: the value of the `WA_VERIFY_TOKEN` Supabase secret.
+2. **Verify and Save.** `wa-webhook` answers the `hub.challenge` handshake at
+   `index.ts:3380`; a mismatched token returns 403 and Meta refuses to save.
+3. Under **Webhook Fields** → Manage, subscribe to **`messages`**. That single
+   field carries both inbound customer messages and the `statuses` delivery
+   callbacks the 24-hour-window reopener depends on.
+
+> [!WARNING]
+> If the app secret is ever reset, every tenant's WhatsApp goes silent at once —
+> `wa-webhook` fails closed and returns 401 on every payload
+> (`index.ts:55`). Update the `WA_APP_SECRET` Supabase secret in the same sitting.
 
 ---
 
-### Step C: Register the Operator in the Super-Admin Dashboard
-Once you have the Meta credentials, onboard the operator via the **Super Admin Onboarding Panel**:
+### Step C: Store the credentials on the tenant
 
-1. Log in to the [Super Admin Dashboard](https://caepweb-admin.vercel.app/super-admin).
-2. Fill in the operator's registration details:
-   * **Business Name**, **Subdomain**, **Timezone**, and **Currency**.
-3. Under **Credentials**, enter the values gathered in Step A:
-   * **WhatsApp Access Token (`wa_token`)**
-   * **WhatsApp Phone ID (`wa_phone_id`)**
-4. Click **Create Operator**.
+**For an existing tenant — the normal case.** Admin app → **Settings →
+Credentials → WhatsApp**, paste the Access Token and Phone Number ID, save.
+That posts to `app/api/credentials/route.ts` with `section: "wa"`, which is
+MAIN_ADMIN/SUPER_ADMIN gated and **validates the pair against Meta Graph before
+storing anything** (`GET /v19.0/{phone_id}?fields=display_phone_number`). A
+token Meta rejects is refused with Meta's own error text and nothing is saved,
+so a wrong paste cannot sit there reading "✓ Configured" while every send fails.
+It then calls the narrow `set_wa_credentials` RPC.
 
-The onboarding script invokes the `super-admin-onboard` edge function, which:
-* Creates the operator's database records.
-* Calls the `set_business_credentials` Supabase RPC to securely encrypt the `wa_token` and `wa_phone_id` using AES-256 (via the server's `SETTINGS_ENCRYPTION_KEY`).
-* Backfills the fast-path search index column `wa_phone_id_lookup`.
+**For a brand-new tenant**, create the tenant first — see
+[CLIENT_ONBOARDING_RUNBOOK.md](./CLIENT_ONBOARDING_RUNBOOK.md). The wizard's
+WhatsApp step is **display-only**: `whatsapp` is absent from `STEP_COLUMNS`
+(`supabase/functions/_shared/onboarding-guards.ts:11`) and `save-credentials`
+handles Yoco only, so the client cannot enter their own Meta details. You store
+them afterwards via Settings → Credentials as above.
+
+`super-admin-onboard` can also take `wa_token`/`wa_phone_id`, but only at
+creation time and only through the broad `set_business_credentials` RPC.
+
+> [!CAUTION]
+> Never call `set_business_credentials` on an existing tenant to change only
+> WhatsApp. It writes all four credential columns in one UPDATE, so the omitted
+> Yoco secret key and webhook secret are encrypted from NULL and that tenant
+> stops taking payments. Use `set_wa_credentials(p_business_id, p_key,
+> p_wa_token, p_wa_phone_id)` — which is what the admin app already does.
+
+**On `wa_phone_id_lookup`:** neither RPC writes it, and you do not need to set it
+by hand. It is a routing cache. The first inbound message from an unknown phone
+id falls through to a paged scan that decrypts every tenant, finds the match,
+and backfills the column for the whole platform as it goes
+(`_shared/tenant.ts:247-266`). One slow message, then the indexed fast path
+forever. The wizard's go-live step also writes it directly when credentials
+already exist (`onboarding-wizard/index.ts:580`).
 
 ---
 
@@ -106,11 +156,72 @@ The bot requires operator-specific guidelines to answer inquiries:
 
 1. **Add Tours & Pricing**:
    * Navigate to the operator's settings and add their tours, prices, durations, and capacities.
+   * A tour with no future slots is hidden from the bot's booking flows, so seed
+     slots before testing or the bot will correctly say there is nothing to book.
 2. **Configure FAQ Knowledge**:
    * In the operator's **Settings > Chat FAQ**, add common questions and answers (e.g. cancellation policy, clothing recommendations, parking availability).
-3. **Turn Bot Mode ON**:
+   * `kb-sync` builds the tenant's pgvector knowledge base from `faq_json`,
+     `chat_faq_entries` and active `tours`. The cron runs hourly at **:23**, so
+     new answers are not retrievable immediately. To not wait:
+     `POST /functions/v1/kb-sync {"business_id": "<uuid>"}` with the service key.
+3. **Check the tenant has its `policies` row.** The bot reads it for loyalty and
+   group discounts (`wa-webhook/index.ts:453`). A missing row does not crash the
+   bot — the result is guarded and simply yields no discount — but the operator
+   will report that their loyalty discount never applies. The wizard's go-live
+   step seeds it; `super-admin-onboard` does not, so tenants created that way
+   need it backfilled:
+   `insert into policies (business_id) values ('<uuid>') on conflict do nothing;`
+4. **Turn Bot Mode ON**:
    * Go to **Settings > WhatsApp Bot**.
    * Toggle Bot Mode to **ALWAYS_ON** (responds 24/7) or **OUTSIDE_HOURS** (responds only outside business hours, forwarding active chats to the Inbox during work hours).
+   * `OUTSIDE_HOURS` means the bot is **silent during the operator's working
+     day** by design. Test at 10am on an `OUTSIDE_HOURS` tenant and it will look
+     broken. Use `ALWAYS_ON` to test, or test after hours.
+
+---
+
+### Step E: Prove it on a real phone
+
+Nothing above proves the loop. Send a real WhatsApp to the operator's number
+from a phone that is not an admin, then check in this order — each query
+isolates one link in the chain.
+
+1. **Did Meta call us at all?** Supabase → Edge Functions → `wa-webhook` logs. No
+   entry means the problem is on the Meta side: the app is not subscribed to
+   that WABA (Step A.4), or the `messages` field is not subscribed (Step B.3).
+2. **Was the signature accepted?** A log line reading
+   `WA webhook rejected — invalid or missing signature` means `WA_APP_SECRET`
+   does not match the app's current secret. Nothing reaches the bot until that
+   is fixed.
+3. **Did it route to the right tenant?** `No business matched WhatsApp
+   phone_number_id <id>` means the stored `wa_phone_id` is not the id Meta is
+   sending. Re-copy the Phone Number ID — people paste the phone *number* here.
+4. **Did the message land, and did we reply?**
+
+   ```sql
+   select created_at, direction, bot_skipped_reason, left(body, 60)
+   from chat_messages
+   where business_id = '<uuid>'
+   order by created_at desc limit 10;
+   ```
+
+   An `IN` row with **no following `OUT` row** is the diagnostic that matters:
+   * `bot_skipped_reason` set (`mode_off`, etc.) — the mode gate stopped it.
+     Check Step D.4.
+   * `bot_skipped_reason` **NULL** — the mode gate *passed* and something after
+     it returned silently. In practice that is the per-conversation HUMAN hold:
+
+     ```sql
+     select id, status, current_state from conversations
+     where business_id = '<uuid>' and phone = '<test phone>';
+     ```
+
+     `status = 'HUMAN'` means an admin replied in the Inbox once and pinned the
+     thread. Clear it with the Inbox's **Return to bot** button, or have the
+     customer send `menu`.
+
+Once a reply comes back, the whole chain is proven: subscription, signature,
+routing, decryption, bot, and outbound send on the operator's own token.
 
 ---
 
@@ -118,20 +229,32 @@ The bot requires operator-specific guidelines to answer inquiries:
 
 For troubleshooting or extending the resolver, here is the database layout:
 
-### `businesses` table
-* `id` (uuid) — unique business identifier.
-* `wa_phone_id_lookup` (text) — indexed, plaintext phone number ID used for instant route matching.
+There is no separate credentials table. Everything lives as columns on
+`businesses`, encrypted in place with pgcrypto under `SETTINGS_ENCRYPTION_KEY`.
 
-### `credentials` table (accessible via RPC only)
-* `wa_token` (encrypted) — Meta access token.
-* `wa_phone_id` (encrypted) — Meta phone number ID.
+### `businesses`
+* `id` (uuid) — unique business identifier.
+* `wa_phone_id_lookup` (text) — indexed plaintext phone number ID, the fast-path
+  route match. Written lazily by the resolver, never by the credential RPCs.
+* `wa_phone_id_encrypted` (bytea) — Meta phone number ID, the source of truth.
+* `wa_token_encrypted` (bytea) — Meta system-user access token.
+* `whatsapp_bot_mode` (enum) — `OFF` / `ALWAYS_ON` / `OUTSIDE_HOURS`.
+* `business_hours` (jsonb) — per-day open/close, read by the `OUTSIDE_HOURS` gate.
+
+### `conversations`
+* `status` — `BOT` or `HUMAN`. The second, invisible switch: `HUMAN` silences the
+  bot for that one thread regardless of `whatsapp_bot_mode`.
 
 ```sql
--- The secure encryption RPC used to write credentials:
-SELECT set_business_credentials(
+-- Read back what is actually stored (decrypts):
+SELECT * FROM get_business_credentials('operator-uuid', 'SETTINGS_ENCRYPTION_KEY');
+
+-- Write WhatsApp credentials WITHOUT touching Yoco. Prefer the admin app's
+-- Settings → Credentials screen, which also validates against Meta first.
+SELECT set_wa_credentials(
   p_business_id := 'operator-uuid',
-  p_key := 'YOUR_SETTINGS_ENCRYPTION_KEY',
-  p_wa_token := 'EAAg...',
+  p_key         := 'SETTINGS_ENCRYPTION_KEY',
+  p_wa_token    := 'EAAg...',
   p_wa_phone_id := '105948...'
 );
 ```
