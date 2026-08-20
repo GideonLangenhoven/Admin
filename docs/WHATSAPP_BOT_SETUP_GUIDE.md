@@ -62,24 +62,151 @@ their credentials on the tenant, then prove it on a real phone.
 ### Step A: Add the operator's number to the shared app
 
 The operator needs their own WhatsApp Business Account (WABA) and phone number,
-shared into the CapeKayakBookings app:
+shared into the CapeKayakBookings app.
 
-1. **Get access to their WABA.** Either they add CapeWeb as a partner in their
-   Meta Business Manager (Business settings → Partners → share the WABA with
-   business ID `2304217393358934`), or you create the WABA on their behalf. The
-   number must not already be registered to a personal WhatsApp or WhatsApp
-   Business app account — it has to be freed up first.
-2. **Register the phone number** under WhatsApp → API Setup and complete the SMS
-   or voice verification. Note the **Phone Number ID** (digits, e.g.
-   `105948375920384`). This is *not* the phone number itself.
-3. **Generate a System User access token** in Business Manager → System Users,
-   with **`whatsapp_business_messaging`** and **`whatsapp_business_management`**,
-   scoped to that operator's WABA. This is the permanent `wa_token`.
-4. **Subscribe the app to their WABA** so their inbound messages actually reach
-   the webhook — WhatsApp → Configuration, or
-   `POST /{waba-id}/subscribed_apps`. Skipping this is the most common cause of
-   "I sent a message and nothing happened": the number works, the token works,
-   and Meta simply never calls us.
+**Ask one question before anything else: is that number currently in use on a
+phone?** Almost every operator you onboard will say yes, because the number they
+want the bot on is the number their customers already message. That answer
+decides the whole path, and getting it wrong destroys their chat history.
+
+#### A1. Read the number's current state
+
+WhatsApp Manager shows a status pill against every number. It is the only thing
+worth trusting; the API Setup tab is happy to look finished while the number is
+still dead.
+
+| Pill | What it means | What it needs |
+|---|---|---|
+| **Unverified** | Number added, ownership never proven | SMS or voice verification in WhatsApp Manager |
+| **Pending** | Verified, but never registered for the Cloud API | The register call in A4. Meta's own tooltip says "register this phone number using the registration API" |
+| **Connected** | Live. Meta will deliver its messages to the webhook | Nothing |
+
+Read it from the API too, since this is also your post-registration proof:
+
+```sh
+curl -sS "https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}?fields=display_phone_number,verified_name,status,code_verification_status" \
+  -H "Authorization: Bearer $WA_TOKEN"
+```
+
+Only `"status":"CONNECTED"` means the bot can be reached. **Pending is the
+default state of a freshly added number and nothing in the BookingTours admin
+can compensate for it** — no credentials, no bot mode, no toggle. Meta never
+calls the webhook, so the bot never hears the message at all.
+
+#### A2. Get access to their WABA
+
+Either they add CapeWeb as a partner in their Meta Business Manager (Business
+settings → Partners → share the WABA with business ID `2304217393358934`), or
+you create the WABA on their behalf.
+
+#### A3. Free the number from its existing WhatsApp account
+
+A number that is live on a handset cannot be registered. The register call fails
+with:
+
+```json
+{ "code": 100, "error_subcode": 2388001,
+  "error_user_title": "Cannot Create Certificate",
+  "error_user_msg": "This number is registered to an existing WhatsApp account.
+    To use this number, disconnect it from the existing account." }
+```
+
+Two ways out, and the choice is the operator's to make, not yours:
+
+**Path A — Embedded Signup / "coexistence". Default for any working number.**
+Keeps their history and lets them keep answering from their phone. Meta syncs
+messages from the 180 days before onboarding, and keeps the Business app and the
+API in sync afterwards. Requires **WhatsApp Business app 2.24.17 or higher**. The
+operator enters their number, gets a code, taps **Connect to the Business
+Platform**, approves the chat-history share, enters the code. The app has both
+*Embedded Signup Builder* and *Migrate customers* tabs under the WhatsApp use
+case, and CapeWeb is a Verified Tech Provider, so the pieces are already there.
+
+**Path B — delete the account, register fresh. Only for an empty or brand-new
+number.** On the handset: WhatsApp / WhatsApp Business → Settings → Account →
+**Delete my account**. History is gone, the number drops out of every WhatsApp
+group, and there is no undo. Wait up to 3 minutes for Meta to release it.
+
+> [!CAUTION]
+> Do not pick Path B on the operator's behalf to save time. "It's just a few
+> chats" is not a call you can make about someone else's customer conversations.
+> Ask, and let them answer.
+
+> [!WARNING]
+> **Coexistence does not silence the bot.** If the operator answers a customer
+> from the WhatsApp Business app on their phone, that reply arrives as a
+> `message_echoes` webhook field, and `wa-webhook` subscribes only to `messages`
+> and `statuses` (`index.ts:3398,3410`). The thread's `conversations.status`
+> stays `BOT`, so the bot will keep replying underneath them and the customer
+> gets two voices. Tell any coexistence operator to take over threads from the
+> **Inbox**, not the handset — the Inbox is what flips the thread to `HUMAN`.
+
+#### A4. Register the number
+
+Adding the number in the UI does not register it. This call does, and there is
+no button for it:
+
+```sh
+curl -sS -X POST "https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}/register" \
+  -H "Authorization: Bearer $WA_TOKEN" -H "Content-Type: application/json" \
+  -d '{"messaging_product":"whatsapp","pin":"{SIX_DIGITS}"}'
+# want: {"success":true}
+```
+
+Then re-run the A1 status read and confirm `CONNECTED` from Meta's side. Do not
+take `{"success":true}` alone as proof.
+
+> [!IMPORTANT]
+> **You have 10 register calls per number per rolling 72 hours** (error `133016`
+> when you burn them, and the number is locked for three days). Failed attempts
+> count. Never retry against a number that is still on a handset — confirm A3 is
+> actually done first, or you will spend the budget on the same error.
+
+Error codes you will actually meet:
+
+| Code | Meaning | Fix |
+|---|---|---|
+| `2388001` | Still registered to a WhatsApp account | A3 |
+| `133006` | Number not verified | SMS/voice verify first; the pill reads Unverified |
+| `133005` | Two-step PIN mismatch | The number already has a PIN — reset it in WhatsApp Manager, see A5 |
+| `133016` | 10-attempt budget spent | Wait out the 72 hours |
+| `190` | Token bad or missing scope | `/register` needs `whatsapp_business_management`, not just messaging |
+
+#### A5. The PIN is permanent — treat it like a credential
+
+The `pin` is **six digits you choose**, not something Meta issues. The first
+successful register sets it as that number's two-step verification PIN, and
+[there is no endpoint to disable two-step verification](https://developers.facebook.com/docs/whatsapp/cloud-api/reference/two-step-verification).
+You need it for every future re-register — including after a display-name change
+(A6) or a WABA move.
+
+* **Store it with the operator's other credentials, in the password manager.**
+  There is no field for it on `businesses` and it should not go in one.
+* **Do not run the register call from the Graph API Explorer.** The Explorer puts
+  the body in the query string, so the PIN lands in browser history in plaintext.
+  Use `curl`, or the Explorer's raw-body mode.
+* **Rotate** with `POST /{PHONE_NUMBER_ID}` and body `{"pin":"<new six digits>"}`.
+* Forgotten it? WhatsApp Manager → the number → **Two-step verification** →
+  change PIN. The API cannot recover it.
+
+#### A6. Set the display name to the operator's name, before registering
+
+The display name is what customers see above the chat. A number added under the
+CapeWeb WABA without an explicit name inherits **"CapeWeb"**, and every one of
+that operator's customers sees your agency's name instead of theirs.
+
+Set it when you add the number. A display name changed *after* registration goes
+for Meta review and, once approved, **the number must be re-registered** — which
+costs a register call and needs the PIN from A5. Setting it first is free;
+fixing it later is not.
+
+Check what is actually set with the `verified_name` field in the A1 read.
+
+#### A7. Generate the permanent token
+
+Business Manager → **System Users** → generate a token with
+**`whatsapp_business_messaging`** and **`whatsapp_business_management`**, scoped
+to that operator's WABA. This is the permanent `wa_token`.
 
 > [!IMPORTANT]
 > Do NOT use the temporary 24-hour token from the API Setup tab. It expires
@@ -89,6 +216,19 @@ shared into the CapeKayakBookings app:
 **Advanced Access** on both permissions. Check App Review → Permissions and
 Features before onboarding, not after — Standard Access will pass every step
 here and then fail on the first real send.
+
+#### A8. Subscribe the app to their WABA
+
+So their inbound messages actually reach the webhook — WhatsApp → Configuration,
+or:
+
+```sh
+curl -sS "https://graph.facebook.com/v25.0/{WABA_ID}/subscribed_apps" \
+  -H "Authorization: Bearer $WA_TOKEN"     # empty data[] → POST the same URL
+```
+
+Skipping this is the most common cause of "I sent a message and nothing
+happened": the number works, the token works, and Meta simply never calls us.
 
 ---
 

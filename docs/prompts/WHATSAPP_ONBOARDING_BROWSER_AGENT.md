@@ -72,19 +72,45 @@ Three phases. Do them in order and confirm each before moving on.
 
 1. **Get access to their WABA.** Either the operator shares their WhatsApp
    Business Account with the CapeWeb business (`business.facebook.com` →
-   Business settings → Partners), or you create the WABA under CapeWeb. The
-   phone number must not be registered to a personal WhatsApp or the WhatsApp
-   Business app — it has to be released there first.
-2. **Register the number**: CapeKayakBookings → WhatsApp → **API Setup**, add
-   the number, complete SMS or voice verification.
-3. **Capture the Phone Number ID** — the long digit string on that page. This is
+   Business settings → Partners), or you create the WABA under CapeWeb.
+2. **Confirm the number is off every handset before touching anything else.** A
+   number still live on WhatsApp or the WhatsApp Business app cannot be
+   registered — you get error subcode `2388001`, "Cannot Create Certificate".
+   Stop and ask the human which path applies; do not choose on the operator's
+   behalf, because one of them deletes their customer history:
+   * has chats worth keeping → Embedded Signup / coexistence (needs the operator,
+     their phone, Business app 2.24.17+)
+   * empty or brand-new number → they delete the account on the handset, wait 3
+     minutes
+3. **Add the number** under CapeKayakBookings → WhatsApp → **API Setup**, and
+   complete SMS or voice verification. **Set the display name to the operator's
+   trading name at this point** — a number added under the CapeWeb WABA
+   otherwise inherits "CapeWeb", and changing it later needs Meta review plus a
+   full re-register.
+4. **Capture the Phone Number ID** — the long digit string on that page. This is
    *not* the phone number. Confusing the two is the single most common mistake.
-4. **Create a permanent token**: `business.facebook.com` → Business settings →
+5. **Register it.** Verification alone leaves the number **Pending**, which means
+   Meta never delivers its messages to the webhook. There is no button for this;
+   report the command to the human to run, since it needs a PIN you must not
+   invent for them:
+
+   ```sh
+   curl -sS -X POST "https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}/register" \
+     -H "Authorization: Bearer $WA_TOKEN" -H "Content-Type: application/json" \
+     -d '{"messaging_product":"whatsapp","pin":"{SIX_DIGITS}"}'
+   ```
+
+   Capped at **10 attempts per number per 72 hours**, and failures count — never
+   retry against a number that is still on a handset.
+6. **Confirm CONNECTED from Meta, not from the response.** Read the pill in
+   WhatsApp Manager, or `GET /{PHONE_NUMBER_ID}?fields=display_phone_number,verified_name,status`.
+   Check `verified_name` here too: if it reads "CapeWeb", step 3 was missed.
+7. **Create a permanent token**: `business.facebook.com` → Business settings →
    **System Users** → generate a token with `whatsapp_business_messaging` and
    `whatsapp_business_management`, scoped to that operator's WABA. Never use the
    temporary 24-hour token from the API Setup tab; it expires overnight and
    every send starts failing the next morning.
-5. **Subscribe the app to their WABA** (WhatsApp → Configuration → the WABA's
+8. **Subscribe the app to their WABA** (WhatsApp → Configuration → the WABA's
    subscribed apps). Skipping this is the most common cause of "I sent a message
    and nothing happened": the number is fine, the token is fine, and Meta simply
    never calls the webhook.

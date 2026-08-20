@@ -64,7 +64,22 @@ until then payments will not confirm bookings automatically.
 The client cannot create their own Meta app, so the wizard only records their
 number and shows pending. You connect the number on the Meta side and save the
 credentials from the admin app afterwards. Their number starts routing as soon
-as the credentials are stored.
+as the credentials are stored. Full procedure:
+[WHATSAPP_BOT_SETUP_GUIDE.md](./WHATSAPP_BOT_SETUP_GUIDE.md).
+
+**Ask these two on the call, while they are still on the phone with you:**
+
+1. *Is that number live on a handset right now, on WhatsApp or WhatsApp
+   Business?* Nearly always yes, and a number on a handset cannot be registered.
+2. *Do the chats on it matter?* If yes, they onboard through Embedded Signup,
+   which keeps 180 days of history and needs **them, their phone, and Business
+   app 2.24.17+**. That is a scheduled session, not something you can do alone
+   afterwards. If the chats do not matter, they delete the account on the
+   handset and you register the number yourself.
+
+Getting this at intake is the difference between a ten-minute Meta step and a
+week of back-and-forth — or worse, deleting an operator's customer history to
+unblock yourself.
 
 ---
 
