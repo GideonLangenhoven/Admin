@@ -205,8 +205,11 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
       {/* Floating help assistant + one-time first-login welcome. */}
       <HelpChat />
       <WelcomeChecklist />
+      {/* Sidebar starts at lg, not md: at 768px it would eat 256px of an
+          already-768px tablet, leaving 512px for the md: row/grid layouts that
+          fire at the same breakpoint. Tablets use the drawer instead. */}
       <aside
-        className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`}
+        className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex ${collapsed ? "w-20" : "w-64"}`}
         style={{ background: SIDEBAR_BG, borderColor: "var(--ck-sidebar-border)" }}
       >
         <div className="p-6 pb-2">
@@ -337,7 +340,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Desktop topbar — glass chrome: breadcrumb, live clock, session controls */}
         <header
-          className="ui-glass hidden md:flex h-14 shrink-0 items-center justify-between border-b px-6"
+          className="ui-glass hidden lg:flex h-14 shrink-0 items-center justify-between border-b px-6"
           style={{ borderColor: "var(--ck-border-subtle)" }}
         >
           <div className="flex items-baseline gap-2 min-w-0">
@@ -356,7 +359,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             <SignOutButton variant="header" />
           </div>
         </header>
-        <header className="ui-glass md:hidden flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        <header className="ui-glass lg:hidden flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <MobileMenuDrawer nav={visibleNav} />
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {logoUrl ? (
@@ -400,7 +403,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           ) : children}
         </main>
 
-        <nav className="ui-glass md:hidden shrink-0 overflow-x-auto border-t py-2 no-scrollbar" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        <nav className="ui-glass lg:hidden shrink-0 overflow-x-auto border-t py-2 no-scrollbar" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <div className="flex min-w-max px-2">
           {visibleNav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;

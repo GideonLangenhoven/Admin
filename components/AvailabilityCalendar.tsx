@@ -158,7 +158,9 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                 /* table-layout:fixed + a percentage width per cell lets the grid
                    grow to whatever column it is given, instead of staying at
                    seven fixed-width boxes with dead space beside them. */
-                .avail-cal .rdp-table { width: 100%; max-width: 100%; table-layout: fixed; }
+                /* .rdp-table is the v8 name, .rdp-month_grid the v9 one (we run v9). */
+                .avail-cal .rdp-table,
+                .avail-cal .rdp-month_grid { width: 100%; max-width: 100%; table-layout: fixed; }
                 .avail-cal td { width: 14.2857%; }
                 .avail-cal .rdp-caption_label { font-weight: 700; color: var(--ck-text-strong); }
                 .avail-cal .rdp-head_cell { font-weight: 600; color: var(--ck-text-muted); font-size: 0.75rem; text-transform: uppercase; }

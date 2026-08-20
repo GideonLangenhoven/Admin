@@ -781,9 +781,9 @@ export default function Dashboard() {
             <div className="anim-fade-up anim-d3 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* ── Today's Manifest (pax per slot) ── */}
                 <div className="ui-card flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                 <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>
                                     Manifest
                                 </h3>

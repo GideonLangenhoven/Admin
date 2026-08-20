@@ -688,8 +688,8 @@ function Slots() {
 
   return (
     <div className="space-y-4">
-      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div>
             <p className="ui-mono-label mb-1.5">Operations</p>
             <h2 className="font-display text-[24px] sm:text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Slot Management</h2>
@@ -710,7 +710,7 @@ function Slots() {
             Show closed / 0-capacity
           </label>
         </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
           <button
             onClick={() => {
               if (selectedCancelDates.length === 0) {
