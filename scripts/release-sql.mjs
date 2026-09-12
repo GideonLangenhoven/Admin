@@ -8,7 +8,7 @@ const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split('.')[0]
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 assert(token, 'SUPABASE_ACCESS_TOKEN required');
 const mode = process.argv[2] || 'inspect';
-assert(['inspect', 'rehearse', 'apply', 'security'].includes(mode));
+assert(['inspect', 'rehearse', 'apply', 'security', 'health'].includes(mode));
 const files = readdirSync('supabase/migrations').filter(name => /^202609\d{8}_.*\.sql$/.test(name)).sort();
 const pending = files.filter(name => name >= '20260911110000_');
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
@@ -22,6 +22,11 @@ async function query(sql, readOnly = true) {
   return result;
 }
 
+if (mode === 'health') {
+  console.log(JSON.stringify({recentScheduledHttp:await query("SELECT status_code,timed_out,count(*)::int requests,max(created) latest FROM net._http_response WHERE created>now()-interval '30 minutes' GROUP BY status_code,timed_out ORDER BY status_code")}));
+  console.log(JSON.stringify({scheduledRuns:await query("SELECT j.jobname,r.status,count(*)::int runs,max(r.start_time) latest FROM cron.job_run_details r JOIN cron.job j USING(jobid) WHERE r.start_time>now()-interval '30 minutes' GROUP BY j.jobname,r.status ORDER BY j.jobname,r.status")}));
+  process.exit(0);
+}
 const history = await query('select version,name from supabase_migrations.schema_migrations order by version');
 const definitions = await query("select p.proname, pg_get_function_identity_arguments(p.oid) args, pg_get_functiondef(p.oid) definition from pg_proc p join pg_namespace n on p.pronamespace=n.oid where n.nspname='public' and p.prokind='f'");
 const constraints = await query("select conrelid::regclass::text table_name,conname,pg_get_constraintdef(oid) definition from pg_constraint where connamespace='public'::regnamespace");

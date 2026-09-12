@@ -15,14 +15,17 @@ that a client's own access is isolated.
 - 960 unit tests passed; one pre-existing test skipped.
 - 150 disposable PostgreSQL checks cover payment transactions, concurrent
   holds/voucher spending, refunds, tenant relations and permission boundaries.
-- 340 live API checks passed with five separate temporary MAIN_ADMIN accounts.
+- 362 live API/capacity checks passed with five separate temporary MAIN_ADMIN accounts.
   Every ordered pair was tested: private reads, changes, voucher debit,
   capacity reservations, refund previews, foreign record links, cancellations,
   refunds, manual payment and confirmation-message requests.
+- All 20 cross-client integration-credential reads were denied. A live k6 race
+  sent five simultaneous requests for two seats: exactly two reservations won,
+  three were refused and capacity stayed at two.
 - Each owner could read its own records; valid customer proof continued to work;
   suspending an owner invalidated data access using its existing session.
 - All five generated businesses and authentication accounts were removed.
-  No existing client's records were deleted and no client messages were sent.
+  No existing client's records were deleted and these isolation tests sent no messages.
 - Live aggregate checks found zero cross-client booking/tour/slot/customer/hold
   links, zero mixed marketing enrollments and zero oversold slots.
 - No duplicate WhatsApp phone-ID routing was found across the configured businesses.
@@ -63,8 +66,11 @@ back across the new booking-proof policy without a compatible release.
 
 1. No configured business had Yoco test keys and a test webhook at inspection.
    Configure a dedicated test business in Settings; never paste keys into chat.
-2. An approved test email and WhatsApp recipient are still required. Verify
-   actual delivery, not just a queued/sent flag in the application.
+2. Approved test recipients were supplied privately. The live email provider
+   accepted one labelled confirmation-template test and WhatsApp accepted one
+   labelled text through the Kayak connection. No booking or payment was created.
+   The recipient confirmed both messages arrived. These sends prove delivery
+   through the message workers, not the complete payment-to-confirmation journey.
 3. Complete the test payment, signed webhook confirmation, amendment and refund
    checks in [the smoke runbook](MVP_SMOKE_RUNBOOK.md). Webhook replay requires a
    genuine captured test event; it has not been claimed as live-verified here.
@@ -83,4 +89,22 @@ Sentry source-map/release upload reported configuration warnings during builds
 (administrator project not found; storefront upload token absent). The builds
 succeeded, but enriched error-reporting setup is not claimed as verified.
 
-CI publication/check results are recorded in the release handoff once complete.
+The new [GitHub CI run](https://github.com/GideonLangenhoven/Admin/actions/runs/34707245790)
+passed lint/typecheck, unit/edge/database regressions and production browser smoke.
+Release PRs: [administrator #23](https://github.com/GideonLangenhoven/Admin/pull/23)
+and [storefront #15](https://github.com/GideonLangenhoven/capekayak-booking/pull/15).
+Existing Lighthouse checks initially lacked public build configuration; that
+configuration was supplied and their reruns are tracked on the PRs.
+
+The administrator Lighthouse report scored performance 97, accessibility 100,
+best practices 100 and SEO 91. Its broader assertions still flagged CSP nonce
+hardening, PWA installability and asset-size/unused-code opportunities; this is
+not an all-green Lighthouse result. The login's main-content landmark and
+explicit input labels were corrected afterward. The storefront audit was
+misconfigured: a performance-only preset skipped its required accessibility
+audits, while localhost tested the operator directory instead of a tenant.
+Both configuration issues were corrected without lowering score thresholds.
+
+The storefront's previously tracked generated environment file contained an
+OIDC token expired on 3 March 2026. The file was removed from the release and
+environment-file ignore rules widened. Git history was not rewritten.

@@ -363,7 +363,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (hasHint) {
       // Skeleton of the real shell: pine rail + paper content
       return (
-        <div className="flex min-h-screen">
+        <div role="main" className="flex min-h-screen">
           <div
             className="hidden md:block w-64 shrink-0 border-r"
             style={{
@@ -393,7 +393,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card w-full max-w-sm p-8 text-center">
           <BrandMark size={40} className="mx-auto mb-4 animate-pulse" />
           <p className="text-sm ui-text-muted">Checking admin session...</p>
@@ -407,7 +407,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!authed) return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div role="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="anim-fade-up w-full max-w-sm">
         <div className="ui-card relative overflow-hidden p-8 text-center" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
           {/* Pine crown with the brand trail — the card wears the badge */}
@@ -441,6 +441,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
                 placeholder="Email address"
+                aria-label="Email address"
                 autoComplete="email"
                 className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
@@ -448,6 +449,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
                 placeholder="Password"
+                aria-label="Password"
                 autoComplete="current-password"
                 className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
 
@@ -474,7 +476,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (hostMismatch) {
     const ownHost = hostMismatch.ownSub + ".admin.bookingtours.co.za";
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
           <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"></path></svg>
@@ -500,7 +502,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
   if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
           <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>

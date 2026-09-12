@@ -1,5 +1,8 @@
 # Rollout review — 6 September 2026
 
+**Historical review:** see [the 12 September production release verification](FIRST_FIVE_RELEASE_2026-09-12.md)
+for deployed fixes, live client-isolation evidence and the remaining provider gates.
+
 ## Verdict
 
 Do not approve rollout yet. The current source and database configuration contain critical access-control and payment defects. Operator isolation is not guaranteed, and capacity for 2,000 users has not been demonstrated. The configured Supabase data API was also unavailable during this review because the project exceeded its database-size quota.
@@ -237,8 +240,3 @@ The read-only inspection and isolated-handler scripts used during this session a
 - [reproduce.cjs](/private/tmp/capekayak-review-jHEmJz/reproduce.cjs) — seven current-source failure reproductions with mocked services and network disabled.
 
 Re-run the isolated reproductions with `node /private/tmp/capekayak-review-jHEmJz/reproduce.cjs`. Temporary files may be removed by the operating system; convert the relevant cases into permanent regression tests during remediation.
-# Current release follow-up
-
-This is the original review. For deployment evidence, live tenant-isolation
-results and remaining launch gates, read
-[the 12 September release verification](FIRST_FIVE_RELEASE_2026-09-12.md).
