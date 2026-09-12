@@ -12,4 +12,5 @@ ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS email_img_indemnity     text,  -- Waiver / Indemnity Reminder email
   ADD COLUMN IF NOT EXISTS email_img_admin         text,  -- Admin Welcome email
   ADD COLUMN IF NOT EXISTS email_img_voucher       text,  -- Voucher Code email
-  ADD COLUMN IF NOT EXISTS email_img_photos        text;  -- Trip Photos email
+  ADD COLUMN IF NOT EXISTS email_img_photos        text;
+-- Trip Photos email;

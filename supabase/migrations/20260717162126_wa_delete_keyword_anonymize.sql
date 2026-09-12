@@ -91,4 +91,4 @@ $function$;
 REVOKE ALL ON FUNCTION public.anonymize_customer(uuid, uuid, uuid, uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.anonymize_customer(uuid, uuid, uuid, uuid, text, text) TO service_role;
 
-COMMIT;
+COMMIT;;

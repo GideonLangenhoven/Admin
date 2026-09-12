@@ -9,6 +9,8 @@ import {
   resolveBusinessSiteUrls,
 } from "../_shared/tenant.ts";
 import { blockIfNotTrading } from "../_shared/subscription.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
+import { bookingSuccessUrl } from "../_shared/booking-success.ts";
 
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
@@ -91,7 +93,6 @@ Deno.serve(async (req: any) => {
     const bookingId = body.booking_id;
     const voucherId = body.voucher_id;
     const voucherCode = body.voucher_code;
-    const promoCode = body.promo_code || "";
     const customerEmail = body.customer_email || "";
     const type = body.type || "BOOKING";
     const skipNotifications = body.skip_notifications === true;
@@ -102,7 +103,21 @@ Deno.serve(async (req: any) => {
     // only if they abandon or payment lags past the 15-min hold.
     const sendPaymentLink = body.send_payment_link === true;
 
-    if (!amount) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+    if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) < 0) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+
+    // A public booking ID must not mint a private confirmation capability.
+    // New storefront bookings already receive an independent waiver secret in
+    // their insert response. Internal bots and operator actions use real auth.
+    if (bookingId) {
+      const { data: booking, error } = await supabase.from("bookings")
+        .select("business_id, waiver_token").eq("id", bookingId).maybeSingle();
+      if (error) return new Response(JSON.stringify({ error: "Could not verify booking access" }), { status: 503, headers: buildCors(req?.headers?.get("origin")) });
+      let allowed = Boolean(booking?.waiver_token && typeof body.booking_token === "string" && body.booking_token === booking.waiver_token);
+      if (!allowed && booking) {
+        try { allowed = canAccessBusiness(await requireAuth(req), booking.business_id); } catch { /* not an operator or service caller */ }
+      }
+      if (!allowed) return new Response(JSON.stringify({ error: "Booking verification required" }), { status: 403, headers: buildCors(req?.headers?.get("origin")) });
+    }
 
     // Fix 3a: a paused or suspended operator takes no new business. Gated here,
     // ahead of pricing, promo application and payment, so every downstream exit
@@ -122,163 +137,25 @@ Deno.serve(async (req: any) => {
       }
     }
 
-    // FIX 4: Server-side price verification for BOOKING checkouts
-    // Never trust frontend pricing — calculate from DB for standard bookings
-    let promoDiscount = 0;
+    // Price, voucher reservations and the seat hold commit together.
+    let quote: any = null;
     let promoId: string | null = null;
     let appliedPromoCode = "";
-
     if (type === "BOOKING" && bookingId) {
-      const bookingRow = await supabase
-        .from("bookings")
-        .select("id, business_id, tour_id, slot_id, qty, total_amount, voucher_amount_paid, discount_type, discount_percent, discount_amount, email, phone")
-        .eq("id", bookingId)
-        .maybeSingle();
-      // This select asked for `customer_email`, a column bookings does not
-      // have. PostgREST fails the WHOLE query on one unknown column, so
-      // bookingRow.data was always null and everything below — the price
-      // recalculation, the voucher tenant-mismatch guard, the promo maths —
-      // was skipped for every booking checkout. The client's `amount` went to
-      // the payment provider unverified.
-      //
-      // Fail loud rather than fall through: a checkout that cannot verify its
-      // own price must not proceed. Silence is what hid this.
-      if (bookingRow.error) {
-        console.error("CHECKOUT_PRICE_VERIFY_LOOKUP_ERR booking=" + bookingId + ": " + bookingRow.error.message);
-        return new Response(JSON.stringify({ error: "Could not verify booking pricing" }), {
-          status: 500, headers: buildCors(req?.headers?.get("origin") || "*"),
+      const priced = await supabase.rpc("prepare_booking_checkout", {
+        p_booking_id: bookingId, p_promo_code: body.promo_code ?? null,
+        p_voucher_ids: body.voucher_ids ?? null, p_voucher_codes: body.voucher_codes ?? null,
+        p_add_ons: body.add_ons ?? null,
+      });
+      if (priced.error || !priced.data?.ok) {
+        return new Response(JSON.stringify({ error: "CHECKOUT_UNAVAILABLE", reason: priced.data?.error || "Could not verify booking pricing" }), {
+          status: 409, headers: buildCors(req?.headers?.get("origin")),
         });
       }
-      if (bookingRow.data) {
-        const bk = bookingRow.data;
-        const resolvedEmail = customerEmail || bk.email || "";
-
-        // Look up current base price from tour
-        const tourRow = await supabase.from("tours").select("base_price_per_person").eq("id", bk.tour_id).maybeSingle();
-        let basePrice = Number(tourRow.data?.base_price_per_person || 0);
-        // Check for slot-level price override (peak pricing)
-        if (bk.slot_id) {
-          const slotRow = await supabase.from("slots").select("price_per_person_override").eq("id", bk.slot_id).maybeSingle();
-          if (slotRow.data?.price_per_person_override != null) {
-            basePrice = Number(slotRow.data.price_per_person_override);
-          }
-        }
-        let serverTotal = basePrice * Number(bk.qty || 1);
-
-        // Include add-on line items (priced at booking time) so the server total
-        // matches what the customer selected. Omitting these undercharges the booking.
-        const addOnRows = await supabase
-          .from("booking_add_ons")
-          .select("unit_price, qty")
-          .eq("booking_id", bookingId);
-        if (addOnRows.data?.length) {
-          for (const ao of addOnRows.data) {
-            serverTotal += Number(ao.unit_price || 0) * Number(ao.qty || 0);
-          }
-        }
-
-        // Apply promo code if provided (before other discounts)
-        if (promoCode) {
-          const promoResult = await supabase.rpc("validate_promo_code", {
-            p_business_id: bk.business_id,
-            p_code: promoCode,
-            p_order_amount: serverTotal,
-            p_customer_email: resolvedEmail,
-          });
-          if (promoResult.data?.valid) {
-            const promo = promoResult.data;
-            promoId = promo.promo_id;
-            appliedPromoCode = promo.code;
-            if (promo.discount_type === "PERCENT") {
-              promoDiscount = serverTotal * (Number(promo.discount_value) / 100);
-            } else {
-              promoDiscount = Number(promo.discount_value);
-            }
-            promoDiscount = Math.min(promoDiscount, serverTotal);
-            serverTotal = serverTotal - promoDiscount;
-            // Store promo on booking
-            await supabase.from("bookings").update({
-              promo_code: appliedPromoCode,
-              discount_amount: promoDiscount,
-            }).eq("id", bookingId);
-            console.log("PROMO_APPLIED: code=" + appliedPromoCode + " discount=" + promoDiscount + " booking=" + bookingId);
-          } else {
-            // Invalid promo — return error to frontend
-            return new Response(JSON.stringify({
-              error: "PROMO_INVALID",
-              reason: promoResult.data?.error || "Invalid promo code",
-            }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
-          }
-        }
-
-        // Apply admin discount if present (on top of promo)
-        if (bk.discount_type === "PERCENT" && bk.discount_percent) {
-          serverTotal = serverTotal * (1 - Number(bk.discount_percent) / 100);
-        } else if (bk.discount_amount && !promoCode) {
-          // Only apply stored discount_amount if not from a promo (promo already applied above)
-          serverTotal = serverTotal - Number(bk.discount_amount);
-        }
-        serverTotal = Math.max(0, serverTotal);
-        // Subtract any voucher portion already applied
-        const voucherApplied = Number(bk.voucher_amount_paid || 0);
-
-        // Vouchers are operator-specific: verify the claimed voucher credit is
-        // backed by ACTIVE, unexpired vouchers belonging to THIS booking's
-        // business (or by a voucher already redeemed against this booking —
-        // the admin console deducts up front). Without this, a client-written
-        // voucher_amount_paid could discount the cash due using another
-        // operator's voucher — or no voucher at all.
-        if (voucherApplied > 0) {
-          const redeemedRes = await supabase.from("vouchers")
-            .select("id")
-            .eq("business_id", bk.business_id)
-            .eq("redeemed_booking_id", bookingId)
-            .limit(1);
-          if (!(redeemedRes.data || []).length) {
-            const claimedIds = Array.isArray(body.voucher_ids) ? body.voucher_ids.filter(Boolean) : [];
-            const claimedCodes = Array.isArray(body.voucher_codes) ? body.voucher_codes.filter(Boolean) : [];
-            let available = 0;
-            if (claimedIds.length || claimedCodes.length) {
-              let vq = supabase.from("vouchers")
-                .select("current_balance, value, purchase_amount, expires_at")
-                .eq("business_id", bk.business_id)
-                .eq("status", "ACTIVE");
-              vq = claimedIds.length ? vq.in("id", claimedIds) : vq.in("code", claimedCodes);
-              const vres = await vq;
-              const nowMs = Date.now();
-              available = (vres.data || [])
-                .filter((v: any) => !v.expires_at || new Date(v.expires_at).getTime() > nowMs)
-                .reduce((s: number, v: any) => s + Number(v.current_balance ?? v.value ?? v.purchase_amount ?? 0), 0);
-            }
-            if (available + 0.01 < voucherApplied) {
-              console.warn("VOUCHER_TENANT_MISMATCH: booking=" + bookingId + " claimed=" + voucherApplied + " available=" + available);
-              return new Response(JSON.stringify({
-                error: "VOUCHER_INVALID",
-                reason: "The voucher(s) applied are not valid for this operator or no longer cover the amount. Please remove them and try again.",
-              }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
-            }
-          }
-        }
-
-        let serverCashDue = Math.max(0, serverTotal - voucherApplied);
-        // Round to 2 decimals
-        serverCashDue = Math.round(serverCashDue * 100) / 100;
-
-        if (Math.abs(Number(amount) - serverCashDue) > 0.01) {
-          console.warn("CHECKOUT_PRICE_MISMATCH: frontend=" + amount + " server=" + serverCashDue + " booking=" + bookingId);
-          // Use server-calculated amount (never trust frontend)
-          amount = serverCashDue;
-          // Also update the booking record to reflect corrected total
-          await supabase.from("bookings").update({ total_amount: serverTotal + promoDiscount }).eq("id", bookingId);
-        }
-
-        // If promo covers the entire amount, skip payment
-        if (serverCashDue <= 0 && promoId) {
-          // Apply promo usage
-          await supabase.rpc("apply_promo_code", { p_promo_id: promoId, p_customer_email: resolvedEmail, p_booking_id: bookingId, p_customer_phone: bk.phone || null });
-          return new Response(JSON.stringify({ fully_covered: true, promo_applied: appliedPromoCode, discount: promoDiscount }), { headers: buildCors(req?.headers?.get("origin") || "*") });
-        }
-      }
+      quote = priced.data;
+      amount = Number(quote.amount);
+      promoId = quote.promo_id;
+      appliedPromoCode = quote.promo_code || "";
     }
 
     // Gift-voucher charge must equal the voucher's face value read from the DB —
@@ -312,11 +189,51 @@ Deno.serve(async (req: any) => {
       );
     }
     const corsHeaders = buildCors(origin || allowedOrigins[0] || "*");
-    const metadata: any = { type: type };
+    // R12: strict allowlist. Legacy bot types (ADD_PEOPLE/DEPOSIT_50/RESEND/
+    // SPLIT_*) map to their maintained equivalents; anything else is rejected
+    // instead of falling through to caller-supplied amounts.
+    const TYPE_MAP: Record<string, string> = {
+      BOOKING: "BOOKING", GIFT_VOUCHER: "GIFT_VOUCHER", RESCHEDULE: "RESCHEDULE",
+      ADD_GUESTS: "ADD_GUESTS", ADD_PEOPLE: "ADD_GUESTS",
+      COMBO: "COMBO", COMBO_SETTLEMENT: "COMBO_SETTLEMENT",
+      TOPUP: "TOPUP", PLATFORM_INVOICE: "PLATFORM_INVOICE",
+    };
+    const canonicalType = TYPE_MAP[type] || "";
+    if (!canonicalType) {
+      return new Response(
+        JSON.stringify({ error: "UNKNOWN_CHECKOUT_TYPE", reason: "Unsupported checkout type: " + type }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    // R12: derive every supported charge server-side. Uplifts (RESCHEDULE /
+    // ADD_GUESTS) come from the pending record or qty delta; deposits and
+    // splits pay a fraction of the verified cash due — never the raw caller amount.
+    let expectedCents = 0;
+    let amendmentHold: any = null;
+    let pendingReschedule: any = null;
+    if ((canonicalType === "RESCHEDULE" || canonicalType === "ADD_GUESTS") && bookingId) {
+      if (canonicalType === "RESCHEDULE") {
+        const pending = await supabase.from("pending_reschedules").select("*")
+          .eq("id", String(body.pending_reschedule_id || "")).eq("booking_id", bookingId).eq("business_id", resolved.businessId).maybeSingle();
+        if (pending.error || !pending.data || pending.data.status !== "PENDING") return new Response(JSON.stringify({ error: "RESCHEDULE_NOT_PENDING" }), { status: 409, headers: corsHeaders });
+        pendingReschedule = pending.data;
+      }
+      const held = await supabase.from("holds").select("*").eq("id", pendingReschedule?.hold_id || String(body.hold_id || "")).eq("booking_id", bookingId).maybeSingle();
+      if (held.error || !held.data || held.data.status !== "ACTIVE" || new Date(held.data.expires_at).getTime() <= Date.now()
+          || held.data.hold_type !== canonicalType) return new Response(JSON.stringify({ error: "AMENDMENT_HOLD_EXPIRED" }), { status: 409, headers: corsHeaders });
+      amendmentHold = held.data;
+      if (canonicalType === "ADD_GUESTS" && Number(amendmentHold.metadata?.new_qty) !== Number(body.new_qty)) return new Response(JSON.stringify({ error: "GUEST_COUNT_CHANGED" }), { status: 409, headers: corsHeaders });
+      amount = Number(pendingReschedule?.diff ?? amendmentHold.metadata?.diff);
+      if (!(amount > 0)) return new Response(JSON.stringify({ error: "AMENDMENT_AMOUNT_INVALID" }), { status: 409, headers: corsHeaders });
+      if (amendmentHold.metadata?.payment_url) return new Response(JSON.stringify({
+        id: amendmentHold.metadata.yoco_checkout_id, redirectUrl: amendmentHold.metadata.payment_url, amount, expires_at: amendmentHold.expires_at,
+      }), { headers: corsHeaders });
+    }
+    const metadata: any = { type: canonicalType, requested_type: type };
     let successUrl = businessUrls.bookingSuccessUrl;
     const cancelUrl = businessUrls.bookingCancelUrl;
 
-    if (type === "TOPUP") {
+    if (canonicalType === "TOPUP") {
       return new Response(
         JSON.stringify({ error: "TOPUPS_DISCONTINUED", reason: "Booking top-ups have been removed. Plans are billed monthly by admin seats." }),
         { status: 410, headers: corsHeaders },
@@ -330,19 +247,26 @@ Deno.serve(async (req: any) => {
       );
     }
 
-    if (type === "GIFT_VOUCHER") {
+    if (canonicalType === "GIFT_VOUCHER") {
       metadata.voucher_id = voucherId;
       metadata.voucher_code = voucherCode;
       successUrl = withQuery(businessUrls.voucherSuccessUrl, { code: voucherCode || "" });
-    } else if (type === "RESCHEDULE") {
+    } else if (canonicalType === "RESCHEDULE") {
       metadata.booking_id = bookingId;
       metadata.pending_reschedule_id = body.pending_reschedule_id || "";
-      successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
-    } else if (type === "ADD_GUESTS") {
+      successUrl = await bookingSuccessUrl(businessUrls.bookingSuccessUrl, bookingId, resolved.businessId, amendmentHold.id);
+    } else if (canonicalType === "ADD_GUESTS") {
       metadata.booking_id = bookingId;
       metadata.hold_id = body.hold_id || "";
       metadata.new_qty = String(body.new_qty || 0);
-      successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
+      successUrl = await bookingSuccessUrl(businessUrls.bookingSuccessUrl, bookingId, resolved.businessId, amendmentHold.id);
+    } else if (canonicalType === "COMBO" || canonicalType === "COMBO_SETTLEMENT" || canonicalType === "PLATFORM_INVOICE") {
+      // Combo/platform checkouts carry their own metadata from their dedicated
+      // creators; the generic booking branch must not claim them.
+      return new Response(
+        JSON.stringify({ error: "WRONG_CHECKOUT_CREATOR", reason: "Use the dedicated " + canonicalType + " creator for this checkout type." }),
+        { status: 400, headers: corsHeaders },
+      );
     } else {
       metadata.booking_id = bookingId;
       metadata.customer_name = body.customer_name || "";
@@ -350,7 +274,19 @@ Deno.serve(async (req: any) => {
       if (body.voucher_codes) metadata.voucher_codes = body.voucher_codes.join(",");
       if (body.voucher_ids) metadata.voucher_ids = body.voucher_ids.join(",");
       if (promoId) { metadata.promo_id = promoId; metadata.promo_code = appliedPromoCode; metadata.customer_email = customerEmail; }
-      successUrl = withQuery(businessUrls.bookingSuccessUrl, { ref: bookingId || "" });
+      successUrl = await bookingSuccessUrl(businessUrls.bookingSuccessUrl, bookingId, resolved.businessId);
+    }
+
+    if (quote?.redirectUrl) {
+      return new Response(JSON.stringify({ id: quote.checkout_id, redirectUrl: quote.redirectUrl, amount, expires_at: quote.expires_at }), { headers: corsHeaders });
+    }
+    if (canonicalType === "BOOKING" && quote && amount === 0) {
+      const confirmed = await supabase.rpc("confirm_booking_payment", {
+        p_booking_id: bookingId, p_payment_id: "VOUCHER_WEB", p_captured_cents: 0,
+        p_currency: tenant.business.currency || "ZAR",
+      });
+      if (confirmed.error || !confirmed.data?.ok) return new Response(JSON.stringify({ error: "CONFIRMATION_FAILED", reason: confirmed.data?.error || "Could not confirm booking" }), { status: 409, headers: corsHeaders });
+      return new Response(JSON.stringify({ fully_covered: true, redirectUrl: successUrl, amount: 0 }), { headers: corsHeaders });
     }
 
     console.log("CREATING CHECKOUT: amount=" + amount + " type=" + type);
@@ -362,24 +298,32 @@ Deno.serve(async (req: any) => {
       );
     }
 
-    const isTestMode = tenant.credentials.yocoTestMode === true;
+    let isTestMode = tenant.credentials.yocoTestMode === true;
     console.log("CREATING CHECKOUT: test_mode=" + isTestMode);
 
+    // Store the exact request, including its signed return URL. A lost response
+    // retries the same provider operation instead of minting a second payment.
+    const savedRequest = await supabase.rpc("save_checkout_request", {
+      p_booking_id: bookingId || null, p_hold_id: amendmentHold?.id || null, p_voucher_id: voucherId || null,
+      p_request: { mode: isTestMode ? "test" : "live", body: {
+        amount: Math.round(Number(amount) * 100), currency: tenant.business.currency || "ZAR",
+        successUrl, cancelUrl, failureUrl: cancelUrl, metadata,
+      } },
+    });
+    if (savedRequest.error || !savedRequest.data?.ok) return new Response(JSON.stringify({ error: "CHECKOUT_REQUEST_FAILED", reason: savedRequest.data?.error || "Could not save checkout. Please try again." }), { status: 409, headers: corsHeaders });
+    const paymentRequest = savedRequest.data.request;
+    isTestMode = paymentRequest.mode === "test";
+    const paymentKey = isTestMode ? tenant.credentials.yocoTestSecretKey : tenant.credentials.yocoSecretKey;
+    if (!paymentKey) return new Response(JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "Payment credentials for this checkout are missing." }), { status: 503, headers: corsHeaders });
+    amount = Number(paymentRequest.body.amount) / 100;
     const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
       method: "POST",
-      headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: Math.round(Number(amount) * 100),
-        currency: tenant.business.currency || "ZAR",
-        successUrl: successUrl,
-        cancelUrl: cancelUrl,
-        failureUrl: cancelUrl,
-        metadata: metadata,
-      }),
+      headers: { Authorization: "Bearer " + paymentKey, "Content-Type": "application/json", "Idempotency-Key": paymentRequest.id },
+      body: JSON.stringify(paymentRequest.body),
     });
 
     const yocoData = await yocoRes.json();
-    console.log("CHECKOUT:" + JSON.stringify(yocoData));
+    console.log("CHECKOUT:", yocoData?.id, yocoRes.status);
 
     if (!yocoRes.ok) {
       return new Response(
@@ -393,25 +337,49 @@ Deno.serve(async (req: any) => {
     }
 
     if (yocoData && yocoData.id && yocoData.redirectUrl) {
-      if (bookingId) {
+      // R12/R14: stamp the immutable expected charge (cents) the webhook
+      // reconciles against; reserve voucher credit so concurrent checkouts
+      // cannot spend the same balance twice.
+      expectedCents = Math.round(Number(amount) * 100);
+      if (bookingId && canonicalType === "BOOKING") {
         // payment_url only for first-payment checkouts: the cron hold-expiry
         // sweep re-sends it if the customer abandons. Top-up links (RESCHEDULE/
         // ADD_GUESTS) must not overwrite the original booking payment link.
-        const bookingUpdate: Record<string, string> = { yoco_checkout_id: yocoData.id };
-        if (type === "BOOKING") bookingUpdate.payment_url = yocoData.redirectUrl;
-        await supabase.from("bookings").update(bookingUpdate).eq("id", bookingId);
+        const bookingUpdate: Record<string, unknown> = {
+          yoco_checkout_id: yocoData.id,
+          expected_amount_cents: expectedCents,
+          expected_currency: tenant.business.currency || "ZAR",
+          yoco_mode: isTestMode ? "test" : "live",
+        };
+        if (canonicalType === "BOOKING") bookingUpdate.payment_url = yocoData.redirectUrl;
+        const savedCheckout = await supabase.from("bookings").update(bookingUpdate).eq("id", bookingId).eq("business_id", resolved.businessId);
+        if (savedCheckout.error) return new Response(JSON.stringify({ error: "CHECKOUT_SAVE_FAILED", reason: "Could not save the payment link. Please try again." }), { status: 503, headers: corsHeaders });
+
+      }
+      if (amendmentHold) {
+        const stamp = {
+          yoco_checkout_id: yocoData.id, yoco_mode: isTestMode ? "test" : "live",
+          expected_amount_cents: expectedCents, expected_currency: tenant.business.currency || "ZAR",
+        };
+        const held = await supabase.from("holds").update({ metadata: { ...amendmentHold.metadata, ...stamp, payment_url: yocoData.redirectUrl } })
+          .eq("id", amendmentHold.id).eq("booking_id", bookingId);
+        if (held.error) return new Response(JSON.stringify({ error: "AMENDMENT_CHECKOUT_SAVE_FAILED" }), { status: 503, headers: corsHeaders });
+        if (pendingReschedule) {
+          const pending = await supabase.from("pending_reschedules").update(stamp).eq("id", pendingReschedule.id).eq("business_id", resolved.businessId);
+          if (pending.error) return new Response(JSON.stringify({ error: "RESCHEDULE_CHECKOUT_SAVE_FAILED" }), { status: 503, headers: corsHeaders });
+        }
       }
       if (voucherId) {
         // Persist payment_url so the cron can re-send it if the buyer abandons.
         // No "please pay" email here — the buyer is redirected straight to Yoco,
         // so an immediate email is redundant. Mirrors the BOOKING flow: the cron
         // emails the link only if the voucher is still PENDING after 15 min.
-        await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id, payment_url: yocoData.redirectUrl }).eq("id", voucherId);
+        await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id, payment_url: yocoData.redirectUrl, yoco_mode: isTestMode ? "test" : "live" }).eq("id", voucherId);
       }
 
       // Send payment link via WhatsApp + email for BOOKING checkouts — opt-in
       // (admin-only). See sendPaymentLink note above.
-      if (type === "BOOKING" && bookingId && sendPaymentLink) {
+      if (canonicalType === "BOOKING" && bookingId && sendPaymentLink) {
         try {
           const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
           const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
@@ -504,7 +472,7 @@ Deno.serve(async (req: any) => {
       // channel; WhatsApp only when no email on file. The customer needs to
       // know (a) the booking was moved, (b) there's a top-up payment due,
       // (c) the new slot is held for 15 min.
-      if (type === "RESCHEDULE" && bookingId && !skipNotifications) {
+      if (canonicalType === "RESCHEDULE" && bookingId && !skipNotifications) {
         try {
           const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL") || "";
           const SERVICE_ROLE_KEY_ENV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
@@ -607,7 +575,7 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl }), { status: 200, headers: corsHeaders });
+      return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl, amount, expires_at: quote?.expires_at }), { status: 200, headers: corsHeaders });
     }
 
     return new Response(JSON.stringify({ error: "Yoco error", details: yocoData }), { status: 500, headers: corsHeaders });

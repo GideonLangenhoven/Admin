@@ -5,8 +5,6 @@
 -- never fed them. Sync the lead signer's DOB inside the RPC itself, where
 -- every signing routes through. The sync is non-fatal: a malformed date or
 -- contact conflict must never block the legal signing write.
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.sign_waiver(
   p_booking_id uuid,
   p_waiver_token uuid,
@@ -100,6 +98,4 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.sign_waiver(uuid, uuid, text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.sign_waiver(uuid, uuid, text, jsonb) TO anon, authenticated, service_role;
-
-COMMIT;
+GRANT EXECUTE ON FUNCTION public.sign_waiver(uuid, uuid, text, jsonb) TO anon, authenticated, service_role;;

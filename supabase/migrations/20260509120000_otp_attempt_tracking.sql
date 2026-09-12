@@ -14,24 +14,19 @@ CREATE TABLE IF NOT EXISTS public.otp_attempts (
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL
 );
-
 ALTER TABLE public.otp_attempts ADD COLUMN IF NOT EXISTS phone_tail text;
 ALTER TABLE public.otp_attempts ADD COLUMN IF NOT EXISTS code_hash text;
 ALTER TABLE public.otp_attempts ADD COLUMN IF NOT EXISTS ip_address text;
 ALTER TABLE public.otp_attempts ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'my_bookings';
-
 CREATE INDEX IF NOT EXISTS idx_otp_attempts_expiry ON public.otp_attempts (expires_at);
 CREATE INDEX IF NOT EXISTS idx_otp_attempts_email_created ON public.otp_attempts (email, created_at);
 CREATE INDEX IF NOT EXISTS idx_otp_attempts_ip_created ON public.otp_attempts (ip_address, created_at);
 CREATE INDEX IF NOT EXISTS idx_otp_attempts_purpose_created ON public.otp_attempts (purpose, created_at);
-
 ALTER TABLE public.otp_attempts ENABLE ROW LEVEL SECURITY;
-
 -- Only edge functions (service_role) touch this table
 DROP POLICY IF EXISTS otp_attempts_service ON public.otp_attempts;
 CREATE POLICY otp_attempts_service ON public.otp_attempts
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-
 CREATE OR REPLACE FUNCTION public.bt_record_otp_failed_attempt(
   p_token_hash text,
   p_max_attempts int DEFAULT 5,
@@ -55,6 +50,5 @@ BEGIN
   RETURNING oa.attempts, oa.locked_until;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.bt_record_otp_failed_attempt(text, int, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.bt_record_otp_failed_attempt(text, int, int) TO service_role;

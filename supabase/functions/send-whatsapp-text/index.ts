@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
@@ -12,6 +13,10 @@ function getCors(req?: any) {
 
 Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: getCors(req) });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) }); }
   try {
     const body = await req.json();
     const to = body.to;
@@ -22,11 +27,19 @@ Deno.serve(async (req: any) => {
 
     const supabase = createServiceClient();
 
-    if (!businessId && bookingId) {
-      const bookingRes = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
-      businessId = String(bookingRes.data?.business_id || "");
+    if (bookingId) {
+      let query = supabase.from("bookings").select("business_id").eq("id", bookingId);
+      if (!auth.isServiceRole && auth.role !== "SUPER_ADMIN") query = query.eq("business_id", auth.businessId);
+      const bookingRes = await query.maybeSingle();
+      if (!bookingRes.data || (businessId && businessId !== bookingRes.data.business_id)) {
+        return new Response(JSON.stringify({ error: "Booking not accessible" }), { status: 403, headers: getCors(req) });
+      }
+      businessId = String(bookingRes.data.business_id);
     }
     if (!businessId) return new Response(JSON.stringify({ error: "business_id or booking_id is required" }), { status: 400, headers: getCors(req) });
+    if (!canAccessBusiness(auth, businessId)) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+    }
 
     const tenant = await getTenantByBusinessId(supabase, businessId);
     // Support template fallback for outbound messages outside the 24h window

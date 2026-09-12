@@ -1,9 +1,7 @@
 BEGIN;
-
 -- POPIA data subject request types and statuses
 DO $$ BEGIN CREATE TYPE data_request_type AS ENUM ('ACCESS', 'DELETION', 'CORRECTION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE data_request_status AS ENUM ('PENDING_CONFIRMATION', 'CONFIRMED', 'IN_REVIEW', 'FULFILLED', 'CANCELLED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
 CREATE TABLE IF NOT EXISTS data_subject_requests (
   id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id               uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
@@ -26,23 +24,18 @@ CREATE TABLE IF NOT EXISTS data_subject_requests (
   created_at                timestamptz NOT NULL DEFAULT now(),
   updated_at                timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_dsr_business_status ON data_subject_requests(business_id, status);
 CREATE INDEX IF NOT EXISTS idx_dsr_scheduled ON data_subject_requests(scheduled_for) WHERE status = 'CONFIRMED';
 CREATE INDEX IF NOT EXISTS idx_dsr_email ON data_subject_requests(lower(email));
-
 ALTER TABLE data_subject_requests ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS dsr_tenant_read ON data_subject_requests;
 CREATE POLICY dsr_tenant_read ON data_subject_requests FOR SELECT TO authenticated
   USING (business_id IN (
     SELECT au.business_id FROM admin_users au WHERE au.user_id = auth.uid() AND NOT au.suspended
   ));
-
 DROP POLICY IF EXISTS dsr_service ON data_subject_requests;
 CREATE POLICY dsr_service ON data_subject_requests FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-
 -- Anonymization audit trail
 CREATE TABLE IF NOT EXISTS pii_anonymization_log (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,22 +47,17 @@ CREATE TABLE IF NOT EXISTS pii_anonymization_log (
   performed_by      uuid REFERENCES admin_users(id),
   performed_at      timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE pii_anonymization_log ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS pii_log_read ON pii_anonymization_log;
 CREATE POLICY pii_log_read ON pii_anonymization_log FOR SELECT TO authenticated
   USING (business_id IN (
     SELECT au.business_id FROM admin_users au WHERE au.user_id = auth.uid() AND NOT au.suspended
   ));
-
 DROP POLICY IF EXISTS pii_log_service ON pii_anonymization_log;
 CREATE POLICY pii_log_service ON pii_anonymization_log FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-
 -- Add deleted_at to customers if missing
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
-
 -- Anonymization RPC (service_role only)
 CREATE OR REPLACE FUNCTION anonymize_customer(
   p_customer_id uuid,
@@ -133,8 +121,6 @@ BEGIN
   RETURN v_counts;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION anonymize_customer FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION anonymize_customer TO service_role;
-
 COMMIT;

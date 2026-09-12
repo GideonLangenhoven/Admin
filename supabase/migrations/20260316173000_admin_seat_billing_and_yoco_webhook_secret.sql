@@ -1,8 +1,6 @@
 alter table public.businesses
   add column if not exists yoco_webhook_secret_encrypted bytea;
-
 drop function if exists public.set_business_credentials(uuid, text, text, text);
-
 create or replace function public.set_business_credentials(
   p_business_id uuid,
   p_wa_token text,
@@ -29,7 +27,6 @@ begin
   end if;
 end;
 $$;
-
 create or replace function public.get_business_credentials(p_business_id uuid)
 returns table (
   wa_token text,
@@ -49,13 +46,10 @@ as $$
   from public.businesses b
   where b.id = p_business_id
 $$;
-
 revoke all on function public.set_business_credentials(uuid, text, text, text, text) from public, anon, authenticated;
 revoke all on function public.get_business_credentials(uuid) from public, anon, authenticated;
-
 grant execute on function public.set_business_credentials(uuid, text, text, text, text) to service_role;
 grant execute on function public.get_business_credentials(uuid) to service_role;
-
 with ranked_plans as (
   select
     id,

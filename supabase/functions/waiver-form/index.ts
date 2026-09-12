@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
     // force text/plain content-type which prevents HTML rendering in browsers)
     if (req.method === "GET" && bookingId && token) {
       // Look up the business booking site URL from the booking
-      const waiverBaseUrl = "";
+      let waiverBaseUrl = "";
       try {
         const { data: wbk } = await supabase.from("bookings").select("business_id").eq("id", bookingId).maybeSingle();
         if (wbk?.business_id) {

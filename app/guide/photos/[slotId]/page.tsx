@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import { getAuthHeaders } from "@/app/lib/admin-auth";
 import { useBusinessContext } from "@/components/BusinessContext";
 
 type Photo = { id: string; photo_url: string; gdrive_view_url: string | null; uploaded_at: string };
@@ -13,6 +14,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
 
   useEffect(() => { reload(); }, [slotId, businessId]);
@@ -28,6 +30,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
       supabase.from("slots")
         .select("start_time, tours(name)")
         .eq("id", slotId)
+        .eq("business_id", businessId)
         .maybeSingle(),
     ]);
     setPhotos((photosRes.data as Photo[]) || []);
@@ -35,37 +38,53 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   }
 
   async function onPickPhotos(files: FileList | null) {
-    if (!files || files.length === 0) return;
+    if (uploading || !files || files.length === 0) return;
     setUploading(true);
+    setUploadStatus(null);
     setProgress({ done: 0, total: files.length });
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("slot_id", slotId);
-      try {
-        const r = await fetch("/api/guide/photo-upload", { method: "POST", body: fd });
-        if (!r.ok) console.warn("upload failed for", file.name, await r.text());
-      } catch (e) { console.warn(e); }
-      setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) throw new Error("Please sign in again before uploading photos.");
+      delete headers["Content-Type"]; // The browser supplies the multipart boundary.
+      const failed: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("slot_id", slotId);
+        try {
+          const r = await fetch("/api/guide/photo-upload", { method: "POST", headers, body: fd });
+          const data = await r.json();
+          if (!r.ok || data.ok !== true) throw new Error(data.error || "Upload failed");
+        } catch { failed.push(file.name); }
+        setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
+      }
+      setUploadStatus((files.length - failed.length) + " of " + files.length + " photos uploaded." + (failed.length ? " Please retry: " + failed.join(", ") : ""));
+      reload();
+    } catch (e: any) {
+      setUploadStatus(e?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      setProgress(null);
     }
-    setUploading(false);
-    setProgress(null);
-    reload();
   }
 
   async function sendThankYou() {
     setEmailStatus("Sending...");
     try {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) throw new Error("Please sign in again before sending photos.");
       const r = await fetch("/api/guide/send-thank-you", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ slot_id: slotId }),
       });
       const data = await r.json();
-      if (r.ok) {
-        setEmailStatus("Sent to " + data.recipient_count + " customer(s).");
+      if (r.ok && typeof data.recipient_count === "number") {
+        setEmailStatus(data.failed?.length
+          ? "Sent to " + data.recipient_count + " customer(s); " + data.failed.length + " failed. Check customer contact details before sending again."
+          : "Sent to " + data.recipient_count + " customer(s).");
       } else {
         setEmailStatus("Failed: " + (data.error || "unknown"));
       }
@@ -93,12 +112,13 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
         ) : (
           <>
             <span className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Take or pick photos</span>
-            <span className="text-[12px] ui-text-muted">Saved to your Google Drive, shared as a private gallery in the thank-you email.</span>
+            <span className="text-[12px] ui-text-muted">Saved to your Google Drive. Share this trip’s photo links in the thank-you email.</span>
           </>
         )}
         <input type="file" multiple accept="image/*" capture="environment" className="hidden"
-          disabled={uploading} onChange={e => onPickPhotos(e.target.files)} />
+          disabled={uploading} onChange={async e => { const input = e.currentTarget; await onPickPhotos(input.files); input.value = ""; }} />
       </label>
+      {uploadStatus && <p role="status" className="mt-3 text-[13px] font-semibold">{uploadStatus}</p>}
 
       {photos.length > 0 && (
         <>
@@ -122,7 +142,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
       )}
       {emailStatus && (
         <p className="mt-3 text-[13px] font-semibold text-center"
-          style={{ color: emailStatus.startsWith("Sent") ? "var(--ck-success)" : emailStatus.startsWith("Sending") ? "var(--ck-text-muted)" : "var(--ck-danger)" }}>{emailStatus}</p>
+          style={{ color: emailStatus.startsWith("Sent") && !emailStatus.includes("failed") ? "var(--ck-success)" : emailStatus.startsWith("Sending") ? "var(--ck-text-muted)" : "var(--ck-danger)" }}>{emailStatus}</p>
       )}
     </div>
   );

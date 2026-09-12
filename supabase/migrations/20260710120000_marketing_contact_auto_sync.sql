@@ -65,12 +65,10 @@ EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS ck_booking_sync_marketing_contact ON public.bookings;
 CREATE TRIGGER ck_booking_sync_marketing_contact
 AFTER INSERT OR UPDATE OF email, customer_name, phone, waiver_payload ON public.bookings
 FOR EACH ROW EXECUTE FUNCTION public.ck_sync_marketing_contact();
-
 -- ── Backfill ──
 -- 1) customers ledger (deduped per business, carries DOB/phone)
 INSERT INTO marketing_contacts (business_id, email, first_name, last_name, phone, date_of_birth, source)
@@ -92,7 +90,6 @@ ON CONFLICT (business_id, email) DO UPDATE SET
   phone         = coalesce(nullif(marketing_contacts.phone, ''), excluded.phone),
   date_of_birth = coalesce(marketing_contacts.date_of_birth, excluded.date_of_birth),
   updated_at    = now();
-
 -- 2) bookings not present in the customers ledger (belt and braces), newest
 --    booking per (business, email) wins for name/phone; DOB from waiver payload
 INSERT INTO marketing_contacts (business_id, email, first_name, last_name, phone, date_of_birth, source)
@@ -116,7 +113,6 @@ ON CONFLICT (business_id, email) DO UPDATE SET
   phone         = coalesce(nullif(marketing_contacts.phone, ''), excluded.phone),
   date_of_birth = coalesce(marketing_contacts.date_of_birth, excluded.date_of_birth),
   updated_at    = now();
-
 -- 3) DOB sweep: waiver-signed bookings whose contact still lacks DOB
 UPDATE marketing_contacts mc
 SET date_of_birth = w.dob, updated_at = now()

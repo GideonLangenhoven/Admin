@@ -9,6 +9,8 @@ import { getWaiverContext } from "../_shared/waiver.ts";
 import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { tourEndDate } from "../_shared/duration.ts";
 import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
+import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -209,7 +211,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       emailColor: "#1b3b36",
       imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
       socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
-      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", emailTagline: "", logoUrl: "",
+      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "",
     };
   }
 
@@ -284,6 +286,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     businessAddress: String(data?.business_address || ""),
     whatToBring: String(data?.what_to_bring || ""),
     activityVerbPast: String(data?.activity_verb_past || ""),
+    locationPhrase: String(data?.location_phrase || ""),
     emailTagline: String(data?.email_tagline || ""),
     logoUrl: String(data?.logo_url || ""),
   };
@@ -501,13 +504,11 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     );
   }
 
-  // Replace activity verb (Prompt 23)
+  // Replace activity verb in the booking-confirm template (the only remaining
+  // static "paddling" — trip-photos now renders the tenant verb directly).
   brandedHtml = brandedHtml
     .split("Thank you for paddling with")
-    .join("Thank you for " + (branding.activityVerbPast || "adventuring") + " with")
-    // Trip-photos email: drop the water-specific suffix for non-water operators
-    .split("We hope you had an incredible time on the water")
-    .join("We hope you had an incredible time");
+    .join("Thank you for " + (branding.activityVerbPast || "adventuring") + " with");
 
   // Maps button: point at the tenant's own location, falling back through their
   // configured address fields; tenants with no location get the button STRIPPED
@@ -1748,7 +1749,16 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-function tripPhotosHtml(d: Record<string, unknown>) {
+function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPast?: string; locationPhrase?: string }) {
+  // Activity wording comes from the tenant's own terminology (Settings →
+  // Email Customisation). A tenant with neither set gets the neutral fallback
+  // — never another operator's activity. Note: the confirm-email
+  // `email_tagline` ("Get ready to…") is deliberately NOT reused here; a
+  // pre-trip excitement line reads wrong in a post-trip email.
+  const verb = String(branding?.activityVerbPast || "").trim() || "adventuring";
+  const loc = String(branding?.locationPhrase || "").trim();
+  const flavorLine = "We hope you had an incredible time" + (loc ? " " + loc : "");
+  const photoUrls = (Array.isArray(d.photo_urls) ? d.photo_urls : [d.photo_url]).filter(url => typeof url === "string" && url.trim());
   return `
     <!DOCTYPE html>
     <html>
@@ -1769,7 +1779,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
         <!-- Sub-header -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
-            <p style="font-size: 15px; color: #6b7280; margin: 0;">We hope you had an incredible time on the water</p>
+            <p style="font-size: 15px; color: #6b7280; margin: 0;">${flavorLine}</p>
           </td>
         </tr>
         <!-- Message -->
@@ -1777,7 +1787,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
           <td style="padding: 10px 40px 20px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.7; margin: 0;">
               Hi ${d.customer_name},<br><br>
-              Thank you for paddling with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
+              Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
             </p>
           </td>
         </tr>
@@ -1789,7 +1799,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
                 <td style="padding: 24px; text-align: center;">
                   <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">Your trip photos are ready!</p>
                   <p style="margin: 0 0 16px 0; font-size: 13px; color: #888; line-height: 1.5;">We captured some great moments from your trip. Click below to view and download your photos.<br><strong>Share this link with your group!</strong></p>
-                  <a href="${d.photo_url}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">View Photos</a>
+                  ${photoUrls.map((url, index) => `<a href="${escHtml(String(url))}" style="display: inline-block; margin: 4px; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">View Photos${photoUrls.length > 1 ? " " + (index + 1) : ""}</a>`).join("")}
                 </td>
               </tr>
             </table>
@@ -2511,6 +2521,7 @@ async function resolveTenantFromRedirect(redirectUrl: string): Promise<string | 
 
 Deno.serve(withSentry("send-email", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: getCors(req) });
 
   try {
     if (!RESEND_API_KEY) {
@@ -2574,6 +2585,31 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
 
     const type = (parsedBody as { type?: string }).type as string;
     let d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
+    if (typeof type !== "string" || !type || !d || typeof d !== "object" || Array.isArray(d)) {
+      return new Response(JSON.stringify({ error: "type and data are required" }), { status: 400, headers: getCors(req) });
+    }
+    if (!isAuthHook) {
+      let auth;
+      try { auth = await requireAuth(req); }
+      catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) }); }
+      if (!auth.isServiceRole) {
+        // Identity, privacy and platform billing messages are issued only by
+        // their verified server workflows, never as arbitrary admin payloads.
+        if (["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING"].includes(type) || type.startsWith("POPIA_")) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+        }
+        const businessId = String(d.business_id || auth.businessId || "");
+        if (!canAccessBusiness(auth, businessId)) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+        }
+        if (d.booking_id) {
+          const booking = await supabase?.from("bookings").select("id")
+            .eq("id", String(d.booking_id)).eq("business_id", businessId).maybeSingle();
+          if (!booking?.data) return new Response(JSON.stringify({ error: "Booking not accessible" }), { status: 403, headers: getCors(req) });
+        }
+        d.business_id = businessId;
+      }
+    }
 
     // Escape user-controlled fields to prevent HTML injection in email templates
     const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email", "business_name", "plan_name"];
@@ -2588,7 +2624,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER") {
@@ -2615,7 +2651,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     // joins by id (see below), so this needs no changes on the sending side.
     if (type === "BOOKING_CONFIRM" && d.booking_id && supabase) {
       try {
-        const tt = await supabase.from("bookings").select("tours(confirmation_tagline)").eq("id", String(d.booking_id)).maybeSingle();
+        const tt = await supabase.from("bookings").select("tours(confirmation_tagline)").eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
         const tag = (tt.data as { tours?: { confirmation_tagline?: string } } | null)?.tours?.confirmation_tagline;
         if (tag && String(tag).trim()) d._emailTagline = String(tag).trim();
       } catch (tagErr) {
@@ -2636,7 +2672,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       try {
         const rangeBookingId = String(d.booking_id || "").trim();
         if (rangeBookingId) {
-          const bres = await supabase.from("bookings").select("slots(start_time), tours(duration_minutes)").eq("id", rangeBookingId).maybeSingle();
+          const bres = await supabase.from("bookings").select("slots(start_time), tours(duration_minutes)").eq("id", rangeBookingId).eq("business_id", branding.businessId).maybeSingle();
           const row = bres.data as { slots?: { start_time?: string }; tours?: { duration_minutes?: number } } | null;
           const durMin = Number(row?.tours?.duration_minutes || 0);
           const startIso = row?.slots?.start_time;
@@ -2767,7 +2803,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         break;
       case "TRIP_PHOTOS":
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
-        html = tripPhotosHtml(d);
+        html = tripPhotosHtml(d, branding);
         break;
       case "SETTLEMENT_REQUEST":
         // Operator B asks operator A to pay their combo share via Yoco link.
@@ -2809,6 +2845,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = fillMarketingTokens(String(d.subject_line || "[TEST] Marketing preview"), testTokens);
         html = fillMarketingTokens(String(d.html_content || "<p>No content</p>"), testTokens)
           .replace(/\{\{unsubscribe_url\}\}/g, SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=preview");
+        html = replaceLegacyMarketingSocialIcons(html);
         break;
       }
       case "POPIA_CONFIRM_REQUEST":

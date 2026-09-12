@@ -14,12 +14,14 @@ describe("partial gift-voucher checkout (B1)", () => {
 
   it("create-checkout subtracts voucher_amount_paid from the server total", () => {
     const checkout = readFileSync("supabase/functions/create-checkout/index.ts", "utf8");
-    expect(checkout).toContain("Number(bk.voucher_amount_paid || 0)");
-    expect(checkout).toContain("serverTotal - voucherApplied");
+    expect(checkout).toContain('supabase.rpc("prepare_booking_checkout"');
+    expect(readFileSync("supabase/migrations/20260911130000_checkout_pricing.sql","utf8")).toContain("total_amount = net - credit");
   });
 
-  it("yoco-webhook deducts the voucher via voucher_amount_paid", () => {
+  it("yoco-webhook settles reserved vouchers atomically before marking PAID", () => {
     const webhook = readFileSync("supabase/functions/yoco-webhook/index.ts", "utf8");
-    expect(webhook).toContain("booking.voucher_amount_paid");
+    expect(webhook).toContain('supabase.rpc("confirm_booking_payment"');
+    const migration = readFileSync("supabase/migrations/20260911090000_payment_hold_hardening.sql", "utf8");
+    expect(migration).toContain("settle_voucher_reservations(p_booking_id)");
   });
 });

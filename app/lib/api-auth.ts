@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-export { isPrivilegedRole } from "./role-utils";
+export { isPrivilegedRole, canManageAdmin } from "./role-utils";
 
 export type CallerAdmin = {
   id: string;

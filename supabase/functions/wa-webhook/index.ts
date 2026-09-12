@@ -34,6 +34,17 @@ const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 const supabase = createServiceClient();
 
+async function requestCheckout(body: Record<string, unknown>) {
+  const response = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, skip_notifications: true }),
+  });
+  const data = await response.json();
+  if (!response.ok) return { error: data?.reason || data?.error || "Payment link unavailable" };
+  return data;
+}
+
 // ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
@@ -70,14 +81,6 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
     console.error("HMAC verify failed:", e);
     return false;
   }
-}
-
-function withQuery(base: string, params: Record<string, string>) {
-  const url = new URL(base);
-  for (const [key, value] of Object.entries(params)) {
-    if (value) url.searchParams.set(key, value);
-  }
-  return url.toString();
 }
 
 function tenantTimeZone(tenant: TenantContext) {
@@ -1858,48 +1861,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (newQty === sd.qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed. \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
 
       if (newQty > sd.qty) {
-        // Adding guests — use atomic capacity check via RPC (H2: don't update slot before payment)
         const addCount = newQty - sd.qty;
-        const addCost = addCount * Number(sd.unit_price);
-        await sendText(tenant, phone, "Adding " + addCount + " guest" + (addCount !== 1 ? "s" : "") + "...");
-        // H2: Create hold via atomic RPC instead of directly updating slots.booked
-        const addHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: sd.booking_id,
-          p_slot_id: sd.slot_id,
-          p_qty: addCount,
-          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        const changed = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({ booking_id: sd.booking_id, action: "ADD_GUESTS", new_qty: newQty }),
         });
-        if (addHoldRes.error || !addHoldRes.data?.success) {
-          await sendText(tenant, phone, addHoldRes.data?.error || "Sorry, not enough spots left for " + addCount + " more. Try a smaller number.");
+        const result = await changed.json();
+        if (!changed.ok || !result.ok) {
+          await sendText(tenant, phone, result.error || "We couldn't reserve the extra guests. Please try again.");
           return;
         }
-        const addNewTotal = newQty * Number(sd.unit_price);
-        // DB writes keep total_amount as the CASH portion: existing cash total
-        // plus the uplift. newQty * unit_price clobbered voucher/discount-
-        // adjusted totals (addNewTotal stays display-only).
-        const addNewCashTotal = Number(sd.total || 0) + addCost;
-        // M8: Invalidate waiver on guest addition
-        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
-        await logE(tenant, "guests_added_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: newQty, additional_cost: addCost }, sd.booking_id);
-        // Create checkout for extra payment — booking qty/total updated by webhook on payment success
-        try {
-          const coRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
-            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-            body: JSON.stringify({ amount: addCost, booking_id: sd.booking_id, business_id: tenant.business.id, type: "BOOKING",
-              metadata: { hold_id: addHoldRes.data.hold_id, add_qty: addCount, new_qty: newQty, new_total: addNewTotal } }),
-          });
-          const coData = await coRes.json();
-          if (coData?.redirectUrl) {
-            await sendText(tenant, phone, "\u{1F465} *" + addCount + " extra guest" + (addCount !== 1 ? "s" : "") + " reserved!*\n\nNew total will be: " + newQty + " people (R" + addNewTotal + ")\n\nPlease pay the extra *R" + addCost + "* to confirm:\n" + coData.redirectUrl + "\n\n\u23F0 Spots held for 15 minutes.");
-          } else {
-            // Fallback: update booking directly since checkout failed
-            await supabase.from("bookings").update({ qty: newQty, total_amount: addNewCashTotal }).eq("id", sd.booking_id);
-            await sendText(tenant, phone, "\u2705 *" + addCount + " guest" + (addCount !== 1 ? "s" : "") + " added!*\n\nNew total: " + newQty + " people (R" + addNewTotal + ")\n\nA payment link for R" + addCost + " will be sent to your email.");
-          }
-        } catch (e) {
-          // Fallback: update booking directly since checkout failed
-          await supabase.from("bookings").update({ qty: newQty, total_amount: addNewCashTotal }).eq("id", sd.booking_id);
-          await sendText(tenant, phone, "\u2705 Guests added! A payment link for R" + addCost + " will be sent shortly.");
+        if (result.payment_url) {
+          await sendText(tenant, phone, "To confirm " + addCount + " extra guests, pay R" + Number(result.diff).toFixed(2) + ":\n" + result.payment_url + "\n\nExtra spots are held for 15 minutes. Your existing booking stays confirmed.");
+        } else {
+          await sendText(tenant, phone, "Your booking now has " + newQty + " guests. The updated total is due with your booking payment.");
         }
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
@@ -2498,6 +2473,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         customer_name: sd.customer_name, phone: phone, email: email,
         qty: verifiedSd.qty, unit_price: verifiedSd.unit_price, total_amount: verifiedSd.total,
         original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
+        voucher_amount_paid: Number(verifiedSd.voucher_deduction || 0),
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
         marketing_opt_in: null, total_captured: 0, total_refunded: 0,
         terms_accepted_at: new Date().toISOString(),
@@ -2512,42 +2488,19 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // VOUCHER BOOKING — skip payment
       if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
-        // H1: Atomic capacity check must run before voucher deduction.
-        const vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+        // Funding, capacity and confirmation commit together. A stale voucher
+        // must not leave a PAID booking or a partially drained voucher stack.
+        const voucherConfirmation = await supabase.rpc("confirm_voucher_booking", {
           p_booking_id: booking.id,
-          p_slot_id: verifiedSd.slot_id,
-          p_qty: verifiedSd.qty,
-          p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
+          p_voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id],
         });
-        if (vHoldRes.error || !vHoldRes.data?.success) {
-          // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
-          await supabase.from("bookings").delete().eq("id", booking.id);
-          await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
+        if (voucherConfirmation.error || !voucherConfirmation.data?.ok) {
+          await sendText(tenant, phone, "We couldn't confirm that booking. The voucher balance or available spots may have changed. Please try again or contact our team.");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
-        await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + verifiedSd.voucher_code, total_captured: 0 }).eq("id", booking.id);
-        // Deduct voucher balances — sequential drain using atomic RPC (prevents double-spend)
-        const allVIds = verifiedSd.voucher_ids || [verifiedSd.voucher_id];
-        let waRemainingCost = Number(verifiedSd.voucher_deduction || 0);
-        for (let vi = 0; vi < allVIds.length; vi++) {
-          if (!allVIds[vi] || waRemainingCost <= 0) continue;
-          // Atomic deduction via RPC — drains Voucher A to R0 first, then Voucher B
-          const waRpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: allVIds[vi], p_amount: waRemainingCost });
-          if (waRpcRes.data?.success) {
-            const waDeducted = Number(waRpcRes.data.deducted);
-            const waNewBal = Number(waRpcRes.data.remaining);
-            waRemainingCost -= waDeducted;
-            await supabase.from("vouchers").update({ redeemed_booking_id: booking.id, redeemed_by_phone: phone }).eq("id", allVIds[vi]);
-            if (waNewBal > 0) {
-              // Notify about remaining balance via WhatsApp
-              const waVCode = await supabase.from("vouchers").select("code").eq("id", allVIds[vi]).single();
-              try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + (waVCode.data?.code || allVIds[vi]) + "* has *R" + waNewBal + "* remaining. Use it on your next booking!"); } catch (e) { }
-            }
-          } else {
-            // Redemption failed — do NOT mark REDEEMED (strands balance + hides failure).
-            console.error("VOUCHER_DEDUCT_FAILED:", allVIds[vi], waRpcRes.data?.error);
-          }
+        for (const remainder of voucherConfirmation.data.remainders || []) {
+          try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + remainder.code + "* has *R" + remainder.remaining + "* remaining. Use it on your next booking!"); } catch (e) { }
         }
         const vref = booking.id.substring(0, 8).toUpperCase();
         const vslot = await supabase.from("slots").select("start_time").eq("id", verifiedSd.slot_id).single();
@@ -2600,22 +2553,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
-      const bookingSiteUrls = await getBusinessSiteUrls(tenant);
-      console.log("YOCO_CALL: key_len=" + tenant.credentials.activeYocoSecretKey.length + " amount=" + Math.round(verifiedSd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
-        method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Math.round(verifiedSd.total * 100), currency: tenant.business.currency || "ZAR",
-          successUrl: withQuery(bookingSiteUrls.bookingSuccessUrl, { ref: booking.id }),
-          cancelUrl: bookingSiteUrls.bookingCancelUrl,
-          failureUrl: bookingSiteUrls.bookingCancelUrl,
-          metadata: { booking_id: booking.id, customer_name: sd.customer_name, qty: String(verifiedSd.qty) },
-        }),
+      const yocoData = await requestCheckout({
+        type: "BOOKING", booking_id: booking.id, amount: verifiedSd.total,
+        customer_name: sd.customer_name, qty: verifiedSd.qty,
+        voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id].filter(Boolean),
+        voucher_codes: verifiedSd.voucher_codes || [verifiedSd.voucher_code].filter(Boolean),
       });
-      const yocoData = await yocoRes.json();
-      console.log("YOCO:" + JSON.stringify(yocoData));
       let payUrl = "";
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
-        await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", booking.id);
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable. Type *speak to us* for help"; }
       const ref = booking.id.substring(0, 8).toUpperCase();
@@ -2739,25 +2684,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           return;
         }
 
-        // Create Yoco checkout
-        // Uses tenant.credentials.activeYocoSecretKey (test-mode aware)
-        const voucherSiteUrls = await getBusinessSiteUrls(tenant);
-        const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(Number(sd.value) * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(voucherSiteUrls.voucherSuccessUrl, { code: vcode }),
-            cancelUrl: voucherSiteUrls.bookingCancelUrl,
-            failureUrl: voucherSiteUrls.bookingCancelUrl,
-            metadata: { voucher_id: vr.data.id, voucher_code: vcode, type: "GIFT_VOUCHER" },
-          }),
+        const yocoData = await requestCheckout({
+          type: "GIFT_VOUCHER", voucher_id: vr.data.id, voucher_code: vcode, amount: sd.value,
         });
-        const yocoData = await yocoRes.json();
-        console.log("YOCO_GV:" + JSON.stringify(yocoData));
 
         if (yocoData && yocoData.id && yocoData.redirectUrl) {
-          await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", vr.data.id);
           await sendText(tenant, phone,
             "\u{1F381} Great! Complete your payment to generate the voucher:\n\n" +
             "\u{1F4B0} Amount: R" + sd.value + "\n" +
@@ -2944,20 +2875,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           // Create new checkout
           const rpBk = payBkr.data;
           const rpRef = rpBk.id.substring(0, 8).toUpperCase();
-          const resendSiteUrls = await getBusinessSiteUrls(tenant);
-          const rpYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              amount: Math.round(Number(rpBk.total_amount) * 100), currency: tenant.business.currency || "ZAR",
-              successUrl: withQuery(resendSiteUrls.bookingSuccessUrl, { ref: rpBk.id }),
-              cancelUrl: resendSiteUrls.bookingCancelUrl,
-              failureUrl: resendSiteUrls.bookingCancelUrl,
-              metadata: { booking_id: rpBk.id, type: "RESEND" },
-            }),
-          });
-          const rpYocoData = await rpYoco.json();
+          const rpYocoData = await requestCheckout({ type: "BOOKING", booking_id: rpBk.id, amount: rpBk.total_amount });
           if (rpYocoData?.redirectUrl) {
-            await supabase.from("bookings").update({ yoco_checkout_id: rpYocoData.id }).eq("id", rpBk.id);
             await sendText(tenant, phone, "Here\u2019s a fresh payment link for booking *" + rpRef + "* (R" + rpBk.total_amount + "):\n\n" + rpYocoData.redirectUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
           } else {
             await sendText(tenant, phone, "Couldn\u2019t generate a new link. Let me connect you to our team.");
@@ -2995,49 +2914,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      // Handle split payment
+      // Instalment/deposit accounting is not part of the MVP. Only issue a
+      // checkout for the full outstanding balance until that ledger exists.
       const wantSplit = (input.includes("split") && input.includes("pay")) || (input.includes("separate") && input.includes("pay"));
-      if (wantSplit) {
-        const spBkr = await supabase.from("bookings").select("id, total_amount, status")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (spBkr.data) {
-          await sendText(tenant, phone, "Sure! Your total is R" + spBkr.data.total_amount + ". How many people are splitting the payment? (2-10)");
-          await setConvo(convo.id, { current_state: "SPLIT_PAYMENT_COUNT", state_data: { booking_id: spBkr.data.id, split_total: spBkr.data.total_amount } });
-        } else {
-          await sendText(tenant, phone, "No unpaid booking found. Start a new booking first!");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
-        return;
-      }
-
-      // Handle cash/deposit request
       const wantCash = input.includes("cash") || (input.includes("deposit") && !input.includes("refund"));
-      if (wantCash) {
-        const cashBkr = await supabase.from("bookings").select("id, total_amount, status")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (cashBkr.data) {
-          const depAmount = Math.round(Number(cashBkr.data.total_amount) * 0.5);
-          const depositSiteUrls = await getBusinessSiteUrls(tenant);
-          const depYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              amount: Math.round(depAmount * 100), currency: tenant.business.currency || "ZAR",
-              successUrl: withQuery(depositSiteUrls.bookingSuccessUrl, { ref: cashBkr.data.id }),
-              cancelUrl: depositSiteUrls.bookingCancelUrl,
-              metadata: { booking_id: cashBkr.data.id, type: "DEPOSIT_50" },
-            }),
-          });
-          const depData = await depYoco.json();
-          if (depData?.redirectUrl) {
-            await sendText(tenant, phone, "No problem! Pay a 50% deposit (R" + depAmount + ") to secure your booking, and settle the rest in cash on the day:\n\n" + depData.redirectUrl);
-          } else {
-            await sendText(tenant, phone, "Couldn\u2019t generate deposit link. Contact our team.");
-          }
-        } else {
-          await sendText(tenant, phone, "We ask for at least a 50% deposit online to secure your booking. Start a booking and I\u2019ll send you a deposit link!");
-        }
+      if (wantSplit || wantCash) {
+        await sendText(tenant, phone, "Online booking requires one payment for the full balance. Please use your payment link, or speak to our team about another payment arrangement.");
         await setConvo(convo.id, { current_state: "MENU" });
         return;
       }
@@ -3147,59 +3029,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "MENU" });
         return;
       }
-      // Recalculate discount for new qty (group discount threshold may change)
-      const mqDisc = await calcDiscount(tenant, newQty, phone);
-      const mqBaseTotal = newQty * Number(sd.unit_price);
-      let newTotal = mqBaseTotal;
-      if (mqDisc.percent > 0) { newTotal = mqBaseTotal - Math.round(mqBaseTotal * mqDisc.percent / 100); }
-      let oldTotal = sd.current_qty * Number(sd.unit_price);
-      const oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
-      if (oldDisc.percent > 0) { oldTotal = oldTotal - Math.round(oldTotal * oldDisc.percent / 100); }
-      const diffAmount = Math.abs(newTotal - oldTotal);
-      if (qtyDiff > 0) {
-        // Added people — use atomic capacity check via RPC
-        const mqHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: sd.booking_id,
-          p_slot_id: sd.slot_id,
-          p_qty: qtyDiff,
-          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        });
-        if (mqHoldRes.error || !mqHoldRes.data?.success) {
-          await sendText(tenant, phone, mqHoldRes.data?.error || "Sorry, not enough spots left. Try a smaller number.");
-          return;
-        }
-        // Update booking
-        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        // M8: Invalidate waiver on guest addition
-        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
-        // Need additional payment
-        const addSiteUrls = await getBusinessSiteUrls(tenant);
-        const addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(diffAmount * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(addSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
-            cancelUrl: addSiteUrls.bookingCancelUrl,
-            failureUrl: addSiteUrls.bookingCancelUrl,
-            metadata: { booking_id: sd.booking_id, type: "ADD_PEOPLE", hold_id: mqHoldRes.data.hold_id, add_qty: qtyDiff, new_qty: newQty },
-          }),
-        });
-        const addYocoData = await addYoco.json();
-        if (addYocoData?.redirectUrl) {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nYou need to pay an extra *R" + diffAmount + "* for the " + qtyDiff + " additional " + (qtyDiff === 1 ? "person" : "people") + ":\n\n" + addYocoData.redirectUrl);
-        } else {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! Please contact our team to arrange the additional payment of R" + diffAmount + ".");
-        }
+      const existingBooking = await supabase.from("bookings").select("id, qty")
+        .eq("id", sd.booking_id).eq("business_id", tenant.business.id).eq("phone", phone).maybeSingle();
+      if (existingBooking.error || !existingBooking.data) {
+        await sendText(tenant, phone, "We couldn't verify this booking. Please open My Bookings or speak to our team.");
+        return;
+      }
+      const { data: changed, error: changeError } = await supabase.functions.invoke("rebook-booking", {
+        body: { booking_id: existingBooking.data.id, action: newQty > existingBooking.data.qty ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: newQty },
+      });
+      if (changeError || !changed?.ok) {
+        await sendText(tenant, phone, changed?.error || "We couldn't change the guest count. Please try again or speak to our team.");
+        return;
+      }
+      if (changed.payment_url) {
+        await sendText(tenant, phone, "Pay *R" + changed.diff + "* to confirm the change to " + newQty + " guests:\n\n" + changed.payment_url);
       } else {
-        // Reduced people — update booking and release slot capacity
-        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, qtyDiff);
-        if (sd.hours_before >= 24) {
-          await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted. Expect it within 5-7 business days.");
-        } else {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nAs this is within 24 hours, the refund policy applies for the difference.");
-        }
+        await sendText(tenant, phone, "Updated to " + newQty + " guests. " + (changed.voucher_code ? "Your credit voucher is " + changed.voucher_code + "." : "Check My Bookings for the updated payment and refund details."));
       }
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
@@ -3264,29 +3110,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== SPLIT PAYMENT =====
     else if (state === "SPLIT_PAYMENT_COUNT") {
-      const splitCount = parseInt(input);
-      if (isNaN(splitCount) || splitCount < 2 || splitCount > 10) { await sendText(tenant, phone, "How many payment links do you need? (2-10)"); return; }
-      const splitAmount = Math.round(Number(sd.split_total) / splitCount * 100) / 100;
-      let splitLinks = "";
-      for (let spi = 0; spi < splitCount; spi++) {
-        const splitSiteUrls = await getBusinessSiteUrls(tenant);
-        const spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.activeYocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(splitAmount * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(splitSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
-            cancelUrl: splitSiteUrls.bookingCancelUrl,
-            metadata: { booking_id: sd.booking_id, type: "SPLIT_" + (spi + 1) + "_OF_" + splitCount },
-          }),
-        });
-        const spData = await spYoco.json();
-        if (spData?.redirectUrl) splitLinks += "\nPayment " + (spi + 1) + " (R" + splitAmount + "): " + spData.redirectUrl;
-      }
-      if (splitLinks) {
-        await sendText(tenant, phone, "Here are your " + splitCount + " payment links (R" + splitAmount + " each):" + splitLinks);
-      } else {
-        await sendText(tenant, phone, "Couldn\u2019t generate split links. Contact our team for help.");
-      }
+      await sendText(tenant, phone, "Please use one payment link for the full booking balance. Our team can help with other payment arrangements.");
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
 
@@ -3374,29 +3198,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
   }
 }
 
-Deno.serve(async (req: any) => {
-  const url = new URL(req.url);
-  if (req.method === "GET") {
-    const mode = url.searchParams.get("hub.mode"); const token = url.searchParams.get("hub.verify_token"); const challenge = url.searchParams.get("hub.challenge");
-    if (mode === "subscribe" && token === VERIFY_TOKEN) return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
-    return new Response("Forbidden", { status: 403 });
-  }
-  if (req.method === "POST") {
-    try {
-      // ── 1. Read raw body for signature verification ──
-      const rawBody = await req.text();
-      const signature = req.headers.get("x-hub-signature-256");
-      const verified = await verifyMetaSignature(rawBody, signature);
-      if (!verified) {
-        console.warn("WA webhook rejected — invalid or missing signature");
-        return new Response("Invalid signature", { status: 401 });
-      }
-
-      const body = JSON.parse(rawBody);
-      const tenant = await resolveTenantByWhatsappPayload(supabase, body);
-      const value = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value;
-      const message = value && value.messages && value.messages[0];
-
+async function processWhatsappValue(tenant: TenantContext, value: any, message: any = null) {
       // ── Delivery-status callbacks (value.statuses) ──────────────────────
       // Meta ACCEPTS an out-of-window free-form send (we log SENT with a
       // message id) and only reports the failure here, asynchronously, as a
@@ -3502,6 +3304,39 @@ Deno.serve(async (req: any) => {
       else { console.log("SKIP non-text msg type:" + mt + " from:" + ph); return new Response("OK", { status: 200 }); }
       console.log("F:" + ph + " B:" + tenant.business.id + " T:" + txt);
       await handleMsg(tenant, ph, txt, mt, inter);
+      return new Response("OK", { status: 200 });
+}
+
+async function processWhatsappBatch(body: any) {
+  for (const entry of body.entry || []) {
+    for (const change of entry.changes || []) {
+      const value = change?.value;
+      if (!value?.messages && !value?.statuses) continue;
+      // One provider delivery can contain messages for different numbers.
+      // Resolve each change separately, never reuse the first tenant.
+      const tenant = await resolveTenantByWhatsappPayload(supabase, { entry: [{ changes: [change] }] });
+      if (value.statuses?.length) await processWhatsappValue(tenant, value);
+      for (const message of value.messages || []) await processWhatsappValue(tenant, value, message);
+    }
+  }
+}
+
+Deno.serve(async (req: any) => {
+  const url = new URL(req.url);
+  if (req.method === "GET") {
+    const mode = url.searchParams.get("hub.mode"); const token = url.searchParams.get("hub.verify_token"); const challenge = url.searchParams.get("hub.challenge");
+    if (mode === "subscribe" && token === VERIFY_TOKEN) return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
+    return new Response("Forbidden", { status: 403 });
+  }
+  if (req.method === "POST") {
+    try {
+      const rawBody = await req.text();
+      const verified = await verifyMetaSignature(rawBody, req.headers.get("x-hub-signature-256"));
+      if (!verified) {
+        console.warn("WA webhook rejected — invalid or missing signature");
+        return new Response("Invalid signature", { status: 401 });
+      }
+      await processWhatsappBatch(JSON.parse(rawBody));
       return new Response("OK", { status: 200 });
     } catch (err) {
       console.error("E:", err);

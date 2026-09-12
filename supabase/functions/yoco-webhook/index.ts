@@ -1,6 +1,7 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { bookingVoucherBalances } from "../_shared/voucher-balances.ts";
 import { Webhook } from "npm:standardwebhooks";
 import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, resolveManageBookingsUrl, sendWhatsappTextForTenant, sendWhatsappFreeformOrSignal } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
@@ -23,6 +24,12 @@ async function resolveWebhookBusinessId(checkoutId: string, payload: any) {
   const metaBookingId = String(metadata.booking_id || "");
   const metaVoucherId = String(metadata.voucher_id || "");
   const metaBusinessId = String(metadata.business_id || "");
+
+  if (payload?.type === "refund" && checkoutId) {
+    const refund = await supabase.from("refund_operations").select("source_business_id").eq("checkout_id", checkoutId).limit(1).maybeSingle();
+    if (refund.error) throw new Error(refund.error.message);
+    if (refund.data?.source_business_id) return String(refund.data.source_business_id);
+  }
 
   if (metaType === "TOPUP" && metaBusinessId) return metaBusinessId;
 
@@ -74,6 +81,7 @@ async function verifyWebhookSignature(
   rawBody: string,
   businessId: string,
   eventType: string,
+  paymentMode = "",
 ) {
   if (!businessId) {
     throw new Error(
@@ -93,7 +101,17 @@ async function verifyWebhookSignature(
     );
   }
 
-  if (!tenant.credentials.activeYocoWebhookSecret) {
+  if (paymentMode && paymentMode !== "live" && paymentMode !== "test") {
+    throw new Error("YOCO_WEBHOOK_VERIFY: unsupported payment mode");
+  }
+  // Yoco signs the payment's original mode. Switching the storefront's mode
+  // must not invalidate outstanding payments from the other environment.
+  const webhookSecret = paymentMode === "test"
+    ? tenant.credentials.yocoTestWebhookSecret
+    : paymentMode === "live"
+    ? tenant.credentials.yocoWebhookSecret
+    : tenant.credentials.activeYocoWebhookSecret;
+  if (!webhookSecret) {
     throw new Error(
       "YOCO_WEBHOOK_VERIFY: no webhook secret configured for business " +
         businessId +
@@ -101,12 +119,78 @@ async function verifyWebhookSignature(
     );
   }
 
-  const webhook = new Webhook(tenant.credentials.activeYocoWebhookSecret);
+  const webhook = new Webhook(webhookSecret);
   await webhook.verify(rawBody, {
     "webhook-id": req.headers.get("webhook-id") || "",
     "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
     "webhook-signature": req.headers.get("webhook-signature") || "",
   });
+}
+
+// A signature authenticates one merchant, not arbitrary IDs in metadata. Bind
+// every referenced object to that merchant and the checkout before any writes.
+async function validateWebhookReferences(checkoutId: string, payload: any, businessId: string, eventType = "payment.succeeded") {
+  const meta = payload.metadata || {};
+  const type = String(meta.type || "BOOKING");
+  const row = async (query: any) => {
+    const result = await query.maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    return result.data;
+  };
+  const modeMatches = (record: any) => !record?.yoco_mode || record.yoco_mode === payload.mode;
+  const amountMatches = (record: any, amount: number) => eventType !== "payment.succeeded" || (
+    Number(payload.amount) === Number(record.expected_amount_cents ?? Math.round(amount * 100))
+    && String(payload.currency || "") === String(record.expected_currency || "ZAR")
+  );
+  if (!checkoutId || !["BOOKING", "RESEND", "GIFT_VOUCHER", "RESCHEDULE", "ADD_GUESTS", "COMBO", "COMBO_SETTLEMENT"].includes(type)) return false;
+
+  if (type === "COMBO_SETTLEMENT") {
+    const settlement = await row(supabase.from("combo_settlements").select("*")
+      .eq("yoco_checkout_id", checkoutId).eq("owed_business_id", businessId));
+    if (!settlement || settlement.owed_business_id !== businessId || (meta.settlement_id && settlement.id !== meta.settlement_id)
+      || (meta.business_id && meta.business_id !== businessId) || !amountMatches(settlement, Number(settlement.amount_owed))) return false;
+    for (const comboId of settlement.combo_booking_ids || []) {
+      const combo = await row(supabase.from("combo_bookings")
+        .select("id, combo_offers(business_a_id, business_b_id, created_by_business_id), combo_booking_items(business_id, position)").eq("id", comboId));
+      const offer = combo?.combo_offers;
+      const items = combo?.combo_booking_items || [];
+      const collector = offer?.business_a_id || offer?.created_by_business_id || items.find((item: any) => item.position === 1)?.business_id;
+      if (collector !== settlement.collector_business_id) return false;
+      if (items.length ? !items.some((item: any) => item.business_id === businessId) : offer?.business_b_id !== businessId) return false;
+    }
+    return true;
+  }
+  if (type === "GIFT_VOUCHER" || meta.voucher_id) {
+    const voucher = await row(supabase.from("vouchers").select("*")
+      .eq("yoco_checkout_id", checkoutId).eq("business_id", businessId));
+    return !!voucher && voucher.business_id === businessId && (!meta.voucher_id || voucher.id === meta.voucher_id)
+      && modeMatches(voucher) && amountMatches(voucher, Number(voucher.value ?? voucher.purchase_amount));
+  }
+
+  const bookingQuery = supabase.from("bookings").select("*").eq("business_id", businessId);
+  const booking = await row(meta.booking_id ? bookingQuery.eq("id", meta.booking_id) : bookingQuery.eq("yoco_checkout_id", checkoutId));
+  if (!booking || booking.business_id !== businessId) return false;
+  if (type === "RESCHEDULE") {
+    if (!meta.pending_reschedule_id) return false;
+    const pending = await row(supabase.from("pending_reschedules").select("*")
+      .eq("id", meta.pending_reschedule_id).eq("booking_id", booking.id).eq("business_id", businessId));
+    return !!pending && pending.booking_id === booking.id && pending.business_id === businessId
+      && pending.yoco_checkout_id === checkoutId && modeMatches(pending);
+  }
+  if (type === "ADD_GUESTS") {
+    if (!meta.hold_id || !Number.isSafeInteger(Number(meta.new_qty))) return false;
+    const hold = await row(supabase.from("holds").select("*").eq("id", meta.hold_id).eq("booking_id", booking.id));
+    return !!hold && hold.booking_id === booking.id && hold.slot_id === booking.slot_id
+      && hold.metadata?.yoco_checkout_id === checkoutId
+      && (!hold.metadata?.yoco_mode || hold.metadata.yoco_mode === payload.mode);
+  }
+  if (type === "COMBO") {
+    const combo = await row(supabase.from("combo_bookings").select("*").eq("yoco_checkout_id", checkoutId));
+    return !!combo && (!meta.combo_booking_id || combo.id === meta.combo_booking_id)
+      && booking.yoco_checkout_id === checkoutId && (!meta.business_id || meta.business_id === businessId)
+      && amountMatches(combo, Number(combo.combo_total));
+  }
+  return booking.yoco_checkout_id === checkoutId && modeMatches(booking);
 }
 
 async function createInvoice(booking: any, tourName: string, slotTime: string, paymentRef: string) {
@@ -336,14 +420,37 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
   });
 }
 
+// Payment is real even when the requested seats are no longer available.
+async function refundUnfulfilledPayment(bookingId: string, paymentId: string, checkoutId: string, cents: number, holdId: string | null = null) {
+  const recorded = await supabase.rpc("record_unfulfilled_payment", {
+    p_booking_id: bookingId, p_payment_id: paymentId, p_checkout_id: checkoutId, p_amount_cents: cents, p_hold_id: holdId,
+  });
+  if (recorded.error || !recorded.data?.ok) throw new Error("Could not record unfulfilled payment");
+  const response = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+    body: JSON.stringify({ booking_id: bookingId, amount: cents / 100, keep_booking: Boolean(holdId) }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "Automatic refund needs retry");
+}
+
 Deno.serve(withSentry("yoco-webhook", async (req: any) => {
   if (req.method !== "POST") return new Response("OK", { status: 200 });
+  let idempotencyKey = "";
+  let leaseClaimed = false;
+  const finishLease = async (ok: boolean, error?: string) => {
+    if (!leaseClaimed) return;
+    const result = await supabase.rpc("finish_yoco_payment", { p_key: idempotencyKey, p_ok: ok, p_error: error || null });
+    if (result.error) throw new Error(result.error.message);
+    leaseClaimed = false;
+  };
+  const processPayment = async () => {
   try {
     const rawBody = await req.text();
     const body = rawBody ? JSON.parse(rawBody) : {};
     console.log("YOCO_WEBHOOK:" + JSON.stringify(body).substring(0, 500));
     const type = body.type; const payload = body.payload;
-    if (type !== "payment.succeeded" && type !== "payment.failed") { console.log("Ignoring:" + type); return new Response("OK", { status: 200 }); }
+    if (!["payment.succeeded", "payment.failed", "refund.succeeded", "refund.failed"].includes(type)) { console.log("Ignoring:" + type); return new Response("OK", { status: 200 }); }
     const checkoutId = payload.metadata?.checkoutId || payload.checkoutId || payload.checkout_id || "";
     const yocoPaymentId = payload.id || "";
     const metaBookingId = payload.metadata?.booking_id || "";
@@ -351,7 +458,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     if (!checkoutId && !metaBookingId) { console.log("No checkoutId or booking_id in payload"); return new Response("OK", { status: 200 }); }
     const businessId = await resolveWebhookBusinessId(checkoutId, payload);
     try {
-      await verifyWebhookSignature(req, rawBody, businessId, type);
+      await verifyWebhookSignature(req, rawBody, businessId, type, String(payload.mode || ""));
     } catch (verifyError) {
       // Console-only: CLAUDE.md requires zero DB writes on an invalid/missing
       // signature. A DB log insert here (even audit-only) violated that on
@@ -365,16 +472,74 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    // ── IDEMPOTENCY CHECK ──
-    // Prevent duplicate processing when Yoco sends the same webhook multiple times
+    if (type === "refund.succeeded" || type === "refund.failed") {
+      const cents = Number(payload.amount);
+      if (!Number.isSafeInteger(cents) || cents <= 0 || payload.currency !== "ZAR") return new Response("Invalid refund amount", { status: 400 });
+      const eventKey = "yoco_refund:" + businessId + ":" + String(body.id || payload.id || "");
+      const claim = await supabase.rpc("claim_yoco_payment", { p_key: eventKey });
+      if (claim.error) throw new Error(claim.error.message);
+      if (claim.data === "duplicate") return new Response("OK", { status: 200 });
+      if (claim.data !== "claimed") return new Response("Refund processing", { status: 503 });
+      let query = supabase.from("refund_operations").select("*").eq("checkout_id", checkoutId)
+        .eq("source_business_id", businessId).eq("amount", cents / 100);
+      if (payload.metadata?.refund_operation_id) query = query.eq("id", payload.metadata.refund_operation_id);
+      else query = query.order("created_at", { ascending: false }).limit(1);
+      const found = await query.maybeSingle();
+      if (found.error || !found.data || (found.data.mode && found.data.mode !== payload.mode)) {
+        await supabase.rpc("finish_yoco_payment", { p_key: eventKey, p_ok: false, p_error: "Refund reference missing or ambiguous" });
+        return new Response("Refund reference missing or ambiguous", { status: 503 });
+      }
+      const finished = await supabase.rpc("finish_refund_operation", {
+        p_operation_id: found.data.id, p_status: type === "refund.succeeded" ? "SUCCEEDED" : "FAILED",
+        p_provider_id: found.data.provider_id || payload.id, p_error: payload.failureReason || null,
+      });
+      if (finished.error || !finished.data?.ok) {
+        await supabase.rpc("finish_yoco_payment", { p_key: eventKey, p_ok: false, p_error: "Could not record refund result" });
+        return new Response("Refund processing error", { status: 503 });
+      }
+      // The refund handler also completes voucher reissue and notification.
+      const resumed = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
+        method: "POST", headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_id: found.data.booking_id, resume_refund: true }),
+      });
+      const followupOk = resumed.ok || type === "refund.failed";
+      await supabase.rpc("finish_yoco_payment", { p_key: eventKey, p_ok: followupOk, p_error: followupOk ? null : "Refund follow-up needs retry" });
+      return new Response(followupOk ? "OK" : "Refund follow-up needs retry", { status: followupOk ? 200 : 503 });
+    }
+
+    if (!await validateWebhookReferences(checkoutId, payload, businessId, type)) {
+      console.error("YOCO_WEBHOOK_REFERENCE_MISMATCH", { checkout_id: checkoutId, business_id: businessId, type: metaType });
+      return new Response("Invalid payment reference", { status: 400 });
+    }
+
+    // Gateway amounts are integer cents. Validate before claiming the event so
+    // malformed data cannot poison retries or become a guessed cash capture.
+    const capturedCents = Number(payload.amount);
+    if (type === "payment.succeeded" && (!Number.isSafeInteger(capturedCents) || capturedCents <= 0)) {
+      return new Response("Invalid payment amount", { status: 400 });
+    }
+
+    // ── R11: PROCESSING LEASE ──
+    // claim_yoco_payment returns 'duplicate' only for completed work.
+    // 'failed' or stale 'processing' rows are re-claimed so a crashed
+    // booking update retries instead of ACK-and-drop. Notifications stay
+    // outside the lease: only financial completion is gated here.
     if (type === "payment.succeeded" && (yocoPaymentId || checkoutId)) {
-      const idempotencyKey = "yoco_payment:" + (yocoPaymentId || checkoutId);
-      const idempInsert = await supabase.from("idempotency_keys").insert({ key: idempotencyKey }).select("id").maybeSingle();
-      if (idempInsert.error && idempInsert.error.code === "23505") {
-        // Duplicate key — this payment was already processed
+      idempotencyKey = "yoco_payment:" + businessId + ":" + String(payload.mode || "legacy") + ":" + (yocoPaymentId || checkoutId);
+      const claim = await supabase.rpc("claim_yoco_payment", { p_key: idempotencyKey });
+      const state = String(claim.data || "claimed");
+      if (state === "duplicate") {
         console.log("IDEMPOTENCY_SKIP: already processed key=" + idempotencyKey);
         return new Response("OK", { status: 200 });
       }
+      if (state === "in_progress") {
+        return new Response("Payment processing; retry later", { status: 503 });
+      }
+      if (claim.error) {
+        console.error("IDEMPOTENCY_CLAIM_ERR key=" + idempotencyKey + ": " + claim.error.message);
+        return new Response("Temporary processing error", { status: 503 });
+      }
+      leaseClaimed = true;
     }
 
     // ── COMBO SETTLEMENT payment link (operator A pays operator B's share) ──
@@ -385,11 +550,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       const settlementId = String(payload.metadata?.settlement_id || "");
       let settlement: any = null;
       if (settlementId) {
-        const r = await supabase.from("combo_settlements").select("*").eq("id", settlementId).maybeSingle();
+        const r = await supabase.from("combo_settlements").select("*").eq("id", settlementId).eq("owed_business_id", businessId).maybeSingle();
+        if (r.error) throw new Error(r.error.message);
         settlement = r.data;
       }
       if (!settlement && checkoutId) {
-        const r = await supabase.from("combo_settlements").select("*").eq("yoco_checkout_id", checkoutId).maybeSingle();
+        const r = await supabase.from("combo_settlements").select("*").eq("yoco_checkout_id", checkoutId).eq("owed_business_id", businessId).maybeSingle();
+        if (r.error) throw new Error(r.error.message);
         settlement = r.data;
       }
       if (!settlement) {
@@ -400,37 +567,42 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       if (type === "payment.succeeded") {
         if (settlement.status === "PAID") return new Response("OK", { status: 200 });
         const nowIso = new Date().toISOString();
-        await supabase.from("combo_settlements").update({
-          status: "PAID",
-          paid_at: nowIso,
-          settled_at: nowIso,
-          notes: ((settlement.notes ? settlement.notes + " · " : "") + "Paid via Yoco " + (yocoPaymentId || checkoutId)),
-        }).eq("id", settlement.id);
-
         // Settle per pair: only the owed operator's legs are marked settled;
         // the combo-wide flag flips once no non-collector leg remains open.
         // Legacy combos without items rows settle whole (2-party, one pair).
         const comboIds: string[] = Array.isArray(settlement.combo_booking_ids) ? settlement.combo_booking_ids : [];
         for (const cid of comboIds) {
-          const { data: legItems } = await supabase.from("combo_booking_items")
+          const { data: legItems, error: itemsError } = await supabase.from("combo_booking_items")
             .select("id, business_id, settled_at").eq("combo_booking_id", cid);
+          if (itemsError) throw new Error(itemsError.message);
           if (!legItems || legItems.length === 0) {
-            await supabase.from("combo_bookings").update({
+            const legacyUpdate = await supabase.from("combo_bookings").update({
               settled: true, settled_at: nowIso, settlement_notes: "Paid via Yoco settlement link",
             }).eq("id", cid).eq("settled", false);
+            if (legacyUpdate.error) throw new Error(legacyUpdate.error.message);
             continue;
           }
-          await supabase.from("combo_booking_items").update({ settled_at: nowIso })
+          const itemsUpdate = await supabase.from("combo_booking_items").update({ settled_at: nowIso })
             .eq("combo_booking_id", cid).eq("business_id", settlement.owed_business_id).is("settled_at", null);
+          if (itemsUpdate.error) throw new Error(itemsUpdate.error.message);
           const stillOpen = legItems.some((it: any) =>
             it.business_id !== settlement.collector_business_id &&
             it.business_id !== settlement.owed_business_id && !it.settled_at);
           if (!stillOpen) {
-            await supabase.from("combo_bookings").update({
+            const comboUpdate = await supabase.from("combo_bookings").update({
               settled: true, settled_at: nowIso, settlement_notes: "Paid via Yoco settlement link",
             }).eq("id", cid).eq("settled", false);
+            if (comboUpdate.error) throw new Error(comboUpdate.error.message);
           }
         }
+
+        // Mark the settlement complete LAST. Each preceding update is
+        // idempotent, so a partial database failure can be retried safely.
+        const settlementUpdate = await supabase.from("combo_settlements").update({
+          status: "PAID", paid_at: nowIso, settled_at: nowIso,
+          notes: ((settlement.notes ? settlement.notes + " · " : "") + "Paid via Yoco " + (yocoPaymentId || checkoutId)),
+        }).eq("id", settlement.id).eq("owed_business_id", businessId);
+        if (settlementUpdate.error) throw new Error(settlementUpdate.error.message);
 
         await supabase.from("logs").insert({
           business_id: settlement.owed_business_id,
@@ -465,10 +637,12 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       let combo: any = null;
       if (comboId) {
         const r = await supabase.from("combo_bookings").select("*, combo_offers(business_a_id)").eq("id", comboId).maybeSingle();
+        if (r.error) throw new Error(r.error.message);
         combo = r.data;
       }
       if (!combo && checkoutId) {
         const r = await supabase.from("combo_bookings").select("*, combo_offers(business_a_id)").eq("yoco_checkout_id", checkoutId).maybeSingle();
+        if (r.error) throw new Error(r.error.message);
         combo = r.data;
       }
       if (!combo) {
@@ -478,7 +652,8 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       if (type === "payment.succeeded") {
         if (combo.payment_status === "PAID") return new Response("OK", { status: 200 });
-        await supabase.from("combo_bookings").update({ yoco_payment_id: yocoPaymentId }).eq("id", combo.id);
+        const paymentUpdate = await supabase.from("combo_bookings").update({ yoco_payment_id: yocoPaymentId }).eq("id", combo.id);
+        if (paymentUpdate.error) throw new Error(paymentUpdate.error.message);
         const confirm = await confirmComboAndNotify(supabase, combo.id, yocoPaymentId || checkoutId, "YOCO_COMBO");
         const lg = await supabase.from("logs").insert({
           business_id: combo.combo_offers?.business_a_id || businessId || null,
@@ -486,7 +661,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           payload: { combo_booking_id: combo.id, yoco_payment_id: yocoPaymentId, provider: "yoco", bookings_confirmed: confirm.bookingsConfirmed, error: confirm.error || null },
         });
         if (lg.error) console.error("LOG_ERR:", lg.error.message);
-        return new Response("OK", { status: 200 });
+        return new Response(confirm.ok ? "OK" : "Temporary processing error", { status: confirm.ok ? 200 : 503 });
       }
 
       // payment.failed — release both legs (hold-guarded, replay-safe)
@@ -503,61 +678,22 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     if (type === "payment.failed") {
-      // Handle failed reschedule upgrade payment — cancel the pending reschedule and release hold
-      if (metaType === "RESCHEDULE") {
-        const failedPrId = String(payload.metadata?.pending_reschedule_id || "");
-        if (failedPrId) {
-          const failedPr = await supabase.from("pending_reschedules").select("*").eq("id", failedPrId).eq("status", "PENDING").single();
-          if (failedPr.data) {
-            await supabase.from("pending_reschedules").update({ status: "CANCELLED" }).eq("id", failedPr.data.id);
-            if (failedPr.data.hold_id) {
-              await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedPr.data.hold_id);
-            }
-            // Release held capacity on new slot (S3: atomic, no read-modify-write)
-            {
-              const failedBooking = await supabase.from("bookings").select("qty").eq("id", failedPr.data.booking_id).single();
-              // Remediation reschedules hold the (possibly reduced) new_qty
-              const failedQty = Number(failedPr.data.new_qty || failedBooking.data?.qty || 0);
-              if (failedQty > 0) await supabase.rpc("adjust_slot_capacity", { p_slot_id: failedPr.data.new_slot_id, p_business_id: failedPr.data.business_id, p_booked_delta: 0, p_held_delta: -failedQty });
-            }
-            await supabase.from("logs").insert({
-              business_id: failedPr.data.business_id,
-              booking_id: failedPr.data.booking_id,
-              event: "reschedule_upgrade_payment_failed",
-              payload: { pending_reschedule_id: failedPr.data.id, checkout_id: checkoutId },
-            });
-            console.log("RESCHEDULE PAYMENT FAILED - cancelled pending_reschedule:" + failedPr.data.id);
-          }
-        }
-        return new Response("OK", { status: 200 });
-      }
-
-      // Handle failed ADD_GUESTS payment — release hold
-      if (metaType === "ADD_GUESTS") {
-        const failedHoldId = String(payload.metadata?.hold_id || "");
-        const failedAgBookingId = String(payload.metadata?.booking_id || "");
-        const failedAgNewQty = Number(payload.metadata?.new_qty || 0);
-        if (failedHoldId) {
-          await supabase.from("holds").update({ status: "CANCELLED" }).eq("id", failedHoldId);
-          // Release held capacity
-          if (failedAgBookingId) {
-            const failedAgBooking = await supabase.from("bookings").select("slot_id, qty, business_id").eq("id", failedAgBookingId).single();
-            if (failedAgBooking.data) {
-              const failedAgDelta = failedAgNewQty - failedAgBooking.data.qty;
-              if (failedAgDelta > 0) {
-                // S3: atomic held release (no read-modify-write)
-                await supabase.rpc("adjust_slot_capacity", { p_slot_id: failedAgBooking.data.slot_id, p_business_id: failedAgBooking.data.business_id, p_booked_delta: 0, p_held_delta: -failedAgDelta });
-              }
-            }
-          }
-          await supabase.from("logs").insert({
-            business_id: businessId,
-            booking_id: failedAgBookingId,
-            event: "add_guests_payment_failed",
-            payload: { hold_id: failedHoldId, checkout_id: checkoutId },
-          });
-          console.log("ADD_GUESTS PAYMENT FAILED - cancelled hold:" + failedHoldId);
-        }
+      // A failed attempt may be retried on the same checkout. Preserve its
+      // reservation until expiry; duplicate failure events must not release
+      // capacity owned by another hold or invalidate a later success.
+      if (metaType === "RESCHEDULE" || metaType === "ADD_GUESTS") {
+        const failureLog = await supabase.from("logs").insert({
+          business_id: businessId,
+          booking_id: metaBookingId,
+          event: metaType === "RESCHEDULE" ? "reschedule_upgrade_payment_failed" : "add_guests_payment_failed",
+          payload: {
+            pending_reschedule_id: payload.metadata?.pending_reschedule_id || null,
+            hold_id: payload.metadata?.hold_id || null,
+            checkout_id: checkoutId,
+            yoco_payment_id: yocoPaymentId,
+          },
+        });
+        if (failureLog.error) throw new Error(failureLog.error.message);
         return new Response("OK", { status: 200 });
       }
 
@@ -581,7 +717,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       // counter avoids a schema change; distinct Yoco payment IDs make it exact.
       const paidStatuses = ["PAID", "CONFIRMED", "COMPLETED", "CANCELLED"];
       if (fbk && (yocoPaymentId || checkoutId) && fbk.email && fbk.payment_url && !paidStatuses.includes(fbk.status)) {
-        const failKey = "yoco_failed:" + (yocoPaymentId || checkoutId);
+        const failKey = "yoco_failed:" + businessId + ":" + String(payload.mode || "legacy") + ":" + (yocoPaymentId || checkoutId);
         const dedup = await supabase.from("idempotency_keys").insert({ key: failKey }).select("id").maybeSingle();
         if (!(dedup.error && dedup.error.code === "23505")) {
           await supabase.from("logs").insert({ business_id: fbk.business_id, booking_id: fbk.id, event: "booking_payment_failed", payload: { checkout_id: checkoutId, payment_id: yocoPaymentId } });
@@ -671,8 +807,10 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         .from("pending_reschedules")
         .select("*")
         .eq("id", pendingRescheduleId)
-        .eq("status", "PENDING")
-        .single();
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      if (prRes.error) throw new Error(prRes.error.message);
 
       if (!prRes.data) {
         console.log("RESCHEDULE: pending_reschedule not found or already processed: " + pendingRescheduleId);
@@ -684,7 +822,10 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
         .from("bookings")
         .select("*, slots(start_time), tours(name)")
         .eq("id", pr.booking_id)
+        .eq("business_id", businessId)
         .single();
+
+      if (prBooking.error) throw new Error(prBooking.error.message);
 
       if (!prBooking.data) {
         console.log("RESCHEDULE: booking not found for pending reschedule: " + pr.booking_id);
@@ -693,54 +834,21 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       const rBooking = prBooking.data;
 
-      // Credit-claim reschedule (weather/admin-cancelled booking): the old slot's
-      // capacity was already released at cancellation — don't release it again,
-      // and reactivate the booking now that the uplift is paid.
-      const wasCancelled = rBooking.status === "CANCELLED";
-      // Remediation reschedules may reduce the party size; the hold was taken
-      // for the reduced qty, so convert exactly that much.
-      const finalQty = Number(pr.new_qty || rBooking.qty);
-
-      // 1. Release old slot capacity (decrement booked)
-      if (!wasCancelled) {
-        // S3: atomic booked release on the old slot (no read-modify-write)
-        await supabase.rpc("adjust_slot_capacity", { p_slot_id: pr.old_slot_id, p_business_id: pr.business_id, p_booked_delta: -Number(rBooking.qty), p_held_delta: 0 });
+      const confirmed = await supabase.rpc("confirm_booking_uplift", {
+        p_booking_id: pr.booking_id, p_payment_id: yocoPaymentId, p_checkout_id: checkoutId,
+        p_captured_cents: capturedCents, p_currency: String(payload.currency || "ZAR"),
+        p_hold_id: pr.hold_id, p_pending_reschedule_id: pr.id, p_new_qty: null,
+      });
+      if (confirmed.error || !confirmed.data?.ok) {
+        if (!confirmed.error && ["no_capacity", "slot_closed", "bad_status", "amendment_changed"].includes(confirmed.data?.error)) {
+          await refundUnfulfilledPayment(pr.booking_id, yocoPaymentId, checkoutId, capturedCents, pr.hold_id);
+          await finishLease(true);
+          return new Response("Change unavailable; refund recorded", { status: 200 });
+        }
+        await finishLease(false, confirmed.error?.message || confirmed.data?.error || "reschedule_confirmation_failed");
+        return new Response("Temporary processing error", { status: 503 });
       }
-
-      // 2. Convert hold on new slot: held -> booked (S3: atomic)
-      if (finalQty > 0) {
-        await supabase.rpc("adjust_slot_capacity", { p_slot_id: pr.new_slot_id, p_business_id: pr.business_id, p_booked_delta: finalQty, p_held_delta: -finalQty });
-      }
-
-      // 3. Update booking to new slot. total_amount is the CASH portion
-      // (cash due after voucher) — any voucher-funded portion rides along in
-      // voucher_amount_paid and keeps covering its share of the new price.
-      const rVoucherPaid = Number(rBooking.voucher_amount_paid || 0);
-      await supabase.from("bookings").update({
-        slot_id: pr.new_slot_id,
-        tour_id: pr.new_tour_id,
-        unit_price: pr.new_unit_price,
-        total_amount: Math.max(0, Number(pr.new_total_amount || 0) - rVoucherPaid),
-        qty: finalQty,
-        ...(wasCancelled ? {
-          status: "PAID",
-          refund_status: null,
-          refund_amount: 0,
-          cancellation_reason: null,
-          cancelled_at: null,
-        } : {}),
-      }).eq("id", pr.booking_id);
-
-      // 4. Mark hold as CONVERTED
-      if (pr.hold_id) {
-        await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", pr.hold_id);
-      }
-
-      // 5. Mark pending_reschedule as COMPLETED
-      await supabase.from("pending_reschedules").update({
-        status: "COMPLETED",
-        completed_at: new Date().toISOString(),
-      }).eq("id", pr.id);
+      await finishLease(true);
 
       // 6. Log the completed reschedule
       await supabase.from("logs").insert({
@@ -825,30 +933,29 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           .from("bookings")
           .select("*, slots(start_time), tours(name)")
           .eq("id", agBookingId)
+          .eq("business_id", businessId)
           .single();
+
+        if (agBooking.error) throw new Error(agBooking.error.message);
 
         if (agBooking.data) {
           const agBk = agBooking.data;
           const agDelta = agNewQty - agBk.qty;
-          const agUnitPrice = Number(agBk.unit_price || 0);
-          // Add the paid uplift to the existing cash portion. Recomputing
-          // qty * unit_price clobbered voucher- and discount-adjusted totals.
-          const agNewTotal = Number(agBk.total_amount || 0) + agDelta * agUnitPrice;
-
-          // Update booking qty and total
-          await supabase.from("bookings").update({
-            qty: agNewQty,
-            total_amount: agNewTotal,
-          }).eq("id", agBookingId);
-
-          // Convert hold: held -> booked on slot
-          if (agHoldId) {
-            await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", agHoldId);
+          const confirmed = await supabase.rpc("confirm_booking_uplift", {
+            p_booking_id: agBookingId, p_payment_id: yocoPaymentId, p_checkout_id: checkoutId,
+            p_captured_cents: capturedCents, p_currency: String(payload.currency || "ZAR"),
+            p_hold_id: agHoldId, p_pending_reschedule_id: null, p_new_qty: agNewQty,
+          });
+          if (confirmed.error || !confirmed.data?.ok) {
+            if (!confirmed.error && ["no_capacity", "slot_closed", "bad_status", "amendment_changed"].includes(confirmed.data?.error)) {
+              await refundUnfulfilledPayment(agBookingId, yocoPaymentId, checkoutId, capturedCents, agHoldId);
+              await finishLease(true);
+              return new Response("Change unavailable; refund recorded", { status: 200 });
+            }
+            await finishLease(false, confirmed.error?.message || confirmed.data?.error || "guest_confirmation_failed");
+            return new Response("Temporary processing error", { status: 503 });
           }
-          // S3: atomic convert (booked += agDelta, held -= agDelta)
-          if (agDelta !== 0) {
-            await supabase.rpc("adjust_slot_capacity", { p_slot_id: agBk.slot_id, p_business_id: agBk.business_id, p_booked_delta: agDelta, p_held_delta: -agDelta });
-          }
+          await finishLease(true);
 
           await supabase.from("logs").insert({
             business_id: agBk.business_id,
@@ -859,12 +966,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
           // Invalidate waiver if previously signed — new guests are uninsured
           if (agBk.waiver_status === "SIGNED") {
-            const newWaiverToken = crypto.randomUUID();
-            await supabase.from("bookings").update({
-              waiver_status: "PENDING",
-              waiver_token: newWaiverToken,
-              waiver_token_expires_at: null, // trigger will re-set based on slot time
-            }).eq("id", agBookingId);
+            const newWaiverToken = confirmed.data.waiver_token;
 
             // Send INDEMNITY email so the lead booker can update the waiver
             if (agBk.email) {
@@ -953,10 +1055,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     // Check if this is a gift voucher payment
-    const gvr = await supabase.from("vouchers").select("*").eq("yoco_checkout_id", checkoutId).single();
+    const gvr = await supabase.from("vouchers").select("*").eq("yoco_checkout_id", checkoutId).eq("business_id", businessId).maybeSingle();
+    if (gvr.error) throw new Error(gvr.error.message);
     if (gvr.data && gvr.data.status === "PENDING") {
       const gv = gvr.data;
-      await supabase.from("vouchers").update({ status: "ACTIVE", current_balance: gv.value || gv.purchase_amount || 0 }).eq("id", gv.id);
+      const activation = await supabase.from("vouchers").update({ status: "ACTIVE", current_balance: gv.value || gv.purchase_amount || 0 })
+        .eq("id", gv.id).eq("business_id", businessId);
+      if (activation.error) throw new Error(activation.error.message);
       // Send voucher email(s). recipient_email exists on the vouchers table
       // but no purchase flow ever populated it before now — every gift email
       // went to the BUYER, addressed to the buyer ("Hi {buyer_name}, your
@@ -1022,11 +1127,13 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     }
 
     let br = checkoutId
-      ? await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("yoco_checkout_id", checkoutId).maybeSingle()
+      ? await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("yoco_checkout_id", checkoutId).eq("business_id", businessId).maybeSingle()
       : { data: null, error: null };
+    if (br.error) throw new Error(br.error.message);
     if (!br.data && metaBookingId) {
       console.log("Fallback: lookup by metadata.booking_id=" + metaBookingId);
-      br = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", metaBookingId).maybeSingle();
+      br = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", metaBookingId).eq("business_id", businessId).maybeSingle();
+      if (br.error) throw new Error(br.error.message);
     }
     if (!br.data) { console.log("No booking found. checkoutId=" + checkoutId + " bookingId=" + metaBookingId); return new Response("OK", { status: 200 }); }
     const booking = br.data;
@@ -1040,223 +1147,22 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       return new Response("OK", { status: 200 });
     }
 
-    // ── LATE WEBHOOK OVERBOOKING CHECK ──
-    // If the hold has expired/been released, check if capacity is still available
-    const activeHold = await supabase.from("holds").select("id, status").eq("booking_id", booking.id).eq("status", "ACTIVE").maybeSingle();
-    if (!activeHold.data) {
-      // Hold is gone (expired or cancelled) — check slot capacity before proceeding
-      const capacityCheck = await supabase.rpc("slot_has_capacity", { p_slot_id: booking.slot_id, p_qty: booking.qty });
-      if (capacityCheck.data === false) {
-        // Slot is full — auto-cancel and refund
-        console.log("LATE_WEBHOOK_OVERBOOK: slot full, auto-cancelling booking:" + booking.id);
-
-        await supabase.from("bookings").update({
-          status: "CANCELLED",
-          payment_status: "REFUND_PENDING",
-          yoco_payment_id: yocoPaymentId,
-          cancellation_reason: "Auto-cancelled: slot full after hold expired",
-          cancelled_at: new Date().toISOString(),
-        }).eq("id", booking.id);
-
-        // Trigger automatic refund via process-refund
-        try {
-          await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-            body: JSON.stringify({ booking_id: booking.id }),
-          });
-        } catch (refundErr) {
-          console.error("LATE_WEBHOOK_REFUND_ERR:", refundErr);
-        }
-
-        // Send apology notifications
-        try {
-          const lateNotifyTenant = await getTenantByBusinessId(supabase, booking.business_id);
-          const lateBrandName = getBusinessDisplayName(lateNotifyTenant.business);
-          const lateRef = booking.id.substring(0, 8).toUpperCase();
-          const lateTourName = booking.tours?.name || "Booking";
-          const lateCurrency = lateNotifyTenant.business.currency || "ZAR";
-
-          if (booking.phone) {
-            try {
-              await sendWhatsappTextForTenant(lateNotifyTenant, booking.phone,
-                "Booking update\n\n" +
-                "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") +
-                ", unfortunately the slot for " + lateTourName + " (Ref: " + lateRef + ") is now fully booked.\n\n" +
-                "Your payment of " + lateCurrency + " " + booking.total_amount + " will be refunded automatically. " +
-                "Please allow 5 to 10 business days.\n\n" +
-                "We apologise for the inconvenience. Please contact us to rebook on another date.\n\n" +
-                "Thanks, " + lateBrandName + "."
-              );
-            } catch (e) { console.error("LATE_WEBHOOK_WA_ERR:", e); }
-          }
-
-          if (booking.email) {
-            try {
-              await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-                body: JSON.stringify({
-                  type: "CANCELLATION",
-                  data: {
-                    business_id: booking.business_id,
-                    email: booking.email,
-                    customer_name: booking.customer_name,
-                    ref: lateRef,
-                    tour_name: lateTourName,
-                    start_time: booking.slots?.start_time || "",
-                    reason: "The slot became fully booked while your payment was processing. A full refund has been issued automatically.",
-                    refund_amount: String(booking.total_amount),
-                    total_amount: String(booking.total_amount),
-                    is_partial: false,
-                  },
-                }),
-              });
-            } catch (e) { console.error("LATE_WEBHOOK_EMAIL_ERR:", e); }
-          }
-        } catch (notifyErr) {
-          console.error("LATE_WEBHOOK_NOTIFY_ERR:", notifyErr);
-        }
-
-        // Log as alert for admin visibility
-        await supabase.from("logs").insert({
-          business_id: booking.business_id,
-          booking_id: booking.id,
-          event: "late_webhook_overbooking_prevented",
-          payload: {
-            yoco_payment_id: yocoPaymentId,
-            checkout_id: checkoutId,
-            slot_id: booking.slot_id,
-            qty: booking.qty,
-            reason: "Hold expired and slot is now full. Auto-refund triggered.",
-          },
-        });
-
-        return new Response("OK", { status: 200 });
-      }
-      // Capacity IS available — proceed normally (the hold-to-booked conversion below
-      // will handle the slot update even without an active hold)
-      console.log("LATE_WEBHOOK_OK: hold expired but capacity still available for booking:" + booking.id);
+    // ── R12/R15/R14: single-writer financial confirmation ──
+    // confirm_booking_payment serializes on the booking row: reconciles gateway
+    // cents against the immutable expected charge, settles reserved vouchers,
+    // then converts capacity — all-or-nothing. No partial PAID state.
+    const confirm = await supabase.rpc("confirm_booking_payment", {
+      p_booking_id: booking.id, p_payment_id: yocoPaymentId,
+      p_captured_cents: capturedCents, p_currency: String(payload.currency || "ZAR"),
+    });
+    if (confirm.error) {
+      console.error("BOOKING_CONFIRM_RPC_ERR booking=" + booking.id + ": " + confirm.error.message);
+      await finishLease(false, confirm.error.message);
+      return new Response("Temporary processing error", { status: 503 });
     }
-
-    // ── MID-CHECKOUT SLOT CLOSURE CHECK ──
-    // Before marking as PAID, verify the slot hasn't been closed/cancelled during checkout
-    const slotStatusCheck = await supabase.from("slots").select("status").eq("id", booking.slot_id).single();
-    if (slotStatusCheck.data && (slotStatusCheck.data.status === "CLOSED" || slotStatusCheck.data.status === "CANCELLED")) {
-      console.log("SLOT_CLOSED_DURING_CHECKOUT: slot " + booking.slot_id + " status=" + slotStatusCheck.data.status + " booking=" + booking.id);
-
-      // Do NOT mark as PAID — cancel the booking
-      await supabase.from("bookings").update({
-        status: "CANCELLED",
-        payment_status: "REFUND_PENDING",
-        yoco_payment_id: yocoPaymentId,
-        cancellation_reason: "Slot closed during checkout",
-        cancelled_at: new Date().toISOString(),
-      }).eq("id", booking.id);
-
-      // Trigger refund to reverse the Yoco charge
-      try {
-        await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-          body: JSON.stringify({ booking_id: booking.id }),
-        });
-      } catch (refundErr) {
-        console.error("SLOT_CLOSED_REFUND_ERR:", refundErr);
-      }
-
-      // Release any active hold
-      await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
-
-      // Send customer apology email with reschedule option
-      try {
-        const closedTenant = await getTenantByBusinessId(supabase, booking.business_id);
-        const closedRef = booking.id.substring(0, 8).toUpperCase();
-        const closedTourName = booking.tours?.name || "Booking";
-        const closedBrandName = getBusinessDisplayName(closedTenant.business);
-        const closedCurrency = closedTenant.business.currency || "ZAR";
-
-        if (booking.phone) {
-          try {
-            await sendWhatsappTextForTenant(closedTenant, booking.phone,
-              "Booking update\n\n" +
-              "Hi " + ((booking.customer_name && booking.customer_name.split(" ")[0]) || "there") +
-              ", we're sorry but the slot for " + closedTourName + " (Ref: " + closedRef + ") has been closed.\n\n" +
-              "Your payment of " + closedCurrency + " " + booking.total_amount + " will be refunded automatically. " +
-              "Please allow 5 to 10 business days.\n\n" +
-              "You can reschedule to another available date via My Bookings.\n\n" +
-              "Apologies for the inconvenience.\n" + closedBrandName + "."
-            );
-          } catch (e) { console.error("SLOT_CLOSED_WA_ERR:", e); }
-        }
-
-        if (booking.email) {
-          try {
-            await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-              body: JSON.stringify({
-                type: "CANCELLATION",
-                data: {
-                  business_id: booking.business_id,
-                  email: booking.email,
-                  customer_name: booking.customer_name,
-                  ref: closedRef,
-                  tour_name: closedTourName,
-                  start_time: booking.slots?.start_time || "",
-                  reason: "The slot was closed while your payment was being processed. A full refund has been issued automatically. You can reschedule to another date via My Bookings.",
-                  refund_amount: String(booking.total_amount),
-                  total_amount: String(booking.total_amount),
-                  is_partial: false,
-                },
-              }),
-            });
-          } catch (e) { console.error("SLOT_CLOSED_EMAIL_ERR:", e); }
-        }
-      } catch (notifyErr) {
-        console.error("SLOT_CLOSED_NOTIFY_ERR:", notifyErr);
-      }
-
-      // Log as alert event
-      await supabase.from("logs").insert({
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        event: "slot_closed_during_checkout",
-        payload: {
-          yoco_payment_id: yocoPaymentId,
-          checkout_id: checkoutId,
-          slot_id: booking.slot_id,
-          slot_status: slotStatusCheck.data.status,
-          qty: booking.qty,
-          reason: "Slot closed/cancelled during checkout. Auto-refund triggered.",
-        },
-      });
-
-      return new Response("OK", { status: 200 });
-    }
-
-    // Verify payment amount matches expected booking total
-    const webhookAmountZar = Number(payload.metadata?.amount_zar || Math.round((Number(payload.amount) || 0) / 100));
-    if (webhookAmountZar > 0 && Math.abs(webhookAmountZar - Number(booking.total_amount || 0)) > 1) {
-      console.warn("YOCO_AMOUNT_MISMATCH: booking=" + booking.id + " expected=" + booking.total_amount + " received=" + webhookAmountZar);
-    }
-
-    // Atomically update to PAID — if already updated by a concurrent webhook, skip
-    // total_captured = cash Yoco actually charged (voucher portion was never captured
-    // by Yoco and must never be refundable as cash)
-    const cashCaptured = Math.max(0, Number(booking.total_amount || 0) - Number(booking.voucher_amount_paid || 0));
-    const upd = await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: yocoPaymentId, total_captured: cashCaptured, payment_status: "CAPTURED" }).eq("id", booking.id).is("yoco_payment_id", null).select("id").maybeSingle();
-    if (upd.error) {
-      console.log("BOOKING_PAID_UPDATE_FAILED booking=" + booking.id + " err=" + upd.error.message);
-      await supabase.from("logs").insert({
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        event: "payment_confirmed_but_status_update_failed",
-        payload: { error: upd.error.message, yoco_payment_id: yocoPaymentId, checkout_id: checkoutId },
-      });
-      return new Response("OK", { status: 200 });
-    }
-    if (!upd.data) {
+    const cres = confirm.data || {};
+    if (cres.already_paid) {
+      await finishLease(true);
       console.log("Already processed (concurrent webhook), ensuring confirmation delivery:" + booking.id);
       try {
         await sendBookingConfirmation(booking, booking.yoco_payment_id || yocoPaymentId, checkoutId, payload.amount);
@@ -1265,77 +1171,60 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       }
       return new Response("OK", { status: 200 });
     }
-    const holdConvert = await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE").select("id").maybeSingle();
-    // S3: atomic convert. If hold was still active, held -> booked; if it expired
-    // (cron released it), just increment booked. Single atomic statement — no
-    // read-modify-write race with a concurrent cron hold-expiry on this slot.
-    {
-      const heldDecrement = holdConvert.data ? booking.qty : 0;
-      await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: booking.qty, p_held_delta: -heldDecrement });
-    }
-
-    // Deduct voucher balances for vouchers applied to this booking (sequential, atomic RPC)
-    const metaVoucherIds = String(payload.metadata?.voucher_ids || "");
-    const metaVoucherCodes = String(payload.metadata?.voucher_codes || "");
-    if (metaVoucherIds || metaVoucherCodes) {
-      const voucherIdList = metaVoucherIds ? metaVoucherIds.split(",").filter(Boolean) : [];
-      const voucherCodeList = metaVoucherCodes ? metaVoucherCodes.split(",").filter(Boolean) : [];
-      // Prefer the voucher amount recorded on the booking — original_total minus
-      // total_amount also includes any promo discount, which must not drain the voucher.
-      const voucherDiscount = Number(booking.voucher_amount_paid || 0) > 0
-        ? Number(booking.voucher_amount_paid)
-        : Number(booking.original_total || 0) - Number(booking.total_amount || 0);
-      if (voucherDiscount > 0) {
-        let vouchersToDeduct: any[] = [];
-        // Vouchers are operator-specific — only deduct vouchers issued by the
-        // booking's own business (create-checkout already rejects cross-tenant
-        // claims; this keeps the webhook safe on its own too).
-        if (voucherIdList.length > 0) {
-          const vr = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").eq("business_id", booking.business_id).in("id", voucherIdList);
-          vouchersToDeduct = vr.data || [];
-        } else if (voucherCodeList.length > 0) {
-          const vr2 = await supabase.from("vouchers").select("id, code, current_balance, value, purchase_amount").eq("business_id", booking.business_id).in("code", voucherCodeList);
-          vouchersToDeduct = vr2.data || [];
-        }
-        let remainingDiscount = voucherDiscount;
-        for (let vi = 0; vi < vouchersToDeduct.length; vi++) {
-          if (remainingDiscount <= 0) break;
-          const voucher = vouchersToDeduct[vi];
-          // Atomic deduction via RPC — sequential drain (Voucher A to R0 first, then Voucher B)
-          const rpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: remainingDiscount });
-          if (rpcRes.data?.success) {
-            const deduction = Number(rpcRes.data.deducted);
-            const newBal = Number(rpcRes.data.remaining);
-            remainingDiscount -= deduction;
-            await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
-            // Send remaining balance email if voucher still has credit
-            if (newBal > 0 && booking.email) {
-              try {
-                await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-                  body: JSON.stringify({
-                    type: "VOUCHER_BALANCE",
-                    data: {
-                      email: booking.email,
-                      customer_name: booking.customer_name,
-                      voucher_code: voucher.code,
-                      original_value: Number(voucher.current_balance ?? voucher.value ?? voucher.purchase_amount ?? 0),
-                      amount_used: deduction,
-                      remaining_balance: newBal,
-                      booking_ref: booking.id.substring(0, 8).toUpperCase(),
-                      tour_name: booking.tours?.name || "Booking",
-                      business_id: booking.business_id,
-                    },
-                  }),
-                });
-              } catch (vbErr) { console.error("VOUCHER_BALANCE_EMAIL_ERR:", vbErr); }
-            }
-          }
-        }
-        console.log("VOUCHER_DEDUCTION booking=" + booking.id + " discount=" + voucherDiscount + " vouchers=" + vouchersToDeduct.length);
+    if (!cres.ok) {
+      const errCode = String(cres.error || "confirm_failed");
+      console.warn("BOOKING_CONFIRM_REJECTED booking=" + booking.id + " reason=" + errCode);
+      if (errCode === "amount_mismatch" || errCode === "voucher_shortfall") {
+        // Money arrived but does not match the expected charge: quarantine for
+        // manual review, release reservations, do NOT mark PAID.
+        await supabase.from("bookings").update({
+          status: "PENDING PAYMENT", yoco_payment_id: yocoPaymentId,
+          payment_status: "MISMATCH_QUARANTINE",
+        }).eq("id", booking.id);
+        await supabase.rpc("release_voucher_reservations", { p_booking_id: booking.id });
+        await supabase.from("logs").insert({
+          business_id: booking.business_id, booking_id: booking.id,
+          event: "payment_amount_mismatch",
+          payload: { error: errCode, expected_cents: cres.expected_cents || null, captured_cents: capturedCents, yoco_payment_id: yocoPaymentId, checkout_id: checkoutId },
+        });
+        await finishLease(true);
+        return new Response("OK", { status: 200 });
       }
+      if (["no_capacity", "slot_closed", "bad_status"].includes(errCode)) {
+        await refundUnfulfilledPayment(booking.id, yocoPaymentId, checkoutId, capturedCents);
+        await finishLease(true);
+        return new Response("Reservation unavailable; refund recorded", { status: 200 });
+      }
+      await finishLease(false, errCode);
+      return new Response("Temporary processing error", { status: 503 });
     }
+    await finishLease(true);
+
+    // R14: vouchers were reserved at checkout and settled inside
+    // confirm_booking_payment. Notify on remaining balances only.
+    try {
+      const settledV = await bookingVoucherBalances(supabase, booking.id, booking.business_id);
+      for (const voucher of settledV) {
+        if (!booking.email) break;
+        try {
+          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({
+              type: "VOUCHER_BALANCE",
+              data: {
+                email: booking.email, customer_name: booking.customer_name,
+                voucher_code: voucher.code, remaining_balance: voucher.current_balance,
+                original_value: voucher.value, amount_used: voucher.amount_used,
+                booking_ref: booking.id.substring(0, 8).toUpperCase(),
+                tour_name: booking.tours?.name || "Booking",
+                business_id: booking.business_id,
+              },
+            }),
+          });
+        } catch (vbErr) { console.error("VOUCHER_BALANCE_EMAIL_ERR:", vbErr); }
+      }
+    } catch (vbErr) { console.error("VOUCHER_BALANCE_LOOKUP_ERR:", vbErr); }
 
     // Apply promo code usage if one was used during checkout
     const metaPromoId = payload?.metadata?.promo_id;
@@ -1369,5 +1258,14 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
     console.log("PAYMENT CONFIRMED booking:" + booking.id);
     return new Response("OK", { status: 200 });
-  } catch (err) { console.error("YOCO_WEBHOOK_ERROR:", err); return new Response("OK", { status: 200 }); }
+  } catch (err) { console.error("YOCO_WEBHOOK_ERROR:", err); return new Response("Temporary processing error", { status: 503 }); }
+  };
+  const response = await processPayment();
+  try {
+    await finishLease(response.ok, response.ok ? undefined : "HTTP " + response.status);
+  } catch (error) {
+    console.error("YOCO_WEBHOOK_FINISH_ERROR:", error);
+    return new Response("Temporary processing error", { status: 503 });
+  }
+  return response;
 }));

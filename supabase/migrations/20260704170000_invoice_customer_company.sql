@@ -5,7 +5,6 @@
 ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS customer_company_name text,
   ADD COLUMN IF NOT EXISTS customer_vat_number text;
-
 ALTER TABLE public.invoices
   ADD COLUMN IF NOT EXISTS customer_company_name text,
   ADD COLUMN IF NOT EXISTS customer_vat_number text;

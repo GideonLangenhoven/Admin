@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
@@ -27,11 +28,54 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
+  release-regressions:
+    name: Payments, tenant isolation and edge functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: local-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      # The storefront is a separate public repository; unit checks cover both apps.
+      - uses: actions/checkout@v4
+        with:
+          repository: GideonLangenhoven/capekayak-booking
+          # Update this pin alongside the next storefront release.
+          ref: 2f664bf69ddb7b80f04e3751b37715567340a6a3
+          path: booking
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm ci --prefix booking
+      - run: npm run test:unit
+      - run: npm run check:edge
+      - run: npx tsc --noEmit --incremental false --project booking/tsconfig.json
+      - name: Real PostgreSQL isolation and payment transactions
+        env:
+          ROLLOUT_TEST_USER: postgres
+          ROLLOUT_TEST_PASSWORD: local-ci-only
+        run: npm run test:isolation:local
+
   smoke-e2e:
     name: Smoke E2E (production booking site)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: lint-and-typecheck
+    needs: [lint-and-typecheck, release-regressions]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -4,7 +4,6 @@
 -- upserted customers but never recomputed lifetime stats. Backfill both:
 -- link orphaned bookings to customers, then refresh stats for every customer.
 BEGIN;
-
 DO $$
 DECLARE
   rec record;
@@ -27,7 +26,6 @@ BEGIN
     END;
   END LOOP;
 END $$;
-
 DO $$
 DECLARE r record;
 BEGIN
@@ -35,5 +33,4 @@ BEGIN
     PERFORM public.recompute_customer_stats(r.id);
   END LOOP;
 END $$;
-
 COMMIT;

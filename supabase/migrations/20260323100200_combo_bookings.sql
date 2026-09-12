@@ -19,10 +19,7 @@ CREATE TABLE IF NOT EXISTS public.combo_bookings (
   CONSTRAINT unique_booking_a UNIQUE (booking_a_id),
   CONSTRAINT unique_booking_b UNIQUE (booking_b_id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_combo_bookings_offer ON public.combo_bookings (combo_offer_id);
 CREATE INDEX IF NOT EXISTS idx_combo_bookings_payment_status ON public.combo_bookings (payment_status);
-
 ALTER TABLE public.combo_bookings ENABLE ROW LEVEL SECURITY;
-
 GRANT ALL ON public.combo_bookings TO service_role;

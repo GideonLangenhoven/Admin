@@ -12,11 +12,9 @@
 
 ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS wa_phone_id_lookup text;
-
 CREATE INDEX IF NOT EXISTS businesses_wa_phone_id_lookup_idx
   ON public.businesses (wa_phone_id_lookup)
   WHERE wa_phone_id_lookup IS NOT NULL;
-
 -- Do not expose the lookup column to anon/authenticated (service_role, which
 -- resolves inbound WhatsApp, bypasses column grants). Revoking then re-granting
 -- the prior column set is fiddly; instead rely on the booking app never

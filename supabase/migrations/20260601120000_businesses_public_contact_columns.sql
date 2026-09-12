@@ -11,9 +11,7 @@ alter table public.businesses
   add column if not exists public_email text,
   add column if not exists public_phone text,
   add column if not exists public_whatsapp text;
-
 grant select (public_email, public_phone, public_whatsapp) on public.businesses to anon;
-
 -- Seed the launch tenant (Aonyx) so the panel has data to render immediately.
 update public.businesses
    set public_email    = 'aonyx@bookingtours.co.za',

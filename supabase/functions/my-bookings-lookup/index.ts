@@ -98,6 +98,9 @@ const BOOKING_SELECT = [
   "phone",
   "qty",
   "total_amount",
+  "voucher_amount_paid",
+  "original_total",
+  "last_amendment_id",
   "status",
   "refund_status",
   "refund_amount",
@@ -172,11 +175,15 @@ Deno.serve(async (req) => {
       issueNewSession = true;
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("bookings")
       .select(BOOKING_SELECT)
       .eq("business_id", business.id)
-      .eq("email", verifiedEmail)
+      .eq("email", verifiedEmail);
+    // Payment polling needs one booking, still behind the same verified email
+    // and operator checks. It must not fall off the 100-booking history page.
+    if (typeof body.booking_id === "string" && body.booking_id) query = query.eq("id", body.booking_id);
+    const { data, error } = await query
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) return respond(req, 500, { success: false, error: error.message });

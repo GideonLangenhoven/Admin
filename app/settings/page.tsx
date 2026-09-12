@@ -298,6 +298,8 @@ export default function SettingsPage() {
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
     const [emailTagline, setEmailTagline] = useState("");
+    const [activityVerbPast, setActivityVerbPast] = useState("");
+    const [locationPhrase, setLocationPhrase] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
     const [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
     const [emailColor, setEmailColor] = useState("#1b3b36");
@@ -968,6 +970,8 @@ export default function SettingsPage() {
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
             setEmailTagline(data.email_tagline || "");
+            setActivityVerbPast(data.activity_verb_past || "");
+            setLocationPhrase(data.location_phrase || "");
             setSocialLinks({
                 facebook: data.social_facebook || "",
                 instagram: data.social_instagram || "",
@@ -1531,6 +1535,8 @@ export default function SettingsPage() {
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
             email_tagline: emailTagline.trim() || null,
+            activity_verb_past: activityVerbPast.trim() || null,
+            location_phrase: locationPhrase.trim() || null,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
             email_img_invoice: emailImgs.invoice || null,
@@ -2783,7 +2789,25 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
-                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Activity verb</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Past-tense word used in post-trip emails: &quot;Thank you for … with us.&quot; Leave blank for the neutral &quot;adventuring&quot;.</p>
+                                <input type="text" value={activityVerbPast} onChange={e => setActivityVerbPast(e.target.value)}
+                                    maxLength={40}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. paddling, exploring, riding" />
+                            </label>
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Location phrase</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Appended to &quot;We hope you had an incredible time …&quot; in the trip-photos email. Leave blank for no suffix.</p>
+                                <input type="text" value={locationPhrase} onChange={e => setLocationPhrase(e.target.value)}
+                                    maxLength={60}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. on the water, in the bush" />
+                            </label>
+                        </div>
                         <label className="block">
                             <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
                             <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours). Set your own if the guess doesn&apos;t fit your activity.</p>

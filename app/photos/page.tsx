@@ -6,7 +6,6 @@ import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: getAdminTimezone() });
@@ -81,7 +80,7 @@ export default function PhotosPage() {
   function removeFile(i: number) { setUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }
 
   async function uploadToDrive() {
-    if (!selectedSlot || uploadFiles.length === 0) return;
+    if (uploading || !selectedSlot || uploadFiles.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     setUploadedFolderUrl("");
@@ -117,6 +116,7 @@ export default function PhotosPage() {
       const accessToken = tokenData.access_token;
 
       // Upload each file directly to Google Drive
+      const failed: File[] = [];
       for (let i = 0; i < uploadFiles.length; i++) {
         const file = uploadFiles[i];
         const metadata = JSON.stringify({ name: file.name, parents: [folderId] });
@@ -124,29 +124,36 @@ export default function PhotosPage() {
         form.append("metadata", new Blob([metadata], { type: "application/json" }));
         form.append("file", file);
 
-        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + accessToken },
-          body: form,
-        });
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.error("Drive upload failed for", file.name, errBody);
+        try {
+          const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + accessToken },
+            body: form,
+          });
+          if (!res.ok) throw new Error("Google Drive rejected the upload (" + res.status + ").");
+        } catch (error) {
+          failed.push(file);
+          console.error("Drive upload failed:", error);
         }
 
         setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
       }
 
-      setUploadedFolderUrl(folderUrl);
-      setUrls([folderUrl]);
-
-      // Log to trip_photos
-      await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: folderUrl, business_id: businessId });
-
-      notify({ title: "Upload complete", message: uploadFiles.length + " file" + (uploadFiles.length === 1 ? "" : "s") + " uploaded to Google Drive.", tone: "success" });
-      setUploadFiles([]);
-      loadHistory();
+      const uploaded = uploadFiles.length - failed.length;
+      setUploadFiles(failed);
+      if (uploaded > 0) {
+        setUploadedFolderUrl(folderUrl);
+        // Keep earlier folders when retrying failed files.
+        setUrls(previous => [...new Set([...previous.filter(url => url.trim()), folderUrl])]);
+        const { error } = await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: folderUrl, business_id: businessId });
+        if (error) throw new Error(uploaded + " files uploaded, but the photo link could not be saved. Use Send Photos to save and share the link.");
+        loadHistory();
+      }
+      notify({
+        title: failed.length ? "Some uploads failed" : "Upload complete",
+        message: uploaded + " of " + uploadFiles.length + " files uploaded." + (failed.length ? " Failed files remain selected for retry." : ""),
+        tone: failed.length ? "error" : "success",
+      });
     } catch (e: any) {
       notify({ title: "Upload failed", message: e.message || "Unknown error", tone: "error" });
     }
@@ -200,8 +207,9 @@ export default function PhotosPage() {
   }
 
   async function sendPhotos() {
+    if (sending) return;
     if (!selectedSlot) { notify({ title: "Select a trip", message: "Select a trip slot first.", tone: "warning" }); return; }
-    const validUrls = urls.filter(u => u.trim().length > 0);
+    const validUrls = [...new Set(urls.map(u => u.trim()).filter(Boolean))];
     if (validUrls.length === 0) { notify({ title: "No photo links", message: "Add at least one photo URL.", tone: "warning" }); return; }
     if (!await confirmAction({
       title: "Send trip photos",
@@ -214,69 +222,71 @@ export default function PhotosPage() {
     setResult(null);
     setSendProgress(10);
     try {
-      const tourName = (selectedSlot as any).tours?.name || "kayak trip";
-      const photoLink = validUrls.length === 1 ? validUrls[0] : validUrls[0];
+      const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!accessToken) throw new Error("Please sign in again before sending photos.");
+      const tourName = (selectedSlot as any).tours?.name || "trip";
 
       // Fetch bookings for this slot
-      const { data: bookings } = await supabase.from("bookings")
+      const { data: bookings, error: bookingError } = await supabase.from("bookings")
         .select("id, customer_name, phone, email, status")
         .eq("business_id", businessId)
         .eq("slot_id", selectedSlot.id)
         .in("status", ["PAID", "CONFIRMED", "COMPLETED"]);
+      if (bookingError) throw new Error("Could not load this trip's customers. Please try again.");
+      if (!bookings?.length) throw new Error("No confirmed customers were found for this trip.");
+
+      // Save the links before notifying customers so they are also available in My Bookings.
+      const { error: photoError } = await supabase.from("trip_photos").insert(validUrls.map(photo_url => ({
+        slot_id: selectedSlot.id, photo_url, business_id: businessId,
+      })));
+      if (photoError) throw new Error("Could not save the photo links. No notifications were sent.");
       setSendProgress(35);
 
       let sent = 0;
-      for (const b of (bookings || [])) {
-        // Send WhatsApp photo notification via template (24h compliant).
-        // Uses send-whatsapp-text which has built-in template fallback for
-        // customers outside the 24h window. The message is kept short and
-        // asks the customer to reply YES to receive the photo link,
-        // ensuring we open a new 24h window for follow-up.
+      const failures: string[] = [];
+      async function sendMessage(endpoint: string, body: unknown, label: string) {
+        try {
+          const response = await fetch(SU + "/functions/v1/" + endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+            body: JSON.stringify(body),
+          });
+          const outcome = await response.json();
+          if (!response.ok || outcome.ok !== true) throw new Error(outcome.error || "Message was not sent");
+          return true;
+        } catch {
+          failures.push(label);
+          return false;
+        }
+      }
+      for (const [index, b] of bookings.entries()) {
+        let delivered = false;
+        const name = b.customer_name || "Guest";
+        // Include the links directly; a YES reply does not reliably identify this trip.
         if (b.phone) {
           const waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
             "! 📸 Your trip photos from the " + tourName +
-            " are ready! Reply YES to this message to receive the photo link." +
-            "\n\nShare with your group once you get it!";
-          try {
-            await fetch(SU + "/functions/v1/send-whatsapp-text", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({ business_id: businessId, to: b.phone, message: waMsg }),
-            });
-          } catch (e) { console.error("WA photo send failed:", b.phone, e); }
+            " are ready!\n\n" + validUrls.join("\n") + "\n\nShare with your group and enjoy the memories!";
+          delivered = await sendMessage("send-whatsapp-text", { business_id: businessId, to: b.phone, message: waMsg }, name + " (WhatsApp)");
         }
 
         // Send thank-you email with photo link
         if (b.email) {
-          try {
-            await fetch(SU + "/functions/v1/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({
-                type: "TRIP_PHOTOS",
-                data: {
-                  business_id: businessId,
-                  email: b.email,
-                  customer_name: b.customer_name || "Guest",
-                  tour_name: tourName,
-                  photo_url: photoLink,
-                },
-              }),
-            });
-          } catch (e) { console.error("Email photo send failed:", b.email, e); }
+          const emailed = await sendMessage("send-email", {
+            type: "TRIP_PHOTOS",
+            data: { business_id: businessId, email: b.email, customer_name: name, tour_name: tourName, photo_url: validUrls[0], photo_urls: validUrls },
+          }, name + " (email)");
+          delivered = delivered || emailed;
         }
-        sent++;
-        setSendProgress(35 + Math.round((sent / Math.max((bookings || []).length, 1)) * 45));
+        if (!b.phone && !b.email) failures.push(name + " (no contact details)");
+        if (delivered) sent++;
+        setSendProgress(35 + Math.round(((index + 1) / bookings.length) * 45));
       }
 
-      // Log to trip_photos
-      for (const url of validUrls) {
-        await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: url, business_id: businessId });
-      }
       setSendProgress(100);
 
-      setResult({ sent });
-      if (sent > 0) { setUrls([""]); setSelectedSlot(null); }
+      setResult({ sent, failures });
+      if (sent > 0 && failures.length === 0) { setUrls([""]); setSelectedSlot(null); }
       loadHistory();
     } catch (e) { setResult({ error: String(e) }); }
     setSendProgress(0);
@@ -398,7 +408,7 @@ export default function PhotosPage() {
               {/* Folder link result */}
               {uploadedFolderUrl && (
                 <div className="mt-3 rounded-xl p-3" style={{ background: "var(--ck-success-soft)", border: "1px solid color-mix(in srgb, var(--ck-success) 25%, transparent)" }}>
-                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--ck-success)" }}>Photos uploaded successfully</p>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--ck-success)" }}>Uploaded photo folder</p>
                   <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="break-all text-xs underline" style={{ color: "var(--ck-ocean)" }}>{uploadedFolderUrl}</a>
                   <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Click &quot;Send Photos&quot; below to share this link with customers.</p>
                 </div>
@@ -464,10 +474,11 @@ export default function PhotosPage() {
           )}
 
           {result && (
-            <div className="rounded-lg p-3 text-sm" style={result.error
+            <div className="rounded-lg p-3 text-sm" style={result.error || result.failures?.length
               ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
               : { background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-              {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
+              {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "."}
+              {result.failures?.length > 0 && <p className="mt-2">Messages failed: {result.failures.join(", ")}. Check these contacts before sending again.</p>}
             </div>
           )}
         </div>
@@ -476,7 +487,7 @@ export default function PhotosPage() {
       {/* History */}
       <div className="ui-card anim-fade-up anim-d2 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recently Sent</h2>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recent Photo Links</h2>
           <span className="ui-mono-label !text-[10px]"><span className="tabular-nums">{sentHistory.length}</span> items</span>
         </div>
         {sentHistory.length === 0 ? (

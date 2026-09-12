@@ -10,11 +10,11 @@ describe("voucher-aware guest reduction", () => {
 
   it("REMOVE_GUESTS prices the excess from cash + voucher portions", () => {
     expect(fn).toContain("const { cashPaid, voucherPaid, paidValue } = getPaidPortions(booking)");
-    expect(fn).toContain("const voucherShare = Math.min(excessAmount, voucherPaid)");
+    expect(fn).toContain('supabase.rpc("apply_booking_change"');
   });
 
   it("REMOVE_GUESTS decrements the booking's voucher portion", () => {
-    expect(fn).toContain("voucher_amount_paid: voucherPaid - voucherShare");
+    expect(readFileSync("supabase/migrations/20260911180000_immediate_booking_changes.sql", "utf8")).toContain("voucher_amount_paid = credit - voucher_share");
   });
 
   it("bookings page money columns include the voucher-funded portion", () => {
@@ -44,15 +44,17 @@ describe("voucher-aware reschedule and WA flows", () => {
   });
 
   it("reschedule swap keeps total_amount as the cash portion", () => {
-    expect(fn).toContain("total_amount: Math.max(0, newTotalAmount - newVoucherPaid)");
+    expect(readFileSync("supabase/migrations/20260911180000_immediate_booking_changes.sql", "utf8")).toContain("total_amount = p_new_total - (credit - voucher_share)");
   });
 
-  it("yoco-webhook reschedule apply preserves the voucher portion", () => {
-    expect(yoco).toContain("Number(pr.new_total_amount || 0) - rVoucherPaid");
+  it("yoco-webhook reschedule delegates paid portions to the atomic settlement", () => {
+    expect(yoco).toContain('supabase.rpc("confirm_booking_uplift"');
+    expect(yoco).toContain("p_pending_reschedule_id: pr.id");
   });
 
-  it("yoco-webhook add-guests apply adds the uplift instead of recomputing qty * unit", () => {
-    expect(yoco).toContain("Number(agBk.total_amount || 0) + agDelta * agUnitPrice");
+  it("yoco-webhook add-guests settles the hold and actual capture together", () => {
+    expect(yoco).toContain("p_hold_id: agHoldId, p_pending_reschedule_id: null, p_new_qty: agNewQty");
+    expect(yoco).toContain("p_captured_cents: capturedCents");
   });
 
   it("WA guest removal routes through rebook-booking", () => {

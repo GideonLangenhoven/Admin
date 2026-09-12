@@ -6,16 +6,13 @@ DO $$ BEGIN
   CREATE TYPE whatsapp_bot_mode AS ENUM ('OFF', 'ALWAYS_ON', 'OUTSIDE_HOURS');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 -- 2. Add mode columns to businesses
 ALTER TABLE businesses
   ADD COLUMN IF NOT EXISTS whatsapp_bot_mode whatsapp_bot_mode NOT NULL DEFAULT 'ALWAYS_ON',
   ADD COLUMN IF NOT EXISTS whatsapp_bot_mode_changed_at timestamptz,
   ADD COLUMN IF NOT EXISTS whatsapp_bot_mode_changed_by uuid REFERENCES admin_users(id);
-
 -- 3. Add bot_skipped_reason to chat_messages for analytics
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS bot_skipped_reason text;
-
 -- 4. Helper function: is it currently inside business hours for a tenant?
 CREATE OR REPLACE FUNCTION is_inside_business_hours(p_business_id uuid)
 RETURNS boolean
@@ -57,5 +54,4 @@ BEGIN
   RETURN v_local_time >= v_open AND v_local_time < v_close;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION is_inside_business_hours(uuid) TO authenticated, service_role;

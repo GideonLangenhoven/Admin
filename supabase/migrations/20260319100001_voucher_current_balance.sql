@@ -4,7 +4,6 @@
 
 ALTER TABLE vouchers
   ADD COLUMN IF NOT EXISTS current_balance numeric;
-
 -- Backfill: set current_balance for existing vouchers
 -- ACTIVE vouchers get their full value; REDEEMED vouchers get 0
 UPDATE vouchers
@@ -15,7 +14,6 @@ SET current_balance = CASE
   ELSE COALESCE(value, purchase_amount, 0)
 END
 WHERE current_balance IS NULL;
-
 -- Set a default so new vouchers auto-populate current_balance from value
 -- (Note: this sets a static default; the insert logic in the app will set it explicitly)
 ALTER TABLE vouchers

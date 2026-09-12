@@ -29,7 +29,8 @@ describe("weather-cancellation credit claim (B3)", () => {
   it("credit-claim reschedules do not double-release the old slot", () => {
     // capacity for a cancelled booking was already released at cancellation
     expect(rebook).toContain("isCreditClaim");
-    expect(webhook).toContain("wasCancelled");
+    expect(webhook).toContain('supabase.rpc("confirm_booking_uplift"');
+    expect(readFileSync("supabase/migrations/20260911140000_booking_amendments.sql", "utf8")).toContain("IF NOT cancelled THEN UPDATE slots");
   });
 });
 

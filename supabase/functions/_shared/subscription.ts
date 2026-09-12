@@ -58,19 +58,19 @@ export async function nonTradingBusinessIds(supabase: any, ids: string[]): Promi
   const unique = [...new Set(ids.filter(Boolean).map(String))];
   if (unique.length === 0) return new Set<string>();
 
-  const { data, error } = await supabase
-    .from("businesses")
-    .select("id, subscription_status")
-    .in("id", unique);
-
-  if (error) {
-    console.error("SUBSCRIPTION_BATCH_LOOKUP_FAILED err=" + error.message);
-    return new Set(unique);
+  const trading = new Set<string>();
+  // Keep both the URL and each result below PostgREST's 1000-row limit.
+  for (let from = 0; from < unique.length; from += 500) {
+    const { data, error } = await supabase
+      .from("businesses")
+      .select("id, subscription_status")
+      .in("id", unique.slice(from, from + 500));
+    if (error) {
+      console.error("SUBSCRIPTION_BATCH_LOOKUP_FAILED err=" + error.message);
+      return new Set(unique);
+    }
+    for (const b of data || []) if (isTradingStatus(b.subscription_status)) trading.add(String(b.id));
   }
-
-  const trading = new Set(
-    (data || []).filter((b: any) => isTradingStatus(b.subscription_status)).map((b: any) => String(b.id)),
-  );
   return new Set(unique.filter((id) => !trading.has(id)));
 }
 

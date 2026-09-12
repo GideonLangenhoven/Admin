@@ -24,10 +24,8 @@
 --
 -- See docs/POPIA_DATA_OBFUSCATION.md for the obfuscate-vs-retain field map.
 BEGIN;
-
 -- Drop the old 4-arg version so the new 5-arg (p_email default) isn't ambiguous.
 DROP FUNCTION IF EXISTS public.anonymize_customer(uuid, uuid, uuid, uuid);
-
 CREATE OR REPLACE FUNCTION public.anonymize_customer(
   p_customer_id uuid, p_business_id uuid, p_request_id uuid, p_admin_id uuid, p_email text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
@@ -85,7 +83,5 @@ BEGIN
   RETURN v_counts;
 END;
 $function$;
-
 REVOKE ALL ON FUNCTION public.anonymize_customer(uuid, uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;
-
 COMMIT;

@@ -15,10 +15,8 @@ REVOKE ALL ON public.ngt_payments        FROM anon;
 REVOKE ALL ON public.chat_messages       FROM anon;
 REVOKE ALL ON public.conversations       FROM anon;
 REVOKE ALL ON public.messages            FROM anon;
-
 -- businesses: partial revoke. Keep the column-level SELECT grants from Prompt 10.
 -- Drop the broad table-level write grants and defensive N/A privileges.
 -- Column-level GRANTs are unaffected by table-level REVOKE.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.businesses FROM anon;
-
 NOTIFY pgrst, 'reload schema';

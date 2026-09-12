@@ -32,36 +32,30 @@ export async function POST(req: NextRequest) {
 
   const tourName = (slot as any).tours?.name || "your adventure";
 
-  const { data: bookings } = await db.from("bookings")
+  const { data: bookings, error: bookingError } = await db.from("bookings")
     .select("id, email, customer_name")
     .eq("slot_id", slot_id)
     .eq("business_id", caller.business_id)
     .in("status", ["PAID", "CONFIRMED", "COMPLETED"]);
 
+  if (bookingError) return NextResponse.json({ error: "Could not load the trip's customers" }, { status: 500 });
   if (!bookings?.length) return NextResponse.json({ error: "No customers on this slot" }, { status: 400 });
 
-  const { data: photos } = await db.from("trip_photos")
+  const { data: photos, error: photoError } = await db.from("trip_photos")
     .select("photo_url, gdrive_view_url")
     .eq("slot_id", slot_id)
     .eq("business_id", caller.business_id);
 
-  const photoUrls = (photos || []).map((p: any) => p.gdrive_view_url || p.photo_url).filter(Boolean);
-  let photoUrl = photoUrls[0] || "";
-
-  const { data: biz } = await db.from("businesses")
-    .select("gdrive_photos_folder_url, google_drive_folder_id")
-    .eq("id", caller.business_id)
-    .maybeSingle();
-
-  const folderUrl = biz?.gdrive_photos_folder_url ||
-    (biz?.google_drive_folder_id ? "https://drive.google.com/drive/folders/" + biz.google_drive_folder_id : "");
-  if (folderUrl) photoUrl = folderUrl;
-
-  if (!photoUrl) return NextResponse.json({ error: "No photos uploaded for this slot" }, { status: 400 });
+  if (photoError) return NextResponse.json({ error: "Could not load the trip's photos" }, { status: 500 });
+  const photoUrls = [...new Set((photos || []).map((p: any) => p.gdrive_view_url || p.photo_url).filter(Boolean))];
+  if (!photoUrls.length) return NextResponse.json({ error: "No photos uploaded for this slot" }, { status: 400 });
 
   const results: { booking_id: string; ok: boolean; error?: string }[] = [];
   for (const b of bookings) {
-    if (!b.email) continue;
+    if (!b.email) {
+      results.push({ booking_id: b.id, ok: false, error: "No email address" });
+      continue;
+    }
     try {
       const r = await fetch(supabaseUrl + "/functions/v1/send-email", {
         method: "POST",
@@ -73,11 +67,14 @@ export async function POST(req: NextRequest) {
             email: b.email,
             customer_name: b.customer_name || "Guest",
             tour_name: tourName,
-            photo_url: photoUrl,
+            photo_url: photoUrls[0],
+            photo_urls: photoUrls,
           },
         }),
       });
-      results.push({ booking_id: b.id, ok: r.ok });
+      const outcome = await r.json();
+      const ok = r.ok && outcome.ok === true;
+      results.push({ booking_id: b.id, ok, ...(!ok ? { error: String(outcome.error || "Email was not sent") } : {}) });
     } catch (e: any) {
       results.push({ booking_id: b.id, ok: false, error: e?.message });
     }
@@ -93,7 +90,7 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({
-    ok: true,
+    ok: results.every(r => r.ok),
     recipient_count: results.filter(r => r.ok).length,
     failed: results.filter(r => !r.ok),
   });

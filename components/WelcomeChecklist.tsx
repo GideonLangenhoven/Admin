@@ -135,17 +135,22 @@ export default function WelcomeChecklist() {
 
   const loadChecklist = useCallback(async () => {
     if (!isPrivileged || !businessId) return;
-    const [tours, slots, bookings] = await Promise.all([
-      supabase.from("tours").select("id", { count: "exact", head: true }).eq("business_id", businessId),
-      supabase.from("slots").select("id", { count: "exact", head: true }).eq("business_id", businessId),
-      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("business_id", businessId),
+    const session = (await supabase.auth.getSession()).data.session;
+    const [tours, slots, bookings, branding, credentials] = await Promise.all([
+      supabase.from("tours").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("active", true),
+      supabase.from("slots").select("capacity_total,booked,held").eq("business_id", businessId).eq("status", "OPEN").gt("start_time", new Date(Date.now() + 60 * 60 * 1000).toISOString()).limit(100),
+      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("business_id", businessId).in("status", ["PAID", "COMPLETED"]).eq("payment_status", "CAPTURED"),
+      supabase.from("businesses").select("logo_url,booking_site_url").eq("id", businessId).maybeSingle(),
+      session ? fetch("/api/credentials?business_id=" + encodeURIComponent(businessId), { headers: { Authorization: "Bearer " + session.access_token } }).then(async response => response.ok ? response.json() : null).catch(() => null) : Promise.resolve(null),
     ]);
+    const bookable = slots.data?.some(slot => slot.capacity_total - slot.booked - (slot.held || 0) > 0);
+
     setItems([
-      { key: "tours", title: "Create your tours", detail: "Names, descriptions, durations and prices: the products customers book.", href: "/settings", done: (tours.count || 0) > 0 },
-      { key: "slots", title: "Open bookable slots", detail: "Departures with dates, times and capacity. No slots, no bookings.", href: "/slots", done: (slots.count || 0) > 0 },
-      { key: "payments", title: "Connect payments & WhatsApp", detail: "Add your Yoco and WhatsApp credentials under Integration Credentials.", href: "/settings" },
-      { key: "branding", title: "Brand your booking site", detail: "Logo, colours, policies and FAQ under Booking Site Configuration.", href: "/settings" },
-      { key: "booking", title: "Take your first booking", detail: "Create one manually or share your booking site link.", href: "/new-booking", done: (bookings.count || 0) > 0 },
+      { key: "tours", title: "Create your tours", detail: "Names, descriptions, durations and prices: the products customers book.", href: "/settings#tours", done: (tours.count || 0) > 0 },
+      { key: "slots", title: "Open bookable slots", detail: "Departures with dates, times and capacity. No slots, no bookings.", href: "/slots", done: !!bookable },
+      { key: "payments", title: "Connect payments & WhatsApp", detail: "Add your Yoco and WhatsApp credentials under Integration Credentials.", href: "/settings#credentials", done: !!credentials?.yoco && !credentials?.yoco_test_mode && !!credentials?.wa },
+      { key: "branding", title: "Brand your booking site", detail: "Logo, colours, policies and FAQ under Booking Site Configuration.", href: "/settings#site", done: !!branding.data?.logo_url && !!branding.data?.booking_site_url },
+      { key: "booking", title: "Take your first booking", detail: "Complete a payment and check the customer confirmation before opening bookings.", href: "/new-booking", done: (bookings.count || 0) > 0 },
     ]);
   }, [businessId, isPrivileged]);
 

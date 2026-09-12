@@ -14,6 +14,7 @@ import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
@@ -177,6 +178,7 @@ export default function Bookings() {
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const loadRequestRef = useRef(0);
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
   const [cancellingWeatherId, setCancellingWeatherId] = useState<string | null>(null);
   const [resendingInvoiceId, setResendingInvoiceId] = useState<string | null>(null);
@@ -319,140 +321,117 @@ export default function Bookings() {
 
   async function loadBookings() {
     if (!businessId) return;
-    console.log("[BOOKINGS] loadBookings started", { businessId, rangeStart: rangeStart.toISOString(), rangeEnd: rangeEnd.toISOString() });
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
+    try {
+      // ponytail: re-fetch visible rows so actions/realtime refresh every loaded
+      // page coherently. Add a keyed page cache if thousands are routinely opened.
+      const visibleCount = (page + 1) * PAGE_SIZE;
+      const allBookings: any[] = [];
+      for (let from = 0; from < visibleCount + 1; from += 1000) {
+        const limit = Math.min(1000, visibleCount + 1 - from);
+        const { data, error } = await supabase.rpc("list_operator_bookings", {
+          p_business_id: businessId,
+          p_start: rangeStart.toISOString(),
+          p_end: rangeEnd.toISOString(),
+          p_limit: limit,
+          p_offset: from,
+        })
+          .select("id, created_at, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .order("created_at", { ascending: true }).order("id");
+        if (error) throw error;
+        if (requestId !== loadRequestRef.current) return;
+        if (data && !Array.isArray(data)) throw new Error("Unexpected booking list response");
+        const rows = data || [];
+        allBookings.push(...rows);
+        if (rows.length < limit) break;
+      }
 
-    // Step 1: Get slot IDs in the date range
-    const { data: slotRows, error: slotErr } = await supabase
-      .from("slots")
-      .select("id")
-      .eq("business_id", businessId)
-      .gte("start_time", rangeStart.toISOString())
-      .lte("start_time", rangeEnd.toISOString());
+      // Deduplicate
+      const seen = new Set<string>();
+      const deduped = allBookings.filter((b: any) => {
+        if (seen.has(b.id)) return false;
+        seen.add(b.id);
+        return true;
+      });
 
-    if (slotErr) {
-      console.error("[BOOKINGS] loadBookings slot fetch error:", slotErr.message, slotErr.code, slotErr.details);
-    }
-
-    const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
-
-    // Step 2: Fetch bookings matching those slots (paginated)
-    const allBookings: any[] = [];
-    const rangeFrom = page * PAGE_SIZE;
-    const rangeTo = rangeFrom + PAGE_SIZE - 1;
-
-    if (slotIds.length > 0) {
-      const BATCH = 500;
-      for (let i = 0; i < slotIds.length; i += BATCH) {
-        const batch = slotIds.slice(i, i + BATCH);
-        const { data, error } = await supabase
-          .from("bookings")
-          .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
-          .eq("business_id", businessId)
-          .in("slot_id", batch)
-          .order("created_at", { ascending: true })
-          .range(rangeFrom, rangeTo + 1);
-        if (error) {
-          console.error("[BOOKINGS] loadBookings batch fetch error:", error.message, error.code, error.details, error.hint);
+      // Batch related rows without exceeding request/response limits.
+      const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+      const bookingIds = deduped.map((b: any) => b.id);
+      for (let from = 0; from < bookingIds.length; from += 200) {
+        const ids = bookingIds.slice(from, from + 200);
+        const addOnRows = await fetchAllRows((start, end) => supabase.from("booking_add_ons")
+          .select("booking_id, qty, add_ons(name)")
+          .in("booking_id", ids).order("id").range(start, end));
+        for (const row of (addOnRows || []) as any[]) {
+          const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
+          if (!ao?.name) continue;
+          (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
         }
-        if (data) allBookings.push(...data);
       }
-    }
 
-    // Step 3: Also fetch unslotted bookings (created in range, no slot assigned)
-    if (page === 0) {
-      const { data: unslotted } = await supabase
-        .from("bookings")
-        .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
-        .eq("business_id", businessId)
-        .is("slot_id", null)
-        .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
-        .gte("created_at", rangeStart.toISOString())
-        .order("created_at", { ascending: true })
-        .limit(50);
-      if (unslotted) allBookings.push(...unslotted);
-    }
-
-    // Deduplicate
-    const seen = new Set<string>();
-    const deduped = allBookings.filter((b: any) => {
-      if (seen.has(b.id)) return false;
-      seen.add(b.id);
-      return true;
-    });
-
-    // Fetch booking_add_ons in one round-trip and group by booking_id.
-    const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
-    const bookingIds = deduped.map((b: any) => b.id);
-    if (bookingIds.length > 0) {
-      const { data: addOnRows } = await supabase.from("booking_add_ons")
-        .select("booking_id, qty, add_ons(name)")
-        .in("booking_id", bookingIds);
-      for (const row of (addOnRows || []) as any[]) {
-        const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
-        if (!ao?.name) continue;
-        (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
+      // Fetch ACTIVE pending_reschedules so we can show a "Pending reschedule"
+      // badge on bookings that have a held-but-unpaid upgrade. Joined with the
+      // hold to pull expires_at and the new slot for context.
+      const pendingByBooking: Record<string, { newSlotStart: string | null; newTourName: string | null; diff: number; expiresAt: string | null; pendingId: string }> = {};
+      for (let from = 0; from < bookingIds.length; from += 200) {
+        const ids = bookingIds.slice(from, from + 200);
+        const prRows = await fetchAllRows((start, end) => supabase
+          .from("pending_reschedules")
+          .select("id, booking_id, new_slot_id, new_tour_id, diff, status, holds(expires_at, status), slots:new_slot_id(start_time), tours:new_tour_id(name)")
+          .in("booking_id", ids).eq("business_id", businessId)
+          .eq("status", "PENDING").order("id").range(start, end));
+        for (const row of (prRows || []) as any[]) {
+          const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
+          // Expired/lapsed holds stay visible: the upgrade fee is still owed if
+          // the customer wants the move — "Send link" issues a fresh checkout.
+          const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
+          // ponytail: skip reschedules whose target slot already departed —
+          // nothing is owed for a trip that can no longer happen.
+          if (slot?.start_time && new Date(slot.start_time).getTime() < Date.now()) continue;
+          const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
+          pendingByBooking[row.booking_id] = {
+            pendingId: row.id,
+            newSlotStart: slot?.start_time || null,
+            newTourName: tour?.name || null,
+            diff: Number(row.diff || 0),
+            expiresAt: hold?.expires_at || null,
+          };
+        }
       }
-    }
 
-    // Fetch ACTIVE pending_reschedules so we can show a "Pending reschedule"
-    // badge on bookings that have a held-but-unpaid upgrade. Joined with the
-    // hold to pull expires_at and the new slot for context.
-    const pendingByBooking: Record<string, { newSlotStart: string | null; newTourName: string | null; diff: number; expiresAt: string | null; pendingId: string }> = {};
-    if (bookingIds.length > 0) {
-      const { data: prRows } = await supabase
-        .from("pending_reschedules")
-        .select("id, booking_id, new_slot_id, new_tour_id, diff, status, holds(expires_at, status), slots:new_slot_id(start_time), tours:new_tour_id(name)")
-        .in("booking_id", bookingIds)
-        .eq("status", "PENDING");
-      for (const row of (prRows || []) as any[]) {
-        const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
-        // Expired/lapsed holds stay visible: the upgrade fee is still owed if
-        // the customer wants the move — "Send link" issues a fresh checkout.
-        const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
-        // ponytail: skip reschedules whose target slot already departed —
-        // nothing is owed for a trip that can no longer happen.
-        if (slot?.start_time && new Date(slot.start_time).getTime() < Date.now()) continue;
-        const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
-        pendingByBooking[row.booking_id] = {
-          pendingId: row.id,
-          newSlotStart: slot?.start_time || null,
-          newTourName: tour?.name || null,
-          diff: Number(row.diff || 0),
-          expiresAt: hold?.expires_at || null,
-        };
-      }
-    }
+      const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
+        .map((b) => ({
+          ...b,
+          tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
+          slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
+          add_ons: addOnsByBooking[b.id] || [],
+          pending_reschedule: pendingByBooking[b.id] || null,
+        } as Booking));
 
-    const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
-      .map((b) => ({
-        ...b,
-        tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
-        slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
-        add_ons: addOnsByBooking[b.id] || [],
-        pending_reschedule: pendingByBooking[b.id] || null,
-      } as Booking));
-
-    console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length, page });
-    setHasMore(normalized.length > PAGE_SIZE);
-    const limited = normalized.slice(0, PAGE_SIZE);
-    if (page === 0) {
-      setBookings(limited as Booking[]);
-    } else {
-      setBookings(prev => [...prev, ...limited] as Booking[]);
+      if (requestId !== loadRequestRef.current) return;
+      setHasMore(normalized.length > visibleCount);
+      setBookings(normalized.slice(0, visibleCount));
+    } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      console.error("[BOOKINGS] load failed:", error);
+      notify({ title: "Bookings could not be loaded", message: "Please try again.", tone: "error" });
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
     setPage(0);
+    setBookings([]);
+    setSelected(new Set());
   }, [rangeStart, rangeEnd, businessId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       loadBookings();
     }, 0);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); loadRequestRef.current++; };
   }, [rangeStart, rangeEnd, businessId, page]);
 
   // Auto-refresh when a booking status changes (e.g. payment received)

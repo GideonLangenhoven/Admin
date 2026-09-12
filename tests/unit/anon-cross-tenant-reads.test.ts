@@ -67,10 +67,9 @@ describe("bookings_read keeps its narrow customer-facing doors", () => {
     expect(readPolicy!.cmd).toBe("SELECT");
   });
 
-  it("still admits the success-page and waiver token reads", () => {
-    // Narrowing the POST/PATCH clause must not take these with it: the success
-    // page and the waiver link are how customers see their own booking.
-    expect(readPolicy!.qual).toContain("x-booking-success-token");
+  it("still admits independent waiver token reads", () => {
+    // Success-page reads now use a signed edge capability, not this historical
+    // baseline's booking-ID header. Native rollout tests verify its removal.
     expect(readPolicy!.qual).toContain("x-booking-waiver-token");
   });
 

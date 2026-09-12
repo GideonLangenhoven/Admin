@@ -527,7 +527,7 @@ export default function Dashboard() {
             fetchManifest(today, tomorrow),
             fetchManifest(tomorrow, dayAfter),
             // ACTION_REQUIRED excluded — those await the customer's remediation choice, not operator action
-            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).eq("refund_status", "REQUESTED"),
+            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"]),
             supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
             Promise.all([
                 supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),

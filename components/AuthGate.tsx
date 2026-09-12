@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
+import { fetchAllRows } from "../supabase/functions/_shared/pagination";
 
 const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
@@ -38,6 +39,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Business context from login/session
   const [businessId, setBusinessId] = useState("");
+  const contextRequestRef = useRef(0);
   const [businessName, setBusinessName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
@@ -51,7 +53,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setHasHint(document.cookie.includes("ck_session_hint=1"));
-    validateSession();
+    validateSession().catch((error) => {
+      console.error("Session validation failed:", error);
+      setError("We couldn't verify your account. Please try signing in again.");
+      setChecking(false);
+    });
     checkLockout();
   }, []);
 
@@ -70,16 +76,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
     const targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
-    const baseQuery = supabase
-      .from("businesses")
-      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
-      .order("business_name", { ascending: true });
-
-    const businessesRes = isMultiOperator
-      ? await baseQuery
-      : await baseQuery.eq("id", defaultBusinessId);
-
-    const businessRows = (businessesRes.data || []) as Array<{
+    const businessRows = await fetchAllRows((from, to) => {
+      let query = supabase.from("businesses")
+        .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
+        .order("business_name", { ascending: true }).order("id").range(from, to);
+      if (!isMultiOperator) query = query.eq("id", defaultBusinessId);
+      return query;
+    }) as Array<{
       id: string;
       name: string | null;
       business_name: string | null;
@@ -185,6 +188,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function clearSession() {
+    contextRequestRef.current++;
     try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
@@ -337,10 +341,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   function switchOperator(nextBusinessId: string) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
-    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
+    contextRequestRef.current++;
+    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     setBusinessId(nextOperator.id);
     setBusinessName(nextOperator.name);
     setLogoUrl(nextOperator.logoUrl || "");
@@ -527,8 +532,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     // until a hard reload. Re-running loadBusinessContext (without any role
     // change) reseeds the active operator and the sidebar updates in place.
     if (!businessId) return;
+    const requestId = ++contextRequestRef.current;
     try {
       const context = await loadBusinessContext(role, businessId);
+      if (requestId !== contextRequestRef.current) return;
       setBusinessId(context.businessId);
       setBusinessName(context.businessName);
       setLogoUrl(context.logoUrl);

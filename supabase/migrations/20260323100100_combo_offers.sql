@@ -31,10 +31,7 @@ CREATE TABLE IF NOT EXISTS public.combo_offers (
     split_type != 'FIXED' OR (split_a_fixed + split_b_fixed = combo_price)
   )
 );
-
 CREATE INDEX IF NOT EXISTS idx_combo_offers_partnership ON public.combo_offers (partnership_id);
 CREATE INDEX IF NOT EXISTS idx_combo_offers_active ON public.combo_offers (active) WHERE active = true;
-
 ALTER TABLE public.combo_offers ENABLE ROW LEVEL SECURITY;
-
 GRANT ALL ON public.combo_offers TO service_role;

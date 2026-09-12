@@ -4,7 +4,6 @@
 -- Also updates the ck_seed_external_booking_credentials seeder function.
 
 BEGIN;
-
 -- ── Guard: every row with a plaintext secret must have an encrypted one ──
 DO $$
 BEGIN
@@ -15,11 +14,9 @@ BEGIN
     RAISE EXCEPTION 'Cannot drop: encrypted column missing for some rows';
   END IF;
 END $$;
-
 -- ── Drop plaintext column ──
 ALTER TABLE public.external_booking_credentials
   DROP COLUMN hmac_secret;
-
 -- ── Update seeder function to use encrypted column ──
 -- The seeder still generates the plaintext (returned to the admin for display)
 -- but now stores it encrypted.  Requires p_key parameter.
@@ -84,10 +81,7 @@ BEGIN
    AND i.source = c.source;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.ck_seed_external_booking_credentials(text, text, boolean) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.ck_seed_external_booking_credentials(text, text, boolean) TO authenticated, service_role;
-
 NOTIFY pgrst, 'reload schema';
-
 COMMIT;

@@ -3,10 +3,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_invoice_sequences (
   business_id uuid PRIMARY KEY REFERENCES public.businesses(id) ON DELETE CASCADE,
   last_number integer NOT NULL DEFAULT 0
 );
-
 ALTER TABLE public.tenant_invoice_sequences ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.tenant_invoice_sequences TO service_role;
-
 -- Replace the global next_invoice_number() with a per-tenant version
 -- that uses SELECT FOR UPDATE for gapless sequential numbering.
 CREATE OR REPLACE FUNCTION public.next_invoice_number(p_business_id uuid)
@@ -31,7 +29,6 @@ BEGIN
   RETURN 'INV-' || LPAD(next_val::text, 5, '0');
 END;
 $$;
-
 -- Keep the old zero-arg version as a fallback (uses global sequence)
 -- so existing callers don't break until they're migrated.
 

@@ -1,5 +1,10 @@
 # BookingTours — 5-Minute Onboarding Call Script
 
+> Historical quick-start script. For the September release, use
+> [the first-five-client checklist](qa/FIRST_FIVE_CLIENTS_2026-09-13.md).
+> Allow 30–45 minutes plus provider setup. A manually marked PAID booking does
+> not verify online payments, confirmation delivery or refunds.
+
 > For the person running the setup call with a new operator.
 > Goal: operator has a working dashboard and has sent their first real booking within 5 minutes.
 

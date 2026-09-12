@@ -3,7 +3,6 @@
 -- a Realtime subscription could leak messages across tenants.
 
 ALTER TABLE IF EXISTS public.chat_messages ENABLE ROW LEVEL SECURITY;
-
 -- Allow service-role full access (Edge Functions use the service key).
 -- Authenticated users (admin dashboard) can only see their own business rows.
 
@@ -22,13 +21,11 @@ BEGIN
     DROP POLICY chat_messages_insert_own_business ON public.chat_messages;
   END IF;
 END $$;
-
 -- Service role bypass (for Edge Functions)
 CREATE POLICY chat_messages_service_all
   ON public.chat_messages
   FOR ALL
   USING (auth.role() = 'service_role');
-
 -- Authenticated users can SELECT only their business's messages.
 -- The admin's business_id is looked up from admin_users by their auth.uid().
 CREATE POLICY chat_messages_select_own_business
@@ -39,7 +36,6 @@ CREATE POLICY chat_messages_select_own_business
       SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()
     )
   );
-
 -- Authenticated users can INSERT only into their business's messages.
 CREATE POLICY chat_messages_insert_own_business
   ON public.chat_messages

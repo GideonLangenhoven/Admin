@@ -10,17 +10,13 @@ create table if not exists public.chatbot_avatars (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists idx_chatbot_avatars_active_sort
   on public.chatbot_avatars(active, sort_order);
-
 alter table public.chatbot_avatars enable row level security;
-
 drop policy if exists chatbot_avatars_read on public.chatbot_avatars;
 create policy chatbot_avatars_read on public.chatbot_avatars
   for select to authenticated
   using (active = true);
-
 drop policy if exists chatbot_avatars_super_admin_all on public.chatbot_avatars;
 create policy chatbot_avatars_super_admin_all on public.chatbot_avatars
   for all to authenticated
@@ -40,15 +36,12 @@ create policy chatbot_avatars_super_admin_all on public.chatbot_avatars
         and not coalesce(au.suspended, false)
     )
   );
-
 drop policy if exists chatbot_avatars_service on public.chatbot_avatars;
 create policy chatbot_avatars_service on public.chatbot_avatars
   for all to service_role
   using (true) with check (true);
-
 grant select on public.chatbot_avatars to authenticated;
 grant all on public.chatbot_avatars to service_role;
-
 -- Seed the initial 11 avatars previously hardcoded in app/settings/page.tsx.
 insert into public.chatbot_avatars (lottie_url, sort_order) values
   ('https://lottie.host/f88dfbd9-9fbb-43af-9ac4-400d4f0b96ae/tc9tMgAjqf.lottie', 1),

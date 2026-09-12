@@ -1,8 +1,7 @@
 name: E2E on main
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: e2e-main
@@ -27,10 +26,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run happy-path
         env:
-          BASE_URL: ${{ secrets.BASE_URL }}
-          ADMIN_URL: ${{ secrets.ADMIN_URL }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          LIVE_PAYMENT_E2E: "1"
+          BASE_URL: ${{ secrets.RELEASE_TEST_BOOKING_URL }}
+          ADMIN_URL: ${{ secrets.RELEASE_TEST_ADMIN_URL }}
+          ADMIN_EMAIL: ${{ secrets.RELEASE_TEST_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.RELEASE_TEST_ADMIN_PASSWORD }}
+          TEST_CUSTOMER_EMAIL: ${{ secrets.RELEASE_TEST_CUSTOMER_EMAIL }}
+          TEST_CUSTOMER_PHONE: ${{ secrets.RELEASE_TEST_CUSTOMER_PHONE }}
         run: npm run test:e2e:happy
       - name: Upload Playwright report on failure
         if: failure()

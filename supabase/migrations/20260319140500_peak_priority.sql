@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS peak_periods (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT peak_periods_date_order CHECK (end_date >= start_date)
 );
-
 -- Per-tour peak prices within a peak period
 CREATE TABLE IF NOT EXISTS peak_period_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -18,11 +17,9 @@ CREATE TABLE IF NOT EXISTS peak_period_prices (
   price_per_person numeric NOT NULL,
   UNIQUE (peak_period_id, tour_id)
 );
-
 -- Enable RLS
 ALTER TABLE peak_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE peak_period_prices ENABLE ROW LEVEL SECURITY;
-
 -- RLS policies
 DO $$
 BEGIN

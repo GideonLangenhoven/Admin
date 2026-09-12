@@ -21,12 +21,10 @@
 
 -- 1. pgcrypto — Supabase puts extensions in the "extensions" schema
 create extension if not exists pgcrypto with schema extensions;
-
 -- 2. app_private schema
 create schema if not exists app_private;
 revoke all on schema app_private from public;
 grant usage on schema app_private to service_role;
-
 -- 3. No-op stub — keeps old two-step callers from throwing
 --    "function not found" while they are being updated.
 create or replace function public.set_app_settings_encryption_key(p_value text)
@@ -35,10 +33,8 @@ language sql
 security definer
 set search_path = public, app_private, extensions
 as $$ select null::void; $$;
-
 revoke all on function public.set_app_settings_encryption_key(text) from public, anon, authenticated;
 grant  execute on function public.set_app_settings_encryption_key(text) to service_role;
-
 -- 4. Internal helpers — key is passed as an explicit parameter.
 --    NULL/empty plaintext  → NULL ciphertext  (represents "not configured")
 --    NULL ciphertext       → NULL plaintext
@@ -56,7 +52,6 @@ begin
   return extensions.pgp_sym_encrypt(p_value, p_key);
 end;
 $$;
-
 create or replace function app_private.decrypt_secret(p_encrypted bytea, p_key text)
 returns text
 language plpgsql
@@ -70,19 +65,16 @@ begin
   return extensions.pgp_sym_decrypt(p_encrypted, p_key);
 end;
 $$;
-
 revoke all on function app_private.encrypt_secret(text, text)   from public, anon, authenticated;
 revoke all on function app_private.decrypt_secret(bytea, text)  from public, anon, authenticated;
 grant  execute on function app_private.encrypt_secret(text, text)   to service_role;
 grant  execute on function app_private.decrypt_secret(bytea, text)  to service_role;
-
 -- 5. Drop old credential RPCs (old signatures had no p_key param)
 drop function if exists public.get_business_credentials(uuid);
 drop function if exists public.set_business_credentials(uuid, text, text, text);
 drop function if exists public.set_business_credentials(uuid, text, text, text, text);
 drop function if exists public.set_wa_credentials(uuid, text, text);
 drop function if exists public.set_yoco_credentials(uuid, text, text);
-
 -- 6. get_business_credentials — single call, key as explicit param
 create or replace function public.get_business_credentials(p_business_id uuid, p_key text)
 returns table (
@@ -103,7 +95,6 @@ as $$
   from public.businesses b
   where b.id = p_business_id;
 $$;
-
 -- 7. set_business_credentials — key as 2nd param (used by onboarding)
 create or replace function public.set_business_credentials(
   p_business_id         uuid,
@@ -132,7 +123,6 @@ begin
   end if;
 end;
 $$;
-
 -- 8. Partial update — WhatsApp only (key as 2nd param)
 create or replace function public.set_wa_credentials(
   p_business_id  uuid,
@@ -157,7 +147,6 @@ begin
   end if;
 end;
 $$;
-
 -- 9. Partial update — Yoco only (key as 2nd param)
 create or replace function public.set_yoco_credentials(
   p_business_id         uuid,
@@ -182,13 +171,11 @@ begin
   end if;
 end;
 $$;
-
 -- 10. Grants
 revoke all on function public.get_business_credentials(uuid, text)             from public, anon, authenticated;
 revoke all on function public.set_business_credentials(uuid, text, text, text, text, text) from public, anon, authenticated;
 revoke all on function public.set_wa_credentials(uuid, text, text, text)       from public, anon, authenticated;
 revoke all on function public.set_yoco_credentials(uuid, text, text, text)     from public, anon, authenticated;
-
 grant execute on function public.get_business_credentials(uuid, text)             to service_role;
 grant execute on function public.set_business_credentials(uuid, text, text, text, text, text) to service_role;
 grant execute on function public.set_wa_credentials(uuid, text, text, text)       to service_role;

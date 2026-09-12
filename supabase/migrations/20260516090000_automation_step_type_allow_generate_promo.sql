@@ -13,12 +13,9 @@
 -- ════════════════════════════════════════════════════════════════════
 
 BEGIN;
-
 ALTER TABLE public.marketing_automation_steps
   DROP CONSTRAINT IF EXISTS marketing_automation_steps_step_type_check;
-
 ALTER TABLE public.marketing_automation_steps
   ADD CONSTRAINT marketing_automation_steps_step_type_check
   CHECK (step_type IN ('send_email', 'delay', 'condition', 'generate_voucher', 'generate_promo'));
-
 COMMIT;

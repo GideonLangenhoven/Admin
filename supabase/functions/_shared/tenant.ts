@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchAllRows } from "./pagination.ts";
 
 export type TenantBusiness = {
   id: string;
@@ -126,8 +127,8 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     yocoTestMode: testMode,
     yocoTestSecretKey: testKey,
     yocoTestWebhookSecret: testWebhook,
-    activeYocoSecretKey: testMode && testKey ? testKey : liveKey,
-    activeYocoWebhookSecret: testMode && testWebhook ? testWebhook : liveWebhook,
+    activeYocoSecretKey: testMode ? testKey : liveKey,
+    activeYocoWebhookSecret: testMode ? testWebhook : liveWebhook,
     // The get_business_credentials RPC has returned these since 20260323100400;
     // they were never mapped here, which made the Paysafe combo path dead code.
     paysafeApiKey: String(row.paysafe_api_key || ""),
@@ -232,11 +233,12 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
   ].join(",");
 
   // Fast path: indexed single-row lookup on the plaintext phone-id column.
-  const { data: fast } = await supabase
+  const { data: fast, error: lookupError } = await supabase
     .from("businesses")
     .select(cols)
     .eq("wa_phone_id_lookup", incomingPhoneId)
     .maybeSingle();
+  if (lookupError) throw new Error("WhatsApp operator lookup failed: " + lookupError.message);
   if (fast) {
     const credentials = await getBusinessCredentials(supabase, (fast as any).id);
     if (normalizePhoneLookup(credentials.waPhoneId) === incomingPhoneId) {
@@ -260,7 +262,8 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
         await supabase.from("businesses").update({ wa_phone_id_lookup: normalized }).eq("id", business.id);
       } catch (_e) { /* best-effort backfill */ }
     }
-    if (!match && normalized === incomingPhoneId) {
+    if (normalized === incomingPhoneId) {
+      if (match && match.business.id !== business.id) throw new Error("WhatsApp phone_number_id is assigned to multiple operators");
       match = { business: business as TenantBusiness, credentials, resolvedBy: "wa_phone_id" };
     }
   }
@@ -406,20 +409,7 @@ export function createServiceClient() {
  * awaitable to `{ data, error }`. Use for cron/sweep queries that iterate all
  * tenants (or all rows) and would otherwise silently stop at 1000 rows.
  */
-export async function fetchAllRows<T = any>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
-): Promise<T[]> {
-  const pageSize = 1000;
-  const all: T[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await build(from, from + pageSize - 1);
-    if (error) throw error;
-    const rows = data || [];
-    all.push(...rows);
-    if (rows.length < pageSize) break;
-  }
-  return all;
-}
+export { fetchAllRows };
 
 export function getBusinessDisplayName(business?: TenantBusiness | null) {
   return String(business?.business_name || business?.name || "Adventure Operator");

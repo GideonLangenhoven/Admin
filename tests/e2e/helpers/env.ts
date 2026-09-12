@@ -8,8 +8,8 @@ export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 export const TEST_CARD = "4242424242424242";
 export const TEST_CUSTOMER = {
   name: "Playwright Test",
-  email: "gidslang89@gmail.com",
-  phone: "0821234567",
+  email: process.env.TEST_CUSTOMER_EMAIL || "release-test@example.invalid",
+  phone: process.env.TEST_CUSTOMER_PHONE || "",
 };
 
 export function requireAdminCreds() {

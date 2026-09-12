@@ -1,9 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
+import { fetchAllRowsResult } from "../../supabase/functions/_shared/pagination";
+import { zonedToUtc } from "../lib/admin-timezone";
+import { notify } from "../lib/app-notify";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, LabelList,
@@ -120,6 +123,9 @@ export default function Reports() {
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
   const [reportTruncated, setReportTruncated] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const loadRequestRef = useRef(0);
+  const mountedRef = useRef(true);
   const [signedInPeriod, setSignedInPeriod] = useState(0);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => monthStartStr(activeTimezone));
@@ -134,83 +140,90 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<"bookings" | "financials" | "marketing" | "attendance" | "waivers">("bookings");
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
     setStartDate(monthStartStr(activeTimezone));
     setEndDate(todayStr(activeTimezone));
   }, [activeTimezone]);
 
   async function loadReport() {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
-    const startIso = startDate + "T00:00:00+02:00";
-    const endIso = endDate + "T23:59:59+02:00";
+    setReportError("");
+    setBookings([]);
+    setSignedInPeriod(0);
+    setReportTruncated(false);
+    try {
+      const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+      const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+      const slotRelation = filterBy === "slot" ? "slots!inner(start_time)" : "slots(start_time)";
 
-    let slotIds: string[] | null = null;
-    if (filterBy === "slot") {
-      // Two-step: first get slot IDs in the date range, then query bookings
-      const { data: slotRows } = await supabase
-        .from("slots")
-        .select("id")
-        .eq("business_id", businessId)
-        .gte("start_time", startIso)
-        .lte("start_time", endIso);
-      slotIds = (slotRows || []).map((s: any) => s.id);
-      if (slotIds.length === 0) {
-        setBookings([]);
-        setLoading(false);
-        return;
+      // Page through the full result set so revenue/attendance/CSV totals cover
+      // every booking in range. A single `.limit(2000)` silently understated
+      // revenue for any tenant with >2000 bookings in the period. Downstream
+      // revenue logic is unchanged — it just now sees the complete set. A high
+      // safety ceiling caps browser memory for pathological ranges; if hit, the
+      // report is flagged as truncated rather than silently wrong.
+      const PAGE = 1000;
+      const CEILING = 20000;
+      const rows: any[] = [];
+      let truncated = false;
+      for (let from = 0; from < CEILING; from += PAGE) {
+        let query = supabase
+          .from("bookings")
+          .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), " + slotRelation)
+          .eq("business_id", businessId);
+        if (filterBy === "slot") {
+          query = query.eq("slots.business_id", businessId).gte("slots.start_time", startIso).lt("slots.start_time", endIso);
+        } else {
+          query = query.gte("created_at", startIso).lt("created_at", endIso);
+        }
+        const { data, error } = await query.order("created_at", { ascending: false }).order("id").range(from, from + PAGE - 1);
+        if (requestId !== loadRequestRef.current) return;
+        if (error) throw error;
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < PAGE) break;
+        if (from + PAGE >= CEILING) truncated = true;
       }
-    }
+      setReportTruncated(truncated);
+      setBookings(rows.map((b: any) => ({
+        ...b,
+        tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
+        slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
+      })));
 
-    // Page through the full result set so revenue/attendance/CSV totals cover
-    // every booking in range. A single `.limit(2000)` silently understated
-    // revenue for any tenant with >2000 bookings in the period. Downstream
-    // revenue logic is unchanged — it just now sees the complete set. A high
-    // safety ceiling caps browser memory for pathological ranges; if hit, the
-    // report is flagged as truncated rather than silently wrong.
-    const PAGE = 1000;
-    const CEILING = 20000;
-    const rows: any[] = [];
-    let truncated = false;
-    for (let from = 0; from < CEILING; from += PAGE) {
-      let query = supabase
+      // Separately count waivers SIGNED in the period (by signing date, not trip
+      // date). The default query above filters by slot.start_time, so a waiver
+      // signed in May for a trip in March wouldn't appear. This independent
+      // count answers "did we sign any waivers in this window?" honestly.
+      const { count: signedCount, error: countError } = await supabase
         .from("bookings")
-        .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), slots(start_time)")
-        .eq("business_id", businessId);
-      if (filterBy === "slot" && slotIds) {
-        query = query.in("slot_id", slotIds);
-      } else {
-        query = query.gte("created_at", startIso).lte("created_at", endIso);
-      }
-      const { data, error } = await query.order("created_at", { ascending: false }).range(from, from + PAGE - 1);
-      if (error) { console.error("Report load error:", error); break; }
-      const page = data || [];
-      rows.push(...page);
-      if (page.length < PAGE) break;
-      if (from + PAGE >= CEILING) truncated = true;
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .eq("waiver_status", "SIGNED")
+        .gte("waiver_signed_at", startIso)
+        .lt("waiver_signed_at", endIso);
+      if (requestId !== loadRequestRef.current) return;
+      if (countError) throw countError;
+      setSignedInPeriod(signedCount || 0);
+    } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      console.error("Report load error:", error);
+      setBookings([]);
+      setReportError("This report could not be fully loaded. Retry to get complete totals and exports.");
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-    setReportTruncated(truncated);
-    setBookings(rows.map((b: any) => ({
-      ...b,
-      tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
-      slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
-    })));
-
-    // Separately count waivers SIGNED in the period (by signing date, not trip
-    // date). The default query above filters by slot.start_time, so a waiver
-    // signed in May for a trip in March wouldn't appear. This independent
-    // count answers "did we sign any waivers in this window?" honestly.
-    const { count: signedCount } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .eq("waiver_status", "SIGNED")
-      .gte("waiver_signed_at", startIso)
-      .lte("waiver_signed_at", endIso);
-    setSignedInPeriod(signedCount || 0);
-
-    setLoading(false);
   }
 
-  useEffect(() => { loadReport(); }, [startDate, endDate, filterBy, businessId]);
+  useEffect(() => {
+    loadReport();
+    return () => { loadRequestRef.current++; };
+  }, [startDate, endDate, filterBy, businessId, activeTimezone]);
 
   const filtered = useMemo(() => {
     let rows = filterStatus === "ALL" ? bookings : bookings.filter(b => b.status === filterStatus);
@@ -389,6 +402,7 @@ export default function Reports() {
   }
 
   function triggerDownload(content: string, filename: string) {
+    if (!mountedRef.current) return;
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -562,24 +576,27 @@ export default function Reports() {
   // ── Accounting registers (on-demand fetch + CSV; financials tab only) ──
   const [registerBusy, setRegisterBusy] = useState<string | null>(null);
 
+  function registerFailed(error: unknown) {
+    console.error("Register load error:", error);
+    if (mountedRef.current) notify({ title: "Register could not be loaded", message: "Please retry. No partial export was downloaded.", tone: "error" });
+  }
+
   async function downloadRefundRegister() {
     setRegisterBusy("refunds");
-    const startIso = startDate + "T00:00:00+02:00";
-    const endIso = endDate + "T23:59:59+02:00";
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
     // Money truth lives on bookings; refund_requests is workflow. A refund
     // belongs to this period when it was PROCESSED in it (or, for legacy rows
     // without a processed date, when the booking was cancelled in it).
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
       .from("bookings")
       .select("id, created_at, customer_name, email, total_amount, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, refund_notes, cancelled_at, cancellation_reason, yoco_payment_id, status, tours(name)")
       .eq("business_id", businessId)
-      .or("total_refunded.gt.0,refund_processed_at.not.is.null")
-      .limit(5000);
+      .or(`and(refund_processed_at.gte.${startIso},refund_processed_at.lt.${endIso}),and(refund_processed_at.is.null,total_refunded.gt.0,cancelled_at.gte.${startIso},cancelled_at.lt.${endIso})`)
+      .order("id").range(from, to));
     setRegisterBusy(null);
-    if (error) { console.error("Refund register error:", error); return; }
-    const inRange = (iso: string | null) => !!iso && iso >= startIso && iso <= endIso;
+    if (error) { registerFailed(error); return; }
     const rows = (data || [])
-      .filter((b: any) => inRange(b.refund_processed_at) || (Number(b.total_refunded || 0) > 0 && !b.refund_processed_at && inRange(b.cancelled_at)))
       .map((b: any) => ({ ...b, tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours }))
       .sort((a: any, z: any) => String(a.refund_processed_at || a.cancelled_at || "").localeCompare(String(z.refund_processed_at || z.cancelled_at || "")));
     const headers = ["Refund Date", "Booking Ref", "Booking ID", "Customer", "Tour", "Booking Status", "Amount Received", "Amount Refunded", "Refund Status", "Gateway Ref", "Cancelled At", "Reason", "Notes"];
@@ -604,18 +621,18 @@ export default function Reports() {
 
   async function downloadInvoiceRegister() {
     setRegisterBusy("invoices");
-    const startIso = startDate + "T00:00:00+02:00";
-    const endIso = endDate + "T23:59:59+02:00";
-    const { data, error } = await supabase
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
       .from("invoices")
       .select("invoice_number, created_at, customer_name, customer_email, customer_company_name, customer_vat_number, tour_name, tour_date, qty, unit_price, subtotal, discount_type, discount_amount, total_amount, payment_method, payment_reference, voucher_code, status, booking_id")
       .eq("business_id", businessId)
       .gte("created_at", startIso)
-      .lte("created_at", endIso)
+      .lt("created_at", endIso)
       .order("invoice_number", { ascending: true })
-      .limit(10000);
+      .order("id").range(from, to));
     setRegisterBusy(null);
-    if (error) { console.error("Invoice register error:", error); return; }
+    if (error) { registerFailed(error); return; }
     const rows = data || [];
     const headers = ["Invoice No", "Issued At", "Customer", "Company", "VAT No", "Email", "Tour", "Tour Date", "Qty", "Unit Price", "Subtotal", "Discount", "Total", "Payment Method", "Payment Reference", "Voucher", "Status", "Booking Ref"];
     const csvRows = rows.map((inv: any) => [
@@ -644,28 +661,28 @@ export default function Reports() {
 
   async function downloadVoucherRegister() {
     setRegisterBusy("vouchers");
-    const startIso = startDate + "T00:00:00+02:00";
-    const endIso = endDate + "T23:59:59+02:00";
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
     // Three sections in one register: sold in period (income received),
     // redeemed in period (liability released), and the open-balance snapshot
     // (current liability, as of now, independent of the date range).
     const [sold, redeemed, open] = await Promise.all([
-      supabase.from("vouchers")
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
         .select("code, created_at, buyer_name, buyer_email, recipient_name, purchase_amount, value, current_balance, status, expires_at")
-        .eq("business_id", businessId).gte("created_at", startIso).lte("created_at", endIso)
-        .order("created_at").limit(5000),
-      supabase.from("vouchers")
+        .eq("business_id", businessId).gte("created_at", startIso).lt("created_at", endIso)
+        .order("created_at").order("id").range(from, to)),
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
         .select("code, redeemed_at, buyer_name, recipient_name, value, current_balance, status, redeemed_booking_id")
-        .eq("business_id", businessId).gte("redeemed_at", startIso).lte("redeemed_at", endIso)
-        .order("redeemed_at").limit(5000),
-      supabase.from("vouchers")
+        .eq("business_id", businessId).gte("redeemed_at", startIso).lt("redeemed_at", endIso)
+        .order("redeemed_at").order("id").range(from, to)),
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
         .select("code, created_at, buyer_name, recipient_name, value, current_balance, status, expires_at")
         .eq("business_id", businessId).gt("current_balance", 0).eq("status", "ACTIVE")
-        .order("created_at").limit(5000),
+        .order("created_at").order("id").range(from, to)),
     ]);
     setRegisterBusy(null);
     if (sold.error || redeemed.error || open.error) {
-      console.error("Voucher register error:", sold.error || redeemed.error || open.error);
+      registerFailed(sold.error || redeemed.error || open.error);
       return;
     }
     const headers = ["Section", "Code", "Date", "Buyer", "Recipient", "Face Value", "Purchase Amount", "Current Balance", "Status", "Expires / Booking"];
@@ -689,22 +706,22 @@ export default function Reports() {
 
   async function downloadSettlementRegister() {
     setRegisterBusy("settlements");
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
       .from("combo_settlements")
       .select("period_start, period_end, collector_business_id, owed_business_id, total_collected, amount_owed, combo_booking_count, status, settled_at, notes, created_at")
       .or(`collector_business_id.eq.${businessId},owed_business_id.eq.${businessId}`)
       .gte("period_end", startDate)
       .lte("period_start", endDate)
       .order("period_start")
-      .limit(2000);
-    if (error) { setRegisterBusy(null); console.error("Settlement register error:", error); return; }
+      .order("id").range(from, to));
+    if (error) { setRegisterBusy(null); registerFailed(error); return; }
     const rows = data || [];
-    // Resolve counterparty names in one lookup.
+    // Keep lookup URLs bounded even for large partner networks.
     const otherIds = Array.from(new Set(rows.flatMap((r: any) => [r.collector_business_id, r.owed_business_id]).filter((id: string) => id && id !== businessId)));
-    let names: Record<string, string> = {};
-    if (otherIds.length > 0) {
-      const { data: biz } = await supabase.from("businesses").select("id, name").in("id", otherIds);
-      names = Object.fromEntries((biz || []).map((b: any) => [b.id, b.name]));
+    const names: Record<string, string> = {};
+    for (let from = 0; from < otherIds.length; from += 200) {
+      const { data: biz } = await supabase.from("businesses").select("id, name").in("id", otherIds.slice(from, from + 200));
+      Object.assign(names, Object.fromEntries((biz || []).map((b: any) => [b.id, b.name])));
     }
     setRegisterBusy(null);
     const headers = ["Period", "Direction", "Counterparty", "Combo Bookings", "Total Collected", "Amount Owed", "Status", "Settled At", "Notes"];
@@ -843,14 +860,19 @@ export default function Reports() {
       headStyles: { fillColor: [4, 120, 87] },
     });
 
-    doc.save(`${csvPrefix}-${activeTab}-${startDate}-to-${endDate}.pdf`);
+    if (mountedRef.current) doc.save(`${csvPrefix}-${activeTab}-${startDate}-to-${endDate}.pdf`);
   }
 
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto pb-10">
+      {reportError && (
+        <div role="alert" className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
+          {reportError} <button type="button" onClick={loadReport} className="underline">Retry</button>
+        </div>
+      )}
       {reportTruncated && (
         <div className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-warn-soft, #fef3c7)", color: "var(--ck-warn-strong, #92400e)" }}>
-          This period has more than 20,000 bookings. Totals and CSV cover the first 20,000; narrow the date range for exact figures.
+          This report reached the 20,000-booking limit. Totals and exports cover those bookings only; narrow the date range to verify complete figures.
         </div>
       )}
       {/* ── Header ── */}
@@ -861,10 +883,10 @@ export default function Reports() {
           <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Filter by tour date or booking date, download as CSV or PDF.</p>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <button onClick={downloadCSV} disabled={filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
+          <button onClick={downloadCSV} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
             CSV ({filtered.length})
           </button>
-          <button onClick={downloadPDF} disabled={filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
+          <button onClick={downloadPDF} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
             PDF
           </button>
         </div>

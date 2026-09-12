@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-24T05:58:32.367Z",
-  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged.",
+  "generated_at": "2026-09-12T17:02:37.430Z",
+  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations.",
   "grants": [
     {
       "grantee": "anon",
@@ -470,11 +470,6 @@
     {
       "grantee": "anon",
       "table_name": "reviews",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
       "privilege_type": "TRIGGER"
     },
     {
@@ -5544,6 +5539,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_operations",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "refund_requests",
       "privilege_type": "DELETE"
     },
@@ -5960,6 +5990,41 @@
     {
       "grantee": "service_role",
       "table_name": "usage_counters",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "voucher_reservations",
       "privilege_type": "UPDATE"
     },
     {
@@ -6446,6 +6511,11 @@
     },
     {
       "schema": "public",
+      "table_name": "refund_operations",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "refund_requests",
       "rls_enabled": true
     },
@@ -6497,6 +6567,11 @@
     {
       "schema": "public",
       "table_name": "usage_counters",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "voucher_reservations",
       "rls_enabled": true
     },
     {
@@ -6742,7 +6817,7 @@
       "tablename": "bookings",
       "policyname": "bookings_anon_insert",
       "cmd": "INSERT",
-      "roles": "{anon,authenticated}",
+      "roles": "{anon}",
       "qual": null,
       "with_check": "((status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))"
     },
@@ -6751,9 +6826,9 @@
       "tablename": "bookings",
       "policyname": "bookings_anon_update",
       "cmd": "UPDATE",
-      "roles": "{anon,authenticated}",
-      "qual": "((status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))",
-      "with_check": "((status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)))"
+      "roles": "{anon}",
+      "qual": "((status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND ((id)::text = ( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header)) AND ((waiver_token)::text = NULLIF(( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header), ''::text)) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) <> ''::text))",
+      "with_check": "((status <> ALL (ARRAY['PAID'::text, 'CONFIRMED'::text, 'COMPLETED'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND ((id)::text = ( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header)) AND ((waiver_token)::text = NULLIF(( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header), ''::text)) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) <> ''::text))"
     },
     {
       "schemaname": "public",
@@ -6761,7 +6836,7 @@
       "policyname": "bookings_read",
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
-      "qual": "(((COALESCE(( SELECT current_setting('request.method'::text, true) AS current_setting), ''::text) = ANY (ARRAY['POST'::text, 'PATCH'::text])) AND ((business_id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) AND (status = ANY (ARRAY['DRAFT'::text, 'PENDING'::text]))) OR (( SELECT bt_request_header('x-booking-success-token'::text) AS bt_request_header) = (id)::text) OR ((( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header) = (id)::text) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) = (waiver_token)::text)) OR (customer_id IN ( SELECT c.id\n   FROM customers c\n  WHERE (c.user_id = ( SELECT auth.uid() AS uid)))) OR (business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest)))",
+      "qual": "(((( SELECT bt_request_header('x-booking-id'::text) AS bt_request_header) = (id)::text) AND (( SELECT bt_request_header('x-booking-waiver-token'::text) AS bt_request_header) = (waiver_token)::text)) OR (customer_id IN ( SELECT customers.id\n   FROM customers\n  WHERE (customers.user_id = ( SELECT auth.uid() AS uid)))) OR (business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[])))",
       "with_check": null
     },
     {
@@ -6832,7 +6907,7 @@
       "tablename": "businesses",
       "policyname": "businesses_anon_select",
       "cmd": "SELECT",
-      "roles": "{anon,authenticated}",
+      "roles": "{anon}",
       "qual": "(((id)::text = ( SELECT bt_request_header('x-tenant-business-id'::text) AS bt_request_header)) OR (subdomain = ( SELECT bt_request_header('x-tenant-subdomain'::text) AS bt_request_header)) OR (regexp_replace(COALESCE(booking_site_url, ''::text), '/+$'::text, ''::text) = regexp_replace(COALESCE(NULLIF(( SELECT bt_request_header('origin'::text) AS bt_request_header), ''::text), ( SELECT bt_request_header('x-tenant-origin'::text) AS bt_request_header)), '/+$'::text, ''::text)))",
       "with_check": null
     },
@@ -6851,8 +6926,8 @@
       "policyname": "businesses_super_admin_all",
       "cmd": "ALL",
       "roles": "{authenticated}",
-      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))",
-      "with_check": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))"
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users a\n  WHERE ((a.user_id = ( SELECT auth.uid() AS uid)) AND (a.role = 'SUPER_ADMIN'::text) AND (NOT COALESCE(a.suspended, false)))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM admin_users a\n  WHERE ((a.user_id = ( SELECT auth.uid() AS uid)) AND (a.role = 'SUPER_ADMIN'::text) AND (NOT COALESCE(a.suspended, false)))))"
     },
     {
       "schemaname": "public",
@@ -8173,7 +8248,7 @@
       "tablename": "reviews",
       "policyname": "reviews_anon_read",
       "cmd": "SELECT",
-      "roles": "{anon,authenticated}",
+      "roles": "{anon}",
       "qual": "(status = 'APPROVED'::text)",
       "with_check": null
     },
@@ -8437,6 +8512,15 @@
       "roles": "{authenticated}",
       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "voucher_reservations",
+      "policyname": "voucher_reservations_service_only",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
     },
     {
       "schemaname": "public",

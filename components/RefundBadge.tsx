@@ -50,7 +50,7 @@ export default function RefundBadge() {
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("business_id", businessId)
-            .eq("refund_status", "REQUESTED");
+            .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"]);
 
         setCount(count || 0);
     }

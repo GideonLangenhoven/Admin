@@ -1,25 +1,7 @@
--- Revoke anon SELECT on 14 sensitive columns in public.businesses.
--- Booking site (anon) needs the table for tenant resolution and display,
--- but never reads credentials, bank details, or encrypted secrets.
---
--- Approach: revoke table-level SELECT from anon, re-grant on 85 safe columns.
--- authenticated and service_role are unaffected (keep table-level SELECT).
---
--- REVOKED columns (14):
---   CRITICAL:  google_drive_refresh_token (plaintext OAuth token)
---   HIGH:      bank_account_owner, bank_account_number, bank_account_type,
---              bank_name, bank_branch_code (financial PII)
---   MEDIUM:    paysafe_account_id, paysafe_linked_account_id
---   LOW:       wa_token_encrypted, wa_phone_id_encrypted,
---              yoco_secret_key_encrypted, yoco_webhook_secret_encrypted,
---              paysafe_api_key_encrypted, paysafe_api_secret_encrypted
-
 BEGIN;
 
--- Step 1: Remove table-level SELECT from anon
 REVOKE SELECT ON public.businesses FROM anon;
 
--- Step 2: Grant column-level SELECT on 85 non-sensitive columns to anon
 GRANT SELECT (
   id,
   name,
@@ -108,7 +90,6 @@ GRANT SELECT (
   invoice_vat_number
 ) ON public.businesses TO anon;
 
--- Step 3: Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';
 
-COMMIT;
+COMMIT;;
