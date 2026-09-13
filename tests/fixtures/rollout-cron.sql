@@ -8,9 +8,9 @@ create function cron.alter_job(job_id bigint, command text) returns void languag
 $$;
 create table vault.decrypted_secrets(name text primary key, decrypted_secret text);
 insert into vault.decrypted_secrets values ('edge_jobs_service_role_key','local-fixture-server-only-not-a-real-key');
-create table net.fixture_requests(url text, headers jsonb, body jsonb);
-create function net.http_post(url text, headers jsonb, body jsonb) returns bigint language plpgsql as $$
-begin insert into net.fixture_requests values (url,headers,body); return 1; end $$;
+create table net.fixture_requests(url text, headers jsonb, body jsonb, timeout_milliseconds integer);
+create function net.http_post(url text, headers jsonb, body jsonb, timeout_milliseconds integer default 5000) returns bigint language plpgsql as $$
+begin insert into net.fixture_requests values (url,headers,body,timeout_milliseconds); return 1; end $$;
 insert into cron.job values
   (1,'cron-tasks-every-5-minutes','*/5 * * * *',$job$select net.http_post(url := 'https://fixture.invalid/functions/v1/cron-tasks', headers := '{}'::jsonb, body := '{}'::jsonb);$job$),
   (2,'marketing-dispatch-every-minute','* * * * *',$job$select net.http_post(url := 'https://fixture.invalid/functions/v1/marketing-dispatch', headers := '{}'::jsonb, body := '{}'::jsonb);$job$),

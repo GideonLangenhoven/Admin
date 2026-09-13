@@ -106,11 +106,17 @@ try {
       const request = (await db.query('select * from net.fixture_requests')).rows.at(-1);
       assert.equal(request.headers.apikey, 'local-fixture-server-only-not-a-real-key');
       assert.equal(request.headers['Content-Type'], 'application/json');
+      assert.equal(request.timeout_milliseconds, 60000);
       if (jobname === 'review-reminders-daily') assert.equal(request.body.action, 'review_reminders');
     });
   }
   await check('R08 scheduler migration leaves unrelated jobs unchanged', async () => {
     assert.deepEqual((await db.query('select schedule,command from cron.job where jobid=5')).rows[0], {schedule:'0 0 * * *',command:'select 42'});
+  });
+  await check('scheduler timeout correction is safe to reapply', async () => {
+    const before = (await db.query('select * from cron.job order by jobid')).rows;
+    await db.query(readFileSync('supabase/migrations/20260913070000_message_job_request_timeout.sql','utf8'));
+    assert.deepEqual((await db.query('select * from cron.job order by jobid')).rows,before);
   });
   await check('R08 scheduler migration refuses missing credentials without altering jobs', async () => {
     const before = (await db.query('select * from cron.job order by jobid')).rows;
