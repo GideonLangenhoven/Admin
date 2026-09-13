@@ -1,5 +1,6 @@
 "use client";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 interface BusinessContextValue {
     businessId: string;
@@ -23,6 +24,10 @@ interface BusinessContextValue {
 const BusinessContext = createContext<BusinessContextValue | null>(null);
 
 export function BusinessProvider({ value, children }: { value: BusinessContextValue; children: React.ReactNode }) {
+    useEffect(() => {
+        Sentry.setTag("business_id", value.businessId || undefined);
+        return () => Sentry.setTag("business_id", undefined);
+    }, [value.businessId]);
     // Operator changes remount scoped UI state, including pending forms and
     // old query results. Refreshing the SAME operator does not reset the page.
     return <BusinessContext.Provider key={value.businessId} value={value}>{children}</BusinessContext.Provider>;

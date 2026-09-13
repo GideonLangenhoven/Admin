@@ -115,9 +115,11 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
   }
 
   const testMode = row.yoco_test_mode === true;
-  const liveKey = String(row.yoco_secret_key || "");
+  // A misfiled key creates payments in a different mode from our stored
+  // checkout, so the signed payment notification can never confirm it.
+  const liveKey = /^sk_live_/.test(row.yoco_secret_key || "") ? String(row.yoco_secret_key) : "";
   const liveWebhook = String(row.yoco_webhook_secret || "");
-  const testKey = String(row.yoco_test_secret_key || "");
+  const testKey = /^sk_test_/.test(row.yoco_test_secret_key || "") ? String(row.yoco_test_secret_key) : "";
   const testWebhook = String(row.yoco_test_webhook_secret || "");
   return {
     waToken: String(row.wa_token || ""),
@@ -127,7 +129,7 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     yocoTestMode: testMode,
     yocoTestSecretKey: testKey,
     yocoTestWebhookSecret: testWebhook,
-    activeYocoSecretKey: testMode ? testKey : liveKey,
+    activeYocoSecretKey: testMode ? (testWebhook ? testKey : "") : (liveWebhook ? liveKey : ""),
     activeYocoWebhookSecret: testMode ? testWebhook : liveWebhook,
     // The get_business_credentials RPC has returned these since 20260323100400;
     // they were never mapped here, which made the Paysafe combo path dead code.

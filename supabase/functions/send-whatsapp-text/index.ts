@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -11,7 +12,7 @@ function getCors(req?: any) {
   return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 }
 
-Deno.serve(async (req: any) => {
+Deno.serve(withSentry("send-whatsapp-text", async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: getCors(req) });
   let auth;
@@ -58,4 +59,4 @@ Deno.serve(async (req: any) => {
     console.error("send-whatsapp-text error:", err);
     return new Response(JSON.stringify({ ok: false, error: String(err instanceof Error ? err.message : err) }), { status: 200, headers: getCors(req) });
   }
-});
+}));

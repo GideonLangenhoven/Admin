@@ -34,6 +34,17 @@ export async function getCallerAdmin(
 
   if (!adminRow || adminRow.suspended) return null;
 
+  // A browser-selected tenant is a target, never proof of permission. Regular
+  // operators cannot pivot away from the business bound to their identity.
+  const target = req.headers.get("x-admin-business-id")?.trim();
+  if (target && target !== adminRow.business_id) {
+    if (adminRow.role !== "SUPER_ADMIN" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)) return null;
+    const { data: business, error: businessError } = await admin.from("businesses")
+      .select("id").eq("id", target).maybeSingle();
+    if (businessError || !business) return null;
+    adminRow.business_id = business.id;
+  }
+
   // A8: a tenant whose subscription is suspended/cancelled loses privileged API
   // access — enforced server-side here so it can't be bypassed by hitting the
   // API directly (the client-side gate alone was security-theatre). SUPER_ADMIN

@@ -58,7 +58,7 @@ describe("rollout pagination and operator state", () => {
   });
 
   it("operator switches change the React subtree identity; settings refreshes retain it", () => {
-    const { BusinessProvider } = sourceExports("components/BusinessContext.tsx", { react: React, "react/jsx-runtime": jsx }) as any;
+    const { BusinessProvider } = sourceExports("components/BusinessContext.tsx", { react: { ...React, useEffect: vi.fn() }, "react/jsx-runtime": jsx, "@sentry/nextjs": { setTag: vi.fn() } }) as any;
     const value = { businessId: "operator-a", businessName: "A", role: "SUPER_ADMIN", timezone: "UTC", logoUrl: "" };
     const a = BusinessProvider({ value, children: "page" });
     const refreshed = BusinessProvider({ value: { ...value, businessName: "Renamed" }, children: "page" });

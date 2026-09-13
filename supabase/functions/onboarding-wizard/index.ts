@@ -429,6 +429,7 @@ Deno.serve(async (req) => {
     if (action === "save-credentials") {
       const yocoSecretKey = String(body.yoco_secret_key || "").trim();
       if (!yocoSecretKey) return respond(400, { success: false, error: "yoco_secret_key is required" });
+      if (!yocoSecretKey.startsWith("sk_live_")) return respond(400, { success: false, error: "Enter a live Yoco key (sk_live_...). Add test keys in Settings → Yoco Test Credentials and enable Test Mode." });
       if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
         throw new Error("SETTINGS_ENCRYPTION_KEY must be 32+ characters to store credentials.");
       }
@@ -482,21 +483,8 @@ Deno.serve(async (req) => {
       // 1. Subscription. Without this row the tenant is invisible to platform
       //    invoicing — the gap that left every previously onboarded tenant
       //    un-invoiceable.
-      const { data: existingSub } = await supabase
-        .from("subscriptions").select("id").eq("business_id", businessId).maybeSingle();
-      if (!existingSub) {
-        const now = new Date();
-        const periodEnd = new Date(now);
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-        const { error } = await supabase.from("subscriptions").insert({
-          business_id: businessId,
-          plan_id: "standard",
-          status: "ACTIVE",
-          period_start: now.toISOString(),
-          period_end: periodEnd.toISOString(),
-        });
-        if (error) throw error;
-      }
+      const { error: setupError } = await supabase.rpc("platform_complete_business_setup", { p_business_id: businessId });
+      if (setupError) throw setupError;
 
       // 2. Loyalty/group-discount policies. wa-webhook does .single() on this
       //    table, so a missing row is an error for the bot, not a default.

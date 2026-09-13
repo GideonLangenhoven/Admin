@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
-import { withSentry } from "../_shared/sentry.ts";
+import { withSentry, captureCheckIn } from "../_shared/sentry.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -565,6 +565,8 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: headers() }); }
   // This sweep performs platform-wide cleanup; there is no operator UI caller.
   if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
+  // Check-ins begin only AFTER service authentication, never from a public ping.
+  const checkInId = await captureCheckIn("cron-tasks", "in_progress");
   const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
@@ -593,6 +595,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
       body: JSON.stringify({ action: "all" }),
     });
     results.reminders = await reminderRes.json().catch(() => null);
+    if (!reminderRes.ok || results.reminders?.ok === false || !results.reminders) throw new Error("Scheduled notifications did not complete successfully");
   } catch (error) {
     console.error("AUTO_MESSAGES_INVOKE_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
@@ -668,6 +671,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  await captureCheckIn("cron-tasks", results.errors.length ? "error" : "ok", checkInId);
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
 

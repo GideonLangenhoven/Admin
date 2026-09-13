@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { getAuthHeaders } from "../../lib/admin-auth";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
 
@@ -45,14 +45,12 @@ export default function DataRequestsPage() {
   }, []);
 
   async function authHeaders() {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    return getAuthHeaders(businessId);
   }
 
   async function load() {
     setLoading(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = await getAuthHeaders(businessId);
     const r = await fetch("/api/admin/data-requests", { headers });
     if (r.ok) {
       const data = await r.json();

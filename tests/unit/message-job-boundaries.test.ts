@@ -117,7 +117,7 @@ function fixture() {
   const invoke = (name: string, body: any = message, token = "a", method = "POST", headers: Record<string, string> = {}) => {
     const handler = sourceHandler("supabase/functions/" + name + "/index.ts", {
       "../_shared/auth.ts": auth, "../_shared/tenant.ts": tenant,
-      "../_shared/sentry.ts": { withSentry: (_name: string, fn: unknown) => fn },
+      "../_shared/sentry.ts": { withSentry: (_name: string, fn: unknown) => fn, captureCheckIn: vi.fn(async () => "fixture-checkin") },
       "../_shared/subscription.ts": subscription, "../_shared/marketing-tokens.ts": tokens,
       "../_shared/marketing-batch.ts": batch, "../_shared/marketing-email-html.ts": emailHtml,
       "../_shared/waiver.ts": waiver, "../_shared/duration.ts": duration,

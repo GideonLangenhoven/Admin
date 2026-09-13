@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -80,7 +81,7 @@ async function resolveCheckoutBusiness(params: { bookingId?: string; voucherId?:
   };
 }
 
-Deno.serve(async (req: any) => {
+Deno.serve(withSentry("create-checkout", async (req: any) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: buildCors(req?.headers?.get("origin") || "*") });
   }
@@ -293,7 +294,7 @@ Deno.serve(async (req: any) => {
 
     if (!tenant.credentials.activeYocoSecretKey) {
       return new Response(
-        JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "No Yoco secret key configured for this business." }),
+        JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "Matching Yoco payment and webhook credentials are required for this business's payment mode." }),
         { status: 503, headers: corsHeaders },
       );
     }
@@ -314,7 +315,8 @@ Deno.serve(async (req: any) => {
     const paymentRequest = savedRequest.data.request;
     isTestMode = paymentRequest.mode === "test";
     const paymentKey = isTestMode ? tenant.credentials.yocoTestSecretKey : tenant.credentials.yocoSecretKey;
-    if (!paymentKey) return new Response(JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "Payment credentials for this checkout are missing." }), { status: 503, headers: corsHeaders });
+    const paymentWebhook = isTestMode ? tenant.credentials.yocoTestWebhookSecret : tenant.credentials.yocoWebhookSecret;
+    if (!paymentKey || !paymentWebhook) return new Response(JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "Payment or webhook credentials for this checkout are missing." }), { status: 503, headers: corsHeaders });
     amount = Number(paymentRequest.body.amount) / 100;
     const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
       method: "POST",
@@ -583,4 +585,4 @@ Deno.serve(async (req: any) => {
     console.error("CHECKOUT_ERR:", err?.message || err, JSON.stringify(_reqBody));
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: buildCors(req?.headers?.get("origin") || "*") });
   }
-});
+}));

@@ -1,58 +1,38 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { periodBounds } from "../../app/lib/billing-period";
+import { sourceHandler } from "../helpers/source-handler";
 
-// Item 15 — "Add seat to plan" fails with "No subscription found", always,
-// for every tenant, regardless of subscription age. Root cause: the route
-// selected subscriptions.seats_purchased/billing_cycle_start/billing_cycle_end
-// — columns that only ever existed in a parked, never-applied migration.
-// PostgREST fails the whole SELECT when any column doesn't exist, and the
-// error was discarded, so `sub` was always undefined.
-describe("billing seats (item 15)", () => {
-  const seatsRoute = readFileSync("app/api/billing/seats/route.ts", "utf8");
-  const pauseRoute = readFileSync("app/api/billing/pause/route.ts", "utf8");
-  const resumeRoute = readFileSync("app/api/billing/resume/route.ts", "utf8");
-
-  it("seats route no longer selects the phantom columns that made every lookup fail", () => {
-    expect(seatsRoute).not.toContain('.select("id, seats_purchased');
-    expect(seatsRoute).not.toContain("billing_cycle_start, billing_cycle_end, status");
-    expect(seatsRoute).toContain('.select("id, plan_id, period_start, period_end, status")');
+describe("atomic billing controls", () => {
+  function fixture(role: string | null = "MAIN_ADMIN", result: any = {data:{ok:true,new_seats:2,proration_zar:166.67},error:null}, action="seats") {
+    const rpc=vi.fn(async()=>result);
+    const handler=sourceHandler("app/api/billing/"+action+"/route.ts",{
+      "@/app/lib/api-auth":{getCallerAdmin:async()=>role?{id:"actor",role,business_id:"selected-business"}:null,isPrivilegedRole:(r:string)=>["SUPER_ADMIN","MAIN_ADMIN"].includes(r)},
+      "@supabase/supabase-js":{createClient:()=>({rpc})},
+    });
+    const request=(delta:any)=>new Request("https://test.invalid",{method:"POST",body:JSON.stringify({delta,business_id:"spoofed-business"})});
+    return {handler,rpc,request};
+  }
+  for(const role of [null,"ADMIN"]) it("rejects "+role+" before writing",async()=>{
+    const f=fixture(role);expect((await f.handler(f.request(1))).status).toBe(role?403:401);expect(f.rpc).not.toHaveBeenCalled();
   });
-
-  it("seats route checks the lookup error instead of silently discarding it", () => {
-    expect(seatsRoute).toContain("const { data: sub, error: subErr }");
-    expect(seatsRoute).toContain("if (subErr) console.error");
+  for(const delta of [0,1.5,51,-51,"1",null]) it("rejects invalid delta "+delta,async()=>{
+    const f=fixture();expect((await f.handler(f.request(delta))).status).toBe(400);expect(f.rpc).not.toHaveBeenCalled();
   });
-
-  it("seats route accepts TRIAL as well as ACTIVE, matching requireActiveSubscription", () => {
-    expect(seatsRoute).toContain('sub.status !== "ACTIVE" && sub.status !== "TRIAL"');
+  it("uses only the authenticated effective business and preserves cents",async()=>{
+    const f=fixture("SUPER_ADMIN"); const response=await f.handler(f.request(1));
+    expect(await response.json()).toMatchObject({proration_zar:166.67,new_seats:2});
+    expect(f.rpc).toHaveBeenCalledOnce();
+    expect(f.rpc).toHaveBeenCalledWith("platform_change_seats",{p_business_id:"selected-business",p_actor_id:"actor",p_delta:1});
   });
-
-  it("seats route writes the new seat count to businesses.max_admin_seats, not the unread subscriptions column", () => {
-    expect(seatsRoute).toContain('.from("businesses").update({ max_admin_seats: newSeats })');
+  it("reports a conflict without a second partial write",async()=>{
+    const f=fixture("MAIN_ADMIN",{data:null,error:{message:"Seat limit conflict"}});
+    expect((await f.handler(f.request(-1))).status).toBe(409);expect(f.rpc).toHaveBeenCalledOnce();
   });
-
-  it("seats route reads seat price from the real plans table via the shared FALLBACK default", () => {
-    expect(seatsRoute).toContain('.from("plans")');
-    expect(seatsRoute).toContain("extra_seat_price_zar ?? 500");
-  });
-
-  it("seats route's billing_line_items insert uses the real table columns", () => {
-    expect(seatsRoute).toContain("source_type: \"SUBSCRIPTION\"");
-    expect(seatsRoute).toContain("amount_zar: proration");
-    expect(seatsRoute).not.toContain("unit_amount_zar:");
-    expect(seatsRoute).not.toContain("invoice_period_start:");
-  });
-
-  it("pause/resume routes no longer write the phantom paused_at/resumed_at columns", () => {
-    expect(pauseRoute).not.toContain("paused_at: new Date");
-    expect(resumeRoute).not.toContain("resumed_at: new Date");
-  });
-
-  it("all three routes stay reachable when the tenant is suspended (unchanged S4 gate)", () => {
-    for (const src of [seatsRoute, pauseRoute, resumeRoute]) {
-      expect(src).toContain("getCallerAdmin(req, { skipSubscriptionCheck: true })");
-    }
+  for(const [action,status,previous] of [["pause","PAUSED","ACTIVE"],["resume","ACTIVE","PAUSED"]]) it(action+" uses an atomic optimistic transition",async()=>{
+    const f=fixture("MAIN_ADMIN",{data:{ok:true},error:null},action);
+    expect((await f.handler(f.request(1))).status).toBe(200);
+    expect(f.rpc).toHaveBeenCalledOnce();
+    expect(f.rpc).toHaveBeenCalledWith("platform_change_business_status",{p_business_id:"selected-business",p_actor_id:"actor",p_status:status,p_expected_status:previous});
   });
 });
 

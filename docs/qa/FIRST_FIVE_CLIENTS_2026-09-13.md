@@ -5,6 +5,10 @@ an assisted setup, with extra time if payment or WhatsApp accounts need attentio
 The release verification result belongs in `ROLLOUT_REMEDIATION_2026-09-06.md`;
 this guide is not itself a launch approval.
 
+Record the result in **Super Admin → Client readiness & support** for that
+business. Saved provider settings and delivered/tested results are separate
+checks. Do not tick a test just because a key exists.
+
 ## Before each appointment
 
 Ask the owner to bring their business name, preferred booking-link name, owner
@@ -22,6 +26,10 @@ Sign in with your platform-owner account and open **Super Admin**. For an
 assisted setup use **Onboard New Client**. Alternatively, **Onboarding Invites**
 creates a link through which the owner fills in their own business details.
 Choose one route per client; do not create a second business if setup is interrupted.
+
+If an existing client's subscription or policies are missing, expand their
+readiness panel and choose **Complete missing setup**. This preserves existing
+records and does not send an invoice or charge a card.
 
 Give each business its own name, subdomain and main administrator email. The
 client owner gets **MAIN_ADMIN** access. Reserve **SUPER_ADMIN** for your platform
@@ -105,3 +113,7 @@ and again the next morning.
 During the first week, check failed payments, refunds awaiting confirmation,
 message failures and departure capacity at the start and end of each day.
 Resolve a problem for the affected business before onboarding the next one.
+
+For a beginner's monitoring checklist and safe staff/billing controls, see
+[Super Admin help](../admin-help/super-admin.md). Check Sentry **production**
+issues and the cleanup/reminder monitor as well as the client support counts.

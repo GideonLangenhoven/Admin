@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -43,7 +44,7 @@ async function authorizeRefund(req: any, booking: any): Promise<{ ok: true } | {
   }
 }
 
-Deno.serve(async (req: any) => {
+Deno.serve(withSentry("process-refund", async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
   const respond = (data: any, status = 200) => new Response(JSON.stringify(data), { status, headers: getCors(req) });
   try {
@@ -186,4 +187,4 @@ Deno.serve(async (req: any) => {
     console.error("PROCESS_REFUND_ERROR:", error);
     return respond({ error: error.message || "Internal error" }, 500);
   }
-});
+}));

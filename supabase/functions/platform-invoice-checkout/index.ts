@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Creates a Yoco checkout for a platform_invoices row using BookingTours'
 // OWN Yoco merchant account (PLATFORM_YOCO_SECRET_KEY) — a completely
@@ -8,6 +9,7 @@
 // caller-auth check here.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -24,7 +26,11 @@ function fail(msg: string, status = 400) {
   return new Response(JSON.stringify({ error: msg }), { status, headers: { "Content-Type": "application/json" } });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentry("platform-invoice-checkout", async (req) => {
+  // Gateway verification is disabled: enforce service-only access here too.
+  if (req.method !== "POST") return fail("Method not allowed", 405);
+  try { if (!(await requireAuth(req)).isServiceRole) return fail("Service access required", 403); }
+  catch { return fail("Unauthorized", 401); }
   if (!PLATFORM_YOCO_SECRET_KEY) return fail("PLATFORM_YOCO_SECRET_KEY not configured", 503);
 
   let body: any;
@@ -37,20 +43,18 @@ Deno.serve(async (req) => {
   const platformInvoiceId = String(body.platform_invoice_id || "");
   if (!platformInvoiceId) return fail("platform_invoice_id required");
 
-  const { data: invoice, error: invErr } = await db.from("platform_invoices")
-    .select("id, business_id, amount_zar, status")
-    .eq("id", platformInvoiceId)
-    .maybeSingle();
+  const { data: invoice, error: invErr } = await db.rpc("platform_reserve_invoice_checkout", { p_invoice_id: platformInvoiceId });
   if (invErr) return fail(invErr.message, 500);
   if (!invoice) return fail("Invoice not found", 404);
-  if (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") return fail("Invoice is already paid");
+  if (!["DRAFT", "SENT"].includes(invoice.status)) return fail("Invoice is paid or void");
+  if (invoice.yoco_payment_link_url) return ok({ yoco_checkout_id: invoice.yoco_checkout_id, yoco_payment_link_url: invoice.yoco_payment_link_url });
   if (Number(invoice.amount_zar) <= 0) return fail("Invoice amount must be greater than zero");
 
   const redirectUrl = ADMIN_APP_URL + "/super-admin";
 
   const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
     method: "POST",
-    headers: { Authorization: "Bearer " + PLATFORM_YOCO_SECRET_KEY, "Content-Type": "application/json" },
+    headers: { Authorization: "Bearer " + PLATFORM_YOCO_SECRET_KEY, "Content-Type": "application/json", "Idempotency-Key": "platform-invoice:" + invoice.id },
     body: JSON.stringify({
       amount: Math.round(Number(invoice.amount_zar) * 100),
       currency: "ZAR",
@@ -66,10 +70,11 @@ Deno.serve(async (req) => {
     return fail("YOCO_CHECKOUT_FAILED: " + (yocoData?.message || yocoData?.error?.message || "Unable to create checkout"), 502);
   }
 
-  await db.from("platform_invoices").update({
+  const { data: saved, error: saveError } = await db.from("platform_invoices").update({
     yoco_checkout_id: yocoData.id,
     yoco_payment_link_url: yocoData.redirectUrl,
-  }).eq("id", invoice.id);
+  }).eq("id", invoice.id).in("status", ["DRAFT", "SENT"]).select("id").maybeSingle();
+  if (saveError || !saved) return fail("Payment link could not be recorded. Retry to recover the same checkout.", 503);
 
   return ok({ yoco_checkout_id: yocoData.id, yoco_payment_link_url: yocoData.redirectUrl });
-});
+}));

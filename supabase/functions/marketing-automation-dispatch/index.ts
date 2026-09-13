@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -28,7 +29,7 @@ function buildCors(req: Request) {
   };
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
   // V-DISP: browser preflight + POST CORS. Without these the admin "Run
   // dispatch now" button got Failed to fetch from the browser even though
   // the function ran fine. pg_cron / curl callers don't care, but the UI
@@ -664,4 +665,4 @@ Deno.serve(async (req: Request) => {
     console.error("AUTOMATION_DISPATCH_ERROR:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: cors });
   }
-});
+}));

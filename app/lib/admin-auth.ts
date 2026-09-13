@@ -2,10 +2,14 @@
 
 import { supabase } from "./supabase";
 
-export async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(businessId?: string): Promise<Record<string, string>> {
+  // Capture the target before awaiting the session: switching operator while
+  // auth refreshes must not redirect an in-flight action to the new operator.
+  const target = businessId ?? (typeof window === "undefined" ? "" : localStorage.getItem("ck_admin_business_id") || "");
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.access_token) headers["Authorization"] = "Bearer " + session.access_token;
+  if (target) headers["x-admin-business-id"] = target;
   return headers;
 }
 
@@ -43,7 +47,7 @@ function setupUrl(email: string, token: string) {
 // Direct anon-key access to admin_users is closed once the permissive RLS fallback is dropped.
 
 async function setupLinkApi(action: "send" | "validate" | "complete", body: Record<string, any>) {
-  const headers = action === "send" ? await getAuthHeaders() : { "Content-Type": "application/json" };
+  const headers = action === "send" ? await getAuthHeaders(typeof body.business_id === "string" ? body.business_id : undefined) : { "Content-Type": "application/json" };
   const res = await fetch("/api/admin/setup-link", {
     method: "POST",
     headers,

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const action = String(body.action || "");
-  if (!["update_permissions", "update_role", "reset_password", "change_password"].includes(action)) {
+  if (!["update_permissions", "update_role", "reset_password", "change_password", "set_suspended"].includes(action)) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
@@ -37,6 +37,16 @@ export async function POST(req: NextRequest) {
     db = adminClient();
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Server misconfigured" }, { status: 500 });
+  }
+
+  if (action === "set_suspended") {
+    const caller = await getCallerAdmin(req, { skipSubscriptionCheck: true });
+    if (caller?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Super Admin required" }, { status: 403 });
+    if (typeof body.suspended !== "boolean" || !body.admin_id) return NextResponse.json({ error: "Administrator and suspension state required" }, { status: 400 });
+    const { data: target } = await db.from("admin_users").select("business_id").eq("id", body.admin_id).maybeSingle();
+    if (!target || target.business_id !== caller.business_id) return NextResponse.json({ error: "Select this administrator's business first" }, { status: 403 });
+    const { data, error } = await db.rpc("platform_suspend_admin", { p_admin_id: body.admin_id, p_actor_id: caller.id, p_suspended: body.suspended });
+    return NextResponse.json(error ? { error: error.message } : data, { status: error ? 409 : 200 });
   }
 
   // --- update_permissions: MAIN_ADMIN/SUPER_ADMIN sets another admin's settings_permissions ---
@@ -98,7 +108,8 @@ export async function POST(req: NextRequest) {
       const { count } = await db.from("admin_users")
         .select("*", { count: "exact", head: true })
         .eq("business_id", target.business_id)
-        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+        .eq("suspended", false)
+        .eq("role", "MAIN_ADMIN")
         .neq("id", targetId);
       if ((count ?? 0) < 1) {
         return NextResponse.json({ error: "This is the last admin with full access. Promote another admin first." }, { status: 400 });

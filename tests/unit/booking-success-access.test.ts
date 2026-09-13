@@ -116,7 +116,7 @@ describe("R01 actual confirmation handler", () => {
   });
 });
 
-function checkoutFixture() {
+function checkoutFixture(webhookSecret = "fixture-webhook-secret") {
   const db = queryClient((table, calls) => {
     if (table === "bookings") return { data: { ...booking, tour_id: "tour-a", qty: 1, unit_price: 100, total_amount: 100 }, error: null };
     if (table === "tours") return { data: { base_price_per_person: 100 }, error: null };
@@ -140,7 +140,7 @@ function checkoutFixture() {
     "../_shared/subscription.ts": { blockIfNotTrading: async () => null },
     "../_shared/tenant.ts": {
       createServiceClient: () => db,
-      getTenantByBusinessId: async () => ({ business: { id: "a" }, credentials: { activeYocoSecretKey: "fixture-provider-key", yocoSecretKey: "fixture-provider-key" } }),
+      getTenantByBusinessId: async () => ({ business: { id: "a" }, credentials: { activeYocoSecretKey: "fixture-provider-key", yocoSecretKey: "fixture-provider-key", yocoWebhookSecret: webhookSecret } }),
       getBusinessAllowedOrigins: () => ["https://a.fixture.invalid"], isAllowedOrigin: () => true,
       resolveBusinessSiteUrls: () => ({ bookingSuccessUrl: "https://a.fixture.invalid/success", bookingCancelUrl: "https://a.fixture.invalid/cancel" }),
     },
@@ -151,6 +151,13 @@ function checkoutFixture() {
 }
 
 describe("R01 confirmation issuance must not bypass booking ownership", () => {
+  it("does not create a payment when the saved checkout mode has no webhook secret", async () => {
+    const f = checkoutFixture("");
+    const response = await f.request("admin-a");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "BUSINESS_PAYMENT_CONFIG_MISSING" });
+    expect(f.gateway).not.toHaveBeenCalled();
+  });
   it.each(["public-anon", "forged-service-role-jwt", "admin-b", "admin-suspended"])("denies %s before payment, pricing writes or token issuance", async auth => {
     const f = checkoutFixture();
     const res = await f.request(auth, { booking_token: "booking-a", type: "ADD_GUESTS" });
