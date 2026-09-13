@@ -68,7 +68,6 @@ export default function PlatformOperations() {
     <div className="flex flex-wrap gap-4 text-sm">
       <a className="underline" href="https://bookingtours.sentry.io/issues/?environment=production" target="_blank" rel="noreferrer">Sentry errors ↗</a>
       <a className="underline" href="https://bookingtours.sentry.io/monitors/" target="_blank" rel="noreferrer">Sentry monitors ↗</a>
-      <a className="underline" href="/help?topic=super-admin">Super Admin help</a>
     </div>
     <details className="text-sm border-b border-[var(--ck-border-subtle)] pb-3">
       <summary className="cursor-pointer font-semibold">New to Sentry? Start here</summary>

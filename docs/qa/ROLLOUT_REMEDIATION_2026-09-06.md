@@ -4,6 +4,8 @@
 live five-client isolation checks passed. See the
 [current release evidence and remaining provider gates](FIRST_FIVE_RELEASE_2026-09-12.md)
 and [onboarding instructions](FIRST_FIVE_CLIENTS_2026-09-13.md).
+The later [Super Admin and Sentry closeout](SUPER_ADMIN_CLOSEOUT_2026-09-13.md)
+records the new platform controls and latest monitoring verification.
 The dated status and local-only table below are retained as historical notes.
 
 Latest functional follow-up: [MVP closeout](MVP_CLOSEOUT_2026-09-11.md), following

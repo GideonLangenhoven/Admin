@@ -34,6 +34,12 @@ try {
   await db.query(readFileSync('tests/fixtures/rollout-policies.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-marketing.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-cron.sql', 'utf8'));
+  await db.query(readFileSync('tests/fixtures/rollout-platform.sql', 'utf8'));
+  const platformInvoiceSchema = readFileSync('supabase/migrations/20260714172241_platform_invoices.sql', 'utf8');
+  // Use the actual invoice schema and grants, without the unrelated encryption RPCs.
+  await db.query(platformInvoiceSchema.slice(0, platformInvoiceSchema.indexOf('-- ── RPC:')) + '\nCOMMIT;');
+  await db.query(readFileSync('supabase/migrations/20260717092131_platform_invoice_email_overage.sql', 'utf8'));
+  await db.query(readFileSync('supabase/migrations/20260805081024_ai_overage_invoice_and_5000_allowance.sql', 'utf8'));
   // Use the real policy calculator for customer/operator refund positive paths.
   const refundPolicy = readFileSync('supabase/migrations/20260504000000_refund_policy.sql', 'utf8');
   await db.query(refundPolicy.slice(refundPolicy.indexOf('CREATE OR REPLACE FUNCTION public.calculate_refund_percent'), refundPolicy.indexOf('CREATE OR REPLACE FUNCTION public.calculate_booking_refund')));
@@ -367,6 +373,15 @@ try {
     await db.query('delete from customers where id=$1',[id(880021)]);
     assert.deepEqual((await db.query('select customer_id,business_id from bookings where id=$1',[id(880031)])).rows[0],{customer_id:null,business_id:id(1)});
   }));
+  await check('platform onboarding, seats, suspension, readiness and invoice lifecycle', async () => {
+    // The scenario temporarily changes an invoice DEFAULT, so run as the
+    // disposable schema owner, with service claims, and roll everything back.
+    await db.query('begin');
+    try {
+      await db.query("select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true)");
+      await db.query(readFileSync('tests/tenant-isolation/platform-admin.sql', 'utf8'));
+    } finally { await db.query('rollback'); }
+  });
   console.log(`Database regression checks passed: ${passed}`);
 } finally {
   if (connected) await db.end();

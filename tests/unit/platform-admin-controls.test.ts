@@ -84,4 +84,13 @@ describe("edge Sentry capture",()=>{
     const f=fixture();await f.withSentry("checkout",async()=>Response.json({ok:false},{status:403}))(new Request("https://test.invalid"));
     expect(f.fetch).not.toHaveBeenCalled();
   });
+  for(const body of [{ok:true,errors:1},{ok:true,failed:2},{errors:["private"]}]) it("reports partial batch failures",async()=>{
+    const f=fixture();await f.withSentry("batch",async()=>Response.json(body))(new Request("https://test.invalid"));
+    expect(f.fetch).toHaveBeenCalledOnce();expect(f.fetch.mock.calls[0][1].body).not.toContain("private");
+  });
+  it("uses the same check-in ID for cron start and completion",async()=>{
+    const f=fixture();const id=await f.captureCheckIn("cron-tasks","in_progress");await f.captureCheckIn("cron-tasks","ok",id);
+    expect(f.fetch).toHaveBeenCalledTimes(2);
+    for(const [,init] of f.fetch.mock.calls){const payload=JSON.parse(init.body.trim().split("\n")[2]);expect(payload.check_in_id).toBe(id);expect(payload.monitor_slug).toBe("cron-tasks");}
+  });
 });

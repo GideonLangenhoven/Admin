@@ -65,6 +65,16 @@ try {
     check(`client ${n+1} signs in through the administrator app`,auth.admin?.business_id===f.business);
   }
   for(const [i,a] of fixtures.entries()) {
+    for (const path of ['/api/super-admin/operations','/api/platform-invoices/list']) {
+      const denied=await fetch((process.env.ADMIN_URL||'https://admin.bookingtours.co.za')+path,{headers:{Authorization:'Bearer '+a.token,'x-admin-business-id':a.business},signal:AbortSignal.timeout(20000)});
+      check(`client ${i+1} cannot open platform data at ${path}`,denied.status===403);
+    }
+    for (const fn of ['platform-bank-details','platform-invoice-checkout']) {
+      const denied=await request('/functions/v1/'+fn,a.token,'POST',{action:'get'});
+      check(`client ${i+1} cannot call service-only ${fn}`,denied.status===403);
+      const anonymous=await request('/functions/v1/'+fn,anon,'POST',{action:'get'});
+      check(`anonymous caller cannot call service-only ${fn}`,anonymous.status===401);
+    }
     for(const fn of ['super-admin-onboard','generate-invite-token']) {
       const denied=await request('/functions/v1/'+fn,a.token,'POST',{});
       check(`client ${i+1} cannot use platform-only ${fn}`,denied.status===403);
@@ -80,6 +90,8 @@ try {
     for(const [j,b] of fixtures.entries()) {
       if(i===j)continue;
       const spoof={'x-tenant-business-id':b.business,'x-booking-success-token':b.booking};
+      const targeted=await fetch((process.env.ADMIN_URL||'https://admin.bookingtours.co.za')+'/api/billing/subscription',{headers:{Authorization:'Bearer '+a.token,'x-admin-business-id':b.business},signal:AbortSignal.timeout(20000)});
+      check(`client ${i+1} cannot switch the billing API to client ${j+1}`,targeted.status===401);
       const credentials=await fetch((process.env.ADMIN_URL||'https://admin.bookingtours.co.za')+'/api/credentials?business_id='+b.business,{headers:{Authorization:'Bearer '+a.token},signal:AbortSignal.timeout(20000)});
       check(`client ${i+1} cannot read client ${j+1} integration credentials`,credentials.status===403);
       const inbox=await request('/functions/v1/admin-reply',a.token,'POST',{business_id:b.business,phone:'web:release-'+run,action:'return_to_bot'});

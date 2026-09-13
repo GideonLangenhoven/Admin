@@ -2,6 +2,7 @@
 
 **Historical review:** see [the 12–13 September production release verification](FIRST_FIVE_RELEASE_2026-09-12.md)
 for deployed fixes, live client-isolation evidence and the remaining provider gates.
+See also the later [Super Admin and Sentry closeout](SUPER_ADMIN_CLOSEOUT_2026-09-13.md).
 
 ## Verdict
 

@@ -1,5 +1,9 @@
 # First-five release verification — 12–13 September 2026
 
+**Later 13 September update:** see the [Super Admin and Sentry closeout](SUPER_ADMIN_CLOSEOUT_2026-09-13.md)
+for the latest deployed controls, test counts, monitoring evidence and remaining
+checks. The deployments/test counts below describe the preceding release batch.
+
 ## Decision
 
 The technical remediation is deployed. Assisted account setup can proceed;
@@ -77,10 +81,10 @@ back across the new booking-proof policy without a compatible release.
 
 ## Remaining owner/provider checks
 
-1. No configured business had Yoco test keys and a test webhook at inspection.
-   Kayak was rechecked on 13 September: test key absent, test webhook absent,
-   live mode still enabled. Configure test credentials in Settings; never paste
-   keys into chat. Do not switch an actively trading business into test mode.
+1. The initial inspection found no configured test business. A later 13 September
+   check confirmed that Kayak now has a test key, test webhook and test mode enabled.
+   Its live keys are absent. The hosted payment/refund journey remains to be
+   verified; do not accept real customer payments through this test configuration.
 2. Approved test recipients were supplied privately. The live email provider
    accepted one labelled confirmation-template test and WhatsApp accepted one
    labelled text through the Kayak connection. No booking or payment was created.
@@ -100,9 +104,10 @@ from the ticket price. Reconcile those specific payments against provider or
 manual-payment records before refunding them. They are not the new clients'
 bookings.
 
-Sentry source-map/release upload reported configuration warnings during builds
-(administrator project not found; storefront upload token absent). The builds
-succeeded, but enriched error-reporting setup is not claimed as verified.
+The initial builds reported Sentry source-map configuration warnings. These were
+repaired in the later Super Admin release: uploads succeeded for both apps and
+genuine scheduled-job check-ins reached Sentry. Alert-email delivery and individual
+issue inspection remain unverified; see the closeout linked above.
 
 The final [GitHub CI run](https://github.com/GideonLangenhoven/Admin/actions/runs/34742530940)
 passed lint/typecheck, unit/edge/database regressions and production browser smoke.
