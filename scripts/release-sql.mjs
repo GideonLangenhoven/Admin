@@ -23,7 +23,8 @@ async function query(sql, readOnly = true) {
 }
 
 if (mode === 'health') {
-  console.log(JSON.stringify({recentScheduledHttp:await query("SELECT status_code,timed_out,count(*)::int requests,max(created) latest FROM net._http_response WHERE created>now()-interval '30 minutes' GROUP BY status_code,timed_out ORDER BY status_code")}));
+  console.log(JSON.stringify({recentScheduledHttp:await query("SELECT status_code,timed_out,case when error_msg like 'Timeout%' then 'Request timeout' else error_msg end error,count(*)::int requests,max(created) latest FROM net._http_response WHERE created>now()-interval '10 minutes' GROUP BY 1,2,3 ORDER BY status_code")}));
+  console.log(JSON.stringify({cleanupWorkerResults:await query("SELECT created,status_code,(content::jsonb->'reminders'->>'ok')::boolean reminders_ok,jsonb_array_length(content::jsonb->'errors') internal_error_count FROM net._http_response WHERE created>now()-interval '10 minutes' AND status_code=200 AND content like '%\"hold_cleanup\"%' ORDER BY created DESC")}));
   console.log(JSON.stringify({scheduledRuns:await query("SELECT j.jobname,r.status,count(*)::int runs,max(r.start_time) latest FROM cron.job_run_details r JOIN cron.job j USING(jobid) WHERE r.start_time>now()-interval '30 minutes' GROUP BY j.jobname,r.status ORDER BY j.jobname,r.status")}));
   process.exit(0);
 }

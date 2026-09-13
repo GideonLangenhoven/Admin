@@ -56,7 +56,7 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     await page.waitForLoadState("networkidle");
 
     // Wait for tour data to load, then click "Book Now" on the first tour card
-    const bookBtn = page.getByRole("button", { name: /^Book / }).first();
+    const bookBtn = page.locator('button[data-shot="tour-card"]').first();
     await expect(bookBtn).toBeVisible({ timeout: 20_000 });
     await bookBtn.click();
 

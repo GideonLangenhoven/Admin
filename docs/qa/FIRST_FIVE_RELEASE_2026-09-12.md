@@ -12,13 +12,16 @@ that a client's own access is isolated.
 
 ## Verified
 
-- 960 unit tests passed; one pre-existing test skipped.
+- 974 unit tests passed; one pre-existing test skipped.
 - 150 disposable PostgreSQL checks cover payment transactions, concurrent
   holds/voucher spending, refunds, tenant relations and permission boundaries.
-- 362 live API/capacity checks passed with five separate temporary MAIN_ADMIN accounts.
+- 407 live API/capacity checks passed with five separate temporary MAIN_ADMIN accounts.
   Every ordered pair was tested: private reads, changes, voucher debit,
   capacity reservations, refund previews, foreign record links, cancellations,
   refunds, manual payment and confirmation-message requests.
+- Current owner sessions reached their own inbox handler; every cross-client
+  inbox change was denied. Owners and anonymous callers were also blocked from
+  platform-only client creation and invite-token management.
 - All 20 cross-client integration-credential reads were denied. A live k6 race
   sent five simultaneous requests for two seats: exactly two reservations won,
   three were refused and capacity stayed at two.
@@ -49,7 +52,7 @@ checkout request and unfulfilled-payment transactions were applied. New client
 boundaries use composite foreign keys and independent booking proof; tenant
 headers or booking references alone cannot grant private access.
 
-Twenty release edge functions were deployed, including the six message workers
+Twenty-three release edge functions were deployed, including the six message workers
 and the booking/payment/refund/chat handlers. Message workers now accept the
 configured server API key used by scheduled jobs. The four job schedules were
 preserved. Administrator-invoked functions validate sessions internally rather

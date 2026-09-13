@@ -65,6 +65,14 @@ try {
     check(`client ${n+1} signs in through the administrator app`,auth.admin?.business_id===f.business);
   }
   for(const [i,a] of fixtures.entries()) {
+    for(const fn of ['super-admin-onboard','generate-invite-token']) {
+      const denied=await request('/functions/v1/'+fn,a.token,'POST',{});
+      check(`client ${i+1} cannot use platform-only ${fn}`,denied.status===403);
+      const anonymous=await request('/functions/v1/'+fn,anon,'POST',{});
+      check(`anonymous caller cannot use ${fn}`,anonymous.status===401);
+    }
+    const ownInbox=await request('/functions/v1/admin-reply',a.token,'POST',{business_id:a.business,phone:'web:release-'+run,action:'return_to_bot'});
+    check(`client ${i+1} can reach its own inbox handler with a current session`,ownInbox.status===200&&ownInbox.body?.ok===true);
     for(const [table,pk] of [['businesses','business'],['bookings','booking'],['customers','customer'],['vouchers','voucher']]) {
       const own=await request(`/rest/v1/${table}?id=eq.${a[pk]}&select=id`,a.token);
       check(`client ${i+1} reads its own ${table}`,own.status===200&&own.body?.length===1);
@@ -74,6 +82,8 @@ try {
       const spoof={'x-tenant-business-id':b.business,'x-booking-success-token':b.booking};
       const credentials=await fetch((process.env.ADMIN_URL||'https://admin.bookingtours.co.za')+'/api/credentials?business_id='+b.business,{headers:{Authorization:'Bearer '+a.token},signal:AbortSignal.timeout(20000)});
       check(`client ${i+1} cannot read client ${j+1} integration credentials`,credentials.status===403);
+      const inbox=await request('/functions/v1/admin-reply',a.token,'POST',{business_id:b.business,phone:'web:release-'+run,action:'return_to_bot'});
+      check(`client ${i+1} cannot change client ${j+1} inbox`,inbox.status===403);
       for(const [table,pk] of [['businesses','business'],['bookings','booking'],['customers','customer'],['vouchers','voucher']]) {
         const read=await request(`/rest/v1/${table}?id=eq.${b[pk]}&select=id`,a.token,'GET',undefined,spoof);
         check(`client ${i+1} cannot read client ${j+1} ${table}`,read.status===200&&Array.isArray(read.body)&&read.body.length===0);

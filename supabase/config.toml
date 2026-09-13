@@ -39,6 +39,16 @@ verify_jwt = false
 [functions.manual-mark-paid]
 verify_jwt = false
 
+# Validate ES256 sessions and tenant/platform ownership inside each handler.
+[functions.admin-reply]
+verify_jwt = false
+
+[functions.super-admin-onboard]
+verify_jwt = false
+
+[functions.generate-invite-token]
+verify_jwt = false
+
 # Requires independent booking proof and a matching tenant, never a reference alone.
 [functions.confirm-booking]
 verify_jwt = false
