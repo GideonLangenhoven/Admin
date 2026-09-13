@@ -1,6 +1,6 @@
 # Rollout remediation — 6 September 2026
 
-**Current status (12 September):** technical fixes have now been deployed and
+**Current status (13 September):** technical fixes have now been deployed and
 live five-client isolation checks passed. See the
 [current release evidence and remaining provider gates](FIRST_FIVE_RELEASE_2026-09-12.md)
 and [onboarding instructions](FIRST_FIVE_CLIENTS_2026-09-13.md).

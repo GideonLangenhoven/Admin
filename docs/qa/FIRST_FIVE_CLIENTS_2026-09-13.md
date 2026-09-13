@@ -54,6 +54,8 @@ key alone does not prove that a paid booking will be confirmed.
 
 Run the test-mode checks first. Before accepting customer money, verify the
 live key and live webhook, and ensure the business is no longer in TEST MODE.
+Use a separate test business if the existing one is already taking bookings:
+switching test mode affects checkout for that whole business.
 Agree with the owner before making any small real-card transaction; mark a
 booking paid manually only when money was actually received through that channel.
 

@@ -1,6 +1,6 @@
 # Rollout review — 6 September 2026
 
-**Historical review:** see [the 12 September production release verification](FIRST_FIVE_RELEASE_2026-09-12.md)
+**Historical review:** see [the 12–13 September production release verification](FIRST_FIVE_RELEASE_2026-09-12.md)
 for deployed fixes, live client-isolation evidence and the remaining provider gates.
 
 ## Verdict

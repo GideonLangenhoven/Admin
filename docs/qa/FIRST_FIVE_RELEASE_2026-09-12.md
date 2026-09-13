@@ -1,4 +1,4 @@
-# First-five release verification — 12 September 2026
+# First-five release verification — 12–13 September 2026
 
 ## Decision
 
@@ -13,7 +13,7 @@ that a client's own access is isolated.
 ## Verified
 
 - 974 unit tests passed; one pre-existing test skipped.
-- 150 disposable PostgreSQL checks cover payment transactions, concurrent
+- 151 disposable PostgreSQL checks cover payment transactions, concurrent
   holds/voucher spending, refunds, tenant relations and permission boundaries.
 - 407 live API/capacity checks passed with five separate temporary MAIN_ADMIN accounts.
   Every ordered pair was tested: private reads, changes, voucher debit,
@@ -42,8 +42,8 @@ vulnerability or third-party failure has been eliminated.
 
 ## Deployed
 
-Administrator: `caepweb-admin-jusfpuhsg-jerrys-projects-f4e4eaf9.vercel.app`.
-Storefront: `booking-nnvaabk38-jerrys-projects-f4e4eaf9.vercel.app`.
+Administrator: `caepweb-admin-42jizd3ny-jerrys-projects-f4e4eaf9.vercel.app`.
+Storefront: `booking-730dapncn-jerrys-projects-f4e4eaf9.vercel.app`.
 Their live domains were promoted after successful production builds.
 
 The September migration ledger was reconciled with verified installed batches.
@@ -58,6 +58,16 @@ configured server API key used by scheduled jobs. The four job schedules were
 preserved. Administrator-invoked functions validate sessions internally rather
 than relying on the gateway's legacy JWT algorithm check.
 
+On 13 September the final HTTP health check caught a stale scheduler Vault
+credential and pg_net's five-second timeout. The credential was replaced with
+the already-working server API key, without exposing it. The four message jobs
+now have a 60-second request timeout; URLs, payloads and schedules are unchanged.
+Subsequent automatic cleanup runs returned HTTP 200, successful reminder results
+and zero internal errors; the observed ten-minute window had no failed HTTP
+requests. There were no pending marketing queue items or automation enrollments
+before restoring the workers. The one scheduled campaign was for December and
+had no recipients queued.
+
 Before deployment, private schema snapshots and deployed edge source were saved
 under `/private/tmp/capekayak-release-*` and
 `/private/tmp/capekayak-edge-backup-cFB3VQ`. These are deployment evidence, not a
@@ -68,7 +78,9 @@ back across the new booking-proof policy without a compatible release.
 ## Remaining owner/provider checks
 
 1. No configured business had Yoco test keys and a test webhook at inspection.
-   Configure a dedicated test business in Settings; never paste keys into chat.
+   Kayak was rechecked on 13 September: test key absent, test webhook absent,
+   live mode still enabled. Configure test credentials in Settings; never paste
+   keys into chat. Do not switch an actively trading business into test mode.
 2. Approved test recipients were supplied privately. The live email provider
    accepted one labelled confirmation-template test and WhatsApp accepted one
    labelled text through the Kayak connection. No booking or payment was created.
@@ -92,8 +104,11 @@ Sentry source-map/release upload reported configuration warnings during builds
 (administrator project not found; storefront upload token absent). The builds
 succeeded, but enriched error-reporting setup is not claimed as verified.
 
-The new [GitHub CI run](https://github.com/GideonLangenhoven/Admin/actions/runs/34707245790)
+The final [GitHub CI run](https://github.com/GideonLangenhoven/Admin/actions/runs/34742530940)
 passed lint/typecheck, unit/edge/database regressions and production browser smoke.
+Payment/isolation regressions are now a required merge check alongside the
+existing lint and smoke checks. The security baseline/drift check also passed
+on the release branch after reviewing the deployed grant and policy changes.
 Release PRs: [administrator #23](https://github.com/GideonLangenhoven/Admin/pull/23)
 and [storefront #15](https://github.com/GideonLangenhoven/capekayak-booking/pull/15).
 Existing Lighthouse checks initially lacked public build configuration; that
@@ -107,6 +122,9 @@ explicit input labels were corrected afterward. The storefront audit was
 misconfigured: a performance-only preset skipped its required accessibility
 audits, while localhost tested the operator directory instead of a tenant.
 Both configuration issues were corrected without lowering score thresholds.
+The follow-up audit no longer reports the calendar's unnamed buttons or the
+tour cards' visible/accessibility-label mismatch. Performance, CSP and PWA
+assertions still fail; they have not been disabled or described as passing.
 
 The storefront's previously tracked generated environment file contained an
 OIDC token expired on 3 March 2026. The file was removed from the release and
