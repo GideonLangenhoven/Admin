@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
 
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 const db = createServiceClient();
@@ -35,6 +36,7 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
+  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse(headers(origin));
 
   const rawBody = await req.text();
   let event: any;

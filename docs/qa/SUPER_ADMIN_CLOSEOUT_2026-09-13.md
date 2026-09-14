@@ -1,5 +1,10 @@
 # Super Admin and monitoring closeout — 13 September 2026
 
+**14 September payment follow-up:** the [Yoco verification record](YOCO_PAYMENT_CLOSEOUT_2026-09-14.md)
+confirms the credential safeguards are deployed and both repaired test payments
+return confirmed. A fresh automatic payment/notification/refund journey remains
+to be verified.
+
 The Super Admin and production-monitoring fixes are deployed. This closes the
 implementation gaps below; it is not an unconditional approval to accept money
 from the first five clients. Use the [onboarding checklist](FIRST_FIVE_CLIENTS_2026-09-13.md)

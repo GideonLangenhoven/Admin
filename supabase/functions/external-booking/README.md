@@ -1,6 +1,6 @@
 # external-booking
 
-Shared multi-tenant Supabase Edge Function for supplier and OTA webhook traffic.
+Shared multi-tenant Supabase Edge Function for custom partners implementing the BookingTours API. This is not a native Viator/GetYourGuide contract. Source labels and mappings do not activate a marketplace connection. See [direct OTA connectivity status](../../../docs/OTA_DIRECT_CONNECTIVITY.md).
 
 ## How Tenant Routing Works
 
@@ -15,6 +15,7 @@ Required:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SETTINGS_ENCRYPTION_KEY` for encrypted HMAC credentials and credential administration
 
 ## Auth
 
@@ -23,9 +24,10 @@ Required headers:
 - `x-api-key`
 - `x-source` or `source` in the JSON body
 
-Optional HMAC mode:
+HMAC authentication:
 
-- If the credential row has an `hmac_secret`, the client must also send `x-timestamp` and `x-signature`
+- Create, modify and cancel require HMAC. API-key-only credentials can check availability only.
+- If the credential row has an encrypted HMAC secret, every request must also send `x-timestamp` and `x-signature`
 - Signature format: `HMAC_SHA256(secret, `${x-timestamp}.${raw-json-body}`)`
 - The function rejects signatures older than 5 minutes
 

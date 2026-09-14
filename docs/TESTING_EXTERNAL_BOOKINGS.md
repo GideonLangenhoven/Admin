@@ -1,5 +1,7 @@
 # Testing External Booking Integrations — Runbook
 
+> **Native OTA tests below are historical prototype recipes, not provider certification.** Direct Viator/GetYourGuide processing is now blocked pending connectivity-partner access and validated supplier adapters. Expect `OTA_NOT_READY` (503) from OTA edge handlers. Do not remove the guard to run these recipes against production. See [current status and release checklist](OTA_DIRECT_CONNECTIVITY.md). The generic B2B API remains separate.
+
 **Audience:** developers and operators verifying that OTA channels (Viator, GetYourGuide), the generic B2B `external-booking` API, and payment webhooks behave correctly end-to-end — without charging a real card or polluting production data.
 
 **Golden rule:** always test against a **dedicated test tenant** (a real `businesses` row set up for testing) with **Yoco test mode enabled**. Never point a test at a live operator's tenant.

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { Trash, ToggleLeft, ToggleRight } from "@phosphor-icons/react";
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, OTA_UNAVAILABLE_MESSAGE } from "@/supabase/functions/_shared/ota-readiness";
 
 type Mapping = {
   id: string;
@@ -157,7 +158,7 @@ export default function OtaSettingsPage() {
   async function addMapping() {
     if (!addForm.tour_id || !addForm.external_product_code.trim()) return;
     setAddSaving(true);
-    await supabase.from("ota_product_mappings").insert({
+    const { error } = await supabase.from("ota_product_mappings").insert({
       business_id: businessId,
       channel: activeTab,
       tour_id: addForm.tour_id,
@@ -166,19 +167,22 @@ export default function OtaSettingsPage() {
       default_markup_pct: Number(addForm.default_markup_pct) || 0,
       notes: addForm.notes.trim() || null,
     });
-    setAddForm({ tour_id: "", external_product_code: "", external_option_code: "", default_markup_pct: "0", notes: "" });
     setAddSaving(false);
+    if (error) { setMsg("Mapping was not saved: " + error.message); return; }
+    setAddForm({ tour_id: "", external_product_code: "", external_option_code: "", default_markup_pct: "0", notes: "" });
     refreshChannel(activeTab);
   }
 
   async function toggleMapping(id: string, enabled: boolean) {
-    await supabase.from("ota_product_mappings").update({ enabled, updated_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabase.from("ota_product_mappings").update({ enabled, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) { setMsg("Mapping was not updated: " + error.message); return; }
     refreshChannel(activeTab);
   }
 
   async function deleteMapping(id: string) {
     if (!confirm("Remove this mapping?")) return;
-    await supabase.from("ota_product_mappings").delete().eq("id", id);
+    const { error } = await supabase.from("ota_product_mappings").delete().eq("id", id);
+    if (error) { setMsg("Mapping was not removed: " + error.message); return; }
     refreshChannel(activeTab);
   }
 
@@ -198,6 +202,14 @@ export default function OtaSettingsPage() {
         </div>
       </div>
 
+      {!OTA_DIRECT_CONNECTIONS_AVAILABLE && (
+        <section className="ui-card p-5" aria-labelledby="ota-readiness-title">
+          <h2 id="ota-readiness-title" className="text-[15px] font-semibold mb-2">Direct connections are not available yet</h2>
+          <p className="text-sm text-[var(--ck-text-muted)]">{OTA_UNAVAILABLE_MESSAGE}</p>
+          <p className="text-sm text-[var(--ck-text-muted)] mt-2">You can prepare product mappings below. No bookings, availability updates or reconciliation will run, including for previously enabled connections. Continue managing marketplace bookings manually.</p>
+        </section>
+      )}
+
       {/* Channel Tabs */}
       <div className="anim-fade-up anim-d1 ui-seg">
         {CHANNELS.map(c => {
@@ -205,15 +217,15 @@ export default function OtaSettingsPage() {
           return (
             <button key={c.key} type="button" onClick={() => setActiveTab(c.key)} className="ui-seg-item" data-active={activeTab === c.key}>
               {c.label}
-              {s?.enabled && <span className="h-[5px] w-[5px] rounded-full" style={{ background: "var(--ck-success)" }} aria-hidden="true" />}
+              {OTA_DIRECT_CONNECTIONS_AVAILABLE && s?.enabled && <span className="h-[5px] w-[5px] rounded-full" style={{ background: "var(--ck-success)" }} aria-hidden="true" />}
             </button>
           );
         })}
       </div>
 
       <div className="anim-fade-up anim-d2 space-y-6">
-        {/* Credentials */}
-        <section className="ui-card p-5">
+        {/* Credentials are hidden until the supplier contracts are validated. */}
+        {OTA_DIRECT_CONNECTIONS_AVAILABLE && <section className="ui-card p-5">
           <h2 className="text-[15px] font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>{ch.label} Credentials</h2>
           <div className="space-y-3">
             <div>
@@ -251,10 +263,10 @@ export default function OtaSettingsPage() {
             </div>
             {msg && <p className="text-sm mt-1" style={{ color: msg.includes("saved") ? "var(--ck-success)" : "var(--ck-danger)" }}>{msg}</p>}
           </div>
-        </section>
+        </section>}
 
         {/* Webhook URL */}
-        {status?.configured && (
+        {OTA_DIRECT_CONNECTIONS_AVAILABLE && status?.configured && (
           <section className="ui-card p-5">
             <h2 className="text-[15px] font-semibold mb-2" style={{ color: "var(--ck-text-strong)" }}>Webhook URL</h2>
             <p className="text-xs mb-2" style={{ color: "var(--ck-text-muted)" }}>Paste this into your {ch.label} partner portal webhook settings:</p>
@@ -263,7 +275,7 @@ export default function OtaSettingsPage() {
         )}
 
         {/* Sync Status */}
-        {status?.configured && (
+        {OTA_DIRECT_CONNECTIONS_AVAILABLE && status?.configured && (
           <section className="ui-card p-5">
             <h2 className="text-[15px] font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Availability Sync</h2>
             <div className="flex items-center gap-3 text-sm">
@@ -284,6 +296,7 @@ export default function OtaSettingsPage() {
         {/* Product Mappings */}
         <section className="ui-card p-5">
           <h2 className="text-[15px] font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Tour ↔ {ch.label} Product Mappings</h2>
+          {msg && <p role="status" className="text-sm mb-3 text-[var(--ck-danger)]">{msg}</p>}
 
           {mappings.length > 0 && (
             <div className="space-y-2 mb-4">
@@ -346,7 +359,7 @@ export default function OtaSettingsPage() {
         </section>
 
         {/* Status badges */}
-        {status && (
+        {OTA_DIRECT_CONNECTIONS_AVAILABLE && status && (
           <div className="flex flex-wrap gap-2">
             {/* AG8 fix: previously .split(" ")[0] which produced "Client: not set"
                 for both pills on the GYG tab (since both labels start with "Client").

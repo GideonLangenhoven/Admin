@@ -111,8 +111,26 @@ describe("Yoco environment selection", () => {
     const credentials = sourceExports("supabase/functions/_shared/tenant.ts", {
       "https://esm.sh/@supabase/supabase-js@2": {}, "./pagination.ts": {},
     }, { SETTINGS_ENCRYPTION_KEY: "fixture-encryption-key-".repeat(2) }).getBusinessCredentials as (db: any, businessId: string) => Promise<any>;
-    const db = { rpc: async () => ({ data: { yoco_test_mode: true, yoco_secret_key: "live-key", yoco_webhook_secret: "live-hook" }, error: null }) };
+    const db = { rpc: async () => ({ data: { yoco_test_mode: true, yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "live-hook" }, error: null }) };
     expect(await credentials(db, "a")).toMatchObject({ activeYocoSecretKey: "", activeYocoWebhookSecret: "" });
+  });
+
+  it.each([
+    [false, "sk_test_misfiled", "sk_test_fixture", "live-hook", "test-hook", ""],
+    [true, "sk_live_fixture", "sk_live_misfiled", "live-hook", "test-hook", ""],
+    [false, "sk_live_fixture", "sk_test_fixture", "", "test-hook", ""],
+    [true, "sk_live_fixture", "sk_test_fixture", "live-hook", "", ""],
+    [false, "sk_live_fixture", "sk_test_fixture", "live-hook", "test-hook", "sk_live_fixture"],
+    [true, "sk_live_fixture", "sk_test_fixture", "live-hook", "test-hook", "sk_test_fixture"],
+  ])("enables checkout only with matching credentials: test=%s, key=%s/%s", async (mode, live, test, liveHook, testHook, expected) => {
+    const credentials = sourceExports("supabase/functions/_shared/tenant.ts", {
+      "https://esm.sh/@supabase/supabase-js@2": {}, "./pagination.ts": {},
+    }, { SETTINGS_ENCRYPTION_KEY: "fixture-encryption-key-".repeat(2) }).getBusinessCredentials as (db: any, businessId: string) => Promise<any>;
+    const db = { rpc: async () => ({ data: { yoco_test_mode: mode, yoco_secret_key: live, yoco_test_secret_key: test, yoco_webhook_secret: liveHook, yoco_test_webhook_secret: testHook }, error: null }) };
+    const result = await credentials(db, "a");
+    expect(result.activeYocoSecretKey).toBe(expected);
+    if (live === "sk_test_misfiled") expect(result.yocoSecretKey).toBe("");
+    if (test === "sk_live_misfiled") expect(result.yocoTestSecretKey).toBe("");
   });
 
   it("verifies delayed live payments with their live secret after switching to test", async () => {

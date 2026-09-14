@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
 import { createViatorClient } from "../_shared/viator.ts";
 import { createGygClient, gygFetchBookings } from "../_shared/getyourguide.ts";
 
@@ -19,6 +20,7 @@ type Drift = {
 };
 
 Deno.serve(withSentry("ota-reconcile", async () => {
+  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
   if (!SETTINGS_ENCRYPTION_KEY) {
     return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
   }
