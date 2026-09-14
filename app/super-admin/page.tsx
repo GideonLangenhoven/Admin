@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
+import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
+import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
+import PlatformOperations from "../../components/PlatformOperations";
 
 type OnboardForm = {
   businessName: string;
@@ -27,7 +30,7 @@ const DEFAULT_FORM: OnboardForm = {
   subdomain: "",
   adminName: "",
   adminEmail: "",
-  timezone: "UTC",
+  timezone: "Africa/Johannesburg",
   currency: "ZAR",
   logoUrl: "",
   waToken: "",
@@ -36,7 +39,16 @@ const DEFAULT_FORM: OnboardForm = {
   yocoWebhookSecret: "",
 };
 
-const BOOKING_DOMAIN = "bookingtours.co.za";
+const BOOKING_DOMAIN = "booking.bookingtours.co.za";
+
+// Single pricing model — mirrors the 'standard' row in the plans table:
+// R2000/month includes 1 admin seat, R500/month per additional seat.
+const PLAN_BASE_ZAR = 2000;
+const PLAN_INCLUDED_SEATS = 1;
+const PLAN_EXTRA_SEAT_ZAR = 500;
+function monthlyCostZar(seats: number) {
+  return PLAN_BASE_ZAR + Math.max(0, (seats || 1) - PLAN_INCLUDED_SEATS) * PLAN_EXTRA_SEAT_ZAR;
+}
 
 type BusinessRow = {
   id: string;
@@ -48,19 +60,13 @@ type BusinessRow = {
 };
 
 export default function SuperAdminPage() {
-  const { role } = useBusinessContext();
+  const { role, refreshBusiness } = useBusinessContext();
 
-  if (role !== "SUPER_ADMIN") {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-[var(--ck-text-muted)] text-sm">You do not have permission to view this page.</p>
-      </div>
-    );
-  }
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPassword, setRequesterPassword] = useState("");
   const [form, setForm] = useState<OnboardForm>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const onboardingRequest = useRef<string | null>(null);
   const [createdClient, setCreatedClient] = useState<{ businessId: string; businessName: string; adminEmail: string } | null>(null);
 
   // Business admin seat management
@@ -74,56 +80,69 @@ export default function SuperAdminPage() {
   const [bizDetail, setBizDetail] = useState<Record<string, any> | null>(null);
   const [bizDetailLoading, setBizDetailLoading] = useState(false);
   const [bizDetailSaving, setBizDetailSaving] = useState(false);
+  const detailRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current += 1; }, []);
   const [bizTours, setBizTours] = useState<any[]>([]);
   const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
-  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean }>>([]);
+  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean; settings_permissions: Record<string, boolean> | null }>>([]);
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+  const [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
+  const [savingPermsId, setSavingPermsId] = useState<string | null>(null);
 
   async function loadBusinesses() {
     setLoadingBiz(true);
-    // Anon role has SELECT on businesses (RLS allows it)
-    const { data, error } = await supabase
-      .from("businesses")
-      .select("id, business_name, subdomain, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
-      .order("business_name");
-    if (error) {
-      console.error("LOAD_BIZ_ERR:", error.message);
-      notify({ title: "Failed to load businesses", message: error.message, tone: "error" });
-      setLoadingBiz(false);
-      return;
+    const PAGE = 1000;
+    // Page past the 1000-row cap so all tenants show at scale (SUPER_ADMIN can
+    // read every business via the super-admin RLS policy).
+    const bizRows: any[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("businesses")
+        .select("id, business_name, subdomain, max_admin_seats, subscription_status, marketing_included_emails, marketing_overage_rate_zar")
+        .order("business_name")
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error("LOAD_BIZ_ERR:", error.message);
+        notify({ title: "Failed to load businesses", message: error.message, tone: "error" });
+        setLoadingBiz(false);
+        return;
+      }
+      const page = data || [];
+      bizRows.push(...page);
+      if (page.length < PAGE) break;
     }
-    if (data) {
-      // Get admin counts per business in parallel
-      const withCounts = await Promise.all(
-        (data as any[]).map(async (b: any) => {
-          const { count } = await supabase
-            .from("admin_users")
-            .select("id", { count: "exact", head: true })
-            .eq("business_id", b.id);
-          return { ...b, admin_count: count || 0 };
-        })
-      );
-      setBusinesses(withCounts);
+    // Admin counts in a single paged pass instead of one count query per
+    // business (which was N concurrent round-trips — pool exhaustion at scale).
+    const counts: Record<string, number> = {};
+    for (let from = 0; ; from += PAGE) {
+      const { data: admins, error } = await supabase
+        .from("admin_users")
+        .select("business_id")
+        .eq("suspended", false)
+        .neq("role", "SUPER_ADMIN")
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const page = (admins || []) as { business_id: string }[];
+      for (const a of page) counts[a.business_id] = (counts[a.business_id] || 0) + 1;
+      if (page.length < PAGE) break;
     }
+    setBusinesses(bizRows.map((b: any) => ({ ...b, admin_count: counts[b.id] || 0 })));
     setLoadingBiz(false);
   }
 
   async function updateSeatLimit(businessId: string, newLimit: number) {
+    const business = businesses.find(b => b.id === businessId);
+    if (!business || !await confirmAction({ title: `Change seats: ${business.business_name}`, message: `Set the seat limit to ${newLimit}? Billing is adjusted for the remaining billing period. Active staff cannot exceed the new limit.`, tone: "warning", confirmLabel: "Change seats" })) return;
     setSavingSeatId(businessId);
-    const val = Math.max(1, newLimit);
-    const { error } = await supabase
-      .from("businesses")
-      .update({ max_admin_seats: val })
-      .eq("id", businessId);
-    if (error) {
-      notify({ title: "Failed", message: error.message, tone: "error" });
-    } else {
-      notify({ title: "Updated", message: "Admin seat limit updated.", tone: "success" });
-      setBusinesses((prev) =>
-        prev.map((b) => (b.id === businessId ? { ...b, max_admin_seats: val } : b))
-      );
-    }
-    setSavingSeatId(null);
+    try {
+      const response = await fetch("/api/billing/seats", { method: "POST", headers: await getAuthHeaders(businessId), body: JSON.stringify({ delta: newLimit - business.max_admin_seats }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not change seats");
+      setBusinesses(prev => prev.map(b => b.id === businessId ? { ...b, max_admin_seats: result.new_seats } : b));
+      notify({ title: "Seats updated", message: business.business_name, tone: "success" });
+    } catch (error: any) { notify({ title: "Seats unchanged", message: error.message, tone: "error" }); }
+    finally { setSavingSeatId(null); }
   }
 
   async function saveSubdomain(businessId: string, raw: string) {
@@ -144,10 +163,10 @@ export default function SuperAdminPage() {
     if (error) {
       notify({ title: "Failed", message: error.code === "23505" ? "This subdomain is already taken." : error.message, tone: "error" });
     } else {
-      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN} — all 6 booking URLs regenerated`, tone: "success" });
+      notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN}: all 6 booking URLs regenerated`, tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === businessId ? { ...b, subdomain: slug } : b));
       // Refresh expanded detail if this is the open one
-      if (expandedBiz === businessId) await loadBizDetail(businessId);
+      if (expandedBiz === businessId) await loadBizDetail(businessId, true);
     }
     setEditingSubdomain(null);
     setSavingSubdomain(false);
@@ -169,38 +188,50 @@ export default function SuperAdminPage() {
       notify({ title: "Regenerate failed", message: error.message, tone: "error" });
     } else {
       notify({ title: "URLs regenerated", message: "All 6 booking-site URLs reset to match the subdomain.", tone: "success" });
-      if (expandedBiz === businessId) await loadBizDetail(businessId);
+      if (expandedBiz === businessId) await loadBizDetail(businessId, true);
     }
   }
 
   async function toggleSubscriptionStatus(bizId: string, current: string) {
-    setTogglingStatusId(bizId);
     const next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
-    const { error } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", bizId);
-    if (error) {
-      notify({ title: "Failed", message: error.message, tone: "error" });
-    } else {
+    const business = businesses.find(b => b.id === bizId);
+    if (!await confirmAction({ title: `${next === "SUSPENDED" ? "Suspend" : "Reactivate"}: ${business?.business_name}`, message: next === "SUSPENDED" ? "Stop new bookings and marketing for this business? Existing customer obligations remain. This manual suspension is recorded and will not be cleared automatically by a payment." : "Allow this business to accept new bookings again? Check its payment connection and outstanding issues first.", tone: "warning", confirmLabel: next === "SUSPENDED" ? "Suspend business" : "Reactivate business" })) return;
+    const reason = window.prompt("Why are you changing this business's access? This reason is saved in the audit trail.");
+    if (!reason) return;
+    setTogglingStatusId(bizId);
+    try {
+      const response = await fetch("/api/super-admin/business", { method: "POST", headers: await getAuthHeaders(bizId), body: JSON.stringify({ action: "status", business_id: bizId, status: next, expected_status: current, reason }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not change status");
       notify({ title: next === "SUSPENDED" ? "Suspended" : "Reactivated", message: "Subscription status updated to " + next + ".", tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === bizId ? { ...b, subscription_status: next } : b));
-    }
-    setTogglingStatusId(null);
+      await refreshBusiness?.();
+    } catch (error: any) { notify({ title: "Status unchanged", message: error.message, tone: "error" }); }
+    finally { setTogglingStatusId(null); }
   }
 
-  async function loadBizDetail(bizId: string) {
-    if (expandedBiz === bizId) { setExpandedBiz(null); return; }
+  async function loadBizDetail(bizId: string, refresh = false) {
+    const request = ++detailRequest.current;
+    if (expandedBiz === bizId && !refresh) { setExpandedBiz(null); setBizDetail(null); return; }
     setBizDetailLoading(true);
+    setBizDetail(null);
+    setBizTours([]);
+    setBizAdmins([]);
+    setBizFaqs([]);
     setExpandedBiz(bizId);
-
-    const { data } = await supabase.from("businesses").select("*").eq("id", bizId).single();
-    setBizDetail(data || {});
-
-    // Load tours
-    const { data: tours } = await supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order");
-    setBizTours(tours || []);
-
-    // Load admin users
-    const { data: admins } = await supabase.from("admin_users").select("id, email, name, role, suspended").eq("business_id", bizId).order("role");
-    setBizAdmins(admins || []);
+    try {
+    const [business, tours, admins] = await Promise.all([
+      supabase.from("businesses").select("*").eq("id", bizId).single(),
+      supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order"),
+      supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role"),
+    ]);
+    if (request !== detailRequest.current) return;
+    if (business.error || tours.error || admins.error) throw business.error || tours.error || admins.error;
+    const data = business.data;
+    if (!data || data.id !== bizId) throw new Error("Business details could not be verified. Refresh and try again.");
+    setBizDetail(data);
+    setBizTours(tours.data || []);
+    setBizAdmins((admins.data || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
 
     // Parse FAQs
     const faqRaw = data?.faq_json;
@@ -212,11 +243,15 @@ export default function SuperAdminPage() {
       }
     } else { setBizFaqs([]); }
 
-    setBizDetailLoading(false);
+    } catch (error: any) {
+      if (request === detailRequest.current) notify({ title: "Could not load this business", message: error.message, tone: "error" });
+    } finally {
+      if (request === detailRequest.current) setBizDetailLoading(false);
+    }
   }
 
   async function saveBizDetail() {
-    if (!bizDetail || !expandedBiz) return;
+    if (!bizDetail || !expandedBiz || bizDetail.id !== expandedBiz || bizDetailLoading) return;
     setBizDetailSaving(true);
 
     // Rebuild faq_json from array
@@ -289,27 +324,74 @@ export default function SuperAdminPage() {
   }
 
   async function resetAdminPassword(adminId: string, adminEmail: string) {
-    const newPassword = window.prompt(`Enter new password for ${adminEmail}:`);
-    if (!newPassword) return;
-    if (newPassword.length < 6) {
-      notify({ title: "Too short", message: "Password must be at least 6 characters.", tone: "error" });
-      return;
-    }
+    const targetBusiness = expandedBiz;
+    if (!targetBusiness || !await confirmAction({ title: "Send password setup link", message: `Send a secure password setup email to ${adminEmail}?`, confirmLabel: "Send link" })) return;
     setResettingPasswordId(adminId);
     try {
-      const res = await fetch("/api/admin/update", {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "reset_password", admin_id: adminId, password: newPassword }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Could not reset password.");
-      notify({ title: "Password reset", message: `Password updated for ${adminEmail}.`, tone: "success" });
-    } catch (err: any) {
-      notify({ title: "Reset failed", message: err.message || "Could not reset password.", tone: "error" });
-    } finally {
-      setResettingPasswordId(null);
+      await sendAdminSetupLink({ id: adminId, email: adminEmail }, "RESET", targetBusiness);
+      notify({ title: "Setup link sent", message: adminEmail, tone: "success" });
+    } catch (error: any) { notify({ title: "Could not send link", message: error.message, tone: "error" }); }
+    finally { setResettingPasswordId(null); }
+  }
+
+  async function setAdminSuspended(admin: typeof bizAdmins[number]) {
+    const targetBusiness = expandedBiz;
+    if (!targetBusiness || !await confirmAction({ title: admin.suspended ? "Reactivate staff member" : "Suspend staff member", message: `${admin.email}: ${admin.suspended ? "allow sign-in again, using an available seat" : "block access and revoke refresh sessions"}? Their records will be kept.`, tone: "warning", confirmLabel: admin.suspended ? "Reactivate" : "Suspend" })) return;
+    setChangingRoleId(admin.id);
+    try {
+      const response = await fetch("/api/admin/update", { method: "POST", headers: await getAuthHeaders(targetBusiness), body: JSON.stringify({ action: "set_suspended", admin_id: admin.id, suspended: !admin.suspended }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not update access");
+      setBizAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, suspended: !admin.suspended } : a));
+      await loadBusinesses();
+      notify({ title: "Staff access updated", message: admin.email, tone: "success" });
+    } catch (error: any) { notify({ title: "Access unchanged", message: error.message, tone: "error" }); }
+    finally { setChangingRoleId(null); }
+  }
+
+  async function changeAdminRole(admin: { id: string; email: string; name: string | null }, newRole: "ADMIN" | "MAIN_ADMIN") {
+    const label = admin.name || admin.email;
+    const promoting = newRole === "MAIN_ADMIN";
+    if (!await confirmAction({
+      title: promoting ? "Make Main Admin" : "Change to Admin",
+      message: promoting
+        ? `Give ${label} full Main Admin access (settings, billing, admin management) on this business?`
+        : `Reduce ${label} to a regular Admin on this business? They'll lose settings, billing and admin-management access.`,
+      tone: "warning",
+      confirmLabel: promoting ? "Make Main Admin" : "Change to Admin",
+    })) return;
+
+    setChangingRoleId(admin.id);
+    const res = await fetch("/api/admin/update", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "update_role", admin_id: admin.id, role: newRole }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setChangingRoleId(null);
+    if (!res.ok) {
+      notify({ title: "Couldn't change role", message: data?.error || "Unknown error", tone: "error" });
+      return;
     }
+    setBizAdmins(bizAdmins.map(a => a.id === admin.id ? { ...a, role: newRole } : a));
+    notify({ title: "Role updated", message: `${label} is now ${promoting ? "a Main Admin" : "a regular Admin"}.`, tone: "success" });
+  }
+
+  async function saveBizAdminPerms(adminId: string, perms: Record<string, boolean>) {
+    setSavingPermsId(adminId);
+    const res = await fetch("/api/admin/update", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "update_permissions", admin_id: adminId, permissions: perms }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      notify({ title: "Failed to save permissions", message: data?.error || "Unknown error", tone: "error" });
+    } else {
+      setBizAdmins(bizAdmins.map(a => a.id === adminId ? { ...a, settings_permissions: perms } : a));
+      notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
+    }
+    setSavingPermsId(null);
   }
 
   function updateDetail(key: string, value: any) {
@@ -347,9 +429,11 @@ export default function SuperAdminPage() {
     }
 
     setSubmitting(true);
+    onboardingRequest.current ||= crypto.randomUUID();
     try {
       const res = await supabase.functions.invoke("super-admin-onboard", {
         body: {
+          idempotency_key: onboardingRequest.current,
           requester_email: requesterEmail,
           requester_password: requesterPassword,
           business_name: form.businessName,
@@ -368,7 +452,15 @@ export default function SuperAdminPage() {
         },
       });
 
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        // functions.invoke gives a generic "non-2xx" message; the real reason is in the response body.
+        let detail = "";
+        try {
+          const ctx = (res.error as { context?: Response }).context;
+          if (ctx && typeof ctx.json === "function") detail = (await ctx.json())?.error || "";
+        } catch { /* body already consumed or not JSON */ }
+        throw new Error(detail || res.error.message);
+      }
       if (!res.data?.success) throw new Error(res.data?.error || "Unknown onboarding error");
 
       const admin = res.data.admin;
@@ -391,8 +483,12 @@ export default function SuperAdminPage() {
         adminEmail: admin?.email || form.adminEmail,
       });
       setForm(DEFAULT_FORM);
+      onboardingRequest.current = null;
       setRequesterPassword("");
       notify({ title: "Client created", message: "The tenant environment was created successfully.", tone: "success" });
+      // The sidebar's tenant switcher fetches operators once on session load —
+      // without this, a newly created tenant stays invisible until a hard reload.
+      await refreshBusiness?.();
     } catch (error) {
       notify({
         title: "Onboarding failed",
@@ -407,7 +503,7 @@ export default function SuperAdminPage() {
   if (!/super/i.test(role || "")) {
     return (
       <div className="max-w-2xl">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-[var(--ck-text-strong)]">Super Admin</h1>
+        <h1 className="font-display mb-6 text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 text-center">
           <p className="ui-text-muted">This route is restricted to super admin accounts.</p>
         </div>
@@ -417,20 +513,21 @@ export default function SuperAdminPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)]">Super Admin</h1>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Platform Control</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
         <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Hidden onboarding workspace for creating new client tenants without touching SQL manually.</p>
       </div>
 
       {createdClient && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+        <div className="anim-fade-up rounded-2xl border p-4 text-sm" style={{ borderColor: "var(--ck-success)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
           <div className="font-semibold">{createdClient.businessName} created</div>
           <div className="mt-1">Business ID: {createdClient.businessId}</div>
           <div className="mt-1">Admin invite target: {createdClient.adminEmail}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="ui-card anim-fade-up anim-d1 p-6 space-y-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
@@ -456,6 +553,7 @@ export default function SuperAdminPage() {
             <div className="flex items-center gap-0">
               <input
                 value={form.subdomain}
+                required
                 onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
                 className="ui-control rounded-r-none rounded-lg px-3 py-2 text-sm outline-none flex-1"
                 placeholder="atlas-adventures"
@@ -495,7 +593,7 @@ export default function SuperAdminPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">WhatsApp Token</label>
-            <textarea value={form.waToken} onChange={(e) => setForm({ ...form, waToken: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="EAAG..." />
+            <input type="password" autoComplete="off" aria-label="WhatsApp token" value={form.waToken} onChange={(e) => setForm({ ...form, waToken: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="WhatsApp token" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">WhatsApp Phone ID</label>
@@ -503,11 +601,11 @@ export default function SuperAdminPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Secret Key</label>
-            <textarea value={form.yocoSecretKey} onChange={(e) => setForm({ ...form, yocoSecretKey: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="sk_live_..." />
+            <input type="password" autoComplete="off" aria-label="Yoco live secret key" value={form.yocoSecretKey} onChange={(e) => setForm({ ...form, yocoSecretKey: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="sk_live_..." />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Webhook Secret</label>
-            <textarea value={form.yocoWebhookSecret} onChange={(e) => setForm({ ...form, yocoWebhookSecret: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="whsec_..." />
+            <input type="password" autoComplete="off" aria-label="Yoco webhook secret" value={form.yocoWebhookSecret} onChange={(e) => setForm({ ...form, yocoWebhookSecret: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="whsec_..." />
           </div>
         </div>
 
@@ -516,14 +614,17 @@ export default function SuperAdminPage() {
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" disabled={submitting} className="rounded-xl bg-[var(--ck-text-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+          <button type="submit" disabled={submitting} className="ui-btn ui-btn-primary disabled:opacity-50">
             {submitting ? "Creating client..." : "Add New Client"}
           </button>
         </div>
       </form>
 
+      {/* ── Onboarding Invites (client-driven wizard links) ── */}
+      <OnboardingInvitesPanel />
+
       {/* ── Business Management ── */}
-      <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+      <div className="ui-card anim-fade-up anim-d2 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Management</h2>
@@ -535,13 +636,15 @@ export default function SuperAdminPage() {
         </div>
 
         {businesses.length === 0 && !loadingBiz && (
-          <p className="text-sm text-[var(--ck-text-muted)]">No businesses found.</p>
+          <div className="ui-empty">            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No businesses yet</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">New tenants you onboard will appear here.</p>
+          </div>
         )}
 
         {businesses.length > 0 && (
           <div className="space-y-3">
             {businesses.map((b) => (
-              <div key={b.id} className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-4">
                   {/* Left: Name + ID */}
                   <div>
@@ -555,10 +658,8 @@ export default function SuperAdminPage() {
                       onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
                       disabled={togglingStatusId === b.id}
                       title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
-                      className={"inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold cursor-pointer transition-colors " +
-                        (b.subscription_status === "SUSPENDED"
-                          ? "bg-red-100 text-red-700 hover:bg-red-200"
-                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200")}
+                      className={"ui-status cursor-pointer transition-opacity hover:opacity-80 " +
+                        (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : "ui-pill-success")}
                     >
                       {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
                     </button>
@@ -566,12 +667,12 @@ export default function SuperAdminPage() {
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
                       <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">−</button>
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">−</button>
                       <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
                       <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-bg-subtle)] disabled:opacity-30">+</button>
-                      <span className={"ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold " +
-                        ((b.admin_count || 0) >= b.max_admin_seats ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>
+                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">+</button>
+                      <span className={"ml-1 ui-status " +
+                        ((b.admin_count || 0) >= b.max_admin_seats ? "ui-pill-danger" : "ui-pill-success")}>
                         {b.admin_count || 0}/{b.max_admin_seats}
                       </span>
                     </div>
@@ -592,7 +693,7 @@ export default function SuperAdminPage() {
                       />
                       <span className="inline-flex items-center border border-l-0 rounded-r-lg px-2 py-1 text-[10px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
                       <button onClick={() => saveSubdomain(b.id, editingSubdomain.value)} disabled={savingSubdomain}
-                        className="ml-2 rounded-lg px-3 py-1 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
+                        className="ui-btn ui-btn-primary ml-2 !h-7 !px-3 !text-xs">
                         {savingSubdomain ? "..." : "Save"}
                       </button>
                       <button onClick={() => setEditingSubdomain(null)} className="ml-1 text-xs text-[var(--ck-text-muted)]">Cancel</button>
@@ -622,10 +723,33 @@ export default function SuperAdminPage() {
                 {/* ── Expanded Detail Panel ── */}
                 {expandedBiz === b.id && (
                   <div className="mt-3 border-t pt-4 space-y-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    {/* ── Monthly cost (single pricing model) ── */}
+                    <div className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                      <span className="font-semibold text-[var(--ck-text-strong)]">
+                        Monthly cost: R{monthlyCostZar(b.max_admin_seats).toLocaleString("en-ZA")}/month
+                      </span>
+                      <span className="ml-2 text-xs text-[var(--ck-text-muted)]">
+                        R{PLAN_BASE_ZAR.toLocaleString("en-ZA")} base (1 seat included)
+                        {b.max_admin_seats > PLAN_INCLUDED_SEATS
+                          ? ` + ${b.max_admin_seats - PLAN_INCLUDED_SEATS} extra seat${b.max_admin_seats - PLAN_INCLUDED_SEATS === 1 ? "" : "s"} × R${PLAN_EXTRA_SEAT_ZAR}`
+                          : ""}
+                      </span>
+                    </div>
                     {bizDetailLoading ? (
-                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" /></div>
+                      <div className="space-y-2 py-2"><div className="ui-skeleton h-4 w-3/4" /><div className="ui-skeleton h-4 w-1/2" /></div>
                     ) : bizDetail ? (
                       <>
+                        {/* ── Yoco webhook registration state (set by the onboarding wizard) ── */}
+                        {bizDetail.yoco_webhook_status === "PENDING_REGISTRATION" && (
+                          <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+                            <span className="font-semibold">Yoco webhook needs manual registration.</span>
+                            {" "}Payments will not confirm until the webhook is registered on this tenant's Yoco account.
+                          </div>
+                        )}
+                        {bizDetail.yoco_webhook_status === "REGISTERED" && (
+                          <div className="text-xs text-[var(--ck-text-muted)]">Yoco webhook registered.</div>
+                        )}
+
                         {/* ── Business Info ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Business Info</legend>
@@ -783,7 +907,7 @@ export default function SuperAdminPage() {
                           <div className="grid grid-cols-3 gap-3">
                             {[
                               ["activity_noun", "Activity noun (e.g. 'tour', 'dive', 'flight')"],
-                              ["activity_verb_past", "Activity verb — past (e.g. 'kayaked')"],
+                              ["activity_verb_past", "Activity verb in the past tense (e.g. 'kayaked')"],
                               ["location_phrase", "Location phrase (e.g. 'in Cape Town')"],
                             ].map(([key, label]) => (
                               <label key={key} className="text-xs text-[var(--ck-text-muted)]">
@@ -830,7 +954,7 @@ export default function SuperAdminPage() {
                         {/* ── FAQs ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>
-                            FAQs ({bizFaqs.length}) — Powers chatbot responses
+                            FAQs ({bizFaqs.length}): powers chatbot responses
                           </legend>
                           <div className="space-y-2">
                             {bizFaqs.map((faq, i) => (
@@ -841,7 +965,7 @@ export default function SuperAdminPage() {
                                   <input value={faq.a} onChange={(e) => { const next = [...bizFaqs]; next[i].a = e.target.value; setBizFaqs(next); }}
                                     className="ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="Answer" />
                                 </div>
-                                <button onClick={() => setBizFaqs(bizFaqs.filter((_, j) => j !== i))} className="text-red-500 text-xs mt-1">✕</button>
+                                <button onClick={() => setBizFaqs(bizFaqs.filter((_, j) => j !== i))} className="text-[var(--ck-danger)] text-xs mt-1">✕</button>
                               </div>
                             ))}
                             <button onClick={() => setBizFaqs([...bizFaqs, { q: "", a: "" }])}
@@ -883,7 +1007,7 @@ export default function SuperAdminPage() {
                                     <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">{t.name}</div>
                                     <div className="text-[10px] text-[var(--ck-text-muted)]">
                                       R{t.base_price_per_person} · {t.duration_minutes}min · Cap {t.default_capacity}
-                                      {t.hidden && <span className="ml-1 text-amber-500">(Hidden)</span>}
+                                      {t.hidden && <span className="ml-1 text-[var(--ck-amber)]">(Hidden)</span>}
                                     </div>
                                   </div>
                                 </div>
@@ -901,27 +1025,72 @@ export default function SuperAdminPage() {
                             <p className="text-xs italic text-[var(--ck-text-muted)]">No admin users found for this business.</p>
                           ) : (
                             <div className="space-y-2">
-                              {bizAdmins.map((admin) => (
-                                <div key={admin.id} className="flex items-center justify-between rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
-                                      {admin.name || admin.email}
-                                      {admin.suspended && <span className="ml-1.5 text-red-500 text-[10px] font-bold">(Suspended)</span>}
+                              {bizAdmins.map((admin) => {
+                                const perms = (admin.settings_permissions || {}) as Record<string, boolean>;
+                                const permsExpanded = expandedPermsAdmin === admin.id;
+                                return (
+                                <div key={admin.id} className="rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
+                                        {admin.name || admin.email}
+                                        {admin.suspended && <span className="ml-1.5 text-[var(--ck-danger)] text-[10px] font-bold">(Suspended)</span>}
+                                      </div>
+                                      <div className="text-[10px] text-[var(--ck-text-muted)]">
+                                        {admin.email} · {admin.role}
+                                      </div>
                                     </div>
-                                    <div className="text-[10px] text-[var(--ck-text-muted)]">
-                                      {admin.email} · {admin.role}
+                                    <div className="flex flex-wrap items-center justify-end gap-2 ml-3">
+                                      {admin.role !== "SUPER_ADMIN" && <button onClick={() => setAdminSuspended(admin)} disabled={changingRoleId === admin.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">{admin.suspended ? "Reactivate" : "Suspend"}</button>}
+                                      {admin.role !== "SUPER_ADMIN" && (
+                                        <button
+                                          onClick={() => changeAdminRole(admin, admin.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
+                                          disabled={changingRoleId === admin.id}
+                                          className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                          {changingRoleId === admin.id ? "Saving..." : (admin.role === "MAIN_ADMIN" ? "Change to Admin" : "Make Main Admin")}
+                                        </button>
+                                      )}
+                                      {admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
+                                        <button
+                                          onClick={() => setExpandedPermsAdmin(permsExpanded ? null : admin.id)}
+                                          className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs whitespace-nowrap"
+                                        >
+                                          {permsExpanded ? "Close" : "Permissions"}
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => resetAdminPassword(admin.id, admin.email)}
+                                        disabled={resettingPasswordId === admin.id}
+                                        className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap"
+                                      >
+                                        {resettingPasswordId === admin.id ? "Sending..." : "Send setup link"}
+                                      </button>
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => resetAdminPassword(admin.id, admin.email)}
-                                    disabled={resettingPasswordId === admin.id}
-                                    className="shrink-0 ml-3 rounded-lg border px-3 py-1 text-xs font-semibold transition-colors hover:bg-[var(--ck-bg-subtle)] disabled:opacity-50"
-                                    style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}
-                                  >
-                                    {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
-                                  </button>
+                                  {permsExpanded && admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
+                                    <div className="mt-2 pt-2 border-t grid grid-cols-2 gap-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                      {SETTINGS_SECTIONS.map(section => (
+                                        <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded px-2 py-1 hover:bg-[var(--ck-surface-sunken)]">
+                                          <input
+                                            type="checkbox"
+                                            checked={perms[section.key] === true}
+                                            onChange={() => {
+                                              const newPerms = { ...perms, [section.key]: !perms[section.key] };
+                                              setBizAdmins(bizAdmins.map(a => a.id === admin.id ? { ...a, settings_permissions: newPerms } : a));
+                                              saveBizAdminPerms(admin.id, newPerms);
+                                            }}
+                                            disabled={savingPermsId === admin.id}
+                                            className="h-3.5 w-3.5 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
+                                          />
+                                          <span className="text-[10.5px] text-[var(--ck-text)]">{section.label}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </fieldset>
@@ -929,7 +1098,7 @@ export default function SuperAdminPage() {
                         {/* ── Save ── */}
                         <div className="flex justify-end pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           <button onClick={saveBizDetail} disabled={bizDetailSaving}
-                            className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                            className="ui-btn ui-btn-primary disabled:opacity-50">
                             {bizDetailSaving ? "Saving..." : "Save All Changes"}
                           </button>
                         </div>
@@ -947,10 +1116,371 @@ export default function SuperAdminPage() {
       <LandingPageManager businesses={businesses} />
 
       {/* ── Email Usage & Billing ── */}
+      <PlatformOperations />
       <EmailUsageBilling />
+
+      {/* ── Platform Invoices (BookingTours -> operator monthly billing) ── */}
+      <div id="platform-invoices"><PlatformInvoicesBilling /></div>
+
+      {/* ── Platform Settings (BookingTours' own logo + banking) ── */}
+      <PlatformSettingsPanel />
 
       {/* ── Chatbot Avatars (global catalog) ── */}
       <ChatbotAvatarManager />
+
+      {/* ── Chatbot Ratings (visitor feedback across all tenants) ── */}
+      <ChatbotRatingsPanel />
+
+      {/* ── Operator Directory (central landing page copy + visibility) ── */}
+      <DirectoryPanel />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Onboarding Invites — single-use wizard links, super-admin only
+   ══════════════════════════════════════════════════════════════ */
+
+type InviteRow = {
+  id: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+  used_by_email: string | null;
+  business_id: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  wizard_step: string | null;
+  businesses: { business_name: string; subdomain: string; subscription_status: string; yoco_webhook_status: string | null } | null;
+  status: "used" | "expired" | "active";
+  invite_link: string | null;
+};
+
+const INVITE_FORM = { clientName: "", clientEmail: "", subdomain: "", expiresInHours: "48" };
+
+function OnboardingInvitesPanel() {
+  const [requesterEmail, setRequesterEmail] = useState("");
+  const [requesterPassword, setRequesterPassword] = useState("");
+  const [form, setForm] = useState(INVITE_FORM);
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<{ businessName: string; token: string; inviteLink: string | null; expiresAt: string } | null>(null);
+  const [rows, setRows] = useState<InviteRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => { setRequesterEmail(localStorage.getItem("ck_admin_email") || ""); }, []);
+
+  // Every action re-verifies the super admin's password, so the list can only be
+  // loaded once the password field is filled in — no auto-load on mount.
+  async function callInvites(body: Record<string, unknown>) {
+    if (!requesterEmail || !requesterPassword) throw new Error("Enter your super admin email and password first.");
+    const res = await supabase.functions.invoke("generate-invite-token", {
+      body: { requester_email: requesterEmail, requester_password: requesterPassword, ...body },
+    });
+    if (res.error) {
+      // functions.invoke gives a generic "non-2xx" message; the real reason is in the response body.
+      let detail = "";
+      try {
+        const ctx = (res.error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") detail = (await ctx.json())?.error || "";
+      } catch { /* body already consumed or not JSON */ }
+      throw new Error(detail || res.error.message);
+    }
+    if (!res.data?.success) throw new Error(res.data?.error || "Unknown invite error");
+    return res.data;
+  }
+
+  async function loadInvites() {
+    setLoading(true);
+    try {
+      const data = await callInvites({ action: "list" });
+      setRows(data.tokens || []);
+    } catch (err: any) {
+      notify({ title: "Failed to load invites", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  async function generateInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setGenerating(true);
+    try {
+      const data = await callInvites({
+        action: "generate",
+        client_name: form.clientName,
+        client_email: form.clientEmail,
+        subdomain: form.subdomain,
+        expires_in_hours: Number(form.expiresInHours) || 48,
+      });
+      setGenerated({ businessName: data.business_name, token: data.token, inviteLink: data.invite_link, expiresAt: data.expires_at });
+      setForm(INVITE_FORM);
+      notify({ title: "Invite created", message: `${data.business_name} is provisioned and waiting on the wizard.`, tone: "success" });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Could not create invite", message: err.message, tone: "error" });
+    }
+    setGenerating(false);
+  }
+
+  async function reissueInvite(row: InviteRow) {
+    if (!row.business_id) { notify({ title: "No tenant", message: "This invite has no business to reissue against.", tone: "error" }); return; }
+    setBusyId(row.id);
+    try {
+      const data = await callInvites({ action: "reissue", business_id: row.business_id, expires_in_hours: Number(form.expiresInHours) || 48 });
+      setGenerated({ businessName: row.businesses?.business_name || row.client_name || "Tenant", token: data.token, inviteLink: data.invite_link, expiresAt: data.expires_at });
+      notify({ title: "Invite reissued", message: "The client keeps their half-filled tenant; send them the new link.", tone: "success" });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Reissue failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function revokeInvite(row: InviteRow) {
+    const label = row.businesses?.business_name || row.client_name || row.client_email || "this invite";
+    if (!await confirmAction({
+      title: "Revoke invite",
+      message: `Revoke the invite for ${label}? If that tenant never went live, its skeleton is deleted too and the subdomain is freed for reuse.`,
+      tone: "warning",
+      confirmLabel: "Revoke invite",
+    })) return;
+
+    setBusyId(row.id);
+    try {
+      const data = await callInvites({ action: "revoke", token_id: row.id });
+      notify({
+        title: "Invite revoked",
+        message: data.business_deleted
+          ? `The skeleton tenant was deleted and ${row.businesses?.subdomain || "its subdomain"} is free again.`
+          : "The invite link no longer works. The tenant was kept because it is already live.",
+        tone: "success",
+      });
+      await loadInvites();
+    } catch (err: any) {
+      notify({ title: "Revoke failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  function copyLink(link: string | null, token: string) {
+    if (!link) {
+      navigator.clipboard.writeText(token);
+      notify({ title: "Token copied", message: "No wizard URL is configured, so only the raw token was copied.", tone: "warning" });
+      return;
+    }
+    navigator.clipboard.writeText(link);
+    notify({ title: "Link copied", message: "Send it to the client; it works once.", tone: "success" });
+  }
+
+  const statusPill: Record<InviteRow["status"], string> = {
+    active: "ui-pill-success",
+    used: "ui-pill-neutral",
+    expired: "ui-pill-danger",
+  };
+
+  return (
+    <div className="ui-card anim-fade-up anim-d2 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Onboarding Invites</h2>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Single-use wizard links. Generating one provisions a skeleton tenant the client fills in themselves.</p>
+        </div>
+        <button onClick={loadInvites} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+
+      <form onSubmit={generateInvite} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
+            <input value={requesterEmail} onChange={(e) => setRequesterEmail(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="superadmin@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Confirm Your Password</label>
+            <input type="password" value={requesterPassword} onChange={(e) => setRequesterPassword(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Current admin password" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Client Name</label>
+            <input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Atlas Adventures" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Client Email</label>
+            <input type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="owner@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Booking Subdomain</label>
+            <div className="flex items-center gap-0">
+              <input
+                value={form.subdomain}
+                onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                required
+                className="ui-control rounded-r-none rounded-lg px-3 py-2 text-sm outline-none flex-1"
+                placeholder="atlas-adventures"
+              />
+              <span className="inline-flex items-center rounded-r-lg border border-l-0 px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Link Valid For (hours)</label>
+            <input type="number" min={1} max={720} value={form.expiresInHours} onChange={(e) => setForm({ ...form, expiresInHours: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="48" />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={generating} className="ui-btn ui-btn-primary disabled:opacity-50">
+            {generating ? "Creating invite..." : "Generate Invite Link"}
+          </button>
+        </div>
+      </form>
+
+      {generated && (
+        <div className="mt-4 rounded-2xl border p-4 text-sm" style={{ borderColor: "var(--ck-success)", background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+          <div className="font-semibold">{generated.businessName}: invite ready</div>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 truncate rounded-lg px-2 py-1.5 text-xs font-mono" style={{ background: "var(--ck-bg)", color: "var(--ck-text)" }}>
+              {generated.inviteLink || generated.token}
+            </code>
+            <button type="button" onClick={() => copyLink(generated.inviteLink, generated.token)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs shrink-0">Copy</button>
+          </div>
+          {!generated.inviteLink && (
+            <div className="mt-1 text-xs">No wizard URL configured (ONBOARDING_APP_URL); this is the raw token.</div>
+          )}
+          <div className="mt-1 text-xs">Expires {new Date(generated.expiresAt).toLocaleString()}</div>
+        </div>
+      )}
+
+      <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        {rows.length === 0 ? (
+          <div className="ui-empty">
+            <p className="text-sm font-medium text-[var(--ck-text-strong)]">No invites loaded</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">Enter your password and hit Refresh to see the 50 most recent invites.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((row) => (
+              <div key={row.id} className="rounded-lg border p-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-[var(--ck-text-strong)] truncate">
+                        {row.businesses?.business_name || row.client_name || "Unknown tenant"}
+                      </span>
+                      <span className={"ui-status " + statusPill[row.status]}>{row.status}</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">
+                      {row.client_name || "-"} · {row.client_email || "-"}
+                      {row.businesses?.subdomain ? ` · ${row.businesses.subdomain}.${BOOKING_DOMAIN}` : ""}
+                    </div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] mt-0.5">
+                      {row.wizard_step ? `Reached: ${row.wizard_step}` : "Not started"}
+                      {row.status === "used"
+                        ? ` · used ${new Date(row.used_at!).toLocaleString()}${row.used_by_email ? ` by ${row.used_by_email}` : ""}`
+                        : ` · ${row.status === "expired" ? "expired" : "expires"} ${new Date(row.expires_at).toLocaleString()}`}
+                    </div>
+                    {row.businesses?.yoco_webhook_status === "PENDING_REGISTRATION" && (
+                      <div className="text-[10px] font-medium mt-0.5" style={{ color: "var(--ck-warning)" }}>Yoco webhook needs manual registration</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {row.status === "active" && (
+                      <button onClick={() => copyLink(row.invite_link, row.token)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs whitespace-nowrap">Copy link</button>
+                    )}
+                    <button onClick={() => reissueInvite(row)} disabled={busyId === row.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap">
+                      {busyId === row.id ? "..." : "Reissue"}
+                    </button>
+                    {!row.used_at && (
+                      <button onClick={() => revokeInvite(row)} disabled={busyId === row.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs text-[var(--ck-danger)] disabled:opacity-50 whitespace-nowrap">
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Visitor ratings (1-5 stars) of how well web chats were handled, across every
+// tenant. Reads conversations directly — SUPER_ADMIN's current_business_ids()
+// returns all businesses so RLS lets this see every tenant's rated chats.
+function ChatbotRatingsPanel() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const [{ data: convos }, { data: biz }] = await Promise.all([
+      supabase.from("conversations")
+        .select("id, business_id, rating, rating_at, handled_by, customer_name")
+        .not("rating", "is", null)
+        .order("rating_at", { ascending: false })
+        .limit(200),
+      supabase.from("businesses").select("id, name"),
+    ]);
+    setNames(Object.fromEntries((biz || []).map((b: any) => [b.id, b.name])));
+    setRows(convos || []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  const count = rows.length;
+  const avg = count ? (rows.reduce((s, r) => s + Number(r.rating || 0), 0) / count) : 0;
+  const botRows = rows.filter((r) => r.handled_by !== "HUMAN");
+  const humanRows = rows.filter((r) => r.handled_by === "HUMAN");
+  const avgOf = (rs: any[]) => rs.length ? (rs.reduce((s, r) => s + Number(r.rating || 0), 0) / rs.length).toFixed(1) : "—";
+
+  return (
+    <div className="ui-card">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Ratings</h2>
+        <button onClick={load} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-6 mb-4 text-sm">
+        <div><span className="text-[var(--ck-text-muted)]">Rated chats</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{count}</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Overall avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{count ? avg.toFixed(1) : "—"} ★</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Bot avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{avgOf(botRows)} ★</span> <span className="text-xs text-[var(--ck-text-muted)]">({botRows.length})</span></div>
+        <div><span className="text-[var(--ck-text-muted)]">Human avg</span><br /><span className="text-xl font-semibold text-[var(--ck-text-strong)]">{avgOf(humanRows)} ★</span> <span className="text-xs text-[var(--ck-text-muted)]">({humanRows.length})</span></div>
+      </div>
+      {count === 0 ? (
+        <p className="text-sm text-[var(--ck-text-muted)]">No chat ratings yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[var(--ck-text-muted)] border-b border-[var(--ck-border-subtle)]">
+                <th className="py-2 pr-3 font-medium">Rating</th>
+                <th className="py-2 pr-3 font-medium">Handled by</th>
+                <th className="py-2 pr-3 font-medium">Business</th>
+                <th className="py-2 pr-3 font-medium">Visitor</th>
+                <th className="py-2 font-medium">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-[var(--ck-border-subtle)]">
+                  <td className="py-2 pr-3 whitespace-nowrap" style={{ color: "var(--ck-accent)" }}>{"★".repeat(r.rating)}<span className="text-[var(--ck-text-muted)]">{"★".repeat(5 - r.rating)}</span></td>
+                  <td className="py-2 pr-3">{r.handled_by === "HUMAN" ? "Human" : "Bot"}</td>
+                  <td className="py-2 pr-3">{names[r.business_id] || r.business_id?.slice(0, 8) || "—"}</td>
+                  <td className="py-2 pr-3">{r.customer_name || "Website visitor"}</td>
+                  <td className="py-2 whitespace-nowrap text-[var(--ck-text-muted)]">{r.rating_at ? new Date(r.rating_at).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -963,20 +1493,21 @@ export default function SuperAdminPage() {
 // The super-admin UI fetches /landing-pages/templates/<id>.html — if the file is
 // missing the preview 404s. Template ids shown here are the ones currently on disk.
 const TEMPLATES = [
-  { id: "adventure", name: "Adventure", desc: "Cinematic fullscreen hero, scroll-reveal animations, glassmorphism nav", preview: "A" },
-  { id: "modern", name: "Modern", desc: "Bold split-hero layout, stat counters, sharp geometric design", preview: "M" },
-  { id: "luxury", name: "Luxury", desc: "Elegant serif typography, gold accents, refined whitespace", preview: "L" },
-  { id: "safari", name: "Safari", desc: "Warm earthy tones, bottom-aligned hero, lodge aesthetic", preview: "S" },
-  { id: "coastal", name: "Coastal", desc: "Ocean blues, wave dividers, fresh beach vibes", preview: "C" },
-  { id: "minimal", name: "Minimal", desc: "Ultra-clean whitespace, no decoration, typography-focused", preview: "Mi" },
-  { id: "dark", name: "Dark", desc: "Full dark mode, neon glow accents, cinematic moody feel", preview: "D" },
-  { id: "retro", name: "Retro", desc: "Vintage serif fonts, warm film tones, nostalgic charm", preview: "R" },
-  { id: "tropical", name: "Tropical", desc: "Lush greens, vibrant gradients, paradise island energy", preview: "T" },
+  { id: "sea_kayak", name: "Sea-Kayak & Coastal", desc: "Warm paper tone, long swell divider, conditions-aware calendar, organic wave-blob hover reveal", preview: "SK" },
+  { id: "polar", name: "Polar Cruise", desc: "Ice white, jagged floe edge, temperature season dial shifts gear list", preview: "PE" },
+  { id: "desert", name: "Desert Overlanding", desc: "Sun-bleached sand, dune divider, route scrubber on custom-styled map", preview: "DO" },
+  { id: "alpine", name: "Alpine Ascent", desc: "Slate grey, mountain ridgeline, difficulty scale profile graph", preview: "AM" },
+  { id: "safari", name: "Safari Wildlife", desc: "Savanna cream, grass divider, cinema borders, live recent sightings ticker", preview: "SW" },
+  { id: "aerial", name: "Skydive Aerial", desc: "Stratosphere blue, falling teardrop mask, scroll-driven altimeter", preview: "SA" },
+  { id: "jungle", name: "Jungle River", desc: "Deep moss dark theme, foliage scroll parallax, ambient audio toggle", preview: "JR" },
+  { id: "nordic", name: "Nordic Fjord", desc: "Fog tones, waterline reflection, historical weather odds cards", preview: "NF" },
+  { id: "dive", name: "Dive & Reef", desc: "Abyss dark theme, caustic light ripple, descent depth overlay, species index", preview: "DR" },
+  { id: "wine_cycling", name: "Wine Cycling", desc: "Chalk background, vineyard rows, editorial asymmetric pairs, menu route pairing", preview: "WC" }
 ];
 
 function LandingPageManager({ businesses }: { businesses: any[] }) {
   const [selectedBiz, setSelectedBiz] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState("adventure");
+  const [selectedTemplate, setSelectedTemplate] = useState("sea_kayak");
   const [generating, setGenerating] = useState(false);
   const [generatedHtml, setGeneratedHtml] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -990,6 +1521,16 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
     // Load business + tours data
     const { data: biz } = await supabase.from("businesses").select("*").eq("id", selectedBiz).single();
     const { data: tours } = await supabase.from("tours").select("name, description, duration_minutes, default_capacity, base_price_per_person, image_url").eq("business_id", selectedBiz).eq("hidden", false).order("sort_order");
+    // Real social proof only — approved reviews, best-rated first. Templates
+    // hide their reviews strip entirely when a business has none.
+    const { data: reviewRows } = await supabase.from("reviews")
+      .select("rating, comment, reviewer_name")
+      .eq("business_id", selectedBiz)
+      .eq("status", "APPROVED")
+      .not("comment", "is", null)
+      .order("rating", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(3);
 
     if (!biz) { notify({ title: "Error", message: "Business not found.", tone: "error" }); setGenerating(false); return; }
 
@@ -1001,14 +1542,16 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       hero_eyebrow: biz.hero_eyebrow || "",
       hero_title: biz.hero_title || biz.business_name || "Welcome",
       hero_subtitle: biz.hero_subtitle || biz.business_tagline || "",
-      hero_image: "",
+      // Photography-first: business hero image, else the first tour's image.
+      hero_image: biz.hero_image || (tours || []).find((t: any) => t.image_url)?.image_url || "",
       color_main: biz.color_main || "#1a3c34",
       color_secondary: biz.color_secondary || "#132833",
       color_cta: biz.color_cta || "#ca6c2f",
       color_bg: biz.color_bg || "#f5f5f5",
       color_nav: biz.color_nav || "#ffffff",
       color_hover: biz.color_hover || "#48cfad",
-      booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.bookingtours.co.za` : "#"),
+      booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.${BOOKING_DOMAIN}` : "#"),
+      subdomain: biz.subdomain || "",
       directions: biz.directions || "",
       what_to_bring: biz.what_to_bring || "",
       what_to_wear: biz.what_to_wear || "",
@@ -1023,6 +1566,15 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         base_price_per_person: t.base_price_per_person || "0",
         image_url: t.image_url || "",
       })),
+      has_tours: (tours || []).length > 0,
+      tour_count: String((tours || []).length),
+      reviews: (reviewRows || []).map((r: any) => ({
+        quote: r.comment || "",
+        author: r.reviewer_name || "Verified guest",
+        rating: String(r.rating || 5),
+      })),
+      has_reviews: (reviewRows || []).length > 0,
+      review_count: String((reviewRows || []).length),
     };
 
     // Fetch template
@@ -1050,7 +1602,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       setShowPreview(true);
       setFirebaseSite(biz.subdomain || biz.business_name?.toLowerCase().replace(/[^a-z0-9]/g, "-") || "site");
       setCustomDomain("");
-      notify({ title: "Landing page generated", message: `${ctx.business_name} — ${selectedTemplate} template`, tone: "success" });
+      notify({ title: "Landing page generated", message: `${ctx.business_name}: ${selectedTemplate} template`, tone: "success" });
     } catch (err: any) {
       notify({ title: "Generation failed", message: err.message, tone: "error" });
     }
@@ -1103,7 +1655,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
   }
 
   return (
-    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Landing Pages</h2>
         <p className="text-xs text-[var(--ck-text-muted)] mt-1">Generate polished landing pages for each business. Choose a template, preview, and deploy to Firebase.</p>
@@ -1123,13 +1675,13 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Template</label>
           <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}
             className="w-full ui-control rounded-lg px-3 py-2 text-sm">
-            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.desc}</option>)}
+            {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}: {t.desc}</option>)}
           </select>
         </div>
       </div>
 
       {/* Template previews */}
-      <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="grid grid-cols-5 md:grid-cols-10 gap-2 mb-4">
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
             className={"rounded-xl border p-2.5 text-center transition-all cursor-pointer " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-50 hover:opacity-80")}
@@ -1142,7 +1694,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
 
       {/* Generate button */}
       <button onClick={generateLandingPage} disabled={generating || !selectedBiz}
-        className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 w-full" style={{ background: "var(--ck-accent)" }}>
+        className="ui-btn ui-btn-primary w-full disabled:opacity-50">
         {generating ? "Generating..." : "Generate Landing Page"}
       </button>
 
@@ -1151,8 +1703,8 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         <div className="mt-4 space-y-3">
           {/* Preview iframe */}
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
-            <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-bg-subtle)", color: "var(--ck-text-muted)" }}>
-              <span>Preview — {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
+            <div className="px-3 py-2 flex items-center justify-between text-xs" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>
+              <span>Preview: {TEMPLATES.find((t) => t.id === selectedTemplate)?.name} template</span>
               <div className="flex gap-2">
                 <button onClick={() => setShowPreview(!showPreview)} className="hover:underline">{showPreview ? "Hide" : "Show"}</button>
               </div>
@@ -1162,22 +1714,22 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
 
           {/* Actions */}
           <div className="grid grid-cols-3 gap-2">
-            <button onClick={downloadHtml} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            <button onClick={downloadHtml} className="ui-btn ui-btn-ghost !text-xs">
               Download HTML
             </button>
-            <button onClick={downloadProject} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            <button onClick={downloadProject} className="ui-btn ui-btn-ghost !text-xs">
               Download for IDE
             </button>
             <button onClick={() => {
               const w = window.open("", "_blank");
               if (w) { w.document.write(generatedHtml); w.document.close(); }
-            }} className="rounded-lg border px-4 py-2.5 text-xs font-semibold text-center" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-strong)" }}>
+            }} className="ui-btn ui-btn-ghost !text-xs">
               Open Full Page
             </button>
           </div>
 
           {/* Deployment guide */}
-          <div className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-bg-subtle)" }}>
+          <div className="rounded-xl border p-4" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-2">Deploy to Firebase</h3>
             <div className="space-y-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               <div className="flex items-start gap-2">
@@ -1201,7 +1753,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
                   <div className="mt-1">
                     <label className="text-[10px] font-medium">Custom domain for this site:</label>
                     <input value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="e.g. www.clientbusiness.co.za"
-                      className="mt-0.5 w-full rounded border px-2 py-1 text-[11px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)" }} />
+                      className="mt-0.5 w-full ui-control !px-2 !py-1 !text-[11px]" />
                   </div>
                   {customDomain && (
                     <div className="mt-1 p-2 rounded text-[10px]" style={{ background: "var(--ck-surface)" }}>
@@ -1246,7 +1798,6 @@ function EmailUsageBilling() {
   const [loading, setLoading] = useState(false);
   const [editingRate, setEditingRate] = useState<{ id: string; value: string } | null>(null);
   const [savingRate, setSavingRate] = useState(false);
-  const [generatingInvoice, setGeneratingInvoice] = useState<string | null>(null);
 
   async function loadUsage() {
     setLoading(true);
@@ -1273,7 +1824,7 @@ function EmailUsageBilling() {
 
     const combined: EmailUsageRow[] = bizData.map((b: any) => {
       const sent = usageMap.get(b.id) || 0;
-      const included = Number(b.marketing_included_emails || 500);
+      const included = Number(b.marketing_included_emails ?? 20);
       const rate = Number(b.marketing_overage_rate_zar || 0.15);
       const overage = Math.max(0, sent - included);
       return {
@@ -1314,62 +1865,16 @@ function EmailUsageBilling() {
     setSavingRate(false);
   }
 
-  async function generateInvoice(row: EmailUsageRow) {
-    if (row.overage_cost <= 0) {
-      notify({ title: "No overage", message: "This business has no overage charges for this period.", tone: "warning" });
-      return;
-    }
-    setGeneratingInvoice(row.business_id);
-
-    try {
-      // Create invoice in invoices table
-      const periodLabel = new Date(row.period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
-
-      // Get next invoice number
-      const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: row.business_id });
-      if (invNumRes.error) console.warn("next_invoice_number RPC failed, using fallback");
-      const invNum = invNumRes.data || `MKT-${row.period}-${row.business_id.substring(0, 4).toUpperCase()}`;
-
-      const { data: inv, error: invErr } = await supabase.from("invoices").insert({
-        business_id: row.business_id,
-        invoice_number: invNum,
-        customer_name: row.business_name,
-        customer_email: "",
-        tour_name: "Marketing Email Overage",
-        qty: row.overage,
-        unit_price: row.rate_zar,
-        subtotal: row.overage_cost,
-        total_amount: row.overage_cost,
-        payment_method: "Pending",
-        discount_type: null,
-        discount_percent: 0,
-        discount_amount: 0,
-        discount_notes: `${row.emails_sent} emails sent in ${periodLabel}. ${row.included} included, ${row.overage} overage at R${row.rate_zar.toFixed(2)}/email.`,
-      }).select("id, invoice_number").single();
-
-      if (invErr) throw invErr;
-
-      notify({
-        title: "Invoice created",
-        message: `Invoice ${inv.invoice_number} for R${row.overage_cost.toFixed(2)} — ${row.overage} overage emails in ${periodLabel}`,
-        tone: "success",
-      });
-    } catch (err: any) {
-      notify({ title: "Invoice failed", message: err.message || "Unknown error", tone: "error" });
-    }
-    setGeneratingInvoice(null);
-  }
-
   const totalSent = rows.reduce((s, r) => s + r.emails_sent, 0);
   const totalOverageCost = rows.reduce((s, r) => s + r.overage_cost, 0);
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
 
   return (
-    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Usage & Billing</h2>
-          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track emails sent per business, set per-email pricing, and generate overage invoices.</p>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track usage and pricing. Email overages are included once in the monthly Platform Invoice below.</p>
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -1386,24 +1891,30 @@ function EmailUsageBilling() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{totalSent.toLocaleString()}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Emails sent in {periodLabel}</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Emails Sent</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{totalSent.toLocaleString()}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">in {periodLabel}</div>
         </div>
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className="text-2xl font-bold text-[var(--ck-text-strong)]">{rows.filter((r) => r.overage > 0).length}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Businesses over limit</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Over Limit</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: "var(--ck-text-strong)" }}>{rows.filter((r) => r.overage > 0).length}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">businesses over their plan</div>
         </div>
-        <div className="rounded-xl border border-[var(--ck-border-subtle)] p-3 text-center">
-          <div className={"text-2xl font-bold " + (totalOverageCost > 0 ? "text-amber-600" : "text-[var(--ck-text-strong)]")}>R{totalOverageCost.toFixed(2)}</div>
-          <div className="text-xs text-[var(--ck-text-muted)]">Total overage charges</div>
+        <div className="ui-card p-4">
+          <div className="flex items-center gap-2">            <span className="ui-mono-label">Overage Owed</span>
+          </div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: totalOverageCost > 0 ? "var(--ck-amber)" : "var(--ck-text-strong)" }}>R{totalOverageCost.toFixed(2)}</div>
+          <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">total for {periodLabel}</div>
         </div>
       </div>
 
       {rows.length > 0 && (
         <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--ck-bg-subtle)] text-xs font-medium text-[var(--ck-text-muted)]">
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
             <div className="col-span-3">Business</div>
             <div className="col-span-2 text-center">Emails Sent</div>
             <div className="col-span-1 text-center">Included</div>
@@ -1431,9 +1942,9 @@ function EmailUsageBilling() {
               {/* Overage */}
               <div className="col-span-1 text-center">
                 {r.overage > 0 ? (
-                  <span className="text-amber-600 font-semibold">{r.overage}</span>
+                  <span className="text-[var(--ck-amber)] font-semibold">{r.overage}</span>
                 ) : (
-                  <span className="text-emerald-600">0</span>
+                  <span className="text-[var(--ck-success)]">0</span>
                 )}
               </div>
 
@@ -1448,13 +1959,13 @@ function EmailUsageBilling() {
                       min="0"
                       value={editingRate.value}
                       onChange={(e) => setEditingRate({ id: r.business_id, value: e.target.value })}
-                      className="w-16 rounded border border-[var(--ck-border-subtle)] px-1.5 py-0.5 text-xs text-center outline-none"
+                      className="w-16 ui-control !px-1.5 !py-0.5 !text-xs text-center"
                       autoFocus
                     />
                     <button
                       onClick={() => saveRate(r.business_id, Number(editingRate.value))}
                       disabled={savingRate}
-                      className="text-xs text-emerald-600 font-semibold hover:underline"
+                      className="text-xs text-[var(--ck-accent)] font-semibold hover:underline"
                     >Save</button>
                     <button onClick={() => setEditingRate(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline">Cancel</button>
                   </div>
@@ -1472,26 +1983,340 @@ function EmailUsageBilling() {
               {/* Owed */}
               <div className="col-span-1 text-center">
                 {r.overage_cost > 0 ? (
-                  <span className="font-bold text-amber-600">R{r.overage_cost.toFixed(2)}</span>
+                  <span className="font-bold text-[var(--ck-amber)]">R{r.overage_cost.toFixed(2)}</span>
                 ) : (
-                  <span className="text-emerald-600 text-xs">R0</span>
+                  <span className="text-[var(--ck-success)] text-xs">R0</span>
                 )}
               </div>
 
               {/* Invoice button */}
               <div className="col-span-2 text-center">
-                <button
-                  onClick={() => generateInvoice(r)}
-                  disabled={r.overage_cost <= 0 || generatingInvoice === r.business_id}
-                  className="rounded-lg bg-[var(--ck-text-strong)] px-3 py-1 text-xs font-medium text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-30 transition-opacity"
-                >
-                  {generatingInvoice === r.business_id ? "..." : r.overage_cost > 0 ? "Generate Invoice" : "No charge"}
-                </button>
+                <a href="#platform-invoices" className="text-xs text-[var(--ck-accent)] underline">Monthly invoice</a>
               </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Platform Invoices — BookingTours -> operator monthly billing
+   (mirrors EmailUsageBilling's month-picker + computed-row pattern)
+   ══════════════════════════════════════════════════════════════ */
+
+type PlatformInvoiceRow = {
+  voided_invoices?: Array<{ id: string; invoice_number: string; amount_zar: number; void_reason: string }>;
+  business_id: string;
+  business_name: string;
+  has_subscription: boolean;
+  plan_name?: string;
+  monthly_price_zar?: number;
+  active_days?: number;
+  total_days?: number;
+  pro_rated?: boolean;
+  pause_note?: string | null;
+  amount_zar?: number;
+  existing_invoice: {
+    id: string;
+    status: string;
+    amount_zar: number;
+    yoco_payment_link_url: string | null;
+    paid_method: string | null;
+  } | null;
+};
+
+function PlatformInvoicesBilling() {
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [rows, setRows] = useState<PlatformInvoiceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function loadInvoices() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/platform-invoices/list?period=${period}`, { headers: await getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to load");
+      setRows(data.rows || []);
+    } catch (err: any) {
+      notify({ title: "Failed to load platform invoices", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadInvoices(); }, [period]);
+
+  async function generate(row: PlatformInvoiceRow) {
+    if (!await confirmAction({ title: "Generate monthly invoice", message: `${row.business_name}: create a draft for ${period}? Review the amount before sending. This does not take payment.`, confirmLabel: "Generate draft" })) return;
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/generate", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ business_id: row.business_id, period }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to generate");
+      notify({ title: "Invoice generated", message: `${row.business_name}: R${Number(data.invoice.amount_zar).toFixed(2)}`, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Generate failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function createPaymentLink(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/create-payment-link", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to create payment link");
+      notify({ title: "Payment link created", message: row.business_name, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Payment link failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function markPaidManually(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    const method = window.prompt("Payment method (MANUAL, EFT, OTHER):", "EFT");
+    if (!method) return;
+    const notes = window.prompt("Optional note / reference:") || "";
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/mark-paid", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id, method, notes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to mark paid");
+      notify({ title: "Marked as paid", message: row.business_name, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function sendEmail(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    if (!await confirmAction({ title: "Send invoice email", message: `Send ${row.business_name}'s invoice for R${Number(row.existing_invoice.amount_zar).toFixed(2)} to their billing contact?`, confirmLabel: "Send invoice" })) return;
+    setBusyId(row.business_id);
+    try {
+      const res = await fetch("/api/platform-invoices/send", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to send");
+      notify({ title: "Email sent", message: `${row.business_name} (${(data.sent_to || []).join(", ")})`, tone: "success" });
+      loadInvoices();
+    } catch (err: any) {
+      notify({ title: "Send failed", message: err.message, tone: "error" });
+    }
+    setBusyId(null);
+  }
+
+  async function voidInvoice(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    const reason = window.prompt(`Why are you voiding ${row.business_name}'s draft? The original stays in the audit trail. Payment-linked invoices require provider cancellation first.`);
+    if (!reason) return;
+    setBusyId(row.business_id);
+    try {
+      const response = await fetch("/api/platform-invoices/void", { method: "POST", headers: await getAuthHeaders(row.business_id), body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id, reason }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not void invoice");
+      await loadInvoices();
+      notify({ title: "Draft voided", message: "Correct the settings, then generate a replacement for the same month.", tone: "success" });
+    } catch (error: any) { notify({ title: "Invoice unchanged", message: error.message, tone: "error" }); }
+    finally { setBusyId(null); }
+  }
+
+  const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+
+  return (
+    <div className="ui-card anim-fade-up anim-d3 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Invoices</h2>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours -&gt; operator monthly subscription invoices, pro-rated for pauses.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="ui-control rounded-lg px-3 py-1.5 text-sm outline-none" />
+          <button onClick={loadInvoices} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
+            <div className="col-span-3">Business</div>
+            <div className="col-span-2">Plan</div>
+            <div className="col-span-2 text-center">Active Days</div>
+            <div className="col-span-1 text-center">Amount</div>
+            <div className="col-span-1 text-center">Status</div>
+            <div className="col-span-3 text-center">Actions</div>
+          </div>
+
+          {rows.filter(r => r.has_subscription).map((r) => {
+            const invoice = r.existing_invoice;
+            const busy = busyId === r.business_id;
+            return (
+              <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+                <div className="col-span-3">
+                  <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
+                  {r.pro_rated && r.pause_note && <div className="text-[10px] text-[var(--ck-amber)] mt-0.5">{r.pause_note}</div>}
+                </div>
+                <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} (R{r.monthly_price_zar})</div>
+                <div className="col-span-2 text-center">
+                  <span className={r.pro_rated ? "text-[var(--ck-amber)] font-semibold" : "text-[var(--ck-success)]"}>{r.active_days}</span>
+                  <span className="text-[var(--ck-text-muted)]"> / {r.total_days}</span>
+                </div>
+                <div className="col-span-1 text-center font-bold">R{Number(invoice?.amount_zar ?? r.amount_zar ?? 0).toFixed(2)}</div>
+                <div className="col-span-1 text-center text-[10px] font-mono uppercase">{invoice?.status || "—"}</div>
+                <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
+                  {!invoice && (
+                    <button onClick={() => generate(r)} disabled={busy} className="ui-btn ui-btn-primary !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                      {busy ? "..." : "Generate"}
+                    </button>
+                  )}
+                  {invoice && invoice.status !== "PAID" && invoice.status !== "PAID_MANUALLY" && (
+                    <>
+                      <button onClick={() => createPaymentLink(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                        {invoice.yoco_payment_link_url ? "Recover Link" : "Payment Link"}
+                      </button>
+                      <button onClick={() => markPaidManually(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Mark Paid</button>
+                      <button onClick={() => sendEmail(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Send</button>
+                      <button onClick={() => voidInvoice(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Void draft</button>
+                    </>
+                  )}
+                  {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
+                    <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
+                  )}
+                  {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · R{Number(old.amount_zar).toFixed(2)} · {old.void_reason}</p>)}</details>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!loading && rows.filter(r => r.has_subscription).length === 0 && (
+        <p className="text-xs italic text-[var(--ck-text-muted)]">No active subscriptions for {periodLabel}.</p>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Platform Settings — BookingTours' own logo + banking details
+   ══════════════════════════════════════════════════════════════ */
+
+function PlatformSettingsPanel() {
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bank, setBank] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/platform-settings", { headers: await getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to load");
+      setLogoUrl(data.logo_url || "");
+      setBank({
+        account_owner: data.bank?.account_owner || "",
+        account_number: data.bank?.account_number || "",
+        account_type: data.bank?.account_type || "",
+        bank_name: data.bank?.bank_name || "",
+        branch_code: data.bank?.branch_code || "",
+      });
+    } catch (err: any) {
+      notify({ title: "Failed to load platform settings", message: err.message, tone: "error" });
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function handleLogoFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setLogoUrl(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/platform-settings", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ logo_url: logoUrl, bank }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to save");
+      notify({ title: "Saved", message: "Platform settings updated.", tone: "success" });
+    } catch (err: any) {
+      notify({ title: "Save failed", message: err.message, tone: "error" });
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="ui-card anim-fade-up anim-d3 p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Settings</h2>
+        <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours' own logo and banking details, shown on platform invoices.</p>
+      </div>
+      {loading ? (
+        <p className="text-xs text-[var(--ck-text-muted)]">Loading...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ck-text-muted)]">Logo</label>
+            <div className="mt-2 flex items-center gap-3">
+              {logoUrl && <img src={logoUrl} alt="BookingTours logo" className="h-12 w-12 rounded object-contain border" style={{ borderColor: "var(--ck-border-subtle)" }} />}
+              <label className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs cursor-pointer">
+                Upload
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0] || null)} />
+              </label>
+              {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ck-text-muted)]">Banking Details</label>
+            <input value={bank.account_owner} onChange={(e) => setBank({ ...bank, account_owner: e.target.value })} placeholder="Account owner" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.bank_name} onChange={(e) => setBank({ ...bank, bank_name: e.target.value })} placeholder="Bank name" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.account_number} onChange={(e) => setBank({ ...bank, account_number: e.target.value })} placeholder="Account number" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={bank.account_type} onChange={(e) => setBank({ ...bank, account_type: e.target.value })} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+              <input value={bank.branch_code} onChange={(e) => setBank({ ...bank, branch_code: e.target.value })} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex justify-end pt-4 mt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+        <button onClick={save} disabled={saving || loading} className="ui-btn ui-btn-primary disabled:opacity-50">
+          {saving ? "Saving..." : "Save Platform Settings"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1598,7 +2423,7 @@ function ChatbotAvatarManager() {
   }
 
   return (
-    <section className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-4">
+    <section className="ui-card anim-fade-up anim-d3 p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Avatars</h2>
         <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Global catalog. Every tenant sees the active avatars in their booking-site settings. Only super admins can add, edit, or remove entries.</p>
@@ -1617,7 +2442,7 @@ function ChatbotAvatarManager() {
           <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Sort</label>
           <input type="number" value={newSortOrder} onChange={(e) => setNewSortOrder(parseInt(e.target.value || "0", 10))} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" />
         </div>
-        <button type="submit" disabled={adding || !newUrl.trim()} className="rounded-lg bg-[var(--ck-text-strong)] px-4 py-2 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+        <button type="submit" disabled={adding || !newUrl.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
           {adding ? "Adding..." : "Add Avatar"}
         </button>
       </form>
@@ -1652,5 +2477,142 @@ function ChatbotAvatarManager() {
         </div>
       </div>
     </section>
+  );
+}
+
+// Central operator-directory landing page (bare booking domain): edit the
+// hero copy, styling and value props stored in platform_settings('directory'),
+// and toggle which operators are listed (businesses.directory_visible — new
+// operators default to visible). RLS: platform_settings super-admin ALL;
+// businesses_super_admin_all covers the visibility updates.
+function DirectoryPanel() {
+  const [cfg, setCfg] = useState<any>({});
+  const [operators, setOperators] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [busyBiz, setBusyBiz] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    const [{ data: settingsRow }, { data: biz }] = await Promise.all([
+      supabase.from("platform_public_settings").select("value").eq("key", "directory").maybeSingle(),
+      supabase.from("businesses").select("id, name, business_name, subdomain, directory_visible").order("name"),
+    ]);
+    setCfg(settingsRow?.value || {});
+    setOperators(biz || []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  function setField(key: string, value: any) {
+    setCfg((c: any) => ({ ...c, [key]: value }));
+  }
+
+  const valueProps: Array<{ title: string; text: string }> = Array.isArray(cfg.value_props) ? cfg.value_props : [];
+
+  async function save() {
+    setSaving(true);
+    const { error } = await supabase.from("platform_public_settings").upsert({
+      key: "directory",
+      value: cfg,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) notify({ title: "Save failed", message: error.message, tone: "error" });
+    else notify({ title: "Directory saved", message: "The landing page updates immediately.", tone: "success" });
+    setSaving(false);
+  }
+
+  async function toggleVisible(biz: any) {
+    setBusyBiz(biz.id);
+    const { error } = await supabase.from("businesses")
+      .update({ directory_visible: !biz.directory_visible })
+      .eq("id", biz.id);
+    if (error) notify({ title: "Update failed", message: error.message, tone: "error" });
+    else setOperators((ops) => ops.map((o) => o.id === biz.id ? { ...o, directory_visible: !biz.directory_visible } : o));
+    setBusyBiz(null);
+  }
+
+  const fields: Array<{ key: string; label: string; placeholder: string }> = [
+    { key: "eyebrow", label: "Eyebrow", placeholder: "BookingTours" },
+    { key: "headline", label: "Headline", placeholder: "Real adventures, run by real local operators" },
+    { key: "subheadline", label: "Subheadline", placeholder: "Kayaking, hiking, boats, wine routes and more…" },
+    { key: "search_placeholder", label: "Search placeholder", placeholder: "Search operators or locations…" },
+    { key: "hero_image_url", label: "Hero image URL (optional)", placeholder: "https://…" },
+    { key: "accent", label: "Accent colour (optional)", placeholder: "#D9A441" },
+    { key: "review_strip", label: "Trust strip text", placeholder: "Book direct with independent local operators…" },
+    { key: "cta_label", label: "Card button label", placeholder: "View tours" },
+    { key: "footer_note", label: "Footer note", placeholder: "Are you a tour operator? …" },
+  ];
+
+  return (
+    <div className="ui-card">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Operator Directory</h2>
+        <a href="https://booking.bookingtours.co.za" target="_blank" rel="noreferrer" className="text-xs font-medium text-[var(--ck-accent)] hover:underline">View live page</a>
+      </div>
+      <p className="text-xs text-[var(--ck-text-muted)] mb-4">
+        The central landing page on the bare booking domain listing every operator. Blank fields fall back to the built-in defaults; new operators are listed automatically.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-[var(--ck-text-muted)]">Loading…</p>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fields.map((f) => (
+              <label key={f.key} className="space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
+                {f.label}
+                <input
+                  className="ui-control w-full text-sm"
+                  value={cfg[f.key] || ""}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <p className="text-[12px] font-semibold text-[var(--ck-text-strong)] mb-2">Value props (the &ldquo;why book here&rdquo; strip; leave empty for defaults)</p>
+            <div className="space-y-2">
+              {valueProps.map((vp, i) => (
+                <div key={i} className="grid gap-2 sm:grid-cols-[200px_1fr_36px]">
+                  <input className="ui-control text-sm" value={vp.title} placeholder="Title" onChange={(e) => setField("value_props", valueProps.map((v, j) => j === i ? { ...v, title: e.target.value } : v))} />
+                  <input className="ui-control text-sm" value={vp.text} placeholder="Text" onChange={(e) => setField("value_props", valueProps.map((v, j) => j === i ? { ...v, text: e.target.value } : v))} />
+                  <button onClick={() => setField("value_props", valueProps.filter((_, j) => j !== i))} className="text-[var(--ck-danger)] text-sm" title="Remove">&times;</button>
+                </div>
+              ))}
+              {valueProps.length < 6 && (
+                <button onClick={() => setField("value_props", [...valueProps, { title: "", text: "" }])} className="ui-btn !py-1.5 text-[12px]">+ Add value prop</button>
+              )}
+            </div>
+          </div>
+
+          <button onClick={save} disabled={saving} className="ui-btn ui-btn-primary">{saving ? "Saving…" : "Save Directory Settings"}</button>
+
+          <div>
+            <p className="text-[12px] font-semibold text-[var(--ck-text-strong)] mb-2">Listed operators</p>
+            <div className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
+              {operators.map((b) => (
+                <div key={b.id} className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--ck-text-strong)]">{b.business_name || b.name}</p>
+                    <p className="text-[11px] text-[var(--ck-text-muted)]">{b.subdomain ? b.subdomain + ".booking.bookingtours.co.za" : "No subdomain — never listed"}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleVisible(b)}
+                    disabled={busyBiz === b.id || !b.subdomain}
+                    className={"ui-status " + (b.directory_visible && b.subdomain ? "ui-pill-success" : "ui-pill-neutral")}
+                    title={b.subdomain ? "Toggle directory listing" : "Operator needs a subdomain first"}
+                  >
+                    {b.directory_visible && b.subdomain ? "Listed" : "Hidden"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

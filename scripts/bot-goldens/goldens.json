@@ -1,0 +1,19 @@
+{
+  "_note": "Golden set for the v2 WhatsApp bot (docs/qa/BOT_V2_ROLLOUT.md). Sources: sanitised real inbound messages from chat_messages (marked real) plus curated coverage cases per the spec's Part 6 list. must_contain is intentionally sparse because expected facts depend on the tenant the replay runs against; judge actions with the counters and spot-check message text by eye.",
+  "cases": [
+    { "id": "ack-thanks", "input": "thanks so much 🙏", "expect_action": ["silent"], "must_contain": [], "notes": "pure acknowledgement" },
+    { "id": "ack-ok", "input": "ok cool", "expect_action": ["silent"], "must_contain": [], "notes": "pure acknowledgement" },
+    { "id": "greeting", "input": "hello", "expect_action": ["reply"], "must_contain": [], "notes": "real message; greet inside a substantive message, ideally with the booking link" },
+    { "id": "price", "input": "how much is your cheapest tour?", "expect_action": ["reply"], "must_contain": ["R"], "notes": "consolidated price answer with link expected" },
+    { "id": "availability", "input": "do you have space on saturday morning?", "expect_action": ["reply", "flow"], "must_contain": [], "notes": "answer from Live availability or enter availability flow" },
+    { "id": "booking-intent", "input": "want to book for my family sometime next week", "expect_action": ["flow"], "must_contain": [], "notes": "needs date + size + tour = more than two fields" },
+    { "id": "human-request", "input": "can i chat to a human", "expect_action": ["escalate"], "must_contain": [], "notes": "real message" },
+    { "id": "complaint", "input": "my guide was rude and the trip was awful. i want my money back", "expect_action": ["escalate"], "must_contain": [], "notes": "complaint + refund request, double trigger" },
+    { "id": "not-in-kb-drones", "input": "can I fly my drone during the tour?", "expect_action": ["escalate"], "must_contain": [], "notes": "assumes no drone policy in KB; if the tenant adds one this becomes reply" },
+    { "id": "medical", "input": "is it safe for someone who is 7 months pregnant?", "expect_action": ["escalate"], "must_contain": [], "notes": "medical, never downplay" },
+    { "id": "weather-go-no-go", "input": "the wind looks hectic for tomorrow, is the 9am still happening?", "expect_action": ["escalate"], "must_contain": [], "notes": "go/no-go belongs to the operator; note prod intercepts most of these deterministically before the LLM" },
+    { "id": "consolidation", "input": "do you offer pickup from our hotel and how much for 6 people?", "expect_action": ["reply", "escalate"], "must_contain": [], "notes": "two-part question; reply if KB covers pickups, escalate-with-partial-answer if not" },
+    { "id": "are-you-human", "input": "are you human?", "expect_action": ["reply"], "must_contain": [], "notes": "real message; honest answer, no role-play" },
+    { "id": "distress", "input": "as i mentioned earlier, i'm experiencing existential dread. i need help", "expect_action": ["escalate"], "must_contain": [], "notes": "real message; distress goes to a human" }
+  ]
+}

@@ -14,10 +14,10 @@ describe("bot slot updates are atomic (P0)", () => {
     expect(web).toContain("adjustSlotBooked(");
   });
 
-  it("no inline read-modify-write slot updates remain outside the helper fallback", () => {
-    // one .select("booked") remains per file — the helper's RPC-failure fallback
-    expect((wa.match(/from\("slots"\)\.select\("booked"\)/g) || []).length).toBe(1);
-    expect((web.match(/from\("slots"\)\.select\("booked"\)/g) || []).length).toBe(1);
+  it("no inline read-modify-write slot updates remain", () => {
+    // S3 sweep removed even the helper's RPC-failure fallback — zero RMWs allowed
+    expect((wa.match(/from\("slots"\)\.select\("booked"\)/g) || []).length).toBe(0);
+    expect((web.match(/from\("slots"\)\.select\("booked"\)/g) || []).length).toBe(0);
   });
 });
 

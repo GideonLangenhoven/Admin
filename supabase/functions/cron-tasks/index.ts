@@ -1,8 +1,9 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
-import { withSentry } from "../_shared/sentry.ts";
+import { createServiceClient, fetchAllRows, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { withSentry, captureCheckIn } from "../_shared/sentry.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -23,121 +24,77 @@ async function cleanupExpiredHolds() {
   const cutoffIso = new Date(Date.now() - graceMs).toISOString();
   const { data: expiredHolds } = await supabase
     .from("holds")
-    .select("id, booking_id, slot_id, business_id, hold_type, bookings(phone, qty, status, yoco_payment_id), slots(start_time), tours(name)")
+    // holds has neither a business_id column nor an FK to tours, so this select
+    // failed outright (PGRST200 + 42703) and expired holds never reached the
+    // payment-link notification path. Tour name comes via the booking.
+    .select("id, booking_id, slot_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url, allow_unpaid, business_id, tours(name)), slots(start_time)")
     .eq("status", "ACTIVE")
     .lt("expires_at", cutoffIso)
     .order("expires_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
 
   for (const hold of expiredHolds || []) {
-    // Check if the booking has already been paid — if so, convert the hold
-    // instead of expiring it. This handles the case where a webhook arrived
-    // but the hold wasn’t converted yet (or a manual mark-paid happened).
-    const bookingStatus = (hold.bookings as any)?.status;
-    const hasPaid = (hold.bookings as any)?.yoco_payment_id;
-    if (bookingStatus === "PAID" || bookingStatus === "COMPLETED" || hasPaid) {
-      // For reschedule holds, check if the pending_reschedule was already completed
-      if ((hold as any).hold_type === "RESCHEDULE") {
-        const { data: prCheck } = await supabase
-          .from("pending_reschedules")
-          .select("id, status")
-          .eq("hold_id", hold.id)
-          .single();
-        if (prCheck && prCheck.status === "COMPLETED") {
-          await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
-          console.log("RESCHEDULE_HOLD_EXPIRY_SKIP_COMPLETED hold=" + hold.id);
-          results.skipped_paid += 1;
-          continue;
-        }
-      }
-      await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
-      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id + " status=" + bookingStatus);
+    // R16: single authoritative expiry — expire_single_hold claims the row
+    // under lock (idempotent), enforces the 5-min grace, converts paid holds,
+    // and releases capacity tenant-checked. Skip branches the RPC handled.
+    const expiry = await supabase.rpc("expire_single_hold", { p_hold_id: hold.id });
+    const exRes = expiry.data || {};
+    if (expiry.error || !exRes.ok) {
+      if (exRes.error !== "in_grace") console.error("HOLD_EXPIRY_ERR", hold.id, expiry.error || exRes.error);
+      continue;
+    }
+    if (exRes.converted) {
+      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id);
       results.skipped_paid += 1;
       continue;
     }
+    if (exRes.already) continue;
 
-    await supabase.from("holds").update({ status: "EXPIRED" }).eq("id", hold.id);
-
-    // ── RESCHEDULE hold expiry: cancel the pending reschedule, release new slot hold, keep original booking intact ──
-    if ((hold as any).hold_type === "RESCHEDULE") {
-      const { data: pendingReschedules } = await supabase
-        .from("pending_reschedules")
-        .select("id, booking_id, new_slot_id, business_id")
-        .eq("hold_id", hold.id)
-        .eq("status", "PENDING");
-
-      for (const pr of pendingReschedules || []) {
-        await supabase.from("pending_reschedules").update({
-          status: "EXPIRED",
-          expired_at: cutoffIso,
-        }).eq("id", pr.id);
-
-        // Release held capacity on the new slot
-        const qty = (hold.bookings as any)?.qty || 0;
-        if (qty > 0) {
-          const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-            p_slot_id: pr.new_slot_id,
-            p_business_id: pr.business_id,
-            p_booked_delta: 0,
-            p_held_delta: -qty,
-          });
-          if (rpcRes.error) {
-            const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", pr.business_id).eq("id", pr.new_slot_id).maybeSingle();
-            if (slotHeldData) {
-              await supabase.from("slots").update({
-                held: Math.max(0, (slotHeldData.held || 0) - qty),
-              }).eq("business_id", pr.business_id).eq("id", pr.new_slot_id);
-            }
-          }
-        }
-
-        await supabase.from("logs").insert({
-          business_id: pr.business_id,
-          booking_id: pr.booking_id,
-          event: "reschedule_upgrade_expired",
-          payload: { hold_id: hold.id, pending_reschedule_id: pr.id },
-        });
-      }
-
-      console.log("RESCHEDULE_HOLD_EXPIRED hold=" + hold.id + " booking=" + hold.booking_id);
+    if (["RESCHEDULE", "ADD_GUESTS"].includes(String(hold.hold_type))) {
       results.reschedule_hold_cleanup += 1;
       results.hold_cleanup += 1;
-      // No WhatsApp notification — original booking stays intact
       continue;
     }
 
     // ── Regular booking hold expiry ──
-    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; qty?: number } | null;
-    // Release held capacity on the slot (mirrors the reschedule branch above)
-    const heldQty = Number(holdBooking?.qty || 0);
-    if (heldQty > 0 && hold.slot_id && hold.business_id) {
-      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-        p_slot_id: hold.slot_id,
-        p_business_id: hold.business_id,
-        p_booked_delta: 0,
-        p_held_delta: -heldQty,
-      });
-      if (rpcRes.error) {
-        const { data: slotHeldData } = await supabase.from("slots").select("held").eq("business_id", hold.business_id).eq("id", hold.slot_id).maybeSingle();
-        if (slotHeldData) {
-          await supabase.from("slots").update({
-            held: Math.max(0, (slotHeldData.held || 0) - heldQty),
-          }).eq("business_id", hold.business_id).eq("id", hold.slot_id);
-        }
-      }
-    }
+    // Capacity was already released tenant-checked by expire_single_hold.
+    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string; business_id?: string; tours?: unknown } | null;
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
-    const holdTour = Array.isArray(hold.tours) ? hold.tours[0] : hold.tours as { name?: string } | null;
-    if (holdBooking?.phone && hold.business_id) {
+    // Tour name now arrives nested under the booking (holds has no FK to tours).
+    const holdTourRaw = (holdBooking as any)?.tours;
+    const holdTour = (Array.isArray(holdTourRaw) ? holdTourRaw[0] : holdTourRaw) as { name?: string } | null;
+    // Abandoned-checkout follow-up: email the ORIGINAL payment link once the
+    // 15-min hold lapses unpaid (this sweep runs at expiry + 5-min grace, so a
+    // payment already in flight lands first and the paid-check above skips it).
+    // Email only — no WhatsApp, per operator request. A late payment is safe:
+    // yoco-webhook re-checks capacity and auto-refunds if the slot filled.
+    const stillUnpaid = holdBooking?.status === "HELD" || holdBooking?.status === "PENDING";
+    if (stillUnpaid && holdBooking?.email && holdBooking?.payment_url && (holdBooking as any)?.business_id) {
       try {
-        const tenant = await getTenantByBusinessId(supabase, hold.business_id);
-        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "your selected slot";
-        const message =
-          "Your held booking for " + (holdTour?.name || "the experience") + " at " + slotLabel + " has expired.\n\n" +
-          "If you still want those spots, start a new booking and we’ll help from there.";
-        await sendWhatsappTextForTenant(tenant, holdBooking.phone, message);
+        const tenant = await getTenantByBusinessId(supabase, (holdBooking as any).business_id);
+        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "";
+        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({
+            type: "PAYMENT_LINK",
+            data: {
+              business_id: (holdBooking as any).business_id,
+              email: holdBooking.email,
+              booking_id: hold.booking_id,
+              customer_name: holdBooking.customer_name || "there",
+              ref: String(hold.booking_id || "").slice(0, 8).toUpperCase(),
+              tour_name: holdTour?.name || "your tour",
+              tour_date: slotLabel,
+              qty: Number(holdBooking.qty || 1),
+              total_amount: Number(holdBooking.total_amount || 0).toFixed(2),
+              payment_url: holdBooking.payment_url,
+            },
+          }),
+        });
+        console.log("HOLD_EXPIRY_PAYLINK_SENT hold=" + hold.id + " booking=" + hold.booking_id);
       } catch (error) {
-        console.error("HOLD_EXPIRY_WA_ERR", hold.id, error);
+        console.error("HOLD_EXPIRY_PAYLINK_EMAIL_ERR", hold.id, error);
       }
     }
     results.hold_cleanup += 1;
@@ -155,34 +112,20 @@ async function cleanupExpiredManualBookings() {
     .select("id, slot_id, qty, business_id, customer_name, phone, email, tours(name), slots(start_time)")
     .eq("status", "PENDING")
     .eq("source", "ADMIN")
+    // allow_unpaid = admin let this booking go ahead unpaid (pay on arrival)
+    // — the deadline sweep must not cancel it.
+    .eq("allow_unpaid", false)
     .not("payment_deadline", "is", null)
     .lt("payment_deadline", new Date().toISOString())
     .order("payment_deadline", { ascending: true })
     .limit(CRON_BATCH_SIZE);
 
   for (const booking of expiredBookings || []) {
-    // Cancel the booking
-    await supabase.from("bookings").update({
-      status: "CANCELLED",
-      cancellation_reason: "Auto-cancelled: payment deadline exceeded",
-      cancelled_at: new Date().toISOString(),
-    }).eq("id", booking.id);
-
-    // Release the capacity (decrement slot.booked)
-    const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-      p_slot_id: booking.slot_id,
-      p_business_id: booking.business_id,
-      p_booked_delta: -Number(booking.qty || 0),
-      p_held_delta: 0,
+    const cancelled = await supabase.rpc("cancel_booking_transaction", {
+      p_booking_id: booking.id, p_business_id: booking.business_id,
+      p_reason: "Auto-cancelled: payment deadline exceeded", p_allow_late_choice: false, p_weather: false,
     });
-    if (rpcRes.error) {
-      const { data: slotData } = await supabase.from("slots").select("booked").eq("business_id", booking.business_id).eq("id", booking.slot_id).single();
-      if (slotData) {
-        await supabase.from("slots").update({
-          booked: Math.max(0, (slotData.booked || 0) - booking.qty),
-        }).eq("business_id", booking.business_id).eq("id", booking.slot_id);
-      }
-    }
+    if (cancelled.error || !cancelled.data?.ok || cancelled.data.already_cancelled) continue;
 
     // Log the expiry
     await supabase.from("logs").insert({
@@ -207,19 +150,21 @@ async function cleanupExpiredManualBookings() {
       const ref = booking.id.substring(0, 8).toUpperCase();
 
       // Notify admin (operator email lookup)
-      const { data: adminUser } = await supabase
-        .from("admin_users")
-        .select("phone")
-        .eq("business_id", booking.business_id)
-        .eq("role", "MAIN_ADMIN")
-        .limit(1)
+      // admin_users has no phone column, so this lookup used to fail and the
+      // operator was never told a manual booking had lapsed. The operator's
+      // WhatsApp number lives on businesses.
+      const { data: bizContact } = await supabase
+        .from("businesses")
+        .select("public_whatsapp, public_phone")
+        .eq("id", booking.business_id)
         .maybeSingle();
+      const operatorPhone = bizContact?.public_whatsapp || bizContact?.public_phone || "";
 
-      if (adminUser?.phone) {
-        await sendWhatsappTextForTenant(tenant, adminUser.phone,
+      if (operatorPhone) {
+        await sendWhatsappTextForTenant(tenant, operatorPhone,
           "Manual booking expired\n\n" +
           "Ref: " + ref + "\n" +
-          tourName + " — " + slotLabel + "\n" +
+          tourName + ": " + slotLabel + "\n" +
           "Customer: " + (booking.customer_name || "Unknown") + "\n" +
           booking.qty + " spot" + (booking.qty === 1 ? "" : "s") + " released.\n\n" +
           "Payment was not received before the deadline."
@@ -246,7 +191,50 @@ async function cleanupExpiredOtpAttempts() {
 }
 
 async function cleanupAbandonedVouchers() {
-  const results = { vouchers_cleaned: 0 };
+  const results = { vouchers_cleaned: 0, voucher_reminders_sent: 0 };
+
+  // Payment-link reminder: a voucher still PENDING 15 min after checkout means
+  // the buyer didn't pay (or payment failed). Email the stored payment_url once.
+  // This replaces the old eager email at checkout creation — mirrors the booking
+  // hold-expiry sweep. The 24h delete below sweeps anything still unpaid after.
+  const reminderCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { data: unpaidVouchers } = await supabase
+    .from("vouchers")
+    .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url")
+    .eq("status", "PENDING")
+    .is("payment_reminder_sent_at", null)
+    .not("payment_url", "is", null)
+    .lt("created_at", reminderCutoff)
+    .order("created_at", { ascending: true })
+    .limit(CRON_BATCH_SIZE);
+
+  for (const v of unpaidVouchers || []) {
+    const voucherEmail = String((v as any).buyer_email || "").trim().toLowerCase();
+    if (!voucherEmail.includes("@") || !(v as any).business_id) continue;
+    try {
+      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({
+          type: "VOUCHER_PAYMENT_LINK",
+          data: {
+            email: voucherEmail,
+            business_id: (v as any).business_id,
+            buyer_name: (v as any).buyer_name || "there",
+            recipient_name: (v as any).recipient_name || "your recipient",
+            tour_name: (v as any).tour_name || "Gift Voucher",
+            total_amount: Number((v as any).value || (v as any).purchase_amount || 0).toFixed(2),
+            payment_url: (v as any).payment_url,
+          },
+        }),
+      });
+      await supabase.from("vouchers").update({ payment_reminder_sent_at: new Date().toISOString() }).eq("id", (v as any).id);
+      results.voucher_reminders_sent += 1;
+      console.log("VOUCHER_PAYMENT_REMINDER_SENT voucher=" + (v as any).id);
+    } catch (remErr) {
+      console.error("VOUCHER_PAYMENT_REMINDER_ERR", (v as any).id, remErr);
+    }
+  }
 
   // Delete PENDING vouchers older than 24 hours (abandoned checkout flows)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -336,10 +324,12 @@ async function autoTagContacts() {
   const results = { synced: 0, tagged: 0, errors: 0 };
   const now = new Date();
 
-  // Get all businesses with their automation config
-  const { data: businesses } = await supabase.from("businesses").select("id, automation_config");
+  // Get all businesses with their automation config (paged past the 1000-row cap)
+  const businesses = await fetchAllRows<{ id: string; automation_config: any }>((from, to) =>
+    supabase.from("businesses").select("id, automation_config").range(from, to)
+  );
 
-  for (const biz of (businesses || [])) {
+  for (const biz of businesses) {
     try {
       // Load configurable thresholds (admin can change these in Settings → Automation Tag Rules)
       const ac = (biz as any).automation_config || {};
@@ -352,12 +342,15 @@ async function autoTagContacts() {
       const COMPLETED_TOUR_ENABLED = ac.completed_tour_enabled ?? true;
       const VOUCHER_EXPIRY_DAYS = ac.voucher_expiry_days ?? 30;
 
-      // Get all marketing contacts for this business
-      const { data: contacts } = await supabase
-        .from("marketing_contacts")
-        .select("id, email, phone, tags")
-        .eq("business_id", biz.id)
-        .eq("status", "active");
+      // Get all marketing contacts for this business (paged past the 1000-row cap)
+      const contacts = await fetchAllRows<{ id: string; email: string; phone: string; tags: any }>((from, to) =>
+        supabase
+          .from("marketing_contacts")
+          .select("id, email, phone, tags")
+          .eq("business_id", biz.id)
+          .eq("status", "active")
+          .range(from, to)
+      );
 
       if (!contacts || contacts.length === 0) continue;
 
@@ -565,7 +558,15 @@ async function cleanupStaleDraftBookings() {
   return results;
 }
 
-Deno.serve(withSentry("cron-tasks", async (_req) => {
+Deno.serve(withSentry("cron-tasks", async (req) => {
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: headers() });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: headers() }); }
+  // This sweep performs platform-wide cleanup; there is no operator UI caller.
+  if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
+  // Check-ins begin only AFTER service authentication, never from a public ping.
+  const checkInId = await captureCheckIn("cron-tasks", "in_progress");
   const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
@@ -594,6 +595,7 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
       body: JSON.stringify({ action: "all" }),
     });
     results.reminders = await reminderRes.json().catch(() => null);
+    if (!reminderRes.ok || results.reminders?.ok === false || !results.reminders) throw new Error("Scheduled notifications did not complete successfully");
   } catch (error) {
     console.error("AUTO_MESSAGES_INVOKE_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
@@ -631,6 +633,17 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  // R20: 7-day retention for cron.job_run_details + net._http_response
+  // (best-effort; purge function guards missing schemas).
+  try {
+    const { data: purged, error: purgeErr } = await supabase.rpc("purge_operational_logs");
+    if (purgeErr) throw purgeErr;
+    results.operational_logs_purged = purged;
+  } catch (error) {
+    console.error("OPERATIONAL_LOG_PURGE_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   try {
     results.auto_tags = await autoTagContacts();
   } catch (error) {
@@ -645,6 +658,20 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  // Last-minute deals: one SQL statement stamps every tenant's discounted
+  // slots (see apply_last_minute_deals). Kept as an RPC so 2000 tenants cost
+  // one round-trip, not one per tour.
+  try {
+    const { data: lmCount, error: lmErr } = await supabase.rpc("apply_last_minute_deals");
+    if (lmErr) throw lmErr;
+    results.last_minute_deals = lmCount ?? 0;
+    if (lmCount) console.log("LAST_MINUTE_DEALS_APPLIED slots=" + lmCount);
+  } catch (error) {
+    console.error("LAST_MINUTE_DEALS_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  await captureCheckIn("cron-tasks", results.errors.length ? "error" : "ok", checkInId);
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
 

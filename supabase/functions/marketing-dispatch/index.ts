@@ -1,8 +1,13 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient } from "../_shared/tenant.ts";
+import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { requireAuth } from "../_shared/auth.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { nonTradingBusinessIds } from "../_shared/subscription.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
+import { marketingEmailValidationError, parseResendBatchResponse } from "../_shared/marketing-batch.ts";
+import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
@@ -12,53 +17,80 @@ const FROM_EMAIL = RAW_FROM_EMAIL && !/onboarding@resend\.dev|@resend\.dev/i.tes
   ? RAW_FROM_EMAIL
   : "BookingTours <noreply@bookingtours.co.za>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const BATCH_SIZE = 50;
+// Throughput budget. At 50 per run on a 5-minute cron this was 14,400 emails a
+// day for the WHOLE platform — about 7 per tenant per day at 2,000 tenants, and
+// a single 5,000-contact campaign ate a third of it. The ceiling was never
+// Resend: the send already uses the batch endpoint, so a run costs one API call
+// per 100 recipients regardless of batch size. What actually capped it was two
+// sequential DB round trips per email inside the loop, both now batched.
+//
+// 500 is the maximum claim_marketing_queue will hand out in one call. Paired
+// with a per-minute cron that is 720,000 emails/day, which is roughly 5x what
+// 2,000 tenants sending two 1,000-contact campaigns a month would need — the
+// headroom is deliberate, because campaigns burst rather than trickle.
+const BATCH_SIZE = 500;
+
+// Resend's /emails/batch accepts at most 100 messages per request, so a run's
+// claim is split into chunks of this size and the chunks go out in parallel.
+const RESEND_BATCH_MAX = 100;
+
+// Cap on simultaneous PostgREST writes when recording per-email results. High
+// enough to collapse hundreds of sequential round trips into a few, low enough
+// not to exhaust the isolate's socket pool.
+const DB_WRITE_CONCURRENCY = 50;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 const MAX_RETRIES = 3;
 
 const supabase = createServiceClient();
 
-async function claimPendingQueueItems() {
+async function claimPendingQueueItems(businessId: string | null) {
   const { data, error } = await supabase.rpc("claim_marketing_queue", {
     p_limit: BATCH_SIZE,
     p_max_retries: MAX_RETRIES,
+    p_business_id: businessId,
   });
-
-  if (!error) return { items: data || [], error: null };
-
-  console.warn("CLAIM_MARKETING_QUEUE_RPC_FALLBACK:", error.message);
-
-  const { data: fallbackItems, error: fetchErr } = await supabase
-    .from("marketing_queue")
-    .select("id, business_id, campaign_id, contact_id, email, first_name, retry_count")
-    .eq("status", "pending")
-    .lt("retry_count", MAX_RETRIES)
-    .or("next_retry_at.is.null,next_retry_at.lte." + new Date().toISOString())
-    .order("created_at", { ascending: true })
-    .limit(BATCH_SIZE);
-
-  if (fetchErr) return { items: [], error: fetchErr };
-  if (!fallbackItems || fallbackItems.length === 0) return { items: [], error: null };
-
-  const itemIds = fallbackItems.map((i: any) => i.id);
-  await supabase.from("marketing_queue").update({ status: "processing" }).in("id", itemIds).eq("status", "pending");
-  return { items: fallbackItems, error: null };
+  // Never fall back to an unlocked/unscoped select when the claim RPC fails.
+  return { items: data || [], error };
 }
 
-Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
+Deno.serve(withSentry("marketing-dispatch", async (req: Request) => {
+  const origins = getAdminAppOrigins();
+  const origin = req.headers.get("origin") || "";
+  const headers = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin, origins) ? origin : origins[0],
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+  const jsonRes = (body: Record<string, unknown>, status: number) => new Response(JSON.stringify(body), { status, headers });
+  if (req.method === "OPTIONS") return new Response("ok", { headers });
+  if (req.method !== "POST") return jsonRes({ error: "Method not allowed" }, 405);
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return jsonRes({ error: "Unauthorized" }, 401); }
+  const businessId = auth.isServiceRole || auth.role === "SUPER_ADMIN" ? null : auth.businessId;
   try {
     if (!RESEND_API_KEY) {
       console.error("MARKETING_DISPATCH: RESEND_API_KEY not configured — skipping");
-      return new Response(JSON.stringify({ error: "RESEND_API_KEY not set" }), { status: 503 });
+      return jsonRes({ error: "RESEND_API_KEY not set" }, 503);
     }
 
     // ── 0. Activate any scheduled campaigns that are due ──
-    await supabase.from("marketing_campaigns")
+    let scheduledQuery = supabase.from("marketing_campaigns")
       .update({ status: "sending", started_at: new Date().toISOString() })
       .eq("status", "scheduled")
       .lte("scheduled_at", new Date().toISOString());
+    if (businessId) scheduledQuery = scheduledQuery.eq("business_id", businessId);
+    const { error: scheduledErr } = await scheduledQuery;
+    if (scheduledErr) throw scheduledErr;
 
     // ── 1. Atomically claim pending queue items (oldest first, respecting retry backoff) ──
-    const { items, error: fetchErr } = await claimPendingQueueItems();
+    const { items, error: fetchErr } = await claimPendingQueueItems(businessId);
 
     if (fetchErr) {
       console.error("QUEUE_FETCH_ERR:", fetchErr.message);
@@ -72,12 +104,13 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const campaignIds = [...new Set(items.map((i: any) => i.campaign_id))];
     const { data: campaigns } = await supabase
       .from("marketing_campaigns")
-      .select("id, subject_line, template_id, business_id, status, marketing_templates(html_content, subject_line)")
+      .select("id, subject_line, template_id, business_id, status, marketing_templates(business_id, html_content, subject_line)")
       .in("id", campaignIds);
 
     const campaignMap: Record<string, { subject: string; html: string; businessId: string; status: string }> = {};
     for (const c of (campaigns || []) as any[]) {
       const tpl = c.marketing_templates;
+      if (!tpl || tpl.business_id !== c.business_id) continue;
       campaignMap[c.id] = {
         subject: c.subject_line || tpl?.subject_line || "Update",
         html: tpl?.html_content || "<p>No content</p>",
@@ -90,11 +123,13 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const bizIds = [...new Set(Object.values(campaignMap).map((c) => c.businessId))];
     const bizFromMap: Record<string, string> = {};
     const bizBrandMap: Record<string, string> = {};
+    const bizSiteMap: Record<string, string> = {};
     if (bizIds.length > 0) {
-      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name").in("id", bizIds);
+      const { data: bizRows } = await supabase.from("businesses").select("id, business_name, name, subdomain, booking_site_url").in("id", bizIds);
       for (const b of (bizRows || []) as any[]) {
         const name = b.business_name || b.name || "Marketing";
         bizBrandMap[b.id] = name;
+        bizSiteMap[b.id] = String(b.booking_site_url || (b.subdomain ? "https://" + b.subdomain + ".booking.bookingtours.co.za" : "")).replace(/\/+$/, "");
         // V-12: send from the verified ROOT domain bookingtours.co.za with the
         // tenant's brand name as the display label. Per-subdomain From would
         // need each tenant subdomain DNS-verified in Resend, which isn't done,
@@ -111,11 +146,59 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     const trackingBaseUrl = SUPABASE_URL + "/functions/v1/marketing-track";
 
     const emailPayloads: Array<{ from: string; to: string[]; subject: string; html: string; queueId: string; contactId: string; campaignId: string; businessId: string; unsubscribeUrl: string }> = [];
+    const tokenRows: Array<{ business_id: string; campaign_id: string; contact_id: string; token: string }> = [];
+
+    // A contact's status was only ever checked once, at queue-build time
+    // (app/marketing/templates/page.tsx). Anyone who unsubscribed after being
+    // queued — or before this cron tick caught up — still got emailed. One
+    // batch lookup here re-verifies status right before actually sending.
+    const contactIds = Array.from(new Set((items as any[]).map((i) => i.contact_id).filter(Boolean)));
+    const contactMap = new Map<string, { business_id: string; status: string }>();
+    let contactsUnavailable = false;
+    if (contactIds.length > 0) {
+      const { data: contacts, error: contactErr } = await supabase.from("marketing_contacts")
+        .select("id, business_id, status")
+        .in("id", contactIds);
+      contactsUnavailable = Boolean(contactErr);
+      if (contactErr) console.error("MARKETING_DISPATCH_CONTACT_LOOKUP_ERR:", contactErr.message);
+      for (const contact of contacts || []) contactMap.set(contact.id, contact);
+    }
+
+    // Fix 3b: a paused or suspended operator sends no new marketing. Deferred,
+    // not failed — the rows go back to `pending`, so a campaign queued before a
+    // seasonal pause sends when the operator resumes rather than being lost.
+    const pausedBusinessIds = await nonTradingBusinessIds(
+      supabase,
+      (items as any[]).map((i) => i.business_id),
+    );
+    if (pausedBusinessIds.size > 0) {
+      console.log("MARKETING_DISPATCH_SKIP_NON_TRADING businesses=" + [...pausedBusinessIds].join(","));
+    }
 
     for (const item of items as any[]) {
+      if (businessId && item.business_id !== businessId) throw new Error("Queue claim returned a foreign business");
+      if (pausedBusinessIds.has(String(item.business_id))) {
+        deferredIds.push(item.id);
+        continue;
+      }
+
       const camp = campaignMap[item.campaign_id];
-      if (!camp) {
+      if (!camp || camp.businessId !== item.business_id) {
         failedIds.push({ id: item.id, error: "Campaign/template not found", retryable: false });
+        continue;
+      }
+
+      if (contactsUnavailable) {
+        failedIds.push({ id: item.id, error: "Recipient lookup unavailable", retryable: true });
+        continue;
+      }
+      const contact = contactMap.get(item.contact_id);
+      if (!contact || contact.business_id !== item.business_id) {
+        failedIds.push({ id: item.id, error: "Recipient not found for business", retryable: false });
+        continue;
+      }
+      if (contact.status !== "active") {
+        failedIds.push({ id: item.id, error: "Recipient unsubscribed before send", retryable: false });
         continue;
       }
 
@@ -130,36 +213,49 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
         continue;
       }
 
-      // Generate unsubscribe token (with error handling — don't send without a working unsubscribe link)
+      // Keep known placeholders and malformed addresses out of Resend. The
+      // provider's permissive validation below is the final safety net for
+      // anything that cannot be identified locally.
+      const emailError = marketingEmailValidationError(item.email);
+      if (emailError) {
+        failedIds.push({ id: item.id, error: emailError, retryable: false });
+        continue;
+      }
+
+      // Unsubscribe token. Generated locally here and written in one bulk
+      // insert after the loop — this used to be a round trip per email, which
+      // is half of what capped the batch size. The invariant is unchanged: the
+      // insert still happens before anything is handed to Resend, so no email
+      // can go out without a working unsubscribe link behind it.
       const unsubToken = crypto.randomUUID();
-      const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert({
+      tokenRows.push({
         business_id: item.business_id,
         campaign_id: item.campaign_id,
         contact_id: item.contact_id,
         token: unsubToken,
       });
-      if (tokenErr) {
-        failedIds.push({ id: item.id, error: "Failed to create unsubscribe token: " + tokenErr.message, retryable: true });
-        continue;
-      }
 
       const unsubscribeUrl = SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=" + unsubToken;
 
-      // Variable replacement — including brand tokens. Older templates that
-      // were seeded with a literal "Cape Kayak" string get rewritten to the
-      // tenant's actual business_name so multi-tenant tenants don't leak the
-      // origin tenant's brand to their own customers (U-7 / U-12).
+      // Variable replacement — shared map (_shared/marketing-tokens.ts).
+      // Voucher/promo tokens have no data in a campaign context, so they
+      // resolve to "" rather than reaching customers as literal {braces}.
+      // Older templates seeded with a literal "Cape Kayak" string still get
+      // rewritten to the tenant's actual business_name so multi-tenant
+      // tenants don't leak the origin tenant's brand (U-7 / U-12).
       const brand = bizBrandMap[item.business_id] || "Our Team";
-      let html = camp.html
-        .replace(/\{first_name\}/g, item.first_name || "there")
-        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+      const tokenValues = {
+        first_name: item.first_name,
+        business_name: brand,
+        site_url: bizSiteMap[item.business_id] || "",
+      };
+      let html = fillMarketingTokens(camp.html, tokenValues)
         .replace(/Cape Kayak Adventures/g, brand)
         .replace(/Cape Kayak/g, brand)
         .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
+      html = replaceLegacyMarketingSocialIcons(html);
 
-      const subject = camp.subject
-        .replace(/\{first_name\}/g, item.first_name || "there")
-        .replace(/\{\{?\s*(company_name|business_name|brand_name)\s*\}?\}/g, brand)
+      const subject = fillMarketingTokens(camp.subject, tokenValues)
         .replace(/Cape Kayak/g, brand);
 
       // Inject open-tracking pixel before </body>
@@ -194,10 +290,25 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     }
 
     // ── 4. Send via Resend batch API ──
+    // Persist every unsubscribe token in one insert, before anything is sent.
+    // All-or-nothing on purpose: if this fails we do not know which links would
+    // work, so the whole batch goes back to the queue rather than risk mailing
+    // anyone a dead unsubscribe link.
+    if (tokenRows.length > 0) {
+      const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert(tokenRows);
+      if (tokenErr) {
+        console.error("MARKETING_DISPATCH_TOKEN_INSERT_ERR:", tokenErr.message);
+        for (const p of emailPayloads) {
+          failedIds.push({ id: p.queueId, error: "Failed to create unsubscribe token: " + tokenErr.message, retryable: true });
+        }
+        emailPayloads.length = 0;
+      }
+    }
+
     if (emailPayloads.length > 0) {
       // RFC 8058 one-click unsubscribe header — mailbox providers require it
       // for bulk mail. Without it Gmail / Yahoo route most of these to spam.
-      const batchBody = emailPayloads.map((p) => ({
+      const toResendMessage = (p: typeof emailPayloads[number]) => ({
         from: p.from,
         to: p.to,
         subject: p.subject,
@@ -206,47 +317,71 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
           "List-Unsubscribe": "<" + p.unsubscribeUrl + ">",
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
-      }));
-
-      const res = await fetch("https://api.resend.com/emails/batch", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + RESEND_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(batchBody),
       });
 
-      if (res.ok) {
-        const resData = await res.json();
-        const results = resData.data || resData || [];
-        if (Array.isArray(results)) {
-          for (let i = 0; i < emailPayloads.length; i++) {
-            const payload = emailPayloads[i];
-            const result = results[i];
-            if (result?.id) {
+      // One request per 100 recipients (Resend's per-request maximum), all in
+      // flight together. A run of 500 is 5 requests, not 500.
+      const groups = chunk(emailPayloads, RESEND_BATCH_MAX);
+      const responses = await Promise.all(groups.map((group) =>
+        fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + RESEND_API_KEY,
+            "Content-Type": "application/json",
+            "x-batch-validation": "permissive",
+          },
+          body: JSON.stringify(group.map(toResendMessage)),
+        })
+          .then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }))
+          // A network failure on one chunk must not lose the other four.
+          .catch((e) => ({ ok: false, status: 0, data: { message: e instanceof Error ? e.message : String(e) } }))
+      ));
+
+      // Recorded after the sends land, batched rather than one round trip per
+      // email — the other half of what capped the old batch size.
+      const idUpdates: Array<{ queueId: string; emailId: string }> = [];
+
+      for (let gi = 0; gi < groups.length; gi++) {
+        const group = groups[gi];
+        const res = responses[gi];
+
+        if (res.ok) {
+          const resData = res.data as any;
+          const result = parseResendBatchResponse(resData, group.length);
+          if (result) {
+            for (const sent of result.sent) {
+              const payload = group[sent.index];
               sentIds.push(payload.queueId);
               businessCounts[payload.businessId] = (businessCounts[payload.businessId] || 0) + 1;
               // Store resend email ID for later bounce matching
-              await supabase.from("marketing_queue").update({ resend_email_id: result.id }).eq("id", payload.queueId);
-            } else {
-              failedIds.push({ id: payload.queueId, error: result?.message || "Send failed", retryable: true });
+              idUpdates.push({ queueId: payload.queueId, emailId: sent.emailId });
+            }
+            for (const failed of result.failed) {
+              failedIds.push({ id: group[failed.index].queueId, error: failed.error, retryable: false });
+            }
+          } else {
+            // Unexpected response shape — mark as retryable rather than optimistically marking sent
+            console.warn("RESEND_UNEXPECTED_RESPONSE:", JSON.stringify(resData).substring(0, 500));
+            for (const p of group) {
+              failedIds.push({ id: p.queueId, error: "Unexpected Resend response shape", retryable: true });
             }
           }
         } else {
-          // Unexpected response shape — mark as retryable rather than optimistically marking sent
-          console.warn("RESEND_UNEXPECTED_RESPONSE:", JSON.stringify(resData).substring(0, 500));
-          for (const p of emailPayloads) {
-            failedIds.push({ id: p.queueId, error: "Unexpected Resend response shape", retryable: true });
+          // This chunk failed — mark retryable. Scoped to the chunk, so one bad
+          // request no longer condemns the other four hundred recipients.
+          const errMsg = (res.data as any)?.message || "Batch API error " + res.status;
+          for (const p of group) {
+            failedIds.push({ id: p.queueId, error: errMsg, retryable: res.status >= 500 || res.status === 429 || res.status === 0 });
           }
         }
-      } else {
-        // Entire batch failed — mark retryable
-        const errBody = await res.json().catch(() => ({}));
-        const errMsg = (errBody as any)?.message || "Batch API error " + res.status;
-        for (const p of emailPayloads) {
-          failedIds.push({ id: p.queueId, error: errMsg, retryable: res.status >= 500 || res.status === 429 });
-        }
+      }
+
+      // Bounce-matching ids, written concurrently in bounded waves instead of
+      // one blocking round trip per email.
+      for (const wave of chunk(idUpdates, DB_WRITE_CONCURRENCY)) {
+        await Promise.all(wave.map((u) =>
+          supabase.from("marketing_queue").update({ resend_email_id: u.emailId }).eq("id", u.queueId)
+        ));
       }
     }
 
@@ -280,8 +415,12 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
 
     // ── 6. Update campaign counters (atomic RPCs) ──
     for (const campId of campaignIds) {
-      const campSent = sentIds.filter((sid) => { const it = items.find((i: any) => i.id === sid) as any; return it?.campaign_id === campId; }).length;
-      const campFailed = failedIds.filter((f) => { if (f.retryable) return false; const it = items.find((i: any) => i.id === f.id) as any; return it?.campaign_id === campId; }).length;
+      // Invalid legacy queue rows must not alter a foreign campaign's totals.
+      const campaign = campaignMap[String(campId)];
+      if (!campaign) continue;
+      const ownsItem = (item: any) => item?.campaign_id === campId && item?.business_id === campaign.businessId;
+      const campSent = sentIds.filter((sid) => ownsItem(items.find((i: any) => i.id === sid))).length;
+      const campFailed = failedIds.filter((f) => !f.retryable && ownsItem(items.find((i: any) => i.id === f.id))).length;
 
       if (campSent > 0) {
         await supabase.rpc("increment_campaign_counter", { p_campaign_id: campId, p_column: "total_sent", p_amount: campSent });
@@ -344,7 +483,3 @@ Deno.serve(withSentry("marketing-dispatch", async (_req: Request) => {
     return jsonRes({ error: err.message || "Internal error" }, 500);
   }
 }));
-
-function jsonRes(body: Record<string, unknown>, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}

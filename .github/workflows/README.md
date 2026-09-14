@@ -1,36 +1,25 @@
-# CI / CD Workflows
+# Release checks
 
-| Workflow | File | Trigger | Jobs | Timeout |
-|----------|------|---------|------|---------|
-| **CI** | `ci.yml` | PR to `main`, push to `main` | Lint + Typecheck → Smoke E2E | 5 min / 10 min |
-| **E2E on main** | `e2e-on-main.yml` | Push to `main` | Happy-path booking (Yoco test mode) | 10 min |
+`ci.yml` runs on PRs/pushes to main and manual dispatch. It checks lint,
+TypeScript, unit tests in both apps, all edge functions and payment/isolation
+transactions in a disposable PostgreSQL 17 database. Read-only public browser
+smoke tests run after those checks pass. Smoke URLs are `BASE_URL` and
+`ADMIN_URL` secrets; use the actual booking link, including `.booking.`.
 
-## Required GitHub Secrets
+`e2e-on-main.yml` is a **manual, provider-writing** test. It never silently skips
+its payment case. Configure these dedicated secrets before dispatching it:
 
-| Secret | Description | Example |
-|--------|-------------|---------|
-| `BASE_URL` | Customer-facing booking site URL | `https://aonyx.booking.bookingtours.co.za` |
-| `ADMIN_URL` | Admin dashboard URL | `https://aonyx.admin.bookingtours.co.za` |
-| `ADMIN_EMAIL` | Admin login email (for happy-path test) | — |
-| `ADMIN_PASSWORD` | Admin login password (for happy-path test) | — |
+- `RELEASE_TEST_BOOKING_URL`, `RELEASE_TEST_ADMIN_URL`
+- `RELEASE_TEST_ADMIN_EMAIL`, `RELEASE_TEST_ADMIN_PASSWORD`
+- `RELEASE_TEST_CUSTOMER_EMAIL`, `RELEASE_TEST_CUSTOMER_PHONE`
 
-`ADMIN_EMAIL` and `ADMIN_PASSWORD` are only needed by the post-merge happy-path workflow. The smoke suite uses only `BASE_URL` and `ADMIN_URL`.
+The account must be a MAIN_ADMIN for a dedicated test business with Yoco test
+keys, a test webhook and test mode enabled. Customer recipients must approve
+receiving test messages. The test refuses a storefront from another business.
+Never run it using a real client's live merchant configuration.
 
-## How It Works
+The database harness needs no production credentials. Provider completion,
+message delivery and refunds still require the human checks in
+`docs/qa/MVP_SMOKE_RUNBOOK.md`; unit/mock success is not provider evidence.
 
-**On every PR:**
-1. Lint + TypeScript typecheck must pass (blocks merge)
-2. Playwright smoke tests run against the deployed site (blocks merge)
-
-**On every merge to main:**
-1. CI runs again (lint + smoke)
-2. Full happy-path E2E runs: customer books a tour via Yoco test card → verifies booking appears as PAID in admin
-
-## Local Testing
-
-```bash
-npm run test:e2e:smoke    # smoke tests
-npm run test:e2e:happy    # happy-path (needs ADMIN_EMAIL + ADMIN_PASSWORD)
-npm run test:e2e          # all tests
-npm run test:e2e:headed   # headed mode for debugging
-```
+Required branch checks must be enabled separately in GitHub repository rules.

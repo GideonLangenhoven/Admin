@@ -6,7 +6,11 @@ import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Webhook } from "npm:standardwebhooks";
 import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { tourEndDate } from "../_shared/duration.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
+import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -63,7 +67,12 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   }
   // Always send FROM a platform-controlled domain to pass DMARC/SPF.
   // The tenant's email goes in Reply-To so customers reply to the right place.
-  const payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html };
+  // Every send here was HTML-only, no plain-text MIME alternative — a real
+  // (if secondary, next to SPF/DMARC — see DNS note in project docs) spam
+  // scoring factor, and Resend derives it automatically when omitted, so a
+  // simple tag-stripped fallback costs nothing and removes the gap.
+  const text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html, text };
   if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
@@ -188,6 +197,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     return {
       businessId: "",
       brandName: fallbackBrand,
+      timezone: "UTC",
       shortBrandName: fallbackBrand,
       footerLineOne: "Thanks for choosing our team.",
       footerLineTwo: "Reply to this email if you need anything.",
@@ -201,7 +211,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       emailColor: "#1b3b36",
       imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
       socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
-      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "",
+      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "",
     };
   }
 
@@ -209,7 +219,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     const res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase")
+      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, logo_url")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -220,7 +230,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     try {
       const res2 = await supabase
         .from("businesses")
-        .select("id, name, business_name, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
+        .select("id, name, business_name, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions")
         .eq("id", businessId)
         .maybeSingle();
       data = res2.data;
@@ -233,6 +243,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   return {
     businessId,
     brandName,
+    timezone: String((data as Record<string, unknown> | null)?.timezone || "UTC"),
     shortBrandName: brandName,
     footerLineOne: String(data?.footer_line_one || "Thanks for choosing " + brandName + "."),
     footerLineTwo: String(data?.footer_line_two || "Reply to this email if you need anything."),
@@ -275,6 +286,9 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     businessAddress: String(data?.business_address || ""),
     whatToBring: String(data?.what_to_bring || ""),
     activityVerbPast: String(data?.activity_verb_past || ""),
+    locationPhrase: String(data?.location_phrase || ""),
+    emailTagline: String(data?.email_tagline || ""),
+    logoUrl: String(data?.logo_url || ""),
   };
 }
 
@@ -283,6 +297,7 @@ type InvoiceContext = {
   addressLines: string[];
   reg: string;
   vat: string;
+  logoUrl: string;
   bank: {
     account_owner: string | null;
     account_number: string | null;
@@ -298,13 +313,14 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
     addressLines: [],
     reg: "",
     vat: "",
+    logoUrl: "",
     bank: { account_owner: null, account_number: null, account_type: null, bank_name: null, branch_code: null },
   };
   if (!businessId || !supabase) return empty;
 
   const { data: biz } = await supabase
     .from("businesses")
-    .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number")
+    .select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number, logo_url")
     .eq("id", businessId)
     .maybeSingle();
 
@@ -312,6 +328,7 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
   const addressLines = [biz?.invoice_address_line1, biz?.invoice_address_line2, biz?.invoice_address_line3].filter(Boolean) as string[];
   const reg = String(biz?.invoice_reg_number || "");
   const vat = String(biz?.invoice_vat_number || "");
+  const logoUrl = String(biz?.logo_url || "");
 
   let bank = empty.bank;
   if (SETTINGS_ENCRYPTION_KEY) {
@@ -337,27 +354,71 @@ async function getInvoiceContext(businessId: string): Promise<InvoiceContext> {
     console.warn("INVOICE_CONTEXT: SETTINGS_ENCRYPTION_KEY not set, skipping bank details");
   }
 
-  return { companyName, addressLines, reg, vat, bank };
+  return { companyName, addressLines, reg, vat, logoUrl, bank };
+}
+
+// BookingTours' own logo + bank details (platform_settings singleton) — used
+// only by PLATFORM_INVOICE_OUTSTANDING, which must look like it's FROM
+// BookingTours TO the operator, never resolving the operator's own branding.
+type PlatformInvoiceContext = {
+  logoUrl: string;
+  bank: InvoiceContext["bank"];
+};
+
+async function getPlatformInvoiceContext(): Promise<PlatformInvoiceContext> {
+  const empty: PlatformInvoiceContext = {
+    logoUrl: "",
+    bank: { account_owner: null, account_number: null, account_type: null, bank_name: null, branch_code: null },
+  };
+  if (!supabase) return empty;
+
+  const { data: settings } = await supabase.from("platform_settings").select("logo_url").eq("id", true).maybeSingle();
+  const logoUrl = String(settings?.logo_url || "");
+
+  let bank = empty.bank;
+  if (SETTINGS_ENCRYPTION_KEY) {
+    try {
+      const { data: bankRows } = await supabase.rpc("get_platform_bank_details", { p_key: SETTINGS_ENCRYPTION_KEY });
+      const row = Array.isArray(bankRows) ? bankRows[0] : bankRows;
+      if (row) {
+        bank = {
+          account_owner: row.account_owner || null,
+          account_number: row.account_number || null,
+          account_type: row.account_type || null,
+          bank_name: row.bank_name || null,
+          branch_code: row.branch_code || null,
+        };
+      }
+    } catch (bankErr) {
+      console.error("PLATFORM_INVOICE_BANK_DETAILS_ERR:", bankErr);
+    }
+  }
+
+  return { logoUrl, bank };
 }
 
 function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagram: string; socialTiktok: string; socialYoutube: string; socialTwitter: string; socialLinkedin: string; socialTripadvisor: string; socialGoogleReviews: string; emailColor?: string }) {
-  const icons: string[] = [];
-  const iconStyle = "display: inline-block; margin: 0 6px; text-decoration: none;";
-  const svgStyle = "width: 24px; height: 24px;";
-  // Use accent color derived from brand, fallback to light muted
-  const fill = "#A8C2B8";
+  // Platform ICON images, not names. Inline <svg> is stripped by Gmail/
+  // Outlook/Yahoo, and data: URIs are blocked by Gmail — so we use hosted
+  // PNG favicons via Google's s2 favicon service (plain <img>, renders
+  // everywhere, nothing for us to host). alt text keeps the platform name
+  // for screen readers and image-blocking clients.
+  const links: string[] = [];
+  const icon = (href: string, domain: string, name: string) =>
+    `<a href="${href}" target="_blank" style="text-decoration: none;"><img src="https://www.google.com/s2/favicons?domain=${domain}&sz=64" alt="${name}" width="22" height="22" style="width: 22px; height: 22px; border-radius: 5px; vertical-align: middle; border: 0;" /></a>`;
 
-  if (branding.socialFacebook) icons.push(`<a href="${branding.socialFacebook}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>`);
-  if (branding.socialInstagram) icons.push(`<a href="${branding.socialInstagram}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>`);
-  if (branding.socialTiktok) icons.push(`<a href="${branding.socialTiktok}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.44v-7.15a8.16 8.16 0 005.58 2.18V11.2a4.85 4.85 0 01-3.59-1.57V6.69h3.59z"/></svg></a>`);
-  if (branding.socialYoutube) icons.push(`<a href="${branding.socialYoutube}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>`);
-  if (branding.socialTwitter) icons.push(`<a href="${branding.socialTwitter}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>`);
-  if (branding.socialLinkedin) icons.push(`<a href="${branding.socialLinkedin}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>`);
-  if (branding.socialTripadvisor) icons.push(`<a href="${branding.socialTripadvisor}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 004.04 10.43 5.976 5.976 0 004.075-1.6L12 19.545l1.922-1.932a5.976 5.976 0 004.075 1.6 5.997 5.997 0 004.04-10.43L24 6.648h-4.35a13.573 13.573 0 00-7.644-2.353zM6.003 17.213a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zm11.994 0a3.997 3.997 0 110-7.994 3.997 3.997 0 010 7.994zM6.003 11.219a2 2 0 100 4 2 2 0 000-4zm11.994 0a2 2 0 100 4 2 2 0 000-4z"/></svg></a>`);
-  if (branding.socialGoogleReviews) icons.push(`<a href="${branding.socialGoogleReviews}" style="${iconStyle}" target="_blank"><svg style="${svgStyle}" viewBox="0 0 24 24" fill="${fill}"><path d="M12 0C5.372 0 0 5.373 0 12s5.372 12 12 12c6.627 0 12-5.373 12-12S18.627 0 12 0zm.14 19.018c-3.868 0-7-3.14-7-7.018 0-3.878 3.132-7.018 7-7.018 1.89 0 3.47.697 4.682 1.829l-1.974 1.896c-.508-.486-1.394-1.052-2.708-1.052-2.322 0-4.218 1.924-4.218 4.345s1.897 4.345 4.218 4.345c2.703 0 3.718-1.945 3.875-2.951h-3.875v-2.485h6.447c.075.407.134.812.134 1.345 0 4.014-2.686 6.764-6.581 6.764z"/></svg></a>`);
+  if (branding.socialFacebook) links.push(icon(branding.socialFacebook, "facebook.com", "Facebook"));
+  if (branding.socialInstagram) links.push(icon(branding.socialInstagram, "instagram.com", "Instagram"));
+  if (branding.socialTiktok) links.push(icon(branding.socialTiktok, "tiktok.com", "TikTok"));
+  if (branding.socialYoutube) links.push(icon(branding.socialYoutube, "youtube.com", "YouTube"));
+  if (branding.socialTwitter) links.push(icon(branding.socialTwitter, "x.com", "X / Twitter"));
+  if (branding.socialLinkedin) links.push(icon(branding.socialLinkedin, "linkedin.com", "LinkedIn"));
+  if (branding.socialTripadvisor) links.push(icon(branding.socialTripadvisor, "tripadvisor.com", "TripAdvisor"));
+  if (branding.socialGoogleReviews) links.push(icon(branding.socialGoogleReviews, "google.com", "Google Reviews"));
 
-  if (icons.length === 0) return "";
-  return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${icons.join("")}</td></tr></table>`;
+  if (links.length === 0) return "";
+  const separator = `<span style="display: inline-block; width: 12px;">&nbsp;</span>`;
+  return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${links.join(separator)}</td></tr></table>`;
 }
 
 function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>) {
@@ -413,42 +474,82 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
     .split("Cape Town<br>8005")
     .join("");
 
-  // Replace arrival instructions + what-to-bring (Prompt 23)
-  if (branding.arrivalInstructions || branding.whatToBring) {
-    brandedHtml = brandedHtml
-      .split("Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.")
-      .join((branding.arrivalInstructions || "Please arrive 15 minutes before launch.") + (branding.whatToBring ? "<br>" + branding.whatToBring : ""));
-  }
+  // Replace arrival instructions + what-to-bring (Prompt 23). Always runs:
+  // an unconfigured tenant gets a neutral line, never the kayak-specific default.
+  brandedHtml = brandedHtml
+    .split("Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.")
+    .join((branding.arrivalInstructions || "Please arrive 15 minutes early.") + (branding.whatToBring ? "<br>" + branding.whatToBring : ""));
 
-  // Replace Google Reviews URL (Prompt 23)
+  // Replace Google Reviews URL (Prompt 23) — or strip the review ask entirely
+  // for tenants with no review link configured; never ship Cape Kayak's Place ID.
   if (branding.socialGoogleReviews) {
     brandedHtml = brandedHtml
       .split("https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ")
       .join(branding.socialGoogleReviews);
+  } else {
+    brandedHtml = brandedHtml
+      .split("Had a great time? We'd love it if you could leave us a quick review on Google. It means the world to our small team!")
+      .join("We hope you had a great time — see you again soon!")
+      .split(`<a href="https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ" style="display: inline-block; background-color: #ffffff; color: #2a5a52; border: 2px solid #2a5a52; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: bold;">⭐ Leave a Google Review</a>`)
+      .join("");
   }
 
-  // Replace activity verb (Prompt 23)
+  // Operator logo in every email header: inject above the eyebrow line.
+  // One mechanism for all templates (the invoice's own inline logo was removed
+  // in favour of this).
+  if (branding.logoUrl) {
+    const eyebrowTag = '<p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">';
+    brandedHtml = brandedHtml.split(eyebrowTag).join(
+      `<img src="${branding.logoUrl}" alt="" style="max-height: 48px; max-width: 180px; margin: 0 auto 12px; display: block;" />` + eyebrowTag,
+    );
+  }
+
+  // Replace activity verb in the booking-confirm template (the only remaining
+  // static "paddling" — trip-photos now renders the tenant verb directly).
   brandedHtml = brandedHtml
     .split("Thank you for paddling with")
     .join("Thank you for " + (branding.activityVerbPast || "adventuring") + " with");
 
-  // Replace hardcoded Google Maps URL with business directions or remove it
-  if (branding.directions) {
+  // Maps button: point at the tenant's own location, falling back through their
+  // configured address fields; tenants with no location get the button STRIPPED
+  // rather than Cape Kayak's pin.
+  const mapsQuery = branding.directions || branding.meetingPointAddress || branding.businessAddress;
+  if (mapsQuery) {
     brandedHtml = brandedHtml.split("https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005").join(
-      "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(branding.directions)
+      "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsQuery)
     );
+  } else {
+    brandedHtml = brandedHtml
+      .split(`<a href="https://www.google.com/maps/search/?api=1&query=Cape+Kayak+Adventures+180+Beach+Rd+Three+Anchor+Bay+Cape+Town+8005" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 15px;">Open in Google Maps</a>`)
+      .join("");
   }
 
-  // Inject social media icons inside the dark email footer
+  // Inject the dark-footer extras: social icons (per-operator, optional) and
+  // a "Powered by BookingTours" line. The powered-by line is intentionally
+  // NOT one of the ordinary per-tenant `branding` fields above — it isn't
+  // read from any business setting, so no operator config can omit or
+  // override it, and it must render even when a tenant has zero social links.
   const socialHtml = buildSocialIconsHtml(branding);
-  if (socialHtml) {
+  // The mark carries alt="" and sits beside the text rather than replacing it:
+  // most clients block remote images by default, and a blocked decorative image
+  // collapses to nothing while "Powered by BookingTours" still reads. Ivory
+  // variant because this footer is dark. Hosted on the customer-facing booking
+  // domain (4 KB asset — this ships on every transactional email).
+  const poweredByHtml = `<table cellpadding="0" cellspacing="0" style="width:100%;"><tr><td style="text-align:center; padding-top:14px; margin-top:14px; border-top:1px solid rgba(255,255,255,0.14);"><p style="margin:0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:11px; letter-spacing:0.02em; color:#A8C2B8;"><img src="https://booking.bookingtours.co.za/brand/bt-mark-email.png" alt="" width="11" height="14" style="height:14px; width:auto; vertical-align:-3px; margin-right:6px; border:0;" />Powered by <a href="https://bookingtours.co.za" style="color:#ffffff; font-weight:600; text-decoration:none;">BookingTours</a></p></td></tr></table>`;
+  const footerExtras = socialHtml + poweredByHtml;
+  {
     // Find the footer </td> — it's the last </td> before </body>
     const bodyClose = brandedHtml.lastIndexOf("</body>");
     if (bodyClose > -1) {
       const footerTdClose = brandedHtml.lastIndexOf("</td>", bodyClose);
       if (footerTdClose > -1) {
-        brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + socialHtml + "\n          " + brandedHtml.slice(footerTdClose);
+        brandedHtml = brandedHtml.slice(0, footerTdClose) + "\n            " + footerExtras + "\n          " + brandedHtml.slice(footerTdClose);
+      } else {
+        // No table-footer to anchor to — still guarantee the line renders.
+        brandedHtml = brandedHtml.slice(0, bodyClose) + footerExtras + brandedHtml.slice(bodyClose);
       }
+    } else {
+      brandedHtml += footerExtras;
     }
   }
 
@@ -498,7 +599,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Complete Your Reservation</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.heading || "Complete Your Reservation"}</h1>
           </td>
         </tr>
         ${heroImg("IMG_PAYMENT", "Cape Kayak")}
@@ -506,7 +607,8 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">You're almost there. Please complete your payment below to secure your spots for the <strong>${d.tour_name}</strong>.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${d.intro || ("You're almost there. Please complete your payment below to secure your spots for the <strong>" + d.tour_name + "</strong>.")}</p>
+            ${d.cancel_phrase ? `<p style="font-size: 14px; line-height: 1.6; color: #B45309; background:#FEF3C7; border-radius:8px; padding:12px 16px; margin: 0 0 20px 0;">Heads up: if payment isn't made, this booking will be automatically cancelled about <strong>${d.cancel_phrase} before the trip</strong> so the spot can be released. Any trouble paying? Just reply to this email.</p>` : ""}
           </td>
         </tr>
         <!-- Details Box -->
@@ -638,9 +740,10 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `;
-  // Activity-aware messaging based on tour name
+  // Operator-set tagline wins; otherwise guess a flavor line from the tour name
   const tourLower = String(d.tour_name || "").toLowerCase();
-  let activityFlavor = "Get ready for an unforgettable experience.";
+  let activityFlavor = String(d._emailTagline || "") || "Get ready for an unforgettable experience.";
+  if (d._emailTagline) { /* operator copy — skip the guesswork below */ } else
   if (/kayak|paddle|canoe/.test(tourLower)) activityFlavor = "Get ready for an unforgettable experience on the water.";
   else if (/hike|hiking|trail|walk|mountain/.test(tourLower)) activityFlavor = "Lace up your boots and get ready for an incredible adventure on the trail.";
   else if (/surf|wave/.test(tourLower)) activityFlavor = "Get ready to catch some waves and have an amazing time.";
@@ -735,6 +838,41 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
             <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
             If you have any questions, reply to this email or contact us on WhatsApp.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
+function myBookingsOtpHtml(d: Record<string, unknown>) {
+  const code = String(d.otp_code || "");
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Your Login Code</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 40px 10px; text-align: center;">
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 24px 0;">Use this code to access and manage your bookings:</p>
+            <div style="text-align: center; margin: 0 0 24px 0;">
+              <span style="display: inline-block; font-family: 'Courier New', monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1b3b36; background: #F7F7F6; padding: 16px 28px; border-radius: 10px; border: 2px dashed #1b3b36;">${code}</span>
+            </div>
+            <p style="font-size: 13px; color: #888; margin: 0 0 4px 0;">This code expires in 15 minutes.</p>
+            <p style="font-size: 13px; color: #888; margin: 0;">If you didn't request this, you can safely ignore this email.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+            <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Manage your bookings anytime.<br>If you have any questions, reply to this email.</p>
           </td>
         </tr>
       </table>
@@ -876,7 +1014,20 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-function invoiceHtml(d: Record<string, unknown>) {
+// Invoices can be (re)sent for bookings that haven't paid yet (admin resend,
+// invoices page). Callers may pass amount_paid explicitly; otherwise
+// payment_method "Pending" (the admin apps' convention for unpaid, cleared by
+// manual-mark-paid on payment) means nothing has been paid. Default: paid in
+// full, which preserves the original webhook/confirm flows.
+function invoiceAmountPaid(d: Record<string, unknown>, total: number): number {
+  if (d.amount_paid !== undefined && d.amount_paid !== null && d.amount_paid !== "") {
+    const n = parseFloat(String(d.amount_paid).replace(/[^0-9.,-]/g, "").replace(/,/g, ""));
+    if (!isNaN(n)) return n;
+  }
+  return String(d.payment_method || "").trim().toLowerCase() === "pending" ? 0 : total;
+}
+
+function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
   // Always compute the VAT breakdown locally so the email is a compliant
   // SA tax invoice regardless of what the caller passed for `subtotal`.
   // Some callers (admin /bookings page) pass `subtotal = total` which would
@@ -890,6 +1041,7 @@ function invoiceHtml(d: Record<string, unknown>) {
   const subtotalStr = m2(subtotalNum);
   const vatStr = m2(vatNum);
   const totalStrFmt = m2(totalNum);
+  const fullyPaid = invoiceAmountPaid(d, totalNum) >= totalNum - 0.005;
   return `
     <!DOCTYPE html>
     <html>
@@ -901,7 +1053,7 @@ function invoiceHtml(d: Record<string, unknown>) {
         <!-- Hero Banner -->
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
-            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${invCtx?.companyName || "Tax Invoice"}</p>
             <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Tax Invoice ${d.invoice_number}</h1>
           </td>
         </tr>
@@ -911,7 +1063,7 @@ function invoiceHtml(d: Record<string, unknown>) {
           <td style="padding: 30px 40px 20px;">
             <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #E5E5E5; padding-bottom: 20px; margin-bottom: 20px; font-size: 14px; color: #555; line-height: 1.6;">
               <tr>
-                <td style="vertical-align: top;"><strong style="color: #1b3b36;">Billed To:</strong><br>${d.customer_name}<br>${d.customer_email}</td>
+                <td style="vertical-align: top;"><strong style="color: #1b3b36;">Billed To:</strong><br>${d.customer_company_name ? `${d.customer_company_name}<br>` : ""}${d.customer_name}<br>${d.customer_email}${d.customer_vat_number ? `<br>VAT: ${d.customer_vat_number}` : ""}</td>
                 <td style="vertical-align: top; text-align: right;"><strong style="color: #1b3b36;">Date:</strong> ${d.invoice_date}</td>
               </tr>
             </table>
@@ -943,7 +1095,7 @@ function invoiceHtml(d: Record<string, unknown>) {
                 <td style="padding: 4px 0; border-bottom: 1px solid #E5E5E5; color: #555; text-align: right;">R${vatStr}</td>
               </tr>
               <tr>
-                <td colspan="3" style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36;">Total Paid (incl. VAT)</td>
+                <td colspan="3" style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36;">${fullyPaid ? "Total Paid" : "Total Due"} (incl. VAT)</td>
                 <td style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36; text-align: right;">R${totalStrFmt}</td>
               </tr>
             </table>
@@ -953,6 +1105,7 @@ function invoiceHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 13px; color: #888; margin: 0;">Payment Method: <strong>${d.payment_method}</strong> &nbsp;|&nbsp; Ref: <strong>${String(d.payment_reference || "").substring(0, 8).toUpperCase()}</strong></p>
+            ${fullyPaid ? "" : `<p style="font-size: 13px; color: #B45309; margin: 8px 0 0; font-weight: 600;">Payment outstanding: this invoice has not been paid yet.</p>`}
           </td>
         </tr>
         <!-- Footer -->
@@ -967,40 +1120,198 @@ function invoiceHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: PlatformInvoiceContext) {
+  const fmtZar = (n: unknown) => Number(n || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const amountStr = fmtZar(d.amount_zar);
+  const emailOverageZar = Number(d.email_overage_zar || 0);
+  const aiOverageZar = Number(d.ai_overage_zar || 0);
+  const subscriptionZar = Number(d.amount_zar || 0) - emailOverageZar - aiOverageZar;
+  const bank = platCtx.bank;
+  const hasBank = !!(bank.account_number || bank.bank_name);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
+            ${platCtx.logoUrl ? `<img src="${platCtx.logoUrl}" alt="BookingTours" style="max-height: 40px; margin-bottom: 12px;" />` : ""}
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">BookingTours</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Invoice ${d.platform_invoice_number}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 30px 40px 10px;">
+            <p style="font-size: 14px; color: #555; margin: 0 0 4px;">Hi ${d.name || ""},</p>
+            <p style="font-size: 14px; color: #555; line-height: 1.6; margin: 0;">
+              Your ${d.plan_name || "subscription"} invoice for <strong>${d.business_name}</strong>
+              (${d.period_start} to ${d.period_end}) is outstanding.
+              ${d.pro_rated ? `<br><span style="color: #B45309;">${d.pause_note || "This invoice was pro-rated."}</span>` : ""}
+            </p>
+          </td>
+        </tr>
+        ${emailOverageZar > 0 || aiOverageZar > 0 ? `
+        <tr>
+          <td style="padding: 10px 40px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #555; border-top: 1px solid #eee;">
+              <tr>
+                <td style="padding: 10px 0 4px;">${d.plan_name || "Subscription"} (monthly fee${d.pro_rated ? ", pro-rated" : ""})</td>
+                <td style="padding: 10px 0 4px; text-align: right;">R${fmtZar(subscriptionZar)}</td>
+              </tr>
+              ${emailOverageZar > 0 ? `
+              <tr>
+                <td style="padding: 4px 0 10px;">Marketing emails over included quota (${d.email_overage_count || 0})</td>
+                <td style="padding: 4px 0 10px; text-align: right;">R${fmtZar(emailOverageZar)}</td>
+              </tr>` : ""}
+              ${aiOverageZar > 0 ? `
+              <tr>
+                <td style="padding: 4px 0 10px;">AI assistant replies over included quota (${d.ai_overage_count || 0})</td>
+                <td style="padding: 4px 0 10px; text-align: right;">R${fmtZar(aiOverageZar)}</td>
+              </tr>` : ""}
+            </table>
+          </td>
+        </tr>` : ""}
+        <tr>
+          <td style="padding: 10px 40px 20px; text-align: center;">
+            <p style="font-size: 32px; font-weight: bold; color: #1b3b36; margin: 0;">R${amountStr}</p>
+            <p style="font-size: 12px; color: #888; margin: 4px 0 0;">Amount due</p>
+          </td>
+        </tr>
+        ${d.yoco_payment_link_url ? `
+        <tr>
+          <td style="padding: 0 40px 20px; text-align: center;">
+            <a href="${d.yoco_payment_link_url}" style="display: inline-block; background-color: #0c8a59; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Pay Now</a>
+          </td>
+        </tr>` : ""}
+        ${hasBank ? `
+        <tr>
+          <td style="padding: 0 40px 30px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px; padding: 16px; font-size: 13px; color: #555; line-height: 1.7;">
+              <tr><td style="padding: 16px;">
+                <strong style="color: #1b3b36;">Or pay via EFT:</strong><br>
+                ${bank.account_owner ? `Account owner: ${bank.account_owner}<br>` : ""}
+                ${bank.bank_name ? `Bank: ${bank.bank_name}<br>` : ""}
+                ${bank.account_number ? `Account number: ${bank.account_number}<br>` : ""}
+                ${bank.account_type ? `Account type: ${bank.account_type}<br>` : ""}
+                ${bank.branch_code ? `Branch code: ${bank.branch_code}` : ""}
+              </td></tr>
+            </table>
+          </td>
+        </tr>` : ""}
+        <tr>
+          <td style="background-color: #1b3b36; color: #A8C2B8; text-align: center; padding: 30px; font-size: 12px; line-height: 1.5;">
+            BookingTours. Thank you for partnering with us.
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
 
 function giftVoucherHtml(d: Record<string, unknown>) {
+  // Redesigned as a premium, celebratory gift-card experience instead of a
+  // plain transactional layout. Framing adapts to who's actually reading it
+  // — a real gift ("You've received a gift!") when it lands in the
+  // recipient's own inbox (recipient_email supplied at purchase); a short,
+  // reassuring receipt when the buyer gets a copy alongside it; or, when no
+  // recipient email was given, an honest "forward this on" framing for the
+  // buyer rather than pretending it's a receipt for themselves.
+  const mode = String(d.gift_recipient_mode || "buyer_forward");
+  const recipientName = String(d.recipient_name || "your friend");
+  const buyerName = String(d.buyer_name || "Someone special");
+
+  const heroEyebrow = mode === "recipient" ? "You've Received a Gift" : mode === "buyer_receipt" ? "Gift Sent" : "A Gift For Someone Special";
+  const heroTitle = mode === "recipient" ? "🎁 Surprise, " + recipientName + "!" : mode === "buyer_receipt" ? "🎁 On Its Way!" : "🎁 Your Gift Voucher";
+
+  const introHtml = mode === "recipient"
+    ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${recipientName},</h2>
+       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift: an adventure, on them. Your voucher is below.</p>`
+    : mode === "buyer_receipt"
+      ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift for <strong>${recipientName}</strong> is on its way to their inbox right now. Here's a copy for your records.</p>`
+      : `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below. <strong>Forward this email</strong> to give it to them, or print it as a card to hand over in person.</p>`;
+
+  // Elegant quote card in the brand palette (applyBranding recolors #1b3b36).
+  const messageBlock = d.gift_message
+    ? (mode === "recipient"
+        ? `<tr><td style="padding: 0 32px 24px;">
+            <div style="background: #F7F7F6; border-radius: 14px; padding: 24px; text-align: center; border: 1px solid #e6e6e3;">
+              <p style="margin: 0 0 10px 0; font-size: 17px; line-height: 1.6; font-style: italic; color: #1b3b36;">&ldquo;${d.gift_message}&rdquo;</p>
+              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #6b7280;">From ${buyerName}</p>
+            </div>
+          </td></tr>`
+        : `<tr><td style="padding: 0 32px 20px;">
+            <div style="background: #F7F7F6; border-radius: 10px; padding: 16px 20px; font-size: 13px; color: #6b7280;">Your message to ${recipientName}: <em>&ldquo;${d.gift_message}&rdquo;</em></div>
+          </td></tr>`)
+    : "";
+
+  // How to give / redeem the gift, tailored to who's reading.
+  const forwardNote = mode === "recipient"
+    ? `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Quote your code above when you book online or over WhatsApp. The balance is applied to your trip.</p></td></tr>`
+    : mode === "buyer_receipt"
+      ? ""
+      : `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;"><strong>To gift it:</strong> forward this email to ${recipientName}, or print this page as a card. They redeem the code when booking online or over WhatsApp.</p></td></tr>`;
+
+  const ctaLabel = mode === "recipient" ? "Redeem Your Gift" : "View Booking Site";
+  const ctaBlock = `<tr><td style="padding: 20px 40px 12px; text-align: center;">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
+        <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
+          <a href="{{BOOKING_URL}}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">${ctaLabel}</a>
+        </td>
+      </tr></table>
+    </td></tr>`;
+
+  // Deliverability nudge — recipient gift emails often land in Promotions/Spam.
+  const spamNote = mode === "buyer_receipt"
+    ? ""
+    : `<tr><td style="padding: 0 40px 24px; text-align: center;"><p style="margin: 0; font-size: 12px; color: #9ca3af;">Don't see it in your inbox? Check your <strong>spam / promotions</strong> folder.</p></td></tr>`;
+
   return `
     <!DOCTYPE html>
     <html>
     <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
     <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 45px -12px rgba(27,59,54,0.28);">
         <tr>
-          <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
-            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Gift Voucher</h1>
+          <td style="background: linear-gradient(135deg, #1b3b36 0%, #2d5a4f 100%); padding: 36px 30px 28px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${heroEyebrow}</p>
+            <h1 style="margin: 12px 0 0 0; font-size: 32px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${heroTitle}</h1>
           </td>
         </tr>
         ${heroImg("IMG_GIFT", "Cape Kayak")}
         <tr>
-          <td style="padding: 40px 40px 10px; text-align: center;">
-            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.buyer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${d.recipient_name}</strong> is ready!</p>
+          <td style="padding: 36px 40px 10px; text-align: center;">
+            ${introHtml}
           </td>
         </tr>
         <tr>
-          <td style="padding: 0 40px 20px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f3ff; border: 2px dashed #7c3aed; border-radius: 12px;">
-              <tr><td style="padding: 24px; text-align: center;">
-                <p style="margin: 0; font-size: 14px; color: #6b7280;">Voucher Code</p>
-                <p style="margin: 8px 0; font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #7c3aed;">${d.code}</p>
-                <p style="margin: 0; font-size: 14px; color: #6b7280;">${d.tour_name} &middot; R${d.value}</p>
-                <p style="margin: 8px 0 0; font-size: 12px; color: #9ca3af;">Valid until ${d.expires_at}</p>
+          <td style="padding: 0 32px 8px;">
+            <!-- The voucher itself, styled as a physical gift card / ticket. -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: #ffffff; border: 2px dashed #1b3b36; border-radius: 20px;">
+              <tr><td style="padding: 30px 24px 8px; text-align: center;">
+                <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Gift Voucher</p>
+                <p style="margin: 10px 0 0; font-size: 52px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.value}</p>
+                ${d.tour_name ? `<p style="margin: 8px 0 0; font-size: 14px; color: #6b7280;">${d.tour_name}</p>` : ""}
+              </td></tr>
+              <tr><td style="padding: 18px 24px 6px;">
+                <div style="border-top: 2px dashed #d7ddd9;"></div>
+              </td></tr>
+              <tr><td style="padding: 6px 24px 30px; text-align: center;">
+                <p style="margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #9ca3af;">Voucher Code</p>
+                <p style="margin: 10px 0 0; font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #1b3b36;">${d.code}</p>
+                <p style="margin: 14px 0 0; font-size: 12px; color: #9ca3af;">Valid until ${d.expires_at}</p>
               </td></tr>
             </table>
           </td>
         </tr>
-        ${d.gift_message ? `<tr><td style="padding: 0 40px 20px;"><div style="background: #fafafa; border-radius: 8px; padding: 16px; font-style: italic; color: #4b5563; text-align: center;">&ldquo;${d.gift_message}&rdquo;</div></td></tr>` : ""}
+        ${messageBlock}
+        ${forwardNote}
+        ${ctaBlock}
+        ${spamNote}
         <tr>
           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
@@ -1014,9 +1325,28 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 
 function cancellationHtml(d: Record<string, unknown>) {
   const isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
-  const cancelText = isWeather
+  // When a voucher was issued (customer chose it, or voucher-paid booking),
+  // the email confirms the voucher — it must NOT re-offer the three options.
+  const hasVoucher = Boolean(d.voucher_code);
+  // Cancelled within 24h of the trip start: booking is forfeited, so the
+  // email must NOT offer reschedule/voucher/refund options.
+  const isForfeit = d.is_forfeit === true;
+  // The reschedule/voucher/refund choice is OPT-IN: only operator-initiated
+  // cancellations that still need a customer decision set offer_choice. Every
+  // other cancellation email (refund already chosen or processed) must confirm
+  // the outcome, never re-offer the three options.
+  const offerChoice = d.offer_choice === true;
+  const refundAmt = d.refund_amount != null && d.refund_amount !== "" ? String(d.refund_amount) : "";
+  const isRefundConfirmed = !hasVoucher && !isForfeit && !offerChoice && refundAmt !== "";
+  const cancelText = hasVoucher
+    ? "Your booking has been cancelled and its value converted to a voucher. The code is below; use it any time on your next booking."
+    : isForfeit
+    ? `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. As the cancellation falls within 24 hours of the trip start, the booking amount is forfeited in line with our cancellation policy. If you believe this is a mistake, just reply to this email.`
+    : isRefundConfirmed
+    ? "Your booking has been cancelled and your refund is on its way. The details are below."
+    : isWeather
     ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
-    : `Unfortunately, your trip has been cancelled${d.reason ? " due to <strong>" + d.reason + "</strong>" : ""}. We sincerely apologise for the inconvenience.`;
+    : "Unfortunately, your trip has been cancelled. We sincerely apologise for the inconvenience.";
 
   const amountRow = d.total_amount ? `<tr>
                 <td width="40%" style="padding: 18px 20px; color: #888; font-size: 15px;">Amount Paid:</td>
@@ -1038,7 +1368,42 @@ function cancellationHtml(d: Record<string, unknown>) {
   }
 
   // Weather cancellations get a prominent self-service block
-  const optionsBlock = isWeather
+  const optionsBlock = isForfeit
+    ? ""
+    : isRefundConfirmed
+    ? `
+        <tr>
+          <td style="padding: 0 40px 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
+              <tr>
+                <td style="padding: 24px; text-align: center;">
+                  <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #047857;">Refund confirmed</p>
+                  <p style="margin: 0 0 10px 0; font-size: 26px; font-weight: 700; color: #1b3b36;">R${refundAmt}</p>
+                  <p style="margin: 0; font-size: 14px; color: #166534; line-height: 1.5;">Your refund is being processed. Please allow 5 to 10 business days for it to reflect in your account.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `
+    : hasVoucher
+    ? `
+        <tr>
+          <td style="padding: 0 40px 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border: 2px dashed #d97706; border-radius: 12px;">
+              <tr>
+                <td style="padding: 24px; text-align: center;">
+                  <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #92400e;">Your voucher</p>
+                  <p style="margin: 0 0 6px 0; font-family: 'Courier New', monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.12em; color: #1b3b36;">${d.voucher_code}</p>
+                  ${d.voucher_amount ? `<p style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600; color: #92400e;">Value: R${d.voucher_amount}</p>` : ""}
+                  <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;">Enter this code at checkout on your next booking. Valid for 3 years.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `
+    : isWeather
     ? `
         <tr>
           <td style="padding: 0 40px 10px;">
@@ -1059,7 +1424,8 @@ function cancellationHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `
-    : `
+    : offerChoice
+    ? `
         <tr>
           <td style="padding: 10px 40px 8px; text-align: center;">
             <p style="font-size: 15px; font-family: Georgia, serif; color: #1b3b36; margin: 0 0 16px 0;">What would you like to do?</p>
@@ -1073,7 +1439,8 @@ function cancellationHtml(d: Record<string, unknown>) {
             <p style="font-size: 12px; color: #999; margin: 12px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>
-      `;
+      `
+    : "";
 
   return `
     <!DOCTYPE html>
@@ -1218,8 +1585,7 @@ function indemnityHtml(d: Record<string, unknown>) {
             <h3 style="font-family: Georgia, serif; color: #1b3b36; font-size: 20px; margin: 0 0 10px 0;">See You Tomorrow</h3>
             <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 0 0 25px 0;">
               <strong>Cape Kayak Adventures, 180 Beach Rd, Three Anchor Bay</strong><br>
-              Please arrive 15 minutes before launch.<br>
-              Bring sunscreen, a hat, a towel, and a water bottle.
+              Please arrive 15 minutes before launch.<br>Bring sunscreen, a hat, a towel, and a water bottle.
             </p>
           </td>
         </tr>
@@ -1383,7 +1749,16 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-function tripPhotosHtml(d: Record<string, unknown>) {
+function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPast?: string; locationPhrase?: string }) {
+  // Activity wording comes from the tenant's own terminology (Settings →
+  // Email Customisation). A tenant with neither set gets the neutral fallback
+  // — never another operator's activity. Note: the confirm-email
+  // `email_tagline` ("Get ready to…") is deliberately NOT reused here; a
+  // pre-trip excitement line reads wrong in a post-trip email.
+  const verb = String(branding?.activityVerbPast || "").trim() || "adventuring";
+  const loc = String(branding?.locationPhrase || "").trim();
+  const flavorLine = "We hope you had an incredible time" + (loc ? " " + loc : "");
+  const photoUrls = (Array.isArray(d.photo_urls) ? d.photo_urls : [d.photo_url]).filter(url => typeof url === "string" && url.trim());
   return `
     <!DOCTYPE html>
     <html>
@@ -1404,7 +1779,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
         <!-- Sub-header -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
-            <p style="font-size: 15px; color: #6b7280; margin: 0;">We hope you had an incredible time on the water</p>
+            <p style="font-size: 15px; color: #6b7280; margin: 0;">${flavorLine}</p>
           </td>
         </tr>
         <!-- Message -->
@@ -1412,7 +1787,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
           <td style="padding: 10px 40px 20px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.7; margin: 0;">
               Hi ${d.customer_name},<br><br>
-              Thank you for paddling with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
+              Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
             </p>
           </td>
         </tr>
@@ -1424,7 +1799,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
                 <td style="padding: 24px; text-align: center;">
                   <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">Your trip photos are ready!</p>
                   <p style="margin: 0 0 16px 0; font-size: 13px; color: #888; line-height: 1.5;">We captured some great moments from your trip. Click below to view and download your photos.<br><strong>Share this link with your group!</strong></p>
-                  <a href="${d.photo_url}" style="display: inline-block; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">View Photos</a>
+                  ${photoUrls.map((url, index) => `<a href="${escHtml(String(url))}" style="display: inline-block; margin: 4px; background-color: #2a5a52; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">View Photos${photoUrls.length > 1 ? " " + (index + 1) : ""}</a>`).join("")}
                 </td>
               </tr>
             </table>
@@ -1434,7 +1809,7 @@ function tripPhotosHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 0 40px 20px; text-align: center;">
             <p style="font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 15px 0;">
-              Had a great time? We'd love it if you could leave us a quick review on Google — it means the world to our small team!
+              Had a great time? We'd love it if you could leave us a quick review on Google. It means the world to our small team!
             </p>
             <a href="https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ" style="display: inline-block; background-color: #ffffff; color: #2a5a52; border: 2px solid #2a5a52; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: bold;">⭐ Leave a Google Review</a>
           </td>
@@ -1454,6 +1829,190 @@ function tripPhotosHtml(d: Record<string, unknown>) {
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
             <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>
             If you have any questions, reply to this email or contact us on WhatsApp.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
+// Customer-facing fallback for an operator's WhatsApp reply that couldn't be
+// delivered on WhatsApp (24h window closed / send failed). Keeps the operator's
+// message intact and branded so the customer still receives it.
+function customerMessageHtml(d: Record<string, unknown>) {
+  const messageHtml = String(d.message || "").replace(/\n/g, "<br>");
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 28px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">A message for you</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 34px 40px 10px;">
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;">Hi ${d.customer_name || "there"},</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 20px 0;">${messageHtml}</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #777; margin: 0;">You can reply directly to this email to reach our team.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 24px;">
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Reply to this email or contact us on WhatsApp.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
+// Internal operator-facing alert (e.g. a customer booking change request).
+// Sent TO the tenant's notification_email. No deep link into the dashboard —
+// tenant admin URLs vary — so it carries the customer's contact details so the
+// operator can act straight from the email, and points them to their inbox.
+function partnershipInviteHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 28px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Partnership Invitation</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 34px 40px 6px;">
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;">Hi ${d.partner_name || "there"},</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;"><strong>${d.inviter_name || "A BookingTours operator"}</strong> would like to partner with your business on BookingTours.</p>
+            <p style="font-size: 15px; line-height: 1.6; color: #555; margin: 0 0 8px 0;">Partners create combo offers together: two experiences bundled at one price, sold on both booking sites with a single checkout. You choose the tours, the price and how the revenue is split.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 20px 40px 12px; text-align: center;">
+            <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
+              <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
+                <a href="${d.approve_url}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">Accept Partnership</a>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 40px 30px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #9ca3af;">Accepting activates the partnership. You can revoke it anytime from your dashboard's Partners page. If you weren't expecting this invitation, you can safely ignore this email.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 24px;">
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Powered by BookingTours.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
+function settlementRequestHtml(d: Record<string, unknown>) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 28px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Combo Settlement Request</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 34px 40px 6px;">
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;">Hi ${d.partner_name || "there"},</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 16px 0;"><strong>${d.requester_name || "Your partner"}</strong> has requested settlement of their share of combo bookings you collected payment for.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 32px 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 12px;">
+              <tr><td style="padding: 26px 24px 6px; text-align: center;">
+                <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Amount Owed</p>
+                <p style="margin: 10px 0 0; font-size: 44px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.amount}</p>
+                <p style="margin: 10px 0 20px; font-size: 13px; color: #6b7280;">${d.combo_count} combo booking${Number(d.combo_count) === 1 ? "" : "s"} · ${d.period_label || ""}</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 20px 40px 12px; text-align: center;">
+            <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
+              <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
+                <a href="${d.payment_url}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">Pay R${d.amount} Now</a>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 40px 30px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #9ca3af;">Payment is processed securely by Yoco and goes directly to ${d.requester_name || "your partner"}. The settlement is marked as paid automatically on both dashboards, and the full breakdown is on your Partners page.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 24px;">
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Powered by BookingTours.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+}
+
+function operatorAlertHtml(d: Record<string, unknown>) {
+  const row = (label: string, value: unknown) => value
+    ? `<tr><td width="35%" style="padding: 14px 20px; border-bottom: 1px solid #E5E5E5; color: #888; font-size: 14px;">${label}</td><td width="65%" style="padding: 14px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 14px; text-align: right;">${value}</td></tr>`
+    : "";
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #F7F7F6; margin: 0; padding: 20px; color: #333;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+        <tr>
+          <td style="background-color: #1b3b36; padding: 28px 30px 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 26px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.heading || "New alert"}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 34px 40px 6px;">
+            <p style="font-size: 16px; line-height: 1.6; color: #333; margin: 0 0 20px 0;">${d.intro || ""}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 40px 10px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border-radius: 8px;">
+              ${row("Reference", d.ref)}
+              ${row("Tour", d.tour_name)}
+              ${row("Customer", d.customer_name)}
+              ${row("Phone", d.customer_phone)}
+              ${row("Email", d.customer_email)}
+            </table>
+          </td>
+        </tr>
+        ${d.note ? `<tr><td style="padding: 6px 40px 10px;"><div style="background: #fff8e6; border-left: 3px solid #d9a441; border-radius: 6px; padding: 14px 16px; font-size: 14px; color: #6b5a2f;">“${d.note}”</div></td></tr>` : ""}
+        <tr>
+          <td style="padding: 10px 40px 36px;">
+            <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0;">Open your <strong>BookingTours dashboard → Inbox</strong> to reply. This request is already waiting there.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color: #1b3b36; text-align: center; padding: 24px;">
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>You're receiving this because you're the notification contact for this business.</p>
           </td>
         </tr>
       </table>
@@ -1620,6 +2179,8 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const toName = String(d.customer_name || "Customer");
   const toEmail = String(d.customer_email || "");
   const toPhone = String(d.phone || "");
+  const toCompany = String(d.customer_company_name || "");
+  const toVat = String(d.customer_vat_number || "");
   const tourName = String(d.tour_name || "Booking");
   const tourDate = String(d.tour_date || d.invoice_date || "-");
   const qty = Number(d.qty) || 1;
@@ -1628,7 +2189,40 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const subtotal = total / (1 + VAT_RATE);
   const vatAmt = total - subtotal;
   const invDate = String(d.invoice_date || "-");
+  const amountPaid = invoiceAmountPaid(d, total);
   function m(n: number) { return "R" + n.toFixed(2); }
+
+  // ── Optional operator logo (top-left) ──
+  // pdf-lib can only embed raster PNG/JPG — SVG and WEBP logos (which render
+  // fine as an <img> on the booking site/admin sidebar) can't be embedded
+  // here without rasterizing first, so they're skipped. That used to fail
+  // completely silently; now it's logged so a missing invoice logo is
+  // diagnosable instead of a mystery.
+  if (invCtx.logoUrl) {
+    try {
+      const resp = await fetch(invCtx.logoUrl);
+      if (!resp.ok) {
+        console.warn("INVOICE_LOGO_FETCH_FAILED url=" + invCtx.logoUrl + " status=" + resp.status);
+      } else {
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const ct = (resp.headers.get("content-type") || "").toLowerCase();
+        const url = invCtx.logoUrl.toLowerCase();
+        let img: any = null;
+        if (ct.includes("png") || url.endsWith(".png")) img = await doc.embedPng(bytes);
+        else if (ct.includes("jpg") || ct.includes("jpeg") || /\.jpe?g(\?|$)/.test(url)) img = await doc.embedJpg(bytes);
+        if (img) {
+          const h = 42;
+          const w = (img.width / img.height) * h;
+          page.drawImage(img, { x: margin, y: y - h, width: w, height: h });
+          y -= (h + 12);
+        } else {
+          console.warn("INVOICE_LOGO_UNSUPPORTED_FORMAT url=" + invCtx.logoUrl + " content-type=" + ct + " — invoice PDFs support PNG/JPG only; re-upload the logo in that format to show it on invoices.");
+        }
+      }
+    } catch (logoErr) {
+      console.error("INVOICE_LOGO_ERR url=" + invCtx.logoUrl + ": " + (logoErr instanceof Error ? logoErr.message : String(logoErr)));
+    }
+  }
 
   // ── Header ──
   page.drawText(invCtx.companyName || "Tax Invoice", { x: margin, y, font: fontBold, size: 18, color: black });
@@ -1652,20 +2246,25 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
     y -= 12;
   }
   let toY = y + 12 + fromLines.length * 12 - 14;
-  const toLines = [toName];
+  const toLines: string[] = [];
+  if (toCompany) toLines.push(toCompany);
+  toLines.push(toName);
   if (toPhone) toLines.push(toPhone);
   toLines.push(toEmail);
+  if (toVat) toLines.push("VAT: " + toVat);
   for (const tl of toLines) {
     page.drawText(tl, { x: margin + usable * 0.5, y: toY, font, size: 9, color: black });
     toY -= 12;
   }
+  // Continue below whichever of From/To is taller so neither overlaps the next row.
+  y = Math.min(y, toY);
   y -= 10;
 
   // ── Invoice details ──
   page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: lightGrey });
   y -= 20;
   const detailLabels = ["Invoice #:", "Booking Ref:", "Date:", "Amount Due:"];
-  const detailValues = [invNo, ref, invDate, "R0.00"];
+  const detailValues = [invNo, ref, invDate, m(Math.max(0, total - amountPaid))];
   for (let di = 0; di < detailLabels.length; di++) {
     page.drawText(detailLabels[di], { x: W - margin - 200, y, font: fontBold, size: 9, color: black });
     page.drawText(detailValues[di], { x: W - margin - 80, y, font: fontMono, size: 9, color: black });
@@ -1713,7 +2312,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
     ["Sub-total (Excl VAT):", m(subtotal)],
     ["VAT - " + (VAT_RATE * 100).toFixed(1) + "%:", m(vatAmt)],
     ["Total:", m(total)],
-    ["Amount Paid:", m(total)],
+    ["Amount Paid:", m(amountPaid)],
   ];
   for (const tr of totalRows) {
     page.drawText(tr[0], { x: totalsX, y, font: tr[0] === "Total:" ? fontBold : font, size: 9, color: black });
@@ -1725,7 +2324,7 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   y -= 4;
   page.drawRectangle({ x: totalsX - 5, y: y - 4, width: W - margin - totalsX + 5, height: 18, color: lightGrey });
   page.drawText("Balance Due:", { x: totalsX, y, font: fontBold, size: 10, color: black });
-  page.drawText("R0.00", { x: totalsValX, y, font: fontBold, size: 10, color: black });
+  page.drawText(m(Math.max(0, total - amountPaid)), { x: totalsValX, y, font: fontBold, size: 10, color: black });
   y -= 35;
 
   // ── Banking Details (only if business has bank details populated) ──
@@ -1784,6 +2383,8 @@ function broadcastHtml(d: Record<string, unknown>) {
             <h1 style="margin: 10px 0 0 0; font-size: 24px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Update About Your Trip</h1>
           </td>
         </tr>
+        <!-- Hero Image (reuses the operator's confirmation-email hero image — broadcast has no dedicated upload of its own) -->
+        ${heroImg("IMG_CONFIRM", "Cape Kayak")}
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 40px;">
@@ -1920,6 +2521,7 @@ async function resolveTenantFromRedirect(redirectUrl: string): Promise<string | 
 
 Deno.serve(withSentry("send-email", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: getCors(req) });
 
   try {
     if (!RESEND_API_KEY) {
@@ -1982,10 +2584,35 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     const type = (parsedBody as { type?: string }).type as string;
-    const d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
+    let d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
+    if (typeof type !== "string" || !type || !d || typeof d !== "object" || Array.isArray(d)) {
+      return new Response(JSON.stringify({ error: "type and data are required" }), { status: 400, headers: getCors(req) });
+    }
+    if (!isAuthHook) {
+      let auth;
+      try { auth = await requireAuth(req); }
+      catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) }); }
+      if (!auth.isServiceRole) {
+        // Identity, privacy and platform billing messages are issued only by
+        // their verified server workflows, never as arbitrary admin payloads.
+        if (["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING"].includes(type) || type.startsWith("POPIA_")) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+        }
+        const businessId = String(d.business_id || auth.businessId || "");
+        if (!canAccessBusiness(auth, businessId)) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
+        }
+        if (d.booking_id) {
+          const booking = await supabase?.from("bookings").select("id")
+            .eq("id", String(d.booking_id)).eq("business_id", businessId).maybeSingle();
+          if (!booking?.data) return new Response(JSON.stringify({ error: "Booking not accessible" }), { status: 403, headers: getCors(req) });
+        }
+        d.business_id = businessId;
+      }
+    }
 
     // Escape user-controlled fields to prevent HTML injection in email templates
-    const fieldsToEscape = ["customer_name", "recipient_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number"];
+    const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email", "business_name", "plan_name"];
     for (let fi = 0; fi < fieldsToEscape.length; fi++) {
       const fk = fieldsToEscape[fi];
       if (d[fk] && typeof d[fk] === "string") d[fk] = escHtml(d[fk] as string);
@@ -1997,10 +2624,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
-    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY") {
+    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER") {
       try { d = await enrichWaiverEmailData(d); } catch (wErr) { console.error("WAIVER_ENRICH_ERR:", wErr); }
     }
 
@@ -2018,6 +2645,45 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     // This avoids relying solely on the {{BOOKING_URL}} placeholder replacement in applyBranding
     d._manageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : "");
     d._siteUrl = branding.bookingSiteUrl || "";
+    d._emailTagline = branding.emailTagline || "";
+    // Per-tour tagline wins over the account-wide one. Every BOOKING_CONFIRM
+    // caller passes booking_id, and send-email already does bookings→tours
+    // joins by id (see below), so this needs no changes on the sending side.
+    if (type === "BOOKING_CONFIRM" && d.booking_id && supabase) {
+      try {
+        const tt = await supabase.from("bookings").select("tours(confirmation_tagline)").eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
+        const tag = (tt.data as { tours?: { confirmation_tagline?: string } } | null)?.tours?.confirmation_tagline;
+        if (tag && String(tag).trim()) d._emailTagline = String(tag).trim();
+      } catch (tagErr) {
+        console.error("TOUR_TAGLINE_LOOKUP_ERR:", tagErr);
+      }
+    }
+
+    // Central guard: senders should pass tenant-formatted date strings, but a
+    // raw ISO timestamp still slips through from older callers — format it
+    // here so no template ever renders "2026-07-11T10:00:00+00:00".
+    if (typeof d.start_time === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(d.start_time) && !Number.isNaN(Date.parse(d.start_time))) {
+      d.start_time = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, d.start_time);
+    }
+
+    // Multi-day tours: render tour_date as a range ("Mon, 13 Jul, 09:00 – Wed, 15 Jul").
+    // Whole-day durations end ON the last day, matching the booking-site display.
+    if (typeof d.tour_date === "string" && d.tour_date && !d.tour_date.includes("–") && supabase) {
+      try {
+        const rangeBookingId = String(d.booking_id || "").trim();
+        if (rangeBookingId) {
+          const bres = await supabase.from("bookings").select("slots(start_time), tours(duration_minutes)").eq("id", rangeBookingId).eq("business_id", branding.businessId).maybeSingle();
+          const row = bres.data as { slots?: { start_time?: string }; tours?: { duration_minutes?: number } } | null;
+          const durMin = Number(row?.tours?.duration_minutes || 0);
+          const startIso = row?.slots?.start_time;
+          const end = startIso ? tourEndDate(startIso, durMin) : null;
+          if (end && durMin >= 1440) {
+            const endStr = formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, end.toISOString(), { hour: undefined, minute: undefined });
+            d.tour_date = d.tour_date + " – " + endStr;
+          }
+        }
+      } catch (e) { console.warn("TOUR_DATE_RANGE_ERR:", e); }
+    }
 
     // Last resort: if URL is still empty, try to construct from business_id lookup
     if (!d._manageUrl && d.business_id && supabase) {
@@ -2039,9 +2705,21 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     let bcc: string | undefined;
 
     switch (type) {
+      case "MY_BOOKINGS_OTP":
+        subject = "Your verification code";
+        html = myBookingsOtpHtml(d);
+        break;
       case "PAYMENT_LINK":
         subject = "Cape Kayak - Payment Link (Ref: " + d.ref + ")";
         html = paymentLinkHtml(d);
+        break;
+      case "PAYMENT_REMINDER":
+        subject = "Reminder: payment outstanding for your upcoming " + (d.tour_name || "booking");
+        html = paymentLinkHtml({
+          ...d,
+          heading: "Your trip is coming up",
+          intro: "Just a friendly reminder: your <strong>" + (d.tour_name || "booking") + "</strong> is coming up soon and we haven't received your payment yet. You can pay securely below to keep your spot.",
+        });
         break;
       case "RESCHEDULE_PAYMENT_LINK":
         subject = "Cape Kayak - Reschedule payment due (Ref: " + d.ref + ")";
@@ -2059,22 +2737,47 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         subject = "Cape Kayak - Booking Updated (Ref: " + d.ref + ")";
         html = bookingUpdatedHtml(d);
         break;
-      case "INVOICE":
-        subject = "Cape Kayak - Tax Invoice " + d.invoice_number;
-        html = invoiceHtml(d);
+      case "INVOICE": {
+        const invCtxHtml = await getInvoiceContext(branding.businessId);
+        subject = (invCtxHtml.companyName || "Tax Invoice") + " - Tax Invoice " + d.invoice_number;
+        html = invoiceHtml(d, invCtxHtml);
         bcc = d.admin_email as string;
         break;
-      case "GIFT_VOUCHER":
-        subject = "Cape Kayak - Gift Voucher for " + d.recipient_name;
+      }
+      case "PLATFORM_INVOICE_OUTSTANDING": {
+        // Uses BookingTours' own branding (platform_settings), never the
+        // operator's — deliberately does NOT reuse the `invoice_number` field
+        // name (see `platform_invoice_number` in the payload) so this never
+        // triggers resolveBrandingBusinessId's tenant-invoice lookup above.
+        const platCtx = await getPlatformInvoiceContext();
+        subject = "BookingTours: Invoice " + d.platform_invoice_number + " outstanding";
+        html = platformInvoiceOutstandingHtml(d, platCtx);
+        break;
+      }
+      case "GIFT_VOUCHER": {
+        const gvMode = String(d.gift_recipient_mode || "buyer_forward");
+        subject = gvMode === "recipient"
+          ? "🎁 " + d.recipient_name + ", you've received a gift!"
+          : gvMode === "buyer_receipt"
+            ? "Your gift for " + d.recipient_name + " is on its way"
+            : "🎁 Cape Kayak - Your gift voucher for " + d.recipient_name;
         html = giftVoucherHtml(d);
         bcc = d.admin_email as string;
         break;
+      }
       case "CANCELLATION":
         subject = "Cape Kayak - Booking Cancelled (Ref: " + d.ref + ")";
         html = cancellationHtml(d);
         break;
       case "INDEMNITY":
         subject = "Cape Kayak - Indemnity & Waiver (Ref: " + d.ref + ")";
+        html = indemnityHtml(d);
+        break;
+      case "REMINDER":
+        // Email fallback for the trip reminder (sent only when WhatsApp
+        // fails). Same body as INDEMNITY — it renders the trip details and
+        // handles both signed and unsigned waiver states.
+        subject = "Cape Kayak - Your trip is tomorrow (Ref: " + d.ref + ")";
         html = indemnityHtml(d);
         break;
       case "VOUCHER":
@@ -2100,18 +2803,51 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         break;
       case "TRIP_PHOTOS":
         subject = "Cape Kayak - Your Trip Photos Are Ready! 📸";
-        html = tripPhotosHtml(d);
+        html = tripPhotosHtml(d, branding);
         break;
-      case "MARKETING_TEST":
+      case "SETTLEMENT_REQUEST":
+        // Operator B asks operator A to pay their combo share via Yoco link.
+        subject = (d.requester_name || "Your partner") + " requested combo settlement: R" + d.amount;
+        html = settlementRequestHtml(d);
+        break;
+      case "PARTNERSHIP_INVITE":
+        // Operator-to-operator combo partnership invite (Partners dashboard).
+        subject = (d.inviter_name || "A BookingTours operator") + " wants to partner with you on BookingTours";
+        html = partnershipInviteHtml(d);
+        break;
+      case "OPERATOR_ALERT":
+        // Internal alert TO the operator (notification_email), not a customer.
+        subject = String(d.heading || "New alert") + (d.ref ? ": " + d.ref : "");
+        html = operatorAlertHtml(d);
+        break;
+      case "CUSTOMER_MESSAGE":
+        // Email fallback for an operator's WhatsApp reply the customer couldn't
+        // receive on WhatsApp (item 21). applyBranding swaps in the tenant brand.
+        subject = "A message from Cape Kayak Adventures";
+        html = customerMessageHtml(d);
+        break;
+      case "MARKETING_TEST": {
         // Admin preview of a marketing template. We do NOT touch the queue or
-        // generate per-recipient unsubscribe tokens here — the body is rendered
-        // verbatim with a [TEST] prefix and a static admin-facing unsubscribe
-        // placeholder so the rendered preview matches what real recipients see.
-        subject = String(d.subject_line || "[TEST] Marketing preview");
-        html = String(d.html_content || "<p>No content</p>")
-          .replace(/\{first_name\}/g, String(d.first_name || "Admin"))
-          .replace(/\{\{unsubscribe_url\}\}/g, "https://bookingtours.co.za/preview-unsubscribe");
+        // generate per-recipient unsubscribe tokens here — the body runs
+        // through the same token map real sends use (_shared/marketing-tokens)
+        // so no {token} ever reaches an inbox raw. Real business name and site
+        // URL; obviously-sample voucher/promo values, since a preview has no
+        // voucher behind it.
+        const testTokens = {
+          first_name: String(d.first_name || "Admin"),
+          business_name: branding.brandName,
+          site_url: branding.bookingSiteUrl,
+          voucher_code: "SAMPLE-CODE",
+          voucher_amount: "R500",
+          promo_code: "SAMPLE10",
+          promo_discount: "10%",
+        };
+        subject = fillMarketingTokens(String(d.subject_line || "[TEST] Marketing preview"), testTokens);
+        html = fillMarketingTokens(String(d.html_content || "<p>No content</p>"), testTokens)
+          .replace(/\{\{unsubscribe_url\}\}/g, SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=preview");
+        html = replaceLegacyMarketingSocialIcons(html);
         break;
+      }
       case "POPIA_CONFIRM_REQUEST":
         subject = "Confirm Your Data Request";
         html = popiaConfirmRequestHtml(d);

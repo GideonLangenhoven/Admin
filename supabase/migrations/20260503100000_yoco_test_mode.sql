@@ -1,14 +1,11 @@
 BEGIN;
-
 -- 1. New columns
 ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS yoco_test_mode boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS yoco_test_secret_key_encrypted bytea,
   ADD COLUMN IF NOT EXISTS yoco_test_webhook_secret_encrypted bytea;
-
 COMMENT ON COLUMN public.businesses.yoco_test_mode IS
   'When true, create-checkout uses yoco_test_* keys and UIs show a TEST MODE banner.';
-
 -- 2. Extend get_business_credentials to return test keys + flag
 DROP FUNCTION IF EXISTS public.get_business_credentials(uuid, text);
 CREATE FUNCTION public.get_business_credentials(p_business_id uuid, p_key text)
@@ -40,7 +37,6 @@ AS $$
   FROM public.businesses b
   WHERE b.id = p_business_id;
 $$;
-
 -- 3. RPC to save test credentials + toggle
 CREATE OR REPLACE FUNCTION public.set_yoco_test_credentials(
   p_business_id uuid,
@@ -71,5 +67,4 @@ begin
   end if;
 end;
 $$;
-
 COMMIT;

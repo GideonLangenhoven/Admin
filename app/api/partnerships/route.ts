@@ -5,7 +5,13 @@ import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Fail loudly rather than degrading to the anon key. combo_bookings,
+  // combo_booking_items and promotion_uses have RLS on with no client
+  // policies, so an anon fallback does not error — it returns empty. A
+  // settlement or cancellation route reporting "nothing found" when the
+  // service key is missing is a silent money bug.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server");
   return createClient(url, key);
 }
 
@@ -134,26 +140,40 @@ export async function POST(req: NextRequest) {
       .single();
     const inviterName = inviterBiz?.business_name || inviterBiz?.name || "A BookingTours operator";
 
-    // Send partnership invite email via send-email function
+    // Send partnership invite email via send-email function.
+    // The approve link must live on the partner's own admin subdomain — only
+    // the *.admin wildcard is attached to the Vercel project; the bare admin
+    // domain 404s.
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    const adminAppUrl = process.env.NEXT_PUBLIC_APP_URL || "https://admin.bookingtours.co.za";
+    const { data: partnerBiz } = await supabase
+      .from("businesses")
+      .select("subdomain")
+      .eq("id", partnerId)
+      .single();
+    const adminAppUrl = partnerBiz?.subdomain
+      ? "https://" + partnerBiz.subdomain + ".admin.bookingtours.co.za"
+      : (process.env.NEXT_PUBLIC_APP_URL || "https://admin.bookingtours.co.za");
     const approveUrl = adminAppUrl + "/api/partnerships/approve?token=" + inviteToken;
 
     try {
-      await fetch(supabaseUrl + "/functions/v1/send-email", {
+      const emailRes = await fetch(supabaseUrl + "/functions/v1/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + serviceKey },
         body: JSON.stringify({
           type: "PARTNERSHIP_INVITE",
           data: {
             email: normalizedEmail,
+            business_id,
             inviter_name: inviterName,
             approve_url: approveUrl,
             partner_name: adminUser.name || normalizedEmail,
           },
         }),
       });
+      if (!emailRes.ok) {
+        console.error("Partnership invite email failed:", emailRes.status, await emailRes.text());
+      }
     } catch (e) {
       console.error("Partnership invite email error:", e);
     }

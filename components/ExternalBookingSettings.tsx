@@ -56,7 +56,6 @@ type CredentialRow = {
   id: string;
   source: string;
   api_key_last4: string | null;
-  hmac_secret: string | null;
   hmac_secret_encrypted: string | null;
   active: boolean;
   created_at: string;
@@ -69,7 +68,7 @@ type GeneratedSecrets = {
 };
 
 const EMPTY_MAPPING_FORM = {
-  source: "VIATOR",
+  source: "PARTNER",
   tour_id: "",
   external_product_id: "",
   external_product_code: "",
@@ -78,7 +77,7 @@ const EMPTY_MAPPING_FORM = {
 };
 
 const EMPTY_CREDENTIAL_FORM = {
-  source: "VIATOR",
+  source: "PARTNER",
   active: true,
   hmacEnabled: true,
   rotateApiKey: true,
@@ -144,7 +143,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     setLoadingCredentials(true);
     const { data, error } = await supabase
       .from("external_booking_credentials")
-      .select("id, source, api_key_last4, hmac_secret, hmac_secret_encrypted, active, created_at")
+      .select("id, source, api_key_last4, hmac_secret_encrypted, active, created_at")
       .eq("business_id", businessId)
       .order("source", { ascending: true });
 
@@ -279,14 +278,21 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     if (credentialId) {
       const hmacValue = !credentialForm.hmacEnabled ? null : (hmacSecret || undefined);
       if (hmacValue !== undefined) {
-        const { error: fnErr } = await supabase.functions.invoke("external-booking", {
+        const { data: result, error: fnErr } = await supabase.functions.invoke("external-booking", {
           body: { action: "admin_set_hmac", credential_id: credentialId, hmac_secret: hmacValue },
-        });
-        if (fnErr) console.error("Failed to encrypt HMAC secret:", fnErr);
+        }).catch((error: unknown) => ({ data: null, error }));
+        if (fnErr || result?.success !== true) {
+          setEditingCredentialId(credentialId);
+          setCredentialForm((prev) => ({ ...prev, rotateApiKey: false, rotateHmacSecret: true }));
+          if (apiKey) setGeneratedSecrets({ source: payload.source as string, apiKey, hmacSecret: null });
+          setCredentialMessage({ type: "error", text: "API key settings were saved, but the HMAC save could not be confirmed. Save the API key below if shown, then retry before using this credential." });
+          setSavingCredential(false);
+          return;
+        }
       }
     }
 
-    setCredentialMessage({ type: "success", text: editingCredentialId ? "Credential updated." : "Credential created." });
+    const successMessage = editingCredentialId ? "Credential updated." : "Credential created.";
     if (apiKey || hmacSecret) {
       setGeneratedSecrets({
         source: credentialForm.source.trim().toUpperCase(),
@@ -296,6 +302,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     }
     await loadCredentials();
     resetCredentialForm();
+    setCredentialMessage({ type: "success", text: successMessage });
 
     setSavingCredential(false);
   }
@@ -318,7 +325,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
     setCredentialForm({
       source: row.source,
       active: row.active,
-      hmacEnabled: Boolean(row.hmac_secret_encrypted || row.hmac_secret),
+      hmacEnabled: Boolean(row.hmac_secret_encrypted),
       rotateApiKey: false,
       rotateHmacSecret: false,
     });
@@ -386,10 +393,10 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">External Booking API</h2>
             <p className="text-xs text-[var(--ck-text-muted)] mt-1">
-              One shared webhook endpoint serves every business. Incoming `x-api-key` resolves the correct business automatically.
+              For custom partners implementing the BookingTours API. Each API key identifies one business. A source name or product mapping does not connect Viator, GetYourGuide or another marketplace.
             </p>
           </div>
-          <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg-subtle)] px-3 py-2 text-xs text-[var(--ck-text-muted)]">
+          <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] px-3 py-2 text-xs text-[var(--ck-text-muted)]">
             Endpoint: <span className="font-medium text-[var(--ck-text-strong)]">/functions/v1/external-booking</span>
           </div>
         </div>
@@ -418,7 +425,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
                           </div>
                           <div className="mt-2 space-y-1 text-xs text-[var(--ck-text-muted)]">
                             <div>API key: {row.api_key_last4 ? `••••${row.api_key_last4}` : "Not set"}</div>
-                            <div>HMAC: {(row.hmac_secret_encrypted || row.hmac_secret) ? "Enabled" : "Disabled"}</div>
+                            <div>HMAC: {row.hmac_secret_encrypted ? "Enabled" : "Not configured (availability only)"}</div>
                             <div>Created: {new Date(row.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>
@@ -439,7 +446,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
             <form onSubmit={handleSaveCredential} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{editingCredentialId ? "Edit Credential" : "Create Credential"}</h3>
-                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Each business/source pair gets its own API key. HMAC is optional but recommended.</p>
+                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Each business/source pair gets its own API key. HMAC is required to create, change or cancel bookings. Without HMAC, only availability checks are allowed.</p>
               </div>
 
               <div>
@@ -449,7 +456,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
                   value={credentialForm.source}
                   onChange={(e) => setCredentialForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))}
                   className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
-                  placeholder="VIATOR"
+                  placeholder="PARTNER"
                 />
               </div>
 
@@ -460,7 +467,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={credentialForm.hmacEnabled} onChange={(e) => setCredentialForm((prev) => ({ ...prev, hmacEnabled: e.target.checked }))} className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
-                <span className="text-sm text-[var(--ck-text-strong)]">Require HMAC signatures</span>
+                <span className="text-sm text-[var(--ck-text-strong)]">Enable signed booking requests (HMAC)</span>
               </label>
 
               {editingCredentialId && (
@@ -494,7 +501,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
                     </div>
                   </div>
                   <CopyField label="Source" value={generatedSecrets.source} />
-                  <CopyField label="Webhook URL" value="https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/external-booking" />
+                  <CopyField label="API endpoint" value={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/external-booking`} />
                   <CopyField label="API Key" value={generatedSecrets.apiKey} />
                   {generatedSecrets.hmacSecret && (
                     <CopyField label="HMAC Secret" value={generatedSecrets.hmacSecret} />
@@ -572,7 +579,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
 
               <div>
                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Source</label>
-                <input type="text" value={mappingForm.source} onChange={(e) => setMappingForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="VIATOR" />
+                <input type="text" value={mappingForm.source} onChange={(e) => setMappingForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="PARTNER" />
               </div>
 
               <div>

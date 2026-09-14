@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
 
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 const db = createServiceClient();
@@ -35,6 +36,7 @@ Deno.serve(withSentry("viator-webhook", async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
+  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse(headers(origin));
 
   const rawBody = await req.text();
   let event: any;
@@ -228,7 +230,12 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
   }
 
   // Increment slot booked count
-  await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
+  await db.rpc("adjust_slot_capacity", { p_slot_id: slot.id, p_business_id: businessId, p_booked_delta: Number(qty), p_held_delta: 0 }); // S7: atomic
+
+  // Refresh customer lifetime stats now that the PAID booking is linked
+  if (customerId) {
+    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
+  }
 
   // Audit log
   await db.from("logs").insert({
@@ -272,10 +279,8 @@ async function handleBookingAmended(businessId: string, event: any, externalRef:
   }).eq("id", existing.id);
 
   if (qtyDiff !== 0 && existing.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", existing.slot_id).single();
-    if (sl) {
-      await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) + qtyDiff) }).eq("id", existing.slot_id);
-    }
+    // S7: atomic booked adjustment
+    await db.rpc("adjust_slot_capacity", { p_slot_id: existing.slot_id, p_business_id: businessId, p_booked_delta: Number(qtyDiff), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({
@@ -311,8 +316,8 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
 
   // Release slot capacity
   if (bk.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
-    if (sl) await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) - (bk.qty || 0)) }).eq("id", bk.slot_id);
+    // S7: atomic booked release
+    await db.rpc("adjust_slot_capacity", { p_slot_id: bk.slot_id, p_business_id: businessId, p_booked_delta: -Number(bk.qty || 0), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({

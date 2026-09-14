@@ -106,6 +106,8 @@ const context = {
   footer_line_two: data.footer_line_two || "",
   currency: data.currency || "R",
   year: new Date().getFullYear().toString(),
+  has_tours: !!(data.tours && data.tours.length),
+  tour_count: (data.tours || []).length,
   tours: (data.tours || []).map((t) => ({
     name: t.name || "Tour",
     description: t.description || "",
@@ -114,6 +116,15 @@ const context = {
     base_price_per_person: t.base_price_per_person || "0",
     image_url: t.image_url || "",
   })),
+  has_reviews: !!(data.reviews && data.reviews.length),
+  review_count: (data.reviews || []).length,
+  reviews: (data.reviews || []).map((r) => ({
+    quote: r.quote || "",
+    author: r.author || "",
+    rating: r.rating || "",
+  })),
+  has_chat: !!data.chat_embed,
+  chat_embed: data.chat_embed || "",
 };
 
 // Render

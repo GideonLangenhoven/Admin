@@ -130,6 +130,5 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'total', v_server_total, 'remainders', v_remainders);
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.confirm_voucher_booking(uuid, uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.confirm_voucher_booking(uuid, uuid[]) TO anon, authenticated, service_role;

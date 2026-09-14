@@ -11,18 +11,23 @@ import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
+import { isNavItemActive } from "./nav-active";
+import WaFailureWatcher from "./WaFailureWatcher";
+import HelpChat from "./HelpChat";
+import WelcomeChecklist from "./WelcomeChecklist";
+import { isSectionHidden } from "@/app/lib/operator-sections";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
-  ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
-  UsersThree, Clock, CaretDoubleLeft, CaretDoubleRight,
+  UsersThree, Clock, CaretDoubleLeft, CaretDoubleRight, CaretDown,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
-  MessageSquareText: ChatText, Ticket, Receipt, CloudSun, Camera, Megaphone,
+  MessageSquareText: ChatText, Ticket, Receipt, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
   ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree, Star, Globe: GlobeSimple, Warning: WarningCircle,
   Clock,
@@ -52,32 +57,87 @@ function isSuspendedAllowed(path: string) {
   return SUSPENDED_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
 }
 
+/* Presentation-only grouping of the nav — the items, order and visibility
+   rules are unchanged; groups whose items are all hidden don't render. */
+const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
+  { label: null, hrefs: ["/"] },
+  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
+  { label: "Customers", hrefs: ["/inbox", "/refunds", "/vouchers", "/reviews"] },
+  { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
+  { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
+  { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/privacy/data-requests", "/super-admin"] },
+];
+
+function groupNav(items: NavItem[]) {
+  const byHref = new Map(items.map((n) => [n.href, n]));
+  const placed = new Set<string>();
+  const groups = NAV_GROUPS.map((g) => ({
+    label: g.label,
+    items: g.hrefs.map((h) => { placed.add(h); return byHref.get(h); }).filter(Boolean) as NavItem[],
+  })).filter((g) => g.items.length > 0);
+  const leftovers = items.filter((n) => !placed.has(n.href));
+  if (leftovers.length > 0) groups.push({ label: null, items: leftovers });
+  return groups;
+}
+
+/* The deep-pine rail: vertical pine gradient with a breath of mint at the
+   crown and amber ember at the base — the signature depth move of v3. */
+const SIDEBAR_BG = [
+  "radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), transparent 60%)",
+  "radial-gradient(120% 45% at 50% 112%, rgba(217, 130, 47, 0.06), transparent 60%)",
+  "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
+].join(", ");
+
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
   const { businessId, businessName, logoUrl, role, subscriptionStatus, yocoTestMode, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
+  const [clock, setClock] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const isSuspended = subscriptionStatus === "SUSPENDED" && !/super/i.test(role);
   const routeBlocked = isSuspended && !isSuspendedAllowed(pathname);
 
   useEffect(() => {
+    const tick = () =>
+      setClock(
+        new Date().toLocaleString("en-ZA", {
+          weekday: "short", day: "2-digit", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: false,
+        }).replace(",", " ·"),
+      );
+    tick();
+    const iv = setInterval(tick, 30_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
     if (displayName && displayName !== "Admin") {
-      document.title = displayName + " — BookingTours Admin";
+      document.title = displayName + " | BookingTours Admin";
     } else {
       document.title = "BookingTours Admin";
     }
   }, [displayName]);
 
+  // Per-operator section visibility set by the Main Admin (see operator-sections.ts).
+  // Read directly from localStorage like the Settings gate below; guarded so SSR
+  // (no localStorage) simply shows everything, then hydration applies the hides.
+  let operatorPerms: Record<string, boolean> = {};
+  try {
+    operatorPerms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
+  } catch { /* SSR / malformed — treat as nothing hidden */ }
+
   const visibleNav = nav.filter((n) => {
     if (n.superAdminOnly) return role === "SUPER_ADMIN";
+    // Main-Admin-controlled hiding applies to operator-level admins only.
+    if (!isPrivilegedRole(role) && isSectionHidden(operatorPerms, n.href)) return false;
     if (!n.privilegedOnly) return true;
     if (isPrivilegedRole(role)) return true;
     // Show Settings for admins who have been granted section permissions
     if (n.href === "/settings") {
-      try {
-        const perms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
-        return Object.values(perms).some(Boolean);
-      } catch { return false; }
+      // Only the settings-section grants count — "hide:*" flags must not
+      // accidentally unlock the Settings page.
+      return Object.entries(operatorPerms).some(([k, v]) => v === true && !k.startsWith("hide:"));
     }
     return false;
   });
@@ -95,27 +155,77 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     });
   }
 
+  // Nav-group accordion state — remembered per admin account (namespaced by
+  // ck_admin_email) so different admins sharing a browser keep separate prefs.
+  useEffect(() => {
+    const email = localStorage.getItem("ck_admin_email") || "shared";
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ck_nav_groups_collapsed_${email}`) || "[]");
+      if (Array.isArray(saved)) setCollapsedGroups(new Set(saved));
+    } catch { /* ignore malformed local state */ }
+  }, []);
+
+  function toggleGroup(label: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      const email = localStorage.getItem("ck_admin_email") || "shared";
+      localStorage.setItem(`ck_nav_groups_collapsed_${email}`, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }
+
   if (isMarketingPath(pathname) && !(pathname === "/operators" && businessId)) {
     return <main className="min-h-screen">{children}</main>;
   }
 
+  // The Guide app renders standalone (its own full-screen PWA shell) — no admin
+  // sidebar/topbar. It still sits inside AuthGate so it keeps auth + business
+  // context, but the chrome is entirely its own.
+  if (pathname === "/guide" || pathname.startsWith("/guide/")) {
+    return <main className="min-h-screen">{children}</main>;
+  }
+
+  // Longest-prefix match against the visible nav → topbar breadcrumb label
+  const sectionLabel = visibleNav
+    .filter((n) => (n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/")))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.label
+    || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
+
+  const visibleHrefs = visibleNav.map((n) => n.href);
+  function isNavActive(href: string) {
+    return isNavItemActive(pathname, href, visibleHrefs);
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className={`hidden shrink-0 flex-col bg-white transition-[width] duration-200 md:flex ${collapsed ? "w-20" : "w-64"}`} style={{ boxShadow: "1px 0 20px rgba(0,0,0,0.02)" }}>
+      {/* Surfaces failed WhatsApp sends as in-the-moment toasts (replaces the
+          removed Notifications tab). Renders nothing. */}
+      <WaFailureWatcher />
+      {/* Floating help assistant + one-time first-login welcome. */}
+      <HelpChat />
+      <WelcomeChecklist />
+      {/* Sidebar starts at lg, not md: at 768px it would eat 256px of an
+          already-768px tablet, leaving 512px for the md: row/grid layouts that
+          fire at the same breakpoint. Tablets use the drawer instead. */}
+      <aside
+        className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex ${collapsed ? "w-20" : "w-64"}`}
+        style={{ background: SIDEBAR_BG, borderColor: "var(--ck-sidebar-border)" }}
+      >
         <div className="p-6 pb-2">
           <div className={`mb-8 flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
-            <Link href="/" className={`flex items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2"}`}>
+            <Link href="/" className={`flex items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2.5"}`}>
             {logoUrl ? (
-              <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded object-contain" unoptimized />
+              <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded-md object-contain p-[1px]" style={{ background: "rgba(244, 241, 232, 0.10)" }} unoptimized />
             ) : (
-              <BrandMark size={26} className="shrink-0" />
+              <BrandMark size={26} variant="ivory" className="shrink-0" />
             )}
-            {!collapsed && <h1 className="text-lg font-bold tracking-tight truncate" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>}
+            {!collapsed && <h1 className="text-[16px] font-semibold tracking-tight truncate" style={{ color: "var(--ck-sidebar-active-text)" }}>{displayName}</h1>}
             </Link>
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="rounded-lg border p-1.5 transition-colors"
+              className="rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-sidebar-hover)]"
               style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -131,7 +241,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               value={businessId}
               onChange={(e) => switchOperator(e.target.value)}
               className="w-full rounded-lg border px-2.5 py-2 text-xs font-medium truncate"
-              style={{ borderColor: "var(--ck-sidebar-border)", background: "var(--ck-sidebar)", color: "var(--ck-sidebar-text)" }}
+              style={{ borderColor: "var(--ck-sidebar-border)", background: "rgba(244, 241, 232, 0.06)", color: "var(--ck-sidebar-text)" }}
             >
               {operators.map((op) => (
                 <option key={op.id} value={op.id}>{op.name}</option>
@@ -147,7 +257,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                 const next = operators[(idx + 1) % operators.length];
                 if (next) switchOperator(next.id);
               }}
-              className="rounded-lg border p-2 text-xs"
+              className="rounded-lg border p-2 text-xs transition-colors hover:bg-[var(--ck-sidebar-hover)]"
               style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-text)" }}
               title={"Switch to: " + (operators.find((o) => o.id !== businessId)?.name || "next")}
             >
@@ -156,55 +266,100 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           </div>
         )}
 
-        <div className="flex-1 overflow-auto px-4 pb-4">
-          {!collapsed && <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-sidebar-muted)" }}>General</div>}
-          <nav className="space-y-1">
-            {visibleNav.map((n) => {
-              const Icon = iconMap[n.icon] || Circle;
-              const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
-              const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
-              return (
-                <Link key={n.href} href={navBlocked ? pathname : n.href}
-                  className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${collapsed ? "justify-center" : "gap-3"} ${isActive
-                      ? "ui-nav-active font-semibold"
-                      : "font-medium text-[var(--ck-sidebar-text)] hover:bg-[var(--ck-sidebar-hover)] hover:text-[var(--ck-sidebar-active-text)]"
-                    } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
-                  aria-disabled={navBlocked}
-                  tabIndex={navBlocked ? -1 : undefined}
+        <div className="flex-1 overflow-auto px-3.5 pb-4">
+          {groupNav(visibleNav).map((group, gi) => {
+            const isCollapsedGroup = group.label ? collapsedGroups.has(group.label) : false;
+            const hasActiveItem = group.items.some((n) => isNavActive(n.href));
+            const showItems = collapsed || !isCollapsedGroup || hasActiveItem || !group.label;
+            return (
+            <div key={group.label ?? `g${gi}`}>
+              {group.label && !collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label!)}
+                  aria-expanded={showItems}
+                  className="ui-mono-label mt-6 mb-1.5 flex w-full items-center justify-between px-2.5 !text-[10px] transition-colors hover:!text-[var(--ck-sidebar-text)]"
+                  style={{ color: "var(--ck-sidebar-muted)" }}
                 >
-                  <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-sidebar-muted)" }}>
-                    <Icon size={20} weight={isActive ? "fill" : "regular"} />
-                  </span>
-                  {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
-                  {n.href === "/inbox" && <NotificationBadge />}
-                  {n.href === "/refunds" && <RefundBadge />}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className={`mt-auto border-t p-4 flex ${collapsed ? "flex-col gap-3" : "items-center justify-between"}`} style={{ borderColor: "var(--ck-sidebar-border)" }}>
-          <SignOutButton />
-          <ThemeToggle />
+                  <span>{group.label}</span>
+                  <CaretDown size={10} weight="bold" className="transition-transform duration-200" style={{ transform: showItems ? "rotate(0deg)" : "rotate(-90deg)" }} />
+                </button>
+              )}
+              {group.label && collapsed && (
+                <div className="mx-auto my-3 w-5 border-t" style={{ borderColor: "var(--ck-sidebar-border)" }} aria-hidden="true" />
+              )}
+              {showItems && (
+              <nav className="space-y-0.5">
+                {group.items.map((n) => {
+                  const Icon = iconMap[n.icon] || Circle;
+                  const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
+                  const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
+                  return (
+                    <Link key={n.href} href={navBlocked ? pathname : n.href}
+                      className={`group flex items-center rounded-[8px] px-2.5 py-[7px] text-[13.5px] transition-colors ${collapsed ? "justify-center" : "gap-2.5"} ${isActive
+                          ? "ui-nav-active font-semibold"
+                          : "font-medium text-[var(--ck-sidebar-text)] hover:bg-[var(--ck-sidebar-hover)] hover:text-[var(--ck-sidebar-active-text)]"
+                        } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
+                      aria-disabled={navBlocked}
+                      tabIndex={navBlocked ? -1 : undefined}
+                      title={collapsed ? n.label : undefined}
+                    >
+                      <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-sidebar-icon-active)" : "var(--ck-sidebar-icon)" }}>
+                        <Icon size={18} weight={isActive ? "fill" : "regular"} />
+                      </span>
+                      {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
+                      {n.href === "/inbox" && <NotificationBadge />}
+                      {n.href === "/refunds" && <RefundBadge />}
+                    </Link>
+                  );
+                })}
+              </nav>
+              )}
+            </div>
+            );
+          })}
         </div>
         {/* Platform provenance — subtle, stays in hairline footer */}
-        <div
-          className={`border-t px-4 py-2.5 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}
+        <a
+          href="https://bookingtours.co.za"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-auto border-t px-4 py-3 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}
           style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
           title="Powered by BookingTours"
         >
-          <BrandMark size={14} className="shrink-0" />
+          <BrandMark size={14} variant="ivory" className="shrink-0 opacity-70" />
           {!collapsed && (
             <span className="flex items-baseline gap-1.5">
               <span className="text-[9px] font-medium uppercase" style={{ letterSpacing: "0.1em" }}>Powered by</span>
               <BrandWordmark className="text-[12px]" />
             </span>
           )}
-        </div>
+        </a>
       </aside>
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--ck-bg)" }}>
-        <header className="md:hidden flex items-center justify-between border-b px-4 py-3 backdrop-blur" style={{ background: "color-mix(in srgb, var(--ck-surface) 85%, transparent)", borderColor: "var(--ck-border-strong)" }}>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Desktop topbar — glass chrome: breadcrumb, live clock, session controls */}
+        <header
+          className="ui-glass hidden lg:flex h-14 shrink-0 items-center justify-between border-b px-6"
+          style={{ borderColor: "var(--ck-border-subtle)" }}
+        >
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="ui-mono-label truncate max-w-[220px]">{displayName}</span>
+            <span className="text-[11px]" style={{ color: "var(--ck-border-strong)" }}>/</span>
+            <span className="ui-mono-label truncate" style={{ color: "var(--ck-text-strong)" }}>{sectionLabel}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            {clock && (
+              <span className="ui-mono-label hidden lg:flex items-center gap-2 !normal-case !tracking-[0.04em]">
+                <span className="h-[5px] w-[5px] rounded-full motion-safe:animate-pulse" style={{ background: "var(--ck-accent)" }} aria-hidden="true" />
+                {clock}
+              </span>
+            )}
+            <ThemeToggle size="sm" />
+            <SignOutButton variant="header" />
+          </div>
+        </header>
+        <header className="ui-glass lg:hidden flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <MobileMenuDrawer nav={visibleNav} />
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {logoUrl ? (
@@ -220,30 +375,27 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           </div>
         </header>
         {isSuspended && (
-          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "#fef2f2", borderColor: "#fecaca" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-red-600"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
-            <p className="text-xs font-medium text-red-800">Subscription suspended — only Reports, Invoices, Refunds, and Settings are accessible. Contact support to reactivate.</p>
+          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-danger)" }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
+            <p className="text-xs font-medium" style={{ color: "var(--ck-danger)" }}>Subscription suspended. Only Reports, Invoices, Refunds, and Settings are accessible. Contact support to reactivate.</p>
           </div>
         )}
         {subscriptionStatus === "PAUSED" && !isSuspended && (
-          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-amber-600"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
-            <p className="text-xs font-medium text-amber-800">Your subscription is paused for off-season. <a href="/billing" className="underline font-semibold">Resume</a> to take new bookings.</p>
+          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-warning-soft)", borderColor: "color-mix(in srgb, var(--ck-warning) 25%, transparent)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-warning)" }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" /></svg>
+            <p className="text-xs font-medium" style={{ color: "var(--ck-warning)" }}>Your subscription is paused for off-season. <a href="/billing" className="underline font-semibold">Resume</a> to take new bookings.</p>
           </div>
         )}
         {yocoTestMode && (
-          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "#fff7ed", borderColor: "#fed7aa" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-orange-600"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-            <p className="text-xs font-medium text-orange-800">TEST MODE — Yoco payments are using sandbox keys. No real charges will be processed.</p>
+          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber-bright) 30%, transparent)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-amber)" }}><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+            <p className="text-xs font-medium" style={{ color: "var(--ck-amber)" }}>TEST MODE: Yoco payments are using sandbox keys. No real charges will be processed.</p>
           </div>
         )}
         <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">
           {routeBlocked ? (
             <div className="flex items-center justify-center min-h-[50vh]">
-              <div className="text-center max-w-sm">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-red-600"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                </div>
+              <div className="ui-card px-10 py-9 text-center max-w-sm">
                 <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Feature Unavailable</h2>
                 <p className="text-sm text-[var(--ck-text-muted)]">This section is not accessible while your subscription is suspended. You can still access Reports, Invoices, Refunds, and Settings.</p>
               </div>
@@ -251,20 +403,21 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           ) : children}
         </main>
 
-        <nav className="md:hidden shrink-0 overflow-x-auto border-t py-2 backdrop-blur no-scrollbar" style={{ background: "color-mix(in srgb, var(--ck-surface) 90%, transparent)", borderColor: "var(--ck-border-strong)" }}>
+        <nav className="ui-glass lg:hidden shrink-0 overflow-x-auto border-t py-2 no-scrollbar" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <div className="flex min-w-max px-2">
           {visibleNav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;
-            const isActive = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+            const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
             const mobileBlocked = isSuspended && !isSuspendedAllowed(n.href);
             return (
-              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] font-medium" + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
+              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                 <div className="relative mb-1">
-                  <Icon size={20} />
+                  <Icon size={20} weight={isActive ? "fill" : "regular"} />
                   {n.href === "/inbox" && <div className="absolute -top-1 -right-2 transform scale-75"><NotificationBadge /></div>}
                   {n.href === "/refunds" && <div className="absolute -top-1 -right-2 transform scale-75"><RefundBadge /></div>}
                 </div>
                 <span className="truncate">{n.label}</span>
+                {isActive && <span className="absolute -bottom-0.5 h-[3px] w-[3px] rounded-full" style={{ background: "var(--ck-amber-bright)" }} aria-hidden="true" />}
               </Link>
             );
           })}

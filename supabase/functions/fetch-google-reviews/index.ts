@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
 import { withSentry, captureException } from "../_shared/sentry.ts";
 
 const db = createServiceClient();
@@ -13,13 +13,16 @@ Deno.serve(withSentry("fetch-google-reviews", async (_req: Request) => {
     });
   }
 
-  const { data: businesses } = await db.from("businesses")
-    .select("id, google_place_id")
-    .not("google_place_id", "is", null);
+  const businesses = await fetchAllRows<{ id: string; google_place_id: string }>((from, to) =>
+    db.from("businesses")
+      .select("id, google_place_id")
+      .not("google_place_id", "is", null)
+      .range(from, to)
+  );
 
   let totalUpserted = 0;
 
-  for (const biz of businesses || []) {
+  for (const biz of businesses) {
     try {
       const res = await fetch(
         "https://places.googleapis.com/v1/places/" + biz.google_place_id,

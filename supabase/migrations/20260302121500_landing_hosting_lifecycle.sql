@@ -23,7 +23,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.ck_after_landing_page_order_write()
 returns trigger
 language plpgsql
@@ -112,13 +111,11 @@ begin
   return null;
 end;
 $$;
-
 drop trigger if exists ck_landing_page_orders_before_write on public.landing_page_orders;
 create trigger ck_landing_page_orders_before_write
 before insert or update on public.landing_page_orders
 for each row
 execute function public.ck_before_landing_page_orders_write();
-
 drop trigger if exists ck_landing_page_orders_after_write on public.landing_page_orders;
 create trigger ck_landing_page_orders_after_write
 after insert or update of hosting_active, hosting_fee_zar, status, build_total_zar, extra_page_count, base_page_count

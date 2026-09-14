@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.customers (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id         uuid NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
@@ -17,38 +16,29 @@ CREATE TABLE IF NOT EXISTS public.customers (
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_business_email
   ON public.customers (business_id, email_lower);
-
 CREATE INDEX IF NOT EXISTS idx_customers_business_phone
   ON public.customers (business_id, phone);
-
 ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id) ON DELETE SET NULL;
-
 CREATE INDEX IF NOT EXISTS idx_bookings_customer_id
   ON public.bookings (customer_id);
-
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS customers_select_own_business ON public.customers;
 CREATE POLICY customers_select_own_business
   ON public.customers FOR SELECT TO authenticated
   USING (business_id = ANY(current_business_ids()));
-
 DROP POLICY IF EXISTS customers_modify_own_business ON public.customers;
 CREATE POLICY customers_modify_own_business
   ON public.customers FOR ALL TO authenticated
   USING (business_id = ANY(current_business_ids()))
   WITH CHECK (business_id = ANY(current_business_ids()));
-
 DROP POLICY IF EXISTS customers_service_all ON public.customers;
 CREATE POLICY customers_service_all
   ON public.customers FOR ALL TO service_role
   USING (true)
   WITH CHECK (true);
-
 CREATE OR REPLACE FUNCTION public.upsert_customer(
   p_business_id uuid,
   p_email       text,
@@ -96,10 +86,8 @@ BEGIN
   RETURN v_id;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.upsert_customer(uuid, text, text, text, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.upsert_customer(uuid, text, text, text, boolean) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.recompute_customer_stats(p_customer_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -126,10 +114,8 @@ BEGIN
   WHERE c.id = p_customer_id;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.recompute_customer_stats(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_customer_stats(uuid) TO service_role;
-
 -- Backfill: create customer rows from existing bookings
 DO $$
 DECLARE
@@ -153,7 +139,6 @@ BEGIN
     END;
   END LOOP;
 END $$;
-
 -- Refresh stats for all backfilled customers
 DO $$
 DECLARE r record;
@@ -162,5 +147,4 @@ BEGIN
     PERFORM public.recompute_customer_stats(r.id);
   END LOOP;
 END $$;
-
 COMMIT;

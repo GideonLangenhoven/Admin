@@ -19,11 +19,12 @@ type ConfirmState = AppConfirmPayload & {
   resolve: (value: AppConfirmResult) => void;
 };
 
-const TONE_STYLES: Record<AppNoticeTone, { bg: string; text: string; Icon: typeof Info }> = {
-  info: { bg: "#0ea5e9", text: "#ffffff", Icon: Info },
-  success: { bg: "#10b981", text: "#ffffff", Icon: CheckCircle },
-  warning: { bg: "#f59e0b", text: "#ffffff", Icon: Warning },
-  error: { bg: "#ef4444", text: "#ffffff", Icon: Warning },
+/* Field Console toasts: ui-card chrome + a 3px tone rail, icon in a soft chip */
+const TONE_STYLES: Record<AppNoticeTone, { rail: string; chipBg: string; chipFg: string; Icon: typeof Info }> = {
+  info: { rail: "var(--ck-ocean)", chipBg: "var(--ck-ocean-soft)", chipFg: "var(--ck-ocean)", Icon: Info },
+  success: { rail: "var(--ck-success)", chipBg: "var(--ck-success-soft)", chipFg: "var(--ck-success)", Icon: CheckCircle },
+  warning: { rail: "var(--ck-warning)", chipBg: "var(--ck-warning-soft)", chipFg: "var(--ck-warning)", Icon: Warning },
+  error: { rail: "var(--ck-danger)", chipBg: "var(--ck-danger-soft)", chipFg: "var(--ck-danger)", Icon: Warning },
 };
 
 export default function AppNotifications() {
@@ -106,14 +107,17 @@ export default function AppNotifications() {
           const style = TONE_STYLES[tone];
           const Icon = style.Icon;
           return (
-            <div key={notice.id} className="pointer-events-auto rounded-2xl border p-4 font-medium shadow-2xl" style={{ backgroundColor: style.bg, color: style.text, borderColor: "rgba(255,255,255,0.2)" }}>
+            <div key={notice.id} className="ui-card anim-fade-up pointer-events-auto relative overflow-hidden p-4" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+              <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: style.rail }} aria-hidden="true" />
               <div className="flex items-start gap-3">
-                <Icon className="mt-0.5 shrink-0 text-white" size={20} weight="bold" />
+                <span className="ui-icon-chip !h-8 !w-8 !rounded-lg" style={{ background: style.chipBg, color: style.chipFg }}>
+                  <Icon size={17} weight="fill" />
+                </span>
                 <div className="min-w-0 flex-1">
-                  {notice.title && <p className="text-sm font-semibold">{notice.title}</p>}
-                  <p className="text-sm leading-6">{notice.message}</p>
+                  {notice.title && <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{notice.title}</p>}
+                  <p className="text-sm leading-6" style={{ color: "var(--ck-text)" }}>{notice.message}</p>
                 </div>
-                <button type="button" onClick={() => dismissNotice(notice.id)} className="rounded-full p-1 text-current/60 transition hover:bg-white/40 hover:text-current">
+                <button type="button" onClick={() => dismissNotice(notice.id)} className="rounded-full p-1 transition hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text-muted)" }}>
                   <X size={16} />
                 </button>
               </div>
@@ -124,17 +128,20 @@ export default function AppNotifications() {
 
       {confirmState && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[101] flex justify-center px-4">
-          <div className="pointer-events-auto w-full max-w-2xl rounded-3xl border p-5 font-medium shadow-2xl" style={{ backgroundColor: TONE_STYLES[confirmState.tone || "warning"].bg, color: TONE_STYLES[confirmState.tone || "warning"].text, borderColor: "rgba(255,255,255,0.2)" }}>
+          <div className="ui-card anim-fade-up pointer-events-auto relative w-full max-w-2xl overflow-hidden p-5" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+            <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: TONE_STYLES[confirmState.tone || "warning"].rail }} aria-hidden="true" />
             <div className="flex items-start gap-3">
-              <Warning className="mt-0.5 shrink-0 text-white" size={24} weight="bold" />
+              <span className="ui-icon-chip shrink-0" style={{ background: TONE_STYLES[confirmState.tone || "warning"].chipBg, color: TONE_STYLES[confirmState.tone || "warning"].chipFg }}>
+                <Warning size={19} weight="fill" />
+              </span>
               <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold">{confirmState.title || "Please confirm"}</p>
-                <p className="mt-1 text-sm leading-6">{confirmState.message}</p>
+                <p className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title || "Please confirm"}</p>
+                <p className="mt-1 text-sm leading-6" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => resolveConfirm(true)}
-                    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                    className={`ui-btn ${confirmState.tone === "error" || confirmState.tone === "warning" ? "ui-btn-danger" : "ui-btn-primary"}`}
                   >
                     {confirmState.confirmLabel || "Confirm"}
                   </button>
@@ -142,7 +149,7 @@ export default function AppNotifications() {
                     <button
                       type="button"
                       onClick={() => resolveConfirm("alt")}
-                      className="rounded-xl border border-current/15 bg-white/60 px-4 py-2 text-sm font-semibold text-current hover:bg-white"
+                      className="ui-btn ui-btn-soft"
                     >
                       {confirmState.altLabel}
                     </button>
@@ -150,7 +157,7 @@ export default function AppNotifications() {
                   <button
                     type="button"
                     onClick={() => resolveConfirm(false)}
-                    className="rounded-xl border border-current/15 bg-white/30 px-4 py-2 text-sm font-semibold text-current/70 hover:bg-white/50"
+                    className="ui-btn ui-btn-ghost"
                   >
                     {confirmState.cancelLabel || "Cancel"}
                   </button>

@@ -23,7 +23,6 @@ SELECT cron.schedule('cron-tasks-every-5-minutes', '*/5 * * * *', $$
     body := '{}'::jsonb
   );
 $$);
-
 SELECT cron.schedule('fetch-google-reviews-daily', '17 3 * * *', $$
   SELECT net.http_post(
     url := 'https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/fetch-google-reviews',
@@ -31,7 +30,6 @@ SELECT cron.schedule('fetch-google-reviews-daily', '17 3 * * *', $$
     body := '{}'::jsonb
   );
 $$);
-
 SELECT cron.schedule('review-reminders-daily', '23 9 * * *', $$
   SELECT net.http_post(
     url := 'https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/auto-messages',
@@ -39,7 +37,6 @@ SELECT cron.schedule('review-reminders-daily', '23 9 * * *', $$
     body := '{}'::jsonb
   );
 $$);
-
 SELECT cron.schedule('viator-availability-hourly', '7 * * * *', $$
   SELECT net.http_post(
     url := 'https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/viator-availability-sync',
@@ -47,7 +44,6 @@ SELECT cron.schedule('viator-availability-hourly', '7 * * * *', $$
     body := '{}'::jsonb
   );
 $$);
-
 SELECT cron.schedule('gyg-availability-hourly', '12 * * * *', $$
   SELECT net.http_post(
     url := 'https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/getyourguide-availability-sync',
@@ -55,7 +51,6 @@ SELECT cron.schedule('gyg-availability-hourly', '12 * * * *', $$
     body := '{}'::jsonb
   );
 $$);
-
 SELECT cron.schedule('ota-reconcile-nightly', '37 2 * * *', $$
   SELECT net.http_post(
     url := 'https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/ota-reconcile',

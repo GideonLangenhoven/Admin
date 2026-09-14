@@ -4,11 +4,9 @@
 -- Phase 2 (contract) drops the plaintext column after verification.
 
 BEGIN;
-
 -- ── 1. Add encrypted column ──
 ALTER TABLE public.external_booking_credentials
   ADD COLUMN hmac_secret_encrypted bytea;
-
 -- ── 2. RPC: decrypt and return hmac_secret for a specific credential ──
 CREATE OR REPLACE FUNCTION public.get_external_booking_credentials(
   p_credential_id uuid,
@@ -23,10 +21,8 @@ AS $$
   FROM public.external_booking_credentials c
   WHERE c.id = p_credential_id;
 $$;
-
 REVOKE ALL ON FUNCTION public.get_external_booking_credentials(uuid, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_external_booking_credentials(uuid, text) TO service_role;
-
 -- ── 3. RPC: encrypt and store hmac_secret ──
 CREATE OR REPLACE FUNCTION public.set_external_booking_credentials(
   p_credential_id uuid,
@@ -52,15 +48,11 @@ BEGIN
   END IF;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.set_external_booking_credentials(uuid, text, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_external_booking_credentials(uuid, text, text) TO service_role;
-
 -- ── 4. Revoke anon access (defense in depth) ──
 -- RLS already blocks anon (no anon policies), but table-level grants are overly broad.
 -- No anon use case exists: edge function uses service_role, admin uses authenticated.
 REVOKE ALL ON public.external_booking_credentials FROM anon;
-
 NOTIFY pgrst, 'reload schema';
-
 COMMIT;

@@ -28,14 +28,11 @@ BEGIN
   END IF;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.set_paysafe_credentials(uuid, text, text, text, text, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_paysafe_credentials(uuid, text, text, text, text, text) TO service_role;
-
 -- 2. Update get_business_credentials to also return Paysafe fields
 --    Drop the old signature first, then recreate with new return columns
 DROP FUNCTION IF EXISTS public.get_business_credentials(uuid, text);
-
 CREATE OR REPLACE FUNCTION public.get_business_credentials(p_business_id uuid, p_key text)
 RETURNS TABLE (
   wa_token              text,
@@ -59,6 +56,5 @@ AS $$
   FROM public.businesses b
   WHERE b.id = p_business_id;
 $$;
-
 REVOKE ALL ON FUNCTION public.get_business_credentials(uuid, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_business_credentials(uuid, text) TO service_role;

@@ -16,6 +16,9 @@ test.describe("Section E: Manual/Admin Booking Probe", () => {
   test.setTimeout(120_000);
 
   test("probe E1-E11 paths with runtime evidence", async ({ page }) => {
+    // One-off QA verification script (May 2026 session): hardcoded debug-ingest
+    // endpoint, pre-redesign login detection, needs ADMIN_EMAIL/PASSWORD.
+    test.skip(process.env.QA_SECTIONS !== "1", "Set QA_SECTIONS=1 to run this archived QA verification script.");
     const businessId = "c8b439f5-c11e-4d46-b347-943df6f172b4";
     await page.goto(ADMIN_URL + "/", { waitUntil: "domcontentloaded" });
     await page.goto(ADMIN_URL + "/new-booking", { waitUntil: "domcontentloaded" });

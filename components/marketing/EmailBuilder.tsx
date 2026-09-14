@@ -3,9 +3,7 @@ import { useState, useRef } from "react";
 import { supabase } from "../../app/lib/supabase";
 import { notify } from "../../app/lib/app-notify";
 import {
-  Trash, DotsSixVertical, TextT, Image as ImageIcon, Minus, ArrowUp, ArrowDown,
-  Eye, Code, FloppyDisk, CursorClick, ArrowsDownUp, TextH, ShareNetwork, Play,
-  Quotes, Columns, Timer, MapPin, FileText, Monitor, DeviceMobile,
+  Trash, DotsSixVertical, ArrowUp, ArrowDown,
 } from "@phosphor-icons/react";
 import type { Block } from "./blocks/block-types";
 import { uid, createBlock } from "./blocks/block-types";
@@ -14,20 +12,20 @@ import { BlockEditor } from "./blocks/block-editors";
 
 /* ── Toolbar block definitions ── */
 
-const BLOCK_DEFS: { type: Block["type"]; label: string; icon: React.ReactNode }[] = [
-  { type: "text", label: "Text", icon: <TextT size={12} /> },
-  { type: "image", label: "Image", icon: <ImageIcon size={12} /> },
-  { type: "button", label: "Button", icon: <CursorClick size={12} /> },
-  { type: "divider", label: "Divider", icon: <Minus size={12} /> },
-  { type: "spacer", label: "Spacer", icon: <ArrowsDownUp size={12} /> },
-  { type: "header", label: "Header", icon: <TextH size={12} /> },
-  { type: "social", label: "Social", icon: <ShareNetwork size={12} /> },
-  { type: "video", label: "Video", icon: <Play size={12} /> },
-  { type: "quote", label: "Quote", icon: <Quotes size={12} /> },
-  { type: "columns", label: "Columns", icon: <Columns size={12} /> },
-  { type: "countdown", label: "Countdown", icon: <Timer size={12} /> },
-  { type: "tourcard", label: "Tour Card", icon: <MapPin size={12} /> },
-  { type: "footer", label: "Footer", icon: <FileText size={12} /> },
+const BLOCK_DEFS: { type: Block["type"]; label: string }[] = [
+  { type: "text", label: "Text" },
+  { type: "image", label: "Image" },
+  { type: "button", label: "Button" },
+  { type: "divider", label: "Divider" },
+  { type: "spacer", label: "Spacer" },
+  { type: "header", label: "Header" },
+  { type: "social", label: "Social" },
+  { type: "video", label: "Video" },
+  { type: "quote", label: "Quote" },
+  { type: "columns", label: "Columns" },
+  { type: "countdown", label: "Countdown" },
+  { type: "tourcard", label: "Tour Card" },
+  { type: "footer", label: "Footer" },
 ];
 
 /* ── Props ── */
@@ -145,11 +143,11 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
       {/* Template meta */}
       <div className="grid gap-3 sm:grid-cols-3">
         <input placeholder="Template name *" value={name} onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+          className="ui-control" />
         <input placeholder="Subject line" value={subject} onChange={(e) => setSubject(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }} />
+          className="ui-control" />
         <select value={category} onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)", color: "var(--ck-text)" }}>
+          className="ui-control">
           <option value="general">General</option>
           <option value="promotional">Promotional</option>
           <option value="newsletter">Newsletter</option>
@@ -163,42 +161,27 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Add block:</span>
         {BLOCK_DEFS.map((def) => (
           <button key={def.type} onClick={() => addBlock(def.type)}
-            className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            {def.icon} {def.label}
+            className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
+            {def.label}
           </button>
         ))}
 
         <div className="ml-auto flex gap-2">
           {preview && (
-            <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--ck-border)" }}>
-              <button
-                onClick={() => setPreviewMode("desktop")}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium"
-                style={{
-                  background: previewMode === "desktop" ? "var(--ck-accent)" : "transparent",
-                  color: previewMode === "desktop" ? "#fff" : "var(--ck-text)",
-                }}
-              >
-                <Monitor size={12} /> Desktop
+            <div className="ui-seg">
+              <button onClick={() => setPreviewMode("desktop")} className="ui-seg-item" data-active={previewMode === "desktop"}>
+                Desktop
               </button>
-              <button
-                onClick={() => setPreviewMode("mobile")}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium"
-                style={{
-                  background: previewMode === "mobile" ? "var(--ck-accent)" : "transparent",
-                  color: previewMode === "mobile" ? "#fff" : "var(--ck-text)",
-                }}
-              >
-                <DeviceMobile size={12} /> Mobile
+              <button onClick={() => setPreviewMode("mobile")} className="ui-seg-item" data-active={previewMode === "mobile"}>
+                Mobile
               </button>
             </div>
           )}
-          <button onClick={() => setPreview(!preview)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-            {preview ? <><Code size={12} /> Editor</> : <><Eye size={12} /> Preview</>}
+          <button onClick={() => setPreview(!preview)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
+            {preview ? "Editor" : "Preview"}
           </button>
-          <button onClick={handleSave} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
-            <FloppyDisk size={12} /> Save Template
+          <button onClick={handleSave} className="ui-btn ui-btn-primary !h-8 !px-3 text-xs gap-1">
+            Save Template
           </button>
         </div>
       </div>
@@ -207,16 +190,16 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
       <div className="text-xs flex flex-wrap gap-x-3 gap-y-1" style={{ color: "var(--ck-text-muted)" }}>
         <span>Variables:</span>
         {["{first_name}", "{last_name}", "{email}", "{promo_code}", "{promo_discount}", "{voucher_code}", "{voucher_amount}"].map((v) => (
-          <code key={v} className="rounded bg-gray-100 px-1 py-0.5 text-[11px] cursor-pointer hover:bg-gray-200" onClick={() => navigator.clipboard.writeText(v)}>{v}</code>
+          <code key={v} className="rounded bg-[var(--ck-surface-sunken)] px-1 py-0.5 text-[11px] text-[var(--ck-text)] cursor-pointer transition-colors hover:bg-[var(--ck-accent-soft)]" onClick={() => navigator.clipboard.writeText(v)}>{v}</code>
         ))}
         <span className="text-[10px] opacity-60">(click to copy)</span>
       </div>
 
       {preview ? (
         /* Preview */
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border)", background: "#f3f4f6" }}>
-          <div className="p-2 text-xs font-medium" style={{ background: "var(--ck-surface)", color: "var(--ck-text-muted)", borderBottom: "1px solid var(--ck-border)" }}>
-            Preview ({previewMode === "desktop" ? "Desktop 600px" : "Mobile 375px"}) — Subject: {subject || "(none)"}
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)", background: "#f3f4f6" }}>
+          <div className="p-2 text-xs font-medium" style={{ background: "var(--ck-surface)", color: "var(--ck-text-muted)", borderBottom: "1px solid var(--ck-border-subtle)" }}>
+            Preview ({previewMode === "desktop" ? "Desktop 600px" : "Mobile 375px"}). Subject: {subject || "(none)"}
           </div>
           <div className="flex justify-center p-4" style={{ background: "#e5e7eb" }}>
             <iframe
@@ -237,7 +220,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
         /* Block editor */
         <div className="space-y-2">
           {blocks.length === 0 && (
-            <div className="rounded-xl border border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border)" }}>
+            <div className="rounded-xl border border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
               <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Add a block to start building your email.</p>
             </div>
           )}
@@ -246,8 +229,8 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
             <div
               key={block.id}
               onDragOver={(e) => handleDragOver(e, index)}
-              className={`group rounded-xl border p-3 transition-colors ${dragIndex === index ? "ring-2 ring-blue-400" : ""}`}
-              style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+              className={`group rounded-xl border p-3 transition-colors bg-[var(--ck-surface)] hover:bg-[var(--ck-surface-sunken)] ${dragIndex === index ? "ring-2 ring-[var(--ck-accent)]" : ""}`}
+              style={{ borderColor: "var(--ck-border-subtle)" }}
             >
               <div className="flex items-start gap-2">
                 {/* Drag handle + controls */}
@@ -256,14 +239,15 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
                     draggable
                     onDragStart={() => handleDragStart(index)}
                     onDragEnd={handleDragEnd}
-                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-bg-subtle)]"
+                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-[var(--ck-surface-sunken)]"
                     title="Drag to reorder"
+                    style={{ color: "var(--ck-text-muted)" }}
                   >
                     <DotsSixVertical size={14} />
                   </div>
-                  <button onClick={() => moveBlock(index, -1)} disabled={index === 0}><ArrowUp size={12} /></button>
-                  <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}><ArrowDown size={12} /></button>
-                  <button onClick={() => removeBlock(block.id)} className="text-red-500 mt-1"><Trash size={12} /></button>
+                  <button onClick={() => moveBlock(index, -1)} disabled={index === 0} className="rounded p-0.5 transition-colors hover:bg-[var(--ck-surface-sunken)] disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}><ArrowUp size={12} /></button>
+                  <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} className="rounded p-0.5 transition-colors hover:bg-[var(--ck-surface-sunken)] disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}><ArrowDown size={12} /></button>
+                  <button onClick={() => removeBlock(block.id)} className="rounded p-0.5 mt-1 transition-colors hover:bg-[var(--ck-danger-soft)]" style={{ color: "var(--ck-danger)" }}><Trash size={12} /></button>
                 </div>
 
                 {/* Block content */}

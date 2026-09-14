@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
   const db = adminClient();
 
   const { data: lineItems } = await db.from("billing_line_items")
-    .select("id, invoice_period_start, invoice_period_end, line_type, quantity, unit_amount_zar, total_amount_zar, billing_status, created_at")
+    // Every column here was renamed out from under this route, so the select
+    // errored and the endpoint always answered with an empty history.
+    .select("id, period_key, kind, description, amount_zar, currency, status, source_type, source_id, created_at")
     .eq("business_id", caller.business_id)
     .order("created_at", { ascending: false })
     .limit(50);

@@ -30,7 +30,6 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- The trigger itself already exists (trg_set_waiver_token_expiry) and will
 -- use the updated function automatically — no need to recreate it.
 

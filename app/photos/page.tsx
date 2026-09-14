@@ -6,7 +6,6 @@ import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: getAdminTimezone() });
@@ -81,7 +80,7 @@ export default function PhotosPage() {
   function removeFile(i: number) { setUploadFiles(prev => prev.filter((_, idx) => idx !== i)); }
 
   async function uploadToDrive() {
-    if (!selectedSlot || uploadFiles.length === 0) return;
+    if (uploading || !selectedSlot || uploadFiles.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     setUploadedFolderUrl("");
@@ -90,7 +89,7 @@ export default function PhotosPage() {
       // Create a trip subfolder
       const tourName = (selectedSlot as any).tours?.name || "Trip";
       const tripDate = fmtDate(selectedSlot.start_time);
-      const folderName = tripDate + " — " + tourName;
+      const folderName = tripDate + " - " + tourName;
 
       const { data: folderData, error: folderErr } = await supabase.functions.invoke("google-drive", {
         body: { action: "create_folder", business_id: businessId, folder_name: folderName },
@@ -117,6 +116,7 @@ export default function PhotosPage() {
       const accessToken = tokenData.access_token;
 
       // Upload each file directly to Google Drive
+      const failed: File[] = [];
       for (let i = 0; i < uploadFiles.length; i++) {
         const file = uploadFiles[i];
         const metadata = JSON.stringify({ name: file.name, parents: [folderId] });
@@ -124,29 +124,36 @@ export default function PhotosPage() {
         form.append("metadata", new Blob([metadata], { type: "application/json" }));
         form.append("file", file);
 
-        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + accessToken },
-          body: form,
-        });
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.error("Drive upload failed for", file.name, errBody);
+        try {
+          const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + accessToken },
+            body: form,
+          });
+          if (!res.ok) throw new Error("Google Drive rejected the upload (" + res.status + ").");
+        } catch (error) {
+          failed.push(file);
+          console.error("Drive upload failed:", error);
         }
 
         setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
       }
 
-      setUploadedFolderUrl(folderUrl);
-      setUrls([folderUrl]);
-
-      // Log to trip_photos
-      await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: folderUrl, business_id: businessId });
-
-      notify({ title: "Upload complete", message: uploadFiles.length + " file" + (uploadFiles.length === 1 ? "" : "s") + " uploaded to Google Drive.", tone: "success" });
-      setUploadFiles([]);
-      loadHistory();
+      const uploaded = uploadFiles.length - failed.length;
+      setUploadFiles(failed);
+      if (uploaded > 0) {
+        setUploadedFolderUrl(folderUrl);
+        // Keep earlier folders when retrying failed files.
+        setUrls(previous => [...new Set([...previous.filter(url => url.trim()), folderUrl])]);
+        const { error } = await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: folderUrl, business_id: businessId });
+        if (error) throw new Error(uploaded + " files uploaded, but the photo link could not be saved. Use Send Photos to save and share the link.");
+        loadHistory();
+      }
+      notify({
+        title: failed.length ? "Some uploads failed" : "Upload complete",
+        message: uploaded + " of " + uploadFiles.length + " files uploaded." + (failed.length ? " Failed files remain selected for retry." : ""),
+        tone: failed.length ? "error" : "success",
+      });
     } catch (e: any) {
       notify({ title: "Upload failed", message: e.message || "Unknown error", tone: "error" });
     }
@@ -200,8 +207,9 @@ export default function PhotosPage() {
   }
 
   async function sendPhotos() {
+    if (sending) return;
     if (!selectedSlot) { notify({ title: "Select a trip", message: "Select a trip slot first.", tone: "warning" }); return; }
-    const validUrls = urls.filter(u => u.trim().length > 0);
+    const validUrls = [...new Set(urls.map(u => u.trim()).filter(Boolean))];
     if (validUrls.length === 0) { notify({ title: "No photo links", message: "Add at least one photo URL.", tone: "warning" }); return; }
     if (!await confirmAction({
       title: "Send trip photos",
@@ -214,69 +222,71 @@ export default function PhotosPage() {
     setResult(null);
     setSendProgress(10);
     try {
-      const tourName = (selectedSlot as any).tours?.name || "kayak trip";
-      const photoLink = validUrls.length === 1 ? validUrls[0] : validUrls[0];
+      const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!accessToken) throw new Error("Please sign in again before sending photos.");
+      const tourName = (selectedSlot as any).tours?.name || "trip";
 
       // Fetch bookings for this slot
-      const { data: bookings } = await supabase.from("bookings")
+      const { data: bookings, error: bookingError } = await supabase.from("bookings")
         .select("id, customer_name, phone, email, status")
         .eq("business_id", businessId)
         .eq("slot_id", selectedSlot.id)
         .in("status", ["PAID", "CONFIRMED", "COMPLETED"]);
+      if (bookingError) throw new Error("Could not load this trip's customers. Please try again.");
+      if (!bookings?.length) throw new Error("No confirmed customers were found for this trip.");
+
+      // Save the links before notifying customers so they are also available in My Bookings.
+      const { error: photoError } = await supabase.from("trip_photos").insert(validUrls.map(photo_url => ({
+        slot_id: selectedSlot.id, photo_url, business_id: businessId,
+      })));
+      if (photoError) throw new Error("Could not save the photo links. No notifications were sent.");
       setSendProgress(35);
 
       let sent = 0;
-      for (const b of (bookings || [])) {
-        // Send WhatsApp photo notification via template (24h compliant).
-        // Uses send-whatsapp-text which has built-in template fallback for
-        // customers outside the 24h window. The message is kept short and
-        // asks the customer to reply YES to receive the photo link,
-        // ensuring we open a new 24h window for follow-up.
+      const failures: string[] = [];
+      async function sendMessage(endpoint: string, body: unknown, label: string) {
+        try {
+          const response = await fetch(SU + "/functions/v1/" + endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+            body: JSON.stringify(body),
+          });
+          const outcome = await response.json();
+          if (!response.ok || outcome.ok !== true) throw new Error(outcome.error || "Message was not sent");
+          return true;
+        } catch {
+          failures.push(label);
+          return false;
+        }
+      }
+      for (const [index, b] of bookings.entries()) {
+        let delivered = false;
+        const name = b.customer_name || "Guest";
+        // Include the links directly; a YES reply does not reliably identify this trip.
         if (b.phone) {
           const waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
             "! 📸 Your trip photos from the " + tourName +
-            " are ready! Reply YES to this message to receive the photo link." +
-            "\n\nShare with your group once you get it!";
-          try {
-            await fetch(SU + "/functions/v1/send-whatsapp-text", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({ business_id: businessId, to: b.phone, message: waMsg }),
-            });
-          } catch (e) { console.error("WA photo send failed:", b.phone, e); }
+            " are ready!\n\n" + validUrls.join("\n") + "\n\nShare with your group and enjoy the memories!";
+          delivered = await sendMessage("send-whatsapp-text", { business_id: businessId, to: b.phone, message: waMsg }, name + " (WhatsApp)");
         }
 
         // Send thank-you email with photo link
         if (b.email) {
-          try {
-            await fetch(SU + "/functions/v1/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-              body: JSON.stringify({
-                type: "TRIP_PHOTOS",
-                data: {
-                  business_id: businessId,
-                  email: b.email,
-                  customer_name: b.customer_name || "Guest",
-                  tour_name: tourName,
-                  photo_url: photoLink,
-                },
-              }),
-            });
-          } catch (e) { console.error("Email photo send failed:", b.email, e); }
+          const emailed = await sendMessage("send-email", {
+            type: "TRIP_PHOTOS",
+            data: { business_id: businessId, email: b.email, customer_name: name, tour_name: tourName, photo_url: validUrls[0], photo_urls: validUrls },
+          }, name + " (email)");
+          delivered = delivered || emailed;
         }
-        sent++;
-        setSendProgress(35 + Math.round((sent / Math.max((bookings || []).length, 1)) * 45));
+        if (!b.phone && !b.email) failures.push(name + " (no contact details)");
+        if (delivered) sent++;
+        setSendProgress(35 + Math.round(((index + 1) / bookings.length) * 45));
       }
 
-      // Log to trip_photos
-      for (const url of validUrls) {
-        await supabase.from("trip_photos").insert({ slot_id: selectedSlot.id, photo_url: url, business_id: businessId });
-      }
       setSendProgress(100);
 
-      setResult({ sent });
-      if (sent > 0) { setUrls([""]); setSelectedSlot(null); }
+      setResult({ sent, failures });
+      if (sent > 0 && failures.length === 0) { setUrls([""]); setSelectedSlot(null); }
       loadHistory();
     } catch (e) { setResult({ error: String(e) }); }
     setSendProgress(0);
@@ -287,33 +297,38 @@ export default function PhotosPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Trip Photos</h1>
-      <p className="text-sm text-gray-500">Send trip photos and a thank-you email to guests. Select a recent trip, add a batch of links, and confirm the gallery preview before sending.</p>
+      <div className="anim-fade-up">
+        <p className="ui-mono-label mb-2">Operations</p>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Trip Photos</h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Send trip photos and a thank-you email to guests. Select a recent trip, add a batch of links, and confirm the gallery preview before sending.</p>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="anim-fade-up anim-d1 grid gap-6 lg:grid-cols-2">
         {/* Left: Select Trip */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h2 className="font-semibold mb-3">Select Trip (Last 7 Days)</h2>
+        <div className="ui-card p-4">
+          <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Select Trip (Last 7 Days)</h2>
           {slots.length === 0 ? (
-            <p className="text-sm text-gray-400">No recent trips with bookings.</p>
+            <div className="ui-empty">              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No recent trips</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Trips with bookings from the last 7 days show up here.</p>
+            </div>
           ) : (
             <div className="space-y-2 max-h-[50vh] overflow-auto">
               {slots.map(group => (
                 <div key={group.date}>
-                  <p className="text-xs font-semibold text-gray-400 mb-1">{group.label}</p>
+                  <p className="ui-mono-label mb-1 !text-[10px]">{group.label}</p>
                   {group.slots.map(s => {
                     const isSelected = selectedSlot?.id === s.id;
                     return (
                       <button key={s.id} onClick={() => setSelectedSlot(s)}
-                        className={"w-full text-left flex items-center gap-3 p-3 rounded-lg border mb-1 transition-colors " +
-                          (isSelected ? "border-blue-400 bg-blue-50" : "border-gray-100 hover:border-gray-200")}>
-                        <span className={"w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs " +
-                          (isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300")}>
+                        className={"mb-1 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all " +
+                          (isSelected ? "border-[var(--ck-accent)] bg-[var(--ck-accent-soft)]" : "hover:border-[var(--ck-border-strong)]")}>
+                        <span className={"flex h-5 w-5 items-center justify-center rounded-full text-xs " +
+                          (isSelected ? "bg-[var(--ck-accent)] text-white" : "border-2 border-[var(--ck-border-strong)]")}>
                           {isSelected ? "✓" : ""}
                         </span>
                         <div>
-                          <p className="font-semibold text-sm">{(s as any).tours?.name}</p>
-                          <p className="text-xs text-gray-400">{fmtTime(s.start_time)} · {s.booked} guests</p>
+                          <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{(s as any).tours?.name}</p>
+                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(s.start_time)} · {s.booked} guests</p>
                         </div>
                       </button>
                     );
@@ -328,10 +343,10 @@ export default function PhotosPage() {
         <div className="space-y-4">
           {/* Google Drive Upload */}
           {gdriveConnected && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="ui-card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold">Upload to Google Drive</h2>
-                <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">{gdriveEmail}</span>
+                <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Upload to Google Drive</h2>
+                <span className="ui-status ui-pill-success">{gdriveEmail}</span>
               </div>
 
               {/* Drop zone */}
@@ -341,36 +356,37 @@ export default function PhotosPage() {
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={"rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors " +
-                  (dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50 hover:border-gray-400")}
+                  (dragOver ? "border-[var(--ck-accent)] bg-[var(--ck-accent-soft)]" : "border-[var(--ck-border-strong)] hover:border-[var(--ck-accent)]")}
+                style={dragOver ? undefined : { background: "var(--ck-surface-sunken)" }}
               >
                 <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>
                   {dragOver ? "Drop files here" : "Drag & drop photos or click to browse"}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">Images and videos accepted</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Images and videos accepted</p>
               </div>
 
               {/* Selected files */}
               {uploadFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected</span>
-                    <span>{(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    <span className="tabular-nums">{uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected</span>
+                    <span className="tabular-nums">{(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-auto">
                     {uploadFiles.map((f, i) => (
                       <div key={f.name + i} className="relative group">
-                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full object-cover rounded-lg border border-gray-200" />
+                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full rounded-lg object-cover" style={{ border: "1px solid var(--ck-border-subtle)" }} />
                         <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                           className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           ✕
                         </button>
-                        <p className="text-[10px] text-gray-400 truncate mt-0.5">{f.name}</p>
+                        <p className="mt-0.5 truncate text-[10px]" style={{ color: "var(--ck-text-muted)" }}>{f.name}</p>
                       </div>
                     ))}
                   </div>
                   <button onClick={uploadToDrive} disabled={uploading || !selectedSlot}
-                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                    className="ui-btn ui-btn-primary w-full disabled:opacity-50">
                     {uploading ? "Uploading..." : !selectedSlot ? "Select a trip first" : "Upload to Google Drive"}
                   </button>
                 </div>
@@ -378,38 +394,38 @@ export default function PhotosPage() {
 
               {/* Upload progress */}
               {uploading && (
-                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
-                  <div className="flex items-center justify-between text-xs font-semibold text-blue-700">
+                <div className="mt-3 rounded-xl p-3" style={{ background: "var(--ck-accent-soft)" }}>
+                  <div className="flex items-center justify-between text-xs font-semibold" style={{ color: "var(--ck-accent)" }}>
                     <span>Uploading to Drive</span>
-                    <span>{uploadProgress}%</span>
+                    <span className="tabular-nums">{uploadProgress}%</span>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-blue-100">
-                    <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: uploadProgress + "%" }} />
+                  <div className="ui-progress mt-2">
+                    <div className="ui-progress-fill" style={{ width: uploadProgress + "%" }} />
                   </div>
                 </div>
               )}
 
               {/* Folder link result */}
               {uploadedFolderUrl && (
-                <div className="mt-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50">
-                  <p className="text-xs font-semibold text-emerald-800 mb-1">Photos uploaded successfully</p>
-                  <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline break-all">{uploadedFolderUrl}</a>
-                  <p className="text-xs text-emerald-600 mt-2">Click &quot;Send Photos&quot; below to share this link with customers.</p>
+                <div className="mt-3 rounded-xl p-3" style={{ background: "var(--ck-success-soft)", border: "1px solid color-mix(in srgb, var(--ck-success) 25%, transparent)" }}>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--ck-success)" }}>Uploaded photo folder</p>
+                  <a href={uploadedFolderUrl} target="_blank" rel="noreferrer" className="break-all text-xs underline" style={{ color: "var(--ck-ocean)" }}>{uploadedFolderUrl}</a>
+                  <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Click &quot;Send Photos&quot; below to share this link with customers.</p>
                 </div>
               )}
             </div>
           )}
 
           {/* Manual URL paste (always available) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">{gdriveConnected ? "Photo Link" : "Photo URLs"}</h2>
+          <div className="ui-card p-4">
+            <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{gdriveConnected ? "Photo Link" : "Photo URLs"}</h2>
             {!gdriveConnected && (
               <>
-                <p className="text-xs text-gray-400 mb-3">Paste share links from Google Drive, Dropbox, or any host. Connect Google Drive in Settings for direct uploads.</p>
-                <div className="mb-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3">
+                <p className="mb-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Paste share links from Google Drive, Dropbox, or any host. Connect Google Drive in Settings for direct uploads.</p>
+                <div className="mb-4 rounded-xl border border-dashed p-3" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)" }}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bulk import</p>
-                    <button type="button" onClick={importBulkUrls} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    <p className="ui-mono-label !text-[10px]">Bulk import</p>
+                    <button type="button" onClick={importBulkUrls} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                       Import links
                     </button>
                   </div>
@@ -418,7 +434,7 @@ export default function PhotosPage() {
                     onChange={(e) => setBulkInput(e.target.value)}
                     placeholder="Paste one image URL per line"
                     rows={3}
-                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    className="ui-control mt-2 w-full"
                   />
                 </div>
               </>
@@ -428,52 +444,55 @@ export default function PhotosPage() {
                 <div key={i} className="flex items-start gap-2">
                   <input type="text" value={u} onChange={e => updateUrl(i, e.target.value)}
                     placeholder="https://drive.google.com/drive/folders/..."
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                    className="ui-control flex-1" />
                   {urls.length > 1 && (
-                    <button onClick={() => removeUrl(i)} className="shrink-0 px-2 py-2 text-sm text-gray-400 hover:text-red-500">✕</button>
+                    <button onClick={() => removeUrl(i)} className="shrink-0 px-2 py-2 text-sm transition-colors hover:text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}>✕</button>
                   )}
                 </div>
               ))}
             </div>
             {!gdriveConnected && (
-              <button onClick={addUrl} className="mt-2 text-sm text-blue-600 font-medium hover:text-blue-800">+ Add another link</button>
+              <button onClick={addUrl} className="mt-2 text-sm font-medium" style={{ color: "var(--ck-accent)" }}>+ Add another link</button>
             )}
           </div>
 
           <button onClick={sendPhotos} disabled={sending || !selectedSlot || urls.every(u => !u.trim())}
-            className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+            className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
             {sending ? "Sending..." : "Send Photos to Lead Bookers"}
           </button>
 
           {sending && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-blue-700">
+            <div className="rounded-xl p-3" style={{ background: "var(--ck-accent-soft)" }}>
+              <div className="flex items-center justify-between text-xs font-semibold" style={{ color: "var(--ck-accent)" }}>
                 <span>Sending photo batch</span>
-                <span>{sendProgress}%</span>
+                <span className="tabular-nums">{sendProgress}%</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-blue-100">
-                <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: `${sendProgress}%` }} />
+              <div className="ui-progress mt-2">
+                <div className="ui-progress-fill" style={{ width: `${sendProgress}%` }} />
               </div>
             </div>
           )}
 
           {result && (
-            <div className={"text-sm p-3 rounded-lg " + (result.error ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")}>
-              {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "! They've been asked to share with their group."}
+            <div className="rounded-lg p-3 text-sm" style={result.error || result.failures?.length
+              ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
+              : { background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
+              {result.error ? "Error: " + result.error : "Photos sent to " + result.sent + " lead booker" + (result.sent === 1 ? "" : "s") + "."}
+              {result.failures?.length > 0 && <p className="mt-2">Messages failed: {result.failures.join(", ")}. Check these contacts before sending again.</p>}
             </div>
           )}
         </div>
       </div>
 
       {/* History */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="ui-card anim-fade-up anim-d2 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">Recently Sent</h2>
-          <span className="text-xs text-gray-500">{sentHistory.length} items</span>
+          <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recent Photo Links</h2>
+          <span className="ui-mono-label !text-[10px]"><span className="tabular-nums">{sentHistory.length}</span> items</span>
         </div>
         {sentHistory.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-            No photo batches have been sent yet.
+          <div className="ui-empty mt-3">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing sent yet</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Photo batches you send to guests will appear here.</p>
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -488,20 +507,20 @@ export default function PhotosPage() {
               const driveThumb = driveFileThumb(url);
               const showImg = isImageUrl(url) || Boolean(driveThumb);
               return (
-                <a key={p.id} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 transition-colors hover:border-gray-300">
+                <a key={p.id} href={url} target="_blank" rel="noreferrer" className="ui-card ui-card-hover block overflow-hidden !rounded-xl">
                   {showImg ? (
                     <img src={driveThumb || url} alt="Sent trip photo" loading="lazy" referrerPolicy="no-referrer" className="h-36 w-full object-cover" />
                   ) : (
-                    <div className="flex h-36 w-full items-center justify-center bg-blue-50 text-blue-500">
+                    <div className="flex h-36 w-full items-center justify-center" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
                       <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor" aria-hidden="true">
                         <path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" />
                       </svg>
                     </div>
                   )}
                   <div className="space-y-1 p-3 text-sm">
-                    <p className="truncate font-medium text-gray-900">{(p as any).slots?.tours?.name || "Trip photo"}</p>
-                    <p className="text-xs text-gray-500">{dateLabel}</p>
-                    <p className="truncate text-xs text-blue-600">{url}</p>
+                    <p className="truncate font-medium" style={{ color: "var(--ck-text-strong)" }}>{(p as any).slots?.tours?.name || "Trip photo"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{dateLabel}</p>
+                    <p className="truncate text-xs" style={{ color: "var(--ck-ocean)" }}>{url}</p>
                   </div>
                 </a>
               );

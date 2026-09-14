@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchAllRows } from "./pagination.ts";
 
 export type TenantBusiness = {
   id: string;
@@ -42,6 +43,8 @@ export type TenantCredentials = {
   yocoTestWebhookSecret: string;
   activeYocoSecretKey: string;
   activeYocoWebhookSecret: string;
+  paysafeApiKey: string;
+  paysafeApiSecret: string;
 };
 
 export type TenantContext = {
@@ -112,9 +115,11 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
   }
 
   const testMode = row.yoco_test_mode === true;
-  const liveKey = String(row.yoco_secret_key || "");
+  // A misfiled key creates payments in a different mode from our stored
+  // checkout, so the signed payment notification can never confirm it.
+  const liveKey = /^sk_live_/.test(row.yoco_secret_key || "") ? String(row.yoco_secret_key) : "";
   const liveWebhook = String(row.yoco_webhook_secret || "");
-  const testKey = String(row.yoco_test_secret_key || "");
+  const testKey = /^sk_test_/.test(row.yoco_test_secret_key || "") ? String(row.yoco_test_secret_key) : "";
   const testWebhook = String(row.yoco_test_webhook_secret || "");
   return {
     waToken: String(row.wa_token || ""),
@@ -124,8 +129,12 @@ export async function getBusinessCredentials(supabase: any, businessId: string):
     yocoTestMode: testMode,
     yocoTestSecretKey: testKey,
     yocoTestWebhookSecret: testWebhook,
-    activeYocoSecretKey: testMode && testKey ? testKey : liveKey,
-    activeYocoWebhookSecret: testMode && testWebhook ? testWebhook : liveWebhook,
+    activeYocoSecretKey: testMode ? (testWebhook ? testKey : "") : (liveWebhook ? liveKey : ""),
+    activeYocoWebhookSecret: testMode ? testWebhook : liveWebhook,
+    // The get_business_credentials RPC has returned these since 20260323100400;
+    // they were never mapped here, which made the Paysafe combo path dead code.
+    paysafeApiKey: String(row.paysafe_api_key || ""),
+    paysafeApiSecret: String(row.paysafe_api_secret || ""),
   };
 }
 
@@ -194,56 +203,73 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
     throw new Error("WhatsApp metadata.phone_number_id is missing");
   }
 
-  const { data, error } = await supabase
+  const cols = [
+    "id",
+    "name",
+    "business_name",
+    "business_tagline",
+    "timezone",
+    "currency",
+    "logo_url",
+    "ai_system_prompt",
+    "faq_json",
+    "terminology",
+    "weather_widget_locations",
+    "waiver_url",
+    "booking_site_url",
+    "manage_bookings_url",
+    "gift_voucher_url",
+    "booking_success_url",
+    "booking_cancel_url",
+    "voucher_success_url",
+    "directions",
+    "footer_line_one",
+    "footer_line_two",
+    "meeting_point_address",
+    "arrival_instructions",
+    "business_address",
+    "social_google_reviews",
+    "what_to_bring",
+    "activity_verb_past",
+    "location_phrase",
+  ].join(",");
+
+  // Fast path: indexed single-row lookup on the plaintext phone-id column.
+  const { data: fast, error: lookupError } = await supabase
     .from("businesses")
-    .select([
-      "id",
-      "name",
-      "business_name",
-      "business_tagline",
-      "timezone",
-      "currency",
-      "logo_url",
-      "ai_system_prompt",
-      "faq_json",
-      "terminology",
-      "weather_widget_locations",
-      "waiver_url",
-      "booking_site_url",
-      "manage_bookings_url",
-      "gift_voucher_url",
-      "booking_success_url",
-      "booking_cancel_url",
-      "voucher_success_url",
-      "directions",
-      "footer_line_one",
-      "footer_line_two",
-      "meeting_point_address",
-      "arrival_instructions",
-      "business_address",
-      "social_google_reviews",
-      "what_to_bring",
-      "activity_verb_past",
-      "location_phrase",
-    ].join(","))
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw new Error("Business scan failed: " + error.message);
-  }
-
-  const businesses = data || [];
-  for (let i = 0; i < businesses.length; i++) {
-    const business = businesses[i] as TenantBusiness;
-    const credentials = await getBusinessCredentials(supabase, business.id);
+    .select(cols)
+    .eq("wa_phone_id_lookup", incomingPhoneId)
+    .maybeSingle();
+  if (lookupError) throw new Error("WhatsApp operator lookup failed: " + lookupError.message);
+  if (fast) {
+    const credentials = await getBusinessCredentials(supabase, (fast as any).id);
     if (normalizePhoneLookup(credentials.waPhoneId) === incomingPhoneId) {
-      return {
-        business,
-        credentials,
-        resolvedBy: "wa_phone_id",
-      };
+      return { business: fast as TenantBusiness, credentials, resolvedBy: "wa_phone_id" };
     }
   }
+
+  // Fallback: paged scan (no 1000-row truncation) that decrypts each tenant's
+  // wa_phone_id and lazily backfills wa_phone_id_lookup, so once any tenant sends
+  // a message the whole platform is populated and future inbound hits the fast
+  // path above. Only runs while a tenant is not yet backfilled.
+  const businesses = await fetchAllRows<any>((from, to) =>
+    supabase.from("businesses").select(cols + ",wa_phone_id_lookup").order("created_at", { ascending: true }).range(from, to)
+  );
+  let match: TenantContext | null = null;
+  for (const business of businesses) {
+    const credentials = await getBusinessCredentials(supabase, business.id);
+    const normalized = normalizePhoneLookup(credentials.waPhoneId);
+    if (normalized && business.wa_phone_id_lookup !== normalized) {
+      try {
+        await supabase.from("businesses").update({ wa_phone_id_lookup: normalized }).eq("id", business.id);
+      } catch (_e) { /* best-effort backfill */ }
+    }
+    if (normalized === incomingPhoneId) {
+      if (match && match.business.id !== business.id) throw new Error("WhatsApp phone_number_id is assigned to multiple operators");
+      match = { business: business as TenantBusiness, credentials, resolvedBy: "wa_phone_id" };
+    }
+  }
+  if (match) return match;
 
   throw new Error("No business matched WhatsApp phone_number_id " + incomingPhoneId);
 }
@@ -378,6 +404,14 @@ export function createServiceClient() {
 
   return createClient(supabaseUrl, supabaseKey);
 }
+
+/**
+ * Fetch every row of a query, paging past the PostgREST 1000-row cap.
+ * `build(from, to)` must return a supabase query with `.range(from, to)` applied,
+ * awaitable to `{ data, error }`. Use for cron/sweep queries that iterate all
+ * tenants (or all rows) and would otherwise silently stop at 1000 rows.
+ */
+export { fetchAllRows };
 
 export function getBusinessDisplayName(business?: TenantBusiness | null) {
   return String(business?.business_name || business?.name || "Adventure Operator");
@@ -624,13 +658,17 @@ export async function sendWhatsappTextForTenant(
     // 131026 = recipient hasn't messaged this number before
     if ((errCode === 131047 || errCode === 131026) && templateFallback) {
       console.log("WA 24h window closed — sending template fallback: " + templateFallback.name + " to " + normalizedTo);
-      // The template send records its own audit row.
-      return await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+      // The template send records its own audit row and throws on failure.
+      const templateData = await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+      // Return shape enriched with the channel actually used so callers (e.g.
+      // broadcast) can log per-recipient routing. No existing caller reads the
+      // return value, so this is safe; failures still throw as before.
+      return { channel: "template" as const, data: templateData };
     }
     const errMsg = String(data?.error?.message || data?.message || "WhatsApp send failed");
     await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
     throw new Error(errMsg);
   }
   await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
-  return data;
+  return { channel: "text" as const, data };
 }

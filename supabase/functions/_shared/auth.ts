@@ -2,6 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+// Hosted functions receive new API keys separately from the legacy JWT key.
+// Admin servers and pg_net jobs may use either format during migration.
+const serviceKeys = [SERVICE_ROLE_KEY, ...Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))]
+  .filter((key): key is string => typeof key === "string" && key.length > 0);
 
 export type AuthResult = {
   userId: string;
@@ -19,12 +23,12 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-  if (!token) {
-    throw new Error("Missing authorization header");
+  if (serviceKeys.includes(token) || serviceKeys.includes(req.headers.get("apikey") || "")) {
+    return { userId: "service_role", businessId: "", role: "service_role", isServiceRole: true };
   }
 
-  if (token === SERVICE_ROLE_KEY) {
-    return { userId: "service_role", businessId: "", role: "service_role", isServiceRole: true };
+  if (!token) {
+    throw new Error("Missing authorization header");
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -40,7 +44,7 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
     .eq("user_id", data.user.id)
     .maybeSingle();
 
-  if (!admin || admin.suspended) {
+  if (!admin || admin.suspended || (!admin.business_id && admin.role !== "SUPER_ADMIN")) {
     throw new Error("Not an active admin user");
   }
 
@@ -50,4 +54,8 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
     role: admin.role,
     isServiceRole: false,
   };
+}
+
+export function canAccessBusiness(auth: AuthResult, businessId: string): boolean {
+  return Boolean(businessId) && (auth.isServiceRole || auth.role === "SUPER_ADMIN" || auth.businessId === businessId);
 }

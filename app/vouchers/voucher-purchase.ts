@@ -2,6 +2,7 @@ export interface AdminVoucherPurchaseInput {
   businessId: string;
   code: string;
   recipientName: string;
+  recipientEmail?: string;
   buyerName: string;
   buyerEmail: string;
   tourName: string;
@@ -23,6 +24,7 @@ export function buildAdminVoucherPurchase(input: AdminVoucherPurchaseInput) {
       status: "PENDING",
       type: input.type,
       recipient_name: input.recipientName.trim() || null,
+      recipient_email: input.recipientEmail?.trim().toLowerCase() || null,
       buyer_name: input.buyerName.trim() || null,
       buyer_email: input.buyerEmail.trim().toLowerCase() || null,
       tour_name: input.tourName.trim() || null,

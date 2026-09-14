@@ -11,7 +11,6 @@
 -- already used explicit single-column selects.
 
 revoke select on public.businesses from anon;
-
 do $$
 declare
   cols text;

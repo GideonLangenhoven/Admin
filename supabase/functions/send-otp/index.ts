@@ -102,8 +102,13 @@ async function issueOtpAttempt(input: {
   return { token, code, tokenHash };
 }
 
-/* ── Email template ── */
-function otpEmailHtml(code: string): string {
+/* ── Email template ──
+   Admin-settings OTP only. The customer /my-bookings OTP goes through
+   send-email so it lands in the tenant's fully branded template; this one
+   stays local because it is plain internal verification mail. brandName is a
+   REQUIRED argument, not a default: this template used to hardcode the origin
+   tenant's brand and showed it to every operator's admins. */
+function otpEmailHtml(code: string, brandName: string): string {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
@@ -111,7 +116,7 @@ function otpEmailHtml(code: string): string {
 <tr><td align="center">
 <table width="100%" style="max-width:440px;background:#ffffff;border-radius:12px;overflow:hidden">
   <tr><td style="background:#1b3b36;padding:24px 32px;text-align:center">
-    <h1 style="margin:0;color:#ffffff;font-family:Georgia,serif;font-size:22px;font-weight:700">Cape Kayak</h1>
+    <h1 style="margin:0;color:#ffffff;font-family:Georgia,serif;font-size:22px;font-weight:700">${brandName}</h1>
   </td></tr>
   <tr><td style="padding:32px">
     <p style="margin:0 0 8px;color:#333;font-size:15px">Your verification code is:</p>
@@ -122,7 +127,7 @@ function otpEmailHtml(code: string): string {
     <p style="margin:0;color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
   </td></tr>
   <tr><td style="padding:16px 32px;background:#f9fafb;text-align:center;border-top:1px solid #eee">
-    <p style="margin:0;color:#999;font-size:11px">Cape Kayak &middot; Verification Code</p>
+    <p style="margin:0;color:#999;font-size:11px">${brandName} &middot; Verification Code</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -186,23 +191,22 @@ Deno.serve(async (req) => {
         await supabase.from("otp_attempts").update({ send_error: outcome }).eq("token_hash", tokenHash);
       }
 
-      // Only send the email if bookings matched — but always return 200
+      // Only send the email if bookings matched — but always return 200.
+      // Route through send-email so the code lands in the tenant's branded
+      // template (logo, brand colour, footer) instead of the plain green default.
       if (matched.length > 0) {
-        const res = await fetch("https://api.resend.com/emails", {
+        const res = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
           method: "POST",
-          headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+          headers: { Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({
-            from: FROM_EMAIL,
-            to: [email],
-            subject: "Your verification code",
-            html: otpEmailHtml(code),
+            type: "MY_BOOKINGS_OTP",
+            data: { business_id: business.id, email, otp_code: code },
           }),
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error("RESEND_OTP_ERR", res.status, JSON.stringify(errData));
-          await recordSendOutcome(res.status + ":" + JSON.stringify(errData).slice(0, 500));
+        const emailData = await res.json().catch(() => ({}));
+        if (!res.ok || emailData?.error) {
+          console.error("SEND_EMAIL_OTP_ERR", res.status, JSON.stringify(emailData).slice(0, 500));
+          await recordSendOutcome(res.status + ":" + JSON.stringify(emailData).slice(0, 500));
           // Still return 200 with token — don't leak send failure vs no-match
         } else {
           await recordSendOutcome("SENT_OK");
@@ -230,7 +234,12 @@ Deno.serve(async (req) => {
       // Verify the email belongs to an admin of this business
       const { data: admin } = await supabase
         .from("admin_users")
-        .select("id, role")
+        // The FK must be named: three constraints link admin_users and
+        // businesses (business_id, billing_admin_user_id,
+        // whatsapp_bot_mode_changed_by), so a bare businesses(...) embed is
+        // ambiguous — PostgREST returns PGRST201 and the whole lookup fails,
+        // which would 403 every admin out of settings verification.
+        .select("id, role, businesses!admin_users_business_id_fkey(business_name, name)")
         .eq("business_id", businessId)
         .eq("email", email)
         .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
@@ -239,6 +248,12 @@ Deno.serve(async (req) => {
       if (!admin) {
         return respond(403, { success: false, error: "Not authorised." });
       }
+
+      // Joined off the authorisation query above — no extra round trip.
+      // "BookingTours" (the platform) is the only safe fallback here; another
+      // operator's brand never is.
+      const adminBiz = (admin as { businesses?: { business_name?: string | null; name?: string | null } | null }).businesses;
+      const adminBrandName = String(adminBiz?.business_name || adminBiz?.name || "BookingTours");
 
       const { token, code } = await issueOtpAttempt({
         businessId,
@@ -255,7 +270,7 @@ Deno.serve(async (req) => {
           from: FROM_EMAIL,
           to: [email],
           subject: "Verify settings change",
-          html: otpEmailHtml(code),
+          html: otpEmailHtml(code, adminBrandName),
         }),
       });
 

@@ -2,7 +2,7 @@
 import React from "react";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
 
-import { Slot } from "./WeekView";
+import { Slot, SlotDayEntry, tourSpanDays } from "./WeekView";
 
 interface DayViewProps {
     slots: Slot[];
@@ -13,15 +13,23 @@ interface DayViewProps {
 }
 
 export default function DayView({ slots, currentDate, onSlotClick, selectedCancelDates, onToggleCancelDate }: DayViewProps) {
-    const getSlotsForDay = (date: Date) => {
-        return slots.filter((slot) => {
-            const slotDate = new Date(slot.start_time);
-            return (
-                slotDate.getDate() === date.getDate() &&
-                slotDate.getMonth() === date.getMonth() &&
-                slotDate.getFullYear() === date.getFullYear()
-            );
-        }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    const getSlotsForDay = (date: Date): SlotDayEntry[] => {
+        const entries: SlotDayEntry[] = [];
+        for (const slot of slots) {
+            const totalDays = tourSpanDays(slot);
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(slot.start_time);
+                d.setDate(d.getDate() + i);
+                if (
+                    d.getDate() === date.getDate() &&
+                    d.getMonth() === date.getMonth() &&
+                    d.getFullYear() === date.getFullYear()
+                ) {
+                    entries.push({ slot, dayN: i + 1, totalDays });
+                }
+            }
+        }
+        return entries.sort((a, b) => new Date(a.slot.start_time).getTime() - new Date(b.slot.start_time).getTime());
     };
 
     const daySlots = getSlotsForDay(currentDate);
@@ -49,16 +57,10 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
         timeZone: getAdminTimezone(),
     });
 
-    const getVisibleAvailability = (slot: Slot) => {
-        const directAvailability = slot.capacity_total - slot.booked - (slot.held || 0);
-        return {
-            directAvailability,
-            effectiveAvailability: typeof slot.available_capacity === "number" ? slot.available_capacity : directAvailability,
-        };
-    };
+    const getAvailability = (slot: Slot) => slot.capacity_total - slot.booked - (slot.held || 0);
 
     return (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="ui-card overflow-hidden">
             <div
                 onClick={() => {
                     if (!isPast) {
@@ -76,9 +78,9 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
             </div>
 
             {isToday && (
-                <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50 px-4 py-2 text-xs font-medium text-blue-700">
+                <div className="flex items-center justify-between px-4 py-2 text-xs font-medium" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)", borderBottom: "1px solid var(--ck-border-subtle)" }}>
                     <span>Current time marker</span>
-                    <span>Now {nowLabel}</span>
+                    <span className="tabular-nums">Now {nowLabel}</span>
                 </div>
             )}
 
@@ -89,34 +91,28 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
             ) : (
                 <>
                     <div className="space-y-3 p-4 md:hidden">
-                        {daySlots.map((s) => {
-                            const { directAvailability, effectiveAvailability } = getVisibleAvailability(s);
-                            const isResourceLimited = effectiveAvailability < directAvailability;
+                        {daySlots.map(({ slot: s, dayN, totalDays }) => {
+                            const availability = getAvailability(s);
                             return (
                                 <button
-                                    key={s.id}
+                                    key={s.id + "-d" + dayN}
                                     onClick={() => onSlotClick(s)}
                                     className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-gray-300"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <p className="font-mono text-sm font-semibold text-gray-900">{fmtTime(s.start_time)}</p>
-                                            <p className="mt-1 truncate text-sm font-medium text-gray-800">{s.tours?.name}</p>
+                                            <p className="font-mono text-sm font-semibold text-gray-900">{dayN === 1 ? fmtTime(s.start_time) : `Day ${dayN}/${totalDays}`}</p>
+                                            <p className="mt-1 truncate text-sm font-medium text-gray-800">{s.tours?.name}{dayN === 1 && totalDays > 1 ? ` · ${totalDays}-day tour` : ""}</p>
                                         </div>
                                         <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${s.status === "OPEN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                                             {s.status}
                                         </span>
                                     </div>
-                                    {isResourceLimited && s.status === "OPEN" && (
-                                        <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                                            Shared resource limit is reducing sellable capacity for this slot.
-                                        </div>
-                                    )}
                                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
                                         <div>Capacity: <span className="font-semibold text-gray-800">{s.capacity_total}</span></div>
                                         <div>Booked: <span className="font-semibold text-gray-800">{s.booked}</span></div>
                                         <div>Held: <span className="font-semibold text-gray-800">{s.held || 0}</span></div>
-                                        <div>Available: <span className={`font-semibold ${effectiveAvailability > 0 ? "text-green-600" : "text-gray-400"}`}>{effectiveAvailability}</span></div>
+                                        <div>Available: <span className={`font-semibold ${availability > 0 ? "text-green-600" : "text-gray-400"}`}>{availability}</span></div>
                                     </div>
                                 </button>
                             );
@@ -138,21 +134,17 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
                                 </tr>
                             </thead>
                             <tbody>
-                                {daySlots.map((s) => {
-                                    const { directAvailability, effectiveAvailability } = getVisibleAvailability(s);
-                                    const isResourceLimited = effectiveAvailability < directAvailability;
+                                {daySlots.map(({ slot: s, dayN, totalDays }) => {
+                                    const availability = getAvailability(s);
                                     return (
-                                        <tr key={s.id} className="border-t border-gray-100 hover:bg-gray-50">
-                                            <td className="p-3 font-mono">{fmtTime(s.start_time)}</td>
-                                            <td className="p-3 font-medium">{s.tours?.name}</td>
+                                        <tr key={s.id + "-d" + dayN} className="border-t border-gray-100 hover:bg-gray-50">
+                                            <td className="p-3 font-mono">{dayN === 1 ? fmtTime(s.start_time) : `Day ${dayN}/${totalDays}`}</td>
+                                            <td className="p-3 font-medium">{s.tours?.name}{dayN === 1 && totalDays > 1 ? ` · ${totalDays}-day tour` : ""}</td>
                                             <td className="p-3">{s.capacity_total}</td>
                                             <td className="p-3">{s.booked}</td>
                                             <td className="p-3">{s.held || 0}</td>
                                             <td className="p-3">
-                                                <div className={`font-bold ${effectiveAvailability > 0 ? "text-green-600" : "text-gray-400"}`}>{effectiveAvailability}</div>
-                                                {isResourceLimited && (
-                                                    <div className="mt-1 text-[10px] font-medium text-amber-700">Shared resource cap</div>
-                                                )}
+                                                <div className={`font-bold ${availability > 0 ? "text-green-600" : "text-gray-400"}`}>{availability}</div>
                                             </td>
                                             <td className="p-3">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === "OPEN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>

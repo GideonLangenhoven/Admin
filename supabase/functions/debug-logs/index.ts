@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "business_id required" }), { status: 400 });
     }
 
-    const body: any = {};
+    let body: any = {};
     try { body = await req.json(); } catch (_) {}
     const businessId = auth.isServiceRole ? (body.business_id || "") : auth.businessId;
     if (!businessId) {

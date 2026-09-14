@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { BrandMark } from "../../../../components/BrandLogo";
 
 interface Tour {
   id: string;
@@ -560,15 +561,19 @@ function AvailabilityWidget() {
             style={{ background: "var(--ck-accent, #125e40)" }}
           />
         </span>
-        <span
-          className="text-[9px] font-medium uppercase opacity-40"
+        <a
+          href="https://bookingtours.co.za"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[9px] font-medium uppercase opacity-40"
           style={{
             letterSpacing: "0.1em",
             color: "var(--ck-text-muted, #6b7280)",
           }}
         >
+          <BrandMark size={7} className="shrink-0" />
           Powered by BookingTours
-        </span>
+        </a>
       </div>
     </div>
   );

@@ -73,6 +73,26 @@ export async function POST(req: NextRequest) {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {
             return NextResponse.json({ error: "Both WhatsApp Access Token and Phone Number ID are required." }, { status: 400 });
         }
+        // Validate against Meta BEFORE saving — a token that Meta rejects (expired,
+        // revoked, wrong phone id) would otherwise sit "✓ Configured" but fail
+        // every send with an opaque error later.
+        try {
+            const metaRes = await fetch(
+                "https://graph.facebook.com/v19.0/" + encodeURIComponent(wa_phone_id.trim()) + "?fields=display_phone_number",
+                { headers: { Authorization: "Bearer " + wa_token.trim() } },
+            );
+            const metaData: any = await metaRes.json().catch(() => ({}));
+            if (!metaRes.ok) {
+                const metaMsg = metaData?.error?.message || "Meta rejected the credentials.";
+                return NextResponse.json({
+                    error: "WhatsApp credentials rejected by Meta. Nothing was saved. " + metaMsg +
+                        " Generate a fresh token in Meta (WhatsApp → API Setup) and check the Phone Number ID.",
+                }, { status: 400 });
+            }
+        } catch {
+            // Meta unreachable (network blip) — don't block the save on our outage.
+            console.warn("WA_CRED_VALIDATE_SKIPPED: Meta Graph unreachable");
+        }
         const { error: waErr } = await supabase.rpc("set_wa_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_wa_token: wa_token.trim(), p_wa_phone_id: wa_phone_id.trim(),
         });
@@ -81,6 +101,9 @@ export async function POST(req: NextRequest) {
         if (!yoco_secret_key?.trim() || !yoco_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Secret Key and Webhook Signing Secret are required." }, { status: 400 });
         }
+        if (!yoco_secret_key.trim().startsWith("sk_live_")) {
+            return NextResponse.json({ error: "Live credentials require a Yoco live key (sk_live_...). Save test keys under Yoco Test Credentials and enable Test Mode." }, { status: 400 });
+        }
         const { error: yocoErr } = await supabase.rpc("set_yoco_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_yoco_secret_key: yoco_secret_key.trim(), p_yoco_webhook_secret: yoco_webhook_secret.trim(),
         });
@@ -88,6 +111,9 @@ export async function POST(req: NextRequest) {
     } else if (section === "yoco_test") {
         if (!yoco_test_secret_key?.trim() || !yoco_test_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Test Secret Key and Test Webhook Signing Secret are required." }, { status: 400 });
+        }
+        if (!yoco_test_secret_key.trim().startsWith("sk_test_")) {
+            return NextResponse.json({ error: "Test credentials require a Yoco test key (sk_test_...). Save live keys under Yoco Credentials." }, { status: 400 });
         }
         const { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_test_secret_key: yoco_test_secret_key.trim(), p_test_webhook_secret: yoco_test_webhook_secret.trim(),

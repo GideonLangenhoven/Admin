@@ -1,7 +1,12 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { requireAuth } from "../_shared/auth.ts";
+import { nonTradingBusinessIds } from "../_shared/subscription.ts";
+import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
+import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
 // Refuse to use the Resend developer sandbox even if it's pasted into the env
@@ -24,32 +29,46 @@ function buildCors(req: Request) {
   };
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
   // V-DISP: browser preflight + POST CORS. Without these the admin "Run
   // dispatch now" button got Failed to fetch from the browser even though
   // the function ran fine. pg_cron / curl callers don't care, but the UI
   // does.
   const cors = buildCors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: cors });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: cors }); }
+  const businessId = auth.isServiceRole || auth.role === "SUPER_ADMIN" ? null : auth.businessId;
 
   try {
     const results = { date_enrolled: 0, processed: 0, sent: 0, delayed: 0, conditions: 0, vouchers: 0, promos: 0, completed: 0, errors: 0 };
 
     // ── 1. Date-field triggers: enroll contacts whose date matches today ──
     const today = new Date();
-    const todayMonth = today.getMonth() + 1;
-    const todayDay = today.getDate();
-
-    const { data: dateAutomations } = await supabase
-      .from("marketing_automations")
-      .select("id, business_id, trigger_config")
-      .eq("status", "active")
-      .eq("trigger_type", "date_field");
+    const dateAutomations = await fetchAllRows((from, to) => {
+      let query = supabase.from("marketing_automations")
+        .select("id, business_id, trigger_config")
+        .eq("status", "active").eq("trigger_type", "date_field")
+        .order("id").range(from, to);
+      if (businessId) query = query.eq("business_id", businessId);
+      return query;
+    });
 
     const currentYear = today.getFullYear();
 
+    // Fix 3b: no new automation enrolments for a paused or suspended operator.
+    const pausedForDates = await nonTradingBusinessIds(
+      supabase,
+      ((dateAutomations || []) as any[]).map((a) => a.business_id),
+    );
+
     for (const auto of (dateAutomations || []) as any[]) {
+      if (pausedForDates.has(String(auto.business_id))) continue;
       const field = auto.trigger_config?.field || "date_of_birth";
+      // Only actual date columns are eligible; config is operator-controlled.
+      if (field !== "date_of_birth" && field !== "anniversary_date") continue;
       const daysBefore = auto.trigger_config?.days_before || 0;
 
       // Calculate target date (today + days_before offset)
@@ -59,12 +78,13 @@ Deno.serve(async (req: Request) => {
       const targetDay = targetDate.getDate();
 
       // Fetch contacts with their date field in one query (avoid N+1)
-      const { data: matchingContacts } = await supabase
+      const matchingContacts = await fetchAllRows((from, to) => supabase
         .from("marketing_contacts")
         .select("id, " + field)
         .eq("business_id", auto.business_id)
         .eq("status", "active")
-        .not(field, "is", null);
+        .not(field, "is", null)
+        .order("id").range(from, to));
 
       for (const contact of (matchingContacts || []) as any[]) {
         if (!contact[field]) continue;
@@ -126,26 +146,39 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 2. Fetch ready enrollments ──
-    const { data: enrollments } = await supabase
-      .from("marketing_automation_enrollments")
-      .select("id, automation_id, contact_id, business_id, current_step, metadata")
-      .eq("status", "active")
-      .lte("next_action_at", new Date().toISOString())
-      .order("next_action_at", { ascending: true })
-      .limit(100);
+    // Eligibility precedes the limit, and the 15-minute claim is atomic.
+    const { data: enrollments, error: claimError } = await supabase.rpc("claim_marketing_automation_enrollments", {
+      p_limit: 100,
+      p_business_id: businessId,
+    });
+    if (claimError) throw claimError;
 
     if (!enrollments || enrollments.length === 0) {
       return new Response(JSON.stringify({ ok: true, ...results }), { status: 200, headers: cors });
     }
 
+    // Automation steps are marketing sends too, so a paused operator's in-flight
+    // enrollments hold rather than continue. next_action_at is left untouched,
+    // so they resume from where they stopped when the operator comes back.
+    const pausedForRuns = await nonTradingBusinessIds(
+      supabase,
+      (enrollments as any[]).map((e) => e.business_id),
+    );
+    if (pausedForRuns.size > 0) {
+      console.log("AUTOMATION_DISPATCH_SKIP_NON_TRADING businesses=" + [...pausedForRuns].join(","));
+    }
+
     // ── 3. Process each enrollment ──
     for (const enrollment of enrollments as any[]) {
+      if (businessId && enrollment.business_id !== businessId) throw new Error("Enrollment claim returned a foreign business");
+      if (pausedForRuns.has(String(enrollment.business_id))) continue;
       try {
         // Load automation
         const { data: automation } = await supabase
           .from("marketing_automations")
           .select("id, status, business_id")
           .eq("id", enrollment.automation_id)
+          .eq("business_id", enrollment.business_id)
           .single();
 
         if (!automation || automation.status !== "active") {
@@ -153,8 +186,9 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain").eq("id", enrollment.business_id).maybeSingle();
+        const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain, booking_site_url").eq("id", enrollment.business_id).maybeSingle();
         const bizName = bizRow?.business_name || "Marketing";
+        const bizSiteUrl = String(bizRow?.booking_site_url || (bizRow?.subdomain ? "https://" + bizRow.subdomain + ".booking.bookingtours.co.za" : "")).replace(/\/+$/, "");
         // V-12 fix: send from the verified ROOT domain with the tenant name as
         // the display label. Per-subdomain From requires each tenant's
         // subdomain (e.g. aonyx.bookingtours.co.za) to be added + DNS-verified
@@ -192,10 +226,22 @@ Deno.serve(async (req: Request) => {
         // Load contact
         const { data: contact } = await supabase
           .from("marketing_contacts")
-          .select("id, email, first_name, last_name, tags")
+          .select("id, email, first_name, last_name, tags, status")
           .eq("id", enrollment.contact_id)
+          .eq("business_id", enrollment.business_id)
           .single();
         if (!contact) continue;
+
+        // A contact can unsubscribe mid-sequence — this used to keep firing
+        // every remaining scheduled step regardless. Exit the enrollment
+        // (terminal, same as the existing condition-not-met exit path below)
+        // instead of re-checking this same row every cron tick forever.
+        if (contact.status !== "active") {
+          await supabase.from("marketing_automation_enrollments")
+            .update({ status: "exited", updated_at: new Date().toISOString() })
+            .eq("id", enrollment.id);
+          continue;
+        }
 
         const metadata = enrollment.metadata || {};
 
@@ -206,7 +252,7 @@ Deno.serve(async (req: Request) => {
             const templateId = config?.template_id;
             if (!templateId) {
               console.error("AUTOMATION_DISPATCH: missing template_id in step config for enrollment " + enrollment.id);
-              await supabase.from("marketing_automation_enrollments").update({ status: "failed" }).eq("id", enrollment.id);
+              await supabase.from("marketing_automation_enrollments").update({ status: "exited" }).eq("id", enrollment.id);
               results.errors++;
               break;
             }
@@ -216,30 +262,30 @@ Deno.serve(async (req: Request) => {
               .from("marketing_templates")
               .select("html_content, subject_line")
               .eq("id", templateId)
+              .eq("business_id", enrollment.business_id)
               .single();
             if (!template) {
               console.error("AUTOMATION_DISPATCH: template " + templateId + " not found for enrollment " + enrollment.id);
-              await supabase.from("marketing_automation_enrollments").update({ status: "failed" }).eq("id", enrollment.id);
+              await supabase.from("marketing_automation_enrollments").update({ status: "exited" }).eq("id", enrollment.id);
               results.errors++;
               break;
             }
 
-            // Variable replacement
-            let html = template.html_content
-              .replace(/\{first_name\}/g, contact.first_name || "there")
-              .replace(/\{last_name\}/g, contact.last_name || "")
-              .replace(/\{email\}/g, contact.email || "")
-              .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
-              .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
-              .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "");
-
-            const subject = (config.subject_override || template.subject_line || "Update")
-              .replace(/\{first_name\}/g, contact.first_name || "there")
-              .replace(/\{voucher_code\}/g, metadata.voucher_code || "")
-              .replace(/\{voucher_amount\}/g, metadata.voucher_amount || "")
-              .replace(/\{promo_code\}/g, metadata.promo_code || "")
-              .replace(/\{promo_discount\}/g, metadata.promo_discount || "");
+            // Variable replacement — shared map, see _shared/marketing-tokens.ts
+            const tokenValues = {
+              first_name: contact.first_name,
+              last_name: contact.last_name,
+              email: contact.email,
+              voucher_code: metadata.voucher_code,
+              voucher_amount: metadata.voucher_amount,
+              promo_code: metadata.promo_code,
+              promo_discount: metadata.promo_discount,
+              business_name: bizName,
+              site_url: bizSiteUrl,
+            };
+            let html = fillMarketingTokens(template.html_content, tokenValues);
+            html = replaceLegacyMarketingSocialIcons(html);
+            const subject = fillMarketingTokens(config.subject_override || template.subject_line || "Update", tokenValues);
 
             // Generate unsubscribe token
             const unsubToken = crypto.randomUUID();
@@ -619,4 +665,4 @@ Deno.serve(async (req: Request) => {
     console.error("AUTOMATION_DISPATCH_ERROR:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: cors });
   }
-});
+}));

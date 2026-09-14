@@ -2,9 +2,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
-import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime } from "../lib/admin-timezone";
+import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime, normalize24HourTime } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
-import { listAvailableSlots } from "../lib/slot-availability";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import CalendarHeader from "../../components/CalendarHeader";
@@ -12,13 +11,35 @@ import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
 import BulkSlotWizard from "../../components/BulkSlotWizard";
+import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
+function TimeInput({ name, value, onChange }: { name?: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      name={name}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={5}
+      placeholder="HH:MM"
+      value={value}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        const normalized = normalize24HourTime(value);
+        if (normalized) onChange(normalized);
+      }}
+      className="ui-control mt-1 w-full tabular-nums"
+    />
+  );
+}
+
 export default function SlotsPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>}>
+    <Suspense fallback={<div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>}>
       <Slots />
     </Suspense>
   );
@@ -34,6 +55,7 @@ function Slots() {
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [filterTourId, setFilterTourId] = useState<string | null>(() => searchParams.get("tour"));
   const [showClosedSlots, setShowClosedSlots] = useState(false);
+  const [monthViewOpen, setMonthViewOpen] = useState(false);
 
   // Individual Edit State
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -56,11 +78,20 @@ function Slots() {
   // Add Slot State
   const [showAddSlot, setShowAddSlot] = useState(false);
   const [bulkGenOpen, setBulkGenOpen] = useState(false);
+
+  // Deep-link the action dialogs (used by the help assistant's [[open]]):
+  // /slots?panel=add or /slots?panel=bulk-edit opens the dialog directly.
+  useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (panel === "add") setShowAddSlot(true);
+    else if (panel === "bulk-edit") setShowBulkEdit(true);
+  }, [searchParams]);
   const [addForm, setAddForm] = useState({
     tourId: "",
     time: "06:00",
-    startDate: "",
-    endDate: "",
+    // Multiple ranges so seasonal availability (e.g. 1–3 Mar AND 20–23 Mar)
+    // is one submit instead of several.
+    ranges: [{ start: "", end: "" }] as Array<{ start: string; end: string }>,
     capacity: "12",
     price: "",
   });
@@ -90,7 +121,7 @@ function Slots() {
   async function cancelSlotWeather(slot: Slot) {
     const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
-    }) + " — " + (slot.tours?.name || "Tour");
+    }) + ": " + (slot.tours?.name || "Tour");
 
     if (!await confirmAction({
       title: "Cancel slot due to weather",
@@ -123,6 +154,87 @@ function Slots() {
       });
     }
     setCancellingWeather(false);
+  }
+
+  // ── Item 20: Close and Cancel are two DISTINCT actions ──
+  // Close = stop new bookings only; existing bookings stand, nobody is
+  // notified, no refund. Cancel = cancel everyone's trip, notify them, and
+  // start the refund flow. They used to be conflated (choosing "CLOSED" in a
+  // dropdown silently cancelled every booking).
+  const [slotStatusSaving, setSlotStatusSaving] = useState(false);
+  const [cancellingSlot, setCancellingSlot] = useState(false);
+
+  async function closeSlot(slot: Slot) {
+    const bookedSeats = slot.booked || 0;
+    if (!await confirmAction({
+      title: "Close this slot?",
+      message: bookedSeats > 0
+        ? `This stops NEW bookings only. The ${bookedSeats} seat(s) already booked keep their trip; nobody is notified. To cancel those trips instead, use "Cancel & notify guests".`
+        : "This stops new bookings for this slot. It has no bookings yet, so nothing else changes. You can reopen it any time.",
+      tone: "info",
+      confirmLabel: "Close slot",
+    })) return;
+    setSlotStatusSaving(true);
+    const { error } = await supabase.from("slots").update({ status: "CLOSED" }).eq("id", slot.id).eq("business_id", businessId);
+    setSlotStatusSaving(false);
+    if (error) { notify({ title: "Couldn't close slot", message: error.message, tone: "error" }); return; }
+    notify({ title: "Slot closed", message: "No new bookings will be taken. Existing bookings are unaffected.", tone: "success" });
+    setSelectedSlot(null);
+    load();
+  }
+
+  async function reopenSlot(slot: Slot) {
+    setSlotStatusSaving(true);
+    const { error } = await supabase.from("slots").update({ status: "OPEN" }).eq("id", slot.id).eq("business_id", businessId);
+    setSlotStatusSaving(false);
+    if (error) { notify({ title: "Couldn't reopen slot", message: error.message, tone: "error" }); return; }
+    notify({ title: "Slot reopened", message: "This slot is accepting bookings again.", tone: "success" });
+    setSelectedSlot(null);
+    load();
+  }
+
+  // The generic FunctionsHttpError message ("non-2xx status code") hides the
+  // real cause — pull the response body so the operator sees what failed.
+  async function describeFnError(err: unknown): Promise<string> {
+    const anyErr = err as { context?: Response; message?: string };
+    if (anyErr?.context && typeof anyErr.context.text === "function") {
+      try {
+        const body = await anyErr.context.text();
+        if (body) return `HTTP ${anyErr.context.status}: ${body.slice(0, 300)}`;
+      } catch { /* fall through */ }
+    }
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  async function cancelSlotAndRefund(slot: Slot, isWeather = false) {
+    const bookedSeats = slot.booked || 0;
+    const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
+      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
+    }) + ": " + (slot.tours?.name || "Tour");
+    if (!await confirmAction({
+      title: isWeather ? "Weather-cancel this trip?" : "Cancel this trip for all guests?",
+      message: bookedSeats > 0
+        ? `This CANCELS "${slotLabel}" for all ${bookedSeats} booked seat(s) and notifies every customer${isWeather ? " (weather framing)" : ""}. Each guest then chooses a full refund, a voucher, or a new date on their My Bookings page. This can't be undone. To simply stop new bookings without affecting anyone, use "Close" instead.`
+        : `This will close "${slotLabel}" and mark it cancelled. There are no bookings to cancel.`,
+      tone: "warning",
+      confirmLabel: isWeather ? "Weather cancel" : "Cancel & notify",
+    })) return;
+    setCancellingSlot(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("weather-cancel", {
+        body: isWeather
+          ? { slot_ids: [slot.id], business_id: businessId, reason: "weather conditions" }
+          : { slot_ids: [slot.id], business_id: businessId, reason: "operator cancellation", is_weather: false },
+      });
+      if (error) throw error;
+      const cancelled = (data as any)?.bookings_cancelled ?? 0;
+      notify({ title: "Trip cancelled", message: `${cancelled} booking(s) cancelled and customers notified with self-service refund options.`, tone: "success" });
+      setSelectedSlot(null);
+      load();
+    } catch (err) {
+      notify({ title: "Cancellation failed", message: await describeFnError(err), tone: "error" });
+    }
+    setCancellingSlot(false);
   }
 
   async function handleCancelDay() {
@@ -179,7 +291,7 @@ function Slots() {
       setSelectedCancelDates([]);
       load();
     } catch (err: any) {
-      notify({ title: "Day cancellation failed", message: err.message, tone: "error" });
+      notify({ title: "Day cancellation failed", message: await describeFnError(err), tone: "error" });
     }
     setCancellingWeather(false);
   }
@@ -273,31 +385,22 @@ function Slots() {
     }
 
     try {
-      const [slotRes, openAvailability] = await Promise.all([
-        supabase.from("slots")
-          .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name)")
-          .eq("business_id", businessId)
-          .gte("start_time", start.toISOString())
-          .lte("start_time", end.toISOString())
-          .order("start_time", { ascending: true }),
-        listAvailableSlots({
-          businessId,
-          startIso: start.toISOString(),
-          endIso: new Date(end.getTime() + 1).toISOString(),
-          tourId: filterTourId,
-        }),
-      ]);
+      // Look back 7 days so multi-day tours that departed before the visible
+      // window still render on the days they span (covers tours up to 8 days).
+      const fetchStart = new Date(start);
+      fetchStart.setDate(fetchStart.getDate() - 7);
+      const slotRes = await supabase.from("slots")
+        .select("id, start_time, capacity_total, booked, held, status, price_per_person_override, tour_id, tours(id, name, duration_minutes)")
+        .eq("business_id", businessId)
+        .gte("start_time", fetchStart.toISOString())
+        .lte("start_time", end.toISOString())
+        .order("start_time", { ascending: true });
 
       if (slotRes.error) throw slotRes.error;
-
-      const availabilityBySlotId = new Map(
-        openAvailability.map((slot) => [slot.id, Number(slot.available_capacity || 0)]),
-      );
 
       const normalized = (slotRes.data || []).map((d: any) => ({
         ...d,
         tours: Array.isArray(d.tours) ? d.tours[0] : d.tours,
-        available_capacity: availabilityBySlotId.get(d.id),
       }));
 
       setSlots(normalized as Slot[]);
@@ -332,8 +435,9 @@ function Slots() {
 
   async function saveSlotEdit() {
     if (!selectedSlot) return;
-    if (!editForm.time) {
-      notify({ title: "Time required", message: "Please enter a valid time.", tone: "warning" });
+    const normalizedTime = normalize24HourTime(editForm.time);
+    if (!normalizedTime) {
+      notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" });
       return;
     }
 
@@ -341,7 +445,7 @@ function Slots() {
 
     const priceVal = editForm.price.trim() === "" ? null : Number(editForm.price);
 
-    const [newHours, newMins] = editForm.time.split(":").map(Number);
+    const [newHours, newMins] = normalizedTime.split(":").map(Number);
     const tz = getAdminTimezone();
     const originalLocal = utcToLocalParts(selectedSlot.start_time, tz);
     const originalHrs = originalLocal.hours;
@@ -381,7 +485,7 @@ function Slots() {
         if (conflict) {
           notify({
             title: "Time already taken",
-            message: `There's already a slot at ${editForm.time} for this tour on this date. Pick a different time.`,
+            message: `There's already a slot at ${normalizedTime} for this tour on this date. Pick a different time.`,
             tone: "warning",
           });
           setSaving(false);
@@ -389,12 +493,18 @@ function Slots() {
         }
       }
 
+      // Note: status is deliberately NOT written here. Open/Close and Cancel
+      // are separate, explicit actions (see closeSlot / reopenSlot /
+      // cancelSlotAndRefund) so "save changes to time/capacity/price" can never
+      // silently close a slot — and closing can never silently cancel bookings.
       const { error: singleUpdateError } = await supabase
         .from("slots")
         .update({
           capacity_total: Number(editForm.capacity) || selectedSlot.capacity_total,
           price_per_person_override: priceVal,
-          status: editForm.status,
+          // last_minute_at means "this override is the last-minute deal price".
+          // The operator is setting the price by hand now, so the flag no longer holds.
+          last_minute_at: null,
           start_time: newUtcTime.toISOString()
         })
         .eq("id", selectedSlot.id);
@@ -436,89 +546,6 @@ function Slots() {
         }
       }
 
-      // If status was changed to CLOSED, cancel all active bookings and notify customers
-      if (editForm.status === "CLOSED" && selectedSlot.status !== "CLOSED") {
-        const { data: bookings } = await supabase
-          .from("bookings")
-          .select("id, customer_name, phone, email, qty, total_amount, status, tours(name), slots(start_time)")
-          .eq("business_id", businessId)
-          .eq("slot_id", selectedSlot.id)
-          .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
-
-        const affected = bookings || [];
-        for (const b of affected) {
-          const isPaidBooking = ["PAID", "CONFIRMED"].includes(b.status);
-
-          await supabase.from("bookings").update({
-            status: "CANCELLED",
-            cancellation_reason: "Slot closed by operator",
-            cancelled_at: new Date().toISOString(),
-          }).eq("id", b.id);
-
-          const slotData = await supabase.from("slots").select("booked, held").eq("id", selectedSlot.id).single();
-          if (slotData.data) {
-            await supabase.from("slots").update({
-              booked: Math.max(0, slotData.data.booked - b.qty),
-              held: Math.max(0, (slotData.data.held || 0) - (b.status === "HELD" ? b.qty : 0)),
-            }).eq("id", selectedSlot.id);
-          }
-
-          await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-
-          const ref = b.id.substring(0, 8).toUpperCase();
-          const tourName = (b as any).tours?.name || "Tour";
-          const startTime = (b as any).slots?.start_time
-            ? new Date((b as any).slots.start_time).toLocaleString("en-ZA", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() })
-            : "";
-
-          if (b.phone) {
-            try {
-              await fetch(SU + "/functions/v1/send-whatsapp-text", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK },
-                body: JSON.stringify({
-                  business_id: businessId,
-                  to: b.phone,
-                  message: "📋 *Trip Cancelled*\n\n" +
-                    "Hi " + (b.customer_name?.split(" ")[0] || "there") + ", unfortunately your " + tourName + " on " + startTime +
-                    " has been cancelled.\n\n" +
-                    "📋 Ref: " + ref + "\n\n" +
-                    "You will receive an email shortly with a link to manage your booking, where you can easily reschedule, get a voucher, or request a refund.",
-                }),
-              });
-            } catch (e) { console.error("WA notify err:", e); }
-          }
-
-          if (b.email) {
-            try {
-              await supabase.functions.invoke("send-email", {
-                body: {
-                  type: "CANCELLATION",
-                  data: {
-                    business_id: businessId,
-                    email: b.email,
-                    customer_name: b.customer_name,
-                    ref,
-                    tour_name: tourName,
-                    start_time: startTime,
-                    reason: "slot closed by operator",
-                    total_amount: isPaidBooking ? b.total_amount : null,
-                  },
-                },
-              });
-            } catch (e) { console.error("Email notify err:", e); }
-          }
-        }
-
-        if (affected.length > 0) {
-          notify({
-            title: "Bookings cancelled",
-            message: `${affected.length} booking(s) on this slot were cancelled and customers notified.`,
-            tone: "success",
-          });
-        }
-      }
-
       setSelectedSlot(null);
       load();
     } catch (err: any) {
@@ -542,14 +569,23 @@ function Slots() {
       return;
     }
 
+    const normalizedBulkTime = bulkForm.newTime === "" ? "" : normalize24HourTime(bulkForm.newTime);
+    if (normalizedBulkTime === null) {
+      notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" });
+      return;
+    }
+
     setSavingBulk(true);
 
     const baseUpdates: any = {};
     if (bulkForm.capacity !== "") baseUpdates.capacity_total = Number(bulkForm.capacity);
-    if (bulkForm.price !== "") baseUpdates.price_per_person_override = bulkForm.price === "NULL" ? null : Number(bulkForm.price);
+    if (bulkForm.price !== "") {
+      baseUpdates.price_per_person_override = bulkForm.price === "NULL" ? null : Number(bulkForm.price);
+      baseUpdates.last_minute_at = null; // hand-set price is no longer a last-minute deal
+    }
 
     try {
-      if (bulkForm.newTime !== "") {
+      if (normalizedBulkTime !== "") {
         // Need to fetch slots to manually calculate new start_time keeping the same date
         let fetchQuery = supabase
           .from("slots")
@@ -563,7 +599,7 @@ function Slots() {
         if (fetchErr) throw fetchErr;
 
         if (slotsToUpdate) {
-          const [newHours, newMins] = bulkForm.newTime.split(":").map(Number);
+          const [newHours, newMins] = normalizedBulkTime.split(":").map(Number);
           const tz = getAdminTimezone();
           const promises = slotsToUpdate.map(slot => {
             return supabase.from("slots").update({
@@ -603,36 +639,42 @@ function Slots() {
 
   async function saveAddSlot() {
     if (!addForm.tourId) { notify({ title: "Tour required", message: "Please select a tour.", tone: "warning" }); return; }
-    if (!addForm.startDate || !addForm.endDate) { notify({ title: "Date range required", message: "Please select start and end dates.", tone: "warning" }); return; }
-    if (!addForm.time) { notify({ title: "Time required", message: "Please enter a time.", tone: "warning" }); return; }
+    if (addForm.ranges.some((r) => !r.start || !r.end)) { notify({ title: "Date range required", message: "Every date range needs a start and an end date.", tone: "warning" }); return; }
+    const normalizedAddTime = normalize24HourTime(addForm.time);
+    if (!normalizedAddTime) { notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" }); return; }
     if (!addForm.capacity || Number(addForm.capacity) <= 0) { notify({ title: "Invalid capacity", message: "Please enter a valid capacity.", tone: "warning" }); return; }
 
     setSavingAdd(true);
 
-    const [hours, mins] = addForm.time.split(":").map(Number);
+    const [hours, mins] = normalizedAddTime.split(":").map(Number);
     const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
     const tz = getAdminTimezone();
 
-    const start = new Date(addForm.startDate + "T00:00:00");
-    const end = new Date(addForm.endDate + "T00:00:00");
     const rows: any[] = [];
+    const seenDates = new Set<string>(); // overlapping ranges shouldn't double-count
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
-      const localIso = `${dateStr}T${timeStr}`;
-      const utcMs = zonedToUtc(localIso, tz);
+    for (const range of addForm.ranges) {
+      const start = new Date(range.start + "T00:00:00");
+      const end = new Date(range.end + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (seenDates.has(dateStr)) continue;
+        seenDates.add(dateStr);
+        const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
+        const localIso = `${dateStr}T${timeStr}`;
+        const utcMs = zonedToUtc(localIso, tz);
 
-      rows.push({
-        tour_id: addForm.tourId,
-        start_time: new Date(utcMs).toISOString(),
-        capacity_total: Number(addForm.capacity),
-        booked: 0,
-        held: 0,
-        status: "OPEN",
-        price_per_person_override: priceOverride,
-        business_id: businessId,
-      });
+        rows.push({
+          tour_id: addForm.tourId,
+          start_time: new Date(utcMs).toISOString(),
+          capacity_total: Number(addForm.capacity),
+          booked: 0,
+          held: 0,
+          status: "OPEN",
+          price_per_person_override: priceOverride,
+          business_id: businessId,
+        });
+      }
     }
 
     if (rows.length === 0) {
@@ -653,7 +695,7 @@ function Slots() {
       const insertedCount = inserted?.length ?? 0;
       const skipped = rows.length - insertedCount;
       setShowAddSlot(false);
-      setAddForm({ tourId: "", time: "06:00", startDate: "", endDate: "", capacity: "12", price: "" });
+      setAddForm({ tourId: "", time: "06:00", ranges: [{ start: "", end: "" }], capacity: "12", price: "" });
       const message = skipped > 0
         ? `${insertedCount} slot(s) created. ${skipped} already existed and were skipped.`
         : `${insertedCount} slot(s) created successfully.`;
@@ -675,26 +717,29 @@ function Slots() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold">Slot Management</h2>
+      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div>
+            <p className="ui-mono-label mb-1.5">Operations</p>
+            <h2 className="font-display text-[24px] sm:text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Slot Management</h2>
+          </div>
           {filterTourName && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
               {filterTourName}
-              <button onClick={() => setFilterTourId(null)} className="ml-0.5 text-emerald-600 hover:text-emerald-900 font-bold">×</button>
+              <button onClick={() => setFilterTourId(null)} className="ml-0.5 font-bold" style={{ color: "var(--ck-accent)" }}>×</button>
             </span>
           )}
-          <label className="ml-2 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer select-none">
+          <label className="ml-2 inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none" style={{ color: "var(--ck-text)" }}>
             <input
               type="checkbox"
               checked={showClosedSlots}
               onChange={(e) => setShowClosedSlots(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-gray-300 accent-[#0f595e]"
+              className="h-3.5 w-3.5 rounded border-gray-300 accent-[var(--ck-accent)]"
             />
             Show closed / 0-capacity
           </label>
         </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
           <button
             onClick={() => {
               if (selectedCancelDates.length === 0) {
@@ -707,9 +752,9 @@ function Slots() {
               }
               setShowCancelDay(true);
             }}
-            className={`px-3 py-2 font-medium rounded-lg transition-colors text-sm ${selectedCancelDates.length > 0 ? 'bg-red-600 border border-red-700 text-white hover:bg-red-700' : 'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100'}`}
+            className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-danger" : "ui-btn-ghost"}`}
           >
-            ⛈ Cancel Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
+            Cancel Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
             onClick={() => {
@@ -723,42 +768,55 @@ function Slots() {
               }
               setShowReopenDay(true);
             }}
-            className={`px-3 py-2 font-medium rounded-lg transition-colors text-sm ${selectedCancelDates.length > 0 ? 'bg-green-600 border border-green-700 text-white hover:bg-green-700' : 'border border-green-300 bg-green-50 text-green-700 hover:bg-green-100'}`}
+            className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-soft" : "ui-btn-ghost"}`}
           >
-            🔓 Reopen Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
+            Reopen Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
             onClick={() => { if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours[0].id })); setShowAddSlot(true); }}
-            className="px-3 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            className="ui-btn ui-btn-primary"
           >
-            + Add Slot
+            Add Slot
           </button>
           <button
             onClick={() => setBulkGenOpen(true)}
-            className="px-3 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+            className="ui-btn ui-btn-soft"
           >
             Bulk Generate
           </button>
           <button
             onClick={() => setShowBulkEdit(true)}
-            className="px-3 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            className="ui-btn ui-btn-ghost"
           >
             Bulk Edit
           </button>
         </div>
       </div>
 
-      <CalendarHeader
-        currentDate={currentDate}
-        viewMode={viewMode}
-        onDateChange={setCurrentDate}
-        onViewModeChange={setViewMode}
-      />
+      <div className="anim-fade-up anim-d1">
+        <CalendarHeader
+          currentDate={currentDate}
+          viewMode={viewMode}
+          onDateChange={setCurrentDate}
+          onViewModeChange={setViewMode}
+          monthViewOpen={monthViewOpen}
+          onToggleMonthView={() => setMonthViewOpen((v) => !v)}
+        />
+      </div>
 
+      {monthViewOpen && (
+        <BookingsMonthCalendar
+          businessId={businessId}
+          tours={tours}
+          selectedDate={currentDate}
+          onSelectDate={setCurrentDate}
+          onClose={() => setMonthViewOpen(false)}
+        />
+      )}
+
+      <div className="anim-fade-up anim-d2">
       {loading ? (
-        <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <div className="space-y-4"><div className="ui-skeleton h-[48px] !rounded-xl" /><div className="ui-skeleton h-[420px] !rounded-2xl" /></div>
       ) : (
         viewMode === "week" ? (
           <WeekView
@@ -778,58 +836,35 @@ function Slots() {
           />
         )
       )}
+      </div>
 
       {selectedSlot && (() => {
-        const directAvailability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
-        const effectiveAvailability = typeof selectedSlot.available_capacity === "number" ? selectedSlot.available_capacity : directAvailability;
-        const isResourceLimited = effectiveAvailability < directAvailability;
+        const availability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
         return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-auto p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-1">Edit Slot</h3>
-            <p className="text-sm text-gray-500 mb-4">
+          <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
+            <div className="ui-card w-full max-h-[90vh] overflow-auto p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Edit Slot</h3>
+            <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               {new Date(selectedSlot.start_time).toLocaleString("en-ZA", {
                 weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone()
-              })} — {selectedSlot.tours?.name}
+              })}: {selectedSlot.tours?.name}
             </p>
 
-            <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Sellable now</div>
-                <div className={`mt-1 text-lg font-semibold ${effectiveAvailability > 0 ? "text-emerald-600" : "text-gray-400"}`}>{effectiveAvailability}</div>
-              </div>
-              <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Raw slot space</div>
-                <div className="mt-1 text-lg font-semibold text-gray-800">{directAvailability}</div>
-              </div>
-              {isResourceLimited && (
-                <div className="col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                  Shared resource limits are reducing capacity for this slot. Increasing the slot max alone will not create more availability unless the linked shared resources also allow it.
-                </div>
-              )}
+            <div className="mb-4 rounded-xl p-3 text-sm" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
+              <div className="ui-mono-label !text-[10px]">Available</div>
+              <div className="font-display mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: availability > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{availability}</div>
+            </div>
+
+            <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ background: selectedSlot.status === "OPEN" ? "var(--ck-success-soft, #e7f5ec)" : "var(--ck-surface-sunken)", color: selectedSlot.status === "OPEN" ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
+              {selectedSlot.status === "OPEN" ? "● Open: accepting bookings" : "○ Closed: not accepting new bookings"}
             </div>
 
             <div className="space-y-4">
               <label className="block text-sm text-gray-600">
-                Status
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="CLOSED">CLOSED</option>
-                </select>
-              </label>
-
-              <label className="block text-sm text-gray-600">
                 Time
-                <input
-                  type="time"
-                  value={editForm.time}
-                  onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
+                <span className="mb-1 block text-xs text-gray-400">24-hour time, for example 14:00.</span>
+                <TimeInput value={editForm.time} onChange={(time) => setEditForm({ ...editForm, time })} />
               </label>
 
               <label className="block text-sm text-gray-600">
@@ -839,7 +874,7 @@ function Slots() {
                   min="0"
                   value={editForm.capacity}
                   onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
 
@@ -853,32 +888,55 @@ function Slots() {
                   placeholder="e.g. 600"
                   value={editForm.price}
                   onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                onClick={() => cancelSlotWeather(selectedSlot)}
-                disabled={cancellingWeather || saving || selectedSlot.status === "CLOSED"}
-                className="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 sm:w-auto"
-              >
-                {cancellingWeather ? "Cancelling..." : "⛈ Cancel Weather"}
+            {/* Save time/capacity/price changes — never affects status/bookings */}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button onClick={() => setSelectedSlot(null)} className="ui-btn ui-btn-ghost">Close window</button>
+              <button onClick={saveSlotEdit} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+                {saving ? "Saving..." : "Save Changes"}
               </button>
-              <div className="grid grid-cols-2 gap-2 sm:flex">
+            </div>
+
+            {/* Availability vs Cancellation — two clearly separated actions */}
+            <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <p className="ui-mono-label !text-[10px] mb-2">Manage this slot</p>
+              <div className="space-y-2">
+                {selectedSlot.status === "OPEN" ? (
+                  <button
+                    onClick={() => closeSlot(selectedSlot)}
+                    disabled={slotStatusSaving || cancellingSlot}
+                    className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
+                    style={{ borderColor: "var(--ck-border-strong)" }}
+                  >
+                    <span className="font-semibold">Close slot</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => reopenSlot(selectedSlot)}
+                    disabled={slotStatusSaving || cancellingSlot}
+                    className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
+                    style={{ borderColor: "var(--ck-border-strong)" }}
+                  >
+                    <span className="font-semibold">Reopen slot</span>
+                  </button>
+                )}
                 <button
-                  onClick={() => setSelectedSlot(null)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                  onClick={() => cancelSlotAndRefund(selectedSlot)}
+                  disabled={cancellingSlot || slotStatusSaving}
+                  className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  Cancel
+                  <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Cancel & notify guests"}</span>
                 </button>
                 <button
-                  onClick={saveSlotEdit}
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  onClick={() => cancelSlotAndRefund(selectedSlot, true)}
+                  disabled={cancellingSlot || slotStatusSaving}
+                  className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Weather cancel"}</span>
                 </button>
               </div>
             </div>
@@ -889,10 +947,10 @@ function Slots() {
 
       {/* BULK EDIT MODAL */}
       {showBulkEdit && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-visible p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-1">Bulk Edit Slots</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
+          <div className="ui-card w-full max-h-[90vh] overflow-visible p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Bulk Edit Slots</h3>
+            <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Apply new capacities or base amounts to multiple slots at once.
             </p>
 
@@ -917,7 +975,7 @@ function Slots() {
                 <select
                   value={bulkForm.tourId}
                   onChange={(e) => setBulkForm({ ...bulkForm, tourId: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 >
                   <option value="ALL">All Tours</option>
                   {tours.map(t => (
@@ -928,12 +986,11 @@ function Slots() {
 
               <label className="block text-sm text-gray-600">
                 New Time
-                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times.</span>
-                <input
-                  type="time"
+                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times. Use 24-hour time, for example 14:00.</span>
+                <TimeInput
+                  name="bulk_new_time"
                   value={bulkForm.newTime}
-                  onChange={(e) => setBulkForm({ ...bulkForm, newTime: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  onChange={(newTime) => setBulkForm({ ...bulkForm, newTime })}
                 />
               </label>
 
@@ -941,12 +998,13 @@ function Slots() {
                 New Max Capacity
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing capacities.</span>
                 <input
+                  name="bulk_capacity"
                   type="number"
                   min="0"
                   placeholder="e.g. 24"
                   value={bulkForm.capacity}
                   onChange={(e) => setBulkForm({ ...bulkForm, capacity: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
 
@@ -954,11 +1012,12 @@ function Slots() {
                 New Base Price (ZAR)
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing prices. Type "NULL" to reset to default base amount.</span>
                 <input
+                  name="bulk_price"
                   type="text"
                   placeholder="e.g. 650 or NULL"
                   value={bulkForm.price}
                   onChange={(e) => setBulkForm({ ...bulkForm, price: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
             </div>
@@ -966,14 +1025,15 @@ function Slots() {
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
                 onClick={() => setShowBulkEdit(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={saveBulkEdit}
+                data-help-submit=""
                 disabled={savingBulk || !bulkForm.startDate || !bulkForm.endDate}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {savingBulk ? "Applying..." : "Apply Bulk Update"}
               </button>
@@ -984,10 +1044,10 @@ function Slots() {
 
       {/* ADD SLOT MODAL */}
       {showAddSlot && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-visible p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-1">Add New Slots</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
+          <div className="ui-card w-full max-h-[90vh] overflow-visible p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Add New Slots</h3>
+            <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Create slots for a time across a date range.
             </p>
 
@@ -997,7 +1057,7 @@ function Slots() {
                 <select
                   value={addForm.tourId}
                   onChange={(e) => setAddForm({ ...addForm, tourId: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+                  className="ui-control mt-1 w-full"
                 >
                   <option value="">Select a tour...</option>
                   {tours.map(t => (
@@ -1007,38 +1067,58 @@ function Slots() {
               </label>
 
               <label className="block text-sm text-gray-600">
-                Time (SA Time)
-                <input
-                  type="time"
+                Time (24-hour SA time)
+                <TimeInput
+                  name="slot_time"
                   value={addForm.time}
-                  onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+                  onChange={(time) => setAddForm({ ...addForm, time })}
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="block text-sm text-gray-600">
-                  Start Date
-                  <div className="mt-1">
-                    <DatePicker position="top" value={addForm.startDate} onChange={(val) => setAddForm({ ...addForm, startDate: val })} className="py-2.5 w-full border-gray-300" />
+              <div className="space-y-3">
+                {addForm.ranges.map((range, idx) => (
+                  <div key={idx} className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_28px] sm:items-end">
+                    <label className="block text-sm text-gray-600">
+                      {idx === 0 ? "Start Date" : `Range ${idx + 1} start`}
+                      <div className="mt-1">
+                        <DatePicker position="top" value={range.start} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, start: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                      </div>
+                    </label>
+                    <label className="block text-sm text-gray-600">
+                      {idx === 0 ? "End Date" : `Range ${idx + 1} end`}
+                      <div className="mt-1">
+                        <DatePicker position="top" value={range.end} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, end: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                      </div>
+                    </label>
+                    {idx > 0 ? (
+                      <button
+                        onClick={() => setAddForm({ ...addForm, ranges: addForm.ranges.filter((_, i) => i !== idx) })}
+                        className="pb-2.5 text-[15px] text-[var(--ck-danger)]"
+                        title="Remove this date range"
+                        aria-label={`Remove date range ${idx + 1}`}
+                      >
+                        &times;
+                      </button>
+                    ) : <span className="hidden sm:block" />}
                   </div>
-                </label>
-                <label className="block text-sm text-gray-600">
-                  End Date
-                  <div className="mt-1">
-                    <DatePicker position="top" value={addForm.endDate} onChange={(val) => setAddForm({ ...addForm, endDate: val })} className="py-2.5 w-full border-gray-300" />
-                  </div>
-                </label>
+                ))}
+                <button
+                  onClick={() => setAddForm({ ...addForm, ranges: [...addForm.ranges, { start: "", end: "" }] })}
+                  className="ui-btn !py-1.5 text-[12px]"
+                >
+                  + Add another date range
+                </button>
               </div>
 
               <label className="block text-sm text-gray-600">
                 Max Capacity
                 <input
+                  name="slot_capacity"
                   type="number"
                   min="1"
                   value={addForm.capacity}
                   onChange={(e) => setAddForm({ ...addForm, capacity: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
 
@@ -1046,13 +1126,14 @@ function Slots() {
                 Price Override (ZAR)
                 <span className="block text-xs text-gray-400 mb-1">Leave blank to use the tour&apos;s default price.</span>
                 <input
+                  name="slot_price"
                   type="number"
                   step="0.01"
                   min="0"
                   placeholder="e.g. 600"
                   value={addForm.price}
                   onChange={(e) => setAddForm({ ...addForm, price: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+                  className="ui-control mt-1 w-full"
                 />
               </label>
             </div>
@@ -1060,14 +1141,15 @@ function Slots() {
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
                 onClick={() => setShowAddSlot(false)}
-                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={saveAddSlot}
-                disabled={savingAdd || !addForm.tourId || !addForm.startDate || !addForm.endDate}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                data-help-submit=""
+                disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {savingAdd ? "Creating..." : "Create Slots"}
               </button>
@@ -1078,17 +1160,17 @@ function Slots() {
 
       {/* CANCEL DAY MODAL */}
       {showCancelDay && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-sm overflow-visible p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-1 text-red-700">Cancel ({selectedCancelDates.length}) Day(s)</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
+          <div className="ui-card w-full max-w-sm overflow-visible p-6">
+            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-danger)" }}>Cancel ({selectedCancelDates.length}) Day(s)</h3>
+            <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               You are about to close all slots and cancel active bookings due to weather for the following days:
             </p>
 
-            <div className="space-y-2 max-h-[30vh] overflow-y-auto mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="mb-4 max-h-[30vh] space-y-2 overflow-y-auto rounded-lg p-3" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
               <ul className="list-disc pl-5">
                 {selectedCancelDates.map((date) => (
-                  <li key={date} className="font-semibold text-gray-800 text-sm">{new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</li>
+                  <li key={date} className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</li>
                 ))}
               </ul>
             </div>
@@ -1096,14 +1178,15 @@ function Slots() {
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
                 onClick={() => setShowCancelDay(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Go Back
               </button>
               <button
                 onClick={handleCancelDay}
                 disabled={cancellingWeather || selectedCancelDates.length === 0}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                className="ui-btn disabled:opacity-50"
+                style={{ background: "var(--ck-danger)", color: "#fff" }}
               >
                 {cancellingWeather ? "Cancelling..." : "Cancel Everything"}
               </button>
@@ -1116,17 +1199,17 @@ function Slots() {
 
       {/* REOPEN DAY MODAL */}
       {showReopenDay && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-sm overflow-visible p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-1 text-green-700">Reopen ({selectedCancelDates.length}) Day(s)</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
+          <div className="ui-card w-full max-w-sm overflow-visible p-6">
+            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-accent)" }}>Reopen ({selectedCancelDates.length}) Day(s)</h3>
+            <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               You are about to reopen all closed slots for the following days. Bookings will be enabled again.
             </p>
 
-            <div className="space-y-2 max-h-[30vh] overflow-y-auto mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="mb-4 max-h-[30vh] space-y-2 overflow-y-auto rounded-lg p-3" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
               <ul className="list-disc pl-5">
                 {selectedCancelDates.map((date) => (
-                  <li key={date} className="font-semibold text-gray-800 text-sm">{new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</li>
+                  <li key={date} className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</li>
                 ))}
               </ul>
             </div>
@@ -1134,14 +1217,14 @@ function Slots() {
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
                 onClick={() => setShowReopenDay(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="ui-btn ui-btn-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReopenDay}
                 disabled={reopeningDay || selectedCancelDates.length === 0}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {reopeningDay ? "Reopening..." : "Reopen Slots"}
               </button>

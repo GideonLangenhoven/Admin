@@ -1,5 +1,4 @@
 BEGIN;
-
 -- ============================================================
 -- OTA INTEGRATIONS — Per-tenant, per-channel config
 -- ============================================================
@@ -19,10 +18,8 @@ CREATE TABLE IF NOT EXISTS public.ota_integrations (
   created_at                timestamptz NOT NULL DEFAULT now(),
   updated_at                timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ota_integration_channel_per_business
   ON public.ota_integrations (business_id, channel);
-
 -- ============================================================
 -- OTA PRODUCT MAPPINGS — our tour ↔ OTA product code
 -- ============================================================
@@ -39,12 +36,10 @@ CREATE TABLE IF NOT EXISTS public.ota_product_mappings (
   created_at              timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ota_mapping_unique
   ON public.ota_product_mappings (business_id, channel, external_product_code, COALESCE(external_option_code, ''));
 CREATE INDEX IF NOT EXISTS idx_ota_mapping_tour
   ON public.ota_product_mappings (tour_id, channel);
-
 -- ============================================================
 -- BOOKINGS — OTA metadata columns
 -- ============================================================
@@ -54,39 +49,30 @@ ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS ota_net_amount numeric(12,2),
   ADD COLUMN IF NOT EXISTS ota_gross_amount numeric(12,2),
   ADD COLUMN IF NOT EXISTS ota_metadata jsonb;
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_ota_external
   ON public.bookings (ota_channel, ota_external_booking_id)
   WHERE ota_external_booking_id IS NOT NULL;
-
 CREATE INDEX IF NOT EXISTS idx_bookings_ota_channel
   ON public.bookings (ota_channel) WHERE ota_channel IS NOT NULL;
-
 -- ============================================================
 -- RLS
 -- ============================================================
 ALTER TABLE public.ota_integrations ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS ota_int_admin ON public.ota_integrations;
 CREATE POLICY ota_int_admin ON public.ota_integrations FOR ALL TO authenticated
   USING (business_id = ANY(current_business_ids()))
   WITH CHECK (business_id = ANY(current_business_ids()));
-
 DROP POLICY IF EXISTS ota_int_service ON public.ota_integrations;
 CREATE POLICY ota_int_service ON public.ota_integrations FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-
 ALTER TABLE public.ota_product_mappings ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS ota_map_admin ON public.ota_product_mappings;
 CREATE POLICY ota_map_admin ON public.ota_product_mappings FOR ALL TO authenticated
   USING (business_id = ANY(current_business_ids()))
   WITH CHECK (business_id = ANY(current_business_ids()));
-
 DROP POLICY IF EXISTS ota_map_service ON public.ota_product_mappings;
 CREATE POLICY ota_map_service ON public.ota_product_mappings FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-
 -- Revoke anon from new tables (they hold sensitive config)
 REVOKE ALL ON public.ota_integrations FROM anon;
 REVOKE ALL ON public.ota_product_mappings FROM anon;
@@ -94,7 +80,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.ota_integrations TO authenticated
 GRANT ALL ON public.ota_integrations TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.ota_product_mappings TO authenticated;
 GRANT ALL ON public.ota_product_mappings TO service_role;
-
 -- ============================================================
 -- CREDENTIAL RPCs — matches existing encrypt/decrypt pattern
 -- ============================================================
@@ -134,10 +119,8 @@ BEGIN
   RETURN v_id;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.set_ota_credentials(uuid, text, text, text, text, text, boolean) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_ota_credentials(uuid, text, text, text, text, text, boolean) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.get_ota_credentials(
   p_business_id uuid,
   p_key         text,
@@ -158,10 +141,8 @@ AS $$
   FROM public.ota_integrations o
   WHERE o.business_id = p_business_id AND o.channel = upper(p_channel);
 $$;
-
 REVOKE ALL ON FUNCTION public.get_ota_credentials(uuid, text, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_ota_credentials(uuid, text, text) TO service_role;
-
 -- ============================================================
 -- HOURLY AVAILABILITY SYNC CRON
 -- ============================================================
@@ -180,5 +161,4 @@ SELECT cron.schedule(
   );
   $$
 );
-
 COMMIT;

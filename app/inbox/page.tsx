@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -8,24 +9,7 @@ import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
-
-function filterHumanConversation(all: any[]): any[] {
-  const firstAdminIdx = all.findIndex(m => m.sender === "Admin");
-
-  if (firstAdminIdx === -1) {
-    // No admin turn yet — show just the last customer message as context
-    return all.filter(m => m.direction === "IN").slice(-1);
-  }
-
-  // 1 message immediately before the first admin reply as context,
-  // then all human messages (customer IN + admin OUT) from that point on
-  const contextIdx = Math.max(0, firstAdminIdx - 1);
-  const context = contextIdx < firstAdminIdx ? [all[contextIdx]] : [];
-  const human = all
-    .slice(firstAdminIdx)
-    .filter(m => m.direction === "IN" || m.sender === "Admin");
-  return [...context, ...human];
-}
+import { Warning, X as XIcon } from "@phosphor-icons/react";
 
 function MessageList({
   messages,
@@ -38,27 +22,31 @@ function MessageList({
   fmtTime: (iso: string) => string;
   fmtDate: (iso: string) => string;
 }) {
-  const filtered = filterHumanConversation(messages);
+  // The full thread — bot, customer and admin turns — grouped by day so an
+  // operator can scan when the customer wrote and what was discussed.
   return (
     <>
-      {filtered.map((m: any, i: number, arr: any[]) => {
-        const isAdmin = m.direction === "OUT";
+      {messages.map((m: any, i: number, arr: any[]) => {
+        const isOut = m.direction === "OUT";
+        const isBot = isOut && m.sender !== "Admin";
         const showDate = i === 0 || fmtDate(m.created_at) !== fmtDate(arr[i - 1].created_at);
         return (
           <div key={m.id}>
             {showDate && (
               <div className="text-center my-2">
-                <span className="bg-gray-200 text-gray-500 text-xs px-3 py-1 rounded-full">{fmtDate(m.created_at)}</span>
+                <span className="font-mono text-[11px] px-3 py-1 rounded-full" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>{fmtDate(m.created_at)}</span>
               </div>
             )}
-            <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isAdmin
-                ? "bg-blue-600 text-white rounded-br-md"
-                : "bg-white border border-gray-200 text-gray-900 rounded-bl-md"
+            <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[75%] [overflow-wrap:anywhere] px-3 py-2 rounded-2xl text-sm ${isOut
+                ? (isBot
+                  ? "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] rounded-br-md"
+                  : "bg-[var(--ck-accent-soft)] text-[var(--ck-text-strong)] rounded-br-md")
+                : "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text)] rounded-bl-md"
                 }`}>
                 <p className="whitespace-pre-wrap">{m.body}</p>
-                <p className={`text-xs mt-1 ${isAdmin ? "text-blue-200" : "text-gray-400"}`}>
-                  {fmtTime(m.created_at)} · {m.sender || (isAdmin ? "Admin" : "Customer")}
+                <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
+                  {fmtTime(m.created_at)} · {m.sender || (isOut ? "Admin" : "Customer")}
                 </p>
               </div>
             </div>
@@ -70,13 +58,35 @@ function MessageList({
   );
 }
 
+const needsAttention = (c: any) => c.status === "HUMAN" || c.status === "AGENT_PENDING";
+
+function ConvoRow({ c, isSelected, onClick }: { c: any; isSelected: boolean; onClick: () => void }) {
+  return (
+    <div onClick={onClick}
+      className={`p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${isSelected ? "bg-[var(--ck-accent-soft)] border-l-4 border-l-[var(--ck-accent)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
+      <div className="flex items-center gap-2">
+        {needsAttention(c) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />}
+        <p className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
+        <IntentBadge intent={c.current_intent} size="xs" />
+        <span className={`ui-status ml-auto shrink-0 ${needsAttention(c) ? "ui-pill-warning" : "ui-pill-neutral"}`}>
+          {needsAttention(c) ? "Needs reply" : "Bot"}
+        </span>
+      </div>
+      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
+      <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+    </div>
+  );
+}
+
 function InboxContent() {
   const { businessId } = useBusinessContext();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"inbox" | "history">("inbox");
 
-  // Inbox state
+  // One unified list — every conversation (bot- or human-handled, WhatsApp or
+  // web chat) lives here. No forked views: chats needing a human float to the
+  // top, the rest follow by recency.
   const [convos, setConvos] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [reply, setReply] = useState("");
@@ -91,15 +101,37 @@ function InboxContent() {
   // WhatsApp send warning (cleared when conversation changes)
   const [waWarning, setWaWarning] = useState<string | null>(null);
 
-  // Chat History state
-  const [historyConvos, setHistoryConvos] = useState<any[]>([]);
-  const [historySelected, setHistorySelected] = useState<any>(null);
-  const [historyMessages, setHistoryMessages] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const historyLoadedRef = useRef(false);
-  const historyChatEndRef = useRef<HTMLDivElement>(null);
+  // Bookings linked to this customer — matched by phone (bot bookings store the
+  // WA phone verbatim) with email as the fallback for web chats.
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
 
-  useEffect(() => { loadConvos(); }, [businessId]);
+  useEffect(() => {
+    setCustomerBookings([]);
+    if (!selected) return;
+    const filters = [`phone.eq.${selected.phone}`];
+    if (selected.email) filters.push(`email.eq.${selected.email}`);
+    supabase.from("bookings")
+      .select("id, status, slots(start_time), tours(name)")
+      .eq("business_id", businessId)
+      .or(filters.join(","))
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .then(({ data }) => setCustomerBookings(data || []));
+  }, [selected, businessId]);
+
+  const loadConvos = useCallback(async () => {
+    const { data } = await supabase.from("conversations")
+      .select("id, phone, customer_name, email, status, current_state, updated_at, current_intent")
+      .eq("business_id", businessId)
+      .order("updated_at", { ascending: false })
+      .limit(300);
+    const all = data || [];
+    // Needs-attention first, each group already newest-first from the query
+    setConvos([...all.filter(needsAttention), ...all.filter((c: any) => !needsAttention(c))]);
+    setLoading(false);
+  }, [businessId]);
+
+  useEffect(() => { loadConvos(); }, [loadConvos]);
 
   // Auto-select conversation from ?phone= query param
   useEffect(() => {
@@ -112,12 +144,6 @@ function InboxContent() {
       autoSelectedRef.current = true;
     }
   }, [convos, loading, searchParams]);
-
-  useEffect(() => {
-    if (activeTab === "history" && !historyLoadedRef.current) {
-      loadHistoryConvos();
-    }
-  }, [activeTab]);
 
   // Clear warning when the selected conversation changes
   useEffect(() => {
@@ -139,8 +165,13 @@ function InboxContent() {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
+        // Tenant isolation: RLS already limits delivery to businesses this
+        // admin can read, but a SUPER_ADMIN can read every tenant — without
+        // this filter a customer chatting with two operators would have the
+        // other operator's thread interleaved into this one.
+        filter: "business_id=eq." + businessId,
       }, (payload: any) => {
-        if (payload.new.phone === selected.phone) {
+        if (payload.new.phone === selected.phone && payload.new.business_id === businessId) {
           setMessages((prev) => {
             if (prev.some((m) => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
@@ -156,17 +187,13 @@ function InboxContent() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selected]);
+  }, [selected, businessId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    historyChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [historyMessages]);
-
-  // Polling fallback for inbox
+  // Polling fallback
   useEffect(() => {
     if (!selected) return;
     const interval = setInterval(() => {
@@ -183,31 +210,6 @@ function InboxContent() {
     return () => clearTimeout(t);
   }, [reply]);
 
-  async function loadConvos() {
-    // Cap at 200 — anything beyond is paginated history (loaded via the History tab)
-    const { data } = await supabase.from("conversations")
-      .select("id, phone, customer_name, email, status, current_state, updated_at, current_intent")
-      .eq("business_id", businessId)
-      .in("status", ["HUMAN", "AGENT_PENDING"])
-      .order("updated_at", { ascending: false })
-      .limit(200);
-    setConvos(data || []);
-    setLoading(false);
-  }
-
-  async function loadHistoryConvos() {
-    setHistoryLoading(true);
-    const { data } = await supabase.from("conversations")
-      .select("id, phone, customer_name, email, status, current_state, updated_at, current_intent")
-      .eq("business_id", businessId)
-      .not("status", "in", '("HUMAN", "AGENT_PENDING")')
-      .order("updated_at", { ascending: false })
-      .limit(500);
-    setHistoryConvos(data || []);
-    setHistoryLoading(false);
-    historyLoadedRef.current = true;
-  }
-
   async function loadMessages(phone: string) {
     const { data } = await supabase.from("chat_messages")
       .select("*")
@@ -218,18 +220,8 @@ function InboxContent() {
     setMessages((data || []).reverse());
   }
 
-  async function loadHistoryMessages(phone: string) {
-    const { data } = await supabase.from("chat_messages")
-      .select("*")
-      .eq("business_id", businessId)
-      .eq("phone", phone)
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    setHistoryMessages((data || []).reverse());
-  }
-
-  async function sendReply(convoOverride?: any) {
-    const target = convoOverride || selected;
+  async function sendReply() {
+    const target = selected;
     const msg = reply.trim();
     if (!msg || !target || sendingRef.current) return;
 
@@ -250,10 +242,12 @@ function InboxContent() {
         if (res.data.error === "outside_24h_window") {
           setWaWarning(res.data.message || "WhatsApp requires the customer to message you first. Ask them to send you a WhatsApp message, then you can reply here.");
         } else {
-          let msgErr = res.data.error || "Unknown Error";
+          // message carries the actionable remedy (expired token, test-number
+          // allow-list); error is the bare category. Prefer the remedy.
+          let msgErr = res.data.message || res.data.error || "Unknown Error";
           if (res.data.details?.error?.error_data?.details) {
             msgErr += "\nDetails: " + res.data.details.error.error_data.details;
-          } else if (res.data.details?.error?.message) {
+          } else if (!res.data.message && res.data.details?.error?.message) {
             msgErr += "\nDetails: " + res.data.details.error.message;
           }
           notify({ title: "Reply failed", message: msgErr, tone: "error" });
@@ -264,17 +258,21 @@ function InboxContent() {
       } else {
         // Refresh updated_at on every admin reply to keep the 2-hour bot-silence window active
         await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("id", target.id);
-        
+        window.dispatchEvent(new Event("inbox-updated"));
         if (target.status !== "HUMAN") {
-          if (convoOverride) {
-            setActiveTab("inbox");
-            setSelected({ ...target, status: "HUMAN" });
-            loadConvos();
-            loadHistoryConvos();
-          }
+          setSelected({ ...target, status: "HUMAN" });
+          loadConvos();
         }
         setReply("");
-        notify({ title: "Reply sent", message: "The conversation remains in human handoff mode.", tone: "success" });
+        // Same three outcomes as the bookings-page WhatsApp action: delivered,
+        // queued behind a reopener, or diverted to email. This used to report
+        // all three as a plain "Reply sent" and drop the explanation entirely.
+        const channel = res.data?.channel;
+        notify({
+          title: channel === "email" ? "Sent by email instead" : channel === "reopener" ? "Queued for WhatsApp" : "Reply sent",
+          message: res.data?.message || "The conversation remains in human handoff mode.",
+          tone: channel === "email" || channel === "reopener" ? "warning" : "success",
+        });
       }
     } catch (err: any) {
       notify({ title: "Reply failed", message: err.message, tone: "error" });
@@ -298,7 +296,9 @@ function InboxContent() {
         setSelected(null);
         setMessages([]);
         loadConvos();
-        loadHistoryConvos();
+        // conversations isn't in the realtime publication, so the sidebar
+        // badge only hears about status flips via this event.
+        window.dispatchEvent(new Event("inbox-updated"));
         notify({ title: "Returned to bot", message: "The conversation was handed back to the bot.", tone: "success" });
       }
     } catch (err: any) {
@@ -306,11 +306,33 @@ function InboxContent() {
     }
   }
 
+  // Web chats only: end the conversation and ask the visitor to rate it. The
+  // widget shows a star picker on its next poll (current_state AWAIT_RATING).
+  async function endChat(phone: string) {
+    if (!phone) return;
+    try {
+      const res = await supabase.functions.invoke("admin-reply", {
+        body: { action: "end_chat", phone, message: "Thanks for chatting with us! 🙏 Before you go, please rate how we did.", business_id: businessId },
+      });
+      if (res.error || (res.data && res.data.ok === false)) {
+        notify({ title: "End chat failed", message: res.error?.message || res.data?.error, tone: "error" });
+      } else {
+        setSelected(null);
+        setMessages([]);
+        loadConvos();
+        window.dispatchEvent(new Event("inbox-updated"));
+        notify({ title: "Chat ended", message: "The visitor was asked to rate the chat.", tone: "success" });
+      }
+    } catch (err: any) {
+      notify({ title: "End chat failed", message: err.message, tone: "error" });
+    }
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!sendingRef.current) {
-        sendReply(activeTab === "history" ? historySelected : selected);
+        sendReply();
       }
     }
   }
@@ -323,213 +345,164 @@ function InboxContent() {
     return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: getAdminTimezone() });
   }
 
+  function fmtSlot(iso: string) {
+    return new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
+  }
+
+  const attentionCount = convos.filter(needsAttention).length;
+  const q = search.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, "");
+  const visibleConvos = q
+    ? convos.filter((c: any) =>
+        String(c.customer_name || "").toLowerCase().includes(q)
+        || String(c.email || "").toLowerCase().includes(q)
+        || (qDigits && String(c.phone || "").replace(/\D/g, "").includes(qDigits)))
+    : convos;
+
   return (
     <div className="h-full flex flex-col">
-      {/* Tab header */}
-      <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex min-w-max items-center gap-3">
-        <button
-          onClick={() => setActiveTab("inbox")}
-          className={`px-1 pb-0.5 text-xl font-bold border-b-2 transition-colors sm:text-2xl ${activeTab === "inbox"
-            ? "border-blue-600 text-gray-900"
-            : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
-        >
-          Inbox
-          {convos.length > 0 && (
-            <span className="ml-2 bg-blue-600 text-white text-xs font-bold rounded-full px-2 py-0.5 align-middle">
-              {convos.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`px-1 pb-0.5 text-xl font-bold border-b-2 transition-colors whitespace-nowrap sm:text-2xl ${activeTab === "history"
-            ? "border-blue-600 text-gray-900"
-            : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
-        >
-          Chat History
-        </button>
-        </div>
+      <div className="anim-fade-up mb-4 flex items-center gap-3">
+        <h1 className="font-display px-1 text-[20px] font-semibold sm:text-[24px]" style={{ color: "var(--ck-text-strong)" }}>Inbox</h1>
+        {attentionCount > 0 && (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 align-middle font-mono text-xs font-semibold tabular-nums" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
+            {attentionCount}
+          </span>
+        )}
       </div>
 
-      {/* ── Inbox Tab ── */}
-      {activeTab === "inbox" && (
-        loading ? <p className="text-gray-500">Loading...</p> : (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+      {loading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
+        <div className="anim-fade-up anim-d1 flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
           <BotStatusBanner />
           <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
             {/* Conversation list — hidden on mobile when a chat is selected */}
-            <div className={`w-full md:w-72 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
-              <div className="p-3 border-b border-gray-200 bg-gray-50">
-                <p className="text-sm font-medium text-gray-600">{convos.length} waiting</p>
+            <div className={`w-full md:w-72 shrink-0 flex flex-col ui-card overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
+              <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="ui-mono-label !text-[10px]">{attentionCount} need attention · {convos.length} total</p>
+                  <button onClick={loadConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]">Refresh</button>
+                </div>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search name, number or email…"
+                  className="ui-control w-full !h-8 px-2.5 text-[12.5px] rounded-lg outline-none"
+                />
               </div>
               <div className="flex-1 overflow-auto">
-                {convos.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 text-center">No conversations waiting ✓</p>
-                ) : convos.length > 50 ? (
+                {visibleConvos.length === 0 ? (
+                  <div className="ui-empty">
+                    <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{q ? "No matches" : "No conversations yet"}</p>
+                    <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{q ? "Try a different name, number or email." : "WhatsApp and web-chat conversations will appear here."}</p>
+                  </div>
+                ) : visibleConvos.length > 50 ? (
                   <Virtuoso
                     style={{ height: "100%" }}
-                    data={convos}
+                    data={visibleConvos}
                     itemContent={(_, c: any) => (
-                      <div onClick={() => setSelected(c)}
-                        className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
-                          <IntentBadge intent={c.current_intent} size="xs" />
-                        </div>
-                        <p className="text-xs text-gray-500">{c.phone}</p>
-                        <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
-                      </div>
+                      <ConvoRow c={c} isSelected={selected?.id === c.id} onClick={() => setSelected(c)} />
                     )}
                   />
-                ) : convos.map((c: any) => (
-                  <div key={c.id} onClick={() => setSelected(c)}
-                    className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
-                      <IntentBadge intent={c.current_intent} size="xs" />
-                    </div>
-                    <p className="text-xs text-gray-500">{c.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
-                  </div>
+                ) : visibleConvos.map((c: any) => (
+                  <ConvoRow key={c.id} c={c} isSelected={selected?.id === c.id} onClick={() => setSelected(c)} />
                 ))}
               </div>
             </div>
 
             {/* Chat panel — full width on mobile */}
             {selected ? (
-              <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 p-3">
-                  <button onClick={() => setSelected(null)} className="md:hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium hover:bg-gray-50">
-                    ← Back
+              <div className="flex-1 flex flex-col ui-card overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] p-3">
+                  <button onClick={() => setSelected(null)} className="ui-btn ui-btn-ghost md:hidden shrink-0 !h-8 !px-2.5 text-xs">
+                    Back
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{selected.customer_name || selected.phone}</p>
-                    <p className="text-xs text-gray-500 truncate">{selected.phone} · {selected.email || "no email"}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">Showing the active human handoff only. Earlier bot context stays hidden.</p>
+                    <p className="font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>{selected.customer_name || selected.phone}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--ck-text-muted)" }}>{selected.phone} · {selected.email || "no email"}</p>
                   </div>
-                  <button onClick={() => returnToBot(selected.id, selected.phone)}
-                    className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 sm:w-auto">
-                    Return to Bot
-                  </button>
+                  {needsAttention(selected) && (
+                    <div className="flex w-full gap-2 sm:w-auto">
+                      {/^web(:|$)/.test(String(selected.phone)) && (
+                        <button onClick={() => endChat(selected.phone)}
+                          className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
+                          End chat &amp; rate
+                        </button>
+                      )}
+                      <button onClick={() => returnToBot(selected.id, selected.phone)}
+                        className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
+                        Return to Bot
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex-1 overflow-auto p-4 space-y-3 bg-gray-50">
+                {customerBookings.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto border-b border-[var(--ck-border-subtle)] px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    {customerBookings.map((b: any) => (
+                      <Link key={b.id} href={`/bookings/${b.id}`}
+                        className="shrink-0 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-2.5 py-1.5 text-[11px] leading-tight transition-colors hover:border-[var(--ck-accent)]">
+                        {/* Same 6-char ref the customer sees in /my-bookings, so both sides quote the same number */}
+                        <span className="font-mono font-semibold" style={{ color: "var(--ck-text-strong)" }}>#{b.id.substring(0, 6).toUpperCase()}</span>
+                        <span style={{ color: "var(--ck-text-muted)" }}> · {b.tours?.name || "Tour"} · {b.slots?.start_time ? fmtSlot(b.slots.start_time) : "no date"} · {b.status}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {messages.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm mt-8">No messages yet. The customer&apos;s next message will appear here.</p>
+                    <div className="ui-empty">
+                      <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No messages yet</p>
+                      <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>The customer&apos;s next message will appear here.</p>
+                    </div>
                   ) : (
                     <MessageList messages={messages} endRef={chatEndRef} fmtTime={fmtTime} fmtDate={fmtDate} />
                   )}
                   {isTyping && (
                     <div className="flex justify-end">
-                      <div className="flex items-center gap-1 rounded-2xl rounded-br-md bg-blue-600 px-3 py-2">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:0ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:150ms]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white [animation-delay:300ms]" />
+                      <div className="flex items-center gap-1 rounded-2xl rounded-br-md px-3 py-2" style={{ background: "var(--ck-accent-soft)" }}>
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ck-accent)] [animation-delay:300ms]" />
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="border-t border-gray-200 bg-white">
+                <div className="border-t border-[var(--ck-border-subtle)]" style={{ background: "var(--ck-surface)" }}>
                   {waWarning && (
-                    <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
-                      <span className="shrink-0 text-amber-500 text-sm font-bold">!</span>
-                      <p className="flex-1 text-xs text-amber-800 leading-snug">{waWarning}</p>
-                      <button onClick={() => setWaWarning(null)} className="shrink-0 text-amber-400 hover:text-amber-600 text-xs font-medium">✕</button>
+                    <div className="flex items-start gap-2 border-b px-3 py-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 25%, transparent)" }}>
+                      <span className="shrink-0 mt-0.5" style={{ color: "var(--ck-amber)" }}><Warning size={15} weight="fill" /></span>
+                      <p className="flex-1 text-xs leading-snug" style={{ color: "var(--ck-amber)" }}>{waWarning}</p>
+                      <button onClick={() => setWaWarning(null)} className="shrink-0 hover:opacity-70" style={{ color: "var(--ck-amber)" }} aria-label="Dismiss"><XIcon size={13} /></button>
                     </div>
                   )}
                   <div className="p-3">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
-                        rows={2} placeholder="Type your reply... (Enter to send)"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                        rows={2} placeholder={needsAttention(selected) ? "Type your reply... (Enter to send)" : "Reply to take over from the bot... (Enter to send)"}
+                        className="ui-control flex-1 resize-none outline-none" />
                       <button onClick={sendReply} disabled={sending || !reply.trim()}
-                        className="self-stretch rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:self-end">
+                        className="ui-btn ui-btn-primary self-stretch !h-auto py-2.5 disabled:opacity-50 sm:self-end sm:!h-9 sm:!py-0">
                         {sending ? "..." : "Send"}
                       </button>
                     </div>
+                    {!needsAttention(selected) && (
+                      <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>This chat is being handled by the bot. Replying moves it to human handling.</p>
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="hidden md:flex flex-1 items-center justify-center bg-white rounded-xl border border-gray-200">
-                <p className="text-gray-400">Select a conversation to start chatting</p>
+              <div className="hidden md:flex flex-1 items-center justify-center ui-card">
+                <div className="ui-empty">
+                  <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No conversation selected</p>
+                  <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation on the left to see its full history.</p>
+                </div>
               </div>
             )}
           </div>
-          </div>
-        )
-      )}
-
-      {/* ── Chat History Tab ── */}
-      {activeTab === "history" && (
-        historyLoading ? <p className="text-gray-500">Loading...</p> : (
-          <div className="flex-1 flex gap-4 min-h-0">
-            {/* Past conversation list — hidden on mobile when a chat is selected */}
-            <div className={`w-full md:w-72 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden ${historySelected ? "hidden md:flex" : "flex"}`}>
-              <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-600">{historyConvos.length} conversations</p>
-                <button onClick={loadHistoryConvos} className="text-xs text-blue-600 hover:underline">Refresh</button>
-              </div>
-              <div className="flex-1 overflow-auto">
-                {historyConvos.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 text-center">No chat history yet</p>
-                ) : historyConvos.map((c: any) => (
-                  <div key={c.id} onClick={() => { setHistorySelected(c); loadHistoryMessages(c.phone); }}
-                    className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${historySelected?.id === c.id ? "bg-blue-50 border-l-4 border-l-blue-500" : "hover:bg-gray-50"}`}>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{c.customer_name || "Unknown"}</p>
-                      <IntentBadge intent={c.current_intent} size="xs" />
-                    </div>
-                    <p className="text-xs text-gray-500">{c.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Read-only transcript — full width on mobile */}
-            {historySelected ? (
-              <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                  <button onClick={() => setHistorySelected(null)} className="md:hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium hover:bg-gray-50">
-                    ← Back
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{historySelected.customer_name || historySelected.phone}</p>
-                    <p className="text-xs text-gray-500 truncate">{historySelected.phone} · {historySelected.email || "no email"} · {historySelected.status}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">Transcript is intentionally trimmed to the human handoff view.</p>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-auto p-4 space-y-3 bg-gray-50">
-                  {historyMessages.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm mt-8">No messages in this conversation</p>
-                  ) : (
-                    <MessageList messages={historyMessages} endRef={historyChatEndRef} fmtTime={fmtTime} fmtDate={fmtDate} />
-                  )}
-                </div>
-
-                {/* Reply box in history allows taking over */}
-                <div className="p-4 border-t border-gray-200 bg-white">
-                  <div className="flex gap-2">
-                    <input type="text" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendReply(historySelected)} placeholder="Reply to take over..." className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-                    <button onClick={() => sendReply(historySelected)} disabled={sending || !reply.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400">
-                      {sending ? "..." : "Reply"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Replying will move this conversation to your active Inbox.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="hidden md:flex flex-1 items-center justify-center bg-white rounded-xl border border-gray-200">
-                <p className="text-gray-400">Select a conversation to view transcript</p>
-              </div>
-            )}
-          </div>
-        )
+        </div>
       )}
     </div>
   );
@@ -537,7 +510,7 @@ function InboxContent() {
 
 export default function Inbox() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading Inbox...</div>}>
+    <Suspense fallback={<div className="p-8 text-center" style={{ color: "var(--ck-text-muted)" }}>Loading Inbox...</div>}>
       <InboxContent />
     </Suspense>
   );

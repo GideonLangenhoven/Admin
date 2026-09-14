@@ -1,46 +1,20 @@
-// IMPORTANT: This function uses the service role key, which BYPASSES RLS.
-// Every query against a tenant-owned table MUST include .eq("business_id", X).
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { recordWaMessage } from "../_shared/tenant.ts";
-
-const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const WA_TOKEN = Deno.env.get("WA_ACCESS_TOKEN")!;
-const WA_PHONE_ID = Deno.env.get("WA_PHONE_NUMBER_ID")!;
-
-async function sendText(to: any, t: any) {
-  const res = await fetch("https://graph.facebook.com/v19.0/" + WA_PHONE_ID + "/messages", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: to, type: "text", text: { body: t } }),
-  });
-  return await res.json();
-}
-
-Deno.serve(async () => {
-  try {
-    const now = new Date().toISOString();
-    const r = await supabase.from("outbox").select("*").eq("status", "PENDING").lte("scheduled_for", now).order("scheduled_for", { ascending: true }).limit(20);
-    const messages = r.data || [];
-    console.log("OUTBOX: " + messages.length + " to send");
-    let sent = 0;
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      try {
-        const result = await sendText(msg.phone, msg.message_body);
-        if (result.messages && result.messages[0] && result.messages[0].id) {
-          await supabase.from("outbox").update({ status: "SENT", sent_at: new Date().toISOString(), attempts: msg.attempts + 1 }).eq("id", msg.id);
-          await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "SENT", providerMessageId: result.messages[0].id, bookingId: msg.booking_id });
-          sent++;
-        } else {
-          await supabase.from("outbox").update({ status: msg.attempts >= 2 ? "FAILED" : "PENDING", attempts: msg.attempts + 1 }).eq("id", msg.id);
-          await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "FAILED", error: String(result?.error?.message || "WhatsApp send failed"), bookingId: msg.booking_id });
-        }
-      } catch (e) {
-        await supabase.from("outbox").update({ status: msg.attempts >= 2 ? "FAILED" : "PENDING", attempts: msg.attempts + 1 }).eq("id", msg.id);
-        await recordWaMessage(msg.business_id, { to: msg.phone, kind: "text", body: msg.message_body, status: "FAILED", error: String((e as Error)?.message || e), bookingId: msg.booking_id });
-      }
-    }
-    return new Response(JSON.stringify({ processed: messages.length, sent: sent }), { status: 200 });
-  } catch (err) { console.error("ERR:", err); return new Response("Error", { status: 500 }); }
-});
+// DECOMMISSIONED 2026-08-05 — legacy pre-multi-tenant function, now a tombstone.
+//
+// Legacy outbox drain using global WhatsApp credentials.
+// Replacement: the outbox drain inside wa-webhook, which fires on the customer's next inbound message
+//
+// Verified dead before locking: no reference anywhere in the repo, and no
+// cron.job invokes it (the live schedule is cron-tasks, marketing-*,
+// auto-messages, ota/viator/gyg sync, kb-sync, billing-enforcement,
+// fetch-google-reviews, expire-holds-db).
+//
+// The body is gone rather than gated so there is nothing left to
+// mis-authorize. Delete the deployment itself when a token with owner
+// privileges is available (CLI delete returns 403 on the current token).
+// Original source: git tag deploy-2026-08-05-5.
+Deno.serve(() =>
+  new Response(
+    JSON.stringify({ error: "gone", message: "outbox-send was decommissioned on 2026-08-05. Use: the outbox drain inside wa-webhook, which fires on the customer's next inbound message" }),
+    { status: 410, headers: { "Content-Type": "application/json" } },
+  )
+);

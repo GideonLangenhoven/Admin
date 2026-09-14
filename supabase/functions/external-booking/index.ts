@@ -59,7 +59,8 @@ type CredentialRecord = {
   source: string;
   api_key_hash: string;
   api_key_last4: string | null;
-  hmac_secret: string | null;
+  hmac_secret_encrypted: string | null;
+  hmac_secret?: string | null;
   active: boolean;
 };
 
@@ -126,7 +127,7 @@ function normalizeEmail(value: unknown): string | null {
 
 function normalizePhone(value: unknown): string | null {
   if (!value) return null;
-  const digits = String(value).replace(/[^\d]/g, "");
+  let digits = String(value).replace(/[^\d]/g, "");
   if (!digits) return null;
   if (digits.startsWith("0")) digits = "27" + digits.substring(1);
   return digits;
@@ -219,7 +220,7 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
   const apiKeyHash = await sha256Hex(apiKey);
   const { data, error } = await db
     .from("external_booking_credentials")
-    .select("id, business_id, source, api_key_hash, api_key_last4, hmac_secret, active")
+    .select("id, business_id, source, api_key_hash, api_key_last4, hmac_secret_encrypted, active")
     .eq("source", source)
     .eq("api_key_hash", apiKeyHash)
     .eq("active", true)
@@ -230,24 +231,16 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
 
   const credential = data as CredentialRecord;
 
-  if (SETTINGS_ENCRYPTION_KEY) {
-    const { data: rpcData } = await db.rpc("get_external_booking_credentials", {
+  if (credential.hmac_secret_encrypted) {
+    if (!SETTINGS_ENCRYPTION_KEY) throw new Error("External booking encryption is not configured");
+    const { data: rpcData, error: rpcError } = await db.rpc("get_external_booking_credentials", {
       p_credential_id: credential.id,
       p_key: SETTINGS_ENCRYPTION_KEY,
     });
+    if (rpcError) throw rpcError;
     const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (row?.hmac_secret) {
-      credential.hmac_secret = row.hmac_secret;
-      return credential;
-    }
-
-    if (credential.hmac_secret) {
-      db.rpc("set_external_booking_credentials", {
-        p_credential_id: credential.id,
-        p_key: SETTINGS_ENCRYPTION_KEY,
-        p_hmac_secret: credential.hmac_secret,
-      }).catch((err: unknown) => console.error("AUTO_MIGRATE_HMAC_ERR:", err));
-    }
+    if (!row?.hmac_secret) throw new Error("External booking HMAC secret could not be decrypted");
+    credential.hmac_secret = row.hmac_secret;
   }
 
   return credential;
@@ -534,7 +527,7 @@ Deno.serve(async (req: Request) => {
   const requestId = crypto.randomUUID();
   let source = "UNKNOWN";
   let action = "unknown";
-  let eventId = requestId;
+  let eventId: string = requestId;
   let logId: string | null = null;
 
   const send = async (
@@ -576,14 +569,15 @@ Deno.serve(async (req: Request) => {
       if (!credentialId) return respond(400, { success: false, code: "MISSING_CREDENTIAL_ID", message: "credential_id required" });
       if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
 
-      const { data: adminRows } = await db.from("admin_users").select("business_id, role").eq("user_id", user.id);
-      if (!adminRows?.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an admin user" });
+      const { data: memberships } = await db.from("admin_users").select("business_id, role, suspended").eq("user_id", user.id);
+      const adminRows = (memberships || []).filter((row: { suspended?: boolean | null }) => !row.suspended);
+      if (!adminRows.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an active admin user" });
 
       const { data: cred } = await db.from("external_booking_credentials").select("business_id").eq("id", credentialId).maybeSingle();
       if (!cred) return respond(404, { success: false, code: "NOT_FOUND", message: "Credential not found" });
 
-      const isSuperAdmin = adminRows.some((r: { role: string | null }) => (r.role || "").toUpperCase().startsWith("SUPER"));
-      if (!isSuperAdmin && !adminRows.some((r: { business_id: string }) => r.business_id === cred.business_id)) {
+      const isSuperAdmin = adminRows.some((r: { role: string | null }) => r.role === "SUPER_ADMIN");
+      if (!isSuperAdmin && !adminRows.some((r: { business_id: string; role: string | null }) => r.business_id === cred.business_id && r.role === "MAIN_ADMIN")) {
         return respond(403, { success: false, code: "FORBIDDEN", message: "No access to this business" });
       }
 
@@ -600,29 +594,10 @@ Deno.serve(async (req: Request) => {
       return respond(200, { success: true });
     }
 
-    // ── Internal: backfill plaintext → encrypted (service_role only) ──
+    // The plaintext column has been retired. Never run an unauthenticated
+    // migration from this public endpoint.
     if (rawAction === "backfill_hmac") {
-      if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
-
-      const { data: rows } = await db
-        .from("external_booking_credentials")
-        .select("id, hmac_secret")
-        .not("hmac_secret", "is", null);
-
-      let migrated = 0;
-      for (const row of (rows || [])) {
-        const { data: check } = await db.from("external_booking_credentials").select("hmac_secret_encrypted").eq("id", row.id).maybeSingle();
-        if (check?.hmac_secret_encrypted) continue;
-
-        const { error: setErr } = await db.rpc("set_external_booking_credentials", {
-          p_credential_id: row.id,
-          p_key: SETTINGS_ENCRYPTION_KEY,
-          p_hmac_secret: row.hmac_secret,
-        });
-        if (!setErr) migrated++;
-        else console.error("BACKFILL_HMAC_ERR:", row.id, setErr);
-      }
-      return respond(200, { success: true, migrated });
+      return respond(410, { success: false, code: "ACTION_RETIRED", message: "Use the documented credential migration procedure" });
     }
 
     source = normalizeSource(req, body);
@@ -639,7 +614,9 @@ Deno.serve(async (req: Request) => {
       logId = (await beginEventLog(auth.businessId, source, eventId, action, externalRef, body))?.id || null;
     }
     if (!auth.ok) {
-      return await send(401, auth.code, auth.message, {}, "REJECTED");
+      // deno check fails to narrow the discriminated union here; be explicit.
+      const failed = auth as VerifyAuthFailure;
+      return await send(401, failed.code, failed.message, {}, "REJECTED");
     }
 
     // Mutating actions must be HMAC-signed. An api-key-only credential (no
@@ -777,7 +754,7 @@ Deno.serve(async (req: Request) => {
         console.error("ck_external_create_booking error:", error);
         const pgCode = String((error as any).code || "");
         const detail = String((error as any).message || (error as any).details || "RPC error");
-        if (pgCode === "23502") return await send(400, "BOOKING_FIELD_REQUIRED", detail, { hint: "A required booking field is missing — check customer_name, email, or total_amount." }, "REJECTED");
+        if (pgCode === "23502") return await send(400, "BOOKING_FIELD_REQUIRED", detail, { hint: "A required booking field is missing. Check customer_name, email, or total_amount." }, "REJECTED");
         if (pgCode === "23505") return await send(409, "DUPLICATE_BOOKING", detail, { hint: "A booking with this external_ref already exists for this source." }, "REJECTED");
         if (pgCode === "23503") return await send(400, "INVALID_REFERENCE", detail, { hint: "A referenced business_id, tour_id, or slot_id is invalid for this source." }, "REJECTED");
         if (pgCode === "23514") return await send(400, "INVALID_VALUE", detail, { hint: "One of the supplied values violates a DB check constraint (status, qty, amount)." }, "REJECTED");
@@ -792,8 +769,8 @@ Deno.serve(async (req: Request) => {
 
       // Apply promo if used
       if (extPromoId && result.booking_id) {
-        await db.from("bookings").update({ promo_code: extPromoCode, discount_amount: extPromoDiscount }).eq("id", result.booking_id).catch(() => {});
-        await db.rpc("apply_promo_code", { p_promo_id: extPromoId, p_customer_email: normalizeEmail(body.email) || "", p_booking_id: result.booking_id }).catch(() => {});
+        await db.from("bookings").update({ promo_code: extPromoCode, discount_amount: extPromoDiscount }).eq("id", result.booking_id).then(undefined, () => {});
+        await db.rpc("apply_promo_code", { p_promo_id: extPromoId, p_customer_email: normalizeEmail(body.email) || "", p_booking_id: result.booking_id }).then(undefined, () => {});
       }
 
       // Calculate hold expiry based on the requested hold duration
@@ -840,8 +817,9 @@ Deno.serve(async (req: Request) => {
             console.error("EXT_BOOKING_CHECKOUT_ERR booking=" + result.booking_id + ":", checkoutErr);
           }
         } else if (bookingStatus === "PAID" || bookingStatus === "CONFIRMED") {
-          // Send confirmation for already-paid bookings
-          if (customerPhone) {
+          // Send confirmation for already-paid bookings. Email is the canonical
+          // confirmation; WhatsApp only when no email on file.
+          if (customerPhone && !customerEmail) {
             try {
               await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
                 method: "POST",

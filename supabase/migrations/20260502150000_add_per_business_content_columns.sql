@@ -7,11 +7,9 @@ ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS meeting_point_address text,
   ADD COLUMN IF NOT EXISTS arrival_instructions  text,
   ADD COLUMN IF NOT EXISTS business_address      text;
-
 -- Grant anon SELECT on the 3 new columns (mirrors column-grant pattern from Prompts 10/15).
 GRANT SELECT (meeting_point_address, arrival_instructions, business_address)
   ON public.businesses TO anon;
-
 -- Seed Cape Kayak (MarineTours) with the values currently hardcoded in edge functions.
 -- COALESCE preserves existing values (what_to_bring already populated).
 UPDATE public.businesses
@@ -26,5 +24,4 @@ SET
   footer_line_one       = COALESCE(footer_line_one, 'Cape Kayak Adventures'),
   footer_line_two       = COALESCE(footer_line_two, 'Three Anchor Bay, Sea Point, Cape Town')
 WHERE business_name ILIKE '%marine%';
-
 NOTIFY pgrst, 'reload schema';

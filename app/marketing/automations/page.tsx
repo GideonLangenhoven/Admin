@@ -4,34 +4,40 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
+import { getStarterTemplateByKey, materializeStarterTemplate } from "../../../components/marketing/starter-templates";
+import { blocksToHtml } from "../../../components/marketing/blocks/blocks-to-html";
+import { stepSentence, triggerSentence, flowSummary, type AutomationStep } from "../../lib/automation-copy";
 import {
-  Plus, Trash, Play, Pause, Sparkle, CaretRight, X, ArrowRight,
+  Trash, Play, Pause,
 } from "@phosphor-icons/react";
 
 interface Automation {
   id: string;
   name: string;
   trigger_type: string;
+  trigger_config: any;
   status: string;
   enrolled_count: number;
   completed_count: number;
   created_at: string;
   description: string | null;
+  steps: AutomationStep[];
+  sentLast7Days: number;
 }
 
-const triggerBadge: Record<string, { bg: string; text: string; label: string }> = {
-  contact_added: { bg: "bg-blue-100", text: "text-blue-700", label: "Contact Added" },
-  tag_added: { bg: "bg-teal-100", text: "text-teal-700", label: "Tag Added" },
-  post_booking: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Post Booking" },
-  date_field: { bg: "bg-orange-100", text: "text-orange-700", label: "Date Field" },
-  manual: { bg: "bg-gray-100", text: "text-gray-500", label: "Manual" },
+const triggerBadge: Record<string, { pill: string; label: string }> = {
+  contact_added: { pill: "ui-pill-ocean", label: "Contact Added" },
+  tag_added: { pill: "ui-pill-accent", label: "Tag Added" },
+  post_booking: { pill: "ui-pill-success", label: "Post Booking" },
+  date_field: { pill: "ui-pill-amber", label: "Date Field" },
+  manual: { pill: "ui-pill-neutral", label: "Manual" },
 };
 
-const statusBadge: Record<string, { bg: string; text: string }> = {
-  draft: { bg: "bg-gray-100", text: "text-gray-500" },
-  active: { bg: "bg-emerald-100", text: "text-emerald-700" },
-  paused: { bg: "bg-yellow-100", text: "text-yellow-700" },
-  archived: { bg: "bg-red-100", text: "text-red-600" },
+const statusBadge: Record<string, { pill: string }> = {
+  draft: { pill: "ui-pill-neutral" },
+  active: { pill: "ui-pill-success" },
+  paused: { pill: "ui-pill-warning" },
+  archived: { pill: "ui-pill-danger" },
 };
 
 /* ─── AUTOMATION TEMPLATE CATALOG ─── */
@@ -60,9 +66,9 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "contact_added",
     triggerConfig: {},
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "Welcome to {business_name} — Your Adventure Starts Here" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Welcome to {business_name}: Your Adventure Starts Here" } },
       { step_type: "delay", config: { duration: 3, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Our Most Popular Tours — See Why Guests Love Us" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Our Most Popular Tours: See Why Guests Love Us" } },
       { step_type: "delay", config: { duration: 4, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "WELCOME", valid_days: 30 } },
       { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 10% Off Your First Booking" } },
@@ -72,15 +78,15 @@ const TEMPLATES: AutomationTemplate[] = [
       "Immediately sends a welcome email with your brand story and what makes you unique",
       "After 3 days, sends a showcase of your most popular tours with guest reviews",
       "After 4 more days, generates a unique 10% discount voucher and sends a conversion email",
-      "Contacts who book within 30 days use their voucher — those who don't, you can re-engage later",
+      "Contacts who book within 30 days use their voucher; those who don't, you can re-engage later",
     ],
-    exampleEmail: "Subject: Welcome to Cape Kayak — Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt Cape Kayak, we believe everyone deserves to experience the ocean from a different perspective. Whether it's paddling alongside dolphins at sunrise or exploring hidden sea caves, every trip is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to paddle\n- Exclusive offers and early access to new tours\n- Stories and photos from the water\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
+    exampleEmail: "Subject: Welcome to {business_name}: Your Adventure Starts Here\n\nHi {first_name},\n\nWelcome! We're so glad you're here.\n\nAt {business_name}, we believe everyone deserves a real experience, not another day of scrolling. Every trip we run is a story waiting to happen.\n\nHere's what to expect from us:\n- Insider tips on the best times to go\n- Exclusive offers and early access to new tours\n- Stories and photos from recent trips\n\nReady to start? Browse our tours and find your next adventure.\n\n[Browse Tours]",
   },
   {
     key: "post-tour-review",
     name: "Post-Tour Review Request",
     description: "Automatically ask for Google/TripAdvisor reviews while the experience is still fresh. Includes a follow-up nudge for those who didn't respond.",
-    benefit: "Guests asked for reviews are 3x more likely to leave one. Reviews are your #1 marketing asset — they directly drive new bookings.",
+    benefit: "Guests asked for reviews are 3x more likely to leave one. Reviews are your #1 marketing asset. They directly drive new bookings.",
 
     tier: "must-have",
     triggerType: "tag_added",
@@ -90,7 +96,7 @@ const TEMPLATES: AutomationTemplate[] = [
       { step_type: "send_email", config: { template_id: "", subject_override: "How Was Your Experience, {first_name}?" } },
       { step_type: "delay", config: { duration: 5, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Quick Favour — Your Review Helps Other Adventurers" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Quick Favour: Your Review Helps Other Adventurers" } },
     ],
     howItWorks: [
       "When a booking is completed, the contact gets tagged 'completed-tour' (via auto-messages or manual)",
@@ -99,7 +105,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 5 days, checks if the first email was opened",
       "If opened but no review yet, sends a gentle reminder with a different angle",
     ],
-    exampleEmail: "Subject: How Was Your Experience, Sarah?\n\nHi Sarah,\n\nThank you for joining us today! We hope you had an amazing time on the water.\n\nWe'd love to hear what you thought. A quick review helps other adventurers discover us and means the world to our small team.\n\nIt only takes 30 seconds:\n\n[Leave a Google Review] [Leave a TripAdvisor Review]\n\nThank you for being part of our story!",
+    exampleEmail: "Subject: How Was Your Experience, Sarah?\n\nHi Sarah,\n\nThank you for joining us today! We hope you had an amazing time.\n\nWe'd love to hear what you thought. A quick review helps other adventurers discover us and means the world to our small team.\n\nIt only takes 30 seconds:\n\n[Leave a Google Review] [Leave a TripAdvisor Review]\n\nThank you for being part of our story!",
   },
   {
     key: "win-back",
@@ -111,13 +117,13 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "lapsed-90-days" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "We Miss You, {first_name} — See What's New" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "We Miss You, {first_name}! See What's New" } },
       { step_type: "delay", config: { duration: 14, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 15, code_prefix: "COMEBACK", valid_days: 30 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 15% Off — Just for You" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Here's 15% Off Just for You" } },
       { step_type: "delay", config: { duration: 21, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Last Chance — Your Exclusive Discount Expires Soon" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Last Chance: Your Exclusive Discount Expires Soon" } },
     ],
     howItWorks: [
       "Contacts tagged 'lapsed-90-days' enter the flow (tag via re-engagement cron or manual)",
@@ -126,7 +132,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "If they opened it, generates a 15% off voucher and sends a personalized offer",
       "After 21 more days, sends a final 'last chance' email with urgency on the expiring voucher",
     ],
-    exampleEmail: "Subject: We Miss You, James — See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- Sunrise Paddle — our most popular new tour\n- Upgraded gear for maximum comfort\n- New routes along the coastline\n\nWe'd love to see you back on the water. Ready for your next trip?\n\n[Browse Tours]",
+    exampleEmail: "Subject: We Miss You, James! See What's New\n\nHi James,\n\nIt's been a while since your last adventure with us, and we've been busy!\n\nHere's what's new:\n- A new tour that's already our most popular\n- Upgraded gear for maximum comfort\n- New routes and experiences added this season\n\nWe'd love to see you back. Ready for your next trip?\n\n[Browse Tours]",
   },
   {
     key: "birthday-special",
@@ -141,21 +147,21 @@ const TEMPLATES: AutomationTemplate[] = [
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 15, code_prefix: "BDAY", valid_days: 30 } },
       { step_type: "send_email", config: { template_id: "", subject_override: "Happy Birthday, {first_name}! Here's a Gift From Us" } },
       { step_type: "delay", config: { duration: 14, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Birthday Voucher Expires Soon — Don't Miss Out" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Birthday Voucher Expires Soon. Don't Miss Out!" } },
     ],
     howItWorks: [
       "On each contact's birthday (requires date_of_birth field), the automation triggers",
       "Generates a unique 15% off voucher code with 'BDAY' prefix, valid for 30 days",
       "Immediately sends a birthday greeting email with the voucher details",
       "After 14 days, sends a reminder that the birthday voucher is expiring soon",
-      "Runs every year automatically — no manual effort needed",
+      "Runs every year automatically, with no manual effort needed",
     ],
-    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as amazing as a sunrise on the water.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo paddle, a trip with friends, or a gift for someone special — this one's on us.\n\n[Book Now With Your Discount]",
+    exampleEmail: "Subject: Happy Birthday, Emma! Here's a Gift From Us\n\nHi Emma,\n\nHappy Birthday! We hope your day is as good as your best trip with us.\n\nTo celebrate, here's an exclusive gift from our team:\n\n15% OFF your next booking\nCode: BDAY-EMMA-X7K2\nValid until: 25 April 2026\n\nWhether it's a solo trip, an outing with friends, or a gift for someone special, this one's on us.\n\n[Book Now With Your Discount]",
   },
   {
     key: "referral-program",
     name: "Referral Request",
-    description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive — they get a voucher, their friend gets a discount.",
+    description: "After a guest leaves a positive review, invite them to refer friends with a dual incentive: they get a voucher, their friend gets a discount.",
     benefit: "Referred customers convert 25-30% better and have 16% higher lifetime value. Delivers new customers at 1/5th the cost of ads.",
 
     tier: "high-value",
@@ -164,7 +170,7 @@ const TEMPLATES: AutomationTemplate[] = [
     steps: [
       { step_type: "delay", config: { duration: 2, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "fixed_amount", amount: 100, code_prefix: "REFER", valid_days: 90 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Share the Adventure — Get R100 Off" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, Share the Adventure and Get R100 Off" } },
     ],
     howItWorks: [
       "When a contact is tagged 'left-review' (after leaving a Google/TripAdvisor review), they enter the flow",
@@ -173,7 +179,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "Sends a 'share the adventure' email with their unique voucher code to share with friends",
       "Tip: Mention that their friend also gets 10% off to boost sharing motivation",
     ],
-    exampleEmail: "Subject: Share the Adventure — Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review — it truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a day on the water. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
+    exampleEmail: "Subject: Share the Adventure and Get R100 Off\n\nHi {first_name},\n\nThank you for the amazing review. It truly means the world to our team!\n\nWe'd love to help you share the experience with friends and family. Here's your personal referral code:\n\nYour reward: R100 off your next trip\nCode: REFER-{first_name}-X9P3\n\nShare it with anyone who'd love a trip like yours. When they book using your code, you both win!\n\n[Share via WhatsApp] [Copy Code]",
   },
   {
     key: "voucher-expiry",
@@ -185,11 +191,11 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "voucher-expiring-30d" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Voucher Expires in 30 Days — Don't Let It Go to Waste" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Voucher Expires in 30 Days. Don't Let It Go to Waste" } },
       { step_type: "delay", config: { duration: 23, unit: "days" } },
       { step_type: "send_email", config: { template_id: "", subject_override: "Only 7 Days Left to Use Your Voucher" } },
       { step_type: "delay", config: { duration: 6, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Final Day — Your Voucher Expires Today!" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Final Day: Your Voucher Expires Today!" } },
     ],
     howItWorks: [
       "Contacts are tagged 'voucher-expiring-30d' when their voucher hits 30 days before expiry",
@@ -198,7 +204,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "After 6 more days, sends a final-day urgency email",
       "Tip: Set up a cron job to auto-tag contacts whose vouchers are 30 days from expiry",
     ],
-    exampleEmail: "Subject: Your Voucher Expires in 30 Days — Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up — your Cape Kayak voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nHere are some popular experiences to choose from:\n- Sunrise Dolphin Paddle (2hrs)\n- Coastal Explorer Tour (3hrs)\n- Sunset Sea Cave Adventure (2.5hrs)\n\nDon't let this go to waste — book your adventure today!\n\n[Book Now]",
+    exampleEmail: "Subject: Your Voucher Expires in 30 Days. Don't Let It Go to Waste\n\nHi {first_name},\n\nJust a heads up: your {business_name} voucher expires on 25 April 2026.\n\nVoucher Code: {voucher_code}\nBalance: {voucher_amount}\n\nBrowse our most popular experiences and pick a date.\n\nDon't let this go to waste. Book your adventure today!\n\n[Book Now]",
   },
   {
     key: "vip-treatment",
@@ -210,10 +216,10 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "tag_added",
     triggerConfig: { tag: "vip" },
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, You're Now a VIP — Here's What That Means" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, You're Now a VIP. Here's What That Means" } },
       { step_type: "delay", config: { duration: 7, unit: "days" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 20, code_prefix: "VIP", valid_days: 60 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Your Exclusive VIP Offer — 20% Off Any Tour" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Your Exclusive VIP Offer: 20% Off Any Tour" } },
     ],
     howItWorks: [
       "When a contact is tagged 'vip' (e.g., 3+ bookings, high spend, or manual selection), they enter the flow",
@@ -222,7 +228,7 @@ const TEMPLATES: AutomationTemplate[] = [
       "The generous discount encourages another booking and reinforces loyalty",
       "Tip: Tag customers as 'vip' after their 3rd booking or when total spend exceeds a threshold",
     ],
-    exampleEmail: "Subject: You're Now a VIP — Here's What That Means\n\nHi {first_name},\n\nWe wanted to say something important: THANK YOU.\n\nYou're one of our most valued guests, and we're upgrading you to VIP status. Here's what that means:\n\n- Priority booking on popular tours\n- Early access to new experiences\n- Exclusive discounts just for VIPs\n- Direct line to our team for special requests\n\nAn exclusive offer is heading your way soon. Keep an eye on your inbox!\n\nThank you for being part of our story.",
+    exampleEmail: "Subject: You're Now a VIP. Here's What That Means\n\nHi {first_name},\n\nWe wanted to say something important: THANK YOU.\n\nYou're one of our most valued guests, and we're upgrading you to VIP status. Here's what that means:\n\n- Priority booking on popular tours\n- Early access to new experiences\n- Exclusive discounts just for VIPs\n- Direct line to our team for special requests\n\nAn exclusive offer is heading your way soon. Keep an eye on your inbox!\n\nThank you for being part of our story.",
   },
   {
     key: "seasonal-launch",
@@ -234,20 +240,20 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerType: "manual",
     triggerConfig: {},
     steps: [
-      { step_type: "send_email", config: { template_id: "", subject_override: "The New Season is Almost Here — Sneak Peek Inside" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "The New Season is Almost Here: Sneak Peek Inside" } },
       { step_type: "delay", config: { duration: 7, unit: "days" } },
       { step_type: "condition", config: { condition_type: "opened_email", value: "" } },
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "EARLYBIRD", valid_days: 45 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Early Bird Special — 10% Off Before Anyone Else" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Early Bird Special: 10% Off Before Anyone Else" } },
     ],
     howItWorks: [
       "You manually enrol your contact list when you're ready to announce the new season",
       "Email 1 sends a season preview: new tours, route changes, gear upgrades, exciting dates",
       "After 7 days, checks who opened the preview email (those are your warmest leads)",
       "For openers, generates a 10% early-bird discount voucher",
-      "Sends the early-bird offer — creating urgency with a 45-day expiry window",
+      "Sends the early-bird offer, creating urgency with a 45-day expiry window",
     ],
-    exampleEmail: "Subject: The New Season is Almost Here — Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New Sunset Paddle route along the cliffs\n- Extended whale-season tours (June-November)\n- Brand new double kayaks for couples\n- Upgraded photo packages with drone footage\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned — an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
+    exampleEmail: "Subject: The New Season is Almost Here: Sneak Peek Inside\n\nHi {first_name},\n\nThe new season is just around the corner, and we've been busy preparing something special.\n\nWhat's new this season:\n- New routes and experiences we scouted in the off-season\n- Upgraded gear across the fleet\n- Extended seasonal tours while conditions are at their best\n- Upgraded photo packages\n\nBookings open on 1 October, but VIPs and early birds get first pick.\n\nStay tuned: an exclusive early-bird offer is coming your way soon.\n\n[View All Tours]",
   },
   {
     key: "booking-anniversary",
@@ -260,16 +266,16 @@ const TEMPLATES: AutomationTemplate[] = [
     triggerConfig: { tag: "anniversary-1yr" },
     steps: [
       { step_type: "generate_voucher", config: { voucher_type: "percentage", amount: 10, code_prefix: "ANNIV", valid_days: 30 } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, This Time Last Year You Were on the Water..." } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "{first_name}, This Time Last Year You Were Out There With Us" } },
     ],
     howItWorks: [
       "Contacts are tagged 'anniversary-1yr' when their booking anniversary approaches (via cron)",
       "Generates a 10% off anniversary voucher",
-      "Sends a nostalgic email: 'this time last year you were paddling with us'",
+      "Sends a nostalgic email: 'this time last year you were out there with us'",
       "Includes a 'Try something new this year' CTA with different tour suggestions",
       "Tip: Include photos from their tour type to trigger positive memories",
     ],
-    exampleEmail: "Subject: This Time Last Year You Were on the Water...\n\nHi {first_name},\n\nOne year ago today, you joined us for an unforgettable adventure on the water.\n\nWe'd love to create another great memory with you. This time, why not try something new?\n\nHere's a special anniversary gift:\n10% OFF any tour\nCode: ANNIV-{first_name}-K4M2\n\n[Rebook Your Favourite] [Try Something New]",
+    exampleEmail: "Subject: This Time Last Year, You Were Out There With Us\n\nHi {first_name},\n\nOne year ago today, you joined us for an unforgettable adventure.\n\nWe'd love to create another great memory with you. This time, why not try something new?\n\nHere's a special anniversary gift:\n10% OFF any tour\nCode: ANNIV-{first_name}-K4M2\n\n[Rebook Your Favourite] [Try Something New]",
   },
   {
     key: "photo-share",
@@ -283,7 +289,7 @@ const TEMPLATES: AutomationTemplate[] = [
     steps: [
       { step_type: "send_email", config: { template_id: "", subject_override: "Your Trip Photos Are Ready, {first_name}!" } },
       { step_type: "delay", config: { duration: 3, unit: "days" } },
-      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure — Tag Us @capekayak" } },
+      { step_type: "send_email", config: { template_id: "", subject_override: "Share Your Adventure and Tag Us" } },
     ],
     howItWorks: [
       "When trip photos are uploaded and the contact is tagged 'photos-ready', they enter the flow",
@@ -292,14 +298,14 @@ const TEMPLATES: AutomationTemplate[] = [
       "Social shares create free organic marketing that reaches the customer's entire network",
       "Tip: Include direct WhatsApp share and Instagram story share links",
     ],
-    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news — your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag @capekayak — we'd love to see it!\n\n#CapeKayak #PaddleLife",
+    exampleEmail: "Subject: Your Trip Photos Are Ready!\n\nHi {first_name},\n\nGreat news: your trip photos are ready to download!\n\n[View Your Photo Gallery]\n\nYou can download, share, and relive your adventure anytime.\n\nLoved your experience? Share a photo on Instagram or Facebook and tag us. We'd love to see it!",
   },
 ];
 
-const TIER_INFO: Record<string, { label: string; bg: string; text: string; description: string }> = {
-  "must-have": { label: "Must-Have", bg: "bg-red-50", text: "text-red-700", description: "Highest ROI — implement these first" },
-  "high-value": { label: "High-Value", bg: "bg-amber-50", text: "text-amber-700", description: "Strong returns — implement after core" },
-  "growth": { label: "Growth", bg: "bg-blue-50", text: "text-blue-700", description: "Long-term engagement and scale" },
+const TIER_INFO: Record<string, { label: string; pill: string; description: string }> = {
+  "must-have": { label: "Must-Have", pill: "ui-pill-danger", description: "Highest ROI: implement these first" },
+  "high-value": { label: "High-Value", pill: "ui-pill-amber", description: "Strong returns: implement after core" },
+  "growth": { label: "Growth", pill: "ui-pill-ocean", description: "Long-term engagement and scale" },
 };
 
 export default function AutomationsPage() {
@@ -325,10 +331,39 @@ export default function AutomationsPage() {
     setLoading(true);
     const { data } = await supabase
       .from("marketing_automations")
-      .select("id, name, trigger_type, status, enrolled_count, completed_count, created_at, description")
+      .select("id, name, trigger_type, trigger_config, status, enrolled_count, completed_count, created_at, description")
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
-    setAutomations((data as Automation[]) || []);
+    const base = (data as any[]) || [];
+    const ids = base.map((a) => a.id);
+    if (ids.length === 0) {
+      setAutomations([]);
+      setLoading(false);
+      return;
+    }
+
+    // One query for every automation's steps (flow summary + step sentences
+    // on the list) and one for the last 7 days of successful sends, instead
+    // of N+1 per-row round trips.
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const [stepsRes, logsRes] = await Promise.all([
+      supabase.from("marketing_automation_steps").select("automation_id, position, step_type, config").in("automation_id", ids).order("position", { ascending: true }),
+      supabase.from("marketing_automation_logs").select("automation_id").eq("action", "email_sent").gte("created_at", since).in("automation_id", ids),
+    ]);
+    const stepsByAutomation: Record<string, AutomationStep[]> = {};
+    for (const s of (stepsRes.data as any[]) || []) {
+      (stepsByAutomation[s.automation_id] ||= []).push({ step_type: s.step_type, config: s.config });
+    }
+    const sentByAutomation: Record<string, number> = {};
+    for (const l of (logsRes.data as any[]) || []) {
+      sentByAutomation[l.automation_id] = (sentByAutomation[l.automation_id] || 0) + 1;
+    }
+
+    setAutomations(base.map((a) => ({
+      ...a,
+      steps: stepsByAutomation[a.id] || [],
+      sentLast7Days: sentByAutomation[a.id] || 0,
+    })));
     setLoading(false);
   }
 
@@ -378,14 +413,56 @@ export default function AutomationsPage() {
 
     const newAutoId = autoData.id;
 
-    // Create steps
+    // Create steps. Every send_email step has a matching designed template in
+    // the starter library (key = `${automation key}-${email ordinal}`) —
+    // find-or-create it for this business and link it, so the automation is
+    // ready to activate without hunting for the right template.
+    let linkedTemplates = 0;
     if (template.steps.length > 0) {
-      const stepRows = template.steps.map((s, i) => ({
-        automation_id: newAutoId,
-        position: i,
-        step_type: s.step_type,
-        config: s.config,
-      }));
+      // Fetched once per automation (not per step) since every email in it
+      // materializes against the same operator branding and tour list.
+      const [{ data: bizRow }, { data: topTours }] = await Promise.all([
+        supabase.from("businesses").select(
+          "email_color, logo_url, business_address, public_phone, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews"
+        ).eq("id", businessId).maybeSingle(),
+        supabase.from("tours").select("id, name, image_url, duration_minutes")
+          .eq("business_id", businessId).eq("active", true).order("sort_order", { ascending: true }).limit(3),
+      ]);
+      const biz = bizRow || {};
+      const tours = topTours || [];
+
+      const stepRows: { automation_id: string; position: number; step_type: string; config: Record<string, any> }[] = [];
+      let emailOrdinal = 0;
+      for (let i = 0; i < template.steps.length; i++) {
+        const s = template.steps[i];
+        const config: Record<string, any> = { ...s.config };
+        if (s.step_type === "send_email") {
+          emailOrdinal++;
+          const starter = getStarterTemplateByKey(`${template.key}-${emailOrdinal}`);
+          if (starter && !config.template_id) {
+            const existing = await supabase.from("marketing_templates").select("id")
+              .eq("business_id", businessId).eq("name", starter.name).limit(1).maybeSingle();
+            let tplId: string | undefined = existing.data?.id;
+            if (!tplId) {
+              const blocks = materializeStarterTemplate(starter, biz, tours);
+              const ins = await supabase.from("marketing_templates").insert({
+                business_id: businessId,
+                name: starter.name,
+                subject_line: starter.subject,
+                category: starter.category,
+                editor_json: blocks,
+                html_content: blocksToHtml(blocks),
+              }).select("id").single();
+              tplId = ins.data?.id;
+            }
+            if (tplId) {
+              config.template_id = tplId;
+              linkedTemplates++;
+            }
+          }
+        }
+        stepRows.push({ automation_id: newAutoId, position: i, step_type: s.step_type, config });
+      }
       const { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
       if (stepErr) {
         notify({ message: stepErr.message, tone: "error" });
@@ -394,7 +471,12 @@ export default function AutomationsPage() {
       }
     }
 
-    notify({ message: `"${template.name}" automation created! Customize your email templates and activate.`, tone: "success" });
+    notify({
+      message: linkedTemplates > 0
+        ? `"${template.name}" created with ${linkedTemplates} designed email${linkedTemplates === 1 ? "" : "s"} already linked. Review and activate.`
+        : `"${template.name}" automation created! Customize your email templates and activate.`,
+      tone: "success",
+    });
     setCreating(false);
     setSelectedTemplate(null);
     setShowGallery(false);
@@ -459,8 +541,10 @@ export default function AutomationsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="space-y-4 py-2">
+        <div className="ui-skeleton h-8 w-48" />
+        <div className="ui-skeleton h-[140px] !rounded-2xl" />
+        <div className="ui-skeleton h-[320px] !rounded-2xl" />
       </div>
     );
   }
@@ -469,32 +553,23 @@ export default function AutomationsPage() {
   if (selectedTemplate) {
     const t = selectedTemplate;
     const tier = TIER_INFO[t.tier];
-    const stepLabels: Record<string, string> = {
-      send_email: "Send Email",
-      delay: "Wait",
-      condition: "Check",
-      generate_voucher: "Create Voucher",
-    };
     return (
       <div className="space-y-6">
         <button
           onClick={() => setSelectedTemplate(null)}
-          className="flex items-center gap-1.5 text-sm font-medium"
+          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-80"
           style={{ color: "var(--ck-text-muted)" }}
         >
-          <X size={14} /> Back to templates
+          Back to templates
         </button>
 
         {/* Header */}
-        <div
-          className="rounded-xl border p-6"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
+        <div className="ui-card p-6 anim-fade-up">
           <div className="flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h1>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tier.bg} ${tier.text}`}>
+                <h1 className="font-display text-[22px] font-semibold leading-tight" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h1>
+                <span className={"ui-status " + tier.pill}>
                   {tier.label}
                 </span>
               </div>
@@ -505,30 +580,22 @@ export default function AutomationsPage() {
             <button
               onClick={() => createFromTemplate(t)}
               disabled={creating}
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "var(--ck-accent)" }}
+              className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               {creating ? "Creating..." : "Use This Template"}
-              {!creating && <ArrowRight size={14} />}
             </button>
           </div>
         </div>
 
         {/* Why this works */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Why This Works</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d1">
+          <p className="ui-mono-label mb-2">Why This Works</p>
           <p className="text-sm" style={{ color: "var(--ck-text)" }}>{t.benefit}</p>
         </div>
 
         {/* How it works — step by step */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>How It Works</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d2">
+          <p className="ui-mono-label mb-4">How It Works</p>
           <div className="space-y-3">
             {t.howItWorks.map((step, i) => (
               <div key={i} className="flex gap-3">
@@ -545,40 +612,28 @@ export default function AutomationsPage() {
         </div>
 
         {/* Workflow preview */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ck-text-strong)" }}>Workflow Preview</h2>
+        <div className="ui-card p-5 anim-fade-up anim-d3">
+          <p className="ui-mono-label mb-4">Workflow Preview</p>
 
           {/* Trigger */}
           <div className="flex items-center gap-2 mb-2">
             <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
-              style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)" }}
+              className="ui-status ui-pill-accent !px-3 !py-1.5"
+              style={{ borderColor: "var(--ck-accent)" }}
             >
               Trigger: {t.triggerType.replace(/_/g, " ")}
               {t.triggerConfig.tag && <span className="opacity-70">({t.triggerConfig.tag})</span>}
               {t.triggerConfig.field && <span className="opacity-70">({t.triggerConfig.field})</span>}
             </div>
           </div>
+          <p className="text-xs mb-3" style={{ color: "var(--ck-text-muted)" }}>
+            {triggerSentence({ trigger_type: t.triggerType, trigger_config: t.triggerConfig })}
+          </p>
 
           {/* Steps */}
-          <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border)" }}>
+          <div className="ml-4 border-l-2 pl-4 space-y-2" style={{ borderColor: "var(--ck-border-strong)" }}>
             {t.steps.map((step, i) => {
-              let label = stepLabels[step.step_type] || "Send Email";
-              if (step.step_type === "delay") {
-                label = `Wait ${step.config.duration} ${step.config.unit}`;
-              } else if (step.step_type === "send_email") {
-                label = step.config.subject_override || "Send Email";
-              } else if (step.step_type === "condition") {
-                label = `Check: ${step.config.condition_type?.replace(/_/g, " ")}`;
-              } else if (step.step_type === "generate_voucher") {
-                label = `Create ${step.config.amount}% off voucher (${step.config.code_prefix})`;
-                if (step.config.voucher_type === "fixed_amount") {
-                  label = `Create R${step.config.amount} voucher (${step.config.code_prefix})`;
-                }
-              }
+              const label = stepSentence(step, i, t.steps);
               return (
                 <div key={i} className="flex items-center gap-2 py-1.5">
                   <span
@@ -595,19 +650,16 @@ export default function AutomationsPage() {
         </div>
 
         {/* Example email */}
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Example Email Content</h2>
+        <div className="ui-card p-5">
+          <p className="ui-mono-label mb-3">Example Email Content</p>
           <div
             className="rounded-lg border p-4 text-xs whitespace-pre-wrap font-mono leading-relaxed"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+            style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)", color: "var(--ck-text)" }}
           >
             {t.exampleEmail}
           </div>
           <p className="text-xs mt-2" style={{ color: "var(--ck-text-muted)" }}>
-            This is a sample — you'll customise the actual email in your template editor after creating the automation.
+            This is a sample. You'll customise the actual email in your template editor after creating the automation.
           </p>
         </div>
 
@@ -616,16 +668,13 @@ export default function AutomationsPage() {
           <button
             onClick={() => createFromTemplate(t)}
             disabled={creating}
-            className="flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: "var(--ck-accent)" }}
+            className="ui-btn ui-btn-primary !px-5 disabled:opacity-50"
           >
             {creating ? "Creating..." : "Use This Template"}
-            {!creating && <ArrowRight size={14} />}
           </button>
           <button
             onClick={() => setSelectedTemplate(null)}
-            className="rounded-lg border px-4 py-2.5 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
             Back
           </button>
@@ -639,29 +688,29 @@ export default function AutomationsPage() {
     const tiers: ("must-have" | "high-value" | "growth")[] = ["must-have", "high-value", "growth"];
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between anim-fade-up">
           <div>
-            <h1 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
-            <p className="text-sm mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+            <p className="ui-mono-label mb-2">Growth · Templates</p>
+            <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
+            <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
               Industry-proven workflows designed for tour &amp; activity businesses. Choose a template to get started in seconds.
             </p>
           </div>
           <button
             onClick={() => setShowGallery(false)}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
-            <X size={14} /> Close
+            Close
           </button>
         </div>
 
-        {tiers.map((tier) => {
+        {tiers.map((tier, tierIdx) => {
           const info = TIER_INFO[tier];
           const tierTemplates = TEMPLATES.filter((t) => t.tier === tier);
           return (
-            <div key={tier}>
+            <div key={tier} className={"anim-fade-up anim-d" + (tierIdx + 1)}>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${info.bg} ${info.text}`}>
+                <span className={"ui-status " + info.pill}>
                   {info.label}
                 </span>
                 <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{info.description}</span>
@@ -674,8 +723,7 @@ export default function AutomationsPage() {
                     <button
                       key={t.key}
                       onClick={() => setSelectedTemplate(t)}
-                      className="rounded-xl border p-4 text-left transition-all hover:shadow-md"
-                      style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+                      className="ui-card ui-card-hover p-4 text-left"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -683,20 +731,19 @@ export default function AutomationsPage() {
                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
                               {t.name}
                             </h3>
-                            <CaretRight size={14} style={{ color: "var(--ck-text-muted)" }} />
                           </div>
                           <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--ck-text-muted)" }}>
                             {t.description}
                           </p>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb.bg} ${tb.text}`}>
+                            <span className={"ui-status " + tb.pill}>
                               {tb.label}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            <span className="ui-status ui-pill-neutral">
                               {t.steps.length} steps
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                              {emailSteps} email{emailSteps !== 1 ? "s" : ""}
+                            <span className="ui-status ui-pill-ocean">
+                              {emailSteps} designed email{emailSteps !== 1 ? "s" : ""} included
                             </span>
                           </div>
                         </div>
@@ -710,15 +757,12 @@ export default function AutomationsPage() {
         })}
 
         {/* Blank automation option */}
-        <div className="pt-2 border-t" style={{ borderColor: "var(--ck-border)" }}>
+        <div className="pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <button
             onClick={createBlankAutomation}
-            className="flex items-center gap-2 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:shadow-sm"
-            style={{ borderColor: "var(--ck-border)" }}
+            className="flex items-center gap-3 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:border-[var(--ck-border-strong)] hover:bg-[var(--ck-surface-warm)]"
+            style={{ borderColor: "var(--ck-border-strong)" }}
           >
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-50">
-              <Plus size={20} className="text-gray-400" />
-            </div>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Start From Scratch</h3>
               <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
@@ -736,21 +780,18 @@ export default function AutomationsPage() {
     <div className="space-y-4">
       {/* Intro banner — shown when there are few automations */}
       {automations.length > 0 && automations.length <= 5 && (
-        <div
-          className="rounded-xl border p-5"
-          style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-        >
+        <div className="ui-card p-5 anim-fade-up">
           <div className="flex items-start gap-3">
             <div className="min-w-0">
               <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
                 Your automations run 24/7 in the background
               </h3>
               <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
-                Tags are automatically applied to your contacts based on their booking behaviour — like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
+                Tags are automatically applied to your contacts based on their booking behaviour, like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {["completed-tour", "lapsed-90-days", "vip", "new-booker", "voucher-expiring"].map(tag => (
-                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700">
+                  <span key={tag} className="ui-status ui-pill-accent">
                     {tag}
                   </span>
                 ))}
@@ -762,47 +803,41 @@ export default function AutomationsPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between anim-fade-up anim-d1">
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-          {automations.length} automation{automations.length !== 1 ? "s" : ""}
+          <span className="font-display text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{automations.length}</span> automation{automations.length !== 1 ? "s" : ""}
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => setShowGallery(true)}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
-            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+            className="ui-btn ui-btn-ghost"
           >
-            <Sparkle size={14} /> Browse Templates
+            Browse Templates
           </button>
           <button
             onClick={createBlankAutomation}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white"
-            style={{ background: "var(--ck-accent)" }}
+            className="ui-btn ui-btn-primary"
           >
-            <Plus size={14} /> New Automation
+            New Automation
           </button>
         </div>
       </div>
 
       {/* Empty state with template suggestions */}
       {automations.length === 0 ? (
-        <div className="space-y-6">
-          <div
-            className="rounded-xl border p-8 text-center"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-          >
-            <h2 className="text-base font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
+        <div className="space-y-6 anim-fade-up">
+          <div className="ui-card ui-empty">
+            <h2 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               No automations yet
             </h2>
-            <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>
-              Automations send emails automatically when things happen — a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
+            <p className="text-sm mb-4 max-w-lg" style={{ color: "var(--ck-text-muted)" }}>
+              Automations send emails automatically when things happen: a new booking, a completed tour, a birthday, or a customer going quiet. Tags are auto-assigned to your contacts based on their behaviour, and automations fire when those tags appear.
             </p>
             <button
               onClick={() => setShowGallery(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-              style={{ background: "var(--ck-accent)" }}
+              className="ui-btn ui-btn-primary"
             >
-              <Sparkle size={14} /> Browse Templates to Get Started
+              Browse Templates to Get Started
             </button>
           </div>
 
@@ -817,8 +852,7 @@ export default function AutomationsPage() {
                   <button
                     key={t.key}
                     onClick={() => { setShowGallery(true); setSelectedTemplate(t); }}
-                    className="rounded-xl border p-4 text-left transition-all hover:shadow-md"
-                    style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
+                    className="ui-card ui-card-hover p-4 text-left"
                   >
                     <h4 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
                       {t.name}
@@ -833,13 +867,8 @@ export default function AutomationsPage() {
           </div>
 
           {/* How automations work */}
-          <div
-            className="rounded-xl border p-5"
-            style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}
-          >
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>
-                How Automations Work
-            </h3>
+          <div className="ui-card p-5">
+            <p className="ui-mono-label mb-3">How Automations Work</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
@@ -847,7 +876,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Trigger Fires</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  Something happens — a new contact signs up, a booking completes, a tag is added, or a date arrives (like a birthday).
+                  Something happens: a new contact signs up, a booking completes, a tag is added, or a date arrives (like a birthday).
                 </p>
               </div>
               <div>
@@ -856,7 +885,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Steps Execute</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  The workflow runs: send emails, wait for a period, check conditions, or generate discount vouchers — all automatically.
+                  The workflow runs: send emails, wait for a period, check conditions, or generate discount vouchers, all automatically.
                 </p>
               </div>
               <div>
@@ -865,7 +894,7 @@ export default function AutomationsPage() {
                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Results Grow</span>
                 </div>
                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  More reviews, more rebookings, more referrals, recovered revenue — all while you focus on running great tours.
+                  More reviews, more rebookings, more referrals, and recovered revenue, all while you focus on running great tours.
                 </p>
               </div>
             </div>
@@ -873,7 +902,7 @@ export default function AutomationsPage() {
         </div>
       ) : (
         /* ─── AUTOMATIONS TABLE ─── */
-        <div className="space-y-3">
+        <div className="space-y-3 anim-fade-up anim-d2">
           {archivedCount > 0 && (
             <div className="flex items-center justify-between text-xs">
               <span style={{ color: "var(--ck-text-muted)" }}>
@@ -881,27 +910,25 @@ export default function AutomationsPage() {
               </span>
               <button
                 onClick={() => setShowArchived((v) => !v)}
-                className="rounded-md border px-2.5 py-1 text-xs font-medium"
-                style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs"
               >
                 {showArchived ? "Hide archived" : "Show archived"}
               </button>
             </div>
           )}
-        <div
-          className="rounded-xl border overflow-x-auto"
-          style={{ borderColor: "var(--ck-border)" }}
-        >
-          <table className="w-full text-sm min-w-[700px]">
+        <div className="ui-card overflow-x-auto">
+          <table className="w-full text-sm min-w-[1050px]">
             <thead>
-              <tr style={{ background: "var(--ck-surface)" }}>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Enrolled</th>
-                <th className="text-center px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Completed</th>
-                <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Created</th>
-                <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
+              <tr style={{ background: "var(--ck-surface-sunken)" }}>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Name</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Trigger</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Flow</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Status</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Enrolled</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Completed</th>
+                <th className="text-center px-4 py-3 ui-mono-label !text-[10px]">Sent (7d)</th>
+                <th className="text-left px-4 py-3 ui-mono-label !text-[10px]">Created</th>
+                <th className="text-right px-4 py-3 ui-mono-label !text-[10px]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -909,7 +936,7 @@ export default function AutomationsPage() {
                 const tb = triggerBadge[a.trigger_type] || triggerBadge.manual;
                 const sb = statusBadge[a.status] || statusBadge.draft;
                 return (
-                  <tr key={a.id} className="border-t" style={{ borderColor: "var(--ck-border)" }}>
+                  <tr key={a.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => router.push("/marketing/automations/" + a.id)}
@@ -925,20 +952,29 @@ export default function AutomationsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tb.bg} ${tb.text}`}>
+                      <span className={"ui-status " + tb.pill}>
                         {tb.label}
                       </span>
+                      <p className="text-xs mt-1 max-w-[200px]" style={{ color: "var(--ck-text-muted)" }}>
+                        {triggerSentence({ trigger_type: a.trigger_type, trigger_config: a.trigger_config })}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs max-w-[180px]" style={{ color: "var(--ck-text-muted)" }}>
+                      {flowSummary(a.steps || [])}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sb.bg} ${sb.text}`}>
+                      <span className={"ui-status " + sb.pill}>
                         {a.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center" style={{ color: "var(--ck-text)" }}>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                       {a.enrolled_count}
                     </td>
-                    <td className="px-4 py-3 text-center" style={{ color: "var(--ck-text)" }}>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
                       {a.completed_count}
+                    </td>
+                    <td className="px-4 py-3 text-center font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                      {a.sentLast7Days ?? 0}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                       {new Date(a.created_at).toLocaleDateString("en-ZA")}
@@ -948,8 +984,8 @@ export default function AutomationsPage() {
                         {a.status !== "archived" && (
                           <button
                             onClick={() => toggleStatus(a)}
-                            className="rounded-lg border p-1.5"
-                            style={{ borderColor: "var(--ck-border)" }}
+                            className="inline-flex items-center justify-center rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-surface-sunken)]"
+                            style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                             title={a.status === "active" ? "Pause" : "Activate"}
                           >
                             {a.status === "active" ? <Pause size={13} /> : <Play size={13} />}
@@ -958,8 +994,7 @@ export default function AutomationsPage() {
                         {a.status === "archived" ? (
                           <button
                             onClick={() => unarchiveAutomation(a)}
-                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
-                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}
+                            className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Restore to draft"
                           >
                             Unarchive
@@ -967,8 +1002,7 @@ export default function AutomationsPage() {
                         ) : (
                           <button
                             onClick={() => archiveAutomation(a)}
-                            className="rounded-lg border px-2 py-1 text-[11px] font-medium"
-                            style={{ borderColor: "var(--ck-border)", color: "var(--ck-text-muted)" }}
+                            className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Hide from active list, preserve history"
                           >
                             Archive
@@ -976,7 +1010,8 @@ export default function AutomationsPage() {
                         )}
                         <button
                           onClick={() => deleteAutomation(a)}
-                          className="p-1.5 text-red-500 hover:text-red-700"
+                          className="inline-flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--ck-danger-soft)]"
+                          style={{ color: "var(--ck-danger)" }}
                           title="Delete permanently"
                         >
                           <Trash size={13} />

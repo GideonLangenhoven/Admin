@@ -4,7 +4,12 @@ import bundleAnalyzer from "@next/bundle-analyzer";
 
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
 
+const releaseName = (process.env.SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL)?.trim();
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_SENTRY_RELEASE: releaseName || "",
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
+  },
   async headers() {
     return [
       {
@@ -30,7 +35,9 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.windguru.cz https://unpkg.com",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.resend.com https://api.yoco.com https://api.whatsapp.com https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.googleusercontent.com https://lottie.host https://unpkg.com",
+              // cdn.jsdelivr.net: dotlottie-wc fetches its WASM from there at
+              // runtime — blocking it kills the settings/super-admin animations.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.resend.com https://api.yoco.com https://api.whatsapp.com https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.googleusercontent.com https://lottie.host https://unpkg.com https://cdn.jsdelivr.net",
               "frame-src 'self' https://www.windguru.cz https://embed.windy.com",
             ].join("; "),
           },
@@ -49,8 +56,10 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(withBundleAnalyzer(nextConfig), {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+  org: process.env.SENTRY_ORG?.trim(),
+  project: process.env.SENTRY_PROJECT?.trim(),
+  authToken: process.env.SENTRY_AUTH_TOKEN?.trim(),
+  release: releaseName ? { name: releaseName } : undefined,
   silent: !process.env.CI,
   widenClientFileUpload: true,
   sourcemaps: {

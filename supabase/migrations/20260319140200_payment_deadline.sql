@@ -3,7 +3,6 @@
 -- This migration is a no-op safety net.
 ALTER TABLE public.bookings
 ADD COLUMN IF NOT EXISTS payment_deadline timestamptz;
-
 -- Ensure index exists for efficient auto-cancel queries
 CREATE INDEX IF NOT EXISTS idx_bookings_payment_deadline
 ON public.bookings (payment_deadline)

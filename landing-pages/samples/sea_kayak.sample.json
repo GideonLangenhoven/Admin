@@ -1,0 +1,62 @@
+{
+  "business_name": "Tidewater Kayak Co.",
+  "business_tagline": "Dawn paddles along the Cape coastline",
+  "logo_url": "",
+  "hero_eyebrow": "Sea-Kayak & Coastal",
+  "hero_title": "Paddle out at first light — we'll have the coffee ready.",
+  "hero_subtitle": "Guided sea-kayak excursions along a working coastline, led by paddlers who know every swell of it.",
+  "hero_image": "https://images.unsplash.com/photo-1436162716854-dcb9157bfac1?w=1600&q=80&auto=format&fit=crop",
+  "color_main": "#0F2B1F",
+  "color_secondary": "#D9822F",
+  "color_cta": "#D9822F",
+  "color_bg": "#F7F5F0",
+  "color_nav": "#0F2B1F",
+  "color_hover": "#D9822F",
+  "booking_url": "https://book.example.com/tidewater",
+  "subdomain": "tidewater",
+  "directions": "Launch from the public slipway at Hout Bay harbour, gate 3. Free parking on Harbour Road after 07:00.",
+  "what_to_bring": "Swimwear, a warm layer for after, sun protection, and a reusable water bottle. We provide everything else.",
+  "what_to_wear": "Quick-dry layers and closed shoes that can get wet. We supply wetsuits, spray-skirts and buoyancy aids.",
+  "footer_line_one": "Hout Bay Harbour, Cape Town",
+  "footer_line_two": "Departures daily, weather permitting",
+  "currency": "R",
+  "chat_embed": "<div style=\"font-family:Inter,system-ui,sans-serif;border:1px solid #e4e1d8;border-radius:12px;overflow:hidden;background:#fff\"><div style=\"background:#0F2B1F;color:#fff;padding:11px 14px;font-size:13px;font-weight:600\">Tidewater Chat</div><div style=\"padding:14px;font-size:13px;color:#333;line-height:1.5\">Hi there! Ask us about routes, tides or bookings and we'll get back to you.</div><textarea placeholder=\"Type a message…\" rows=\"2\" style=\"width:100%;border:0;border-top:1px solid #eee;padding:10px 14px;font-size:13px;resize:none;font-family:inherit;box-sizing:border-box\"></textarea></div><script>console.log('[widget] chat embed mounted');</script>",
+  "tours": [
+    {
+      "name": "Dawn Patrol",
+      "description": "A quiet 90-minute paddle out before the wind picks up, tracing the kelp line past the seal colony while the light comes up over the bay.",
+      "duration_minutes": 90,
+      "default_capacity": 8,
+      "base_price_per_person": 650,
+      "image_url": "https://images.unsplash.com/photo-1620903669944-de50fbe78210?w=1200&q=80&auto=format&fit=crop"
+    },
+    {
+      "name": "Cape Point Traverse",
+      "description": "A full-day open-water crossing for experienced paddlers, rounding the point with two guides and a support boat on standby.",
+      "duration_minutes": 300,
+      "default_capacity": 6,
+      "base_price_per_person": 1850,
+      "image_url": "https://images.unsplash.com/photo-1596736890254-cef0137163bc?w=1200&q=80&auto=format&fit=crop"
+    },
+    {
+      "name": "Sunset & Seals",
+      "description": "An easy family-friendly evening paddle through the harbour and out to the seal colony, back before dark with hot drinks waiting.",
+      "duration_minutes": 120,
+      "default_capacity": 10,
+      "base_price_per_person": 480,
+      "image_url": "https://images.unsplash.com/photo-1525721653822-f9975a57cd4c?w=1200&q=80&auto=format&fit=crop"
+    }
+  ],
+  "reviews": [
+    {
+      "quote": "We saw a pod of dolphins about twenty minutes in. The guides were relaxed but clearly knew exactly what they were doing.",
+      "author": "Priya N.",
+      "rating": 5
+    },
+    {
+      "quote": "Cape Point Traverse was the hardest thing I've done on a holiday, in the best way. Worth every rand.",
+      "author": "Marco D.",
+      "rating": 5
+    }
+  ]
+}

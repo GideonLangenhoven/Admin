@@ -1,12 +1,17 @@
 "use client";
 import { useState, useEffect, ReactNode } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
+import { formatDuration } from "../lib/duration";
+import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
+import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
+import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { CaretDown } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
 
@@ -16,23 +21,23 @@ function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false
 }) {
     const isOpen = openSections[id] ?? defaultOpen;
     return (
-        <div className="border border-[var(--ck-border-subtle)] rounded-xl overflow-hidden">
+        <div className="ui-card anim-fade-up overflow-hidden">
             <button
                 type="button"
                 onClick={() => toggle(id)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[var(--ck-bg-subtle)] transition-colors"
+                className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--ck-surface-sunken)]"
             >
-                <div>
-                    <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">{title}</h2>
-                    {subtitle && <p className="text-xs text-[var(--ck-text-muted)] mt-0.5">{subtitle}</p>}
+                <div className="min-w-0">
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">{title}</h2>
+                    {subtitle && <p className="text-[12px] text-[var(--ck-text-muted)] mt-0.5 leading-snug">{subtitle}</p>}
                 </div>
-                <ChevronDown size={20} className={"text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
+                <CaretDown size={18} weight="bold" className={"shrink-0 text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
             </button>
-            {isOpen && <div className="px-5 pb-5 pt-2 border-t border-[var(--ck-border-subtle)]">{children}</div>}
+            {isOpen && <div className="px-5 pb-5 pt-3 border-t border-[var(--ck-border-subtle)]">{children}</div>}
         </div>
     );
 }
-const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 bg-gray-100 rounded animate-pulse" /> });
+const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="h-40 ui-skeleton" /> });
 const ExternalBookingSettings = dynamic(() => import("../../components/ExternalBookingSettings"), { ssr: false });
 import { fetchUsageSnapshot, type UsageSnapshot } from "../lib/billing";
 import InlineSlotManager from "../../components/InlineSlotManager";
@@ -42,17 +47,123 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
+// Live glass preview of the public booking site, driven by the SAME theme
+// engine the customer site runs (booking/lib/theme-engine): the inks and
+// glass alphas shown here are exactly what customers will get — including
+// automatic contrast repair for hard palettes.
+function BookingSitePreview({ siteSettings }: { siteSettings: Record<string, any> }) {
+    const glass = computeGlassTheme({
+        main: siteSettings.color_main,
+        secondary: siteSettings.color_secondary,
+        cta: siteSettings.color_cta,
+        bg: siteSettings.color_bg,
+        nav: siteSettings.color_nav,
+        hover: siteSettings.color_hover,
+    });
+    const v = glass.vars;
+    const glassCard: React.CSSProperties = {
+        background: v["--glass-tint-card"],
+        border: "1px solid " + v["--glass-border"],
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 32px rgba(0,0,0,0.22)",
+        backdropFilter: "blur(14px) saturate(160%)",
+        WebkitBackdropFilter: "blur(14px) saturate(160%)",
+    };
+    return (
+        <div>
+            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Preview</h3>
+            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview. Text colors are solved automatically so any palette stays readable.</p>
+            <div
+                className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden"
+                style={{
+                    background:
+                        `radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, ${v["--cfg-main"]} 42%, transparent), transparent 60%),` +
+                        `radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, ${v["--cfg-hover"]} 30%, transparent), transparent 62%),` +
+                        `radial-gradient(110% 80% at 50% 105%, color-mix(in srgb, ${v["--cfg-secondary"]} 55%, transparent), transparent 70%),` +
+                        v["--cfg-bg"],
+                }}
+            >
+                <div className="flex items-center justify-between gap-4 px-5 py-3 m-3 rounded-full" style={{ ...glassCard, background: v["--glass-tint-nav"] }}>
+                    <div className="min-w-0">
+                        <div className="text-base font-semibold truncate" style={{ color: v["--ink-nav"] }}>{siteSettings.business_name || "Business Name"}</div>
+                        <div className="text-xs truncate" style={{ color: v["--ink-nav"], opacity: 0.72 }}>{siteSettings.business_tagline || "Business tagline"}</div>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm shrink-0">
+                        <span style={{ color: v["--ink-nav"] }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
+                        <span className="px-4 py-2 rounded-full font-semibold" style={{ backgroundColor: v["--accent"], backgroundImage: `linear-gradient(${v["--main-overlay"]}, ${v["--main-overlay"]})`, color: v["--ink-on-main"] }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
+                    </div>
+                </div>
+                <div className="px-6 py-8 text-center">
+                    <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: v["--accent-text"] }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
+                    <div className="mt-3 text-4xl font-semibold" style={{ color: v["--ink"] }}>{siteSettings.hero_title || "Hero Title"}</div>
+                    <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: v["--ink-muted"] }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
+                    <div className="mt-6 mx-auto max-w-sm rounded-3xl p-4 text-left" style={glassCard}>
+                        <div className="text-sm font-semibold" style={{ color: v["--ink"] }}>Sample Tour Card</div>
+                        <div className="text-xs mt-0.5" style={{ color: v["--ink-muted"] }}>2 hours · R495 per person</div>
+                        <div className="mt-3 inline-flex w-full items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: v["--cta"], backgroundImage: `linear-gradient(${v["--cta-overlay"]}, ${v["--cta-overlay"]})`, color: v["--ink-on-cta"] }}>{siteSettings.card_cta_label || "Book Now"}</div>
+                    </div>
+                </div>
+                <div className="px-6 pb-6 text-center text-sm">
+                    <div style={{ color: v["--ink"] }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
+                    <div className="mt-1" style={{ color: v["--ink-muted"] }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={glassCard}>
+                        <span style={{ color: v["--ink"] }}>{siteSettings.chat_widget_label || "Book here"}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Personal (per-admin) preference — stored on the caller's own admin_users row
+// via self-scoped RPCs, so it follows them across devices. Not gated by
+// settings_permissions: every Settings viewer manages only their own bubble.
+function HelpAssistantSection() {
+    const [hidden, setHidden] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        supabase.rpc("get_my_admin_onboarding").then(({ data }) => {
+            if (!cancelled) setHidden(!!(Array.isArray(data) && data[0]?.help_chat_hidden));
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    async function toggle(next: boolean) {
+        setHidden(next);
+        const { error } = await supabase.rpc("set_my_help_chat_hidden", { p_hidden: next });
+        if (error) {
+            setHidden(!next);
+            notify({ message: "Couldn't save the preference: " + error.message, tone: "error" });
+            return;
+        }
+        // HelpChat (mounted in AppShell) listens for this so the bubble reacts instantly.
+        window.dispatchEvent(new CustomEvent("ck-help-chat-hidden", { detail: { hidden: next } }));
+        notify({ message: next ? "Help assistant hidden. You can turn it back on here any time." : "Help assistant is back.", tone: "success" });
+    }
+
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <div>
+                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Help assistant bubble</h3>
+                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">
+                    The floating chat bubble that answers questions about the dashboard. This only affects your own account. Other team members keep their own setting.
+                </p>
+            </div>
+            <label className="flex shrink-0 cursor-pointer items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={hidden === null ? true : !hidden}
+                    disabled={hidden === null}
+                    onChange={(e) => toggle(!e.target.checked)}
+                    className="h-4 w-4 accent-[var(--ck-accent)]"
+                />
+                <span className="text-sm text-[var(--ck-text)]">Show</span>
+            </label>
+        </div>
+    );
+}
+
 // Settings sections that MAIN_ADMIN can grant to regular admins
-const SETTINGS_SECTIONS = [
-    { key: "tours", label: "Tours & Activities" },
-    { key: "addons", label: "Booking Add-Ons" },
-    { key: "resources", label: "Shared Resources" },
-    { key: "external", label: "External Booking" },
-    { key: "site", label: "Booking Site Config" },
-    { key: "email", label: "Email Customisation" },
-    { key: "invoice", label: "Invoice Details" },
-    { key: "credentials", label: "Integration Credentials" },
-] as const;
 type SettingsSectionKey = typeof SETTINGS_SECTIONS[number]["key"];
 
 // Default Booking App URLs (separate from Admin Dashboard: https://admin-tawny-delta-92.vercel.app)
@@ -66,8 +177,11 @@ const DEFAULT_VOUCHER_SUCCESS_URL = "";
 const DEFAULT_SITE_SETTINGS = {
     directions: "",
     terms_conditions: "",
-    privacy_policy: "Cookies help us deliver our services. By using our services, you agree to our use of cookies. OK Kayaks Adventures Privacy Policy\nThank you for visiting our web site...",
-    cookies_policy: "COOKIES\nCookies are small text files which are downloaded to your computer...",
+    // Blank, not seeded copy: the storefront renders its own POPIA-aligned
+    // template whenever these are empty, and the old seed text named another
+    // operator and was long enough to defeat that fallback once saved.
+    privacy_policy: "",
+    cookies_policy: "",
     color_main: "#0f5dd7",
     color_secondary: "#101828",
     color_cta: "#0c8a59",
@@ -78,6 +192,7 @@ const DEFAULT_SITE_SETTINGS = {
     hero_eyebrow: "",
     hero_title: "",
     hero_subtitle: "",
+    hero_image: "",
     business_name: "",
     business_tagline: "",
     logo_url: "",
@@ -110,24 +225,10 @@ interface Tour {
     sort_order: number | null;
     image_url: string | null;
     hidden: boolean;
-}
-
-interface ResourceRecord {
-    id: string;
-    name: string;
-    resource_type: string;
-    capacity_total: number;
-    active: boolean;
-}
-
-interface TourResourceLink {
-    id: string;
-    tour_id: string;
-    resource_id: string;
-    units_per_guest: number;
-    active: boolean;
-    tours?: { id: string; name: string } | null;
-    resources?: ResourceRecord | null;
+    confirmation_tagline: string | null;
+    last_minute_hours: number | null;
+    last_minute_end_hours: number | null;
+    last_minute_price: number | null;
 }
 
 interface AddOn {
@@ -144,11 +245,14 @@ interface AddOn {
 export default function SettingsPage() {
     const { businessId, refreshBusiness } = useBusinessContext();
     const [admins, setAdmins] = useState<any[]>([]);
+    const [billingAdminId, setBillingAdminId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
+    const [myEmail, setMyEmail] = useState<string | null>(null);
+    const [changingRole, setChangingRole] = useState<string | null>(null);
 
     // Collapsible section state
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ admins: true });
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
     function toggleSection(id: string) { setOpenSections((prev) => ({ ...prev, [id]: !(prev[id] ?? false) })); }
 
     // New Admin Form
@@ -164,24 +268,23 @@ export default function SettingsPage() {
     // Tours state
     const [tours, setTours] = useState<Tour[]>([]);
     const [editingTour, setEditingTour] = useState<Tour | null>(null);
-    const [tourForm, setTourForm] = useState({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
     const [tourSaving, setTourSaving] = useState(false);
     const [tourError, setTourError] = useState("");
     const [slotMessage, setSlotMessage] = useState("");
     const [slotGenerating, setSlotGenerating] = useState(false);
     const [tourSlotCounts, setTourSlotCounts] = useState<Record<string, number>>({});
-    const [resources, setResources] = useState<ResourceRecord[]>([]);
-    const [tourResourceLinks, setTourResourceLinks] = useState<TourResourceLink[]>([]);
-    const [resourceForm, setResourceForm] = useState({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
-    const [assignmentForm, setAssignmentForm] = useState({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
-    const [resourceSaving, setResourceSaving] = useState(false);
-    const [assignmentSaving, setAssignmentSaving] = useState(false);
-    const [resourceMessage, setResourceMessage] = useState({ type: "", text: "" });
 
     // Site Settings State
     const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
     const [subdomain, setSubdomain] = useState<string | null>(null);
-    const [bookingCustomFieldsJson, setBookingCustomFieldsJson] = useState("[]");
+    // Custom booking questions — edited as a plain form; serialised to the
+    // businesses.booking_custom_fields JSON array on save (same structure the
+    // admin new-booking form and the chat bots already consume).
+    type BookingQuestion = { key: string; label: string; type: "text" | "textarea" | "number"; required: boolean; placeholder: string };
+    const [bookingQuestions, setBookingQuestions] = useState<BookingQuestion[]>([]);
+    const [questionsSaving, setQuestionsSaving] = useState(false);
+    const [questionsMessage, setQuestionsMessage] = useState<{ type: string; text: string }>({ type: "", text: "" });
     const [siteSaving, setSiteSaving] = useState(false);
     const [siteMessage, setSiteMessage] = useState({ type: "", text: "" });
     const [chatbotAvatars, setChatbotAvatars] = useState<Array<{ id: string; lottie_url: string; label: string | null }>>([]);
@@ -194,6 +297,9 @@ export default function SettingsPage() {
     // Email Header Images State
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
+    const [emailTagline, setEmailTagline] = useState("");
+    const [activityVerbPast, setActivityVerbPast] = useState("");
+    const [locationPhrase, setLocationPhrase] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
     const [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
     const [emailColor, setEmailColor] = useState("#1b3b36");
@@ -258,10 +364,10 @@ export default function SettingsPage() {
     useEffect(() => {
         const r = localStorage.getItem("ck_admin_role");
         setRole(r);
+        setMyEmail(localStorage.getItem("ck_admin_email"));
         if (isPrivileged(r)) {
             fetchAdmins();
             fetchTours();
-            fetchResources();
             fetchSiteSettings();
             fetchPlanUsage();
             fetchCredStatus();
@@ -311,7 +417,6 @@ export default function SettingsPage() {
         if (hasAny) {
             if (perms.tours) fetchTours();
             if (perms.addons) fetchAddOns();
-            if (perms.resources) fetchResources();
             if (perms.site || perms.email || perms.invoice) fetchSiteSettings();
             if (perms.credentials) { fetchCredStatus(); checkGdriveStatus(); }
         }
@@ -321,8 +426,18 @@ export default function SettingsPage() {
     async function fetchAdmins() {
         setLoading(true);
         const { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
-        if (data) setAdmins(data);
+        if (data) setAdmins(data.filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
+        const { data: biz } = await supabase.from("businesses").select("billing_admin_user_id").eq("id", businessId).maybeSingle();
+        setBillingAdminId(biz?.billing_admin_user_id || "");
         setLoading(false);
+    }
+
+    async function saveBillingContact(adminId: string) {
+        setBillingAdminId(adminId);
+        const { error } = await supabase.from("businesses").update({ billing_admin_user_id: adminId || null }).eq("id", businessId);
+        notify(error
+            ? { message: "Failed to update billing contact: " + error.message, tone: "error" }
+            : { message: adminId ? "Billing contact updated. BookingTours invoices go to them now." : "Billing contact reset. Invoices go to the first admin on the account.", tone: "success" });
     }
 
     async function fetchPlanUsage() {
@@ -371,7 +486,7 @@ export default function SettingsPage() {
             console.error("Welcome email failed:", emailErr);
             const emailErrMsg = String(emailErr?.message || "");
             if (emailErrMsg.includes("onboarding@resend.dev") || emailErrMsg.includes("sandbox") || emailErrMsg.includes("Sandbox")) {
-                setError("Admin added, but email couldn't be delivered: " + emailErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
+                setError("Admin added, but email couldn't be delivered: " + emailErrMsg + ". Set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
                 setError("Admin added, but the password setup email failed to send." + (emailErrMsg ? " (" + emailErrMsg + ")" : ""));
             }
@@ -396,7 +511,7 @@ export default function SettingsPage() {
             console.error("Failed to resend password setup link:", resendError);
             const resendErrMsg = String(resendError?.message || "");
             if (resendErrMsg.includes("onboarding@resend.dev") || resendErrMsg.includes("sandbox") || resendErrMsg.includes("Sandbox")) {
-                setError("Setup link was saved, but the email couldn't be delivered: " + resendErrMsg + " — set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
+                setError("Setup link was saved, but the email couldn't be delivered: " + resendErrMsg + ". Set a verified EMAIL_FROM domain in the Supabase send-email function secrets.");
             } else {
                 setError("Failed to send a password setup email to " + admin.email + "." + (resendErrMsg ? " (" + resendErrMsg + ")" : ""));
             }
@@ -407,13 +522,13 @@ export default function SettingsPage() {
     function adminPasswordStatus(admin: any) {
         if (admin.must_set_password || !admin.password_set_at) {
             const sentLabel = admin.invite_sent_at ? "Setup email sent " + new Date(admin.invite_sent_at).toLocaleDateString() : "Setup email not sent yet";
-            return { label: "Password setup pending", detail: sentLabel, tone: "text-amber-700" };
+            return { label: "Password setup pending", detail: sentLabel, tone: "text-[var(--ck-warning)]" };
         }
 
         return {
             label: "Password created",
             detail: "Created " + new Date(admin.password_set_at).toLocaleDateString(),
-            tone: "text-emerald-700",
+            tone: "text-[var(--ck-success)]",
         };
     }
 
@@ -439,8 +554,17 @@ export default function SettingsPage() {
 
     function resetTourForm() {
         setEditingTour(null);
-        setTourForm({ name: "", description: "", price: "", duration: "", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
+        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
         setTourError("");
+    }
+
+    const DURATION_UNIT_MINUTES = { min: 1, hours: 60, days: 1440 } as const;
+
+    function minutesToDurationForm(m: number | null) {
+        const mins = Number(m || 0);
+        if (mins >= 1440 && mins % 1440 === 0) return { duration: String(mins / 1440), durationUnit: "days" as const };
+        if (mins >= 60 && mins % 60 === 0) return { duration: String(mins / 60), durationUnit: "hours" as const };
+        return { duration: String(mins || ""), durationUnit: "min" as const };
     }
 
     function startEditTour(t: Tour) {
@@ -448,8 +572,13 @@ export default function SettingsPage() {
         setTourForm({
             name: t.name,
             description: t.description || "",
+            confirmationTagline: t.confirmation_tagline || "",
             price: String(t.base_price_per_person || ""),
-            duration: String(t.duration_minutes || ""),
+            lastMinuteHours: t.last_minute_hours != null ? String(t.last_minute_hours) : "",
+            // A deal saved before cut-offs existed ran to departure, i.e. 0.
+            lastMinuteEndHours: t.last_minute_end_hours != null ? String(t.last_minute_end_hours) : (t.last_minute_hours != null ? "0" : ""),
+            lastMinutePrice: t.last_minute_price != null ? String(t.last_minute_price) : "",
+            ...minutesToDurationForm(t.duration_minutes),
             sort_order: String(t.sort_order || 0),
             active: t.active,
             image_url: t.image_url || "",
@@ -513,7 +642,7 @@ export default function SettingsPage() {
         }
 
         if (slots.length === 0) {
-            setTourError("No slots to create — no matching days in the selected date range.");
+            setTourError("No slots to create: there are no matching days in the selected date range.");
             return { created: 0, skipped: 0 };
         }
 
@@ -539,7 +668,7 @@ export default function SettingsPage() {
             const parts: string[] = [];
             if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
             if (skipped > 0) parts.push(`${skipped} already existed and were skipped`);
-            setSlotMessage(parts.join(" — ") + " for " + editingTour.name + ".");
+            setSlotMessage(parts.join("; ") + " for " + editingTour.name + ".");
             setTimeout(() => setSlotMessage(""), 6000);
             if (created > 0) fetchSlotCounts(tours.map(t => t.id));
         }
@@ -551,6 +680,16 @@ export default function SettingsPage() {
         if (!tourForm.name.trim()) return setTourError("Name is required");
         if (!tourForm.price || Number(tourForm.price) <= 0) return setTourError("Price must be greater than 0");
         if (!tourForm.duration || Number(tourForm.duration) <= 0) return setTourError("Duration is required");
+        const lmHours = tourForm.lastMinuteHours.trim() === "" ? null : Number(tourForm.lastMinuteHours);
+        const lmEndHours = tourForm.lastMinuteEndHours.trim() === "" ? null : Number(tourForm.lastMinuteEndHours);
+        const lmPrice = tourForm.lastMinutePrice.trim() === "" ? null : Number(tourForm.lastMinutePrice);
+        const lmSet = [lmHours, lmEndHours, lmPrice].filter(v => v !== null).length;
+        if (lmSet > 0 && lmSet < 3) return setTourError("Last-minute deals need a start, a cut-off and a price. Clear all three to switch the deal off.");
+        // Capped at 30 days: a mistyped 480 instead of 48 would otherwise discount
+        // a month of departures before anyone noticed.
+        if (lmHours !== null && (lmHours <= 0 || lmHours > 720)) return setTourError("Last-minute start must be between 1 and 720 hours (30 days) before departure");
+        if (lmEndHours !== null && (lmEndHours < 0 || lmEndHours >= (lmHours as number))) return setTourError("Last-minute cut-off must be closer to departure than the start (0 runs the deal to departure)");
+        if (lmPrice !== null && (lmPrice <= 0 || lmPrice >= Number(tourForm.price))) return setTourError("Last-minute price must be greater than 0 and lower than the normal price");
 
         setTourSaving(true);
         setTourError("");
@@ -558,8 +697,12 @@ export default function SettingsPage() {
         const payload = {
             name: tourForm.name.trim(),
             description: tourForm.description.trim() || null,
+            confirmation_tagline: tourForm.confirmationTagline.trim() || null,
             base_price_per_person: Number(tourForm.price),
-            duration_minutes: Number(tourForm.duration),
+            last_minute_hours: lmHours,
+            last_minute_end_hours: lmEndHours,
+            last_minute_price: lmPrice,
+            duration_minutes: Number(tourForm.duration) * DURATION_UNIT_MINUTES[tourForm.durationUnit],
             sort_order: Number(tourForm.sort_order) || 0,
             active: tourForm.active,
             image_url: tourForm.image_url.trim() || null,
@@ -580,7 +723,7 @@ export default function SettingsPage() {
                     const parts: string[] = [];
                     if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
                     if (skipped > 0) parts.push(`${skipped} already existed`);
-                    setSlotMessage("Tour created — " + parts.join(", ") + ".");
+                    setSlotMessage("Tour created: " + parts.join(", ") + ".");
                     setTimeout(() => setSlotMessage(""), 6000);
                 }
             }
@@ -609,6 +752,25 @@ export default function SettingsPage() {
             return;
         }
 
+        // Any booking history (any status) blocks deletion — bookings must
+        // never disappear because the tour they were made on was deleted.
+        // The DB enforces this unconditionally too; this check exists so the
+        // admin sees a clear message instead of a raw constraint error.
+        const { count: bookingCount } = await supabase
+            .from("bookings")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", businessId)
+            .eq("tour_id", id);
+
+        if ((bookingCount || 0) > 0) {
+            notify({
+                title: "Cannot delete tour",
+                message: bookingCount + " booking(s) exist for \"" + name + "\". Deactivate the tour instead; deleting it would abandon that booking history.",
+                tone: "warning",
+            });
+            return;
+        }
+
         if (!await confirmAction({
             title: "Delete tour",
             message: "Delete \"" + name + "\"? This will also remove all associated slots, waitlist entries, and combo offers. This cannot be undone.",
@@ -618,7 +780,13 @@ export default function SettingsPage() {
 
         const { error: delErr } = await supabase.from("tours").delete().eq("id", id);
         if (delErr) {
-            notify({ title: "Delete failed", message: delErr.message, tone: "error" });
+            // 23503 = foreign_key_violation. A friendly message beats the raw
+            // Postgres constraint text reaching the admin, for whatever
+            // dependency the checks above didn't anticipate.
+            const message = (delErr as { code?: string }).code === "23503"
+                ? "This tour still has related records (bookings, combo offers, or other data) that need to be removed first. Try deactivating the tour instead."
+                : delErr.message;
+            notify({ title: "Delete failed", message, tone: "error" });
             return;
         }
         notify({ title: "Deleted", message: "\"" + name + "\" has been removed.", tone: "success" });
@@ -641,6 +809,34 @@ export default function SettingsPage() {
             notify({ title: "Permissions saved", message: "Settings access updated", tone: "success" });
         }
         setSavingPerms(null);
+    }
+
+    async function handleChangeRole(admin: { id: string; name?: string | null; email: string; role: string }, newRole: "ADMIN" | "MAIN_ADMIN") {
+        const label = admin.name || admin.email;
+        const promoting = newRole === "MAIN_ADMIN";
+        if (!await confirmAction({
+            title: promoting ? "Make Main Admin" : "Change to Admin",
+            message: promoting
+                ? `Give ${label} full Main Admin access (settings, billing, admin management)?`
+                : `Reduce ${label} to a regular Admin? They'll lose settings, billing and admin-management access.`,
+            tone: "warning",
+            confirmLabel: promoting ? "Make Main Admin" : "Change to Admin",
+        })) return;
+
+        setChangingRole(admin.id);
+        const res = await fetch("/api/admin/update", {
+            method: "POST",
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ action: "update_role", admin_id: admin.id, role: newRole }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setChangingRole(null);
+        if (!res.ok) {
+            notify({ title: "Couldn't change role", message: data?.error || "Unknown error", tone: "error" });
+            return;
+        }
+        setAdmins(admins.map(x => x.id === admin.id ? { ...x, role: newRole } : x));
+        notify({ title: "Role updated", message: `${label} is now ${promoting ? "a Main Admin" : "a regular Admin"}.`, tone: "success" });
     }
 
     async function handleSaveMarketingTestEmail(email: string) {
@@ -725,6 +921,7 @@ export default function SettingsPage() {
                 hero_eyebrow: data.hero_eyebrow || DEFAULT_SITE_SETTINGS.hero_eyebrow,
                 hero_title: data.hero_title || DEFAULT_SITE_SETTINGS.hero_title,
                 hero_subtitle: data.hero_subtitle || DEFAULT_SITE_SETTINGS.hero_subtitle,
+                hero_image: data.hero_image || DEFAULT_SITE_SETTINGS.hero_image,
                 business_name: data.business_name || DEFAULT_SITE_SETTINGS.business_name,
                 business_tagline: data.business_tagline || DEFAULT_SITE_SETTINGS.business_tagline,
                 logo_url: data.logo_url || DEFAULT_SITE_SETTINGS.logo_url,
@@ -747,7 +944,15 @@ export default function SettingsPage() {
                 timezone: data.timezone || DEFAULT_SITE_SETTINGS.timezone,
             });
             setSubdomain(data.subdomain || null);
-            setBookingCustomFieldsJson(JSON.stringify(Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [], null, 2));
+            setBookingQuestions((Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [])
+                .filter((f: any) => f && (f.key || f.label))
+                .map((f: any) => ({
+                    key: String(f.key || ""),
+                    label: String(f.label || ""),
+                    type: (f.type === "textarea" || f.type === "number") ? f.type : "text",
+                    required: !!f.required,
+                    placeholder: String(f.placeholder || ""),
+                })));
             setRefundTiers(Array.isArray(data.refund_policy_tiers) ? data.refund_policy_tiers : []);
             setRefundPolicyText(data.refund_policy_text || "");
             setEmailImgs({
@@ -764,6 +969,9 @@ export default function SettingsPage() {
             });
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
+            setEmailTagline(data.email_tagline || "");
+            setActivityVerbPast(data.activity_verb_past || "");
+            setLocationPhrase(data.location_phrase || "");
             setSocialLinks({
                 facebook: data.social_facebook || "",
                 instagram: data.social_instagram || "",
@@ -845,160 +1053,36 @@ export default function SettingsPage() {
         setTogglingSubscription(false);
     }
 
-    function resetResourceForm() {
-        setResourceForm({ id: "", name: "", resource_type: "GENERAL", capacity_total: "10", active: true });
-    }
-
-    function resetAssignmentForm() {
-        setAssignmentForm({ id: "", tour_id: "", resource_id: "", units_per_guest: "1", active: true });
-    }
-
-    async function fetchResources() {
-        try {
-            const [resourcesRes, linksRes] = await Promise.all([
-                supabase.from("resources").select("id, name, resource_type, capacity_total, active").eq("business_id", businessId).order("active", { ascending: false }).order("name"),
-                supabase.from("tour_resources").select("id, tour_id, resource_id, units_per_guest, active, tours(id, name), resources(id, name, resource_type, capacity_total, active)").eq("business_id", businessId).order("created_at", { ascending: true }),
-            ]);
-
-            if (resourcesRes.error) throw resourcesRes.error;
-            if (linksRes.error) throw linksRes.error;
-
-            setResources((resourcesRes.data || []) as ResourceRecord[]);
-            setTourResourceLinks(((linksRes.data || []) as any[]).map((row) => ({
-                ...row,
-                tours: Array.isArray(row.tours) ? row.tours[0] : row.tours,
-                resources: Array.isArray(row.resources) ? row.resources[0] : row.resources,
-            })));
-        } catch (fetchError: any) {
-            console.error("Failed to load resources:", fetchError);
-            setResourceMessage({ type: "error", text: "Failed to load shared resources: " + String(fetchError?.message || fetchError) });
-        }
-    }
-
-    async function handleSaveResource(e: React.FormEvent) {
-        e.preventDefault();
-        if (!resourceForm.name.trim()) {
-            setResourceMessage({ type: "error", text: "Resource name is required." });
-            return;
-        }
-        if (!resourceForm.capacity_total || Number(resourceForm.capacity_total) <= 0) {
-            setResourceMessage({ type: "error", text: "Resource capacity must be greater than 0." });
-            return;
-        }
-
-        setResourceSaving(true);
-        setResourceMessage({ type: "", text: "" });
-
-        const payload = {
-            business_id: businessId,
-            name: resourceForm.name.trim(),
-            resource_type: resourceForm.resource_type.trim() || "GENERAL",
-            capacity_total: Number(resourceForm.capacity_total),
-            active: resourceForm.active,
-        };
-
-        const query = resourceForm.id
-            ? supabase.from("resources").update(payload).eq("id", resourceForm.id)
-            : supabase.from("resources").insert(payload);
-
-        const { error: saveError } = await query;
-        if (saveError) {
-            setResourceMessage({ type: "error", text: "Failed to save resource: " + saveError.message });
+    // Serialise the plain-form questions back into the booking_custom_fields
+    // JSON array (same shape the new-booking form and bots consume). Keys are
+    // stable once assigned — answers in bookings.custom_fields are keyed on
+    // them — so only brand-new questions get a generated key.
+    async function saveBookingQuestions() {
+        setQuestionsSaving(true);
+        const cleaned = bookingQuestions
+            .filter(q => q.label.trim())
+            .map((q, i) => ({
+                key: q.key || (q.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "question") + "_" + Date.now().toString().slice(-4) + i,
+                label: q.label.trim(),
+                type: q.type,
+                required: q.required,
+                ...(q.placeholder.trim() ? { placeholder: q.placeholder.trim() } : {}),
+            }));
+        const { error } = await supabase.from("businesses").update({ booking_custom_fields: cleaned }).eq("id", businessId);
+        if (error) {
+            setQuestionsMessage({ type: "error", text: "Failed to save questions: " + error.message });
         } else {
-            setResourceMessage({ type: "success", text: resourceForm.id ? "Resource updated." : "Resource created." });
-            resetResourceForm();
-            fetchResources();
+            setBookingQuestions(cleaned.map(f => ({ key: f.key, label: f.label, type: f.type, required: f.required, placeholder: (f as any).placeholder || "" })));
+            setQuestionsMessage({ type: "success", text: "Booking questions saved." });
+            setTimeout(() => setQuestionsMessage({ type: "", text: "" }), 3000);
         }
-        setResourceSaving(false);
-    }
-
-    async function handleDeleteResource(resource: ResourceRecord) {
-        if (!await confirmAction({
-            title: "Delete resource",
-            message: "Delete \"" + resource.name + "\"? Any tour mappings to this resource will also be removed.",
-            tone: "warning",
-            confirmLabel: "Delete resource",
-        })) return;
-
-        const { error: deleteError } = await supabase.from("resources").delete().eq("id", resource.id);
-        if (deleteError) {
-            setResourceMessage({ type: "error", text: "Failed to delete resource: " + deleteError.message });
-            return;
-        }
-        if (resourceForm.id === resource.id) resetResourceForm();
-        setResourceMessage({ type: "success", text: "Resource deleted." });
-        fetchResources();
-    }
-
-    async function handleSaveAssignment(e: React.FormEvent) {
-        e.preventDefault();
-        if (!assignmentForm.tour_id || !assignmentForm.resource_id) {
-            setResourceMessage({ type: "error", text: "Choose both a tour and a resource before saving the mapping." });
-            return;
-        }
-        if (!assignmentForm.units_per_guest || Number(assignmentForm.units_per_guest) <= 0) {
-            setResourceMessage({ type: "error", text: "Units per guest must be greater than 0." });
-            return;
-        }
-
-        setAssignmentSaving(true);
-        setResourceMessage({ type: "", text: "" });
-
-        const payload = {
-            business_id: businessId,
-            tour_id: assignmentForm.tour_id,
-            resource_id: assignmentForm.resource_id,
-            units_per_guest: Number(assignmentForm.units_per_guest),
-            active: assignmentForm.active,
-        };
-
-        const query = assignmentForm.id
-            ? supabase.from("tour_resources").update(payload).eq("id", assignmentForm.id)
-            : supabase.from("tour_resources").upsert(payload, { onConflict: "tour_id,resource_id" });
-
-        const { error: saveError } = await query;
-        if (saveError) {
-            setResourceMessage({ type: "error", text: "Failed to save resource mapping: " + saveError.message });
-        } else {
-            setResourceMessage({ type: "success", text: assignmentForm.id ? "Tour mapping updated." : "Tour mapping saved." });
-            resetAssignmentForm();
-            fetchResources();
-        }
-        setAssignmentSaving(false);
-    }
-
-    async function handleDeleteAssignment(link: TourResourceLink) {
-        if (!await confirmAction({
-            title: "Remove resource mapping",
-            message: "Remove the mapping between " + (link.tours?.name || "this tour") + " and " + (link.resources?.name || "this resource") + "?",
-            tone: "warning",
-            confirmLabel: "Remove mapping",
-        })) return;
-
-        const { error: deleteError } = await supabase.from("tour_resources").delete().eq("id", link.id);
-        if (deleteError) {
-            setResourceMessage({ type: "error", text: "Failed to remove mapping: " + deleteError.message });
-            return;
-        }
-        if (assignmentForm.id === link.id) resetAssignmentForm();
-        setResourceMessage({ type: "success", text: "Resource mapping removed." });
-        fetchResources();
+        setQuestionsSaving(false);
     }
 
     async function handleSaveSiteSettings(e: React.FormEvent) {
         e.preventDefault();
         setSiteSaving(true);
         setSiteMessage({ type: "", text: "" });
-
-        let parsedBookingFields: any[] = [];
-        try {
-            parsedBookingFields = JSON.parse(bookingCustomFieldsJson || "[]");
-            if (!Array.isArray(parsedBookingFields)) throw new Error("Custom booking fields must be a JSON array.");
-        } catch (parseError: any) {
-            setSiteMessage({ type: "error", text: "Custom booking fields JSON is invalid: " + String(parseError?.message || parseError) });
-            setSiteSaving(false);
-            return;
-        }
 
         // Get the single business row that exists
         const { data: biz } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
@@ -1008,21 +1092,40 @@ export default function SettingsPage() {
             return;
         }
 
+        // Theme colors are consumed by the public booking site — reject
+        // non-hex values here so garbage never reaches the tenant theme row.
+        const HEX_RE = /^#?[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/;
+        const colorFields = ["color_main", "color_secondary", "color_cta", "color_bg", "color_nav", "color_hover"] as const;
+        for (const key of colorFields) {
+            const raw = String((siteSettings as any)[key] || "").trim();
+            if (!HEX_RE.test(raw)) {
+                setSiteMessage({ type: "error", text: `"${key.replace("color_", "").replace("_", " ")}" color must be a hex value like #1F7A8C (got "${raw}").` });
+                setSiteSaving(false);
+                return;
+            }
+        }
+        const normHex = (v: string) => {
+            let h = v.trim().replace(/^#/, "").toLowerCase();
+            if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+            return "#" + h;
+        };
+
         const { error } = await supabase.from("businesses").update({
             directions: siteSettings.directions,
             terms_conditions: siteSettings.terms_conditions,
             privacy_policy: siteSettings.privacy_policy,
             cookies_policy: siteSettings.cookies_policy,
-            color_main: siteSettings.color_main,
-            color_secondary: siteSettings.color_secondary,
-            color_cta: siteSettings.color_cta,
-            color_bg: siteSettings.color_bg,
-            color_nav: siteSettings.color_nav,
-            color_hover: siteSettings.color_hover,
+            color_main: normHex(siteSettings.color_main),
+            color_secondary: normHex(siteSettings.color_secondary),
+            color_cta: normHex(siteSettings.color_cta),
+            color_bg: normHex(siteSettings.color_bg),
+            color_nav: normHex(siteSettings.color_nav),
+            color_hover: normHex(siteSettings.color_hover),
             chatbot_avatar: siteSettings.chatbot_avatar,
             hero_eyebrow: siteSettings.hero_eyebrow || null,
             hero_title: siteSettings.hero_title || null,
             hero_subtitle: siteSettings.hero_subtitle || null,
+            hero_image: siteSettings.hero_image || null,
             business_name: siteSettings.business_name || null,
             business_tagline: siteSettings.business_tagline || null,
             logo_url: siteSettings.logo_url || null,
@@ -1043,7 +1146,6 @@ export default function SettingsPage() {
             public_phone: siteSettings.public_phone || null,
             public_whatsapp: siteSettings.public_whatsapp || null,
             timezone: siteSettings.timezone || DEFAULT_SITE_SETTINGS.timezone,
-            booking_custom_fields: parsedBookingFields,
         }).eq("id", biz.id);
 
         if (error) {
@@ -1192,7 +1294,7 @@ export default function SettingsPage() {
             });
             const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
-            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled — sandbox keys will be used for payments." : "Yoco TEST MODE disabled — live keys are active." });
+            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled. Sandbox keys will be used for payments." : "Yoco TEST MODE disabled. Live keys are active." });
             fetchCredStatus();
             window.location.reload();
         } catch (err: any) {
@@ -1278,6 +1380,29 @@ export default function SettingsPage() {
     }
 
     const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+    // Downscale/compress a photo in the browser so operators can upload
+    // camera-size originals: longest edge capped, re-encoded as JPEG. Returns
+    // the original file untouched if it's already small or not bitmap-decodable
+    // (e.g. SVG).
+    async function compressImage(file: File, maxEdge = 2560, quality = 0.82): Promise<File> {
+        if (file.size < 600 * 1024 || file.type === "image/svg+xml" || file.type === "image/gif") return file;
+        try {
+            const bitmap = await createImageBitmap(file);
+            const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+            const w = Math.round(bitmap.width * scale);
+            const h = Math.round(bitmap.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
+            bitmap.close();
+            const blob: Blob | null = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+            if (!blob || blob.size >= file.size) return file;
+            return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+        } catch {
+            return file; // decode failed — let the normal size gate handle it
+        }
+    }
 
     async function handleImageUpload(file: File, bucket: string, folder: string, onUrl: (url: string) => void) {
         const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -1395,7 +1520,7 @@ export default function SettingsPage() {
             if (error) { notify("Upload failed: " + error.message); return; }
             const { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
             setEmailImgs(prev => ({ ...prev, [key]: urlData.publicUrl }));
-            notify("Image uploaded — click Save Email Images to persist.");
+            notify("Image uploaded. Click Save Email Images to persist.");
         } catch (err: any) {
             notify("Upload failed: " + (err?.message || "Unknown error"));
         } finally {
@@ -1409,6 +1534,9 @@ export default function SettingsPage() {
         setEmailImgsMessage({ type: "", text: "" });
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
+            email_tagline: emailTagline.trim() || null,
+            activity_verb_past: activityVerbPast.trim() || null,
+            location_phrase: locationPhrase.trim() || null,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
             email_img_invoice: emailImgs.invoice || null,
@@ -1437,15 +1565,31 @@ export default function SettingsPage() {
         setEmailImgsSaving(false);
     }
 
-    if (loading) return <div className="p-8 ui-text-muted">Loading settings...</div>;
+    if (loading) return (
+        <div className="max-w-4xl">
+            <div className="mb-6">
+                <div className="ui-skeleton h-3 w-24 mb-3" />
+                <div className="ui-skeleton h-8 w-40" />
+            </div>
+            <div className="space-y-4">
+                {[0, 1, 2, 3].map(i => <div key={i} className="ui-skeleton h-[68px] w-full !rounded-2xl" />)}
+            </div>
+        </div>
+    );
 
     const hasAnyPerm = Object.values(myPerms).some(Boolean);
     if (!isPrivileged(role) && !hasAnyPerm) {
         return (
             <div className="max-w-2xl">
-                <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
-                <div className="ui-surface rounded-2xl p-6 border border-[var(--ck-border-subtle)] text-center">
-                    <p className="ui-text-muted">You do not have permission to view or manage admin settings.</p>
+                <div className="anim-fade-up mb-6">
+                    <p className="ui-mono-label mb-2">Admin Console</p>
+                    <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+                </div>
+                <div className="ui-card anim-fade-up anim-d1">
+                    <div className="ui-empty">
+                        <p className="text-[14px] font-medium" style={{ color: "var(--ck-text-strong)" }}>No settings access</p>
+                        <p className="text-[13px] ui-text-muted">You do not have permission to view or manage admin settings.</p>
+                    </div>
                 </div>
             </div>
         );
@@ -1453,17 +1597,61 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-4xl">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--ck-text-strong)] mb-6">Settings</h1>
+            <div className="anim-fade-up mb-6">
+                <p className="ui-mono-label mb-2">Admin Console</p>
+                <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+            </div>
 
             <div className="space-y-4">
 
-            {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection} defaultOpen>
+            {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection}>
+                {/* Business logo — shown in the dashboard sidebar, the booking
+                    site header, every customer email, and on invoices. Saves
+                    immediately on upload/remove. */}
+                <div className="mb-8 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
+                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Business Logo <span className="text-[var(--ck-accent)]">(appears on the dashboard sidebar, booking site, all emails, and invoices)</span></label>
+                    <div className="flex items-center gap-3">
+                        {siteSettings.logo_url && (
+                            <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
+                        )}
+                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
+                            {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingField("logo");
+                                await handleImageUpload(file, "email-images", businessId + "/branding", async (url) => {
+                                    setSiteSettings(prev => ({ ...prev, logo_url: url }));
+                                    const { error } = await supabase.from("businesses").update({ logo_url: url }).eq("id", businessId);
+                                    notify(error ? { message: "Logo upload saved locally but failed to persist: " + error.message, tone: "error" } : { message: "Logo updated everywhere.", tone: "success" });
+                                });
+                                setUploadingField(null);
+                                e.target.value = "";
+                            }} />
+                        </label>
+                        {siteSettings.logo_url && (
+                            <button type="button" onClick={async () => {
+                                setSiteSettings(prev => ({ ...prev, logo_url: "" }));
+                                const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", businessId);
+                                notify(error ? { message: "Failed to remove logo: " + error.message, tone: "error" } : { message: "Logo removed.", tone: "success" });
+                            }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                        )}
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-[var(--ck-bg-subtle)] text-[var(--ck-text-muted)]">
-                            {admins.length} / {usageSnapshot?.seat_limit || 10} seats
+                        <span className="inline-flex items-center gap-2 rounded-full bg-[var(--ck-surface-sunken)] px-3 py-1">
+                            <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{admins.length}</span>
+                            <span className="ui-mono-label !text-[9.5px]">/ {usageSnapshot?.seat_limit || 10} seats</span>
                         </span>
+                        <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Who receives BookingTours subscription invoices. Defaults to the first admin created on this account.">
+                            Billing contact
+                            <select value={billingAdminId} onChange={e => saveBillingContact(e.target.value)} className="ui-control px-2 py-1.5 text-xs rounded-lg outline-none max-w-[180px]">
+                                <option value="">First admin (default)</option>
+                                {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+                            </select>
+                        </label>
                     </div>
 
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
@@ -1475,8 +1663,8 @@ export default function SettingsPage() {
                                 const isExpanded = expandedPermsAdmin === a.id;
                                 return (
                                     <div key={a.id}>
-                                        <div className="p-4 flex items-center justify-between">
-                                            <div>
+                                        <div className="p-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 transition-colors hover:bg-[var(--ck-surface-warm)]">
+                                            <div className="min-w-0">
                                                 <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">
@@ -1491,7 +1679,17 @@ export default function SettingsPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                {a.role !== "SUPER_ADMIN" && a.email !== myEmail && (
+                                                    <button
+                                                        onClick={() => handleChangeRole(a, a.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
+                                                        disabled={changingRole === a.id}
+                                                        className="text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
+                                                        style={{ color: "var(--ck-text-muted)" }}
+                                                    >
+                                                        {changingRole === a.id ? "Saving..." : (a.role === "MAIN_ADMIN" ? "Change to Admin" : "Make Main Admin")}
+                                                    </button>
+                                                )}
                                                 {a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
                                                     <button
                                                         onClick={() => setExpandedPermsAdmin(isExpanded ? null : a.id)}
@@ -1518,7 +1716,7 @@ export default function SettingsPage() {
                                         </div>
                                         {/* Expandable permissions panel */}
                                         {isExpanded && a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
-                                            <div className="px-4 pb-4 pt-1 bg-[var(--ck-bg-subtle)] border-t border-[var(--ck-border-subtle)]">
+                                            <div className="px-4 pb-4 pt-1 bg-[var(--ck-surface-sunken)] border-t border-[var(--ck-border-subtle)]">
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mb-3">Settings page access for {a.name || a.email}</p>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     {SETTINGS_SECTIONS.map(section => (
@@ -1533,11 +1731,35 @@ export default function SettingsPage() {
                                                                     handleSaveAdminPerms(a.id, newPerms);
                                                                 }}
                                                                 disabled={savingPerms === a.id}
-                                                                className="h-4 w-4 rounded border-gray-300 accent-[var(--ck-accent)]"
+                                                                className="h-4 w-4 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
                                                             />
                                                             <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
                                                         </label>
                                                     ))}
+                                                </div>
+                                                <p className="text-xs font-semibold text-[var(--ck-text-strong)] mt-5 mb-1">Dashboard sections visible to {a.name || a.email}</p>
+                                                <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide a section from this admin. Billing, Chat FAQ and Data Requests are always Main-Admin only.</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {OPERATOR_HIDEABLE_SECTIONS.map(section => {
+                                                        const hideKey = `hide:${section.key}`;
+                                                        const visible = perms[hideKey] !== true;
+                                                        return (
+                                                            <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={visible}
+                                                                    onChange={() => {
+                                                                        const newPerms = { ...perms, [hideKey]: visible };
+                                                                        setAdmins(admins.map(x => x.id === a.id ? { ...x, settings_permissions: newPerms } : x));
+                                                                        handleSaveAdminPerms(a.id, newPerms);
+                                                                    }}
+                                                                    disabled={savingPerms === a.id}
+                                                                    className="h-4 w-4 rounded border-[var(--ck-border-strong)] accent-[var(--ck-accent)]"
+                                                                />
+                                                                <span className="text-xs text-[var(--ck-text)]">{section.label}</span>
+                                                            </label>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <p className="text-[10px] text-[var(--ck-text-muted)] mt-3 leading-relaxed">
                                                     Banking details and Admin Users management are always restricted to the Main Admin only.
@@ -1555,21 +1777,21 @@ export default function SettingsPage() {
                 {/* Add Admin Form + Subscription */}
                 <div className="space-y-6">
                     <div className="flex items-center justify-between gap-4">
-                        <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Add New Admin</h2>
+                        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">Add New Admin</h2>
                         <button
                             onClick={toggleSubscription}
                             disabled={togglingSubscription}
-                            className={"text-xs font-medium px-3 py-1.5 rounded-lg border disabled:opacity-50 whitespace-nowrap " +
+                            className={"text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap " +
                                 (subscriptionStatus === "SUSPENDED"
-                                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                                    : "border-red-300 text-red-700 hover:bg-red-50")}
+                                    ? "border-[var(--ck-success)] text-[var(--ck-success)] hover:bg-[var(--ck-success-soft)]"
+                                    : "border-[var(--ck-danger)] text-[var(--ck-danger)] hover:bg-[var(--ck-danger-soft)]")}
                         >
                             {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
                         </button>
                     </div>
                     <form onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
-                            <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+                            <div className="p-3 rounded-xl text-sm" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)", border: "1px solid color-mix(in srgb, var(--ck-warning) 25%, transparent)" }}>
                                 You have reached the admin seat limit for your plan ({usageSnapshot?.seat_limit || 10}).
                             </div>
                         ) : (
@@ -1591,7 +1813,7 @@ export default function SettingsPage() {
                                 </div>
                                 {error && <div className="text-xs text-[var(--ck-danger)] font-medium">{error}</div>}
                                 {adminMessage && <div className="text-xs text-[var(--ck-success)] font-medium">{adminMessage}</div>}
-                                <button type="submit" disabled={adding} className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
+                                <button type="submit" disabled={adding} className="ui-btn ui-btn-primary w-full disabled:opacity-50">
                                     {adding ? "Adding..." : "Add Admin and Send Setup Link"}
                                 </button>
                             </>
@@ -1609,7 +1831,7 @@ export default function SettingsPage() {
                             value={marketingTestEmail}
                             onChange={(e) => handleSaveMarketingTestEmail(e.target.value)}
                             disabled={savingTestEmail}
-                            className="flex-1 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-3 py-2 text-sm text-[var(--ck-text)] disabled:opacity-50"
+                            className="ui-control flex-1 disabled:opacity-50"
                         >
                             <option value="">Select an admin...</option>
                             {admins.map(a => (
@@ -1617,7 +1839,7 @@ export default function SettingsPage() {
                             ))}
                         </select>
                         {marketingTestEmail && (
-                            <span className="shrink-0 text-xs text-[var(--ck-success)] font-medium px-2 py-2">
+                            <span className="ui-status ui-pill-success shrink-0 self-center">
                                 Active
                             </span>
                         )}
@@ -1631,7 +1853,7 @@ export default function SettingsPage() {
                     {/* Tour List */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
+                            <span className="ui-mono-label !text-[10px]">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
                             <button onClick={resetTourForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Tour</button>
                         </div>
                         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
@@ -1656,15 +1878,15 @@ export default function SettingsPage() {
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{t.name}</span>
                                                     <div className="flex items-center gap-1.5">
                                                         {t.hidden && (
-                                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Hidden</span>
+                                                            <span className="ui-status ui-pill-amber">Hidden</span>
                                                         )}
-                                                        <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + (t.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                        <span className={"ui-status " + (t.active ? "ui-pill-success" : "ui-pill-neutral")}>
                                                             {t.active ? "Active" : "Inactive"}
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="text-xs text-[var(--ck-text-muted)]">
-                                                    R{t.base_price_per_person || 0}/person · {t.duration_minutes || "—"} min · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
+                                                    R{t.base_price_per_person || 0}/person · {t.duration_minutes ? formatDuration(t.duration_minutes) : "—"} · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1708,13 +1930,20 @@ export default function SettingsPage() {
                                     placeholder="Describe this activity..." />
                             </div>
                             <div>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Confirmation email tagline</label>
+                                <input type="text" value={tourForm.confirmationTagline} onChange={e => setTourForm({ ...tourForm, confirmationTagline: e.target.value })}
+                                    maxLength={200} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. Lace up your boots for an unforgettable day on the trail." />
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">The excitement line in this tour&apos;s confirmation email, after &quot;Your spots are officially locked in.&quot; Overrides your account tagline. Leave blank to fall back to the account default.</p>
+                            </div>
+                            <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Tour Image</label>
                                 <div className="flex items-center gap-3">
                                     {tourForm.image_url && (
                                         <img src={tourForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
                                     )}
                                     <div className="flex-1">
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "tour_image" ? "Uploading..." : (tourForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
@@ -1739,10 +1968,19 @@ export default function SettingsPage() {
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="600" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Duration (minutes)</label>
-                                    <input type="number" required min="1" step="1" value={tourForm.duration}
-                                        onChange={e => setTourForm({ ...tourForm, duration: e.target.value })}
-                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="90" />
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Duration</label>
+                                    <div className="flex gap-2">
+                                        <input type="number" required min="1" step="1" value={tourForm.duration}
+                                            onChange={e => setTourForm({ ...tourForm, duration: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="90" />
+                                        <select value={tourForm.durationUnit}
+                                            onChange={e => setTourForm({ ...tourForm, durationUnit: e.target.value as "min" | "hours" | "days" })}
+                                            className="ui-control px-2 py-2 text-sm rounded-lg outline-none" aria-label="Duration unit">
+                                            <option value="min">min</option>
+                                            <option value="hours">hours</option>
+                                            <option value="days">days</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -1756,9 +1994,35 @@ export default function SettingsPage() {
                                 <div className="flex items-end pb-1">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={tourForm.active} onChange={e => setTourForm({ ...tourForm, active: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                            className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                         <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
                                     </label>
+                                </div>
+                            </div>
+
+                            {/* Last-minute deals */}
+                            <div className="border-t border-[var(--ck-border-subtle)] pt-4">
+                                <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">Last-minute deal (optional)</label>
+                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats drop to the deal price between the start and the cut-off, then go back to the normal price. Leave blank to switch it off.</p>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Starts (hours before departure)</label>
+                                        <input type="number" min="1" max="720" step="1" value={tourForm.lastMinuteHours}
+                                            onChange={e => setTourForm({ ...tourForm, lastMinuteHours: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="48" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cut-off (hours before departure)</label>
+                                        <input type="number" min="0" step="1" value={tourForm.lastMinuteEndHours}
+                                            onChange={e => setTourForm({ ...tourForm, lastMinuteEndHours: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="4" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Deal price per person (R)</label>
+                                        <input type="number" min="1" step="1" value={tourForm.lastMinutePrice}
+                                            onChange={e => setTourForm({ ...tourForm, lastMinutePrice: e.target.value })}
+                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="450" />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1815,7 +2079,7 @@ export default function SettingsPage() {
                                     <div className="flex flex-wrap gap-1.5 mt-1">
                                         {DAY_LABELS.map((label, idx) => (
                                             <button key={idx} type="button" onClick={() => toggleDay(idx)}
-                                                className={"px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors " + (tourForm.slotDays.includes(idx) ? "bg-[var(--ck-text-strong)] text-[var(--ck-surface)] border-[var(--ck-text-strong)]" : "bg-white text-[var(--ck-text-muted)] border-[var(--ck-border-subtle)] hover:border-[var(--ck-text-muted)]")}>
+                                                className={"px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors " + (tourForm.slotDays.includes(idx) ? "bg-[var(--ck-text-strong)] text-[var(--ck-surface)] border-[var(--ck-text-strong)]" : "bg-[var(--ck-surface)] text-[var(--ck-text-muted)] border-[var(--ck-border-subtle)] hover:border-[var(--ck-text-muted)]")}>
                                                 {label}
                                             </button>
                                         ))}
@@ -1858,6 +2122,85 @@ export default function SettingsPage() {
                     </div>
 
                 </div>
+
+                {/* Custom Booking Questions — plain form; the JSON the backend
+                    expects is generated on save, never shown to the operator. */}
+                <div className="mt-10 space-y-4">
+                    <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
+                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
+                        <p className="text-xs text-[var(--ck-text-muted)]">
+                            Extra questions asked when a booking is taken (e.g. allergies, hotel pickup, experience level).
+                            Add your own or start from a template below. No code needed.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Add a common question</label>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { name: "+ Dietary Requirements", q: { label: "Any dietary requirements or allergies?", type: "textarea" as const, required: false, placeholder: "e.g. Vegetarian, nut allergy, none" } },
+                                { name: "+ Hotel / Pickup", q: { label: "Where are you staying? (For pickup routing)", type: "text" as const, required: false, placeholder: "Hotel name or address" } },
+                                { name: "+ Experience Level", q: { label: "Have you done this activity before?", type: "text" as const, required: true, placeholder: "Yes, No, or A little bit" } },
+                                { name: "+ Emergency Contact", q: { label: "Emergency Contact (Name & Phone Number)", type: "text" as const, required: true, placeholder: "John Doe - +27 123 456 789" } },
+                                { name: "+ Medical Conditions", q: { label: "Do you have any medical conditions we should be aware of?", type: "textarea" as const, required: false, placeholder: "List any relevant medical conditions" } },
+                                { name: "+ Referral Source", q: { label: "How did you hear about us?", type: "text" as const, required: false, placeholder: "Google, TripAdvisor, Friend, etc." } },
+                            ].map(t => (
+                                <button key={t.name} type="button"
+                                    onClick={() => setBookingQuestions(prev => [...prev, { key: "", ...t.q }])}
+                                    className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">
+                                    {t.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {bookingQuestions.length === 0 ? (
+                        <p className="text-xs text-[var(--ck-text-muted)]">No custom questions yet. Add one above, or click &quot;Add question&quot;.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {bookingQuestions.map((q, i) => (
+                                <div key={q.key || "new-" + i} className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-3 grid grid-cols-1 md:grid-cols-[1fr_150px_1fr_auto_auto] gap-2 items-center">
+                                    <input type="text" value={q.label}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, label: e.target.value } : p))}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="The question, e.g. Any allergies?" />
+                                    <select value={q.type}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, type: e.target.value as any } : p))}
+                                        className="ui-control px-2 py-2 text-sm rounded-lg outline-none">
+                                        <option value="text">Short answer</option>
+                                        <option value="textarea">Long answer</option>
+                                        <option value="number">Number</option>
+                                    </select>
+                                    <input type="text" value={q.placeholder}
+                                        onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, placeholder: e.target.value } : p))}
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Hint text (optional)" />
+                                    <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--ck-text-muted)] cursor-pointer select-none whitespace-nowrap">
+                                        <input type="checkbox" checked={q.required}
+                                            onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, required: e.target.checked } : p))}
+                                            className="h-3.5 w-3.5 rounded border-gray-300 accent-[var(--ck-accent)]" />
+                                        Required
+                                    </label>
+                                    <button type="button" aria-label="Remove question"
+                                        onClick={() => setBookingQuestions(prev => prev.filter((_, j) => j !== i))}
+                                        className="justify-self-end px-2 py-1 text-sm font-bold text-[var(--ck-danger)] hover:opacity-70 transition-opacity">×</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setBookingQuestions(prev => [...prev, { key: "", label: "", type: "text", required: false, placeholder: "" }])}
+                            className="px-4 py-2 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg)]">
+                            Add question
+                        </button>
+                        <button type="button" disabled={questionsSaving} onClick={saveBookingQuestions}
+                            className="px-4 py-2 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity">
+                            {questionsSaving ? "Saving..." : "Save Questions"}
+                        </button>
+                        {questionsMessage.text && (
+                            <span className={"text-xs font-medium " + (questionsMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-emerald-700")}>{questionsMessage.text}</span>
+                        )}
+                    </div>
+                </div>
             </CollapsibleSection>}
 
             {canAccess("addons") && <CollapsibleSection id="addons" title="Booking Add-Ons" subtitle="Optional extras customers can add when booking (e.g. photos, equipment rental)" openSections={openSections} toggle={toggleSection}>
@@ -1889,7 +2232,7 @@ export default function SettingsPage() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{a.name}</span>
-                                                    <span className={"text-xs font-medium px-2 py-0.5 rounded-full " + (a.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
+                                                    <span className={"ui-status " + (a.active ? "ui-pill-success" : "ui-pill-neutral")}>
                                                         {a.active ? "Active" : "Inactive"}
                                                     </span>
                                                 </div>
@@ -1936,7 +2279,7 @@ export default function SettingsPage() {
                                         <img src={addOnForm.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" />
                                     )}
                                     <div className="flex-1">
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
+                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "addon_image" ? "Uploading..." : (addOnForm.image_url ? "Change image" : "Upload image")}
                                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
@@ -1963,7 +2306,7 @@ export default function SettingsPage() {
                                 <div className="flex items-end pb-1">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={addOnForm.active} onChange={e => setAddOnForm({ ...addOnForm, active: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
+                                            className="w-4 h-4 rounded border-[var(--ck-border-strong)] text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
                                         <span className="text-sm text-[var(--ck-text-strong)]">Active</span>
                                     </label>
                                 </div>
@@ -1989,148 +2332,6 @@ export default function SettingsPage() {
                 </div>
             </CollapsibleSection>}
 
-            {canAccess("resources") && <CollapsibleSection id="resources" title="Shared Resources & Capacity Pools" subtitle="Assets like vans, guides, kayaks that reduce availability across tours" openSections={openSections} toggle={toggleSection}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
-                            <button type="button" onClick={resetResourceForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Resource</button>
-                        </div>
-                        <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
-                            <div className="divide-y divide-[var(--ck-border-subtle)]">
-                                {resources.map((resource) => (
-                                    <div key={resource.id} className={"p-4 " + (resourceForm.id === resource.id ? "bg-blue-50" : "")}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-sm text-[var(--ck-text-strong)]">{resource.name}</span>
-                                                    <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full " + (resource.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500")}>
-                                                        {resource.active ? "Active" : "Inactive"}
-                                                    </span>
-                                                </div>
-                                                <div className="text-xs text-[var(--ck-text-muted)] mt-1">{resource.resource_type} · Total pool {resource.capacity_total}</div>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <button type="button" onClick={() => setResourceForm({ id: resource.id, name: resource.name, resource_type: resource.resource_type, capacity_total: String(resource.capacity_total), active: resource.active })} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">Edit</button>
-                                                <button type="button" onClick={() => handleDeleteResource(resource)} className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {resources.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No shared resources yet.</div>}
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSaveResource} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4 mt-4">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{resourceForm.id ? "Edit Resource" : "Add Resource"}</h3>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Resource Name</label>
-                                <input type="text" value={resourceForm.name} onChange={e => setResourceForm({ ...resourceForm, name: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Safari Van 1" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Resource Type</label>
-                                    <input type="text" value={resourceForm.resource_type} onChange={e => setResourceForm({ ...resourceForm, resource_type: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="VAN / GUIDE / BIKE" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Total Capacity</label>
-                                    <input type="number" min="1" value={resourceForm.capacity_total} onChange={e => setResourceForm({ ...resourceForm, capacity_total: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
-                                </div>
-                            </div>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={resourceForm.active} onChange={e => setResourceForm({ ...resourceForm, active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
-                                <span className="text-sm text-[var(--ck-text-strong)]">Resource is active</span>
-                            </label>
-                            <div className="flex gap-3">
-                                <button type="submit" disabled={resourceSaving} className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                                    {resourceSaving ? "Saving..." : resourceForm.id ? "Update Resource" : "Add Resource"}
-                                </button>
-                                {resourceForm.id && (
-                                    <button type="button" onClick={resetResourceForm} className="px-4 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg)]">
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-medium text-[var(--ck-text-muted)]">{tourResourceLinks.length} shared mapping{tourResourceLinks.length !== 1 ? "s" : ""}</span>
-                            <button type="button" onClick={resetAssignmentForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Mapping</button>
-                        </div>
-                        <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">
-                            <div className="divide-y divide-[var(--ck-border-subtle)]">
-                                {tourResourceLinks.map((link) => (
-                                    <div key={link.id} className={"p-4 " + (assignmentForm.id === link.id ? "bg-blue-50" : "")}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="font-medium text-sm text-[var(--ck-text-strong)]">{link.tours?.name || "Tour"} <span className="text-[var(--ck-text-muted)]">→</span> {link.resources?.name || "Resource"}</div>
-                                                <div className="text-xs text-[var(--ck-text-muted)] mt-1">{link.units_per_guest} unit{link.units_per_guest === 1 ? "" : "s"} consumed per guest · {link.resources?.resource_type || "GENERAL"}</div>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <button type="button" onClick={() => setAssignmentForm({ id: link.id, tour_id: link.tour_id, resource_id: link.resource_id, units_per_guest: String(link.units_per_guest), active: link.active })} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">Edit</button>
-                                                <button type="button" onClick={() => handleDeleteAssignment(link)} className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {tourResourceLinks.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No tour-to-resource mappings yet.</div>}
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSaveAssignment} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4 mt-4">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{assignmentForm.id ? "Edit Mapping" : "Add Tour Mapping"}</h3>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour</label>
-                                <select value={assignmentForm.tour_id} onChange={e => setAssignmentForm({ ...assignmentForm, tour_id: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
-                                    <option value="">Select a tour...</option>
-                                    {tours.map((tour) => <option key={tour.id} value={tour.id}>{tour.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Shared Resource</label>
-                                <select value={assignmentForm.resource_id} onChange={e => setAssignmentForm({ ...assignmentForm, resource_id: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
-                                    <option value="">Select a resource...</option>
-                                    {resources.filter((resource) => resource.active).map((resource) => (
-                                        <option key={resource.id} value={resource.id}>{resource.name} · {resource.capacity_total} total</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Units Per Guest</label>
-                                    <input type="number" min="1" value={assignmentForm.units_per_guest} onChange={e => setAssignmentForm({ ...assignmentForm, units_per_guest: e.target.value })} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" />
-                                </div>
-                                <label className="flex items-end gap-2 cursor-pointer pb-2">
-                                    <input type="checkbox" checked={assignmentForm.active} onChange={e => setAssignmentForm({ ...assignmentForm, active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-[var(--ck-accent)] focus:ring-[var(--ck-accent)]" />
-                                    <span className="text-sm text-[var(--ck-text-strong)]">Mapping active</span>
-                                </label>
-                            </div>
-                            <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-3 text-xs text-[var(--ck-text-muted)]">
-                                Example: if a 10-seat van is shared between two tours, and each guest consumes 1 van unit, bookings on either tour will reduce the sellable capacity on the other when their slots overlap.
-                            </div>
-                            <div className="flex gap-3">
-                                <button type="submit" disabled={assignmentSaving} className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                                    {assignmentSaving ? "Saving..." : assignmentForm.id ? "Update Mapping" : "Save Mapping"}
-                                </button>
-                                {assignmentForm.id && (
-                                    <button type="button" onClick={resetAssignmentForm} className="px-4 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-muted)] hover:bg-[var(--ck-bg)]">
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {resourceMessage.text && (
-                    <div className={"mt-4 text-sm font-medium " + (resourceMessage.type === "error" ? "text-[var(--ck-danger)]" : "text-[var(--ck-success)]")}>
-                        {resourceMessage.text}
-                    </div>
-                )}
-            </CollapsibleSection>}
-
             {canAccess("external") && (
                 <CollapsibleSection id="external" title="External Booking Integration" subtitle="B2B partner API keys and mappings" openSections={openSections} toggle={toggleSection}>
                     <ExternalBookingSettings tours={tours.map((t) => ({ id: t.id, name: t.name }))} />
@@ -2151,6 +2352,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Terms &amp; Conditions</label>
                                 <RichTextEditor value={siteSettings.terms_conditions} onChange={v => setSiteSettings({ ...siteSettings, terms_conditions: v })} rows={10} placeholder="Enter T&C's..." />
+                                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Shown on your booking site&apos;s Terms &amp; Conditions page. If this is empty or under 100 characters, the site shows platform-default terms (marked as such) instead.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Privacy Policy</label>
@@ -2169,7 +2371,7 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] mb-4">The <strong>Business Name</strong> and <strong>Logo</strong> below control: the admin dashboard sidebar, the browser tab title, all outgoing emails, and the public booking site header.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">— appears in the dashboard header &amp; all emails</span></label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">(appears in the dashboard header &amp; all emails)</span></label>
                                 <input type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Cape Kayak Adventures" />
                             </div>
@@ -2177,31 +2379,6 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
                                 <input type="text" value={siteSettings.business_tagline} onChange={e => setSiteSettings({ ...siteSettings, business_tagline: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town's Original Since 1994" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Logo <span className="text-[var(--ck-accent)]">— appears next to the business name in the dashboard sidebar</span></label>
-                                <div className="flex items-center gap-3">
-                                    {siteSettings.logo_url && (
-                                        <img src={siteSettings.logo_url} alt="Logo preview" className="h-10 w-10 object-contain rounded border border-[var(--ck-border-subtle)] shrink-0" />
-                                    )}
-                                    <div>
-                                        <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg-subtle)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
-                                            {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
-                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                                const file = e.target.files?.[0];
-                                                if (!file) return;
-                                                setUploadingField("logo");
-                                                await handleImageUpload(file, "email-images", businessId + "/branding", (url) => setSiteSettings(prev => ({ ...prev, logo_url: url })));
-                                                setUploadingField(null);
-                                                e.target.value = "";
-                                            }} />
-                                        </label>
-                                        {siteSettings.logo_url && (
-                                            <button type="button" onClick={() => setSiteSettings({ ...siteSettings, logo_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Leave empty to show the default icon.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Eyebrow</label>
@@ -2217,6 +2394,47 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
                                 <input type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
+                            </div>
+                            {/* Site background image — saves immediately on upload/remove
+                                (same pattern as the logo). Falls back to the first active
+                                tour's photo, then a palette gradient, when empty. */}
+                            <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind the glass panels on your booking site)</span></label>
+                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB. It&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
+                                <div className="flex items-center gap-3">
+                                    {siteSettings.hero_image && (
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        <img src={siteSettings.hero_image} alt="Background preview" className="h-14 w-24 shrink-0 rounded border border-[var(--ck-border-subtle)] object-cover" />
+                                    )}
+                                    <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "hero_bg" ? " opacity-50 pointer-events-none" : "")}>
+                                        {uploadingField === "hero_bg" ? "Uploading..." : (siteSettings.hero_image ? "Change background" : "Upload background")}
+                                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            if (file.size > 20 * 1024 * 1024) {
+                                                notify({ title: "File too large", message: "Please choose a photo under 20MB.", tone: "warning" });
+                                                e.target.value = "";
+                                                return;
+                                            }
+                                            setUploadingField("hero_bg");
+                                            const optimised = await compressImage(file);
+                                            await handleImageUpload(optimised, "email-images", businessId + "/branding", async (url) => {
+                                                setSiteSettings(prev => ({ ...prev, hero_image: url }));
+                                                const { error } = await supabase.from("businesses").update({ hero_image: url }).eq("id", businessId);
+                                                notify(error ? { message: "Background uploaded but failed to persist: " + error.message, tone: "error" } : { message: "Background image updated. Reload your booking site to see it.", tone: "success" });
+                                            });
+                                            setUploadingField(null);
+                                            e.target.value = "";
+                                        }} />
+                                    </label>
+                                    {siteSettings.hero_image && (
+                                        <button type="button" onClick={async () => {
+                                            setSiteSettings(prev => ({ ...prev, hero_image: "" }));
+                                            const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
+                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. The site falls back to your first tour photo.", tone: "success" });
+                                        }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2320,116 +2538,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    <div className="space-y-4">
-                        <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
-                            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
-                            <p className="text-xs text-[var(--ck-text-muted)]">
-                                Use this section to ask your customers additional questions during checkout (e.g., allergies, hotel pickups, or experience levels). 
-                                Click the buttons below to instantly add common questions, or write your own using the text box.
-                            </p>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-2">Quick Insert Templates</label>
-                            <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "dietary_" + Date.now().toString().slice(-4), label: "Any dietary requirements or allergies?", type: "textarea", required: false, placeholder: "e.g. Vegetarian, nut allergy, none" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Dietary Requirements</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "hotel_" + Date.now().toString().slice(-4), label: "Where are you staying in Cape Town? (For pickup routing)", type: "text", required: false, placeholder: "Hotel name or address" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Hotel / Pickup</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "experience_" + Date.now().toString().slice(-4), label: "Have you ever kayaked before?", type: "text", required: true, placeholder: "Yes, No, or A little bit" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Kayaking Experience</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "emergency_" + Date.now().toString().slice(-4), label: "Emergency Contact (Name & Phone Number)", type: "text", required: true, placeholder: "John Doe - +27 123 456 789" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Emergency Contact</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "medical_" + Date.now().toString().slice(-4), label: "Do you have any medical conditions we should be aware of?", type: "textarea", required: false, placeholder: "List any relevant medical conditions" });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Medical Conditions</button>
-
-                                <button type="button" onClick={() => {
-                                    try {
-                                        let current = JSON.parse(bookingCustomFieldsJson || "[]");
-                                        if (!Array.isArray(current)) current = [];
-                                        current.push({ key: "referral_" + Date.now().toString().slice(-4), label: "How did you hear about us?", type: "text", required: false, placeholder: "Google, TripAdvisor, Friend, etc." });
-                                        setBookingCustomFieldsJson(JSON.stringify(current, null, 2));
-                                    } catch(e) { alert("Please ensure the box below contains valid JSON (starts with [ and ends with ]) before adding a template."); }
-                                }} className="px-3 py-1.5 text-xs font-medium rounded border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] hover:bg-gray-50 text-[var(--ck-text-strong)] transition-colors">+ Referral Source</button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Configuration Code (JSON)</label>
-                            <textarea
-                                value={bookingCustomFieldsJson}
-                                onChange={e => setBookingCustomFieldsJson(e.target.value)}
-                                rows={12}
-                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono tracking-tight"
-                                placeholder={`[\n  {\n    "key": "dietary_1234",\n    "label": "Dietary Requirements",\n    "type": "textarea",\n    "required": false,\n    "placeholder": "List allergies..."\n  }\n]`}
-                            />
-                            <p className="mt-2 text-xs text-[var(--ck-text-muted)] leading-relaxed">
-                                This box stores the questions in a computer-readable format (JSON). It must always start with <code>[</code> and end with <code>]</code>.
-                                Each question has a <code>key</code> (internal ID), <code>label</code> (the public question), <code>type</code> (<code>text</code> or <code>textarea</code>), <code>placeholder</code> (hint text), and <code>required</code> (true/false).
-                            </p>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Copy Preview</h3>
-                        <div className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden" style={{ background: siteSettings.color_bg }}>
-                            <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--ck-border-subtle)]" style={{ background: siteSettings.color_nav }}>
-                                <div className="min-w-0">
-                                    <div className="text-lg font-semibold truncate" style={{ color: siteSettings.color_secondary }}>{siteSettings.business_name || "Business Name"}</div>
-                                    <div className="text-sm truncate" style={{ color: siteSettings.color_main }}>{siteSettings.business_tagline || "Business tagline"}</div>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm shrink-0">
-                                    <span style={{ color: siteSettings.color_secondary }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
-                                    <span className="px-4 py-2 rounded-full font-semibold" style={{ background: siteSettings.color_main, color: "#ffffff" }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
-                                </div>
-                            </div>
-                            <div className="px-6 py-8 text-center">
-                                <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: siteSettings.color_main }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
-                                <div className="mt-3 text-4xl font-semibold" style={{ color: siteSettings.color_secondary }}>{siteSettings.hero_title || "Hero Title"}</div>
-                                <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
-                                <div className="mt-8 inline-flex px-5 py-2.5 rounded-full font-semibold text-sm" style={{ background: siteSettings.color_cta, color: "#ffffff" }}>{siteSettings.card_cta_label || "Book Now"}</div>
-                            </div>
-                            <div className="px-6 py-6 border-t border-[var(--ck-border-subtle)] text-center text-sm">
-                                <div style={{ color: siteSettings.color_secondary }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
-                                <div className="mt-2" style={{ color: siteSettings.color_secondary, opacity: 0.72 }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
-                                <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={{ background: siteSettings.color_nav, color: siteSettings.color_secondary, boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)" }}>{siteSettings.chat_widget_label || "Book here"}</div>
-                            </div>
-                        </div>
-                    </div>
+                    <BookingSitePreview siteSettings={siteSettings} />
 
                     {/* Branding Colors */}
                     <div>
@@ -2621,7 +2730,7 @@ export default function SettingsPage() {
                                 Drop this snippet into any HTML page on your site. The widget loads in an iframe and auto-resizes to its content.
                             </p>
                             <div className="relative">
-                                <pre className="bg-[var(--ck-bg-subtle)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
+                                <pre className="bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
                                 <button
                                     type="button"
                                     onClick={async () => {
@@ -2680,6 +2789,35 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Activity verb</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Past-tense word used in post-trip emails: &quot;Thank you for … with us.&quot; Leave blank for the neutral &quot;adventuring&quot;.</p>
+                                <input type="text" value={activityVerbPast} onChange={e => setActivityVerbPast(e.target.value)}
+                                    maxLength={40}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. paddling, exploring, riding" />
+                            </label>
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Location phrase</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Appended to &quot;We hope you had an incredible time …&quot; in the trip-photos email. Leave blank for no suffix.</p>
+                                <input type="text" value={locationPhrase} onChange={e => setLocationPhrase(e.target.value)}
+                                    maxLength={60}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. on the water, in the bush" />
+                            </label>
+                        </div>
+                        <label className="block">
+                            <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
+                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours). Set your own if the guess doesn&apos;t fit your activity.</p>
+                            <input type="text" value={emailTagline} onChange={e => setEmailTagline(e.target.value)}
+                                maxLength={200}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                placeholder="e.g. Get ready to meet the lions up close on an unforgettable safari." />
+                        </label>
+                    </div>
+
                     {([
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
                         { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
@@ -2687,7 +2825,7 @@ export default function SettingsPage() {
                         { key: "gift", label: "Gift Voucher", desc: "Sent to the gift voucher buyer after purchase" },
                         { key: "cancel", label: "Cancellation – General", desc: "Sent when a booking is cancelled for any reason" },
                         { key: "cancel_weather", label: "Cancellation – Weather", desc: "Sent when a booking is cancelled due to weather" },
-                        { key: "indemnity", label: "Waiver Reminder", desc: "Sent the day before the tour as a waiver reminder" },
+                        { key: "indemnity", label: "Trip Reminder / Waiver", desc: "Used by the pre-trip reminder email (sent if WhatsApp fails) and waiver requests" },
                         { key: "admin", label: "Admin Welcome", desc: "Sent to new admin users with their setup link" },
                         { key: "voucher", label: "Voucher Code", desc: "Sent when a customer receives a voucher code" },
                         { key: "photos", label: "Trip Photos", desc: "Sent when trip photos are uploaded and shared" },
@@ -2695,7 +2833,7 @@ export default function SettingsPage() {
                         <div key={key} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
                             <div className="flex gap-5 items-start">
                                 {emailImgs[key] ? (
-                                    <img src={emailImgs[key]} alt={label} className="w-24 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0 bg-gray-100" />
+                                    <img src={emailImgs[key]} alt={label} className="w-24 h-16 object-cover rounded-lg border border-[var(--ck-border-subtle)] shrink-0" style={{ background: "var(--ck-surface-sunken)" }} />
                                 ) : (
                                     <div className="w-24 h-16 rounded-lg border border-dashed border-[var(--ck-border-subtle)] bg-gray-50 flex items-center justify-center shrink-0">
                                         <span className="text-xs text-[var(--ck-text-muted)]">Default</span>
@@ -2801,27 +2939,27 @@ export default function SettingsPage() {
                         <label className="block">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to bring</span>
                             <textarea value={opsConfig.what_to_bring} onChange={e => setOpsConfig({ ...opsConfig, what_to_bring: e.target.value })}
-                                rows={4} placeholder="e.g. Sunscreen, towel, water bottle, hat..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                rows={4} placeholder="e.g. Sunscreen, towel, water bottle, hat..." className="ui-control mt-1 w-full" />
                         </label>
                         <label className="block">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">What to wear</span>
                             <textarea value={opsConfig.what_to_wear} onChange={e => setOpsConfig({ ...opsConfig, what_to_wear: e.target.value })}
-                                rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                rows={4} placeholder="e.g. Comfortable clothes that can get wet, closed-toe shoes..." className="ui-control mt-1 w-full" />
                         </label>
                     </div>
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">Arrival instructions</span>
-                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails and in the day-before waiver reminder, together with &quot;What to bring&quot; above. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
                         <textarea value={opsConfig.arrival_instructions} onChange={e => setOpsConfig({ ...opsConfig, arrival_instructions: e.target.value })}
-                            rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                            rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="ui-control mt-1 w-full" />
                     </label>
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
                         <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">This is the system prompt for your AI chatbot on your booking site and WhatsApp. It tells the AI who it is, your business rules, and how to handle questions.</p>
                         <textarea value={opsConfig.ai_system_prompt} onChange={e => setOpsConfig({ ...opsConfig, ai_system_prompt: e.target.value })}
-                            rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)] font-mono text-xs" />
+                            rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="ui-control mt-1 w-full font-mono text-xs" />
                     </label>
 
                     {/* FAQ Repeater */}
@@ -2829,13 +2967,13 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Frequently Asked Questions</span>
                             <button type="button" onClick={() => setFaqEntries([...faqEntries, { q: "", a: "" }])}
-                                className="text-xs font-medium px-2 py-1 rounded-lg border border-[var(--ck-border-subtle)] hover:bg-[var(--ck-bg-subtle)]"
+                                className="text-xs font-medium px-2 py-1 rounded-lg border border-[var(--ck-border-subtle)] hover:bg-[var(--ck-surface-sunken)]"
                                 style={{ color: "var(--ck-accent)" }}>
                                 + Add FAQ
                             </button>
                         </div>
                         {faqEntries.length === 0 && (
-                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask — these power the AI chatbot.</p>
+                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask. These power the AI chatbot.</p>
                         )}
                         <div className="space-y-3">
                             {faqEntries.map((faq, i) => (
@@ -2846,9 +2984,9 @@ export default function SettingsPage() {
                                             className="text-xs text-red-500 hover:text-red-700">Remove</button>
                                     </div>
                                     <input type="text" value={faq.q} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], q: e.target.value }; setFaqEntries(next); }}
-                                        placeholder="Question" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                        placeholder="Question" className="ui-control w-full" />
                                     <textarea value={faq.a} onChange={e => { const next = [...faqEntries]; next[i] = { ...next[i], a: e.target.value }; setFaqEntries(next); }}
-                                        rows={2} placeholder="Answer" className="w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                        rows={2} placeholder="Answer" className="ui-control w-full" />
                                 </div>
                             ))}
                         </div>
@@ -2869,6 +3007,10 @@ export default function SettingsPage() {
               </CollapsibleSection>
             )}
 
+            <CollapsibleSection id="dashboard-prefs" title="Dashboard Preferences" subtitle="Personal preferences for your own admin account" openSections={openSections} toggle={toggleSection}>
+                <HelpAssistantSection />
+            </CollapsibleSection>
+
             {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
                 <form onSubmit={async (e) => {
                     e.preventDefault();
@@ -2879,7 +3021,7 @@ export default function SettingsPage() {
                     notify({ message: "Automation tag rules saved.", tone: "success" });
                 }} className="space-y-6">
                     <p className="text-xs text-[var(--ck-text-muted)]">
-                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations — for example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
+                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations. For example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
                     </p>
 
                     {/* VIP Rules */}
@@ -2890,22 +3032,22 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bookings required</span>
                                 <input type="number" min={1} max={50} value={autoTagConfig.vip_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_bookings: parseInt(e.target.value) || 3 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Within (days)</span>
                                 <input type="number" min={7} max={365} value={autoTagConfig.vip_window_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_window_days: parseInt(e.target.value) || 90 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">VIP valid for (days)</span>
                                 <input type="number" min={30} max={1825} value={autoTagConfig.vip_valid_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_valid_days: parseInt(e.target.value) || 365 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Renew after (bookings)</span>
                                 <input type="number" min={1} max={50} value={autoTagConfig.vip_renewal_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_renewal_bookings: parseInt(e.target.value) || 3 })}
-                                    className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                         <p className="text-[11px] text-[var(--ck-text-muted)]">
@@ -2920,10 +3062,10 @@ export default function SettingsPage() {
                         <label className="block max-w-xs">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Days since last booking</span>
                             <input type="number" min={14} max={365} value={autoTagConfig.lapsed_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, lapsed_days: parseInt(e.target.value) || 90 })}
-                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                className="ui-control mt-1 w-full" />
                         </label>
                         <p className="text-[11px] text-[var(--ck-text-muted)]">
-                            Default: 90 days. Tag name: <code className="bg-[var(--ck-bg-subtle)] px-1 rounded">lapsed-{autoTagConfig.lapsed_days}-days</code>
+                            Default: 90 days. Tag name: <code className="bg-[var(--ck-surface-sunken)] px-1 rounded">lapsed-{autoTagConfig.lapsed_days}-days</code>
                         </p>
                     </div>
 
@@ -2934,18 +3076,18 @@ export default function SettingsPage() {
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" checked={autoTagConfig.completed_tour_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, completed_tour_enabled: e.target.checked })}
                                     className="rounded border-[var(--ck-border-subtle)]" />
-                                <span className="text-sm text-[var(--ck-text)]"><strong>completed-tour</strong> — after a booked tour date has passed</span>
+                                <span className="text-sm text-[var(--ck-text)]"><strong>completed-tour</strong>: applied after a booked tour date has passed</span>
                             </label>
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" checked={autoTagConfig.new_booker_enabled} onChange={e => setAutoTagConfig({ ...autoTagConfig, new_booker_enabled: e.target.checked })}
                                     className="rounded border-[var(--ck-border-subtle)]" />
-                                <span className="text-sm text-[var(--ck-text)]"><strong>new-booker</strong> — first-time customers (removed after 2nd booking)</span>
+                                <span className="text-sm text-[var(--ck-text)]"><strong>new-booker</strong>: first-time customers (removed after 2nd booking)</span>
                             </label>
                         </div>
                         <label className="block max-w-xs">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Voucher expiry warning (days before)</span>
                             <input type="number" min={7} max={90} value={autoTagConfig.voucher_expiry_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, voucher_expiry_days: parseInt(e.target.value) || 30 })}
-                                className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                className="ui-control mt-1 w-full" />
                         </label>
                     </div>
 
@@ -2966,34 +3108,34 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Company name (on invoice)</span>
                                 <input type="text" value={invoiceForm.company_name} onChange={e => setInvoiceForm({ ...invoiceForm, company_name: e.target.value })}
-                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Registration number</span>
                                 <input type="text" value={invoiceForm.reg_number} onChange={e => setInvoiceForm({ ...invoiceForm, reg_number: e.target.value })}
-                                    placeholder="e.g. Reg. 2024/123456/07" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Reg. 2024/123456/07" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">VAT number</span>
                                 <input type="text" value={invoiceForm.vat_number} onChange={e => setInvoiceForm({ ...invoiceForm, vat_number: e.target.value })}
-                                    placeholder="e.g. 4290176926" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 4290176926" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                         <div className="mt-4 space-y-3">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 1</span>
                                 <input type="text" value={invoiceForm.address_line1} onChange={e => setInvoiceForm({ ...invoiceForm, address_line1: e.target.value })}
-                                    placeholder="e.g. 179 Beach Road" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 179 Beach Road" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 2</span>
                                 <input type="text" value={invoiceForm.address_line2} onChange={e => setInvoiceForm({ ...invoiceForm, address_line2: e.target.value })}
-                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 3</span>
                                 <input type="text" value={invoiceForm.address_line3} onChange={e => setInvoiceForm({ ...invoiceForm, address_line3: e.target.value })}
-                                    placeholder="e.g. 8005" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 8005" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                     </div>
@@ -3010,27 +3152,27 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
                                 <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); }}
-                                    placeholder="e.g. Aonyx Adventures" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
                                 <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); }}
-                                    placeholder="e.g. 070631824" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 070631824" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
                                 <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); }}
-                                    placeholder="e.g. Current / Cheque" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Current / Cheque" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bank name</span>
                                 <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); }}
-                                    placeholder="e.g. Standard Bank" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. Standard Bank" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
                                 <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); }}
-                                    placeholder="e.g. 020909" className="mt-1 w-full rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-sm bg-[var(--ck-surface)]" />
+                                    placeholder="e.g. 020909" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
 
@@ -3056,7 +3198,9 @@ export default function SettingsPage() {
                 </form>
             </CollapsibleSection>}
 
-            {canAccess("credentials") && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
+            {/* Privileged-only: credential saves are hard-gated to MAIN_ADMIN/SUPER_ADMIN
+                server-side, so never show this section to a delegated admin. */}
+            {isPrivileged(role) && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
@@ -3067,7 +3211,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">WhatsApp (Meta API)</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.wa ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.wa ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.wa ? "✓ Configured" : "⚠ Not set"}
                                 </span>
                             )}
@@ -3079,7 +3223,7 @@ export default function SettingsPage() {
                                 value={waForm.token}
                                 onChange={e => setWaForm({ ...waForm, token: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "EAAG..."}
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "EAAG..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3090,7 +3234,7 @@ export default function SettingsPage() {
                                 value={waForm.phoneId}
                                 onChange={e => setWaForm({ ...waForm, phoneId: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.wa ? "●●●●●●●● (set — enter new value to replace)" : "123456789012345"}
+                                placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "123456789012345"}
                                 autoComplete="off"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in Meta Business Manager → WhatsApp → API Setup → Phone number ID.</p>
@@ -3112,7 +3256,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco (Payments)</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.yoco ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.yoco ? "✓ Configured" : "⚠ Not set"}
                                 </span>
                             )}
@@ -3124,7 +3268,7 @@ export default function SettingsPage() {
                                 value={yocoForm.secretKey}
                                 onChange={e => setYocoForm({ ...yocoForm, secretKey: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "sk_live_..."}
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set; enter a new value to replace)" : "sk_live_..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3135,7 +3279,7 @@ export default function SettingsPage() {
                                 value={yocoForm.webhookSecret}
                                 onChange={e => setYocoForm({ ...yocoForm, webhookSecret: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco ? "●●●●●●●● (set — enter new value to replace)" : "whsec_..."}
+                                placeholder={credStatus?.yoco ? "●●●●●●●● (set; enter a new value to replace)" : "whsec_..."}
                                 autoComplete="new-password"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Webhooks → Signing secret.</p>
@@ -3157,7 +3301,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Mode</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test_mode ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600")}>
+                                <span className={"ui-status " + (credStatus.yoco_test_mode ? "ui-pill-amber" : "ui-pill-neutral")}>
                                     {credStatus.yoco_test_mode ? "TEST MODE ON" : "Live mode"}
                                 </span>
                             )}
@@ -3170,7 +3314,7 @@ export default function SettingsPage() {
                             onClick={handleToggleTestMode}
                             disabled={testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
                             className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
-                                ? "border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                                ? "border border-[color-mix(in_srgb,var(--ck-amber-bright)_35%,transparent)] bg-[var(--ck-amber-soft)] text-[var(--ck-amber)] hover:bg-[color-mix(in_srgb,var(--ck-amber-bright)_18%,transparent)]"
                                 : "bg-orange-500 text-white hover:bg-orange-600")}
                         >
                             {testModeToggling ? "Updating..." : credStatus?.yoco_test_mode ? "Disable Test Mode" : "Enable Test Mode"}
@@ -3188,7 +3332,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Yoco Test Credentials</h3>
                             </div>
                             {credStatus !== null && (
-                                <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (credStatus.yoco_test ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                                <span className={"ui-status " + (credStatus.yoco_test ? "ui-pill-success" : "ui-pill-amber")}>
                                     {credStatus.yoco_test ? "Configured" : "Not set"}
                                 </span>
                             )}
@@ -3200,7 +3344,7 @@ export default function SettingsPage() {
                                 value={yocoTestForm.secretKey}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, secretKey: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "sk_test_..."}
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set; enter a new value to replace)" : "sk_test_..."}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -3211,7 +3355,7 @@ export default function SettingsPage() {
                                 value={yocoTestForm.webhookSecret}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, webhookSecret: e.target.value })}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none font-mono"
-                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set — enter new value to replace)" : "whsec_test_..."}
+                                placeholder={credStatus?.yoco_test ? "●●●●●●●● (set; enter a new value to replace)" : "whsec_test_..."}
                                 autoComplete="new-password"
                             />
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in your Yoco Dashboard → Developers → Test environment → Webhooks.</p>
@@ -3232,7 +3376,7 @@ export default function SettingsPage() {
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#4285F4]"><path d="M7.71 3.5L1.15 15l3.43 5.94h6.87L7.71 3.5z" fill="#0066DA"/><path d="M16.29 3.5H7.71l3.74 17.44h6.87l3.43-5.94L16.29 3.5z" fill="#00AC47"/><path d="M1.15 15l3.43 5.94h14.84l3.43-5.94H1.15z" fill="#EA4335"/><path d="M7.71 3.5l3.74 6.48L16.29 3.5H7.71z" fill="#00832D"/><path d="M11.45 9.98L7.71 3.5 1.15 15h7.48l2.82-5.02z" fill="#2684FC"/><path d="M11.45 9.98L16.29 3.5l5.56 11.5h-7.48l-2.92-5.02z" fill="#FFBA00"/></svg>
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Drive (Photos)</h3>
                             </div>
-                            <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (gdriveConnected ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                            <span className={"ui-status " + (gdriveConnected ? "ui-pill-success" : "ui-pill-amber")}>
                                 {gdriveConnected ? "Connected" : "Not connected"}
                             </span>
                         </div>
@@ -3274,7 +3418,7 @@ export default function SettingsPage() {
                                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Google Reviews</h3>
                             </div>
                             {googlePlaceId && (
-                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">✓ Configured</span>
+                                <span className="ui-status ui-pill-success">✓ Configured</span>
                             )}
                         </div>
                         <div>
@@ -3287,7 +3431,10 @@ export default function SettingsPage() {
                                 placeholder="ChIJ..."
                                 autoComplete="off"
                             />
-                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Find your Place ID at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>. Reviews sync daily at 03:17 UTC.</p>
+                            <div className="mt-2 space-y-2 text-xs leading-relaxed text-[var(--ck-text-muted)]">
+                                <p><strong className="text-[var(--ck-text-strong)]">How reviews work:</strong> guests automatically get a WhatsApp review link a few hours after their trip. Their reviews land on your <a href="/reviews" className="underline">Reviews</a> page as <em>Pending</em>. Approve them to publish on your booking site, or hide them. Connecting your Google Place ID also imports your Google reviews overnight; they display alongside your own (they&apos;re already public on Google, so they skip moderation).</p>
+                                <p><strong className="text-[var(--ck-text-strong)]">Find your Place ID:</strong> open <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" className="underline">Google&apos;s Place ID Finder</a>, search for your business name exactly as it appears on Google Maps, click your business on the map, and copy the ID shown (it usually starts with &quot;ChIJ&quot;). No Google account needed. Reviews sync daily at 03:17 UTC.</p>
+                            </div>
                         </div>
                         <button
                             type="button"

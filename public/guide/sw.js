@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guide-v2';
+const CACHE_NAME = 'guide-v3';
 const PRECACHE = ['/guide', '/guide/manifest.webmanifest'];
 
 self.addEventListener('install', function(event) {
@@ -7,7 +7,11 @@ self.addEventListener('install', function(event) {
 });
 
 self.addEventListener('activate', function(event) {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME && k.indexOf('guide-') === 0; }).map(function(k) { return caches.delete(k); }));
+    }).then(function() { return self.clients.claim(); })
+  );
 });
 
 self.addEventListener('fetch', function(event) {
@@ -43,7 +47,7 @@ function syncCheckIns() {
     let chain = Promise.resolve();
     all.forEach(function(item) {
       chain = chain.then(function() {
-        var headers = { 'Content-Type': 'application/json' };
+        const headers = { 'Content-Type': 'application/json' };
         if (item.token) headers['Authorization'] = 'Bearer ' + item.token;
         return fetch('/api/guide/check-in', {
           method: 'POST',

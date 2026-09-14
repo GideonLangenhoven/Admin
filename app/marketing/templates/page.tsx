@@ -2,10 +2,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
+import { resolveMarketingTestRecipient } from "../../lib/marketing-test-recipient";
+import { fetchAllRowsResult } from "../../../supabase/functions/_shared/pagination";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { Plus, PencilSimple, Trash, Copy, PaperPlaneTilt, X, Flask } from "@phosphor-icons/react";
+import { Trash, Copy, X } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
-import { starterTemplates, StarterTemplate } from "../../../components/marketing/starter-templates";
+import { starterTemplates, StarterTemplate, materializeStarterTemplate } from "../../../components/marketing/starter-templates";
+import type { Block } from "../../../components/marketing/blocks/block-types";
 
 interface Template {
   id: string;
@@ -34,6 +37,7 @@ export default function TemplatesPage() {
   const [creating, setCreating] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [initialTemplate, setInitialTemplate] = useState<StarterTemplate | null>(null);
+  const [initialBlocks, setInitialBlocks] = useState<Block[] | null>(null);
   const [sending, setSending] = useState<Template | null>(null);
   const [sendForm, setSendForm] = useState<SendFormState>({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
   const [sendingInProgress, setSendingInProgress] = useState(false);
@@ -56,10 +60,11 @@ export default function TemplatesPage() {
 
   // Load unique tags when send modal opens
   async function loadTags() {
-    const { data } = await supabase.from("marketing_contacts")
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase.from("marketing_contacts")
       .select("tags")
       .eq("business_id", businessId)
-      .eq("status", "active");
+      .eq("status", "active").order("id").range(from, to));
+    if (error) { notify({ message: "Audience tags could not be loaded. Please retry.", tone: "error" }); return; }
     const tagSet = new Set<string>();
     for (const row of (data || []) as any[]) {
       const tags = row.tags;
@@ -84,6 +89,20 @@ export default function TemplatesPage() {
     }
     const { count } = await q;
     setAudienceCount(count || 0);
+  }
+
+  async function selectStarterTemplate(tmpl: StarterTemplate) {
+    const [{ data: bizRow }, { data: topTours }] = await Promise.all([
+      supabase.from("businesses").select(
+        "email_color, logo_url, business_address, public_phone, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews"
+      ).eq("id", businessId).maybeSingle(),
+      supabase.from("tours").select("id, name, image_url, duration_minutes")
+        .eq("business_id", businessId).eq("active", true).order("sort_order", { ascending: true }).limit(3),
+    ]);
+    setShowGallery(false);
+    setInitialTemplate(tmpl);
+    setInitialBlocks(materializeStarterTemplate(tmpl, bizRow || {}, topTours || []));
+    setCreating(true);
   }
 
   async function handleSave(name: string, subjectLine: string, category: string, blocks: any[], html: string) {
@@ -133,53 +152,7 @@ export default function TemplatesPage() {
 
   async function sendTestEmail(t: Template) {
     try {
-      // Priority for the test recipient:
-      //  1. The currently logged-in admin (localStorage) — most likely
-      //     what an operator clicking "Send test" actually wants.
-      //  2. businesses.marketing_test_email — explicit per-tenant override
-      //     for unattended automation (e.g. a shared marketing inbox).
-      //  3. First admin on the business as a last resort.
-      // Previously (1) and (2) were swapped, which leaked test emails to a
-      // stale dev address seeded into Aonyx's marketing_test_email row.
-      let testEmail = localStorage.getItem("ck_admin_email") || "";
-      let testName = localStorage.getItem("ck_admin_name") || "Admin";
-
-      if (!testEmail) {
-        const { data: biz, error: bizErr } = await supabase
-          .from("businesses")
-          .select("marketing_test_email")
-          .eq("id", businessId)
-          .maybeSingle();
-        if (bizErr) console.warn("sendTestEmail biz lookup error:", bizErr.message);
-        if (biz?.marketing_test_email) {
-          testEmail = biz.marketing_test_email;
-          const { data: adminRow } = await supabase
-            .from("admin_users")
-            .select("name")
-            .eq("email", testEmail)
-            .eq("business_id", businessId)
-            .maybeSingle();
-          testName = adminRow?.name || "Admin";
-        }
-      }
-
-      // If still no email, look up the first admin for this business
-      if (!testEmail) {
-        const { data: fallbackAdmin } = await supabase
-          .from("admin_users")
-          .select("email, name")
-          .eq("business_id", businessId)
-          .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
-          .order("created_at")
-          .limit(1)
-          .maybeSingle();
-        if (fallbackAdmin?.email) {
-          testEmail = fallbackAdmin.email;
-          testName = fallbackAdmin.name || "Admin";
-          localStorage.setItem("ck_admin_email", testEmail);
-          if (fallbackAdmin.name) localStorage.setItem("ck_admin_name", fallbackAdmin.name);
-        }
-      }
+      const { email: testEmail, name: testName } = await resolveMarketingTestRecipient(supabase, businessId);
 
       if (!testEmail) {
         notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
@@ -228,41 +201,39 @@ export default function TemplatesPage() {
   }
 
   async function sendCampaign() {
-    if (!sending || !sendForm.name.trim()) return;
+    if (!sending || !sendForm.name.trim() || sendingInProgress) return;
     setSendingInProgress(true);
 
     const isScheduled = !!sendForm.scheduledAt;
 
-    // 1. Create campaign
+    const { data: contacts, error: audienceError } = await fetchAllRowsResult((from, to) => {
+      let query = supabase.from("marketing_contacts")
+        .select("id, email, first_name").eq("business_id", businessId)
+        .eq("status", "active").order("id").range(from, to);
+      if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
+        query = query.overlaps("tags", sendForm.selectedTags);
+      }
+      return query;
+    });
+    if (audienceError || !contacts?.length) {
+      notify({ message: audienceError ? "The audience could not be fully loaded. Please retry." : "No active contacts match the selected audience.", tone: audienceError ? "error" : "warning" });
+      setSendingInProgress(false);
+      return;
+    }
+
+    // Keep the campaign in draft until every recipient is queued. The worker
+    // must not finish a partially populated campaign between insert batches.
     const { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
       business_id: businessId,
       template_id: sending.id,
       name: sendForm.name.trim(),
       subject_line: sendForm.subject.trim() || sending.subject_line,
-      status: isScheduled ? "scheduled" : "sending",
+      status: "draft",
       scheduled_at: isScheduled ? sendForm.scheduledAt : null,
-      started_at: isScheduled ? null : new Date().toISOString(),
+      started_at: null,
     }).select("id").single();
     if (campErr || !campaign) {
       notify({ message: campErr?.message || "Failed to create campaign", tone: "error" });
-      setSendingInProgress(false);
-      return;
-    }
-
-    // 2. Get audience contacts
-    let q = supabase.from("marketing_contacts")
-      .select("id, email, first_name")
-      .eq("business_id", businessId)
-      .eq("status", "active");
-    if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
-      q = q.overlaps("tags", sendForm.selectedTags);
-    }
-    const { data: contacts } = await q;
-
-    if (!contacts || contacts.length === 0) {
-      notify({ message: "No active contacts match the selected audience.", tone: "warning" });
-      await supabase.from("marketing_campaigns").update({ status: "cancelled" }).eq("id", campaign!.id);
-      setSending(null);
       setSendingInProgress(false);
       return;
     }
@@ -275,17 +246,27 @@ export default function TemplatesPage() {
       email: c.email,
       first_name: c.first_name || "",
     }));
-    const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows);
-    if (queueErr) {
-      // If partial insert due to dedup constraint, still proceed
-      console.warn("Queue insert warning:", queueErr.message);
+    for (let from = 0; from < queueRows.length; from += 500) {
+      const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows.slice(from, from + 500));
+      if (queueErr) {
+        await supabase.from("marketing_campaigns").update({ status: "cancelled" }).eq("id", campaign.id).eq("business_id", businessId);
+        notify({ message: "Campaign could not be queued completely. No emails were sent; please retry.", tone: "error" });
+        setSendingInProgress(false);
+        return;
+      }
     }
 
-    // 4. Update campaign totals
-    await supabase.from("marketing_campaigns").update({
+    // Publish the complete audience and the ready status in the same write.
+    const { error: readyError } = await supabase.from("marketing_campaigns").update({
+      status: isScheduled ? "scheduled" : "sending",
       total_recipients: contacts.length,
       ...(isScheduled ? {} : { started_at: new Date().toISOString() }),
-    }).eq("id", campaign!.id);
+    }).eq("id", campaign.id).eq("business_id", businessId).select("id").single();
+    if (readyError) {
+      notify({ message: "Campaign is saved but could not be started. Check Recent Campaigns before trying again.", tone: "error" });
+      setSendingInProgress(false);
+      return;
+    }
 
     // 5. For immediate sends, trigger the dispatch function directly
     //    (don't rely solely on the cron job — fire it now for instant delivery)
@@ -343,13 +324,13 @@ export default function TemplatesPage() {
         // zero processed. Could be RLS / cron lag. Tell the user honestly.
         notify({
           title: "Campaign queued",
-          message: `${contacts.length} recipients queued. None have been dispatched yet — the background process will pick them up. Refresh Recent Campaigns in ~1 min to see progress.`,
+          message: `${contacts.length} recipients queued. None have been dispatched yet; the background process will pick them up. Refresh Recent Campaigns in ~1 min to see progress.`,
           tone: "info",
           duration: 7000,
         });
       }
     } else {
-      notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} — ${contacts.length} recipients.`, tone: "success" });
+      notify({ message: `Campaign scheduled for ${new Date(sendForm.scheduledAt).toLocaleString("en-ZA")} (${contacts.length} recipients).`, tone: "success" });
     }
 
     setSending(null);
@@ -369,7 +350,7 @@ export default function TemplatesPage() {
   if (creating || editing) {
     return (
       <div className="space-y-4">
-        <button onClick={() => { setCreating(false); setEditing(null); setInitialTemplate(null); }}
+        <button onClick={() => { setCreating(false); setEditing(null); setInitialTemplate(null); setInitialBlocks(null); }}
           className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>
           &larr; Back to templates
         </button>
@@ -378,7 +359,7 @@ export default function TemplatesPage() {
           initialName={editing?.name || initialTemplate?.name || ""}
           initialSubject={editing?.subject_line || initialTemplate?.subject || ""}
           initialCategory={editing?.category || initialTemplate?.category || "general"}
-          initialBlocks={editing?.editor_json || (initialTemplate ? initialTemplate.blocks() : [])}
+          initialBlocks={editing?.editor_json || initialBlocks || (initialTemplate ? initialTemplate.blocks() : [])}
           onSave={handleSave}
         />
       </div>
@@ -386,26 +367,31 @@ export default function TemplatesPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" /></div>;
+    return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{templates.length} templates</p>
-        <button onClick={() => setShowGallery(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
-          <Plus size={14} /> New Template
+      <div className="anim-fade-up flex items-center justify-between">
+        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+          <span className="font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{templates.length}</span> templates
+        </p>
+        <button onClick={() => setShowGallery(true)} className="ui-btn ui-btn-primary">
+          New Template
         </button>
       </div>
 
       {templates.length === 0 ? (
-        <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
-          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No templates yet. Create your first email template.</p>
+        <div className="ui-card anim-fade-up anim-d1">
+          <div className="ui-empty">
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No templates yet</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first email template.</p>
+          </div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="anim-fade-up anim-d1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((t) => (
-            <div key={t.id} className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--ck-border)", background: "var(--ck-surface)" }}>
+            <div key={t.id} className="ui-card p-4 space-y-3">
               <div>
                 <h3 className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{t.name}</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
@@ -413,7 +399,7 @@ export default function TemplatesPage() {
                 </p>
               </div>
               {/* Preview (sandboxed iframe to prevent XSS) */}
-              <div className="rounded-lg border overflow-hidden h-32" style={{ borderColor: "var(--ck-border)" }}>
+              <div className="rounded-lg border overflow-hidden h-32" style={{ borderColor: "var(--ck-border-subtle)" }}>
                 <iframe
                   srcDoc={t.html_content || "<p style='padding:20px;color:#999'>Empty template</p>"}
                   sandbox=""
@@ -423,19 +409,19 @@ export default function TemplatesPage() {
                 />
               </div>
               <div className="flex items-center gap-1.5 pt-1">
-                <button onClick={() => setEditing(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>
-                  <PencilSimple size={12} /> Edit
+                <button onClick={() => setEditing(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs">
+                  Edit
                 </button>
-                <button onClick={() => openSendModal(t)} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--ck-accent)" }}>
-                  <PaperPlaneTilt size={12} /> Send
+                <button onClick={() => openSendModal(t)} className="ui-btn ui-btn-primary !h-8 !px-2.5 !text-xs">
+                  Send
                 </button>
-                <button onClick={() => sendTestEmail(t)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }} title="Send test to yourself">
-                  <Flask size={12} /> Test
+                <button onClick={() => sendTestEmail(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs" title="Send test to yourself">
+                  Test
                 </button>
-                <button onClick={() => duplicateTemplate(t)} className="p-1.5 rounded-lg border" style={{ borderColor: "var(--ck-border)" }} title="Duplicate">
+                <button onClick={() => duplicateTemplate(t)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" title="Duplicate">
                   <Copy size={12} />
                 </button>
-                <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-red-500 hover:text-red-700" title="Delete">
+                <button onClick={() => deleteTemplate(t.id)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
                   <Trash size={12} />
                 </button>
               </div>
@@ -447,29 +433,24 @@ export default function TemplatesPage() {
       {/* Template gallery modal */}
       {showGallery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-4xl max-h-[85vh] rounded-2xl p-6 shadow-2xl overflow-y-auto" style={{ background: "var(--ck-surface)" }}>
+          <div className="ui-card w-full max-w-4xl max-h-[85vh] p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Choose a Template</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>Start with a pre-built template or create from scratch</p>
               </div>
-              <button onClick={() => setShowGallery(false)}><X size={18} /></button>
+              <button onClick={() => setShowGallery(false)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {starterTemplates.map((tmpl, i) => (
                 <button
                   key={i}
-                  onClick={() => {
-                    setShowGallery(false);
-                    setInitialTemplate(tmpl);
-                    setCreating(true);
-                  }}
-                  className="text-left rounded-xl border p-4 hover:ring-2 hover:ring-blue-400 transition-all"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)" }}
+                  onClick={() => selectStarterTemplate(tmpl)}
+                  className="text-left ui-card ui-card-hover p-4"
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{tmpl.name}</h4>
-                    <span className="text-[10px] rounded-full px-2 py-0.5 font-medium bg-blue-100 text-blue-700">{tmpl.category}</span>
+                    <span className="ui-status ui-pill-ocean">{tmpl.category}</span>
                   </div>
                   <p className="text-xs line-clamp-2" style={{ color: "var(--ck-text-muted)" }}>{tmpl.description}</p>
                 </button>
@@ -482,10 +463,10 @@ export default function TemplatesPage() {
       {/* Send campaign modal */}
       {sending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl p-6 shadow-2xl" style={{ background: "var(--ck-surface)" }}>
+          <div className="ui-card w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Send Campaign</h3>
-              <button onClick={() => setSending(null)}><X size={18} /></button>
+              <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-xs mb-4" style={{ color: "var(--ck-text-muted)" }}>
               Template: &quot;{sending.name}&quot;
@@ -496,14 +477,14 @@ export default function TemplatesPage() {
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Campaign name *</label>
                 <input value={sendForm.name} onChange={(e) => setSendForm({ ...sendForm, name: e.target.value })}
                   placeholder="e.g. Summer Sale Newsletter"
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                  className="ui-control w-full" />
               </div>
 
               {/* Subject line */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>Subject line</label>
                 <input value={sendForm.subject} onChange={(e) => setSendForm({ ...sendForm, subject: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }} />
+                  className="ui-control w-full" />
               </div>
 
               {/* Audience filter */}
@@ -511,18 +492,14 @@ export default function TemplatesPage() {
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
                   Audience
                 </label>
-                <div className="flex gap-2 mb-2">
+                <div className="ui-seg mb-2">
                   <button
                     onClick={() => {
                       setSendForm({ ...sendForm, audienceFilter: "all", selectedTags: [] });
                       computeAudienceCount("all", []);
                     }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium border ${sendForm.audienceFilter === "all" ? "text-white" : ""}`}
-                    style={{
-                      background: sendForm.audienceFilter === "all" ? "var(--ck-accent)" : "var(--ck-bg)",
-                      borderColor: "var(--ck-border)",
-                      color: sendForm.audienceFilter === "all" ? "white" : "var(--ck-text)",
-                    }}
+                    data-active={sendForm.audienceFilter === "all"}
+                    className="ui-seg-item !px-3"
                   >
                     All active contacts
                   </button>
@@ -531,12 +508,8 @@ export default function TemplatesPage() {
                       setSendForm({ ...sendForm, audienceFilter: "tagged" });
                       computeAudienceCount("tagged", sendForm.selectedTags);
                     }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium border ${sendForm.audienceFilter === "tagged" ? "text-white" : ""}`}
-                    style={{
-                      background: sendForm.audienceFilter === "tagged" ? "var(--ck-accent)" : "var(--ck-bg)",
-                      borderColor: "var(--ck-border)",
-                      color: sendForm.audienceFilter === "tagged" ? "white" : "var(--ck-text)",
-                    }}
+                    data-active={sendForm.audienceFilter === "tagged"}
+                    className="ui-seg-item !px-3"
                   >
                     Filter by tags
                   </button>
@@ -559,7 +532,7 @@ export default function TemplatesPage() {
                             className="rounded-full px-2.5 py-0.5 text-xs font-medium border"
                             style={{
                               background: selected ? "var(--ck-accent)" : "var(--ck-bg)",
-                              borderColor: selected ? "var(--ck-accent)" : "var(--ck-border)",
+                              borderColor: selected ? "var(--ck-accent)" : "var(--ck-border-subtle)",
                               color: selected ? "white" : "var(--ck-text)",
                             }}
                           >
@@ -572,7 +545,7 @@ export default function TemplatesPage() {
                 )}
                 {audienceCount !== null && (
                   <p className="text-xs mt-2 font-medium" style={{ color: "var(--ck-accent)" }}>
-                    {audienceCount} contact{audienceCount !== 1 ? "s" : ""} will receive this campaign
+                    <span className="font-display tabular-nums">{audienceCount}</span> contact{audienceCount !== 1 ? "s" : ""} will receive this campaign
                   </p>
                 )}
               </div>
@@ -587,8 +560,7 @@ export default function TemplatesPage() {
                   value={sendForm.scheduledAt}
                   onChange={(e) => setSendForm({ ...sendForm, scheduledAt: e.target.value })}
                   min={new Date().toISOString().slice(0, 16)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "var(--ck-border)", background: "var(--ck-bg)", color: "var(--ck-text)" }}
+                  className="ui-control w-full"
                 />
                 <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
                   {sendForm.scheduledAt ? "Campaign will start at the scheduled time." : "Leave empty to send immediately."}
@@ -597,12 +569,12 @@ export default function TemplatesPage() {
 
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setSending(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border)", color: "var(--ck-text)" }}>Cancel</button>
+                <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                 <button
                   onClick={sendCampaign}
                   disabled={!sendForm.name.trim() || sendingInProgress || (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length === 0)}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ background: sendForm.scheduledAt ? "#7c3aed" : "var(--ck-accent)" }}
+                  className="ui-btn ui-btn-primary disabled:opacity-50"
+                  style={sendForm.scheduledAt ? { background: "var(--ck-amber-bright)", boxShadow: "none" } : undefined}
                 >
                   {sendingInProgress ? "Processing..." : sendForm.scheduledAt ? "Schedule Campaign" : "Send Campaign"}
                 </button>

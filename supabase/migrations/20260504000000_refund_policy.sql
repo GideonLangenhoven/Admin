@@ -1,5 +1,4 @@
 BEGIN;
-
 ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS refund_policy_tiers jsonb NOT NULL DEFAULT
     '[
@@ -9,7 +8,6 @@ ALTER TABLE public.businesses
     ]'::jsonb,
   ADD COLUMN IF NOT EXISTS refund_policy_text text DEFAULT
     'Cancel free up to 24 hours before your tour for a full refund. Within 24 hours, 50% refund. Within 2 hours of tour start, no refund. Weather cancellations by the operator are fully refunded.';
-
 CREATE OR REPLACE FUNCTION public.calculate_refund_percent(
   p_business_id uuid,
   p_tour_start  timestamptz,
@@ -44,10 +42,8 @@ BEGIN
   RETURN 0;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.calculate_refund_percent(uuid, timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.calculate_refund_percent(uuid, timestamptz, timestamptz) TO authenticated, service_role;
-
 CREATE OR REPLACE FUNCTION public.calculate_booking_refund(p_booking_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -82,11 +78,8 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.calculate_booking_refund(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.calculate_booking_refund(uuid) TO authenticated, service_role;
-
 ALTER TABLE public.refund_requests
   ADD COLUMN IF NOT EXISTS policy_percent integer;
-
 COMMIT;

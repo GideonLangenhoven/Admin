@@ -4,7 +4,13 @@ import { isComboEnabledServer } from "../../../lib/feature-flags";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Fail loudly rather than degrading to the anon key. combo_bookings,
+  // combo_booking_items and promotion_uses have RLS on with no client
+  // policies, so an anon fallback does not error — it returns empty. A
+  // settlement or cancellation route reporting "nothing found" when the
+  // service key is missing is a silent money bug.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server");
   return createClient(url, key);
 }
 
@@ -44,10 +50,11 @@ export async function GET(req: NextRequest) {
     return new Response(htmlPage("Expired", "This partnership invite has been revoked or is no longer valid."), { status: 400, headers: { "Content-Type": "text/html" } });
   }
 
-  // Accept the partnership
+  // Accept the partnership. invite_token is cleared so the emailed link is
+  // single-use — same rule as the POST accept_token path.
   const { error: updateErr } = await supabase
     .from("business_partnerships")
-    .update({ status: "ACTIVE", accepted_at: new Date().toISOString() })
+    .update({ status: "ACTIVE", accepted_at: new Date().toISOString(), invite_token: null })
     .eq("id", partnership.id)
     .eq("status", "PENDING");
 
@@ -65,7 +72,7 @@ export async function GET(req: NextRequest) {
 }
 
 function htmlPage(title: string, message: string) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — BookingTours</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} | BookingTours</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f7f7f6;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
 .card{background:#fff;border-radius:16px;padding:48px;max-width:480px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.08)}
 h1{color:#1b3b36;font-size:24px;margin:0 0 16px}p{color:#555;line-height:1.6;margin:0}</style>

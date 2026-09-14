@@ -3,15 +3,26 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
+  getBusinessDisplayName,
   resolveBusinessSiteUrls,
+  resolveManageBookingsUrl,
   resolveTenantByWhatsappPayload,
   sendWhatsappFreeformOrSignal,
+  sendWhatsappTemplate,
   recordWaMessage,
   type TenantContext,
 } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
+import { formatDuration } from "../_shared/duration.ts";
 import { shouldBotReply } from "../_shared/bot-gate.ts";
+import { getSubscriptionState } from "../_shared/subscription.ts";
+import { llmText, withinAiQuota } from "../_shared/llm.ts";
+import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
+import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
+import { hashedUserKey } from "../_shared/openrouter-provider.ts";
+import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
@@ -22,7 +33,17 @@ const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 const supabase = createServiceClient();
-const GK = Deno.env.get("GEMINI_API_KEY") || "";
+
+async function requestCheckout(body: Record<string, unknown>) {
+  const response = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, skip_notifications: true }),
+  });
+  const data = await response.json();
+  if (!response.ok) return { error: data?.reason || data?.error || "Payment link unavailable" };
+  return data;
+}
 
 // ───────── Meta x-hub-signature-256 verification (HMAC-SHA256) ─────────
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -60,14 +81,6 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
     console.error("HMAC verify failed:", e);
     return false;
   }
-}
-
-function withQuery(base: string, params: Record<string, string>) {
-  const url = new URL(base);
-  for (const [key, value] of Object.entries(params)) {
-    if (value) url.searchParams.set(key, value);
-  }
-  return url.toString();
 }
 
 function tenantTimeZone(tenant: TenantContext) {
@@ -122,6 +135,113 @@ function zonedDateTimeToUtcIso(tenant: TenantContext, dateKey: string, hour: num
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const offset = getTimeZoneOffsetMs(guess, tenantTimeZone(tenant));
   return new Date(guess.getTime() - offset).toISOString();
+}
+
+// ── Local natural-language date parsing ───────────────────────────────────
+// The date step must NEVER depend on an LLM call: when Gemini was down the
+// bot rejected every date (including its own suggested "Tomorrow") and
+// customers looped forever. Handles the common phrasings locally, in the
+// tenant's timezone; Gemini remains a fallback for exotic input only.
+const WEEKDAY_INDEX: Record<string, number> = {
+  sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4,
+  friday: 5, fri: 5, saturday: 6, sat: 6,
+};
+const MONTH_INDEX: Record<string, number> = {
+  january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4,
+  may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
+  september: 9, sep: 9, sept: 9, october: 10, oct: 10,
+  november: 11, nov: 11, december: 12, dec: 12,
+};
+
+function tenantTodayKey(tenant: TenantContext): string {
+  // en-CA gives YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tenantTimeZone(tenant), year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
+
+function tenantDateKey(tenant: TenantContext, iso: any): string {
+  // en-CA gives YYYY-MM-DD (same trick as tenantTodayKey)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tenantTimeZone(tenant), year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(iso));
+}
+
+function addDaysToKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12)); // noon UTC avoids DST edges
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().split("T")[0];
+}
+
+function keyFromParts(year: number, month: number, day: number): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const dt = new Date(Date.UTC(year, month - 1, day, 12));
+  // reject overflow like 31 Feb
+  if (dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
+  return dt.toISOString().split("T")[0];
+}
+
+function parseLocalDate(tenant: TenantContext, raw: string): string | null {
+  const todayKey = tenantTodayKey(tenant);
+  const s = String(raw || "").toLowerCase().trim()
+    .replace(/[?!.,]+/g, " ")
+    .replace(/\b(please|pls|plz|on|the|for|of|we|want|would|like|to|go|book|a|an)\b/g, " ")
+    .replace(/(\d+)(st|nd|rd|th)\b/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return null;
+
+  if (/\btoday\b|\btonight\b|\bnow\b/.test(s)) return todayKey;
+  if (/\bday after tomorrow\b|\bovermorrow\b/.test(s)) return addDaysToKey(todayKey, 2);
+  if (/\btom+or+ow\b|\btmrw\b|\btomorow\b|\btommorow\b|\btmr\b/.test(s)) return addDaysToKey(todayKey, 1);
+
+  // ISO YYYY-MM-DD
+  const iso = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) return keyFromParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  // Weekday (optionally "next monday" → the occurrence after the coming one
+  // only when today IS that weekday; otherwise the coming occurrence)
+  const wd = s.match(/\b(?:next\s+|this\s+)?(sunday|sun|monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thurs|thur|thu|friday|fri|saturday|sat)\b/);
+  if (wd) {
+    const target = WEEKDAY_INDEX[wd[1]];
+    const [ty, tm, td] = todayKey.split("-").map(Number);
+    const todayDow = new Date(Date.UTC(ty, tm - 1, td, 12)).getUTCDay();
+    let diff = (target - todayDow + 7) % 7;
+    if (diff === 0) diff = 7; // "monday" said on a Monday → next week's
+    return addDaysToKey(todayKey, diff);
+  }
+
+  const todayYear = Number(todayKey.split("-")[0]);
+  const monthNames = Object.keys(MONTH_INDEX).sort((a, b) => b.length - a.length).join("|");
+
+  // "6 july [2026]" / "6 jul"
+  let m = s.match(new RegExp("\\b(\\d{1,2})\\s+(" + monthNames + ")(?:\\s+(\\d{4}))?\\b"));
+  let day = 0, mon = 0, yr = 0;
+  if (m) { day = Number(m[1]); mon = MONTH_INDEX[m[2]]; yr = m[3] ? Number(m[3]) : 0; }
+  else {
+    // "july 6 [2026]"
+    m = s.match(new RegExp("\\b(" + monthNames + ")\\s+(\\d{1,2})(?:\\s+(\\d{4}))?\\b"));
+    if (m) { mon = MONTH_INDEX[m[1]]; day = Number(m[2]); yr = m[3] ? Number(m[3]) : 0; }
+  }
+  if (!m) {
+    // numeric "6/7[/2026]" or "06-07" — day/month (ZA convention)
+    const n = s.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+    if (n) {
+      day = Number(n[1]); mon = Number(n[2]);
+      yr = n[3] ? (n[3].length === 2 ? 2000 + Number(n[3]) : Number(n[3])) : 0;
+    }
+  }
+  if (day && mon) {
+    let key = keyFromParts(yr || todayYear, mon, day);
+    if (!key) return null;
+    // no explicit year and the date already passed → they mean next year
+    if (!yr && key < todayKey) key = keyFromParts(todayYear + 1, mon, day);
+    return key;
+  }
+
+  return null;
 }
 
 function serializeFaqForPrompt(faqJson: any) {
@@ -233,22 +353,21 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
 }
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
-async function gemFallback(tenant: TenantContext, msg: string, extraContext?: string): Promise<string | null> {
-  if (!GK) return null;
-  try {
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(8000),
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: buildGeminiInstruction(tenant, extraContext) }] },
-        contents: [{ role: "user", parts: [{ text: msg }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 150 }
-      })
-    });
-    const d = await r.json();
-    if (d.candidates?.[0]?.content?.parts?.[0]) return d.candidates[0].content.parts[0].text;
-    return null;
-  } catch (e) { return null; }
+async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extraContext?: string): Promise<string | null> {
+  // Ground the answer in the tenant's vector KB (returns "" when nothing relevant)
+  const kbCtx = await retrieveKbContext(supabase, tenant.business.id, msg);
+  const ctx = [kbCtx, extraContext].filter(Boolean).join("\n\n") || undefined;
+  return await llmText({
+    system: buildGeminiInstruction(tenant, ctx),
+    user: msg,
+    maxTokens: 400,
+    temperature: 0.2,
+    timeoutMs: 8000,
+    label: "wa-faq",
+    quota: true,
+    businessId: tenant.business.id,
+    userKey: phone ? await hashedUserKey(tenant.business.id, String(phone)) : undefined,
+  });
 }
 async function getConvo(tenant: TenantContext, phone: any) {
   const r = await supabase.from("conversations").select().eq("business_id", tenant.business.id).eq("phone", phone).single();
@@ -257,6 +376,15 @@ async function getConvo(tenant: TenantContext, phone: any) {
   return r2.data;
 }
 async function setConvo(id: any, u: any) { await supabase.from("conversations").update({ ...u, updated_at: new Date().toISOString() }).eq("id", id); }
+// Chat self-service for existing bookings (view/reschedule/cancel/change qty/swap tour) is
+// retired — bugs there (duplicate sends, lock-ups) led to routing everything through the
+// dedicated /my-bookings page instead. Call this instead of entering the old flow states.
+async function sendManageBookingsRedirect(tenant: TenantContext, phone: any, convoId: any) {
+  const manageUrl = resolveManageBookingsUrl(tenant.business);
+  const msg = "To view, reschedule, cancel, or change your booking, please use the *My Bookings* tab on our website" + (manageUrl ? ": " + manageUrl : ".") + "\n\nIt\u2019s the quickest way to manage your booking directly.";
+  await sendText(tenant, phone, msg);
+  await setConvo(convoId, { current_state: "MENU" });
+}
 async function logE(tenant: TenantContext, evt: any, p?: any, bid?: any) { await supabase.from("logs").insert({ business_id: tenant.business.id, booking_id: bid, event: evt, payload: p }); }
 function fmtTime(tenant: TenantContext, iso: any) { return formatDateTime(tenant, iso, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
@@ -297,6 +425,13 @@ async function getActiveTours(tenant: TenantContext) {
   const r = await supabase.from("tours").select("id, name, description, base_price_per_person, duration_minutes, hidden")
     .eq("business_id", tenant.business.id).eq("active", true).order("sort_order", { ascending: true });
   return (r.data || []).filter(function (t: any) { return !t.name.includes("Private") && !t.hidden; });
+}
+async function getBookableTours(tenant: TenantContext) {
+  // Booking flows only offer tours with at least one open slot in the next 14
+  // days — gift vouchers still use getActiveTours (no slot needed to buy one).
+  const [tours, slots] = await Promise.all([getActiveTours(tenant), getAvailSlots(tenant, 14)]);
+  const withSlots = new Set(slots.map(function (s: any) { return s.tour_id; }));
+  return tours.filter(function (t: any) { return withSlots.has(t.id); });
 }
 async function getBookingCustomFields(tenant: TenantContext) {
   const r = await supabase.from("businesses").select("booking_custom_fields").eq("id", tenant.business.id).maybeSingle();
@@ -447,10 +582,16 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     }
   }
 
+  // Pick the tenant's default spot, not merely the first one — same selection
+  // the admin weather widget uses (app/page.tsx: find(isDefault) || [0]).
+  // Falling through to hardcoded Cape Town coords means forecasting somebody
+  // else's weather, so say so loudly in the logs when it happens.
   const defaultWeatherSpot = { lat: -33.908, lon: 18.398 };
-  const configuredWeatherSpot = Array.isArray(tenant.business.weather_widget_locations) && tenant.business.weather_widget_locations.length > 0
-    ? tenant.business.weather_widget_locations[0]
-    : defaultWeatherSpot;
+  const weatherSpots = Array.isArray(tenant.business.weather_widget_locations) ? tenant.business.weather_widget_locations : [];
+  const configuredWeatherSpot = weatherSpots.find((l: any) => l?.isDefault) || weatherSpots[0];
+  if (!configuredWeatherSpot) {
+    console.warn("WEATHER_SPOT_FALLBACK business=" + tenant.business.id + " — no weather_widget_locations configured, using hardcoded Cape Town coords");
+  }
   const weatherLat = Number(configuredWeatherSpot?.lat ?? defaultWeatherSpot.lat);
   const weatherLon = Number(configuredWeatherSpot?.lon ?? defaultWeatherSpot.lon);
 
@@ -523,7 +664,7 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 
 function detectAvailQuery(input: string): boolean {
   const i = input.toLowerCase();
-  const hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
+  const hasTime = i.includes("tomorrow") || i.includes("today") || i.includes("weekend") || i.includes("next week") || i.includes("this week") || i.includes("week") || i.includes("morning") || i.includes("afternoon") || i.includes("evening") || ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].some(function (d) { return i.includes(d); }) || /\d{1,2}(st|nd|rd|th)/.test(i) || /\d{1,2}\s*(am|pm)/.test(i);
   const hasIntent = i.includes("available") || i.includes("space") || i.includes("slot") || i.includes("open") || i.includes("spot") || i.includes("can i") || i.includes("do you have") || i.includes("any tour") || i.includes("what time") || i.includes("book for") || i.includes("free") || i.includes("which") || i.includes("what");
   return hasTime && hasIntent;
 }
@@ -551,7 +692,7 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
     const s = displaySlots[si]; const tour = (s as any).tours;
     const avail = s.capacity_total - s.booked - (s.held || 0);
     msg += "\u{1F6F6} *" + (tour?.name || "Tour") + "*\n";
-    msg += "   " + fmtTime(tenant, s.start_time) + " \u2014 " + avail + " spots \u2014 R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
+    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + " spots, R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
   }
 
   if (slots.length > 8) {
@@ -632,10 +773,8 @@ function matchFAQ(input: any) {
 async function adjustSlotBooked(businessId: string, slotId: string, delta: number) {
   if (!slotId || !delta) return;
   const rpcRes = await supabase.rpc("adjust_slot_capacity", { p_slot_id: slotId, p_business_id: businessId, p_booked_delta: delta, p_held_delta: 0 });
-  if (rpcRes.error) {
-    const sr = await supabase.from("slots").select("booked").eq("business_id", businessId).eq("id", slotId).single();
-    if (sr.data) await supabase.from("slots").update({ booked: Math.max(0, (sr.data.booked || 0) + delta) }).eq("business_id", businessId).eq("id", slotId);
-  }
+  // S7: no read-modify-write fallback (that reintroduces the race). Log only.
+  if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR slot=" + slotId + " err=" + rpcRes.error.message);
 }
 
 // Detect intent from natural language
@@ -649,17 +788,9 @@ async function detectIntent(tenant: TenantContext, input: string, phone: string)
   if (i === "reschedule") return "RESCHEDULE";
   if (i === "cancel") return "CANCEL";
 
-  // Use Gemini for natural language intent classification
-  if (!GK) return null; // Fallback if no API key
-
-  try {
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{
-            text: `You are an intent classifier for a tourism activity booking assistant for ${businessName(tenant)}. Read the user's message and reply with EXACTLY ONE of the following keywords based on their intent, or 'UNKNOWN' if it doesn't match any:
+  // Use the LLM for natural language intent classification
+  const intentOut = await llmText({
+    system: `You are an intent classifier for a tourism activity booking assistant for ${businessName(tenant)}. Read the user's message and reply with EXACTLY ONE of the following keywords based on their intent, or 'UNKNOWN' if it doesn't match any:
 
 BOOK (wants to book a tour)
 AVAIL (asking about times, schedule, or availability)
@@ -668,24 +799,171 @@ VOUCHER (wants to buy or redeem a gift voucher)
 HUMAN (wants to speak to a human, agent, or team member)
 THANKS (saying thank you or goodbye)
 
-Reply ONLY with the keyword, nothing else.`}]
-        },
-        contents: [{ role: "user", parts: [{ text: input }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
-      })
-    });
-    const d = await r.json();
-    if (d.candidates?.[0]?.content?.parts?.[0]) {
-      const intent = d.candidates[0].content.parts[0].text.trim().toUpperCase();
-      if (["BOOK", "AVAIL", "MY_BOOKINGS", "VOUCHER", "HUMAN", "THANKS"].includes(intent)) {
-        return intent;
-      }
+Reply ONLY with the keyword, nothing else.`,
+    user: input,
+    maxTokens: 10,
+    temperature: 0.1,
+    timeoutMs: 5000,
+    reasoning: "off", // one-keyword classifier — thinking would blow the 5s budget
+    label: "wa-intent",
+    businessId: tenant.business.id,
+    userKey: await hashedUserKey(tenant.business.id, String(phone)),
+  });
+  if (intentOut) {
+    const intent = intentOut.trim().toUpperCase();
+    if (["BOOK", "AVAIL", "MY_BOOKINGS", "VOUCHER", "HUMAN", "THANKS"].includes(intent)) {
+      return intent;
     }
-  } catch (e) { console.error("Intent classification failed", e); }
+  }
 
   return null;
 }
 
+
+// ───────── v2 bot brain (three-block cached prompt + JSON contract) ─────────
+// Rollout flag WA_BOT_V2 (docs/qa/BOT_V2_ROLLOUT.md):
+//   off    → legacy path only
+//   shadow → legacy path answers as today; v2 runs after the send, logged to
+//            llm_usage, never sent (default while we compare on goldens)
+//   on     → v2 answers free-text turns (one message, no trailing buttons);
+//            legacy path is the automatic fallback whenever v2 degrades
+const WA_BOT_V2 = (Deno.env.get("WA_BOT_V2") || "shadow").toLowerCase();
+
+// Writes to the same llm_usage table _shared/llm.ts meters into (schema from
+// 20260803120000, v2 columns from 20260803130000). Best-effort, never throws.
+async function logLlmUsage(businessId: string, entry: { label: string; shadow: boolean; usage?: BotUsage | null; out?: BotOut | null; action?: string }) {
+  try {
+    await supabase.from("llm_usage").insert({
+      business_id: businessId,
+      fn: entry.label,
+      model: entry.usage?.model || "none",
+      prompt_tokens: entry.usage?.promptTokens ?? 0,
+      completion_tokens: entry.usage?.completionTokens ?? 0,
+      cached_tokens: entry.usage?.cachedTokens ?? 0,
+      action: entry.action || entry.out?.action || null,
+      intent: entry.out?.intent || null,
+      grounded: entry.out?.grounded ?? null,
+      shadow: entry.shadow,
+    });
+  } catch (e) { console.error("LLM_USAGE_ERR " + (e instanceof Error ? e.message : String(e))); }
+}
+
+async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userText: string): Promise<string> {
+  const bizId = tenant.business.id;
+  const [tours, kbHits, bkr, slots, cntRes, siteUrls] = await Promise.all([
+    getActiveTours(tenant),
+    retrieveKb(supabase, bizId, userText),
+    supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
+      .eq("phone", phone).eq("business_id", bizId).in("status", ["PAID", "HELD", "CONFIRMED"])
+      .order("created_at", { ascending: false }).limit(3),
+    getAvailSlots(tenant, 5),
+    supabase.from("wa_messages").select("id", { count: "exact", head: true })
+      .eq("business_id", bizId).eq("to_phone", String(phone)).eq("status", "SENT")
+      .gte("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
+    getBusinessSiteUrls(tenant),
+  ]);
+
+  const blockB = buildBlockB({
+    name: businessName(tenant),
+    aiPrompt: tenant.business.ai_system_prompt,
+    terminology: tenant.business.terminology,
+    faqJson: tenant.business.faq_json,
+    bookingUrl: siteUrls.bookingSiteUrl || null,
+    tours: (tours || []).map((t: any) => ({
+      name: t.name,
+      price: Number(t.base_price_per_person || 0),
+      durationMinutes: Number(t.duration_minutes || 0),
+      description: t.description,
+    })),
+  });
+
+  const bookings = bkr.data || [];
+  const openBookings = bookings.map((b: any) =>
+    (b.tours?.name || "Tour") + " on " + (b.slots ? fmtTime(tenant, b.slots.start_time) : "TBC") + " (" + b.qty + " ppl, " + b.status + ")").join("; ");
+  const avail = (slots || []).slice(0, 6).map((s: any) =>
+    fmtTime(tenant, s.start_time) + " " + (s.tours?.name || "") + " (" + Math.max(0, Number(s.capacity_total || 0) - Number(s.booked || 0) - Number(s.held || 0)) + " spots)").join("\n");
+
+  const nowIso = new Date().toISOString();
+  const blockC = buildBlockC({
+    nowText: formatDateTime(tenant, nowIso, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+    dayName: formatDateTime(tenant, nowIso, { weekday: "long" }),
+    windowOpen: true, // we are replying to an inbound message, so the 24h window is open by definition
+    outboundCount24h: cntRes.count || 0,
+    returning: bookings.length > 0,
+    openBookingsSummary: openBookings || null,
+    availabilitySummary: avail || null,
+    kbHits,
+  });
+
+  return assembleBotSystem(blockB, blockC);
+}
+
+// Returns true when the turn is fully handled (something sent, or intentionally
+// silent). false → caller falls through to the legacy path.
+async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userText: string, mode: "send" | "shadow"): Promise<boolean> {
+  try {
+    // The v2 path calls botReply directly, bypassing llmText, so the fair-use
+    // ceiling has to be applied here too. Returning false drops the turn to the
+    // legacy bot rather than leaving the customer with nothing. Shadow runs are
+    // metering, not customer-facing, so they are not capped.
+    if (mode === "send" && !(await withinAiQuota(tenant.business.id, "wa-v2"))) return false;
+
+    const system = await buildBotSystemForTurn(tenant, String(phone), userText);
+    const label = mode === "shadow" ? "wa-v2-shadow" : "wa-v2";
+    const r = await botReply({ system, user: userText, userKey: await hashedUserKey(tenant.business.id, String(phone)), label });
+    if (!r) {
+      await logLlmUsage(tenant.business.id, { label, shadow: mode === "shadow", action: "parse_fail" });
+      return false;
+    }
+    await logLlmUsage(tenant.business.id, { label, shadow: mode === "shadow", usage: r.usage, out: r.out });
+    if (mode === "shadow") return true;
+
+    const out = r.out;
+    // HARD RULE: only out.message may ever reach the customer. plan and
+    // escalation_reason are internal; a leaked plan is a sev-2.
+    switch (out.action) {
+      case "silent":
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      case "escalate": {
+        await typingDelay();
+        await sendText(tenant, phone, out.message || "Let me get a person on this for you. Our team will reply here shortly.");
+        await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
+        await logE(tenant, "human_takeover", { phone: phone, reason: out.escalation_reason || "bot_escalate" });
+        return true;
+      }
+      case "flow": {
+        await typingDelay();
+        if (out.message) await sendText(tenant, phone, out.message);
+        if (out.flow_id === "availability_check") {
+          const availHandled = await handleSmartAvail(tenant, phone, userText);
+          if (availHandled) { await setConvo(convo.id, { current_state: "MENU" }); return true; }
+        }
+        await handleMsg(tenant, phone, "book", "text"); // existing deterministic booking flow
+        return true;
+      }
+      case "template":
+        // ponytail: unreachable while answering an inbound (window is open by
+        // definition); the reactive 131047 fallback in sendWA owns real
+        // closed-window sends. Log it and stay quiet rather than guess.
+        console.error("BOT_V2_UNEXPECTED_TEMPLATE " + tenant.business.id);
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      case "reply":
+      default: {
+        if (!out.message) return false;
+        await typingDelay();
+        // One message, no trailing button prompt (v2 one-message rule).
+        await sendText(tenant, phone, out.message);
+        await setConvo(convo.id, { current_state: "MENU" });
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error("BOT_V2_ERR " + (e instanceof Error ? e.message : String(e)));
+    return false;
+  }
+}
 
 async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any) {
   try {
@@ -695,20 +973,25 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     const _rt = (text || "").trim();
     const _ri = (msgType === "interactive" && interactive) ? ((interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "") : "";
     let inboundMsgId: string | null = null;
-    try {
-      const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone }).select("id").single();
-      if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
-      else inboundMsgId = cmRes.data?.id || null;
-    } catch (e: any) {
-      await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
+    // internal_proceed is a state-machine token (auto-advance), not a customer
+    // message — logging it polluted the inbox thread.
+    if (_rt !== "internal_proceed") {
+      try {
+        const cmRes = await supabase.from("chat_messages").insert({ business_id: convo.business_id || tenant.business.id, phone: phone, direction: "IN", body: _rt || _ri || "[non-text]", sender: convo.customer_name || phone }).select("id").single();
+        if (cmRes.error) await logE(tenant, "CHAT_ERROR_RES", cmRes.error);
+        else inboundMsgId = cmRes.data?.id || null;
+      } catch (e: any) {
+        await logE(tenant, "CHAT_ERROR_CATCH", { msg: e.message });
+      }
     }
 
-    // ── Drain any queued cancellation follow-ups ────────────────────────────
-    // When weather-cancel (or any cancel flow using sendWhatsappWithWindowReopen)
-    // couldn't send a free-form message because the 24h window was closed, it
-    // queued the full message in outbox with status='WAITING_WINDOW' and sent a
-    // reopener template. The customer just replied → window is now open → send
-    // the queued messages right away using this tenant's own WA credentials.
+    // ── Drain any queued window-closed follow-ups ───────────────────────────
+    // When a sender (weather-cancel/cancel-booking via sendWhatsappWithWindowReopen,
+    // admin-reply, broadcast) couldn't send a free-form message because the 24h
+    // window was closed, it queued the full message in outbox with
+    // status='WAITING_WINDOW' and sent a reopener template. The customer just
+    // replied → window is now open → send the queued messages right away using
+    // this tenant's own WA credentials.
     try {
       const { data: queuedMsgs } = await supabase
         .from("outbox")
@@ -758,21 +1041,67 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       return;
     }
 
+    // Data-deletion keywords (Meta ToS / POPIA) — same always-on path as STOP.
+    // Confirm first, then anonymize: chat history is redacted and personal
+    // details are wiped from bookings; financial records keep their amounts
+    // (5-year tax retention, per the published privacy policy).
+    //
+    // Anchored and deliberately narrow. The risk is asymmetric: a miss falls
+    // through to the bot (which can still hand off to a human), but a false
+    // positive destroys a guest's data irreversibly. "delete my booking" is a
+    // cancellation and must never reach anonymize_customer — hence the fixed
+    // noun list rather than a loose "contains delete" check.
+    const DELETE_RE = /^(?:delete|(?:please\s+)?(?:delete|erase|remove)\s+(?:all\s+)?(?:my|our)\s+(?:personal\s+)?(?:data|info|information|details|records))\.?$/;
+    if (DELETE_RE.test(input)) {
+      await sendText(tenant, phone,
+        "Your data deletion request is confirmed. Your messages and personal details will be removed from our records within 30 days. Invoices and payment records are retained for 5 years as required by South African tax law."
+      );
+      const { error: delErr } = await supabase.rpc("anonymize_customer", {
+        p_customer_id: null,
+        p_business_id: tenant.business.id,
+        p_request_id: null,
+        p_admin_id: null,
+        p_email: null,
+        p_phone: phone,
+      });
+      if (delErr) await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
+      return;
+    }
+
+    // ── Trading gate ──────────────────────────────────────────────────────────
+    // A suspended/paused tenant's storefront is closed and create-checkout
+    // rejects payment, so the bot must not engage customers or spend LLM quota.
+    // Placed after the DELETE handler (data-deletion stays honored) and before
+    // all auto-reply logic. Silent skip: the webhook still returns 200 to Meta.
+    const subState = await getSubscriptionState(supabase, tenant.business.id);
+    if (!subState.trading) {
+      console.warn("WA_BOT_SKIP_NOT_TRADING business=" + tenant.business.id + " status=" + subState.status);
+      return;
+    }
+
     // ── Bot mode gate ─────────────────────────────────────────────────────────
     // Check tenant's whatsapp_bot_mode setting. If the bot is disabled (OFF or
     // inside business hours for OUTSIDE_HOURS mode), skip all auto-reply logic.
     // Stop-words (above) and HUMAN-mode routing (below) still work regardless.
     const botGate = await shouldBotReply(supabase, tenant.business.id);
     if (!botGate.active) {
-      // Tag the message so analytics can track "would have auto-replied but bot was disabled"
+      // Tag the message so analytics can track "would have auto-replied but bot was disabled".
+      // PostgREST ignores order/limit on UPDATE, so fetch the latest row's id first —
+      // the old chained form stamped EVERY inbound message for this phone.
       try {
-        await supabase.from("chat_messages")
-          .update({ bot_skipped_reason: botGate.reason })
+        const { data: lastIn } = await supabase.from("chat_messages")
+          .select("id")
           .eq("business_id", tenant.business.id)
           .eq("phone", phone)
           .eq("direction", "IN")
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
+        if (lastIn?.id) {
+          await supabase.from("chat_messages")
+            .update({ bot_skipped_reason: botGate.reason })
+            .eq("id", lastIn.id);
+        }
       } catch { /* non-critical */ }
       return;
     }
@@ -799,7 +1128,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     // Greetings trigger welcome
-    if ((input === "hi" || input === "hello" || input === "hey" || input === "howzit" || input === "hiya" || input === "yo" || input === "sup" || input === "good morning" || input === "good afternoon" || input === "good evening") && state !== "IDLE") {
+    // Prefix match so "hi there" / "hello!" also count; the length guard keeps
+    // real requests like "hi, I want to cancel my booking" flowing to intent routing.
+    const isGreeting = /^(hi|hello|hey|howzit|hiya|yo|sup|good\s+(morning|afternoon|evening))\b/.test(input) && input.length <= 20;
+    if (isGreeting && state !== "IDLE") {
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       state = "IDLE";
     }
@@ -896,21 +1228,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const faqKey = matchFAQ(input);
       if (faqKey && !rid) {
         const faqAnswer = getFaqAnswer(tenant, faqKey);
-        if (!faqAnswer) {
-          await sendText(tenant, phone, "I’m not sure about that yet. Let me connect you to our team.");
-          await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
+        if (faqAnswer) {
+          await typingDelay();
+          await sendText(tenant, phone, faqAnswer);
+          await typingDelay();
+          await sendText(tenant, phone, "Anything else I can help with?");
+          await sendButtons(tenant, phone, "Quick actions:", [
+            { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
+            { id: "MORE", title: "\u{1F4AC} More Options" },
+          ]);
+          await setConvo(convo.id, { current_state: "MENU" });
           return;
         }
-        await typingDelay();
-        await sendText(tenant, phone, faqAnswer);
-        await typingDelay();
-        await sendText(tenant, phone, "Anything else I can help with?");
-        await sendButtons(tenant, phone, "Quick actions:", [
-          { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
-          { id: "MORE", title: "\u{1F4AC} More Options" },
-        ]);
-        await setConvo(convo.id, { current_state: "MENU" });
-        return;
+        // FAQ pattern matched but this tenant hasn't configured that answer.
+        // Do NOT dead-end into a silent HUMAN handoff (the bot then ignored
+        // everything until "menu" — customers thought it was broken). Fall
+        // through: intent routing / menu keywords / gemFallback still get a
+        // chance to answer, and the final fallback keeps the bot alive.
       }
 
       // Check intent (skip if rid already set from button click)
@@ -919,6 +1253,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await supabase.from("chat_messages").update({ intent: intent, auto_replied: true }).eq("id", inboundMsgId);
       }
       if (intent === "THANKS" && !rid) {
+        if (WA_BOT_V2 === "on") {
+          // v2 one-message rule: pure acknowledgements get silence, not a send.
+          await setConvo(convo.id, { current_state: "MENU" });
+          return;
+        }
         await sendText(tenant, phone, "You\u2019re welcome! \u{1F60A} Feel free to ask anything else or type *menu* to see your options.");
         await setConvo(convo.id, { current_state: "MENU" });
         return;
@@ -961,10 +1300,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     else if (state === "MENU") {
       const c = rid || input;
 
-      // BOOK
-      if (c === "BOOK" || c.includes("book")) {
-        const tours = await getActiveTours(tenant);
-        if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment \u2014 check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
+      // BOOK — but never when the customer is talking about an EXISTING booking
+      // ("change/cancel/reschedule my booking" used to start a brand-new booking
+      // because "booking" contains "book"). Manage-phrases fall through to the
+      // MY_BOOKINGS branch below.
+      const cManage = /\b(change|resched\w*|cancel\w*|move|edit|manage|update|view)\b/.test(c);
+      if (c === "BOOK" || (c.includes("book") && !cManage)) {
+        const tours = await getBookableTours(tenant);
+        if (tours.length === 0) { await sendText(tenant, phone, "No tours available at the moment. Check back soon!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
         if (tours.length === 1) {
           await sendText(tenant, phone, "How many people will be joining? (1\u201330)");
           await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tours[0].id } });
@@ -972,7 +1315,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const trows: any[] = [];
           for (let ti = 0; ti < tours.length; ti++) {
             const tr = tours[ti];
-            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + tr.duration_minutes + " min" });
+            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + formatDuration(tr.duration_minutes) });
           }
           await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
           await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: trows }]);
@@ -980,17 +1323,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
 
-      // AVAILABILITY
-      else if (c === "AVAIL" || c.includes("avail")) {
+      // AVAILABILITY — also catch natural phrasings like "what times do you
+      // have", "what's your schedule", "any open slots this week"
+      else if (c === "AVAIL" || c.includes("avail") || /\b(times?|schedule|slots?|openings?)\b/.test(c)) {
         const tours2 = await getActiveTours(tenant);
         if (tours2.length <= 1) {
           const slots = await getAvailSlots(tenant, 8);
-          if (slots.length === 0) { await sendText(tenant, phone, "Nothing open right now, but check back soon \u2014 we add new slots regularly!"); await setConvo(convo.id, { current_state: "IDLE" }); }
+          if (slots.length === 0) { await sendText(tenant, phone, "Nothing open right now, but check back soon. We add new slots regularly!"); await setConvo(convo.id, { current_state: "IDLE" }); }
           else {
             let msg = "Here\u2019s what\u2019s coming up:\n\n";
             for (let ai = 0; ai < slots.length; ai++) {
               const as2 = slots[ai]; const aav = as2.capacity_total - as2.booked - (as2.held || 0); const apr = await getSlotPrice(as2);
-              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + " \u2014 " + aav + " spots \u2014 R" + apr + "/pp\n";
+              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + ", " + aav + " spots, R" + apr + "/pp\n";
             }
             await sendButtons(tenant, phone, msg, [{ id: "BOOK", title: "\u{1F6F6} Book Now" }, { id: "IDLE", title: "\u2B05 Back" }]);
           }
@@ -1003,7 +1347,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             if (atSlots.length === 0) { availMsg += "  Fully booked for now\n\n"; }
             else {
               for (let asi = 0; asi < atSlots.length; asi++) {
-                const ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + " \u2014 " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
+                const ats = atSlots[asi]; availMsg += "  \u2022 " + fmtTime(tenant, ats.start_time) + ", " + (ats.capacity_total - ats.booked - (ats.held || 0)) + " spots\n";
               }
               availMsg += "\n";
             }
@@ -1013,32 +1357,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       // MY BOOKINGS / RESCHEDULE / CANCEL
-      else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel")) {
-        const bkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED", "CANCELLED"])
-          .order("created_at", { ascending: false }).limit(5);
-        const bookings = bkr.data || [];
-        if (bookings.length === 0) {
-          await sendText(tenant, phone, "You don\u2019t have any active bookings at the moment.");
-          await sendButtons(tenant, phone, "Want to book your next adventure?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Main Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-        } else {
-          let bmsg = "Here are your bookings:\n\n"; const brows: any[] = [];
-          for (let bi = 0; bi < bookings.length; bi++) {
-            const b = bookings[bi]; const bslot = (b as any).slots; const btour = (b as any).tours;
-            const bref = b.id.substring(0, 8).toUpperCase(); const btime = bslot ? fmtTime(tenant, bslot.start_time) : "TBC";
-            bmsg += (bi + 1) + ". *" + bref + "* \u2014 " + (btour?.name || "Tour") + "\n   " + btime + " \u2022 " + b.qty + " pax \u2022 R" + b.total_amount + " \u2022 " + b.status + "\n\n";
-            brows.push({ id: "BK_" + b.id, title: bref + " - " + b.status, description: (btour?.name || "Tour").substring(0, 20) + " " + (btime || "").substring(0, 15) });
-          }
-          await sendList(tenant, phone, bmsg + "Tap to manage a booking:", "My Bookings", [{ title: "Your Bookings", rows: brows }]);
-          await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-        }
+      else if (c === "MY_BOOKINGS" || c === "RESCHEDULE" || c === "CANCEL" || c.includes("my booking") || c.includes("manage") || c.includes("reschedule") || c.includes("cancel") || (cManage && /\bbooking/.test(c))) {
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
+        return;
       }
 
       // ASK A QUESTION
       else if (c === "ASK" || c === "ask" || c.includes("question")) {
         await typingDelay();
-        await sendText(tenant, phone, "Go ahead, ask me anything! \u{1F60A}\n\nI can answer things like:\n\u2022 \"What should I bring?\"\n\u2022 \"Where do we meet?\"\n\u2022 \"Is it safe for beginners?\"\n\u2022 \"Can I reschedule my booking?\"\n\u2022 \"What\'s available tomorrow?\"\n\nOr ask about your specific booking \u2014 I can look it up!");
+        await sendText(tenant, phone, "Go ahead, ask me anything! \u{1F60A}\n\nI can answer things like:\n\u2022 \"What should I bring?\"\n\u2022 \"Where do we meet?\"\n\u2022 \"Is it safe for beginners?\"\n\u2022 \"Can I reschedule my booking?\"\n\u2022 \"What\'s available tomorrow?\"\n\nOr ask about your specific booking, I can look it up!");
         await setConvo(convo.id, { current_state: "ASK_MODE" });
         return;
       }
@@ -1144,16 +1471,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // FALLBACK — try to be helpful
       else {
+        if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, input || rawText, "send")) return;
         await typingDelay();
-        const gemReply = await gemFallback(tenant, input || rawText);
+        const gemReply = await gemFallback(tenant, input || rawText, phone);
         if (gemReply) {
           await sendText(tenant, phone, gemReply);
           await sendButtons(tenant, phone, "Anything else?", [
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
             { id: "MORE", title: "\u{1F4AC} More Options" },
           ]);
+          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, input || rawText, "shadow");
         } else {
-          await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\" \u2014 or pick an option below:");
+          await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\". Or pick an option below:");
           await sendButtons(tenant, phone, "Quick actions:", [
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
             { id: "MY_BOOKINGS", title: "\u{1F4CB} My Bookings" },
@@ -1165,12 +1494,36 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK TOUR =====
     else if (state === "PICK_TOUR") {
-      const tourId = rid ? rid.replace("TOUR_", "") : "";
+      let tourId = rid ? rid.replace("TOUR_", "") : "";
+      // Typed fallback — customers often type the tour name or a number instead
+      // of tapping the list (and some WhatsApp clients don't render lists). The
+      // rid-only version trapped them in "Please pick a tour from the list above."
+      if (!tourId && rawText) {
+        const tours = await getBookableTours(tenant);
+        const typed = rawText.toLowerCase().trim();
+        const num = typed.match(/^(\d{1,2})\.?$/);
+        if (num && Number(num[1]) >= 1 && Number(num[1]) <= tours.length) {
+          tourId = tours[Number(num[1]) - 1].id;
+        } else {
+          const matches = tours.filter((tr: any) => {
+            const nm = String(tr.name || "").toLowerCase();
+            return nm === typed || nm.includes(typed) || typed.includes(nm);
+          });
+          if (matches.length === 1) tourId = matches[0].id;
+        }
+        if (!tourId) {
+          const tours2 = tours.slice(0, 10);
+          let opts = "Which tour would you like? Reply with the name or number:\n\n";
+          for (let oi = 0; oi < tours2.length; oi++) opts += (oi + 1) + ". " + tours2[oi].name + "\n";
+          await sendText(tenant, phone, opts);
+          return;
+        }
+      }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list above."); return; }
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
-      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + t.duration_minutes + " minutes\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
+      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
       await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tourId } });
     }
 
@@ -1371,13 +1724,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             });
           }
         } catch (e) { console.log("cancel voucher email err"); }
-        await sendText(tenant, phone, "Done! Your booking has been cancelled and converted to a voucher:\n\n\u{1F39F} Code: *" + cvcode + "*\n\u{1F4B0} Value: *R" + cvTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await sendText(tenant, phone, "Done! Your booking has been cancelled and converted to a voucher:\n\n\u{1F39F} Code: *" + cvcode + "*\n\u{1F4B0} Value: *R" + cvTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime. Type *menu* and select *Redeem Voucher* when you\u2019re ready!");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else if (rid === "CANCEL_REFUND" || input === "refund") {
         const crTotal = Number(sd.total);
         // C4: Check if booking was paid by voucher — issue a new voucher instead of requesting Yoco refund
-        const crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_deduction").eq("id", sd.booking_id).single();
+        const crBkCheck = await supabase.from("bookings").select("yoco_payment_id, payment_method, voucher_amount_paid").eq("id", sd.booking_id).single();
         const crIsVoucherPaid = crBkCheck.data && (
           (crBkCheck.data.yoco_payment_id && String(crBkCheck.data.yoco_payment_id).startsWith("VOUCHER_")) ||
           crBkCheck.data.payment_method === "VOUCHER" ||
@@ -1388,15 +1741,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const crVCode = genVoucherCode();
           const crVResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: crVCode, status: "ACTIVE", type: "CREDIT", value: crTotal, current_balance: crTotal, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
           if (crVResult.error) { await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
-          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled: voucher refund (originally voucher-paid)", converted_to_voucher_id: crVResult.data.id }).eq("id", sd.booking_id);
           if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_voucher_refund", { booking_id: sd.booking_id, code: crVCode, amount: crTotal }, sd.booking_id);
-          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime \u2014 type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+          await sendText(tenant, phone, "Done! Your booking has been cancelled.\n\nSince you paid with a voucher, we\u2019ve issued a new voucher:\n\n\u{1F39F} Code: *" + crVCode + "*\n\u{1F4B0} Value: *R" + crTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nUse it anytime. Type *menu* and select *Redeem Voucher* when you\u2019re ready!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         } else {
           // M7: Split-tender refund math — check if booking has voucher_deduction > 0
-          const crVoucherDeduction = Number(crBkCheck.data?.voucher_deduction || 0);
+          const crVoucherDeduction = Number(crBkCheck.data?.voucher_amount_paid || 0);
           // Policy percent computed at quote time (ACT_CANCEL_); fallback 95%.
           const crPct = sd.cancel_pct != null && Number(sd.cancel_pct) >= 0 ? Number(sd.cancel_pct) : 95;
           const crFrac = crPct / 100;
@@ -1409,15 +1762,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             // Policy fee applies to the cash portion only
             const crCashPaid = crTotal; // total_amount is the cash portion after voucher deduction
             crRefund = Math.round(crCashPaid * crFrac * 100) / 100;
-            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted. Expect it within 5\u20137 business days.";
             if (crSplitVResult.data) {
               crRefundMsg += "\n\n\u{1F39F} Your voucher credit of *R" + crVoucherDeduction + "* has been restored: *" + crSplitVCode + "*";
             }
           } else {
             crRefund = Math.round(crTotal * crFrac * 100) / 100;
-            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted \u2014 expect it within 5\u20137 business days.";
+            crRefundMsg = "Done! Your booking has been cancelled.\n\nA refund of *R" + crRefund + "* has been submitted. Expect it within 5\u20137 business days.";
           }
-          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled — refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: crPct + "% refund via WhatsApp (refund policy)" }).eq("id", sd.booking_id);
+          await supabase.from("bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancellation_reason: "Customer cancelled: refund", refund_status: "REQUESTED", refund_amount: crRefund, refund_notes: crPct + "% refund via WhatsApp (refund policy)" }).eq("id", sd.booking_id);
           if (sd.slot_id) await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.qty);
           await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", sd.booking_id).eq("status", "ACTIVE");
           await logE(tenant, "booking_cancelled_refund", { booking_id: sd.booking_id, amount: crRefund }, sd.booking_id);
@@ -1427,7 +1780,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             if (crEmail.data?.email) {
               await fetch(SUPABASE_URL + "/functions/v1/send-email", {
                 method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp — refund requested", total_amount: crTotal.toFixed(2), is_partial: false } }),
+                body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: crEmail.data.email, customer_name: crEmail.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (crEmail.data as any).tours?.name || "Tour", start_time: (crEmail.data as any).slots?.start_time || "", reason: "Cancelled via WhatsApp: refund requested", refund_amount: crRefund.toFixed(2), total_amount: crTotal.toFixed(2), is_partial: false } }),
               });
             }
           } catch (e) { console.log("cancel refund email err"); }
@@ -1452,7 +1805,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           if (cbkData.data?.email) {
             await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time || "", reason: "Cancelled within 24h — no refund", total_amount: String(sd.total), is_partial: false } }),
+              body: JSON.stringify({ type: "CANCELLATION", data: { business_id: tenant.business.id, email: cbkData.data.email, customer_name: cbkData.data.customer_name, ref: sd.booking_id.substring(0, 8).toUpperCase(), tour_name: (cbkData.data as any).tours?.name || "Tour", start_time: (cbkData.data as any).slots?.start_time || "", reason: "Cancelled within 24h: no refund", total_amount: String(sd.total), is_partial: false } }),
             });
           }
         } catch (e) { console.log("cancel email err"); }
@@ -1468,7 +1821,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await supabase.from("bookings").update({ refund_status: "ACTION_REQUIRED", refund_amount: refAmt, refund_notes: "100% weather refund" }).eq("id", sd.booking_id);
         await logE(tenant, "refund_requested", { booking_id: sd.booking_id, amount: refAmt }, sd.booking_id);
         const frLoc = tenant.business.location_phrase;
-        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted \u2014 expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
+        await sendText(tenant, phone, "Done! A full refund of *R" + refAmt + "* has been submitted. Expect it within 5\u20137 business days.\n\n" + (frLoc ? "We\u2019d love to have you back " + frLoc + " soon!" : "We\u2019d love to have you back soon!"));
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else {
         await sendText(tenant, phone, "No worries, your booking remains cancelled and untouched. You can manage it again from the My Bookings menu.");
@@ -1496,7 +1849,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             });
           }
         } catch (e) { console.log("voucher email err"); }
-        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F4B0} Value: *R" + vTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nShare it with a friend or use it yourself \u2014 just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
+        await sendText(tenant, phone, "All done! Here\u2019s your voucher:\n\n\u{1F39F} Code: *" + vcode + "*\n\u{1F4B0} Value: *R" + vTotal + "*\n\u{1F4C5} Valid for: *3 years*\n\nShare it with a friend or use it yourself. Just type *menu* and select *Redeem Voucher* when you\u2019re ready!");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       } else { await sendText(tenant, phone, "No worries, your booking stays as is! \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
     }
@@ -1508,44 +1861,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (newQty === sd.qty) { await sendText(tenant, phone, "That\u2019s the same as your current booking! No changes needed. \u{1F60A}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
 
       if (newQty > sd.qty) {
-        // Adding guests — use atomic capacity check via RPC (H2: don't update slot before payment)
         const addCount = newQty - sd.qty;
-        const addCost = addCount * Number(sd.unit_price);
-        await sendText(tenant, phone, "Adding " + addCount + " guest" + (addCount !== 1 ? "s" : "") + "...");
-        // H2: Create hold via atomic RPC instead of directly updating slots.booked
-        const addHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: sd.booking_id,
-          p_slot_id: sd.slot_id,
-          p_qty: addCount,
-          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        const changed = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({ booking_id: sd.booking_id, action: "ADD_GUESTS", new_qty: newQty }),
         });
-        if (addHoldRes.error || !addHoldRes.data?.success) {
-          await sendText(tenant, phone, addHoldRes.data?.error || "Sorry, not enough spots left for " + addCount + " more. Try a smaller number.");
+        const result = await changed.json();
+        if (!changed.ok || !result.ok) {
+          await sendText(tenant, phone, result.error || "We couldn't reserve the extra guests. Please try again.");
           return;
         }
-        const addNewTotal = newQty * Number(sd.unit_price);
-        // M8: Invalidate waiver on guest addition
-        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
-        await logE(tenant, "guests_added_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: newQty, additional_cost: addCost }, sd.booking_id);
-        // Create checkout for extra payment — booking qty/total updated by webhook on payment success
-        try {
-          const coRes = await fetch(SUPABASE_URL + "/functions/v1/create-checkout", {
-            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-            body: JSON.stringify({ amount: addCost, booking_id: sd.booking_id, business_id: tenant.business.id, type: "BOOKING",
-              metadata: { hold_id: addHoldRes.data.hold_id, add_qty: addCount, new_qty: newQty, new_total: addNewTotal } }),
-          });
-          const coData = await coRes.json();
-          if (coData?.redirectUrl) {
-            await sendText(tenant, phone, "\u{1F465} *" + addCount + " extra guest" + (addCount !== 1 ? "s" : "") + " reserved!*\n\nNew total will be: " + newQty + " people (R" + addNewTotal + ")\n\nPlease pay the extra *R" + addCost + "* to confirm:\n" + coData.redirectUrl + "\n\n\u23F0 Spots held for 15 minutes.");
-          } else {
-            // Fallback: update booking directly since checkout failed
-            await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
-            await sendText(tenant, phone, "\u2705 *" + addCount + " guest" + (addCount !== 1 ? "s" : "") + " added!*\n\nNew total: " + newQty + " people (R" + addNewTotal + ")\n\nA payment link for R" + addCost + " will be sent to your email.");
-          }
-        } catch (e) {
-          // Fallback: update booking directly since checkout failed
-          await supabase.from("bookings").update({ qty: newQty, total_amount: addNewTotal }).eq("id", sd.booking_id);
-          await sendText(tenant, phone, "\u2705 Guests added! A payment link for R" + addCost + " will be sent shortly.");
+        if (result.payment_url) {
+          await sendText(tenant, phone, "To confirm " + addCount + " extra guests, pay R" + Number(result.diff).toFixed(2) + ":\n" + result.payment_url + "\n\nExtra spots are held for 15 minutes. Your existing booking stays confirmed.");
+        } else {
+          await sendText(tenant, phone, "Your booking now has " + newQty + " guests. The updated total is due with your booking payment.");
         }
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
@@ -1553,7 +1882,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Removing guests
         if (!sd.can_remove) { await sendText(tenant, phone, "Removing guests is only available more than 24 hours before the trip. You can add more guests, or contact our team for help."); return; }
         const rmCount = sd.qty - newQty;
-        const rmAmount = rmCount * (Number(sd.total) / Number(sd.qty));
+        // Price the freed seats from the booking's full paid value (cash +
+        // voucher portions) — sd.total is only the cash portion and reads R0
+        // on voucher-paid bookings.
+        const rmBkRes = await supabase.from("bookings").select("qty, total_amount, voucher_amount_paid, original_total").eq("id", sd.booking_id).single();
+        const rmPortions = getPaidPortions(rmBkRes.data || { total_amount: sd.total });
+        const rmUnitValue = rmPortions.paidValue / Number(rmBkRes.data?.qty || sd.qty || 1);
+        const rmAmount = Math.round(rmCount * rmUnitValue * 100) / 100;
         await sendText(tenant, phone, "Removing " + rmCount + " guest" + (rmCount !== 1 ? "s" : "") + " frees up *R" + rmAmount + "*.\n\nHow would you like your credit?");
         await sendButtons(tenant, phone, "Choose an option:", [
           { id: "GUEST_VOUCHER", title: "\u{1F39F} Voucher (R" + rmAmount + ")" },
@@ -1566,27 +1901,32 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== EDIT GUESTS — refund or voucher for removed guests =====
     else if (state === "EDIT_GUESTS_EXCESS") {
-      if (rid === "GUEST_VOUCHER" || input === "voucher") {
-        const gvNewTotal = sd.new_qty * Number(sd.unit_price);
-        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: gvNewTotal }).eq("id", sd.booking_id);
-        // Release slot capacity
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
-        // Create voucher
-        let gvCode = genVoucherCode();
-        const gvResult = await insertVoucherWithRetry({ business_id: tenant.business.id, code: gvCode, status: "ACTIVE", type: "CREDIT", value: sd.rm_amount, current_balance: sd.rm_amount, source_booking_id: sd.booking_id, expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() });
-        if (gvResult.data) gvCode = gvResult.data.code;
-        await logE(tenant, "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode, amount: sd.rm_amount }, sd.booking_id);
-        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + gvCode + "*\n\u{1F4B0} Value: *R" + sd.rm_amount + "*\n\u{1F4C5} Valid for 3 years");
-        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
-      }
-      else if (rid === "GUEST_REFUND" || input === "refund") {
-        const grNewTotal = sd.new_qty * Number(sd.unit_price);
-        // Full removed-guest excess, matching the web rebook-booking path (no fee)
-        const grRefund = Math.round(Number(sd.rm_amount) * 100) / 100;
-        await supabase.from("bookings").update({ qty: sd.new_qty, total_amount: grNewTotal, refund_status: "REQUESTED", refund_amount: grRefund, refund_notes: "Guest removal refund" }).eq("id", sd.booking_id);
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, -sd.rm_count);
-        await logE(tenant, "guests_removed_refund_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, refund: grRefund }, sd.booking_id);
-        await sendText(tenant, phone, "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*\n\nRefund of *R" + grRefund + "* submitted. Expect it within 5\u20137 business days.");
+      if (rid === "GUEST_VOUCHER" || input === "voucher" || rid === "GUEST_REFUND" || input === "refund") {
+        const wantRefund = rid === "GUEST_REFUND" || input === "refund";
+        // Route through rebook-booking — the canonical money door for guest
+        // removal. It reprices cash + voucher portions, returns voucher-funded
+        // value as a CREDIT voucher, refunds only the cash share, releases
+        // seats and logs. The hand-rolled copy here was voucher-blind.
+        let rd: any = null;
+        try {
+          const rr = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            body: JSON.stringify({ booking_id: sd.booking_id, action: "REMOVE_GUESTS", new_qty: sd.new_qty, excess_action: wantRefund ? "REFUND" : "VOUCHER" }),
+          });
+          rd = await rr.json();
+        } catch (e) {
+          console.error("WA_REMOVE_GUESTS_ERR:", e);
+        }
+        if (!rd || rd.error || rd.ok === false) {
+          await sendText(tenant, phone, "Sorry, something went wrong updating your booking. Please try again or contact our team.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
+        await logE(tenant, wantRefund ? "guests_removed_refund_wa" : "guests_removed_voucher_wa", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: rd.voucher_code, voucher_amount: rd.voucher_amount, refund: rd.refund_amount }, sd.booking_id);
+        let rmMsg = "\u2705 *Updated to " + sd.new_qty + " guest" + (sd.new_qty !== 1 ? "s" : "") + "*";
+        if (rd.voucher_code) rmMsg += "\n\nHere\u2019s your voucher:\n\u{1F39F} Code: *" + rd.voucher_code + "*\n\u{1F4B0} Value: *R" + rd.voucher_amount + "*\n\u{1F4C5} Valid for 3 years";
+        if (rd.refund_amount) rmMsg += "\n\n\u{1F4B8} Refund of *R" + rd.refund_amount + "* submitted. Expect it within 5\u20137 business days.";
+        await sendText(tenant, phone, rmMsg);
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       }
       else { await sendText(tenant, phone, "No changes made. Your booking stays at " + sd.qty + " people. \u{1F389}"); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); }
@@ -1666,7 +2006,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK QTY =====
     else if (state === "ASK_QTY") {
-      const qty = parseInt(input);
+      // Accept "We are 2 people" / "2 adults" — extract the first number, not parseInt(raw)
+      const qtyMatch = (input || "").match(/\d{1,3}/);
+      const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : NaN;
       if (isNaN(qty) || qty < 1 || qty > 30) { await sendText(tenant, phone, "Just need a number between 1 and 30 \u{1F60A}"); return; }
 
       // Check if there are ANY valid slots left in general (just to catch waitlist cases)
@@ -1682,67 +2024,107 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
-      let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + " \u2014 nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + ", nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
+      const dateMap: any = {};
       try {
-        const previewSlots = await supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
+        let previewQ = supabase.from("slots").select("start_time, capacity_total, booked, held, status, tour_id")
           .eq("business_id", tenant.business.id).gt("start_time", new Date().toISOString())
           .lte("start_time", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
           .order("start_time", { ascending: true });
+        // Only count the selected tour's slots — the preview used to count ALL
+        // tours, so "1 trip available" could be a different activity entirely.
+        if (sd.tour_id) previewQ = previewQ.eq("tour_id", sd.tour_id);
+        const previewSlots = await previewQ;
         const pvSlots = previewSlots.data || [];
-        // Group by date
+        // Group by tenant-local date key (chronological via slot ordering)
         const pvDays: any = {};
         for (let pvi = 0; pvi < pvSlots.length; pvi++) {
           const pvs = pvSlots[pvi];
-          const pvDate = formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" });
-          if (!pvDays[pvDate]) pvDays[pvDate] = { open: 0, closed: 0, full: 0 };
-          if (pvs.status !== "OPEN") { pvDays[pvDate].closed++; }
-          else if (pvs.capacity_total - pvs.booked - (pvs.held || 0) < qty) { pvDays[pvDate].full++; }
-          else { pvDays[pvDate].open++; }
+          const pvKey = tenantDateKey(tenant, pvs.start_time);
+          if (!pvDays[pvKey]) pvDays[pvKey] = { label: formatDateOnly(tenant, pvs.start_time, { weekday: "short", day: "numeric", month: "short" }), open: 0, closed: 0, full: 0 };
+          if (pvs.status !== "OPEN") { pvDays[pvKey].closed++; }
+          else if (pvs.capacity_total - pvs.booked - (pvs.held || 0) < qty) { pvDays[pvKey].full++; }
+          else { pvDays[pvKey].open++; }
         }
         const pvKeys = Object.keys(pvDays);
         let pvShown = 0;
+        // Numbered list + date_map so a customer replying "2" picks option 2
+        // (a bare "2" used to fall through to the LLM date extractor, which
+        // hallucinated "02 Feb" \u2014 see PICK_DATE bare-number guard).
         for (let pvk = 0; pvk < pvKeys.length && pvShown < 5; pvk++) {
           const pvd = pvDays[pvKeys[pvk]];
-          if (pvd.open > 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
-          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 \u274C Closed (weather)\n"; }
-          else { previewMsg += "\u2022 " + pvKeys[pvk] + " \u2014 Fully booked\n"; }
           pvShown++;
+          dateMap[pvShown] = pvKeys[pvk];
+          if (pvd.open > 0) { previewMsg += pvShown + ". " + pvd.label + ": " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
+          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += pvShown + ". " + pvd.label + ": \u274C Closed (weather)\n"; }
+          else { previewMsg += pvShown + ". " + pvd.label + ": Fully booked\n"; }
         }
-        if (pvShown > 0) { previewMsg += "\nType a date to see times!"; }
+        if (pvShown > 0) { previewMsg += "\nReply with a number, or type a date (e.g. 'Saturday' or '20 Jul')"; }
         else { previewMsg += "No upcoming trips in the next week. Type any date to check!"; }
       } catch (pvErr) { previewMsg += "\nType a date to see times! (e.g., 'Tomorrow' or '1 September')"; }
       await sendText(tenant, phone, previewMsg);
-      await setConvo(convo.id, { current_state: "PICK_DATE", state_data: { ...sd, qty: qty } });
+      await setConvo(convo.id, { current_state: "PICK_DATE", state_data: { ...sd, qty: qty, date_map: dateMap } });
     }
 
     // ===== PICK DATE (new step) =====
     else if (state === "PICK_DATE") {
       let pickedDate = "";
 
-      // Attempt Natural Language Date Parsing if they typed it instead of clicking
-      if (rawText) {
-        if (GK) {
-          try {
-            const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              signal: AbortSignal.timeout(5000),
-              body: JSON.stringify({
-                system_instruction: { parts: [{ text: `You are a date extractor. The user is asking for a date. Today is ${new Date().toISOString().split("T")[0]}. Return exactly one YYYY-MM-DD date string based on their input, or "INVALID" if no date is found. Examples: "Tomorrow" -> next date. "1 September" -> 2026-09-01.` }] },
-                contents: [{ role: "user", parts: [{ text: rawText }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 15 }
-              })
-            });
-            const d = await r.json();
-            if (d.candidates?.[0]?.content?.parts?.[0]) {
-              const extracted = d.candidates[0].content.parts[0].text.trim();
-              if (extracted !== "INVALID" && extracted.match(/^\d{4}-\d{2}-\d{2}$/)) pickedDate = extracted;
-            }
-          } catch (e) { }
+      // Bare number = pick from the numbered date list (date_map set in ASK_QTY).
+      // A bare number must NEVER reach the LLM date extractor: a customer who
+      // replied "2" to the list had it hallucinated into "02 Feb".
+      const bareNum = rawText ? rawText.trim().match(/^(\d{1,2})\.?$/) : null;
+      if (bareNum) {
+        const bn = Number(bareNum[1]);
+        if (sd.date_map && sd.date_map[bn]) {
+          pickedDate = sd.date_map[bn];
+        } else {
+          await sendText(tenant, phone, "Just to be sure I book the right day, please type the full date. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+          return;
+        }
+      }
+
+      // Local parsing FIRST — the bot must understand "tomorrow"/"monday"/"6 july"
+      // even when the LLM is down (a silent Gemini outage used to reject every
+      // date and trap customers in a loop here).
+      if (!pickedDate && rawText) {
+        pickedDate = parseLocalDate(tenant, rawText) || "";
+      }
+
+      // LLM fallback for exotic phrasing only
+      if (!pickedDate && rawText) {
+        const dateOut = await llmText({
+          system: `You are a date extractor. The user is asking for a date. Today is ${tenantTodayKey(tenant)}. Return exactly one YYYY-MM-DD date string based on their input, or "INVALID" if no date is found. Examples: "Tomorrow" -> next date. "1 September" -> 2026-09-01.`,
+          user: rawText,
+          maxTokens: 15,
+          temperature: 0.1,
+          timeoutMs: 5000,
+          reasoning: "off", // date extractor — thinking would blow the 5s budget
+          label: "wa-date",
+          businessId: tenant.business.id,
+          userKey: await hashedUserKey(tenant.business.id, String(phone)),
+        });
+        if (dateOut) {
+          const extracted = dateOut.trim();
+          if (extracted !== "INVALID" && extracted.match(/^\d{4}-\d{2}-\d{2}$/)) pickedDate = extracted;
         }
       }
 
       if (!pickedDate) {
-        await sendText(tenant, phone, "Please type a clear date like 'Tomorrow' or '1 September'.");
+        await sendText(tenant, phone, "Sorry, I didn't catch that date. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+        return;
+      }
+
+      // Sanity guard: the LLM fallback (and explicit typed years) can produce
+      // past or absurdly distant dates. Catch them here instead of replying
+      // "no trips scheduled for 02 Feb".
+      const pdTodayKey = tenantTodayKey(tenant);
+      if (pickedDate < pdTodayKey) {
+        await sendText(tenant, phone, "That date has already passed. Try 'Tomorrow', a weekday like 'Saturday', or a date like '12 July'.");
+        return;
+      }
+      if (pickedDate > addDaysToKey(pdTodayKey, 365)) {
+        await sendText(tenant, phone, "We can only take bookings up to a year ahead. Try a closer date!");
         return;
       }
 
@@ -1750,13 +2132,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const startIso = zonedDateTimeToUtcIso(tenant, pickedDate, 0, 0);
       const endIso = zonedDateTimeToUtcIso(tenant, pickedDate, 24, 0);
 
-      const slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
+      let slotQ = supabase.from("slots").select("id, start_time, capacity_total, booked, held, status, is_peak, price_per_person_override, tour_id, tours(name, base_price_per_person)")
         .eq("business_id", tenant.business.id)
         .gte("start_time", startIso)
         .lt("start_time", endIso)
         .order("start_time", { ascending: true });
 
-      // Don't filter by tour_id — show ALL activities for the date so user can see all options
+      // New bookings: only offer the tour the customer picked. Reschedules stay
+      // unfiltered — rebook-booking supports cross-tour moves.
+      if (sd.tour_id && !sd.is_reschedule) slotQ = slotQ.eq("tour_id", sd.tour_id);
 
       const { data: dbSlots } = await slotQ;
 
@@ -1770,10 +2154,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const openSlots = [];
       let allClosed = true;
       let hasOpenButFull = false;
+      let hasCutoffOnly = false;
 
+      const bookingCutoffMs = Date.now() + 60 * 60 * 1000;
       for (const ts of dbSlots) {
         if (ts.status === "OPEN") {
           allClosed = false;
+          // Don't offer slots the customer can no longer book (60-min cutoff) —
+          // showing them and rejecting the pick afterwards trapped people in a loop.
+          if (new Date(ts.start_time).getTime() < bookingCutoffMs) {
+            hasCutoffOnly = true;
+            continue;
+          }
           const t_avail = ts.capacity_total - ts.booked - (ts.held || 0);
           if (t_avail >= sd.qty) {
             openSlots.push(ts);
@@ -1784,11 +2176,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (allClosed) {
-        await sendText(tenant, phone, "\u26C5 Unfortunately *" + pdFormatted + "* is closed due to bad weather. Please choose another date \u2014 type a new date to try again!");
+        await sendText(tenant, phone, "\u26C5 Unfortunately *" + pdFormatted + "* is closed due to bad weather. Please choose another date. Type a new date to try again!");
         return;
       }
 
       if (openSlots.length === 0) {
+        if (hasCutoffOnly && !hasOpenButFull) {
+          await sendText(tenant, phone, "The remaining trips on *" + pdFormatted + "* have already closed for booking (bookings close 60 minutes before the start time). Try another date! \u{1F4C5}");
+          return;
+        }
         if (hasOpenButFull) {
           await sendText(tenant, phone, "All trips on *" + pdFormatted + "* are fully booked for " + sd.qty + " people. Try another date or a smaller group! \u{1F4C5}");
         } else {
@@ -1799,15 +2195,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Multiple or 1 slot — show time picker via numbered text menu (cap at 10)
       const maxDisplay = 10;
-      let timeTxt = pdFormatted + " \u2014 pick a time (reply with a number):\n\n";
+      let timeTxt = pdFormatted + ", pick a time (reply with a number):\n\n";
       const slotMap: any = {};
       const displayCount = Math.min(openSlots.length, maxDisplay);
       for (let ti = 0; ti < displayCount; ti++) {
         const os = openSlots[ti];
         const oavl = os.capacity_total - os.booked - (os.held || 0);
-        const opri = os.price_per_person_override || os.tours?.base_price_per_person || 600;
+        // PostgREST types embedded many-to-one relations as arrays; runtime is an object
+        const osTour: any = Array.isArray(os.tours) ? os.tours[0] : os.tours;
+        const opri = os.price_per_person_override || osTour?.base_price_per_person || 600;
         const otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
-        const tName = os.tours?.name ? os.tours.name + " \u2022 " : "";
+        const tName = osTour?.name ? osTour.name + " \u2022 " : "";
         timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, R" + opri + "/pp)\n";
         slotMap[ti + 1] = os.id;
       }
@@ -1827,23 +2225,33 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (!isNaN(num) && sd.slot_map && sd.slot_map[num]) {
         slotId = sd.slot_map[num];
       }
-      if (!slotId) { await sendText(tenant, phone, "Please reply with a valid number from the list."); return; }
+      if (!slotId) {
+        // Forgive a typed date here (customers often answer the time list with
+        // a new date) — redispatch to PICK_DATE instead of trapping them.
+        const psDate = rawText ? parseLocalDate(tenant, rawText) : null;
+        if (psDate) { await setConvo(convo.id, { current_state: "PICK_DATE" }); await handleMsg(tenant, phone, rawText, "text"); return; }
+        await sendText(tenant, phone, "Please reply with a number from the list, or type a different date.");
+        return;
+      }
       const sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
       const slot = sr2.data;
-      if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date \u2014 type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
-      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date \u2014 type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date. Type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date. Type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       // M5: 60-min cutoff check at slot selection
       const slotStartMs = new Date(slot.start_time).getTime();
-      if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time or another date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time from the list (reply with its number), or type *menu* to start over."); return; }
       const slotAvailRes = await supabase.rpc("slot_available_capacity", { p_slot_id: slotId });
       const slotAvail = Number(slotAvailRes.data || 0);
-      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      // Stay in PICK_SLOT: "another option from the list" must keep working
+      // (this used to reset to PICK_DATE, so replying "3" hit the date parser).
+      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); return; }
 
       if (sd.is_reschedule) {
         await sendText(tenant, phone, "Processing your change... \u23F3");
         const { data: rbData, error: rbErr } = await supabase.functions.invoke("rebook-booking", {
           body: {
             booking_id: sd.booking_id,
+            action: "RESCHEDULE",
             new_slot_id: slotId,
             excess_action: "VOUCHER"
           }
@@ -1886,9 +2294,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
         finalTotal = Math.max(0, finalTotal - voucherDeduction);
         if (finalTotal === 0) {
-          discountMsg = "\n\u{1F39F} *Voucher applied \u2014 this trip is on us!*";
+          discountMsg = "\n\u{1F39F} *Voucher applied, this trip is on us!*";
         } else {
-          discountMsg = "\n\u{1F39F} *Voucher applied \u2014 R" + voucherDeduction + " off!*";
+          discountMsg = "\n\u{1F39F} *Voucher applied: R" + voucherDeduction + " off!*";
         }
       }
       const tourName2 = await supabase.from("tours").select("name").eq("id", slot.tour_id).single();
@@ -1913,6 +2321,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       if (rid === "CONFIRM" || input === "yes") {
+        // Details already collected (e.g. re-confirm after a price update) —
+        // go straight to finalize instead of asking for name/email again.
+        if (sd.customer_name && sd.email) {
+          await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: sd });
+          await handleMsg(tenant, phone, "internal_proceed", "text", null);
+          return;
+        }
         await typingDelay();
         await sendText(tenant, phone, "Brilliant! Just need a couple of details to lock it in.\n\nPlease reply with your:\n- Full Name\n- Email Address\n\n*(You can just send them together in one message!)*");
         await setConvo(convo.id, { current_state: "ASK_DETAILS", state_data: sd });
@@ -1921,17 +2336,26 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== ASK DETAILS (also handles ASK_NAME_EMAIL) =====
     else if (state === "ASK_DETAILS" || state === "ASK_NAME_EMAIL") {
-      const dParts = rawText.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
+      const dParts = rawText.split(/[,;\n]+/).map(function (p: string) { return p.trim(); }).filter(function (p: string) { return p.length > 0; });
       // Restore any partial data saved from a previous message in this state
       let dName = sd.partial_name || "";
       let dEmail = sd.partial_email || "";
       for (const dp of dParts) {
         const dc = dp.replace(/^(name|email)[:\-\s]*/i, "").trim();
         if (!dc) continue;
-        // Use regex to extract just the email address, handles trailing text like "john@email.com but ..."
+        // Extract the email, then treat the REMAINDER of the same part as the
+        // name — "Gideon Langenhoven gids@gmail.com" in one message used to
+        // capture only the email and re-ask for the name.
         const emailMatch = dc.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
-        if (emailMatch && !dEmail) { dEmail = emailMatch[0].toLowerCase(); }
-        else if (!emailMatch && dc.match(/[a-zA-Z]/) && !dName) { dName = dc; }
+        if (emailMatch) {
+          if (!dEmail) dEmail = emailMatch[0].toLowerCase();
+          const rest = dc.replace(emailMatch[0], "").replace(/[<>()\[\]"',;]/g, " ").replace(/\s+/g, " ").trim();
+          if (rest && !dName && /[a-zA-Z]{2,}/.test(rest) && !rest.includes("?") && rest.split(" ").length <= 5) dName = rest;
+        } else if (dc.match(/[a-zA-Z]/) && !dName && !dc.includes("?") && dc.split(/\s+/).length <= 5) {
+          // Question-looking or essay-length text is not a name — re-prompt instead
+          // of saving "do you provide wetsuits?" as the customer's name.
+          dName = dc;
+        }
       }
 
       if (!dName || !dEmail) {
@@ -2011,6 +2435,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         unitPrice: finalUnitPrice,
         voucherDeduction: sd.voucher_id ? Number(sd.voucher_deduction || 0) : 0,
         groupDiscountPercent: Number(sd.discount_percent || 0),
+        // Loyalty discounts apply at any group size; the default min-qty of 6
+        // silently dropped the quoted 10% and triggered a bogus "price changed".
+        groupDiscountMinQty: sd.discount_type === "LOYALTY" ? 1 : undefined,
       });
       if (!finalPriceCheck.ok && finalPriceCheck.reason !== "PRICE_CHANGED") {
         await sendText(tenant, phone, "I couldn't verify the price for that trip, so I won't create the booking yet. Please type *book* to start again.");
@@ -2046,6 +2473,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         customer_name: sd.customer_name, phone: phone, email: email,
         qty: verifiedSd.qty, unit_price: verifiedSd.unit_price, total_amount: verifiedSd.total,
         original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
+        voucher_amount_paid: Number(verifiedSd.voucher_deduction || 0),
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
         marketing_opt_in: null, total_captured: 0, total_refunded: 0,
         terms_accepted_at: new Date().toISOString(),
@@ -2060,42 +2488,19 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // VOUCHER BOOKING — skip payment
       if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
-        // H1: Atomic capacity check must run before voucher deduction.
-        const vHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
+        // Funding, capacity and confirmation commit together. A stale voucher
+        // must not leave a PAID booking or a partially drained voucher stack.
+        const voucherConfirmation = await supabase.rpc("confirm_voucher_booking", {
           p_booking_id: booking.id,
-          p_slot_id: verifiedSd.slot_id,
-          p_qty: verifiedSd.qty,
-          p_expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
+          p_voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id],
         });
-        if (vHoldRes.error || !vHoldRes.data?.success) {
-          // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
-          await supabase.from("bookings").delete().eq("id", booking.id);
-          await sendText(tenant, phone, vHoldRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.");
+        if (voucherConfirmation.error || !voucherConfirmation.data?.ok) {
+          await sendText(tenant, phone, "We couldn't confirm that booking. The voucher balance or available spots may have changed. Please try again or contact our team.");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
-        await supabase.from("bookings").update({ status: "PAID", yoco_payment_id: "VOUCHER_" + verifiedSd.voucher_code, total_captured: 0 }).eq("id", booking.id);
-        // Deduct voucher balances — sequential drain using atomic RPC (prevents double-spend)
-        const allVIds = verifiedSd.voucher_ids || [verifiedSd.voucher_id];
-        let waRemainingCost = Number(verifiedSd.voucher_deduction || 0);
-        for (let vi = 0; vi < allVIds.length; vi++) {
-          if (!allVIds[vi] || waRemainingCost <= 0) continue;
-          // Atomic deduction via RPC — drains Voucher A to R0 first, then Voucher B
-          const waRpcRes = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: allVIds[vi], p_amount: waRemainingCost });
-          if (waRpcRes.data?.success) {
-            const waDeducted = Number(waRpcRes.data.deducted);
-            const waNewBal = Number(waRpcRes.data.remaining);
-            waRemainingCost -= waDeducted;
-            await supabase.from("vouchers").update({ redeemed_booking_id: booking.id, redeemed_by_phone: phone }).eq("id", allVIds[vi]);
-            if (waNewBal > 0) {
-              // Notify about remaining balance via WhatsApp
-              const waVCode = await supabase.from("vouchers").select("code").eq("id", allVIds[vi]).single();
-              try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + (waVCode.data?.code || allVIds[vi]) + "* has *R" + waNewBal + "* remaining. Use it on your next booking!"); } catch (e) { }
-            }
-          } else {
-            // Redemption failed — do NOT mark REDEEMED (strands balance + hides failure).
-            console.error("VOUCHER_DEDUCT_FAILED:", allVIds[vi], waRpcRes.data?.error);
-          }
+        for (const remainder of voucherConfirmation.data.remainders || []) {
+          try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + remainder.code + "* has *R" + remainder.remaining + "* remaining. Use it on your next booking!"); } catch (e) { }
         }
         const vref = booking.id.substring(0, 8).toUpperCase();
         const vslot = await supabase.from("slots").select("start_time").eq("id", verifiedSd.slot_id).single();
@@ -2103,7 +2508,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
         await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: verifiedSd.voucher_code }, booking.id);
         // Upsell second trip
-        const otherTours2 = (await getActiveTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
+        const otherTours2 = (await getBookableTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
         if (otherTours2.length > 0) {
           const upsellTour = otherTours2[0];
           setTimeout(async function () {
@@ -2148,24 +2553,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
-      const bookingSiteUrls = await getBusinessSiteUrls(tenant);
-      console.log("YOCO_CALL: key_len=" + tenant.credentials.yocoSecretKey.length + " amount=" + Math.round(verifiedSd.total * 100)); const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
-        method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Math.round(verifiedSd.total * 100), currency: tenant.business.currency || "ZAR",
-          successUrl: withQuery(bookingSiteUrls.bookingSuccessUrl, { ref: booking.id }),
-          cancelUrl: bookingSiteUrls.bookingCancelUrl,
-          failureUrl: bookingSiteUrls.bookingCancelUrl,
-          metadata: { booking_id: booking.id, customer_name: sd.customer_name, qty: String(verifiedSd.qty) },
-        }),
+      const yocoData = await requestCheckout({
+        type: "BOOKING", booking_id: booking.id, amount: verifiedSd.total,
+        customer_name: sd.customer_name, qty: verifiedSd.qty,
+        voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id].filter(Boolean),
+        voucher_codes: verifiedSd.voucher_codes || [verifiedSd.voucher_code].filter(Boolean),
       });
-      const yocoData = await yocoRes.json();
-      console.log("YOCO:" + JSON.stringify(yocoData));
       let payUrl = "";
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
-        await supabase.from("bookings").update({ yoco_checkout_id: yocoData.id }).eq("id", booking.id);
         payUrl = yocoData.redirectUrl;
-      } else { payUrl = "Payment link unavailable \u2014 type *speak to us* for help"; }
+      } else { payUrl = "Payment link unavailable. Type *speak to us* for help"; }
       const ref = booking.id.substring(0, 8).toUpperCase();
       await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
@@ -2178,7 +2575,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (sd.booking_id) {
         const awHold = await supabase.from("holds").select("status, expires_at").eq("booking_id", sd.booking_id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (awHold.data && new Date(awHold.data.expires_at) < new Date()) {
-          await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries \u2014 type *book* to start a new booking and grab fresh spots!");
+          await sendText(tenant, phone, "Your hold has expired and the spots have been released. \u{1F614}\n\nNo worries! Type *book* to start a new booking and grab fresh spots!");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
@@ -2200,7 +2597,29 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== GIFT VOUCHER PURCHASE =====
     else if (state === "GV_PICK_TOUR") {
-      const tourId = rid ? rid.replace("GV_", "") : "";
+      let tourId = rid ? rid.replace("GV_", "") : "";
+      // Typed fallback — same as PICK_TOUR: accept a typed tour name or number
+      if (!tourId && rawText) {
+        const gvTours = await getActiveTours(tenant);
+        const gvTyped = rawText.toLowerCase().trim();
+        const gvNum = gvTyped.match(/^(\d{1,2})\.?$/);
+        if (gvNum && Number(gvNum[1]) >= 1 && Number(gvNum[1]) <= gvTours.length) {
+          tourId = gvTours[Number(gvNum[1]) - 1].id;
+        } else {
+          const gvMatches = gvTours.filter((tr: any) => {
+            const nm = String(tr.name || "").toLowerCase();
+            return nm === gvTyped || nm.includes(gvTyped) || gvTyped.includes(nm);
+          });
+          if (gvMatches.length === 1) tourId = gvMatches[0].id;
+        }
+        if (!tourId) {
+          const gvTours2 = gvTours.slice(0, 10);
+          let gvOpts = "Which tour is the voucher for? Reply with the name or number:\n\n";
+          for (let gi = 0; gi < gvTours2.length; gi++) gvOpts += (gi + 1) + ". " + gvTours2[gi].name + "\n";
+          await sendText(tenant, phone, gvOpts);
+          return;
+        }
+      }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list."); return; }
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).single();
       if (!tourInfo.data) { await sendText(tenant, phone, "Can't find that tour. Let's try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
@@ -2265,25 +2684,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           return;
         }
 
-        // Create Yoco checkout
-        // Uses global tenant.credentials.yocoSecretKey
-        const voucherSiteUrls = await getBusinessSiteUrls(tenant);
-        const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(Number(sd.value) * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(voucherSiteUrls.voucherSuccessUrl, { code: vcode }),
-            cancelUrl: voucherSiteUrls.bookingCancelUrl,
-            failureUrl: voucherSiteUrls.bookingCancelUrl,
-            metadata: { voucher_id: vr.data.id, voucher_code: vcode, type: "GIFT_VOUCHER" },
-          }),
+        const yocoData = await requestCheckout({
+          type: "GIFT_VOUCHER", voucher_id: vr.data.id, voucher_code: vcode, amount: sd.value,
         });
-        const yocoData = await yocoRes.json();
-        console.log("YOCO_GV:" + JSON.stringify(yocoData));
 
         if (yocoData && yocoData.id && yocoData.redirectUrl) {
-          await supabase.from("vouchers").update({ yoco_checkout_id: yocoData.id }).eq("id", vr.data.id);
           await sendText(tenant, phone,
             "\u{1F381} Great! Complete your payment to generate the voucher:\n\n" +
             "\u{1F4B0} Amount: R" + sd.value + "\n" +
@@ -2315,9 +2720,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Check if redeemed
         const vUsed = await supabase.from("vouchers").select("status").eq("code", code).eq("business_id", tenant.business.id).single();
         if (vUsed.data && vUsed.data.status === "REDEEMED") {
+          // No booking in progress here (this state is entered from the menu),
+          // so never route to CONFIRM_BOOKING \u2014 its buttons led to a phantom
+          // booking flow with no slot/qty in state_data.
           await sendText(tenant, phone, "This voucher has already been redeemed. Each voucher code can only be used once.");
-          await sendButtons(tenant, phone, "Options:", [{ id: "ADD_VOUCHER", title: "\u{1F39F} Try Another" }, { id: "CONFIRM", title: "\u2705 Continue" }, { id: "IDLE", title: "\u2B05 Back" }]);
-          await setConvo(convo.id, { current_state: "CONFIRM_BOOKING" }); return;
+          await sendButtons(tenant, phone, "Options:", [{ id: "REDEEM_VOUCHER", title: "\u{1F39F} Try Another Code" }, { id: "HUMAN", title: "\u{1F4AC} Get Help" }, { id: "IDLE", title: "\u2B05 Back" }]);
+          await setConvo(convo.id, { current_state: "MENU" }); return;
         }
         await sendText(tenant, phone, "Hmm, that code doesn\u2019t seem to be valid. Check for typos and try again, or type *speak to us* for help.");
         await sendButtons(tenant, phone, "Options:", [{ id: "VOUCHER", title: "\u{1F39F} Try Again" }, { id: "HUMAN", title: "\u{1F4AC} Get Help" }, { id: "IDLE", title: "\u2B05 Back" }]);
@@ -2330,7 +2738,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const vType = vr2.data.type || "CREDIT";
       const vPaxLimit = vr2.data.pax_limit || 1;
       const vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
-      const tours3 = await getActiveTours(tenant);
+      const tours3 = await getBookableTours(tenant);
+      if (tours3.length === 0) { await sendText(tenant, phone, "Your voucher is valid, but there are no open dates right now. Check back soon and we’ll get you booked in!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       if (tours3.length === 1) {
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nHow many people will be joining?");
         await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
@@ -2338,7 +2747,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const vtrows: any[] = [];
         for (let vti = 0; vti < tours3.length; vti++) {
           const vtr = tours3[vti];
-          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: vtr.duration_minutes + " min \u2022 normally R" + vtr.base_price_per_person + "/pp" });
+          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: formatDuration(vtr.duration_minutes) + " \u2022 normally R" + vtr.base_price_per_person + "/pp" });
         }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nWhich tour would you like?");
         await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
@@ -2428,64 +2837,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // Handle add/reduce people, change tour, change name — connect to team
       if (wantAddPeople) {
-        const addBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time, capacity_total, booked, held), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (addBkr.data) {
-          const addBk = addBkr.data; const addRef = addBk.id.substring(0, 8).toUpperCase();
-          const addSlot = (addBk as any).slots; const addTour = (addBk as any).tours;
-          const addAvail = addSlot ? addSlot.capacity_total - addSlot.booked - (addSlot.held || 0) : 0;
-          await sendText(tenant, phone, "Your booking *" + addRef + "* currently has " + addBk.qty + " people on " + (addTour?.name || "Tour") + " \u2014 " + (addSlot ? fmtTime(tenant, addSlot.start_time) : "TBC") + ".\n\n" + (addAvail > 0 ? "There are " + addAvail + " extra spots available.\n\n" : "This slot is full unfortunately.\n\n") + "How many people total would you like? (Currently " + addBk.qty + ")");
-          await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: addBk.id, slot_id: addBk.slot_id, tour_id: addBk.tour_id, current_qty: addBk.qty, unit_price: addBk.unit_price, max_avail: addBk.qty + addAvail } });
-        } else {
-          await sendText(tenant, phone, "I couldn\u2019t find an active booking. Try My Bookings or contact our team.");
-          await sendButtons(tenant, phone, "Options:", [{ id: "MY_BOOKINGS", title: "\u{1F4CB} My Bookings" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
       if (wantReducePeople) {
-        const redBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (redBkr.data) {
-          const redBk = redBkr.data; const redRef = redBk.id.substring(0, 8).toUpperCase();
-          const redSlot = (redBk as any).slots; const redTour = (redBk as any).tours;
-          const redHrs = redSlot ? (new Date(redSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-          const refundNote = redHrs >= 24 ? "You\u2019ll get a refund for the difference." : "As it\u2019s within 24 hours, the refund policy applies.";
-          await sendText(tenant, phone, "Your booking *" + redRef + "* has " + redBk.qty + " people on " + (redTour?.name || "Tour") + ".\n\n" + refundNote + "\n\nHow many people total would you like? (Currently " + redBk.qty + ")");
-          await setConvo(convo.id, { current_state: "MODIFY_QTY", state_data: { booking_id: redBk.id, slot_id: redBk.slot_id, tour_id: redBk.tour_id, current_qty: redBk.qty, unit_price: redBk.unit_price, max_avail: 30, hours_before: redHrs } });
-        } else {
-          await sendText(tenant, phone, "No active booking found. Try My Bookings.");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
       if (wantChangeTour) {
-        const ctBkr = await supabase.from("bookings").select("id, qty, total_amount, unit_price, slot_id, tour_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (ctBkr.data) {
-          const ctBk = ctBkr.data; const ctRef = ctBk.id.substring(0, 8).toUpperCase();
-          const ctTour = (ctBk as any).tours;
-          const ctSlot = (ctBk as any).slots;
-          const tours = await getActiveTours(tenant);
-          const otherTours = tours.filter(function (t: any) { return t.id !== ctBk.tour_id; });
-          if (otherTours.length > 0) {
-            await sendText(tenant, phone, "Your booking *" + ctRef + "* is for *" + (ctTour?.name || "Tour") + "* on " + (ctSlot ? fmtTime(tenant, ctSlot.start_time) : "TBC") + ".\n\nWhich tour would you like to switch to?");
-            const ctRows = otherTours.map(function (t: any) { return { id: "CHTOUR_" + t.id, title: t.name, description: "R" + t.base_price_per_person + "/pp \u2022 " + t.duration_minutes + " min" }; });
-            await sendList(tenant, phone, "Pick a new tour:", "Choose Tour", [{ title: "Available Tours", rows: ctRows }]);
-            await setConvo(convo.id, { current_state: "CHANGE_TOUR_PICK", state_data: { booking_id: ctBk.id, slot_id: ctBk.slot_id, tour_id: ctBk.tour_id, qty: ctBk.qty, current_tour: ctTour?.name } });
-          } else {
-            await sendText(tenant, phone, "No other tours available right now.");
-            await setConvo(convo.id, { current_state: "MENU" });
-          }
-        } else {
-          await sendText(tenant, phone, "No active booking found.");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
@@ -2513,20 +2875,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           // Create new checkout
           const rpBk = payBkr.data;
           const rpRef = rpBk.id.substring(0, 8).toUpperCase();
-          const resendSiteUrls = await getBusinessSiteUrls(tenant);
-          const rpYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              amount: Math.round(Number(rpBk.total_amount) * 100), currency: tenant.business.currency || "ZAR",
-              successUrl: withQuery(resendSiteUrls.bookingSuccessUrl, { ref: rpBk.id }),
-              cancelUrl: resendSiteUrls.bookingCancelUrl,
-              failureUrl: resendSiteUrls.bookingCancelUrl,
-              metadata: { booking_id: rpBk.id, type: "RESEND" },
-            }),
-          });
-          const rpYocoData = await rpYoco.json();
+          const rpYocoData = await requestCheckout({ type: "BOOKING", booking_id: rpBk.id, amount: rpBk.total_amount });
           if (rpYocoData?.redirectUrl) {
-            await supabase.from("bookings").update({ yoco_checkout_id: rpYocoData.id }).eq("id", rpBk.id);
             await sendText(tenant, phone, "Here\u2019s a fresh payment link for booking *" + rpRef + "* (R" + rpBk.total_amount + "):\n\n" + rpYocoData.redirectUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
           } else {
             await sendText(tenant, phone, "Couldn\u2019t generate a new link. Let me connect you to our team.");
@@ -2564,49 +2914,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      // Handle split payment
+      // Instalment/deposit accounting is not part of the MVP. Only issue a
+      // checkout for the full outstanding balance until that ledger exists.
       const wantSplit = (input.includes("split") && input.includes("pay")) || (input.includes("separate") && input.includes("pay"));
-      if (wantSplit) {
-        const spBkr = await supabase.from("bookings").select("id, total_amount, status")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (spBkr.data) {
-          await sendText(tenant, phone, "Sure! Your total is R" + spBkr.data.total_amount + ". How many people are splitting the payment? (2-10)");
-          await setConvo(convo.id, { current_state: "SPLIT_PAYMENT_COUNT", state_data: { booking_id: spBkr.data.id, split_total: spBkr.data.total_amount } });
-        } else {
-          await sendText(tenant, phone, "No unpaid booking found. Start a new booking first!");
-          await setConvo(convo.id, { current_state: "MENU" });
-        }
-        return;
-      }
-
-      // Handle cash/deposit request
       const wantCash = input.includes("cash") || (input.includes("deposit") && !input.includes("refund"));
-      if (wantCash) {
-        const cashBkr = await supabase.from("bookings").select("id, total_amount, status")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
-          .order("created_at", { ascending: false }).limit(1).single();
-        if (cashBkr.data) {
-          const depAmount = Math.round(Number(cashBkr.data.total_amount) * 0.5);
-          const depositSiteUrls = await getBusinessSiteUrls(tenant);
-          const depYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-            method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              amount: Math.round(depAmount * 100), currency: tenant.business.currency || "ZAR",
-              successUrl: withQuery(depositSiteUrls.bookingSuccessUrl, { ref: cashBkr.data.id }),
-              cancelUrl: depositSiteUrls.bookingCancelUrl,
-              metadata: { booking_id: cashBkr.data.id, type: "DEPOSIT_50" },
-            }),
-          });
-          const depData = await depYoco.json();
-          if (depData?.redirectUrl) {
-            await sendText(tenant, phone, "No problem! Pay a 50% deposit (R" + depAmount + ") to secure your booking, and settle the rest in cash on the day:\n\n" + depData.redirectUrl);
-          } else {
-            await sendText(tenant, phone, "Couldn\u2019t generate deposit link. Contact our team.");
-          }
-        } else {
-          await sendText(tenant, phone, "We ask for at least a 50% deposit online to secure your booking. Start a booking and I\u2019ll send you a deposit link!");
-        }
+      if (wantSplit || wantCash) {
+        await sendText(tenant, phone, "Online booking requires one payment for the full balance. Please use your payment link, or speak to our team about another payment arrangement.");
         await setConvo(convo.id, { current_state: "MENU" });
         return;
       }
@@ -2632,137 +2945,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       if (wantReschedule || wantCancel || wantMyBooking) {
-        // Look up their bookings
-        const askBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slot_id, tour_id, created_at, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
-          .order("created_at", { ascending: false }).limit(5);
-        const askBookings = askBkr.data || [];
-
-        if (askBookings.length === 0) {
-          await sendText(tenant, phone, "I couldn\u2019t find any active bookings linked to this phone number. If you booked with a different number, try the My Bookings page on our website with your email.");
-          await sendButtons(tenant, phone, "What else?", [{ id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "ASK", title: "\u2753 Another Question" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-          await setConvo(convo.id, { current_state: "MENU" });
-          return;
-        }
-
-        // If they want to reschedule
-        if (wantReschedule) {
-          if (askBookings.length === 1) {
-            const rb = askBookings[0]; const rbSlot = (rb as any).slots; const rbTour = (rb as any).tours;
-            const rbRef = rb.id.substring(0, 8).toUpperCase();
-            const rbHrs = rbSlot ? (new Date(rbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-
-            if (rbHrs < 24) {
-              await sendText(tenant, phone, "Your booking *" + rbRef + "* for " + (rbTour?.name || "the tour") + " on " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + " is within 24 hours, so rescheduling isn\u2019t available anymore. You can contact our team for help.");
-              await sendButtons(tenant, phone, "Options:", [{ id: "HUMAN", title: "\u{1F4AC} Speak to Team" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-              await setConvo(convo.id, { current_state: "MENU" });
-              return;
-            }
-
-            // Check reschedule count
-            const rCount = await supabase.from("bookings").select("reschedule_count").eq("id", rb.id).single();
-            if (rCount.data && rCount.data.reschedule_count >= 2) {
-              await sendText(tenant, phone, "You\u2019ve already rescheduled this booking twice. Let me connect you to our team.");
-              await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
-              return;
-            }
-
-            // Load slots for reschedule
-            const askRSlots = rb.tour_id ? await getAvailSlotsForTour(tenant, rb.tour_id, 60) : await getAvailSlots(tenant, 60);
-            const askRFitting = askRSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= rb.qty && s.id !== rb.slot_id; });
-
-            if (askRFitting.length === 0) {
-              await sendText(tenant, phone, "No alternative slots with enough space right now. Let me connect you to our team.");
-              await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
-              return;
-            }
-
-            await sendText(tenant, phone, "Sure! I found your booking:\n\n\u{1F6F6} *" + (rbTour?.name || "Tour") + "*\n\u{1F4C5} " + (rbSlot ? fmtTime(tenant, rbSlot.start_time) : "TBC") + "\n\u{1F465} " + rb.qty + " people\n\nPick a new date:");
-
-            // Group by week
-            const askRGroups: any = {};
-            for (let ari = 0; ari < askRFitting.length; ari++) {
-              const ars = askRFitting[ari]; const arsDate = new Date(ars.start_time);
-              const arwStart = new Date(arsDate); arwStart.setDate(arwStart.getDate() - arwStart.getDay());
-              const arwLabel = formatDateOnly(tenant, arwStart.toISOString(), { day: "numeric", month: "short" });
-              const arwKey = arwStart.toISOString().split("T")[0];
-              if (!askRGroups[arwKey]) askRGroups[arwKey] = { label: "Week of " + arwLabel, rows: [] };
-              if (askRGroups[arwKey].rows.length < 10) {
-                askRGroups[arwKey].rows.push({ id: "RSLOT_" + ars.id, title: fmtTime(tenant, ars.start_time).substring(0, 24), description: (ars.capacity_total - ars.booked - (ars.held || 0)) + " spots" });
-              }
-            }
-            const askRSecs: any[] = []; const askRKeys = Object.keys(askRGroups).sort(); let askRTotal = 0;
-            for (let ark = 0; ark < askRKeys.length && askRTotal < 10; ark++) {
-              const arg = askRGroups[askRKeys[ark]]; const arRem = 10 - askRTotal;
-              if (arg.rows.length > arRem) arg.rows = arg.rows.slice(0, arRem);
-              askRTotal += arg.rows.length; askRSecs.push({ title: arg.label.substring(0, 24), rows: arg.rows });
-            }
-            await sendList(tenant, phone, "Scroll through weeks:", "View Dates", askRSecs);
-            await setConvo(convo.id, { current_state: "RESCHEDULE_PICK", state_data: { booking_id: rb.id, slot_id: rb.slot_id, qty: rb.qty, total: rb.total_amount, tour_id: rb.tour_id, reschedule_count: rCount.data?.reschedule_count || 0 } });
-            return;
-          } else {
-            // Multiple bookings — let them pick
-            let rbMsg = "I found " + askBookings.length + " active bookings. Which one do you want to reschedule?\n\n";
-            const rbRows: any[] = [];
-            for (let rbi = 0; rbi < askBookings.length; rbi++) {
-              const rbb = askBookings[rbi]; const rbbSlot = (rbb as any).slots; const rbbTour = (rbb as any).tours;
-              const rbbRef = rbb.id.substring(0, 8).toUpperCase();
-              rbMsg += (rbi + 1) + ". *" + rbbRef + "* \u2014 " + (rbbTour?.name || "Tour") + "\n   " + (rbbSlot ? fmtTime(tenant, rbbSlot.start_time) : "TBC") + "\n\n";
-              rbRows.push({ id: "BK_" + rbb.id, title: rbbRef + " - " + (rbbTour?.name || "").substring(0, 15), description: rbbSlot ? fmtTime(tenant, rbbSlot.start_time).substring(0, 24) : "TBC" });
-            }
-            await sendList(tenant, phone, rbMsg, "Select Booking", [{ title: "Your Bookings", rows: rbRows }]);
-            await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-            return;
-          }
-        }
-
-        // If they want to cancel
-        if (wantCancel) {
-          if (askBookings.length === 1) {
-            const cb = askBookings[0]; const cbSlot = (cb as any).slots; const cbTour = (cb as any).tours;
-            const cbRef = cb.id.substring(0, 8).toUpperCase();
-            const cbHrs = cbSlot ? (new Date(cbSlot.start_time).getTime() - Date.now()) / (1000 * 60 * 60) : 0;
-            let cbDetail = "I found your booking:\n\n\u{1F6F6} *" + (cbTour?.name || "Tour") + "*\n\u{1F4C5} " + (cbSlot ? fmtTime(tenant, cbSlot.start_time) : "TBC") + "\n\u{1F465} " + cb.qty + " people\n\n";
-            if (cbHrs >= 24) {
-              // M4: Transition to CANCEL_CHOICE so user can pick voucher vs refund
-              const cbRefund = Math.round(Number(cb.total_amount) * 0.95 * 100) / 100;
-              cbDetail += "How would you like to cancel?\n\n*Option 1: Gift Voucher* \u{1F39F}\nR" + cb.total_amount + " voucher \u2022 No fees \u2022 Valid 3 years\n\n*Option 2: Refund* \u{1F4B8}\nR" + cbRefund + " (5% processing fee) \u2022 5-7 business days";
-              await sendButtons(tenant, phone, cbDetail, [
-                { id: "CANCEL_VOUCHER", title: "\u{1F39F} Voucher (best)" },
-                { id: "CANCEL_REFUND", title: "\u{1F4B8} Refund" },
-                { id: "IDLE", title: "\u274C Keep Booking" },
-              ]);
-              await setConvo(convo.id, { current_state: "CANCEL_CHOICE", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
-            } else {
-              cbDetail += "This is within 24 hours so *no refund* is available. Still cancel?";
-              await sendButtons(tenant, phone, cbDetail, [{ id: "CONFIRM_CANCEL", title: "\u2705 Yes, Cancel" }, { id: "IDLE", title: "\u274C Keep It" }]);
-              await setConvo(convo.id, { current_state: "CONFIRM_CANCEL_ACTION", state_data: { booking_id: cb.id, slot_id: cb.slot_id, qty: cb.qty, total: cb.total_amount, hours_before: cbHrs } });
-            }
-            return;
-          } else {
-            // Multiple — show list
-            const cbMsg = "Which booking do you want to cancel?\n\n";
-            const cbRows: any[] = [];
-            for (let cbi = 0; cbi < askBookings.length; cbi++) {
-              const cbb = askBookings[cbi]; const cbbSlot = (cbb as any).slots; const cbbTour = (cbb as any).tours;
-              const cbbRef = cbb.id.substring(0, 8).toUpperCase();
-              cbRows.push({ id: "BK_" + cbb.id, title: cbbRef + " - " + (cbbTour?.name || "").substring(0, 15), description: cbbSlot ? fmtTime(tenant, cbbSlot.start_time).substring(0, 24) : "TBC" });
-            }
-            await sendList(tenant, phone, cbMsg, "Select Booking", [{ title: "Your Bookings", rows: cbRows }]);
-            await setConvo(convo.id, { current_state: "MY_BOOKINGS_LIST" });
-            return;
-          }
-        }
-
-        // General booking inquiry
-        let bMsg = "Here are your active bookings:\n\n";
-        for (let abi = 0; abi < askBookings.length; abi++) {
-          const ab = askBookings[abi]; const abSlot = (ab as any).slots; const abTour = (ab as any).tours;
-          bMsg += "\u{1F6F6} *" + (abTour?.name || "Tour") + "*\n\u{1F4C5} " + (abSlot ? fmtTime(tenant, abSlot.start_time) : "TBC") + "\n\u{1F465} " + ab.qty + " people \u2022 " + ab.status + "\nRef: " + ab.id.substring(0, 8).toUpperCase() + "\n\n";
-        }
-        bMsg += "Need to change anything?";
-        await sendButtons(tenant, phone, bMsg, [{ id: "MY_BOOKINGS", title: "\u{1F4CB} Manage Bookings" }, { id: "ASK", title: "\u2753 Another Question" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-        await setConvo(convo.id, { current_state: "MENU" });
+        await sendManageBookingsRedirect(tenant, phone, convo.id);
         return;
       }
 
@@ -2801,25 +2984,29 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
 
-      // Call Gemini with full context
-      if (GK) {
-        try {
-          const ctxR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GK, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: buildGeminiInstruction(tenant, gemContext) }] },
-              contents: [{ role: "user", parts: [{ text: rawText }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
-            })
-          });
-          const ctxD = await ctxR.json();
-          if (ctxD.candidates?.[0]?.content?.parts?.[0]) {
-            await sendText(tenant, phone, ctxD.candidates[0].content.parts[0].text);
-            await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
-            await setConvo(convo.id, { current_state: "MENU" });
-            return;
-          }
-        } catch (e) { console.log("Gem err:", e); }
+      // Call the LLM with full context (bookings + availability + vector KB)
+      {
+        if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, rawText, "send")) return;
+        const askKbCtx = await retrieveKbContext(supabase, tenant.business.id, rawText);
+        if (askKbCtx) gemContext = askKbCtx + "\n" + gemContext;
+        const ctxOut = await llmText({
+          system: buildGeminiInstruction(tenant, gemContext),
+          user: rawText,
+          maxTokens: 400,
+          temperature: 0.2,
+          timeoutMs: 8000,
+          label: "wa-ask",
+          quota: true,
+          businessId: tenant.business.id,
+          userKey: await hashedUserKey(tenant.business.id, String(phone)),
+        });
+        if (ctxOut) {
+          await sendText(tenant, phone, ctxOut);
+          await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
+          await setConvo(convo.id, { current_state: "MENU" });
+          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, rawText, "shadow");
+          return;
+        }
       }
 
       // Fallback
@@ -2842,59 +3029,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "MENU" });
         return;
       }
-      // Recalculate discount for new qty (group discount threshold may change)
-      const mqDisc = await calcDiscount(tenant, newQty, phone);
-      const mqBaseTotal = newQty * Number(sd.unit_price);
-      let newTotal = mqBaseTotal;
-      if (mqDisc.percent > 0) { newTotal = mqBaseTotal - Math.round(mqBaseTotal * mqDisc.percent / 100); }
-      let oldTotal = sd.current_qty * Number(sd.unit_price);
-      const oldDisc = await calcDiscount(tenant, sd.current_qty, phone);
-      if (oldDisc.percent > 0) { oldTotal = oldTotal - Math.round(oldTotal * oldDisc.percent / 100); }
-      const diffAmount = Math.abs(newTotal - oldTotal);
-      if (qtyDiff > 0) {
-        // Added people — use atomic capacity check via RPC
-        const mqHoldRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: sd.booking_id,
-          p_slot_id: sd.slot_id,
-          p_qty: qtyDiff,
-          p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        });
-        if (mqHoldRes.error || !mqHoldRes.data?.success) {
-          await sendText(tenant, phone, mqHoldRes.data?.error || "Sorry, not enough spots left. Try a smaller number.");
-          return;
-        }
-        // Update booking
-        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        // M8: Invalidate waiver on guest addition
-        await supabase.from("bookings").update({ waiver_status: "PENDING", waiver_token: crypto.randomUUID() }).eq("id", sd.booking_id);
-        // Need additional payment
-        const addSiteUrls = await getBusinessSiteUrls(tenant);
-        const addYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(diffAmount * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(addSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
-            cancelUrl: addSiteUrls.bookingCancelUrl,
-            failureUrl: addSiteUrls.bookingCancelUrl,
-            metadata: { booking_id: sd.booking_id, type: "ADD_PEOPLE", hold_id: mqHoldRes.data.hold_id, add_qty: qtyDiff, new_qty: newQty },
-          }),
-        });
-        const addYocoData = await addYoco.json();
-        if (addYocoData?.redirectUrl) {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nYou need to pay an extra *R" + diffAmount + "* for the " + qtyDiff + " additional " + (qtyDiff === 1 ? "person" : "people") + ":\n\n" + addYocoData.redirectUrl);
-        } else {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! Please contact our team to arrange the additional payment of R" + diffAmount + ".");
-        }
+      const existingBooking = await supabase.from("bookings").select("id, qty")
+        .eq("id", sd.booking_id).eq("business_id", tenant.business.id).eq("phone", phone).maybeSingle();
+      if (existingBooking.error || !existingBooking.data) {
+        await sendText(tenant, phone, "We couldn't verify this booking. Please open My Bookings or speak to our team.");
+        return;
+      }
+      const { data: changed, error: changeError } = await supabase.functions.invoke("rebook-booking", {
+        body: { booking_id: existingBooking.data.id, action: newQty > existingBooking.data.qty ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: newQty },
+      });
+      if (changeError || !changed?.ok) {
+        await sendText(tenant, phone, changed?.error || "We couldn't change the guest count. Please try again or speak to our team.");
+        return;
+      }
+      if (changed.payment_url) {
+        await sendText(tenant, phone, "Pay *R" + changed.diff + "* to confirm the change to " + newQty + " guests:\n\n" + changed.payment_url);
       } else {
-        // Reduced people — update booking and release slot capacity
-        await supabase.from("bookings").update({ qty: newQty, total_amount: newTotal, discount_type: mqDisc.type || null, discount_percent: mqDisc.percent || 0 }).eq("id", sd.booking_id);
-        await adjustSlotBooked(tenant.business.id, sd.slot_id, qtyDiff);
-        if (sd.hours_before >= 24) {
-          await supabase.from("bookings").update({ refund_status: "REQUESTED", refund_amount: diffAmount, refund_notes: "Qty reduced from " + sd.current_qty + " to " + newQty }).eq("id", sd.booking_id);
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nA refund of *R" + diffAmount + "* has been submitted \u2014 expect it within 5-7 business days.");
-        } else {
-          await sendText(tenant, phone, "Updated to " + newQty + " people! \u2705\n\nAs this is within 24 hours, the refund policy applies for the difference.");
-        }
+        await sendText(tenant, phone, "Updated to " + newQty + " guests. " + (changed.voucher_code ? "Your credit voucher is " + changed.voucher_code + "." : "Check My Bookings for the updated payment and refund details."));
       }
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
@@ -2959,29 +3110,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== SPLIT PAYMENT =====
     else if (state === "SPLIT_PAYMENT_COUNT") {
-      const splitCount = parseInt(input);
-      if (isNaN(splitCount) || splitCount < 2 || splitCount > 10) { await sendText(tenant, phone, "How many payment links do you need? (2-10)"); return; }
-      const splitAmount = Math.round(Number(sd.split_total) / splitCount * 100) / 100;
-      let splitLinks = "";
-      for (let spi = 0; spi < splitCount; spi++) {
-        const splitSiteUrls = await getBusinessSiteUrls(tenant);
-        const spYoco = await fetch("https://payments.yoco.com/api/checkouts", {
-          method: "POST", headers: { Authorization: "Bearer " + tenant.credentials.yocoSecretKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(splitAmount * 100), currency: tenant.business.currency || "ZAR",
-            successUrl: withQuery(splitSiteUrls.bookingSuccessUrl, { ref: sd.booking_id }),
-            cancelUrl: splitSiteUrls.bookingCancelUrl,
-            metadata: { booking_id: sd.booking_id, type: "SPLIT_" + (spi + 1) + "_OF_" + splitCount },
-          }),
-        });
-        const spData = await spYoco.json();
-        if (spData?.redirectUrl) splitLinks += "\nPayment " + (spi + 1) + " (R" + splitAmount + "): " + spData.redirectUrl;
-      }
-      if (splitLinks) {
-        await sendText(tenant, phone, "Here are your " + splitCount + " payment links (R" + splitAmount + " each):" + splitLinks);
-      } else {
-        await sendText(tenant, phone, "Couldn\u2019t generate split links. Contact our team for help.");
-      }
+      await sendText(tenant, phone, "Please use one payment link for the full booking balance. Our team can help with other payment arrangements.");
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
     }
 
@@ -3010,7 +3139,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Re-fetch and validate the slot
       const rSlotR = await supabase.from("slots").select("*, tours(name)").eq("id", rSlotId).single();
       const rSlot = rSlotR.data;
-      if (!rSlot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s try again — type *reschedule* to start over."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+      if (!rSlot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s try again. Type *reschedule* to start over."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (rSlot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Try *reschedule* again for updated options."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       const rAvail = rSlot.capacity_total - rSlot.booked - (rSlot.held || 0);
       if (rAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that slot for " + sd.qty + " people. Try *reschedule* again."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
@@ -3019,6 +3148,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const { data: rbkData, error: rbkErr } = await supabase.functions.invoke("rebook-booking", {
         body: {
           booking_id: sd.booking_id,
+          action: "RESCHEDULE",
           new_slot_id: rSlotId,
           excess_action: "VOUCHER"
         }
@@ -3068,27 +3198,81 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
   }
 }
 
-Deno.serve(async (req: any) => {
-  const url = new URL(req.url);
-  if (req.method === "GET") {
-    const mode = url.searchParams.get("hub.mode"); const token = url.searchParams.get("hub.verify_token"); const challenge = url.searchParams.get("hub.challenge");
-    if (mode === "subscribe" && token === VERIFY_TOKEN) return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
-    return new Response("Forbidden", { status: 403 });
-  }
-  if (req.method === "POST") {
-    try {
-      // ── 1. Read raw body for signature verification ──
-      const rawBody = await req.text();
-      const signature = req.headers.get("x-hub-signature-256");
-      const verified = await verifyMetaSignature(rawBody, signature);
-      if (!verified) {
-        console.warn("WA webhook rejected — invalid or missing signature");
-        return new Response("Invalid signature", { status: 401 });
+async function processWhatsappValue(tenant: TenantContext, value: any, message: any = null) {
+      // ── Delivery-status callbacks (value.statuses) ──────────────────────
+      // Meta ACCEPTS an out-of-window free-form send (we log SENT with a
+      // message id) and only reports the failure here, asynchronously, as a
+      // "failed" status with error 131047/131026. These used to be silently
+      // dropped: the admin saw "sent", the customer got nothing, and the
+      // reopener fallback in admin-reply never fired because it only catches
+      // the synchronous form of the error. Recover the same way admin-reply
+      // does: flip the audit row to FAILED, queue the undelivered message in
+      // outbox (drained on the customer's next reply), and send the
+      // pre-approved reopener template so the customer knows to reply.
+      if (!message && Array.isArray(value?.statuses) && value.statuses.length) {
+        for (const st of value.statuses) {
+          try {
+            if (st?.status !== "failed") continue;
+            const errCode = Number(st?.errors?.[0]?.code || 0);
+            const errMsg = String(st?.errors?.[0]?.message || st?.errors?.[0]?.title || "delivery failed");
+            const providerId = String(st?.id || "");
+            if (!providerId) continue;
+            const { data: original } = await supabase.from("wa_messages")
+              .select("id, kind, body, booking_id, to_phone, status")
+              .eq("business_id", tenant.business.id)
+              .eq("provider_message_id", providerId)
+              .maybeSingle();
+            // Already FAILED = this status was processed before (Meta retries
+            // webhooks) — skip so we don't queue/reopen twice.
+            if (!original || original.status === "FAILED") continue;
+            await supabase.from("wa_messages")
+              .update({ status: "FAILED", error: errCode + ": " + errMsg })
+              .eq("id", original.id);
+            const windowClosed = errCode === 131047 || errCode === 131026;
+            // Only recover free-form text. A failed TEMPLATE send must never
+            // trigger another template — that would loop.
+            if (!windowClosed || original.kind !== "text" || !original.body) continue;
+            const failedPhone = String(original.to_phone || st?.recipient_id || "");
+            if (!failedPhone) continue;
+            await supabase.from("outbox").insert({
+              business_id: tenant.business.id,
+              booking_id: original.booking_id || null,
+              phone: failedPhone,
+              message_type: "WINDOW_CLOSED_RETRY",
+              message_body: original.body,
+              scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
+              status: "WAITING_WINDOW",
+            });
+            // At most one reopener per phone per hour — a burst of failed
+            // sends queues every message but pings the customer once.
+            const reopenerName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
+            const { data: recentReopener } = await supabase.from("wa_messages")
+              .select("id")
+              .eq("business_id", tenant.business.id)
+              .eq("to_phone", failedPhone)
+              .eq("kind", "template")
+              .eq("template_name", reopenerName)
+              .eq("status", "SENT")
+              .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+              .limit(1);
+            if (!(recentReopener || []).length) {
+              let firstName = "there";
+              const { data: convo } = await supabase.from("conversations")
+                .select("customer_name")
+                .eq("business_id", tenant.business.id)
+                .eq("phone", failedPhone)
+                .maybeSingle();
+              if (convo?.customer_name) firstName = String(convo.customer_name).split(" ")[0];
+              await sendWhatsappTemplate(tenant, failedPhone, reopenerName, [firstName, getBusinessDisplayName(tenant.business)]);
+            }
+            console.log("WA_STATUS_RECOVERY: msg " + providerId + " failed (" + errCode + ") — queued + reopener for " + failedPhone);
+          } catch (stErr) {
+            console.error("WA_STATUS_HANDLER_ERR:", stErr);
+          }
+        }
+        return new Response("OK", { status: 200 });
       }
 
-      const body = JSON.parse(rawBody);
-      const tenant = await resolveTenantByWhatsappPayload(supabase, body);
-      const message = body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0];
       if (!message) return new Response("OK", { status: 200 });
 
       // ── 2. Idempotency: dedup via processed_wa_messages (id TEXT PK) ──
@@ -3120,6 +3304,39 @@ Deno.serve(async (req: any) => {
       else { console.log("SKIP non-text msg type:" + mt + " from:" + ph); return new Response("OK", { status: 200 }); }
       console.log("F:" + ph + " B:" + tenant.business.id + " T:" + txt);
       await handleMsg(tenant, ph, txt, mt, inter);
+      return new Response("OK", { status: 200 });
+}
+
+async function processWhatsappBatch(body: any) {
+  for (const entry of body.entry || []) {
+    for (const change of entry.changes || []) {
+      const value = change?.value;
+      if (!value?.messages && !value?.statuses) continue;
+      // One provider delivery can contain messages for different numbers.
+      // Resolve each change separately, never reuse the first tenant.
+      const tenant = await resolveTenantByWhatsappPayload(supabase, { entry: [{ changes: [change] }] });
+      if (value.statuses?.length) await processWhatsappValue(tenant, value);
+      for (const message of value.messages || []) await processWhatsappValue(tenant, value, message);
+    }
+  }
+}
+
+Deno.serve(async (req: any) => {
+  const url = new URL(req.url);
+  if (req.method === "GET") {
+    const mode = url.searchParams.get("hub.mode"); const token = url.searchParams.get("hub.verify_token"); const challenge = url.searchParams.get("hub.challenge");
+    if (mode === "subscribe" && token === VERIFY_TOKEN) return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
+    return new Response("Forbidden", { status: 403 });
+  }
+  if (req.method === "POST") {
+    try {
+      const rawBody = await req.text();
+      const verified = await verifyMetaSignature(rawBody, req.headers.get("x-hub-signature-256"));
+      if (!verified) {
+        console.warn("WA webhook rejected — invalid or missing signature");
+        return new Response("Invalid signature", { status: 401 });
+      }
+      await processWhatsappBatch(JSON.parse(rawBody));
       return new Response("OK", { status: 200 });
     } catch (err) {
       console.error("E:", err);

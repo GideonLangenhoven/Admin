@@ -1,9 +1,9 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -16,12 +16,13 @@ function getCors(req: Request) {
   };
 }
 
-async function createInvoice(supabase: any, booking: any, tenant: any, paymentMethod: string) {
+async function createInvoice(supabase: any, booking: any, tenant: any, paymentMethod: string, paymentReference: string) {
   const existing = await supabase.from("invoices").select("*").eq("booking_id", booking.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
   if (existing.data) {
-    if (existing.data.payment_method !== paymentMethod) {
-      await supabase.from("invoices").update({ payment_method: paymentMethod }).eq("id", existing.data.id);
+    if (existing.data.payment_method !== paymentMethod || existing.data.payment_reference !== paymentReference) {
+      await supabase.from("invoices").update({ payment_method: paymentMethod, payment_reference: paymentReference }).eq("id", existing.data.id);
       existing.data.payment_method = paymentMethod;
+      existing.data.payment_reference = paymentReference;
     }
     return existing.data;
   }
@@ -48,7 +49,7 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
     discount_amount: discountAmt,
     total_amount: booking.total_amount,
     payment_method: paymentMethod,
-    payment_reference: paymentMethod,
+    payment_reference: paymentReference,
   }).select().single();
 
   if (inv.data) {
@@ -69,7 +70,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    if (body.action !== "mark_paid" || !body.booking_id) {
+    if (!["mark_paid", "reserve_capacity"].includes(body.action) || !body.booking_id) {
       return new Response(JSON.stringify({ error: "Invalid parameters" }), { status: 400, headers: getCors(req) });
     }
     // Optional: caller can specify how the payment was received so the
@@ -86,37 +87,19 @@ Deno.serve(async (req: Request) => {
     if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
 
     // Tenant guard: admin can only mark-paid bookings from their own business
-    if (!auth.isServiceRole && auth.businessId && booking.business_id !== auth.businessId) {
+    if (!canAccessBusiness(auth, booking.business_id)) {
       return new Response(JSON.stringify({ error: "You can only mark bookings for your own business as paid" }), { status: 403, headers: getCors(req) });
     }
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
 
-    if (booking.status === "PAID") {
-      return new Response(JSON.stringify({ ok: true, message: "Already paid" }), { status: 200, headers: getCors(req) });
-    }
-
-    const upd = await supabase.from("bookings")
-      .update({ status: "PAID", payment_status: "CAPTURED" })
-      .eq("id", booking.id)
-      .neq("status", "PAID")
-      .select("id")
-      .maybeSingle();
-
-    if (!upd.data || upd.error) {
-      return new Response(JSON.stringify({ error: "Could not mark paid or already paid" }), { status: 400, headers: getCors(req) });
-    }
-
-    await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
-
-    const sr = await supabase.from("slots").select("booked, held").eq("id", booking.slot_id).single();
-    if (sr.data) {
-      await supabase.from("slots").update({
-        booked: sr.data.booked + booking.qty,
-        held: Math.max(0, sr.data.held - booking.qty),
-      }).eq("id", booking.slot_id);
-    }
+    const accounted = await supabase.rpc("account_manual_booking", {
+      p_booking_id: booking.id, p_business_id: booking.business_id,
+      p_mark_paid: body.action === "mark_paid", p_payment_method: paymentMethod,
+    });
+    if (accounted.error || !accounted.data?.ok) return new Response(JSON.stringify({ error: accounted.data?.error || accounted.error?.message || "Could not confirm booking" }), { status: 409, headers: getCors(req) });
+    if (body.action === "reserve_capacity" || accounted.data.already_paid) return new Response(JSON.stringify(accounted.data), { headers: getCors(req) });
 
     await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true, payment_method: paymentMethod, payment_note: paymentNote || null, user_id: auth?.userId || null } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);
@@ -125,9 +108,10 @@ Deno.serve(async (req: Request) => {
     const slotTime = booking.slots?.start_time ? formatTenantDateTime(tenant.business, booking.slots.start_time) : "See email";
     const tourName = booking.tours?.name || "Booking";
     const waiver = await getWaiverContext(supabase, { bookingId: booking.id, businessId: booking.business_id });
-    const invoice = await createInvoice(supabase, booking, tenant, paymentMethod);
+    const invoice = await createInvoice(supabase, booking, tenant, paymentMethod, paymentNote || paymentMethod);
 
-    if (booking.phone) {
+    // Email is the canonical confirmation; WhatsApp only when no email on file.
+    if (!booking.email && booking.phone) {
       try {
         await sendWhatsappTextForTenant(tenant, booking.phone,
           "Booking confirmed\n\n" +
@@ -168,6 +152,7 @@ Deno.serve(async (req: Request) => {
               qty: booking.qty,
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
+              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
             },
           }),
         });

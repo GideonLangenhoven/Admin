@@ -1,12 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
+import { fetchAllRows } from "../supabase/functions/_shared/pagination";
 
-const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
+const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
 const SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -31,9 +32,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [locked, setLocked] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  // Read in an effect, not during render: SSR always renders the no-hint
+  // branch, so a render-time cookie read hydration-mismatches (React #418)
+  // on every authenticated page load.
+  const [hasHint, setHasHint] = useState(false);
 
   // Business context from login/session
   const [businessId, setBusinessId] = useState("");
+  const contextRequestRef = useRef(0);
   const [businessName, setBusinessName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
@@ -42,9 +48,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
   const [yocoTestMode, setYocoTestMode] = useState(false);
   const [notice, setNotice] = useState("");
+  // Set when the host names a different operator than the signed-in session.
+  const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
-    validateSession();
+    setHasHint(document.cookie.includes("ck_session_hint=1"));
+    validateSession().catch((error) => {
+      console.error("Session validation failed:", error);
+      setError("We couldn't verify your account. Please try signing in again.");
+      setChecking(false);
+    });
     checkLockout();
   }, []);
 
@@ -63,16 +76,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
     const targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
-    const baseQuery = supabase
-      .from("businesses")
-      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode")
-      .order("business_name", { ascending: true });
-
-    const businessesRes = isMultiOperator
-      ? await baseQuery
-      : await baseQuery.eq("id", defaultBusinessId);
-
-    const businessRows = (businessesRes.data || []) as Array<{
+    const businessRows = await fetchAllRows((from, to) => {
+      let query = supabase.from("businesses")
+        .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
+        .order("business_name", { ascending: true }).order("id").range(from, to);
+      if (!isMultiOperator) query = query.eq("id", defaultBusinessId);
+      return query;
+    }) as Array<{
       id: string;
       name: string | null;
       business_name: string | null;
@@ -91,7 +101,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     const activeOperator = operatorOptions.find((biz) => biz.id === targetBusinessId) || operatorOptions[0] || null;
 
+    // Host wins: the subdomain names the operator whose console you are on, and
+    // a session for a different operator is never redirected away. Every *.admin
+    // host is its own browser origin with its own localStorage, so bouncing sent
+    // people to a host where they often had no session at all — and once two
+    // hosts each held a session for the other's tenant they redirected at each
+    // other forever. The caller renders a mismatch screen instead, so the choice
+    // is the operator's. Supers roam across operators, so the host never blocks
+    // them. Tenant access itself is enforced by RLS, not by the host.
+    const canonicalSub = (businessRows.find((biz) => biz.id === (activeOperator?.id || defaultBusinessId)) as any)?.subdomain || "";
+    const hostMatch = window.location.hostname.match(/^([^.]+)\.admin\.bookingtours\.co\.za$/);
+    const hostMismatch = !isMultiOperator && canonicalSub && hostMatch && hostMatch[1] !== canonicalSub
+      ? { hostSub: hostMatch[1], ownSub: canonicalSub }
+      : null;
+
     return {
+      hostMismatch,
       businessId: activeOperator?.id || defaultBusinessId,
       businessName: activeOperator?.name || "",
       logoUrl: activeOperator?.logoUrl || "",
@@ -136,6 +161,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
       setYocoTestMode(context.yocoTestMode || false);
+      setHostMismatch(context.hostMismatch);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
       localStorage.setItem("ck_admin_timezone", context.timezone);
@@ -162,6 +188,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function clearSession() {
+    contextRequestRef.current++;
     try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
@@ -183,6 +210,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setOperators([]);
     setSubscriptionStatus("ACTIVE");
     setYocoTestMode(false);
+    setHostMismatch(null);
   }
 
   async function login() {
@@ -283,6 +311,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setOperators(context.operators);
         setSubscriptionStatus(context.subscriptionStatus);
         setYocoTestMode(context.yocoTestMode || false);
+        setHostMismatch(context.hostMismatch);
       }
 
       setAuthed(true);
@@ -312,10 +341,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   function switchOperator(nextBusinessId: string) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
-    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
+    contextRequestRef.current++;
+    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     setBusinessId(nextOperator.id);
     setBusinessName(nextOperator.name);
     setLogoUrl(nextOperator.logoUrl || "");
@@ -330,33 +360,43 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (checking) {
-    const hasHint = typeof document !== "undefined" && document.cookie.includes("ck_session_hint=1");
     if (hasHint) {
+      // Skeleton of the real shell: pine rail + paper content
       return (
-        <div className="flex min-h-screen bg-[var(--ck-bg)]">
-          <div className="w-56 shrink-0 bg-[var(--ck-surface)] border-r border-[var(--ck-border)]">
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-8 rounded bg-[var(--ck-border-subtle)] animate-pulse" />
-              ))}
+        <div role="main" className="flex min-h-screen">
+          <div
+            className="hidden md:block w-64 shrink-0 border-r"
+            style={{
+              background: "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
+              borderColor: "var(--ck-sidebar-border)",
+            }}
+          >
+            <div className="p-5 space-y-3">
+              <div className="h-8 w-3/4 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.08)" }} />
+              <div className="pt-4 space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.05)" }} />
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex-1 p-6">
-            <div className="h-8 w-48 rounded bg-[var(--ck-border-subtle)] animate-pulse mb-6" />
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-16 rounded-lg bg-[var(--ck-border-subtle)] animate-pulse" />
+          <div className="flex-1 p-8">
+            <div className="ui-skeleton h-8 w-48 mb-8" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="ui-skeleton h-[130px] !rounded-2xl" />
               ))}
             </div>
+            <div className="ui-skeleton h-[280px] !rounded-2xl" />
           </div>
         </div>
       );
     }
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-          <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-[var(--ck-border-subtle)]" />
-          <p className="mt-4 text-sm ui-text-muted">Checking admin session...</p>
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card w-full max-w-sm p-8 text-center">
+          <BrandMark size={40} className="mx-auto mb-4 animate-pulse" />
+          <p className="text-sm ui-text-muted">Checking admin session...</p>
         </div>
       </div>
     );
@@ -367,72 +407,107 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!authed) return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-      <div className="ui-surface-elevated w-full max-w-sm p-8 text-center">
-        <div className="mb-6 flex flex-col items-center">
-          <BrandMark size={44} className="mb-4" />
-          <h1 className="text-2xl text-[var(--ck-text-strong)]">
-            <BrandWordmark />
-          </h1>
-          <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
-        </div>
-
-        {locked ? (
-          <div className="text-center">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-4">
-              <p className="text-sm font-semibold text-red-700 mb-2">Account Locked</p>
-              <p className="text-xs text-red-600 leading-relaxed">
-                Too many failed attempts. Your account has been locked for 30 minutes.
-                {resetSent
-                  ? " A password setup email has been sent."
-                  : " If this is your account, a password setup email will be sent."}
-              </p>
-            </div>
-            <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">
-              Set up or reset password
-            </a>
+    <div role="main" className="flex min-h-screen items-center justify-center px-4">
+      <div className="anim-fade-up w-full max-w-sm">
+        <div className="ui-card relative overflow-hidden p-8 text-center" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+          {/* Pine crown with the brand trail — the card wears the badge */}
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-bt-gradient" aria-hidden="true" />
+          <div className="mb-6 mt-1 flex flex-col items-center">
+            <BrandMark size={46} className="mb-4" />
+            <h1 className="font-display text-[26px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+              <BrandWordmark />
+            </h1>
+            <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
           </div>
-        ) : (
-          <>
-            <input type="email" value={email}
-              onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
-              onKeyDown={e => { if (e.key === "Enter") login(); }}
-              placeholder="Email address"
-              autoComplete="email"
-              className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
-            <input type="password" value={pass}
-              onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
-              onKeyDown={e => { if (e.key === "Enter") login(); }}
-              placeholder="Password"
-              autoComplete="current-password"
-              className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
+          {locked ? (
+            <div className="text-center">
+              <div className="rounded-xl border p-5 mb-4" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
+                <p className="text-sm font-semibold mb-2" style={{ color: "var(--ck-danger)" }}>Account Locked</p>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--ck-danger)" }}>
+                  Too many failed attempts. Your account has been locked for 30 minutes.
+                  {resetSent
+                    ? " A password setup email has been sent."
+                    : " If this is your account, a password setup email will be sent."}
+                </p>
+              </div>
+              <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">
+                Set up or reset password
+              </a>
+            </div>
+          ) : (
+            <>
+              <input type="email" value={email}
+                onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
+                onKeyDown={e => { if (e.key === "Enter") login(); }}
+                placeholder="Email address"
+                aria-label="Email address"
+                autoComplete="email"
+                className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
-            {error && <p className="mb-3 text-xs text-[var(--ck-danger)]">{error}</p>}
-            {notice && <p className="mb-3 text-xs text-emerald-700">{notice}</p>}
+              <input type="password" value={pass}
+                onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
+                onKeyDown={e => { if (e.key === "Enter") login(); }}
+                placeholder="Password"
+                aria-label="Password"
+                autoComplete="current-password"
+                className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
 
-            <button onClick={login} disabled={loading} className="w-full rounded-xl bg-bt-gradient py-3 text-sm font-semibold text-white hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-50">
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
+              {error && <p className="mb-3 text-xs" style={{ color: "var(--ck-danger)" }}>{error}</p>}
+              {notice && <p className="mb-3 text-xs" style={{ color: "var(--ck-success)" }}>{notice}</p>}
 
-            <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
-              <a href="/change-password" className="hover:underline">Set up or reset password</a>
-            </p>
-          </>
-        )}
+              <button onClick={login} disabled={loading} className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50">
+                {loading ? "Signing in..." : "Sign In"}
+              </button>
+
+              <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
+                <a href="/change-password" className="hover:underline">Set up or reset password</a>
+              </p>
+            </>
+          )}
+        </div>
+        <p className="ui-mono-label mt-5 text-center !text-[9.5px]">Built for adventure operators</p>
       </div>
     </div>
   );
 
+  // Host wins: this console belongs to another operator, so show the choice
+  // rather than silently moving the operator somewhere they did not ask to go.
+  if (hostMismatch) {
+    const ownHost = hostMismatch.ownSub + ".admin.bookingtours.co.za";
+    return (
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
+          <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"></path></svg>
+          </div>
+          <h1 className="font-display text-[22px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+            This console belongs to another operator
+          </h1>
+          <p className="text-sm text-[var(--ck-text-muted)]">
+            You are signed in to <strong>{businessName || "your operator"}</strong>, but this address is{" "}
+            <strong>{hostMismatch.hostSub}.admin.bookingtours.co.za</strong>. Your console is <strong>{ownHost}</strong>.
+          </p>
+          <a href={"https://" + ownHost + pathname} className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
+            Go to my console
+          </a>
+          <button onClick={clearSession} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
+            Sign out and use this one instead
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
   if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ck-bg)] px-4">
-        <div className="ui-surface-elevated w-full max-w-md p-8 text-center space-y-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "var(--ck-warning-soft)" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--ck-warning)" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
+          <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
           </div>
-          <h1 className="text-xl font-semibold text-[var(--ck-text-strong)]">
+          <h1 className="font-display text-[22px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
             {subscriptionStatus === "PAUSED" ? "Your account is paused" : "Your account has been suspended"}
           </h1>
           <p className="text-sm text-[var(--ck-text-muted)]">
@@ -441,7 +516,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               : "Your subscription has been suspended. Please contact support or reactivate your subscription to continue."}
           </p>
           {role === "MAIN_ADMIN" && (
-            <a href="/billing" className="inline-block mt-4 px-5 py-3 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
+            <a href="/billing" className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
               Go to Billing
             </a>
           )}
@@ -459,8 +534,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     // until a hard reload. Re-running loadBusinessContext (without any role
     // change) reseeds the active operator and the sidebar updates in place.
     if (!businessId) return;
+    const requestId = ++contextRequestRef.current;
     try {
       const context = await loadBusinessContext(role, businessId);
+      if (requestId !== contextRequestRef.current) return;
       setBusinessId(context.businessId);
       setBusinessName(context.businessName);
       setLogoUrl(context.logoUrl);
@@ -468,6 +545,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
       setYocoTestMode(context.yocoTestMode || false);
+      setHostMismatch(context.hostMismatch);
     } catch (e) {
       console.warn("refreshBusiness failed:", e);
     }

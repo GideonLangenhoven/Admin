@@ -21,7 +21,7 @@ Subdomain → business_id resolution lives in supabase/functions/_shared/tenant.
 Combo bookings intentionally span tenants. Settlements must split amounts correctly per tenant. This is the only legitimate cross-tenant data flow.
 
 Business-scoped tables (not exhaustive —if a table has business_id, it's scoped):
-bookings, customers, slots, vouchers, marketing_contacts, holds, refunds, invoices, marketing_campaigns, marketing_automations, conversations, photos, broadcasts, refund_policies, tours, add_ons, shared_resources, reviews, combo_settlements, promo_codes, auto_messages, marketing_queue
+bookings, customers, slots, vouchers, marketing_contacts, holds, refunds, invoices, marketing_campaigns, marketing_automations, conversations, photos, broadcasts, refund_policies, tours, add_ons, reviews, combo_settlements, promo_codes, auto_messages, marketing_queue
 When adding a new table: Add business_id column, create RLS policies, add to supabase/security-baseline.json, and run npm run check-security-drift to confirm.
 Payments
 ProviderUse caseSignatureNotesYocoSingle-tenant card paymentsHMAC-SHA256Primary providerPaysafeCombo/split-pay across tenantsHMAC-SHA256Settlement splitting logic in combo flowPayFastLegacy ITNMD5 + server-side validation round-tripMay be decommissioned

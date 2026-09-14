@@ -6,11 +6,13 @@ One design language across all four surfaces: marketing site (`~/bookingtourssit
 
 ## Logo
 
-The mark is a dotted trail on a deep-pine badge: an amber start-point arcing to a destination ring.
+The mark is the "B" monogram: a solid pine letterform whose counter is filled with a wave-textured mint.
 
-- `public/brand/bt-mark.svg` — pine badge (use on light surfaces)
-- `public/brand/bt-mark-ivory.svg` — ivory badge (use on dark/pine surfaces)
-- `app/icon.svg` — favicon (Next.js file convention) in each app
+- `public/brand/bt-mark.png` — pine mark (use on light surfaces)
+- `public/brand/bt-mark-ivory.png` — ivory mark (use on dark/pine surfaces, e.g. the admin sidebar rail). Required, not decorative: the pine body scores 1.95:1 against `--ck-sidebar` #0F2B1F, so the pine mark is illegible there.
+- `app/icon.png` + `app/favicon.ico` — tab icon (Next.js file convention) in each app, square with transparent padding since the source art is portrait
+- `public/guide/icon-{192,512}.png` — guide PWA, declared `any maskable`, so the mark sits at 60% on a solid paper field that bleeds to the edge
+- Wordmark: "BookingTours" set in Fraunces 600, normal case, tracking `-0.01em`, rendered as HTML text beside the mark (never baked into an image).
 - Wordmark: "BookingTours" set in Fraunces 600, normal case, tracking `-0.01em`, rendered as HTML text beside the mark (never baked into an image).
 
 ## Color

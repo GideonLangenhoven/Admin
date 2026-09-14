@@ -4,7 +4,13 @@ import crypto from "crypto";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Fail loudly rather than degrading to the anon key. combo_bookings,
+  // combo_booking_items and promotion_uses have RLS on with no client
+  // policies, so an anon fallback does not error — it returns empty. A
+  // settlement or cancellation route reporting "nothing found" when the
+  // service key is missing is a silent money bug.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server");
   return createClient(url, key);
 }
 
@@ -66,6 +72,19 @@ export async function POST(req: NextRequest) {
 
   if (comboErr || !combo) return NextResponse.json({ error: "Combo booking not found" }, { status: 404 });
   if (combo.payment_status !== "PAID") return NextResponse.json({ error: "Only PAID combo bookings can be cancelled" }, { status: 400 });
+
+  // The offer's cancellation policy binds customers; operators keep their
+  // override (it is their product and their prerogative to make exceptions).
+  if (initiated_by === "customer") {
+    const { data: offer } = await supabase
+      .from("combo_offers")
+      .select("cancellation_policy")
+      .eq("id", combo.combo_offer_id)
+      .maybeSingle();
+    if (String(offer?.cancellation_policy || "") === "NO_CANCEL") {
+      return NextResponse.json({ error: "This combo package is non-cancellable. Contact the operator if your plans have changed." }, { status: 400 });
+    }
+  }
 
   // ── Authentication gate ──────────────────────────────────────────────────────
   if (initiated_by === "operator") {

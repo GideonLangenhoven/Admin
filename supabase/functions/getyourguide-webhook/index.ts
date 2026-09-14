@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
 
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 const db = createServiceClient();
@@ -26,7 +27,7 @@ async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret
   const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
   const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
   if (receivedHex.length !== expectedHex.length) return false;
-  const mismatch = 0;
+  let mismatch = 0;
   for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
   return mismatch === 0;
 }
@@ -35,9 +36,10 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
   if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
+  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse(headers(origin));
 
   const rawBody = await req.text();
-  const event: any;
+  let event: any;
   try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
 
   const url = new URL(req.url);
@@ -54,8 +56,14 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
   if (!integration) return respond(401, { error: "No GYG integration for this business" }, origin);
   if (!integration.enabled) return respond(200, { ok: true, skipped: "integration disabled" }, origin);
 
-  // HMAC signature verification
-  if (integration.webhook_secret_encrypted && SETTINGS_ENCRYPTION_KEY) {
+  // HMAC signature verification — REQUIRED. A missing secret must REJECT, not
+  // bypass: otherwise anyone who knows ?b=<businessId> can inject fake bookings
+  // (S6 stress-test finding). Fail closed.
+  if (!integration.webhook_secret_encrypted || !SETTINGS_ENCRYPTION_KEY) {
+    console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
+    return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
+  }
+  {
     const { data: creds } = await db.rpc("get_ota_credentials", {
       p_business_id: businessId,
       p_key: SETTINGS_ENCRYPTION_KEY,
@@ -63,13 +71,15 @@ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
     });
     const credRow = Array.isArray(creds) ? creds[0] : creds;
     const webhookSecret = credRow?.webhook_secret || "";
-    if (webhookSecret) {
-      const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
-      const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
-      if (!sigValid) {
-        console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
-        return respond(401, { error: "Invalid signature" }, origin);
-      }
+    if (!webhookSecret) {
+      console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
+      return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
+    }
+    const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
+    const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
+    if (!sigValid) {
+      console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
+      return respond(401, { error: "Invalid signature" }, origin);
     }
   }
 
@@ -210,7 +220,13 @@ async function handleBookingCreated(businessId: string, event: any, externalRef:
     return respond(500, { ok: false, error: "DB insert failed: " + insertErr.message, code: insertErr.code }, origin);
   }
 
-  await db.from("slots").update({ booked: (slot.booked || 0) + qty }).eq("id", slot.id);
+  // S7: atomic booked increment (OTA always lands; no capacity gate, but no lost update)
+  await db.rpc("adjust_slot_capacity", { p_slot_id: slot.id, p_business_id: businessId, p_booked_delta: Number(qty), p_held_delta: 0 });
+
+  // Refresh customer lifetime stats now that the PAID booking is linked
+  if (customerId) {
+    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
+  }
 
   await db.from("logs").insert({
     business_id: businessId,
@@ -254,10 +270,8 @@ async function handleAmended(businessId: string, event: any, externalRef: string
   }).eq("id", existing.id);
 
   if (qtyDiff !== 0 && existing.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", existing.slot_id).single();
-    if (sl) {
-      await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) + qtyDiff) }).eq("id", existing.slot_id);
-    }
+    // S7: atomic booked adjustment
+    await db.rpc("adjust_slot_capacity", { p_slot_id: existing.slot_id, p_business_id: businessId, p_booked_delta: Number(qtyDiff), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({
@@ -292,8 +306,8 @@ async function handleCancelled(businessId: string, event: any, externalRef: stri
   }).eq("id", bk.id);
 
   if (bk.slot_id) {
-    const { data: sl } = await db.from("slots").select("booked").eq("id", bk.slot_id).single();
-    if (sl) await db.from("slots").update({ booked: Math.max(0, (sl.booked || 0) - (bk.qty || 0)) }).eq("id", bk.slot_id);
+    // S7: atomic booked release
+    await db.rpc("adjust_slot_capacity", { p_slot_id: bk.slot_id, p_business_id: businessId, p_booked_delta: -Number(bk.qty || 0), p_held_delta: 0 });
   }
 
   await db.from("logs").insert({

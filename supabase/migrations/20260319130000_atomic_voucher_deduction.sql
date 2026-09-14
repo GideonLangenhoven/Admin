@@ -4,17 +4,14 @@
 -- 1. Add pax_limit column (defaults to 1 for FREE_TRIP vouchers)
 ALTER TABLE vouchers
   ADD COLUMN IF NOT EXISTS pax_limit integer DEFAULT 1;
-
 -- 2. Add purchase_value column to track what was paid for FREE_TRIP vouchers
 --    (may already exist as purchase_amount; alias for clarity)
 ALTER TABLE vouchers
   ADD COLUMN IF NOT EXISTS purchase_value numeric;
-
 -- Backfill purchase_value from purchase_amount where not set
 UPDATE vouchers
 SET purchase_value = COALESCE(purchase_amount, value, 0)
 WHERE purchase_value IS NULL;
-
 -- 3. Create atomic deduction function
 CREATE OR REPLACE FUNCTION deduct_voucher_balance(
   p_voucher_id uuid,

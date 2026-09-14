@@ -1,6 +1,5 @@
 alter table public.businesses
   add column if not exists booking_custom_fields jsonb not null default '[]'::jsonb;
-
 alter table public.bookings
   add column if not exists custom_fields jsonb not null default '{}'::jsonb,
   add column if not exists waiver_status text not null default 'PENDING',
@@ -8,7 +7,6 @@ alter table public.bookings
   add column if not exists waiver_signed_at timestamptz,
   add column if not exists waiver_signed_name text,
   add column if not exists waiver_payload jsonb not null default '{}'::jsonb;
-
 do $$
 begin
   if not exists (
@@ -23,10 +21,8 @@ begin
   end if;
 end
 $$;
-
 create unique index if not exists bookings_waiver_token_uidx
   on public.bookings(waiver_token);
-
 create table if not exists public.resources (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -37,10 +33,8 @@ create table if not exists public.resources (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists resources_business_id_idx
   on public.resources(business_id);
-
 create table if not exists public.tour_resources (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -51,79 +45,64 @@ create table if not exists public.tour_resources (
   created_at timestamptz not null default now(),
   unique(tour_id, resource_id)
 );
-
 create index if not exists tour_resources_business_id_idx
   on public.tour_resources(business_id);
-
 create index if not exists tour_resources_tour_id_idx
   on public.tour_resources(tour_id);
-
 create index if not exists tour_resources_resource_id_idx
   on public.tour_resources(resource_id);
-
 alter table public.resources enable row level security;
 alter table public.tour_resources enable row level security;
-
 drop policy if exists resources_tenant_select on public.resources;
 drop policy if exists resources_tenant_insert on public.resources;
 drop policy if exists resources_tenant_update on public.resources;
 drop policy if exists resources_tenant_delete on public.resources;
-
 create policy resources_tenant_select
 on public.resources
 for select
 to authenticated
 using (business_id = any(public.current_business_ids()));
-
 create policy resources_tenant_insert
 on public.resources
 for insert
 to authenticated
 with check (business_id = any(public.current_business_ids()));
-
 create policy resources_tenant_update
 on public.resources
 for update
 to authenticated
 using (business_id = any(public.current_business_ids()))
 with check (business_id = any(public.current_business_ids()));
-
 create policy resources_tenant_delete
 on public.resources
 for delete
 to authenticated
 using (business_id = any(public.current_business_ids()));
-
 drop policy if exists tour_resources_tenant_select on public.tour_resources;
 drop policy if exists tour_resources_tenant_insert on public.tour_resources;
 drop policy if exists tour_resources_tenant_update on public.tour_resources;
 drop policy if exists tour_resources_tenant_delete on public.tour_resources;
-
 create policy tour_resources_tenant_select
 on public.tour_resources
 for select
 to authenticated
 using (business_id = any(public.current_business_ids()));
-
 create policy tour_resources_tenant_insert
 on public.tour_resources
 for insert
 to authenticated
 with check (business_id = any(public.current_business_ids()));
-
 create policy tour_resources_tenant_update
 on public.tour_resources
 for update
 to authenticated
 using (business_id = any(public.current_business_ids()))
 with check (business_id = any(public.current_business_ids()));
-
 create policy tour_resources_tenant_delete
 on public.tour_resources
 for delete
 to authenticated
 using (business_id = any(public.current_business_ids()));
-
 create or replace function public.slot_available_capacity(p_slot_id uuid)
 returns integer
 language sql
@@ -193,7 +172,6 @@ select greatest(
   0
 )
 $$;
-
 create or replace function public.slot_has_capacity(p_slot_id uuid, p_qty integer)
 returns boolean
 language sql
@@ -202,7 +180,6 @@ set search_path = public
 as $$
   select public.slot_available_capacity(p_slot_id) >= greatest(coalesce(p_qty, 0), 0)
 $$;
-
 create or replace function public.list_available_slots(
   p_business_id uuid,
   p_range_start timestamptz,
@@ -247,7 +224,6 @@ as $$
     and (p_tour_id is null or s.tour_id = p_tour_id)
   order by s.start_time asc
 $$;
-
 grant execute on function public.slot_available_capacity(uuid) to authenticated, service_role;
 grant execute on function public.slot_has_capacity(uuid, integer) to authenticated, service_role;
 grant execute on function public.list_available_slots(uuid, timestamptz, timestamptz, uuid) to authenticated, service_role;

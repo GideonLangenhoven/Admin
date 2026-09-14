@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+import { setAdminAuthPassword } from "../../../lib/admin-password";
 
 // Legacy SHA-256 hash check — matches what the browser admin-auth.ts produces.
 // Used only to verify pre-migration passwords; new passwords are stored by Supabase Auth (bcrypt internally).
@@ -83,29 +84,11 @@ export async function POST(req: NextRequest) {
   // 3. Ensure admin has matching auth.users entry; create + link if not.
   let authUserId: string | null = user.user_id;
   if (!authUserId) {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { admin_id: user.id, business_id: user.business_id, role: user.role },
-    });
-
-    if (createErr) {
-      // Possibly already exists in auth.users from a prior partial migration — find and update.
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const existing = list?.users?.find((u) => u.email?.toLowerCase() === email);
-      if (existing) {
-        await admin.auth.admin.updateUserById(existing.id, { password, email_confirm: true });
-        authUserId = existing.id;
-      } else {
-        console.error("ADMIN_LOGIN_AUTH_CREATE_ERR", createErr.message);
-        return NextResponse.json(
-          { error: "Auth provisioning failed: " + createErr.message },
-          { status: 500 },
-        );
-      }
-    } else {
-      authUserId = created.user.id;
+    try {
+      authUserId = await setAdminAuthPassword(admin, user, password);
+    } catch (error) {
+      console.error("ADMIN_LOGIN_AUTH_CREATE_ERR", error instanceof Error ? error.message : "Auth provisioning failed");
+      return NextResponse.json({ error: "Could not prepare sign-in. Please try again." }, { status: 502 });
     }
 
     const { error: linkErr } = await admin

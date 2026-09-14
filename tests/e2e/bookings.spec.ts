@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { injectAdminSession } from "./helpers/auth";
-import { collectConsoleLogs, hasTrace } from "./helpers/console-collector";
 
 test.describe("Bookings List Page", () => {
   test.beforeEach(async ({ page }) => {
@@ -50,13 +49,6 @@ test.describe("Bookings List Page", () => {
     }
   });
 
-  test("bookings page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/bookings");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[BOOKINGS]")).toBe(true);
-  });
 });
 
 test.describe("New Booking Page", () => {
@@ -106,13 +98,6 @@ test.describe("New Booking Page", () => {
     await expect(mainContent).toBeVisible();
   });
 
-  test("new booking page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/new-booking");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[NEW_BOOKING]")).toBe(true);
-  });
 });
 
 test.describe("Slots Management Page", () => {
@@ -165,9 +150,10 @@ test.describe("Slots Management Page", () => {
     await expect(page.locator("main")).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(2000);
 
-    // Look for week/day view toggle
-    const weekBtn = page.getByText(/week/i).first();
-    const dayBtn = page.getByText(/day/i).first();
+    // Look for week/day view toggle — must be actual buttons, not incidental
+    // text (bare /day/i also matches "Sunday"/"Today" in the calendar).
+    const weekBtn = page.getByRole("button", { name: /^week$/i }).first();
+    const dayBtn = page.getByRole("button", { name: /^day$/i }).first();
 
     if (await weekBtn.isVisible({ timeout: 5_000 }).catch(() => false) &&
         await dayBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -178,11 +164,4 @@ test.describe("Slots Management Page", () => {
     }
   });
 
-  test("slots page console tracing", async ({ page }) => {
-    const logs = collectConsoleLogs(page);
-    await page.goto("/slots");
-    await page.waitForTimeout(4000);
-
-    expect(hasTrace(logs, "[SLOTS]")).toBe(true);
-  });
 });

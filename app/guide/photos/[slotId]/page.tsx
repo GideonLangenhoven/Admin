@@ -1,8 +1,8 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import { getAuthHeaders } from "@/app/lib/admin-auth";
 import { useBusinessContext } from "@/components/BusinessContext";
 
 type Photo = { id: string; photo_url: string; gdrive_view_url: string | null; uploaded_at: string };
@@ -14,6 +14,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
 
   useEffect(() => { reload(); }, [slotId, businessId]);
@@ -29,6 +30,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
       supabase.from("slots")
         .select("start_time, tours(name)")
         .eq("id", slotId)
+        .eq("business_id", businessId)
         .maybeSingle(),
     ]);
     setPhotos((photosRes.data as Photo[]) || []);
@@ -36,37 +38,53 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   }
 
   async function onPickPhotos(files: FileList | null) {
-    if (!files || files.length === 0) return;
+    if (uploading || !files || files.length === 0) return;
     setUploading(true);
+    setUploadStatus(null);
     setProgress({ done: 0, total: files.length });
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("slot_id", slotId);
-      try {
-        const r = await fetch("/api/guide/photo-upload", { method: "POST", body: fd });
-        if (!r.ok) console.warn("upload failed for", file.name, await r.text());
-      } catch (e) { console.warn(e); }
-      setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) throw new Error("Please sign in again before uploading photos.");
+      delete headers["Content-Type"]; // The browser supplies the multipart boundary.
+      const failed: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("slot_id", slotId);
+        try {
+          const r = await fetch("/api/guide/photo-upload", { method: "POST", headers, body: fd });
+          const data = await r.json();
+          if (!r.ok || data.ok !== true) throw new Error(data.error || "Upload failed");
+        } catch { failed.push(file.name); }
+        setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
+      }
+      setUploadStatus((files.length - failed.length) + " of " + files.length + " photos uploaded." + (failed.length ? " Please retry: " + failed.join(", ") : ""));
+      reload();
+    } catch (e: any) {
+      setUploadStatus(e?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      setProgress(null);
     }
-    setUploading(false);
-    setProgress(null);
-    reload();
   }
 
   async function sendThankYou() {
     setEmailStatus("Sending...");
     try {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) throw new Error("Please sign in again before sending photos.");
       const r = await fetch("/api/guide/send-thank-you", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ slot_id: slotId }),
       });
       const data = await r.json();
-      if (r.ok) {
-        setEmailStatus("Sent to " + data.recipient_count + " customer(s).");
+      if (r.ok && typeof data.recipient_count === "number") {
+        setEmailStatus(data.failed?.length
+          ? "Sent to " + data.recipient_count + " customer(s); " + data.failed.length + " failed. Check customer contact details before sending again."
+          : "Sent to " + data.recipient_count + " customer(s).");
       } else {
         setEmailStatus("Failed: " + (data.error || "unknown"));
       }
@@ -76,49 +94,55 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20" style={{ color: "var(--ck-text)" }}>
-      <header className="flex items-center justify-between mb-4">
-        <Link href={"/guide/slot/" + slotId} className="text-sm font-medium" style={{ color: "var(--ck-accent)" }}>&larr; Back to check-in</Link>
-        {slotInfo && (
-          <div className="text-right">
-            <p className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{slotInfo.tour_name}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
-          </div>
+    <div className="pt-5">
+      <div className="mb-4">
+        <h2 className="font-display text-[24px] font-semibold leading-tight" style={{ color: "var(--ck-text-strong)" }}>Trip photos</h2>
+        {slotInfo && <p className="text-[13px] font-medium ui-text-muted">{slotInfo.tour_name} · {new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>}
+      </div>
+
+      <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-2xl text-center cursor-pointer transition border-2 border-dashed active:scale-[0.99]"
+        style={uploading
+          ? { borderColor: "var(--ck-accent)", background: "var(--ck-accent-soft)" }
+          : { borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)" }}>
+        {uploading ? (
+          <>
+            <div className="w-10 h-10 rounded-full border-[3px] animate-spin" style={{ borderColor: "var(--ck-accent-soft)", borderTopColor: "var(--ck-accent)" }} />
+            <span className="text-[14px] font-semibold" style={{ color: "var(--ck-accent)" }}>Uploading {progress?.done || 0}/{progress?.total || 0}…</span>
+          </>
+        ) : (
+          <>
+            <span className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Take or pick photos</span>
+            <span className="text-[12px] ui-text-muted">Saved to your Google Drive. Share this trip’s photo links in the thank-you email.</span>
+          </>
         )}
-      </header>
-
-      <h1 className="text-xl font-bold mb-1" style={{ color: "var(--ck-text-strong)" }}>Trip Photos</h1>
-      <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Photos are uploaded to your Google Drive and attached as a private gallery link in the thank-you email.</p>
-
-      <label className={"block p-4 rounded-xl text-center font-semibold cursor-pointer transition-colors " + (uploading ? "bg-emerald-400 text-white" : "bg-emerald-600 text-white active:bg-emerald-700")}>
-        {uploading ? ("Uploading " + (progress?.done || 0) + "/" + (progress?.total || 0) + "...") : "Pick / take photos"}
         <input type="file" multiple accept="image/*" capture="environment" className="hidden"
-          disabled={uploading} onChange={e => onPickPhotos(e.target.files)} />
+          disabled={uploading} onChange={async e => { const input = e.currentTarget; await onPickPhotos(input.files); input.value = ""; }} />
       </label>
+      {uploadStatus && <p role="status" className="mt-3 text-[13px] font-semibold">{uploadStatus}</p>}
 
       {photos.length > 0 && (
         <>
-          <h2 className="mt-6 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Uploaded ({photos.length})</h2>
-          <div className="mt-2 grid grid-cols-3 gap-2">
+          <h3 className="ui-section-title mt-6 mb-2">Uploaded · {photos.length}</h3>
+          <div className="grid grid-cols-3 gap-2">
             {photos.map(p => (
-                <a key={p.id} href={p.gdrive_view_url || p.photo_url} target="_blank" rel="noreferrer"
-                  className="block aspect-square rounded-lg overflow-hidden border"
-                  style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-subtle)" }}>
-                  <img src={p.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                </a>
+              <a key={p.id} href={p.gdrive_view_url || p.photo_url} target="_blank" rel="noreferrer"
+                className="block aspect-square rounded-xl overflow-hidden border active:scale-95 transition"
+                style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
+                <img src={p.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+              </a>
             ))}
           </div>
+
+          <button onClick={sendThankYou} disabled={!!emailStatus?.startsWith("Sending")}
+            className="mt-6 w-full flex items-center justify-center gap-2 p-4 rounded-2xl text-white font-semibold active:scale-[0.99] transition disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #D9822F, #B4641C)", boxShadow: "var(--ck-shadow-sm)" }}>
+            Send thank-you email with photos
+          </button>
         </>
       )}
-
-      {photos.length > 0 && (
-        <button onClick={sendThankYou} disabled={!!emailStatus?.startsWith("Sending")}
-          className="mt-6 w-full p-4 rounded-xl bg-amber-500 text-white font-bold active:bg-amber-600 transition-colors disabled:opacity-60">
-          Send thank-you email with photos
-        </button>
-      )}
       {emailStatus && (
-        <p className={"mt-2 text-sm text-center " + (emailStatus.startsWith("Sent") ? "text-emerald-600" : emailStatus.startsWith("Sending") ? "" : "text-red-500")} style={emailStatus.startsWith("Sending") ? { color: "var(--ck-text-muted)" } : undefined}>{emailStatus}</p>
+        <p className="mt-3 text-[13px] font-semibold text-center"
+          style={{ color: emailStatus.startsWith("Sent") && !emailStatus.includes("failed") ? "var(--ck-success)" : emailStatus.startsWith("Sending") ? "var(--ck-text-muted)" : "var(--ck-danger)" }}>{emailStatus}</p>
       )}
     </div>
   );

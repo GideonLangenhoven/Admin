@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createServiceClient,
+  formatTenantDate,
   formatTenantDateTime,
   getBusinessDisplayName,
   getTenantByBusinessId,
@@ -10,6 +11,7 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
+import { bookingVoucherBalances } from "../_shared/voucher-balances.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -32,24 +34,50 @@ Deno.serve(async (req: any) => {
     const supabase = createServiceClient();
     const body = await req.json();
     const bookingId = String(body.booking_id || "");
+    const businessId = req.headers.get("x-tenant-business-id") || "";
+    const bookingToken = typeof body.booking_token === "string" ? body.booking_token : "";
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: cors() });
+    }
+    if (!businessId || !bookingToken) {
+      return new Response(JSON.stringify({ error: "Booking proof required" }), { status: 403, headers: cors() });
     }
 
     const br = await supabase
       .from("bookings")
       .select("*, slots(start_time), tours(name)")
       .eq("id", bookingId)
+      .eq("business_id", businessId)
+      .eq("waiver_token", bookingToken)
       .maybeSingle();
 
     if (!br.data) {
-      return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: cors() });
+      return new Response(JSON.stringify({ error: "Booking proof invalid" }), { status: 403, headers: cors() });
     }
 
     const booking = br.data;
     if (booking.status !== "PAID" && booking.status !== "COMPLETED") {
       return new Response(JSON.stringify({ ok: false, reason: "Booking not paid yet" }), { status: 200, headers: cors() });
+    }
+
+    // Upsert customer profile (best-effort — never fail the confirmation).
+    // Runs BEFORE the already-sent check so paid bookings whose webhook path
+    // skipped the customer sync still get linked when the success page calls us.
+    try {
+      const { data: customerId } = await supabase.rpc("upsert_customer", {
+        p_business_id: booking.business_id,
+        p_email: booking.email,
+        p_name: booking.customer_name || null,
+        p_phone: booking.phone || null,
+        p_marketing_consent: booking.marketing_opt_in || false,
+      });
+      if (customerId) {
+        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
+        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
+      }
+    } catch (custErr) {
+      console.error("CUSTOMER_UPSERT_ERR:", custErr);
     }
 
     // Idempotency: check if confirmation was already sent for this booking.
@@ -75,23 +103,6 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ ok: true, already_sent: true }), { status: 200, headers: cors() });
     }
 
-    // Upsert customer profile (best-effort — never fail the confirmation)
-    try {
-      const { data: customerId } = await supabase.rpc("upsert_customer", {
-        p_business_id: booking.business_id,
-        p_email: booking.email,
-        p_name: booking.customer_name || null,
-        p_phone: booking.phone || null,
-        p_marketing_consent: booking.marketing_opt_in || false,
-      });
-      if (customerId) {
-        await supabase.from("bookings").update({ customer_id: customerId }).eq("id", booking.id);
-        await supabase.rpc("recompute_customer_stats", { p_customer_id: customerId });
-      }
-    } catch (custErr) {
-      console.error("CUSTOMER_UPSERT_ERR:", custErr);
-    }
-
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const ref = booking.id.substring(0, 8).toUpperCase();
     const slotTime = booking.slots?.start_time
@@ -111,7 +122,7 @@ Deno.serve(async (req: any) => {
 
     const invR = await supabase
       .from("invoices")
-      .select("invoice_number, payment_reference")
+      .select("invoice_number, payment_reference, created_at")
       .eq("booking_id", bookingId)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -123,7 +134,34 @@ Deno.serve(async (req: any) => {
     let waError = "";
     let emailError = "";
 
-    if (booking.phone) {
+    // Voucher-only checkout used to send arbitrary email payloads from the
+    // anonymous browser. Keep the notification, but derive both recipient and
+    // balance here after the paid-booking/idempotency checks. Cash + voucher
+    // payments already send this from the payment webhook.
+    if (booking.email && Number(booking.total_amount) === 0 && Number(booking.voucher_amount_paid) > 0) {
+      try {
+        const balances = await bookingVoucherBalances(supabase, booking.id, booking.business_id);
+        for (const voucher of balances || []) {
+          const { error } = await supabase.functions.invoke("send-email", {
+            body: { type: "VOUCHER_BALANCE", data: {
+              business_id: booking.business_id,
+              email: booking.email,
+              customer_name: booking.customer_name,
+              voucher_code: voucher.code,
+              original_value: voucher.value,
+              amount_used: voucher.amount_used,
+              remaining_balance: voucher.current_balance,
+              booking_ref: ref,
+              tour_name: tourName,
+            } },
+          });
+          if (error) console.error("VOUCHER_BALANCE_EMAIL_ERR:", error);
+        }
+      } catch (error) { console.error("VOUCHER_BALANCE_EMAIL_ERR:", error); }
+    }
+
+    // Email is the canonical confirmation; WhatsApp only when no email on file.
+    if (!booking.email && booking.phone) {
       try {
         const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
         await sendWhatsappTextForTenant(
@@ -139,7 +177,7 @@ Deno.serve(async (req: any) => {
             ? (isLastMinute ? "\u26A0\uFE0F Please sign your waiver before the trip:\n" : "\u{1F4DD} Waiver: ") + waiver.waiverLink + "\n\n"
             : "") +
           "Manage your booking anytime:\n" + myBookingsUrl + "\n\n" +
-          "Thanks for booking with " + brandName + " \u2014 see you on the water!",
+          "Thanks for booking with " + brandName + ". See you on the water!",
           {
             name: "booking_confirmed1",
             params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount, myBookingsUrl],
@@ -174,6 +212,7 @@ Deno.serve(async (req: any) => {
               qty: booking.qty,
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
+              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
             },
           },
         });

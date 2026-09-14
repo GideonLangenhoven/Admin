@@ -209,7 +209,22 @@ export async function verifyTrackedOtp(
     return { valid: false, status: 401, error: "Incorrect code. Please try again." };
   }
 
-  await supabase.from("otp_attempts").delete().eq("token_hash", tokenHash);
+  // Atomic consume: the DELETE's own WHERE clause re-checks code_hash against
+  // the current row (not the earlier read above), so two concurrent requests
+  // racing with the same correct code can't both succeed — only the first to
+  // execute actually deletes a row; the second finds nothing to delete and
+  // fails as a replay. The plain select-then-delete this replaces let both
+  // requests pass the in-memory comparison before either DELETE ran.
+  const { data: consumed, error: consumeErr } = await supabase
+    .from("otp_attempts")
+    .delete()
+    .eq("token_hash", tokenHash)
+    .eq("code_hash", submittedHash)
+    .select("token_hash");
+  if (consumeErr) throw new Error("OTP consume failed: " + consumeErr.message);
+  if (!consumed || consumed.length === 0) {
+    return { valid: false, status: 401, error: "Code already used. Please request a new one." };
+  }
   return {
     valid: true,
     status: 200,

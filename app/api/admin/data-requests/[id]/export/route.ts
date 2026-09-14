@@ -36,15 +36,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .eq("business_id", caller.business_id)
       .maybeSingle(),
     db.from("bookings")
-      .select("id, ref, status, qty, total_price, customer_name, email, phone, notes, slot_id, created_at, updated_at")
+      .select("id, ref_code, status, qty, total_amount, customer_name, email, phone, slot_id, created_at, cancellation_reason, refund_notes")
       .eq("customer_id", request.customer_id)
       .eq("business_id", caller.business_id)
       .order("created_at", { ascending: false }),
     db.from("marketing_contacts")
       .select("*")
       .eq("business_id", caller.business_id)
-      .eq("email_lower", request.email.toLowerCase()),
+      .ilike("email", request.email),
   ]);
+
+  // A POPIA subject access request that quietly returns an incomplete export is
+  // worse than one that fails: the operator sends it believing it complete.
+  // This select previously asked for ref/total_price/notes/updated_at and
+  // matched marketing_contacts on email_lower — none of which exist on those
+  // tables — so both queries errored and `?? []` turned that into "no data".
+  if (customerRes.error || bookingsRes.error || marketingRes.error) {
+    const detail = [customerRes.error?.message, bookingsRes.error?.message, marketingRes.error?.message]
+      .filter(Boolean).join("; ");
+    console.error("POPIA_EXPORT_QUERY_ERR request=" + request.id + ": " + detail);
+    return NextResponse.json({ error: "Could not assemble a complete export: " + detail }, { status: 500 });
+  }
 
   const exportData = {
     exported_at: new Date().toISOString(),

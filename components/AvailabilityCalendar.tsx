@@ -38,34 +38,12 @@ interface AvailabilityCalendarProps {
 const SlotDataCtx = createContext<DaySlotMap>({});
 const MinQtyCtx = createContext<number>(0);
 
-/* ── colour palette per position ── */
-const SLOT_COLORS = ["#10b981", "#a855f7", "#f59e0b", "#3b82f6"]; // brighter: emerald, purple, amber, blue
-const FULL_COLOR = "#9ca3af"; // gray-400
-
-/* ── position configs ── */
-function getPositions(count: number): { top?: string; bottom?: string; left?: string; right?: string }[] {
-    if (count === 1) return [
-        { right: "4px", top: "50%", bottom: undefined, left: undefined },
-    ];
-    if (count === 2) return [
-        { left: "4px", top: "50%", bottom: undefined, right: undefined },
-        { right: "4px", top: "50%", bottom: undefined, left: undefined },
-    ];
-    if (count === 3) return [
-        { top: "4px", left: "50%", bottom: undefined, right: undefined },
-        { left: "4px", top: "50%", bottom: undefined, right: undefined },
-        { right: "4px", top: "50%", bottom: undefined, left: undefined },
-    ];
-    // 4+
-    return [
-        { top: "4px", left: "50%", bottom: undefined, right: undefined },
-        { right: "4px", top: "50%", bottom: undefined, left: undefined },
-        { bottom: "4px", left: "50%", right: undefined, top: undefined },
-        { left: "4px", top: "50%", bottom: undefined, right: undefined },
-    ];
-}
-
-/* ── Custom Day component ── */
+/* ── Custom Day component ──
+   One seat count per day, not one per slot. The old layout pinned a number to
+   each edge of a 40px cell, so an operator with two 10-seat departures saw
+   "10 17 10" crammed into one box and four departures put digits on all four
+   sides. The per-slot breakdown lives in the tooltip and in the timeslot
+   matrix below the calendar, which have room for it. */
 const CustomDay = React.memo(function CustomDay(props: any) {
     const { day, modifiers, children, ...tdProps } = props;
     const date: Date = day.date ?? day;
@@ -78,40 +56,24 @@ const CustomDay = React.memo(function CustomDay(props: any) {
 
     // Filter out slots that don't have enough capacity for the party size
     const slots = minQty > 0 ? allSlots.filter(s => s.available >= minQty) : allSlots;
+    const openSlots = slots.filter(s => s.available > 0);
+    const totalOpen = openSlots.reduce((sum, s) => sum + s.available, 0);
 
-    // Limit to max 4 badge positions
-    const displaySlots = slots.slice(0, 4);
-    const positions = getPositions(displaySlots.length);
+    const showState = !isOutside && !isDisabled && slots.length > 0;
+    const avail = showState ? (openSlots.length > 0 ? "open" : "full") : undefined;
 
     return (
-        <td {...tdProps} style={{ ...(tdProps.style || {}), padding: 0, position: "relative" }}>
+        <td
+            {...tdProps}
+            data-avail={avail}
+            title={showState
+                ? slots.map(s => `${s.time} · ${s.available > 0 ? `${s.available} open` : "full"}`).join("\n")
+                : undefined}
+            style={{ ...(tdProps.style || {}), padding: 0, position: "relative" }}
+        >
             {children}
-            {/* availability badges */}
-            {!isOutside && !isDisabled && displaySlots.map((s, i) => {
-                const pos = positions[i];
-                const color = s.available > 0 ? SLOT_COLORS[i] : FULL_COLOR;
-                const style: React.CSSProperties = {
-                    position: "absolute",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    lineHeight: "1",
-                    color: color,
-                    pointerEvents: "none",
-                    zIndex: 2,
-                    whiteSpace: "nowrap",
-                };
-                // Apply position + transforms for centering
-                if (pos.top !== undefined && pos.left === "50%") {
-                    style.top = pos.top; style.left = "50%"; style.transform = "translateX(-50%)";
-                } else if (pos.bottom !== undefined && pos.left === "50%") {
-                    style.bottom = pos.bottom; style.left = "50%"; style.transform = "translateX(-50%)";
-                } else if (pos.left !== undefined && pos.top === "50%") {
-                    style.left = pos.left; style.top = "50%"; style.transform = "translateY(-50%)";
-                } else if (pos.right !== undefined && pos.top === "50%") {
-                    style.right = pos.right; style.top = "50%"; style.transform = "translateY(-50%)";
-                }
-                return <span key={i} style={style}>{s.available}</span>;
-            })}
+            {avail === "open" && <span className="avail-cal-count">{totalOpen}</span>}
+            {avail === "full" && <span className="avail-cal-count">full</span>}
         </td>
     );
 });
@@ -178,36 +140,88 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
         <SlotDataCtx.Provider value={daySlots}>
             <MinQtyCtx.Provider value={minQty}>
                 <style>{`
-                .avail-cal { --rdp-cell-size: 40px; --rdp-accent-color: var(--ck-accent); --rdp-background-color: var(--ck-border-subtle); margin: 0; width: 100%; }
+                /* Bookable days are solid dark blocks with white dates, so the
+                   date and the seat count both read at a glance. Both themes
+                   use a dark block on a light-to-mid page, so the meaning of
+                   "filled in = you can sell this day" stays the same. */
+                /* Declared on the wrapper so the swatches in the legend below
+                   the grid pick up the same values the day cells use. */
+                .avail-cal-wrap { --cal-day-bg: #24312A; --cal-day-fg: #FFFFFF; --cal-day-sub: #9FD6BB; }
+                html.dark .avail-cal-wrap { --cal-day-bg: #223029; --cal-day-fg: #F1F3EE; --cal-day-sub: #8FCBAA; }
+                .avail-cal {
+                    --rdp-cell-size: 46px; --rdp-accent-color: var(--ck-accent);
+                    --rdp-background-color: var(--ck-border-subtle);
+                    margin: 0; width: 100%;
+                }
                 .avail-cal .rdp-months { font-family: inherit; }
                 .avail-cal .rdp-month { width: 100%; }
-                .avail-cal .rdp-table { width: 100%; max-width: 100%; }
+                /* table-layout:fixed + a percentage width per cell lets the grid
+                   grow to whatever column it is given, instead of staying at
+                   seven fixed-width boxes with dead space beside them. */
+                /* .rdp-table is the v8 name, .rdp-month_grid the v9 one (we run v9). */
+                .avail-cal .rdp-table,
+                .avail-cal .rdp-month_grid { width: 100%; max-width: 100%; table-layout: fixed; }
+                .avail-cal td { width: 14.2857%; }
                 .avail-cal .rdp-caption_label { font-weight: 700; color: var(--ck-text-strong); }
                 .avail-cal .rdp-head_cell { font-weight: 600; color: var(--ck-text-muted); font-size: 0.75rem; text-transform: uppercase; }
                 .avail-cal td { padding: 0 !important; border: 1px solid var(--ck-border-subtle); border-radius: 8px; }
                 .avail-cal td button {
-                    display: flex; align-items: center; justify-content: center;
-                    width: 40px; height: 40px; border-radius: 7px; border: none;
+                    display: flex; align-items: flex-start; justify-content: center;
+                    width: 100%; height: 46px; padding-top: 7px; border-radius: 7px; border: none;
                     cursor: pointer; font-weight: 500; font-size: 14px;
                     background: transparent; color: var(--ck-text);
                     transition: background 0.15s;
                 }
                 .avail-cal td button:hover { background: var(--ck-border-subtle); }
                 .avail-cal td button:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: -2px; border-radius: 7px; }
+
+                /* Days with seats for this party size */
+                .avail-cal td[data-avail="open"] { border-color: transparent; }
+                .avail-cal td[data-avail="open"] button {
+                    background: var(--cal-day-bg); color: var(--cal-day-fg); font-weight: 700;
+                }
+                .avail-cal td[data-avail="open"] button:hover { background: var(--ck-accent); }
+                /* Departures exist but nothing left to sell. Uses --ck-text
+                   rather than --ck-text-muted: muted on sunken measures 4.1:1,
+                   under the 4.5:1 needed at this size. */
+                .avail-cal td[data-avail="full"] button { background: var(--ck-surface-sunken); color: var(--ck-text); }
+
+                /* Anchored to both edges rather than centre-translated, so a
+                   wide value is clipped inside its own cell instead of spilling
+                   over the neighbouring days. */
+                .avail-cal-count {
+                    position: absolute; bottom: 4px; left: 0; right: 0;
+                    text-align: center; padding: 0 2px;
+                    font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: 0.01em;
+                    color: var(--cal-day-sub); pointer-events: none; z-index: 2;
+                    white-space: nowrap; overflow: hidden;
+                    font-variant-numeric: tabular-nums;
+                }
+                .avail-cal td[data-avail="full"] .avail-cal-count { color: var(--ck-text); font-weight: 600; }
+
                 .avail-cal td[data-selected] { border-color: var(--ck-accent); }
                 .avail-cal td[data-selected] button { background: var(--ck-accent) !important; color: #fff !important; font-weight: 700; }
+                .avail-cal td[data-selected] .avail-cal-count { color: rgba(255, 255, 255, 0.92); }
                 .avail-cal td[data-today] { border-color: var(--ck-text-muted); }
-                .avail-cal td[data-today] button { font-weight: 600; color: var(--ck-text-strong); }
+                .avail-cal td[data-today] button { font-weight: 700; }
                 .avail-cal td[data-outside] { border-color: transparent; }
                 .avail-cal td[data-outside] button { opacity: 0.4; cursor: default; color: var(--ck-text-muted); }
                 .avail-cal td[data-outside] button:hover { background: transparent; }
                 .avail-cal table { border-collapse: separate; border-spacing: 2px; }
                 @media (min-width: 640px) {
-                    .avail-cal { --rdp-cell-size: 44px; }
-                    .avail-cal td button { width: 44px; height: 44px; }
+                    .avail-cal { --rdp-cell-size: 56px; }
+                    /* Height tracks the cell width so a wide column gives taller
+                       tiles instead of squat letterboxes, bounded so it never
+                       runs away on a very wide screen. */
+                    .avail-cal td button {
+                        height: auto; aspect-ratio: 1 / 0.82;
+                        min-height: 56px; max-height: 82px;
+                        padding-top: 9px; font-size: 15px;
+                    }
+                    .avail-cal-count { font-size: 11px; bottom: 6px; }
                 }
             `}</style>
-                <div className="space-y-3">
+                <div className="avail-cal-wrap space-y-3">
                     <DayPicker
                         className="avail-cal"
                         mode="single"
@@ -221,13 +235,13 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                         disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                     />
 
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-xs text-gray-600">
+                    <div className="rounded-xl px-3 py-3 text-xs" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)", color: "var(--ck-text)" }}>
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Open seats</span>
-                            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-gray-400" />Fully booked</span>
-                            <span className="inline-flex items-center gap-2"><span className="font-semibold text-gray-800">{availabilitySummary.openDays}</span> days with bookable capacity</span>
+                            <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-[4px]" style={{ background: "var(--cal-day-bg, #24312A)" }} />Seats open</span>
+                            <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-[4px]" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }} />Fully booked</span>
+                            <span className="inline-flex items-center gap-2"><span className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{availabilitySummary.openDays}</span> days with bookable capacity</span>
                             {availabilitySummary.fullDays > 0 && (
-                                <span className="inline-flex items-center gap-2"><span className="font-semibold text-red-600">{availabilitySummary.fullDays}</span> days full for this party size</span>
+                                <span className="inline-flex items-center gap-2"><span className="font-semibold tabular-nums" style={{ color: "var(--ck-danger)" }}>{availabilitySummary.fullDays}</span> days full for this party size</span>
                             )}
                         </div>
                     </div>

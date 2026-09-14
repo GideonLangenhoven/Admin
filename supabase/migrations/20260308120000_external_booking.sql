@@ -1,27 +1,19 @@
 create extension if not exists pgcrypto;
-
 alter table public.bookings
   add column if not exists external_ref text;
-
 alter table public.bookings
   add column if not exists external_source_details jsonb not null default '{}'::jsonb;
-
 alter table public.bookings
   add column if not exists supplier_payment_status text;
-
 alter table public.bookings
   add column if not exists supplier_settlement_status text;
-
 alter table public.bookings
   add column if not exists supplier_payout_amount numeric;
-
 alter table public.bookings
   add column if not exists supplier_commission_amount numeric;
-
 create unique index if not exists bookings_external_ref_unique_idx
   on public.bookings (business_id, source, external_ref)
   where external_ref is not null;
-
 create table if not exists public.external_booking_credentials (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -33,13 +25,10 @@ create table if not exists public.external_booking_credentials (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
-
 create unique index if not exists external_booking_credentials_business_source_unique_idx
   on public.external_booking_credentials (business_id, source);
-
 create unique index if not exists external_booking_credentials_api_key_hash_unique_idx
   on public.external_booking_credentials (api_key_hash);
-
 create table if not exists public.external_product_mappings (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -60,19 +49,15 @@ create table if not exists public.external_product_mappings (
       ) is not null
     )
 );
-
 create unique index if not exists external_product_mappings_product_id_unique_idx
   on public.external_product_mappings (business_id, source, external_product_id)
   where external_product_id is not null;
-
 create unique index if not exists external_product_mappings_product_code_unique_idx
   on public.external_product_mappings (business_id, source, external_product_code)
   where external_product_code is not null;
-
 create index if not exists external_product_mappings_product_name_idx
   on public.external_product_mappings (business_id, source, lower(external_product_name))
   where external_product_name is not null;
-
 create table if not exists public.external_webhook_events (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -90,16 +75,12 @@ create table if not exists public.external_webhook_events (
   last_seen_at timestamptz not null default timezone('utc', now()),
   processed_at timestamptz
 );
-
 create unique index if not exists external_webhook_events_source_event_unique_idx
   on public.external_webhook_events (business_id, source, event_id);
-
 create index if not exists external_webhook_events_external_ref_idx
   on public.external_webhook_events (business_id, source, external_ref);
-
 create index if not exists external_webhook_events_status_idx
   on public.external_webhook_events (business_id, processed_status, received_at desc);
-
 create or replace function public.ck_seed_external_booking_credentials(
   p_source text,
   p_enable_hmac boolean default true
@@ -155,7 +136,6 @@ begin
    and i.source = c.source;
 end;
 $$;
-
 create or replace function public.ck_external_check_availability(
   p_business_id uuid,
   p_tour_id uuid,
@@ -220,7 +200,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.ck_external_create_booking(
   p_business_id uuid,
   p_tour_id uuid,
@@ -389,7 +368,6 @@ exception
     raise;
 end;
 $$;
-
 create or replace function public.ck_external_cancel_booking(
   p_business_id uuid,
   p_source text,
@@ -447,7 +425,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.ck_external_modify_booking(
   p_business_id uuid,
   p_source text,

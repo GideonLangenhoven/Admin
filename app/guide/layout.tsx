@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import GuideServiceWorker from "@/components/GuideServiceWorker";
+import GuideShell from "./GuideShell";
 
 export const metadata: Metadata = {
-  title: "Guide — BookingTours",
+  title: "Guide · BookingTours",
   manifest: "/guide/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1F7A8C",
+  themeColor: "#10241B",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -18,7 +19,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
   return (
     <>
       <GuideServiceWorker />
-      {children}
+      <GuideShell>{children}</GuideShell>
     </>
   );
 }

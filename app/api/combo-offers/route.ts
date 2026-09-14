@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isComboEnabledServer, comboDisabledResponse } from "../../lib/feature-flags";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
+import { CANCELLATION_POLICIES, parseComboRules } from "../../lib/combo-rules";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Fail loudly rather than degrading to the anon key. combo_bookings,
+  // combo_booking_items and promotion_uses have RLS on with no client
+  // policies, so an anon fallback does not error — it returns empty. A
+  // settlement or cancellation route reporting "nothing found" when the
+  // service key is missing is a silent money bug.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server");
   return createClient(url, key);
 }
 
@@ -76,9 +83,14 @@ export async function POST(req: NextRequest) {
 
   // --- CREATE ---
   if (action === "create") {
-    const { name, description, image_url, combo_price, original_price, split_type, currency, items } = body;
+    const { name, description, image_url, combo_price, original_price, split_type, currency, items, cancellation_policy } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (cancellation_policy !== undefined && !CANCELLATION_POLICIES.includes(cancellation_policy)) {
+      return NextResponse.json({ error: "cancellation_policy must be one of " + CANCELLATION_POLICIES.join(", ") }, { status: 400 });
+    }
+    const parsedRules = parseComboRules(body.combo_rules);
+    if (parsedRules.error) return NextResponse.json({ error: parsedRules.error }, { status: 400 });
     if (combo_price == null || combo_price < 0) return NextResponse.json({ error: "combo_price must be non-negative" }, { status: 400 });
     if (!split_type || !["PERCENT", "FIXED"].includes(split_type)) return NextResponse.json({ error: "split_type must be PERCENT or FIXED" }, { status: 400 });
     if (!Array.isArray(items) || items.length < 2) return NextResponse.json({ error: "At least 2 items required" }, { status: 400 });
@@ -95,6 +107,7 @@ export async function POST(req: NextRequest) {
 
     // Verify all businesses have active partnerships with the creator
     const businessIds = [...new Set(items.map((i: any) => i.business_id).filter((id: string) => id !== business_id))];
+    const partnershipIds: Record<string, string> = {};
     for (const partnerId of businessIds) {
       const aId = business_id < partnerId ? business_id : partnerId;
       const bId = business_id < partnerId ? partnerId : business_id;
@@ -106,6 +119,30 @@ export async function POST(req: NextRequest) {
         .eq("status", "ACTIVE")
         .maybeSingle();
       if (!p) return NextResponse.json({ error: "No active partnership with business " + partnerId }, { status: 403 });
+      partnershipIds[partnerId] = p.id;
+    }
+
+    // 2-party offers also populate the legacy A/B columns for older lookups.
+    // A = the creator (they collect payment in the manual-settlement model).
+    // 3+ party offers are items-only; checkout and the booking site read
+    // combo_offer_items directly.
+    let legacyCols: Record<string, unknown> = {};
+    if (items.length === 2 && businessIds.length === 1) {
+      const mine = items.find((i: any) => i.business_id === business_id);
+      const theirs = items.find((i: any) => i.business_id !== business_id);
+      if (mine && theirs) {
+        legacyCols = {
+          partnership_id: partnershipIds[theirs.business_id],
+          business_a_id: business_id,
+          business_b_id: theirs.business_id,
+          tour_a_id: mine.tour_id,
+          tour_b_id: theirs.tour_id,
+          split_a_percent: split_type === "PERCENT" ? Number(mine.split_percent) : null,
+          split_b_percent: split_type === "PERCENT" ? Number(theirs.split_percent) : null,
+          split_a_fixed: split_type === "FIXED" ? Number(mine.split_fixed) : null,
+          split_b_fixed: split_type === "FIXED" ? Number(theirs.split_fixed) : null,
+        };
+      }
     }
 
     // Create the combo offer
@@ -119,9 +156,12 @@ export async function POST(req: NextRequest) {
         original_price: Number(original_price || combo_price),
         split_type,
         currency: currency || "ZAR",
+        cancellation_policy: cancellation_policy || "VOUCHER_ONLY",
+        combo_rules: parsedRules.rules,
         active: true,
         created_by: business_id,
         created_by_business_id: business_id,
+        ...legacyCols,
       })
       .select()
       .single();
@@ -158,8 +198,13 @@ export async function POST(req: NextRequest) {
 
   // --- UPDATE ---
   if (action === "update") {
-    const { combo_offer_id, name, description, image_url, combo_price, original_price, split_type, currency, items } = body;
+    const { combo_offer_id, name, description, image_url, combo_price, original_price, split_type, currency, items, cancellation_policy } = body;
     if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
+    if (cancellation_policy !== undefined && !CANCELLATION_POLICIES.includes(cancellation_policy)) {
+      return NextResponse.json({ error: "cancellation_policy must be one of " + CANCELLATION_POLICIES.join(", ") }, { status: 400 });
+    }
+    const parsedRules = parseComboRules(body.combo_rules);
+    if (parsedRules.error) return NextResponse.json({ error: parsedRules.error }, { status: 400 });
 
     // Verify ownership (creator or participant)
     const { data: existingItems } = await supabase
@@ -181,6 +226,9 @@ export async function POST(req: NextRequest) {
     if (original_price !== undefined) updates.original_price = Number(original_price);
     if (split_type !== undefined) updates.split_type = split_type;
     if (currency !== undefined) updates.currency = currency;
+    if (cancellation_policy !== undefined) updates.cancellation_policy = cancellation_policy;
+    // Rules are replaced wholesale, so an empty object clears them.
+    if (body.combo_rules !== undefined) updates.combo_rules = parsedRules.rules;
 
     if (Object.keys(updates).length > 0) {
       const { error: updateErr } = await supabase.from("combo_offers").update(updates).eq("id", combo_offer_id);
@@ -226,20 +274,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ combo_offer: full });
   }
 
-  // --- DEACTIVATE ---
-  if (action === "deactivate") {
+  // --- ACTIVATE / DEACTIVATE ---
+  if (action === "deactivate" || action === "activate") {
     const { combo_offer_id } = body;
     if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
-    const { data, error } = await supabase.from("combo_offers").update({ active: false }).eq("id", combo_offer_id).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ combo_offer: data });
-  }
-
-  // --- ACTIVATE ---
-  if (action === "activate") {
-    const { combo_offer_id } = body;
-    if (!combo_offer_id) return NextResponse.json({ error: "combo_offer_id is required" }, { status: 400 });
-    const { data, error } = await supabase.from("combo_offers").update({ active: true }).eq("id", combo_offer_id).select().single();
+    // Tenant check: only a business that's party to the offer may toggle it.
+    if (caller.role !== "SUPER_ADMIN") {
+      const { data: off } = await supabase.from("combo_offers").select("business_a_id, business_b_id, created_by_business_id").eq("id", combo_offer_id).single();
+      const { data: item } = await supabase.from("combo_offer_items").select("id").eq("combo_offer_id", combo_offer_id).eq("business_id", caller.business_id).limit(1).maybeSingle();
+      const isParty = off && [off.business_a_id, off.business_b_id, off.created_by_business_id].includes(caller.business_id);
+      if (!isParty && !item) return NextResponse.json({ error: "Not authorized to change this combo offer" }, { status: 403 });
+    }
+    const { data, error } = await supabase.from("combo_offers").update({ active: action === "activate" }).eq("id", combo_offer_id).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ combo_offer: data });
   }

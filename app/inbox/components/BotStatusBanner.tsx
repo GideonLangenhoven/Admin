@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { getAuthHeaders } from "../../lib/admin-auth";
+import { useBusinessContext } from "../../../components/BusinessContext";
 
 export default function BotStatusBanner() {
+  const { businessId } = useBusinessContext();
   const [bannerText, setBannerText] = useState("");
   const [dismissed, setDismissed] = useState(false);
 
@@ -12,19 +14,18 @@ export default function BotStatusBanner() {
       return;
     }
     (async () => {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
       const r = await fetch("/api/admin/whatsapp/bot-mode", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: await getAuthHeaders(businessId),
       });
       if (!r.ok) return;
       const data = await r.json();
       if (data.mode === "OFF") {
-        setBannerText("WhatsApp bot is off — every message goes to this inbox.");
+        setBannerText("WhatsApp bot is off. Every message goes to this inbox.");
       } else if (data.mode === "OUTSIDE_HOURS" && !data.currentlyActive) {
         setBannerText("WhatsApp bot is paused during business hours.");
       }
     })();
-  }, []);
+  }, [businessId]);
 
   if (dismissed || !bannerText) return null;
 

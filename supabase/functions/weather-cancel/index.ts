@@ -17,8 +17,10 @@ function getCors(req?: any) {
 
 function canWeatherCancel(auth: AuthResult, businessId: string) {
   if (auth.isServiceRole) return true;
-  if (auth.businessId !== businessId) return false;
-  return auth.role === "MAIN_ADMIN" || auth.role === "SUPER_ADMIN";
+  // SUPER_ADMIN is platform-wide (see roles in .claude/CLAUDE.md) — requiring a
+  // business match first 403'd super-admins acting on any tenant but their own.
+  if (auth.role === "SUPER_ADMIN") return true;
+  return auth.businessId === businessId && auth.role === "MAIN_ADMIN";
 }
 
 Deno.serve(async (req: any) => {
@@ -55,89 +57,53 @@ Deno.serve(async (req: any) => {
 
     const tenant = await getTenantByBusinessId(supabase, business_id);
     const brandName = getBusinessDisplayName(tenant.business);
-    const cancelReason = reason || "weather conditions";
+    // This function is the shared "cancel a slot, notify everyone, start the
+    // refund flow" backend. It began weather-only; item 20 uses it for a
+    // generic operator cancellation too. is_weather defaults to true so every
+    // existing weather caller is unchanged; pass is_weather:false for a plain
+    // operator cancel (different reason text + email framing, same mechanics).
+    const isWeather = body.is_weather !== false;
+    const cancelReason = reason || (isWeather ? "weather conditions" : "an operational change");
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
-    await supabase.from("slots").update({ status: "CLOSED" }).eq("business_id", business_id).in("id", slot_ids);
+    const closed = await supabase.from("slots").update({ status: "CLOSED" }).eq("business_id", business_id).in("id", slot_ids);
+    if (closed.error) throw closed.error;
 
     // 2. Fetch all active bookings on these slots
-    const { data: bookings } = await supabase
+    const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, customer_name, phone, email, qty, total_amount, status, yoco_checkout_id, tours(name), slots(start_time), slot_id")
+      .select("id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, original_total, converted_to_voucher_id, status, yoco_checkout_id, source, tours(name), slots(start_time), slot_id")
       .eq("business_id", business_id)
       .in("slot_id", slot_ids)
-      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
+      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"]);
 
+    if (bookingsError) throw bookingsError;
     const affected = bookings || [];
-    const nowIso = new Date().toISOString();
-
-    // ── Phase 1: Cancel all bookings and compute per-slot capacity deltas ──
-    const slotDeltas: Record<string, { booked: number; held: number }> = {};
     const failedCancels: { id: string; error: string }[] = [];
-    for (let i = 0; i < affected.length; i++) {
-      const b = affected[i] as any;
-      const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
-
-      // Cancel the booking
-      const { error: cancelErr } = await supabase.from("bookings").update({
-        status: "CANCELLED",
-        cancellation_reason: "Weather cancellation: " + cancelReason,
-        cancelled_at: nowIso,
-        ...(isPaid && refundAmount > 0 ? {
-          refund_status: "ACTION_REQUIRED",
-          refund_amount: refundAmount,
-          refund_notes: "Weather cancellation — customer to choose: reschedule, voucher, or refund via My Bookings",
-        } : {}),
-      }).eq("business_id", business_id).eq("id", b.id);
-
-      // If the cancel did not persist (e.g. a DB trigger rejected it), the booking
-      // is still active — do NOT release its capacity or notify, and surface it so
-      // a PAID booking never silently survives on a CLOSED slot.
-      if (cancelErr) {
-        console.error("WEATHER_CANCEL_BOOKING_ERR", b.id, cancelErr.message);
-        failedCancels.push({ id: b.id, error: cancelErr.message });
-        continue;
-      }
-
-      // Accumulate capacity deltas per slot (avoids read-then-write race)
-      if (!slotDeltas[b.slot_id]) slotDeltas[b.slot_id] = { booked: 0, held: 0 };
-      slotDeltas[b.slot_id].booked += Number(b.qty || 0);
-      if (b.status === "HELD") slotDeltas[b.slot_id].held += Number(b.qty || 0);
-
-      // Cancel any active holds
-      await supabase.from("holds").update({ status: "CANCELLED" }).eq("business_id", business_id).eq("booking_id", b.id).eq("status", "ACTIVE");
-    }
-
-    const failedIds = new Set(failedCancels.map((f) => f.id));
-
-    // ── Phase 2: Release slot capacity in one atomic update per slot ──
-    for (const slotId of Object.keys(slotDeltas)) {
-      const delta = slotDeltas[slotId];
-      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-        p_slot_id: slotId,
-        p_business_id: business_id,
-        p_booked_delta: -delta.booked,
-        p_held_delta: -delta.held,
+    const outcomes = new Map<string, any>();
+    for (const b of affected) {
+      const cancelled = await supabase.rpc("cancel_booking_transaction", {
+        p_booking_id: b.id, p_business_id: business_id,
+        p_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
+        p_allow_late_choice: true, p_weather: true,
       });
-      if (rpcRes.error) {
-        const { data: slotData } = await supabase.from("slots").select("booked, held").eq("business_id", business_id).eq("id", slotId).maybeSingle();
-        if (slotData) {
-          await supabase.from("slots").update({
-            booked: Math.max(0, (slotData.booked || 0) - delta.booked),
-            held: Math.max(0, (slotData.held || 0) - delta.held),
-          }).eq("business_id", business_id).eq("id", slotId);
-        }
-      }
+      if (cancelled.error || !cancelled.data?.ok) {
+        failedCancels.push({ id: b.id, error: cancelled.data?.error || cancelled.error?.message || "Cancellation failed" });
+      } else outcomes.set(b.id, cancelled.data);
     }
+    const failedIds = new Set(failedCancels.map(f => f.id));
 
     // ── Phase 3: Send notifications (after all DB state is consistent) ──
+    // `notified` counts successful sends (one per channel), which the Broadcasts
+    // page surfaces and logs as the broadcast's sent_count.
+    let notified = 0;
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
-      if (failedIds.has(b.id)) continue;
+      if (failedIds.has(b.id) || outcomes.get(b.id)?.already_cancelled) continue;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      const refundAmount = isPaid ? Number(b.total_amount || 0) : 0;
+      const isOta = String(b.source || "").startsWith("OTA_");
+      const refundAmount = Number(outcomes.get(b.id)?.refund_amount || 0);
       const ref = b.id.substring(0, 8).toUpperCase();
       const tourName = b.tours?.name || "Tour";
       const startTime = b.slots?.start_time
@@ -148,20 +114,27 @@ Deno.serve(async (req: any) => {
       if (b.phone) {
         try {
           const firstName = b.customer_name?.split(" ")[0] || "there";
-          const waMessage = isPaid
+          const waMessage = isPaid && isOta
+            ? "Trip Cancelled \u26C5\n\n" +
+              "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
+              " has been cancelled due to " + cancelReason + ".\n\n" +
+              "Ref: " + ref + "\n\n" +
+              "You booked through a travel platform (e.g. Viator/GetYourGuide). They will handle your refund or rebooking. Please contact them directly.\n\n" +
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
+            : refundAmount > 0
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
               "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
               manageBookingUrl + "\n\n" +
-              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
             : "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
               "No payment was taken, so no action is needed on your side.\n\n" +
-              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon \u2014 " : "We hope to see you again soon \u2014 ") + brandName;
+              ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName;
           // Two-step flow: if 24h window is closed, send reopener template and queue
           // the full cancellation message for drain on next customer reply.
           await sendWhatsappWithWindowReopen(supabase, tenant, {
@@ -170,13 +143,15 @@ Deno.serve(async (req: any) => {
             full_message: waMessage,
             customer_first_name: firstName,
           });
+          notified++;
         } catch (e) { console.error("WA weather-cancel err:", e); }
       }
 
-      // Email notification
+      // Email notification — always attempted alongside WhatsApp; log the
+      // outcome either way so a missing email is diagnosable from logs.
       if (b.email) {
         try {
-          await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+          const emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
             body: JSON.stringify({
@@ -190,12 +165,18 @@ Deno.serve(async (req: any) => {
                 start_time: startTime,
                 reason: cancelReason,
                 total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
-                is_weather: true,
+                is_weather: isWeather,
                 is_unpaid: !isPaid,
+                offer_choice: refundAmount > 0,
+                is_ota: isOta,
               },
             }),
           });
+          console.log("CANCEL_EMAIL", b.id, emailRes.status, await emailRes.text().catch(() => ""));
+          if (emailRes.ok) notified++;
         } catch (e) { console.error("Email weather-cancel err:", e); }
+      } else {
+        console.warn("CANCEL_EMAIL_SKIP no email on booking", b.id);
       }
     }
 
@@ -212,12 +193,28 @@ Deno.serve(async (req: any) => {
       },
     });
 
+    // Opt-in broadcast-history row. The Broadcasts page shows weather
+    // cancellations in its history feed; recorded here rather than client-side
+    // so that page keeps no direct table writes. Best-effort: a failure here
+    // must not fail a cancellation that already happened.
+    if (body.log_broadcast) {
+      try {
+        await supabase.from("broadcasts").insert({
+          business_id,
+          message: (isWeather ? "⛈ Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
+          target_group: "AFFECTED_BOOKINGS",
+          sent_count: notified,
+        });
+      } catch (e) { console.error("WEATHER_CANCEL_BROADCAST_LOG_ERR:", e); }
+    }
+
     return new Response(JSON.stringify({
-      ok: true,
+      ok: failedCancels.length === 0,
       slots_closed: slot_ids.length,
       bookings_cancelled: affected.length - failedCancels.length,
+      notified,
       failed_cancels: failedCancels,
-    }), { status: 200, headers: getCors(req) });
+    }), { status: failedCancels.length ? 409 : 200, headers: getCors(req) });
   } catch (err: any) {
     console.error("WEATHER_CANCEL_ERROR:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: getCors(req) });

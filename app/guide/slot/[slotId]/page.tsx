@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
+import { Check } from "@phosphor-icons/react";
 
 type Booking = {
   id: string;
@@ -97,7 +98,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     const token = session?.access_token || null;
     if (!token) {
       revert();
-      notify({ tone: "error", message: "Session expired — please sign in again to check in guests." });
+      notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
       return;
     }
 
@@ -114,7 +115,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         // Auth/validation failures are not retryable — revert and surface, never queue.
         if (r.status >= 400 && r.status < 500) {
           revert();
-          notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in — please sign in again." : "Check-in was rejected. Please refresh and try again." });
+          notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in. Please sign in again." : "Check-in was rejected. Please refresh and try again." });
           return;
         }
         throw new Error("server_error");
@@ -127,59 +128,88 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
   const checkedCount = bookings.filter(b => b.checked_in).length;
   const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
+  const pct = bookings.length ? Math.round((checkedCount / bookings.length) * 100) : 0;
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20" style={{ color: "var(--ck-text)" }}>
-      <header className="flex items-center justify-between mb-4">
-        <Link href="/guide" className="text-sm font-medium" style={{ color: "var(--ck-accent)" }}>&larr; Back</Link>
-        {slotInfo && (
-          <div className="text-right">
-            <p className="text-sm font-bold" style={{ color: "var(--ck-text-strong)" }}>{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</p>
-            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{slotInfo.tour_name}</p>
+    <div className="pt-5">
+      {/* Trip summary — night surface hero, amber check-in trail */}
+      {slotInfo && (
+        <div className="bg-bt-dark rounded-2xl p-4 mb-4 text-white" style={{ boxShadow: "var(--ck-shadow-md)" }}>
+          <div className="flex items-end justify-between">
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold truncate" style={{ color: "rgba(246,243,234,0.75)" }}>{slotInfo.tour_name}</p>
+              <p className="font-display text-[28px] font-semibold leading-none tabular-nums mt-0.5">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-display text-[24px] font-semibold leading-none tabular-nums">{checkedCount}<span className="text-[16px]" style={{ color: "rgba(246,243,234,0.55)" }}>/{bookings.length}</span></p>
+              <p className="ui-mono-label mt-1" style={{ color: "rgba(246,243,234,0.75)" }}>checked in</p>
+            </div>
           </div>
-        )}
-      </header>
+          <div className="mt-3 h-2 rounded-full bg-white/15 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: pct + "%", background: "var(--ck-amber-bright)" }} />
+          </div>
+          <div className="flex items-center justify-between mt-2.5 text-[12px]">
+            <span className="font-medium" style={{ color: "rgba(246,243,234,0.75)" }}>{totalPax} guest{totalPax !== 1 ? "s" : ""} aboard</span>
+            <Link href={"/guide/photos/" + slotId} className="font-semibold text-white inline-flex items-center gap-1">Trip photos</Link>
+          </div>
+        </div>
+      )}
 
-      <div className="flex items-center gap-4 mb-4 px-1">
-        <span className="text-sm" style={{ color: "var(--ck-text-strong)" }}><strong>{totalPax}</strong> guest{totalPax !== 1 ? "s" : ""}</span>
-        <span className="text-sm text-emerald-600"><strong>{checkedCount}</strong>/{bookings.length} checked in</span>
-        <Link href={"/guide/photos/" + slotId} className="ml-auto text-sm font-medium" style={{ color: "var(--ck-accent)" }}>Photos &rarr;</Link>
-      </div>
+      {loading && (
+        <div className="space-y-2.5">{[0, 1, 2, 3].map(i => <div key={i} className="ui-skeleton h-[72px] rounded-2xl" />)}</div>
+      )}
 
-      {loading && <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Loading...</p>}
+      {!loading && bookings.length === 0 && (
+        <div className="ui-empty mt-6">
+          <p className="text-[14px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No passengers on this trip yet.</p>
+        </div>
+      )}
 
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {bookings.map(b => (
-          <li key={b.id} className={"p-3 rounded-xl border transition-colors " + (b.checked_in ? "bg-emerald-50 border-emerald-200" : "")} style={!b.checked_in ? { background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" } : undefined}>
-            <div className="flex items-center justify-between gap-3">
+          <li key={b.id} className={"rounded-2xl border p-3.5 transition-all " + (b.checked_in ? "" : "ui-card")}
+            style={b.checked_in ? { background: "var(--ck-success-soft)", borderColor: "color-mix(in srgb, var(--ck-success) 30%, transparent)" } : undefined}>
+            <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-bold truncate" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
-                <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-                  <span>{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
-                  {b.phone && <a href={"tel:" + b.phone} className="underline">{b.phone}</a>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-[15px] truncate" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                  {b.waiver_status === "SIGNED"
+                    ? <span className="ui-status ui-pill-success">✓ Waiver</span>
+                    : b.waiver_status
+                      ? <span className="ui-status ui-pill-danger">Waiver: {b.waiver_status}</span>
+                      : null}
                 </div>
-                {b.add_ons.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
+                <div className="flex items-center gap-3 text-[12px] mt-1">
+                  <span className="font-semibold ui-text-muted">{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
+                  {b.phone && (
+                    <>
+                      <a href={"tel:" + b.phone} className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-ocean)" }}>
+                        Call
+                      </a>
+                      <a href={"https://wa.me/" + b.phone.replace(/\D/g, "").replace(/^0/, "27")} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-success)" }}>
+                        WhatsApp
+                      </a>
+                    </>
+                  )}
+                </div>
+                {(b.add_ons.length > 0 || b.dietary) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {b.add_ons.map((ao, idx) => (
-                      <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
+                      <span key={idx} className="ui-pill ui-pill-amber text-[11px]">
                         {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                       </span>
                     ))}
+                    {b.dietary && <span className="ui-pill ui-pill-danger text-[11px]">🍽 {b.dietary}</span>}
                   </div>
-                )}
-                {b.dietary && <p className="text-xs text-amber-700 mt-1 font-medium">Dietary: {b.dietary}</p>}
-                {b.waiver_status && b.waiver_status !== "SIGNED" && (
-                  <p className="text-xs text-red-600 mt-0.5 font-medium">Waiver: {b.waiver_status}</p>
-                )}
-                {b.waiver_status === "SIGNED" && (
-                  <p className="text-xs text-emerald-600 mt-0.5">Waiver signed</p>
                 )}
               </div>
               {b.checked_in ? (
-                <span className="shrink-0 text-emerald-700 text-sm font-semibold px-3 py-1.5">&#10003;</span>
+                <div className="shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center" style={{ background: "var(--ck-success)", boxShadow: "var(--ck-shadow-sm)" }}>
+                  <Check size={22} weight="bold" />
+                </div>
               ) : (
-                <button onClick={() => checkIn(b.id)}
-                  className="shrink-0 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold active:bg-emerald-700 transition-colors">
+                <button onClick={() => checkIn(b.id)} className="ui-btn ui-btn-primary shrink-0">
                   Check in
                 </button>
               )}
@@ -190,8 +220,9 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
       {!loading && bookings.length > 0 && (
         <Link href={"/guide/photos/" + slotId}
-          className="block mt-6 p-4 rounded-xl bg-amber-100 text-amber-900 font-medium text-center border border-amber-200 active:bg-amber-200 transition-colors">
-          After the trip &rarr; upload photos &amp; send thank-you
+          className="ui-card ui-card-hover flex items-center justify-center gap-2 mt-6 p-4 font-semibold text-[14px] active:scale-[0.99]"
+          style={{ color: "var(--ck-text-strong)" }}>
+          Upload trip photos &amp; send thank-you
         </Link>
       )}
     </div>

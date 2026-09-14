@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format, parse, isValid } from "date-fns";
@@ -17,9 +18,14 @@ interface DatePickerProps {
 
 export function DatePicker({ value, onChange, className = "", placeholder = "Pick a date", alignRight = false, position = "bottom", disabled, compact = false }: DatePickerProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const btnRef = useRef<HTMLButtonElement>(null);
     const popRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const cellSize = compact ? 22 : 38;
     const calWidth = cellSize * 7 + (compact ? 36 : 48);
@@ -71,7 +77,7 @@ export function DatePicker({ value, onChange, className = "", placeholder = "Pic
                 <CalendarIcon className="w-4 h-4 ml-2 text-[var(--ck-text-muted)]" />
             </button>
 
-            {isOpen && (
+            {isOpen && mounted && createPortal(
                 <div
                     ref={popRef}
                     className="fixed z-[9999] bg-[var(--ck-surface)] border border-[var(--ck-border-subtle)] rounded-xl shadow-xl"
@@ -98,7 +104,8 @@ export function DatePicker({ value, onChange, className = "", placeholder = "Pic
                             }
                         }}
                     />
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

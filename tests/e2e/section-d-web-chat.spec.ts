@@ -29,6 +29,10 @@ test.describe("Section D: Customer Booking Flow (Web Chat)", () => {
   test.setTimeout(240_000);
 
   test("D1-D4 web chat flow", async ({ page, context }) => {
+    // One-off QA verification script (May 2026 session): hardcoded debug-ingest
+    // endpoint and stale fixtures; the suspended default tenant now gets the
+    // trading-gate reply instead of the booking flow. Opt in to run.
+    test.skip(process.env.QA_SECTIONS !== "1", "Set QA_SECTIONS=1 to run this archived QA verification script.");
     // D1: Open chat widget + greeting
     await openChat(page);
     await expect(page.getByText(/hi there/i)).toBeVisible({ timeout: 12_000 });

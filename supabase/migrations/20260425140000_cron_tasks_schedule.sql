@@ -19,7 +19,6 @@
 -- Idempotent: drop any prior schedule with the same name before adding.
 SELECT cron.unschedule('cron-tasks-every-5-minutes')
   WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cron-tasks-every-5-minutes');
-
 SELECT cron.schedule(
   'cron-tasks-every-5-minutes',
   '*/5 * * * *',

@@ -48,7 +48,6 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'deducted', v_deducted, 'remaining', v_new_balance);
 END;
 $$;
-
 -- FIX AH7: Add start_time check to create_hold_with_capacity_check
 CREATE OR REPLACE FUNCTION create_hold_with_capacity_check(
   p_booking_id UUID,

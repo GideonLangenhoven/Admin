@@ -7,12 +7,14 @@ booking/
 node_modules/
 coverage/
 docs/
-landing-pages/
+# Anchored: only the repo-root build dir. An unanchored "landing-pages/" also
+# matches public/landing-pages/ and strips the templates from every deploy.
+/landing-pages/
 public/pictures/
 public/landing-pages/fonts/
 public/landing-pages/images/
 public/landing-pages/videos/
-supabase/
+supabase/migrations/
 test-results/
 tests/
 playwright-report/
@@ -22,6 +24,10 @@ playwright.config.ts
 .backups/
 .git_broken/
 node_modules_old/
+.demo-capture-tmp/
+.agents/
+data/
+.env*
 next-env.d.ts
 tsconfig.tsbuildinfo
 .activityhub-onboarding-staging/

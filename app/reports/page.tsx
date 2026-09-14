@@ -1,8 +1,16 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
+import { fetchAllRowsResult } from "../../supabase/functions/_shared/pagination";
+import { zonedToUtc } from "../lib/admin-timezone";
+import { notify } from "../lib/app-notify";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell, LabelList,
+} from "recharts";
 
 function fmtCurrency(n: number) {
   return "R" + Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -47,28 +55,94 @@ function formatSource(raw: string | null | undefined): string {
   }
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PAID: "bg-emerald-100 text-emerald-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  CONFIRMED: "bg-blue-100 text-blue-700",
-  PENDING: "bg-amber-100 text-amber-700",
-  HELD: "bg-orange-100 text-orange-700",
-  CANCELLED: "bg-gray-200 text-gray-600",
+// Status vocabulary → the shared pill classes (mono, uppercase, soft wash).
+const STATUS_PILL: Record<string, string> = {
+  PAID: "ui-pill-success",
+  COMPLETED: "ui-pill-success",
+  CONFIRMED: "ui-pill-ocean",
+  PENDING: "ui-pill-warning",
+  HELD: "ui-pill-amber",
+  CANCELLED: "ui-pill-neutral",
+  EXPIRED: "ui-pill-neutral",
 };
+function statusPill(status: string) {
+  return `ui-status ${STATUS_PILL[status] || "ui-pill-neutral"}`;
+}
+
+// Standardized select chevron (muted ink) — matches the Dashboard's controls.
+const selectChevronStyle: React.CSSProperties = {
+  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2366736B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 0.75rem top 50%",
+  backgroundSize: "0.6rem auto",
+};
+
+// Compact ZAR for chart value axes (exact figures stay in the tooltip).
+function compactZar(n: number) {
+  if (n >= 1_000_000) return "R" + (n / 1_000_000).toFixed(1) + "m";
+  if (n >= 1_000) return "R" + (n / 1_000).toFixed(n >= 10_000 ? 0 : 1) + "k";
+  return "R" + Math.round(n);
+}
+
+// Mono-label + Inter-value tooltip, styled like a ui-card.
+function ChartTooltip({ active, payload, label, valueFormat }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const v = payload[0].value;
+  return (
+    <div style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", borderRadius: 12, boxShadow: "var(--ck-shadow-md)", padding: "8px 11px" }}>
+      <div className="ui-mono-label !text-[9.5px]" style={{ marginBottom: 3 }}>{label}</div>
+      <div className="text-[13px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+        {valueFormat ? valueFormat(Number(v)) : v}
+      </div>
+    </div>
+  );
+}
+
+// Table header cell — mono instrument voice, hairline underline.
+function Th({ children, className = "", onClick }: { children?: React.ReactNode; className?: string; onClick?: () => void }) {
+  return (
+    <th
+      onClick={onClick}
+      className={`px-4 py-3 text-[10.5px] font-medium uppercase tracking-[0.1em] border-b ${onClick ? "cursor-pointer select-none" : ""} ${className}`}
+      style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}
+    >
+      {children}
+    </th>
+  );
+}
+
+// Iterate calendar days as strings (noon-UTC anchor avoids DST/boundary drift).
+function addDaysStr(ymd: string, n: number) {
+  const d = new Date(ymd + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function Reports() {
   const { businessId, businessName, timezone } = useBusinessContext();
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
+  const [reportTruncated, setReportTruncated] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const loadRequestRef = useRef(0);
+  const mountedRef = useRef(true);
   const [signedInPeriod, setSignedInPeriod] = useState(0);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => monthStartStr(activeTimezone));
   const [endDate, setEndDate] = useState(() => todayStr(activeTimezone));
-  const [filterBy, setFilterBy] = useState<"slot" | "created">("slot");
+  // Default to booking date (money received) — the tour-date view hides
+  // future-dated bookings inside the current window and reads as "revenue
+  // missing" (matches the dashboard's payment-date semantics).
+  const [filterBy, setFilterBy] = useState<"slot" | "created">("created");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [sortCol, setSortCol] = useState<"created_at" | "slot_time" | "total_amount">("slot_time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [activeTab, setActiveTab] = useState<"bookings" | "financials" | "marketing" | "attendance" | "waivers">("bookings");
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     setStartDate(monthStartStr(activeTimezone));
@@ -76,63 +150,80 @@ export default function Reports() {
   }, [activeTimezone]);
 
   async function loadReport() {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
-    const startIso = startDate + "T00:00:00+02:00";
-    const endIso = endDate + "T23:59:59+02:00";
+    setReportError("");
+    setBookings([]);
+    setSignedInPeriod(0);
+    setReportTruncated(false);
+    try {
+      const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+      const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+      const slotRelation = filterBy === "slot" ? "slots!inner(start_time)" : "slots(start_time)";
 
-    let slotIds: string[] | null = null;
-    if (filterBy === "slot") {
-      // Two-step: first get slot IDs in the date range, then query bookings
-      const { data: slotRows } = await supabase
-        .from("slots")
-        .select("id")
-        .eq("business_id", businessId)
-        .gte("start_time", startIso)
-        .lte("start_time", endIso);
-      slotIds = (slotRows || []).map((s: any) => s.id);
-      if (slotIds.length === 0) {
-        setBookings([]);
-        setLoading(false);
-        return;
+      // Page through the full result set so revenue/attendance/CSV totals cover
+      // every booking in range. A single `.limit(2000)` silently understated
+      // revenue for any tenant with >2000 bookings in the period. Downstream
+      // revenue logic is unchanged — it just now sees the complete set. A high
+      // safety ceiling caps browser memory for pathological ranges; if hit, the
+      // report is flagged as truncated rather than silently wrong.
+      const PAGE = 1000;
+      const CEILING = 20000;
+      const rows: any[] = [];
+      let truncated = false;
+      for (let from = 0; from < CEILING; from += PAGE) {
+        let query = supabase
+          .from("bookings")
+          .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), " + slotRelation)
+          .eq("business_id", businessId);
+        if (filterBy === "slot") {
+          query = query.eq("slots.business_id", businessId).gte("slots.start_time", startIso).lt("slots.start_time", endIso);
+        } else {
+          query = query.gte("created_at", startIso).lt("created_at", endIso);
+        }
+        const { data, error } = await query.order("created_at", { ascending: false }).order("id").range(from, from + PAGE - 1);
+        if (requestId !== loadRequestRef.current) return;
+        if (error) throw error;
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < PAGE) break;
+        if (from + PAGE >= CEILING) truncated = true;
       }
+      setReportTruncated(truncated);
+      setBookings(rows.map((b: any) => ({
+        ...b,
+        tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
+        slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
+      })));
+
+      // Separately count waivers SIGNED in the period (by signing date, not trip
+      // date). The default query above filters by slot.start_time, so a waiver
+      // signed in May for a trip in March wouldn't appear. This independent
+      // count answers "did we sign any waivers in this window?" honestly.
+      const { count: signedCount, error: countError } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .eq("waiver_status", "SIGNED")
+        .gte("waiver_signed_at", startIso)
+        .lt("waiver_signed_at", endIso);
+      if (requestId !== loadRequestRef.current) return;
+      if (countError) throw countError;
+      setSignedInPeriod(signedCount || 0);
+    } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      console.error("Report load error:", error);
+      setBookings([]);
+      setReportError("This report could not be fully loaded. Retry to get complete totals and exports.");
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-
-    let query = supabase
-      .from("bookings")
-      .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, status, yoco_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, tours(name), slots(start_time)")
-      .eq("business_id", businessId);
-
-    if (filterBy === "slot" && slotIds) {
-      query = query.in("slot_id", slotIds);
-    } else {
-      query = query.gte("created_at", startIso).lte("created_at", endIso);
-    }
-
-    const { data, error } = await query.order("created_at", { ascending: false }).limit(2000);
-    if (error) console.error("Report load error:", error);
-    setBookings((data || []).map((b: any) => ({
-      ...b,
-      tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours,
-      slots: Array.isArray(b.slots) ? b.slots[0] || null : b.slots,
-    })));
-
-    // Separately count waivers SIGNED in the period (by signing date, not trip
-    // date). The default query above filters by slot.start_time, so a waiver
-    // signed in May for a trip in March wouldn't appear. This independent
-    // count answers "did we sign any waivers in this window?" honestly.
-    const { count: signedCount } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .eq("waiver_status", "SIGNED")
-      .gte("waiver_signed_at", startIso)
-      .lte("waiver_signed_at", endIso);
-    setSignedInPeriod(signedCount || 0);
-
-    setLoading(false);
   }
 
-  useEffect(() => { loadReport(); }, [startDate, endDate, filterBy, businessId]);
+  useEffect(() => {
+    loadReport();
+    return () => { loadRequestRef.current++; };
+  }, [startDate, endDate, filterBy, businessId, activeTimezone]);
 
   const filtered = useMemo(() => {
     let rows = filterStatus === "ALL" ? bookings : bookings.filter(b => b.status === filterStatus);
@@ -168,6 +259,10 @@ export default function Reports() {
       waiverPending: active.filter(b => b.waiver_status !== "SIGNED").length,
     };
   }, [filtered]);
+
+  // Accounting truth for the Financials tab: cash actually received/refunded
+  // per the captured/refund columns, not booked totals by status.
+  const fin = useMemo(() => financialTotals(filtered), [filtered]);
 
   const visualSeries = useMemo(() => {
     if (activeTab === "marketing") {
@@ -227,14 +322,66 @@ export default function Reports() {
     return grouped.sort((a, b) => b.value - a.value).slice(0, 5);
   }, [activeTab, filtered]);
 
+  // Revenue-over-time series — pure derivation from existing state (no query).
+  // Same paid-status set as summary.revenue, bucketed by the date field the
+  // page is already filtering on (tour date vs booking date). Buckets are
+  // pre-seeded across the range so the area stays continuous; a wide span
+  // (> ~3 months) rolls up to monthly so the axis stays readable.
+  const revenueSeries = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return [];
+    const paidStatuses = new Set(["PAID", "COMPLETED", "CONFIRMED"]);
+    const dayOf = (iso: string) =>
+      new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: activeTimezone }).format(new Date(iso));
+
+    const spanDays = Math.round((new Date(endDate + "T12:00:00Z").getTime() - new Date(startDate + "T12:00:00Z").getTime()) / 86_400_000) + 1;
+    const byMonth = spanDays > 92;
+
+    const buckets = new Map<string, number>();
+    let cursor = startDate;
+    let guard = 0;
+    while (cursor <= endDate && guard < 800) {
+      buckets.set(byMonth ? cursor.slice(0, 7) : cursor, 0);
+      cursor = addDaysStr(cursor, 1);
+      guard++;
+    }
+
+    for (const b of filtered) {
+      if (!paidStatuses.has(b.status)) continue;
+      const iso = filterBy === "slot" ? (b.slots?.start_time || b.created_at) : b.created_at;
+      if (!iso) continue;
+      const day = dayOf(iso);
+      const key = byMonth ? day.slice(0, 7) : day;
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + Number(b.total_amount || 0));
+    }
+
+    const labelOf = (key: string) => {
+      if (byMonth) {
+        const [y, m] = key.split("-").map(Number);
+        return new Date(y, m - 1, 1).toLocaleDateString("en-ZA", { month: "short", year: "2-digit" });
+      }
+      const [y, m, d] = key.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+    };
+
+    return Array.from(buckets, ([key, revenue]) => ({ key, label: labelOf(key), revenue }));
+  }, [filtered, filterBy, startDate, endDate, activeTimezone]);
+
+  const hasRevenue = revenueSeries.some(d => d.revenue > 0);
+  const breakdownCaption =
+    activeTab === "financials" ? "Revenue by status"
+      : activeTab === "marketing" ? "Bookings by source"
+        : activeTab === "attendance" ? "Attendance by pax"
+          : activeTab === "waivers" ? "Signed vs pending"
+            : "Pax by activity";
+
   function toggleSort(col: typeof sortCol) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(col); setSortDir("asc"); }
   }
 
   function sortIcon(col: typeof sortCol) {
-    if (sortCol !== col) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="text-blue-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    if (sortCol !== col) return <span className="ml-1" style={{ color: "var(--ck-text-muted)", opacity: 0.5 }}>↕</span>;
+    return <span className="ml-1" style={{ color: "var(--ck-accent)" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   const reportGenDate = new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: activeTimezone });
@@ -251,10 +398,11 @@ export default function Reports() {
     const csv = [...meta, headers, ...rows]
       .map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    return "\uFEFF" + csv;
+    return "﻿" + csv;
   }
 
   function triggerDownload(content: string, filename: string) {
+    if (!mountedRef.current) return;
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -284,18 +432,69 @@ export default function Reports() {
     }
 
     if (activeTab === "financials") {
-      const headers = ["Transaction Date", "Booking Ref", "Gateway Ref", "Customer Name", "Subtotal", "Discount", "Total Amount", "Status"];
-      const rows = filtered.map(b => [
-        fmtDateTime(b.created_at, activeTimezone),
-        b.id.substring(0, 8).toUpperCase(),
-        b.yoco_payment_id || "",
-        b.customer_name || "",
-        Number(b.original_total || b.total_amount || 0).toFixed(2),
-        Number((b.original_total || b.total_amount || 0) - (b.total_amount || 0)).toFixed(2),
-        Number(b.total_amount || 0).toFixed(2),
-        b.status || ""
-      ]);
-      triggerDownload(buildCSV("Financial Report", headers, rows), `${csvPrefix}-financials-${startDate}-to-${endDate}.csv`);
+      // Full transaction ledger: every money column an accountant needs to
+      // reconcile receipts, refunds and outstanding balances per booking,
+      // with the references to trace each amount to the payment gateway.
+      const headers = [
+        "Transaction Date", "Booking Ref", "Booking ID", "Status", "Customer Name", "Customer VAT No",
+        "Tour", "Tour Date", "Source", "Qty", "Unit Price",
+        "Subtotal", "Discount", "Discount Type", "Promo Code", "Total Due",
+        "Voucher Code", "Voucher Applied", "Amount Received", "Refunded", "Net Received", "Outstanding",
+        "Payment Method", "Gateway Ref (Yoco)", "Gateway Ref (PayFast)", "OTA Channel", "OTA Gross", "OTA Net",
+        "Refund Status", "Refund Processed At", "Cancelled At", "Cancellation Reason", "Booked By",
+      ];
+      const rows = filtered.map(b => {
+        const due = Number(b.total_amount || 0);
+        const received = amountReceived(b);
+        const refunded = amountRefunded(b);
+        return [
+          fmtDateTime(b.created_at, activeTimezone),
+          b.id.substring(0, 8).toUpperCase(),
+          b.id,
+          b.status || "",
+          b.customer_name || "",
+          b.customer_vat_number || "",
+          b.tours?.name || "",
+          b.slots?.start_time ? fmtDateTime(b.slots.start_time, activeTimezone) : "",
+          b.source || "",
+          b.qty || 0,
+          Number(b.unit_price || 0).toFixed(2),
+          Number(b.original_total || b.total_amount || 0).toFixed(2),
+          Number((b.original_total || b.total_amount || 0) - due).toFixed(2),
+          b.discount_type || "",
+          b.promo_code || "",
+          due.toFixed(2),
+          b.voucher_code || "",
+          Number(b.voucher_amount_paid || 0).toFixed(2),
+          received.toFixed(2),
+          refunded.toFixed(2),
+          (received - refunded).toFixed(2),
+          (["CANCELLED", "EXPIRED"].includes(b.status) ? 0 : Math.max(0, due - received)).toFixed(2),
+          derivePaymentMethod(b),
+          b.yoco_payment_id || "",
+          b.payfast_m_payment_id || "",
+          b.ota_channel || "",
+          b.ota_gross_amount != null ? Number(b.ota_gross_amount).toFixed(2) : "",
+          b.ota_net_amount != null ? Number(b.ota_net_amount).toFixed(2) : "",
+          b.refund_status || "",
+          b.refund_processed_at ? fmtDateTime(b.refund_processed_at, activeTimezone) : "",
+          b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : "",
+          b.cancellation_reason || "",
+          b.created_by_admin_name || "",
+        ];
+      });
+      const totals = [
+        [],
+        ["TOTALS"],
+        ["Gross booked (live bookings)", fin.grossBooked.toFixed(2)],
+        ["Discounts given", fin.discounts.toFixed(2)],
+        ["Amount received", fin.received.toFixed(2)],
+        ["of which voucher redemptions", fin.voucherApplied.toFixed(2)],
+        ["Refunded", fin.refunded.toFixed(2)],
+        ["Net received", fin.net.toFixed(2)],
+        ["Outstanding", fin.outstanding.toFixed(2)],
+      ];
+      triggerDownload(buildCSV("Financial Ledger", headers, [...rows, ...totals]), `${csvPrefix}-financial-ledger-${startDate}-to-${endDate}.csv`);
       return;
     }
 
@@ -374,6 +573,181 @@ export default function Reports() {
     triggerDownload(buildCSV("Bookings Report", headers, rows), `${csvPrefix}-bookings-${startDate}-to-${endDate}.csv`);
   }
 
+  // ── Accounting registers (on-demand fetch + CSV; financials tab only) ──
+  const [registerBusy, setRegisterBusy] = useState<string | null>(null);
+
+  function registerFailed(error: unknown) {
+    console.error("Register load error:", error);
+    if (mountedRef.current) notify({ title: "Register could not be loaded", message: "Please retry. No partial export was downloaded.", tone: "error" });
+  }
+
+  async function downloadRefundRegister() {
+    setRegisterBusy("refunds");
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+    // Money truth lives on bookings; refund_requests is workflow. A refund
+    // belongs to this period when it was PROCESSED in it (or, for legacy rows
+    // without a processed date, when the booking was cancelled in it).
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
+      .from("bookings")
+      .select("id, created_at, customer_name, email, total_amount, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, refund_notes, cancelled_at, cancellation_reason, yoco_payment_id, status, tours(name)")
+      .eq("business_id", businessId)
+      .or(`and(refund_processed_at.gte.${startIso},refund_processed_at.lt.${endIso}),and(refund_processed_at.is.null,total_refunded.gt.0,cancelled_at.gte.${startIso},cancelled_at.lt.${endIso})`)
+      .order("id").range(from, to));
+    setRegisterBusy(null);
+    if (error) { registerFailed(error); return; }
+    const rows = (data || [])
+      .map((b: any) => ({ ...b, tours: Array.isArray(b.tours) ? b.tours[0] || null : b.tours }))
+      .sort((a: any, z: any) => String(a.refund_processed_at || a.cancelled_at || "").localeCompare(String(z.refund_processed_at || z.cancelled_at || "")));
+    const headers = ["Refund Date", "Booking Ref", "Booking ID", "Customer", "Tour", "Booking Status", "Amount Received", "Amount Refunded", "Refund Status", "Gateway Ref", "Cancelled At", "Reason", "Notes"];
+    const csvRows = rows.map((b: any) => [
+      b.refund_processed_at ? fmtDateTime(b.refund_processed_at, activeTimezone) : (b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : ""),
+      b.id.substring(0, 8).toUpperCase(),
+      b.id,
+      b.customer_name || "",
+      b.tours?.name || "",
+      b.status || "",
+      amountReceived(b).toFixed(2),
+      amountRefunded(b).toFixed(2),
+      b.refund_status || "",
+      b.yoco_payment_id || "",
+      b.cancelled_at ? fmtDateTime(b.cancelled_at, activeTimezone) : "",
+      b.cancellation_reason || "",
+      b.refund_notes || "",
+    ]);
+    const total = rows.reduce((s: number, b: any) => s + amountRefunded(b), 0);
+    triggerDownload(buildCSV("Refund Register", headers, [...csvRows, [], ["Total refunded", total.toFixed(2)]]), `${csvPrefix}-refund-register-${startDate}-to-${endDate}.csv`);
+  }
+
+  async function downloadInvoiceRegister() {
+    setRegisterBusy("invoices");
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
+      .from("invoices")
+      .select("invoice_number, created_at, customer_name, customer_email, customer_company_name, customer_vat_number, tour_name, tour_date, qty, unit_price, subtotal, discount_type, discount_amount, total_amount, payment_method, payment_reference, voucher_code, status, booking_id")
+      .eq("business_id", businessId)
+      .gte("created_at", startIso)
+      .lt("created_at", endIso)
+      .order("invoice_number", { ascending: true })
+      .order("id").range(from, to));
+    setRegisterBusy(null);
+    if (error) { registerFailed(error); return; }
+    const rows = data || [];
+    const headers = ["Invoice No", "Issued At", "Customer", "Company", "VAT No", "Email", "Tour", "Tour Date", "Qty", "Unit Price", "Subtotal", "Discount", "Total", "Payment Method", "Payment Reference", "Voucher", "Status", "Booking Ref"];
+    const csvRows = rows.map((inv: any) => [
+      inv.invoice_number || "",
+      fmtDateTime(inv.created_at, activeTimezone),
+      inv.customer_name || "",
+      inv.customer_company_name || "",
+      inv.customer_vat_number || "",
+      inv.customer_email || "",
+      inv.tour_name || "",
+      inv.tour_date || "",
+      inv.qty || 0,
+      Number(inv.unit_price || 0).toFixed(2),
+      Number(inv.subtotal || 0).toFixed(2),
+      Number(inv.discount_amount || 0).toFixed(2),
+      Number(inv.total_amount || 0).toFixed(2),
+      inv.payment_method || "",
+      inv.payment_reference || "",
+      inv.voucher_code || "",
+      inv.status || "",
+      inv.booking_id ? String(inv.booking_id).substring(0, 8).toUpperCase() : "",
+    ]);
+    const total = rows.reduce((s: number, inv: any) => s + Number(inv.total_amount || 0), 0);
+    triggerDownload(buildCSV("Invoice Register", headers, [...csvRows, [], ["Invoices", rows.length], ["Total invoiced", total.toFixed(2)]]), `${csvPrefix}-invoice-register-${startDate}-to-${endDate}.csv`);
+  }
+
+  async function downloadVoucherRegister() {
+    setRegisterBusy("vouchers");
+    const startIso = new Date(zonedToUtc(startDate + "T00:00:00", activeTimezone)).toISOString();
+    const endIso = new Date(zonedToUtc(addDaysStr(endDate, 1) + "T00:00:00", activeTimezone)).toISOString();
+    // Three sections in one register: sold in period (income received),
+    // redeemed in period (liability released), and the open-balance snapshot
+    // (current liability, as of now, independent of the date range).
+    const [sold, redeemed, open] = await Promise.all([
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
+        .select("code, created_at, buyer_name, buyer_email, recipient_name, purchase_amount, value, current_balance, status, expires_at")
+        .eq("business_id", businessId).gte("created_at", startIso).lt("created_at", endIso)
+        .order("created_at").order("id").range(from, to)),
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
+        .select("code, redeemed_at, buyer_name, recipient_name, value, current_balance, status, redeemed_booking_id")
+        .eq("business_id", businessId).gte("redeemed_at", startIso).lt("redeemed_at", endIso)
+        .order("redeemed_at").order("id").range(from, to)),
+      fetchAllRowsResult((from, to) => supabase.from("vouchers")
+        .select("code, created_at, buyer_name, recipient_name, value, current_balance, status, expires_at")
+        .eq("business_id", businessId).gt("current_balance", 0).eq("status", "ACTIVE")
+        .order("created_at").order("id").range(from, to)),
+    ]);
+    setRegisterBusy(null);
+    if (sold.error || redeemed.error || open.error) {
+      registerFailed(sold.error || redeemed.error || open.error);
+      return;
+    }
+    const headers = ["Section", "Code", "Date", "Buyer", "Recipient", "Face Value", "Purchase Amount", "Current Balance", "Status", "Expires / Booking"];
+    const csvRows: any[][] = [];
+    for (const v of sold.data || []) {
+      csvRows.push(["SOLD", v.code, fmtDateTime(v.created_at, activeTimezone), v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), Number(v.purchase_amount || v.value || 0).toFixed(2), Number(v.current_balance || 0).toFixed(2), v.status || "", v.expires_at ? fmtDate(v.expires_at, activeTimezone) : ""]);
+    }
+    for (const v of redeemed.data || []) {
+      csvRows.push(["REDEEMED", v.code, v.redeemed_at ? fmtDateTime(v.redeemed_at, activeTimezone) : "", v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), "", Number(v.current_balance || 0).toFixed(2), v.status || "", v.redeemed_booking_id ? String(v.redeemed_booking_id).substring(0, 8).toUpperCase() : ""]);
+    }
+    for (const v of open.data || []) {
+      csvRows.push(["OPEN BALANCE", v.code, fmtDateTime(v.created_at, activeTimezone), v.buyer_name || "", v.recipient_name || "", Number(v.value || 0).toFixed(2), "", Number(v.current_balance || 0).toFixed(2), v.status || "", v.expires_at ? fmtDate(v.expires_at, activeTimezone) : ""]);
+    }
+    const soldTotal = (sold.data || []).reduce((s: number, v: any) => s + Number(v.purchase_amount || v.value || 0), 0);
+    const liability = (open.data || []).reduce((s: number, v: any) => s + Number(v.current_balance || 0), 0);
+    triggerDownload(
+      buildCSV("Voucher Register", headers, [...csvRows, [], ["Sold in period (received)", soldTotal.toFixed(2)], ["Open voucher liability (as of today)", liability.toFixed(2)]]),
+      `${csvPrefix}-voucher-register-${startDate}-to-${endDate}.csv`,
+    );
+  }
+
+  async function downloadSettlementRegister() {
+    setRegisterBusy("settlements");
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase
+      .from("combo_settlements")
+      .select("period_start, period_end, collector_business_id, owed_business_id, total_collected, amount_owed, combo_booking_count, status, settled_at, notes, created_at")
+      .or(`collector_business_id.eq.${businessId},owed_business_id.eq.${businessId}`)
+      .gte("period_end", startDate)
+      .lte("period_start", endDate)
+      .order("period_start")
+      .order("id").range(from, to));
+    if (error) { setRegisterBusy(null); registerFailed(error); return; }
+    const rows = data || [];
+    // Keep lookup URLs bounded even for large partner networks.
+    const otherIds = Array.from(new Set(rows.flatMap((r: any) => [r.collector_business_id, r.owed_business_id]).filter((id: string) => id && id !== businessId)));
+    const names: Record<string, string> = {};
+    for (let from = 0; from < otherIds.length; from += 200) {
+      const { data: biz } = await supabase.from("businesses").select("id, name").in("id", otherIds.slice(from, from + 200));
+      Object.assign(names, Object.fromEntries((biz || []).map((b: any) => [b.id, b.name])));
+    }
+    setRegisterBusy(null);
+    const headers = ["Period", "Direction", "Counterparty", "Combo Bookings", "Total Collected", "Amount Owed", "Status", "Settled At", "Notes"];
+    const csvRows = rows.map((r: any) => {
+      const iCollect = r.collector_business_id === businessId;
+      const counterpartyId = iCollect ? r.owed_business_id : r.collector_business_id;
+      return [
+        r.period_start + " to " + r.period_end,
+        iCollect ? "PAYABLE (we collected)" : "RECEIVABLE (they collected)",
+        names[counterpartyId] || counterpartyId || "",
+        r.combo_booking_count || 0,
+        Number(r.total_collected || 0).toFixed(2),
+        Number(r.amount_owed || 0).toFixed(2),
+        r.status || "",
+        r.settled_at ? fmtDateTime(r.settled_at, activeTimezone) : "",
+        r.notes || "",
+      ];
+    });
+    const payable = rows.filter((r: any) => r.collector_business_id === businessId).reduce((s: number, r: any) => s + Number(r.amount_owed || 0), 0);
+    const receivable = rows.filter((r: any) => r.owed_business_id === businessId).reduce((s: number, r: any) => s + Number(r.amount_owed || 0), 0);
+    triggerDownload(
+      buildCSV("Combo Settlement Register", headers, [...csvRows, [], ["Total payable to partners", payable.toFixed(2)], ["Total receivable from partners", receivable.toFixed(2)]]),
+      `${csvPrefix}-settlement-register-${startDate}-to-${endDate}.csv`,
+    );
+  }
+
   async function downloadPDF() {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
@@ -399,17 +773,19 @@ export default function Reports() {
       ]);
     } else if (activeTab === "financials") {
       title = `Financial Report (${startDate} to ${endDate})`;
-      headers = ["Date", "Booking Ref", "Gateway Ref", "Customer", "Subtotal", "Discount", "Net Paid", "Status"];
+      headers = ["Date", "Booking Ref", "Customer", "Method", "Total Due", "Received", "Refunded", "Net", "Status"];
       rows = filtered.map(b => [
         fmtDateTime(b.created_at, activeTimezone),
         b.id.substring(0, 8).toUpperCase(),
-        b.yoco_payment_id || "—",
         b.customer_name || "—",
-        fmtCurrency(Number(b.original_total || b.total_amount || 0)),
-        fmtCurrency(Number((b.original_total || b.total_amount || 0) - (b.total_amount || 0))),
+        derivePaymentMethod(b) || "—",
         fmtCurrency(Number(b.total_amount || 0)),
+        fmtCurrency(amountReceived(b)),
+        fmtCurrency(amountRefunded(b)),
+        fmtCurrency(netReceived(b)),
         b.status
       ]);
+      rows.push(["", "", "", "TOTALS", fmtCurrency(fin.grossBooked), fmtCurrency(fin.received), fmtCurrency(fin.refunded), fmtCurrency(fin.net), ""]);
     } else if (activeTab === "marketing") {
       title = `Marketing Report (${startDate} to ${endDate})`;
       headers = ["Source", "Bookings", "Total Pax", "Revenue", "Avg. Order Value"];
@@ -484,91 +860,91 @@ export default function Reports() {
       headStyles: { fillColor: [4, 120, 87] },
     });
 
-    doc.save(`${csvPrefix}-${activeTab}-${startDate}-to-${endDate}.pdf`);
+    if (mountedRef.current) doc.save(`${csvPrefix}-${activeTab}-${startDate}-to-${endDate}.pdf`);
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="space-y-5 max-w-[1400px] mx-auto pb-10">
+      {reportError && (
+        <div role="alert" className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
+          {reportError} <button type="button" onClick={loadReport} className="underline">Retry</button>
+        </div>
+      )}
+      {reportTruncated && (
+        <div className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-warn-soft, #fef3c7)", color: "var(--ck-warn-strong, #92400e)" }}>
+          This report reached the 20,000-booking limit. Totals and exports cover those bookings only; narrow the date range to verify complete figures.
+        </div>
+      )}
+      {/* ── Header ── */}
+      <div className="anim-fade-up flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{businessName} Reports</h2>
-          <p className="text-sm text-gray-500">Filter by tour date or booking date, download as CSV or PDF.</p>
+          <p className="ui-mono-label mb-2">Reports · {businessName}</p>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reports</h2>
+          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Filter by tour date or booking date, download as CSV or PDF.</p>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <button
-            onClick={downloadCSV}
-            disabled={filtered.length === 0}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
-          >
+          <button onClick={downloadCSV} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
             CSV ({filtered.length})
           </button>
-          <button
-            onClick={downloadPDF}
-            disabled={filtered.length === 0}
-            className="rounded-lg border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
-          >
+          <button onClick={downloadPDF} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
             PDF
           </button>
         </div>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex min-w-max border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("bookings")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "bookings" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Bookings
-          </button>
-          <button
-            onClick={() => setActiveTab("financials")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "financials" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Financials
-          </button>
-          <button
-            onClick={() => setActiveTab("marketing")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "marketing" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Marketing
-          </button>
-          <button
-            onClick={() => setActiveTab("attendance")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "attendance" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Attendance
-          </button>
-          <button
-            onClick={() => setActiveTab("waivers")}
-            className={`px-4 py-2 text-sm font-medium ${activeTab === "waivers" ? "border-b-2 border-emerald-600 text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Waivers
-          </button>
+      {/* ── Tabs — segmented control ── */}
+      <div className="anim-fade-up anim-d1 -mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
+        <div className="ui-seg w-max">
+          {([
+            ["bookings", "Bookings"],
+            ["financials", "Financials"],
+            ["marketing", "Marketing"],
+            ["attendance", "Attendance"],
+            ["waivers", "Waivers"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className="ui-seg-item"
+              data-active={activeTab === key}
+              onClick={() => setActiveTab(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="text-sm text-gray-600 sm:min-w-[150px]">
-          Filter by
-          <select value={filterBy} onChange={e => setFilterBy(e.target.value as "slot" | "created")}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+      {/* ── Filters ── */}
+      <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">Filter by</span>
+          <select
+            value={filterBy}
+            onChange={e => setFilterBy(e.target.value as "slot" | "created")}
+            className="ui-control w-full appearance-none pr-9"
+            style={selectChevronStyle}
+          >
             <option value="slot">Tour date</option>
             <option value="created">Booking date</option>
           </select>
         </label>
-        <label className="text-sm text-gray-600 flex flex-col gap-1 sm:min-w-[150px]">
-          From
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">From</span>
           <DatePicker value={startDate} onChange={setStartDate} />
         </label>
-        <label className="text-sm text-gray-600 flex flex-col gap-1 sm:min-w-[150px]">
-          To
+        <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
+          <span className="ui-mono-label !text-[10px]">To</span>
           <DatePicker alignRight={true} value={endDate} onChange={setEndDate} />
         </label>
-        <label className="text-sm text-gray-600 sm:min-w-[160px]">
-          Status
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+        <label className="flex flex-col gap-1.5 sm:min-w-[160px]">
+          <span className="ui-mono-label !text-[10px]">Status</span>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="ui-control w-full appearance-none pr-9"
+            style={selectChevronStyle}
+          >
             <option value="ALL">All Statuses</option>
             <option value="PAID">PAID</option>
             <option value="COMPLETED">COMPLETED</option>
@@ -576,28 +952,67 @@ export default function Reports() {
             <option value="PENDING">PENDING</option>
             <option value="HELD">HELD</option>
             <option value="CANCELLED">CANCELLED</option>
+            <option value="EXPIRED">EXPIRED</option>
           </select>
         </label>
-        <button onClick={loadReport} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 sm:py-1.5">
+        <button onClick={loadReport} className="ui-btn ui-btn-ghost sm:ml-auto">
           Refresh
         </button>
       </div>
 
-      {/* Summary cards */}
+      {/* ── Summary tiles ── */}
       {activeTab === "waivers" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
-            { label: "Active Bookings", value: summary.total - summary.cancelled, hint: "trip date in range" },
-            { label: "Signed (trip in range)", value: summary.waiverSigned, color: "text-emerald-600", hint: "signed waivers for trips in this period" },
-            { label: "Signed in this period", value: signedInPeriod, color: "text-emerald-600", hint: "by signing date — independent of trip date" },
-            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "text-amber-600" : "text-gray-800", hint: "trips in range, no waiver yet" },
-            { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—" },
+            { label: "Active Bookings", value: summary.total - summary.cancelled, color: "var(--ck-text-strong)", hint: "trip date in range" },
+            { label: "Signed (trip in range)", value: summary.waiverSigned, color: "var(--ck-success)", hint: "signed waivers for trips in this period" },
+            { label: "Signed in this period", value: signedInPeriod, color: "var(--ck-success)", hint: "by signing date, independent of trip date" },
+            { label: "Waivers Pending", value: summary.waiverPending, color: summary.waiverPending > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "trips in range, no waiver yet" },
+            { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—", color: "var(--ck-text-strong)" },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center" title={c.hint || c.label}>
-              <p className="text-xs text-gray-500">{c.label}</p>
-              <p className={`text-xl font-bold ${c.color || "text-gray-800"}`}>{c.value}</p>
+            <div key={c.label} className="ui-card p-4" title={c.hint || c.label}>
+              <p className="ui-mono-label !text-[10px]">{c.label}</p>
+              <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
+        </div>
+      ) : activeTab === "financials" ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {[
+              { label: "Gross Booked", value: fmtCurrency(fin.grossBooked), color: "var(--ck-text-strong)", hint: "total due on live bookings (excl. cancelled/expired)" },
+              { label: "Received", value: fmtCurrency(fin.received), color: "var(--ck-success)", hint: "cash + voucher value actually captured" },
+              { label: "Refunded", value: fmtCurrency(fin.refunded), color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-strong)", hint: "processed refunds" },
+              { label: "Net Received", value: fmtCurrency(fin.net), color: "var(--ck-success)", hint: "received minus refunded" },
+              { label: "Outstanding", value: fmtCurrency(fin.outstanding), color: fin.outstanding > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "due but not yet received on live bookings" },
+            ].map(c => (
+              <div key={c.label} className="ui-card p-4" title={c.hint}>
+                <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
+              </div>
+            ))}
+          </div>
+          {(fin.voucherApplied > 0 || fin.missingGatewayRef > 0) && (
+            <p className="px-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+              {fin.voucherApplied > 0 && <>Includes {fmtCurrency(fin.voucherApplied)} paid by voucher redemption. </>}
+              {fin.missingGatewayRef > 0 && <span style={{ color: "var(--ck-warning)" }}>{fin.missingGatewayRef} paid booking{fin.missingGatewayRef === 1 ? " has" : "s have"} no payment reference recorded (audit flag).</span>}
+            </p>
+          )}
+          <div className="ui-card flex flex-wrap items-center gap-2 p-3">
+            <span className="ui-mono-label !text-[10px] mr-1">Accounting registers</span>
+            <button onClick={downloadRefundRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "refunds" ? "Building…" : "Refunds CSV"}
+            </button>
+            <button onClick={downloadInvoiceRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "invoices" ? "Building…" : "Invoices CSV"}
+            </button>
+            <button onClick={downloadVoucherRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "vouchers" ? "Building…" : "Vouchers CSV"}
+            </button>
+            <button onClick={downloadSettlementRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
+              {registerBusy === "settlements" ? "Building…" : "Combo Settlements CSV"}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -608,154 +1023,209 @@ export default function Reports() {
             { label: "Pending", value: summary.pending },
             { label: "Cancelled", value: summary.cancelled },
           ].map(c => (
-            <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-              <p className="text-xs text-gray-500">{c.label}</p>
-              <p className="text-xl font-bold text-gray-800">{c.value}</p>
+            <div key={c.label} className="ui-card p-4">
+              <p className="ui-mono-label !text-[10px]">{c.label}</p>
+              <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{c.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-gray-800">Visual breakdown</h3>
-            <span className="text-xs text-gray-500">
-              {activeTab === "financials" ? "Revenue by status" : activeTab === "marketing" ? "Bookings by source" : activeTab === "attendance" ? "Attendance by pax" : activeTab === "waivers" ? "Signed vs pending" : "Pax by activity"}
-            </span>
+      {/* ── Revenue over time — area chart ── */}
+      <div className="ui-card p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Revenue over time</h3>
+            <p className="ui-mono-label mt-1 !text-[10px]">Paid revenue · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
+          </div>
+          <span className="font-display text-[22px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(summary.revenue)}</span>
+        </div>
+        {hasRevenue ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={revenueSeries} margin={{ top: 6, right: 12, left: -6, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rev-area-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" style={{ stopColor: "var(--ck-chart-1)", stopOpacity: 0.18 }} />
+                  <stop offset="100%" style={{ stopColor: "var(--ck-chart-1)", stopOpacity: 0 }} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--ck-chart-grid)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10.5, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={24}
+              />
+              <YAxis
+                tickFormatter={compactZar}
+                tick={{ fontSize: 10.5, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                axisLine={false}
+                tickLine={false}
+                width={48}
+              />
+              <Tooltip cursor={{ stroke: "var(--ck-border-strong)", strokeDasharray: "3 3" }} content={<ChartTooltip valueFormat={fmtCurrency} />} />
+              <Area type="monotone" dataKey="revenue" stroke="var(--ck-chart-1)" strokeWidth={2} fill="url(#rev-area-grad)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="ui-empty">
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No revenue in this period</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Paid bookings will chart here once they fall in range.</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Breakdown bar chart + date-range context ── */}
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="ui-card p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Visual breakdown</h3>
+            <span className="ui-mono-label !text-[10px]">{breakdownCaption}</span>
           </div>
           {visualSeries.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
-              No chart data available for this filter.
+            <div className="ui-empty">
+              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No chart data</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing to break down for this filter yet.</p>
             </div>
           ) : (
-            <div className="mt-4 space-y-3">
-              {visualSeries.map((item) => {
-                const max = Math.max(...visualSeries.map((entry) => entry.value), 1);
-                const width = Math.max((item.value / max) * 100, 8);
-                return (
-                  <div key={item.label}>
-                    <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate font-medium text-gray-700">{item.label}</span>
-                      <span className="font-semibold text-gray-900">{activeTab === "financials" ? fmtCurrency(item.value) : item.value}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-gray-100">
-                      <div className="h-2.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={Math.max(170, visualSeries.length * 46)}>
+              <BarChart data={visualSeries} layout="vertical" margin={{ top: 0, right: 88, left: 0, bottom: 0 }} barCategoryGap={14}>
+                <CartesianGrid stroke="var(--ck-chart-grid)" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  width={112}
+                  tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: any) => (String(v).length > 17 ? String(v).slice(0, 16) + "…" : String(v))}
+                />
+                <Tooltip cursor={{ fill: "var(--ck-surface-sunken)" }} content={<ChartTooltip valueFormat={activeTab === "financials" ? fmtCurrency : undefined} />} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26}>
+                  {visualSeries.map((_, i) => <Cell key={i} fill={`var(--ck-chart-${(i % 6) + 1})`} />)}
+                  <LabelList
+                    dataKey="value"
+                    position="right"
+                    formatter={(v: any) => (activeTab === "financials" ? fmtCurrency(Number(v)) : `${v}`)}
+                    fill="var(--ck-text-muted)"
+                    fontSize={10.5}
+                    fontFamily="var(--font-mono)"
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-800">Date range context</h3>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">From</p>
-              <p className="mt-2 font-semibold text-gray-900">{startDate || "Not set"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">To</p>
-              <p className="mt-2 font-semibold text-gray-900">{endDate || "Not set"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtered by</p>
-              <p className="mt-2 font-semibold text-gray-900">{filterBy === "slot" ? "Tour date" : "Booking date"}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status scope</p>
-              <p className="mt-2 font-semibold text-gray-900">{filterStatus}</p>
-            </div>
+        <div className="ui-card p-5">
+          <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Date range context</h3>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[
+              { label: "From", value: startDate || "Not set" },
+              { label: "To", value: endDate || "Not set" },
+              { label: "Filtered by", value: filterBy === "slot" ? "Tour date" : "Booking date" },
+              { label: "Status scope", value: filterStatus },
+            ].map(cell => (
+              <div key={cell.label} className="rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)" }}>
+                <p className="ui-mono-label !text-[9.5px]">{cell.label}</p>
+                <p className="mt-2 text-[14px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{cell.value}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       {loading ? (
-        <div className="flex h-48 items-center justify-center rounded-xl border border-gray-200 bg-white">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+        <div className="ui-card space-y-2.5 p-4">
+          <div className="ui-skeleton h-9 w-full" />
+          {Array.from({ length: 7 }).map((_, i) => <div key={i} className="ui-skeleton h-11 w-full" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          No records found for this period.
+        <div className="ui-card">
+          <div className="ui-empty">
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No records found</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing matches this period and filter.</p>
+          </div>
         </div>
       ) : activeTab === "financials" ? (
         <>
         <div className="space-y-3 md:hidden">
           {filtered.map(b => {
-            const sub = Number(b.original_total || b.total_amount || 0);
-            const tot = Number(b.total_amount || 0);
-            const disc = sub - tot;
+            const received = amountReceived(b);
+            const refunded = amountRefunded(b);
+            const method = derivePaymentMethod(b);
             return (
-              <div key={b.id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                    <p className="text-xs text-gray-500">{fmtDateTime(b.created_at, activeTimezone)}</p>
-                    <p className="mt-1 font-mono text-[11px] text-gray-400">{b.id.substring(0, 8).toUpperCase()}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtDateTime(b.created_at, activeTimezone)}</p>
+                    <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}{method ? ` · ${method}` : ""}</p>
                   </div>
-                  <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                    {b.status}
-                  </span>
+                  <span className={statusPill(b.status)}>{b.status}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Subtotal</p>
-                    <p className="font-semibold">{fmtCurrency(sub)}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Received</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(received)}</p>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Net Paid</p>
-                    <p className="font-semibold text-emerald-700">{fmtCurrency(tot)}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Net</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-amber-600">{disc > 0 ? `Discount ${fmtCurrency(disc)}` : "No discount"}</p>
+                {refunded > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-danger)" }}>Refunded {fmtCurrency(refunded)}</p>}
               </div>
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="p-3">Transaction Date</th>
-                <th className="p-3">Booking Ref</th>
-                <th className="p-3">Gateway Ref</th>
-                <th className="p-3">Customer</th>
-                <th className="p-3 text-right">Subtotal</th>
-                <th className="p-3 text-right text-amber-600">Discounts</th>
-                <th className="p-3 text-right text-emerald-700">Net Paid</th>
-                <th className="p-3 text-center">Status</th>
+              <tr>
+                <Th>Transaction Date</Th>
+                <Th>Booking Ref</Th>
+                <Th>Customer</Th>
+                <Th>Method</Th>
+                <Th className="text-right">Total Due</Th>
+                <Th className="text-right">Received</Th>
+                <Th className="text-right">Refunded</Th>
+                <Th className="text-right">Net</Th>
+                <Th className="text-center">Status</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(b => {
-                const sub = Number(b.original_total || b.total_amount || 0);
-                const tot = Number(b.total_amount || 0);
-                const disc = sub - tot;
+                const due = Number(b.total_amount || 0);
+                const received = amountReceived(b);
+                const refunded = amountRefunded(b);
+                const method = derivePaymentMethod(b);
                 return (
-                  <tr key={b.id} className="hover:bg-gray-50/60">
-                    <td className="p-3 font-medium text-gray-700 whitespace-nowrap">{fmtDateTime(b.created_at, activeTimezone)}</td>
-                    <td className="p-3 font-mono text-xs text-gray-500">{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="p-3 font-mono text-xs text-gray-400">{b.yoco_payment_id || "—"}</td>
-                    <td className="p-3 min-w-[150px]">{b.customer_name || "—"}</td>
-                    <td className="p-3 text-right text-gray-500">{fmtCurrency(sub)}</td>
-                    <td className="p-3 text-right text-amber-600">{disc > 0 ? "-" + fmtCurrency(disc) : "—"}</td>
-                    <td className="p-3 text-right font-bold text-emerald-700">{fmtCurrency(tot)}</td>
-                    <td className="p-3 text-center">
-                      <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                        {b.status}
-                      </span>
-                    </td>
+                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                    <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text)" }}>{fmtDateTime(b.created_at, activeTimezone)}</td>
+                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }} title={b.yoco_payment_id || b.payfast_m_payment_id || ""}>{b.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="min-w-[150px] p-3" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                    <td className="p-3 text-xs" style={{ color: method === "Unrecorded" ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{method || "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(due)}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: received > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{received > 0 ? fmtCurrency(received) : "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : "—"}</td>
+                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</td>
+                    <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td colSpan={6} className="p-3 text-right text-gray-500">Total Net Revenue</td>
-                <td className="p-3 text-right text-emerald-700 font-bold">{fmtCurrency(summary.revenue)}</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td colSpan={4} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(fin.grossBooked)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(fin.received)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{fin.refunded > 0 ? "-" + fmtCurrency(fin.refunded) : "—"}</td>
+                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(fin.net)}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -771,82 +1241,77 @@ export default function Reports() {
           return (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Total Pax</p>
-                  <p className="text-xl font-bold text-gray-800">{totalPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Checked In</p>
-                  <p className="text-xl font-bold text-emerald-700">{checkedInPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">No Show</p>
-                  <p className="text-xl font-bold text-red-600">{noShowPax}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-                  <p className="text-xs text-gray-500">Attendance Rate</p>
-                  <p className="text-xl font-bold text-gray-800">{totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%</p>
-                </div>
+                {[
+                  { label: "Total Pax", value: totalPax, color: "var(--ck-text-strong)" },
+                  { label: "Checked In", value: checkedInPax, color: "var(--ck-success)" },
+                  { label: "No Show", value: noShowPax, color: "var(--ck-danger)" },
+                  { label: "Attendance Rate", value: `${totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%`, color: "var(--ck-text-strong)" },
+                ].map(c => (
+                  <div key={c.label} className="ui-card p-4">
+                    <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                    <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
+                  </div>
+                ))}
               </div>
               <div className="space-y-3 md:hidden">
                 {activeBookings.map(b => (
-                  <div key={b.id} className={`rounded-xl border border-gray-200 bg-white p-4 ${b.checked_in ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
+                  <div key={b.id} className="ui-card p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : undefined}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                        <p className="text-xs text-gray-500">{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
-                        <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
+                        <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.checked_in ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
                         {b.checked_in ? "Present" : "No Show"}
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
-                      <span className="text-gray-500">Pax</span>
-                      <span className="font-semibold">{b.qty}</span>
+                    <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
+                      <span style={{ color: "var(--ck-text-muted)" }}>Pax</span>
+                      <span className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                      <th className="p-3">Tour Date</th>
-                      <th className="p-3">Time</th>
-                      <th className="p-3">Tour</th>
-                      <th className="p-3">Customer</th>
-                      <th className="hidden p-3 md:table-cell">Phone</th>
-                      <th className="p-3 text-right">Pax</th>
-                      <th className="p-3 text-center">Checked In</th>
-                      <th className="hidden p-3 lg:table-cell">Check-in Time</th>
+                    <tr>
+                      <Th>Tour Date</Th>
+                      <Th>Time</Th>
+                      <Th>Tour</Th>
+                      <Th>Customer</Th>
+                      <Th className="hidden md:table-cell">Phone</Th>
+                      <Th className="text-right">Pax</Th>
+                      <Th className="text-center">Checked In</Th>
+                      <Th className="hidden lg:table-cell">Check-in Time</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {activeBookings.map(b => (
-                      <tr key={b.id} className={`hover:bg-gray-50/60 ${b.checked_in ? "bg-emerald-50/40" : ""}`}>
-                        <td className="p-3 whitespace-nowrap font-medium">{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 whitespace-nowrap">{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 text-gray-600">{b.tours?.name || "—"}</td>
-                        <td className="p-3 font-medium">{b.customer_name || "—"}</td>
-                        <td className="hidden p-3 md:table-cell text-xs text-gray-500">{b.phone || "—"}</td>
-                        <td className="p-3 text-right font-semibold">{b.qty}</td>
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.checked_in ? { background: "var(--ck-success-soft)" } : undefined}>
+                        <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="whitespace-nowrap p-3 tabular-nums" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                        <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                        <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</td>
+                        <td className="p-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.checked_in ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
                             {b.checked_in ? "Present" : "No Show"}
                           </span>
                         </td>
-                        <td className="hidden p-3 lg:table-cell text-xs text-gray-400 whitespace-nowrap">
+                        <td className="hidden whitespace-nowrap p-3 text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                           {b.checked_in_at ? fmtDateTime(b.checked_in_at, activeTimezone) : "—"}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                      <td colSpan={5} className="p-3 text-gray-500 text-xs">Totals ({activeBookings.length} bookings)</td>
-                      <td className="p-3 text-right">{totalPax}</td>
-                      <td className="p-3 text-center text-emerald-700">{checkedInPax} present</td>
+                    <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({activeBookings.length} bookings)</td>
+                      <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{totalPax}</td>
+                      <td className="p-3 text-center" style={{ color: "var(--ck-success)" }}>{checkedInPax} present</td>
                       <td className="hidden p-3 lg:table-cell"></td>
                     </tr>
                   </tfoot>
@@ -868,36 +1333,36 @@ export default function Reports() {
             }
             return acc;
           }, {})).map((d: any) => (
-            <div key={d.source} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={d.source} className="ui-card p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-gray-800">{d.source}</p>
-                <p className="text-sm font-semibold text-emerald-700">{fmtCurrency(d.revenue)}</p>
+                <p className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>{d.source}</p>
+                <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(d.revenue)}</p>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-lg bg-gray-50 p-2">
-                  <p className="text-[11px] text-gray-500">Bookings</p>
-                  <p className="font-semibold">{d.count}</p>
+                <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <p className="ui-mono-label !text-[9.5px]">Bookings</p>
+                  <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{d.count}</p>
                 </div>
-                <div className="rounded-lg bg-gray-50 p-2">
-                  <p className="text-[11px] text-gray-500">Pax</p>
-                  <p className="font-semibold">{d.pax}</p>
+                <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <p className="ui-mono-label !text-[9.5px]">Pax</p>
+                  <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{d.pax}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="p-3">Source Name</th>
-                <th className="p-3 text-right">Bookings</th>
-                <th className="p-3 text-right">Total Pax</th>
-                <th className="p-3 text-right">Revenue</th>
-                <th className="p-3 text-right">Avg Order Value</th>
+              <tr>
+                <Th>Source Name</Th>
+                <Th className="text-right">Bookings</Th>
+                <Th className="text-right">Total Pax</Th>
+                <Th className="text-right">Revenue</Th>
+                <Th className="text-right">Avg Order Value</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {Object.values(filtered.reduce((acc: any, b: any) => {
                 const src = b.source || "UNKNOWN";
                 if (!acc[src]) acc[src] = { source: src, count: 0, pax: 0, revenue: 0 };
@@ -908,22 +1373,22 @@ export default function Reports() {
                 }
                 return acc;
               }, {})).map((d: any) => (
-                <tr key={d.source} className="hover:bg-gray-50/60">
-                  <td className="p-3 font-medium text-gray-700">{d.source}</td>
-                  <td className="p-3 text-right">{d.count}</td>
-                  <td className="p-3 text-right">{d.pax} pax</td>
-                  <td className="p-3 text-right font-bold text-emerald-700">{fmtCurrency(d.revenue)}</td>
-                  <td className="p-3 text-right text-gray-500">{fmtCurrency(d.count > 0 ? d.revenue / d.count : 0)}</td>
+                <tr key={d.source} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                  <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{d.source}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{d.count}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{d.pax} pax</td>
+                  <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(d.revenue)}</td>
+                  <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(d.count > 0 ? d.revenue / d.count : 0)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td className="p-3 text-gray-500">Totals</td>
-                <td className="p-3 text-right">{summary.total}</td>
-                <td className="p-3 text-right">{summary.pax} pax</td>
-                <td className="p-3 text-right text-emerald-700 font-bold">{fmtCurrency(summary.revenue)}</td>
-                <td className="p-3 text-right text-gray-500">{fmtCurrency(summary.total > 0 ? summary.revenue / summary.total : 0)}</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td className="p-3" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.total}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.pax} pax</td>
+                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(summary.total > 0 ? summary.revenue / summary.total : 0)}</td>
               </tr>
             </tfoot>
           </table>
@@ -939,64 +1404,62 @@ export default function Reports() {
               {/* Mobile cards */}
               <div className="space-y-3 md:hidden">
                 {active.map(b => (
-                  <div key={b.id} className={`rounded-xl border bg-white p-4 ${b.waiver_status === "SIGNED" ? "border-emerald-200 bg-emerald-50/30" : "border-amber-200 bg-amber-50/20"}`}>
+                  <div key={b.id} className="ui-card p-4" style={b.waiver_status === "SIGNED" ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                        <p className="text-xs text-gray-500">{b.tours?.name || "—"} · {b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</p>
-                        <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</p>
+                        <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`inline-block shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      <span className={`ui-status shrink-0 ${b.waiver_status === "SIGNED" ? "ui-pill-success" : "ui-pill-warning"}`}>
                         {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
                       </span>
                     </div>
                     {b.waiver_status === "SIGNED" && (
-                      <p className="mt-2 text-xs text-emerald-600">Signed by {b.waiver_signed_name || "guest"} · {b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</p>
+                      <p className="mt-2 text-xs" style={{ color: "var(--ck-success)" }}>Signed by {b.waiver_signed_name || "guest"} · {b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</p>
                     )}
                   </div>
                 ))}
               </div>
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+              <div className="ui-card hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                      <th className="p-3">Ref</th>
-                      <th className="p-3">Tour Date</th>
-                      <th className="p-3">Customer</th>
-                      <th className="p-3">Tour</th>
-                      <th className="p-3 text-center">Pax</th>
-                      <th className="p-3 text-center">Waiver</th>
-                      <th className="p-3">Signed By</th>
-                      <th className="p-3">Signed At</th>
-                      <th className="p-3 text-center">Booking</th>
+                    <tr>
+                      <Th>Ref</Th>
+                      <Th>Tour Date</Th>
+                      <Th>Customer</Th>
+                      <Th>Tour</Th>
+                      <Th className="text-center">Pax</Th>
+                      <Th className="text-center">Waiver</Th>
+                      <Th>Signed By</Th>
+                      <Th>Signed At</Th>
+                      <Th className="text-center">Booking</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {active.map(b => (
-                      <tr key={b.id} className={`hover:bg-gray-50/60 ${b.waiver_status === "SIGNED" ? "" : "bg-amber-50/20"}`}>
-                        <td className="p-3 font-mono text-xs text-gray-400">{b.id.substring(0, 8).toUpperCase()}</td>
-                        <td className="p-3 text-gray-700 whitespace-nowrap">{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
-                        <td className="p-3 font-medium text-gray-800">{b.customer_name || "—"}</td>
-                        <td className="p-3 text-gray-600">{b.tours?.name || "—"}</td>
-                        <td className="p-3 text-center text-gray-700">{b.qty}</td>
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.waiver_status === "SIGNED" ? undefined : { background: "var(--ck-amber-soft)" }}>
+                        <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="whitespace-nowrap p-3" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
+                        <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                        <td className="p-3 text-center tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${b.waiver_status === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                          <span className={`ui-status ${b.waiver_status === "SIGNED" ? "ui-pill-success" : "ui-pill-warning"}`}>
                             {b.waiver_status === "SIGNED" ? "✓ Signed" : "Pending"}
                           </span>
                         </td>
-                        <td className="p-3 text-gray-600">{b.waiver_signed_name || "—"}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap text-xs">{b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</td>
-                        <td className="p-3 text-center">
-                          <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>{b.status}</span>
-                        </td>
+                        <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.waiver_signed_name || "—"}</td>
+                        <td className="whitespace-nowrap p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.waiver_signed_at ? fmtDateTime(b.waiver_signed_at, activeTimezone) : "—"}</td>
+                        <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm font-semibold">
-                      <td colSpan={5} className="p-3 text-right text-gray-500">{signed.length} signed / {pending.length} pending</td>
-                      <td colSpan={4} className="p-3 text-center text-emerald-700">
+                    <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                      <td colSpan={5} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>{signed.length} signed / {pending.length} pending</td>
+                      <td colSpan={4} className="p-3 text-center" style={{ color: "var(--ck-success)" }}>
                         {active.length > 0 ? Math.round((signed.length / active.length) * 100) : 0}% compliance
                       </td>
                     </tr>
@@ -1012,30 +1475,28 @@ export default function Reports() {
           {filtered.map(b => {
             const hasDiscount = b.discount_type && b.discount_type !== "none";
             return (
-              <div key={b.id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={b.id} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{b.customer_name || "—"}</p>
-                    <p className="text-xs text-gray-500">{b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} · ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
-                    <p className="mt-1 text-xs text-gray-400">{b.tours?.name || "—"}</p>
-                    <p className="mt-1 text-xs text-gray-400">{b.phone || "No phone"}{b.email ? ` · ${b.email}` : ""}</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} · ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"}</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}{b.email ? ` · ${b.email}` : ""}</p>
                   </div>
-                  <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                    {b.status}
-                  </span>
+                  <span className={statusPill(b.status)}>{b.status}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Qty</p>
-                    <p className="font-semibold">{b.qty}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Qty</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</p>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-2">
-                    <p className="text-[11px] text-gray-500">Total</p>
-                    <p className="font-semibold text-emerald-700">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                    <p className="ui-mono-label !text-[9.5px]">Total</p>
+                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                   </div>
                 </div>
                 {hasDiscount && (
-                  <p className="mt-2 text-xs text-amber-600">
+                  <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>
                     {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
                       b.discount_type === "FIXED" ? "Fixed discount" :
                         b.discount_type === "MANUAL" ? "Manual price" : b.discount_type}
@@ -1045,76 +1506,66 @@ export default function Reports() {
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+        <div className="ui-card hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600">
-                <th className="hidden p-3 md:table-cell">Ref</th>
-                <th className="p-3 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("slot_time")}>
-                  Tour Date {sortIcon("slot_time")}
-                </th>
-                <th className="p-3">Customer</th>
-                <th className="hidden p-3 md:table-cell">Contact</th>
-                <th className="hidden p-3 lg:table-cell">Tour</th>
-                <th className="p-3 text-right">Qty</th>
-                <th className="p-3 cursor-pointer text-right hover:text-blue-600" onClick={() => toggleSort("total_amount")}>
-                  Total {sortIcon("total_amount")}
-                </th>
-                <th className="hidden p-3 lg:table-cell">Discount</th>
-                <th className="p-3">Status</th>
-                <th className="hidden p-3 xl:table-cell cursor-pointer hover:text-blue-600" onClick={() => toggleSort("created_at")}>
-                  Booked {sortIcon("created_at")}
-                </th>
+              <tr>
+                <Th className="hidden md:table-cell">Ref</Th>
+                <Th onClick={() => toggleSort("slot_time")}>Tour Date {sortIcon("slot_time")}</Th>
+                <Th>Customer</Th>
+                <Th className="hidden md:table-cell">Contact</Th>
+                <Th className="hidden lg:table-cell">Tour</Th>
+                <Th className="text-right">Qty</Th>
+                <Th className="text-right" onClick={() => toggleSort("total_amount")}>Total {sortIcon("total_amount")}</Th>
+                <Th className="hidden lg:table-cell">Discount</Th>
+                <Th>Status</Th>
+                <Th className="hidden xl:table-cell" onClick={() => toggleSort("created_at")}>Booked {sortIcon("created_at")}</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(b => {
                 const hasDiscount = b.discount_type && b.discount_type !== "none";
                 return (
-                  <tr key={b.id} className="hover:bg-gray-50/60">
-                    <td className="hidden p-3 font-mono text-xs text-gray-500 md:table-cell">{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="p-3 whitespace-nowrap">
+                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                    <td className="hidden p-3 font-mono text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
+                    <td className="whitespace-nowrap p-3">
                       {b.slots?.start_time ? (
                         <span>
-                          <span className="font-medium">{fmtDate(b.slots.start_time, activeTimezone)}</span>
-                          <span className="ml-1 text-gray-400 text-xs">{fmtTime(b.slots.start_time, activeTimezone)}</span>
+                          <span className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{fmtDate(b.slots.start_time, activeTimezone)}</span>
+                          <span className="ml-1 text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(b.slots.start_time, activeTimezone)}</span>
                         </span>
-                      ) : <span className="text-gray-400">—</span>}
+                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
                     </td>
                     <td className="p-3">
-                      <p className="font-medium">{b.customer_name || "—"}</p>
+                      <p className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
                     </td>
                     <td className="hidden p-3 md:table-cell">
-                      <p className="text-xs text-gray-500">{b.phone || "—"}</p>
-                      <p className="text-xs text-gray-400">{b.email || "—"}</p>
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</p>
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.email || "—"}</p>
                     </td>
-                    <td className="hidden p-3 lg:table-cell text-gray-600">{b.tours?.name || "—"}</td>
-                    <td className="p-3 text-right">{b.qty}</td>
+                    <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
                     <td className="p-3 text-right">
                       {hasDiscount && b.original_total ? (
                         <div>
-                          <p className="line-through text-xs text-gray-400">{fmtCurrency(Number(b.original_total))}</p>
-                          <p className="font-semibold text-emerald-700">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                          <p className="text-xs line-through tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(Number(b.original_total))}</p>
+                          <p className="font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                         </div>
                       ) : (
-                        <p className="font-semibold">{fmtCurrency(Number(b.total_amount || 0))}</p>
+                        <p className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
                       )}
                     </td>
-                    <td className="hidden p-3 lg:table-cell text-xs text-gray-500">
+                    <td className="hidden p-3 text-xs lg:table-cell">
                       {hasDiscount ? (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 font-medium">
+                        <span className="ui-status ui-pill-amber">
                           {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
                             b.discount_type === "FIXED" ? "Fixed" :
                               b.discount_type === "MANUAL" ? "Manual" : b.discount_type}
                         </span>
-                      ) : <span className="text-gray-300">—</span>}
+                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
                     </td>
-                    <td className="p-3">
-                      <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-600"}`}>
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="hidden p-3 xl:table-cell text-xs text-gray-400 whitespace-nowrap">
+                    <td className="p-3"><span className={statusPill(b.status)}>{b.status}</span></td>
+                    <td className="hidden whitespace-nowrap p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                       {fmtDateTime(b.created_at, activeTimezone)}
                     </td>
                   </tr>
@@ -1122,14 +1573,14 @@ export default function Reports() {
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
-                <td className="hidden md:table-cell p-3"></td>
-                <td className="p-3 text-gray-500 text-xs">Totals ({filtered.length})</td>
+              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td className="hidden p-3 md:table-cell"></td>
+                <td className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({filtered.length})</td>
                 <td className="p-3"></td>
                 <td className="hidden p-3 md:table-cell"></td>
                 <td className="hidden p-3 lg:table-cell"></td>
-                <td className="p-3 text-right">{summary.pax}</td>
-                <td className="p-3 text-right text-emerald-700">{fmtCurrency(summary.revenue)}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.pax}</td>
+                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
                 <td className="hidden p-3 lg:table-cell"></td>
                 <td className="p-3"></td>
                 <td className="hidden p-3 xl:table-cell"></td>

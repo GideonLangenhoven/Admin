@@ -13,10 +13,7 @@ CREATE TABLE IF NOT EXISTS public.business_partnerships (
   CONSTRAINT business_a_before_b CHECK (business_a_id < business_b_id),
   CONSTRAINT unique_partnership UNIQUE (business_a_id, business_b_id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_partnerships_business_a ON public.business_partnerships (business_a_id);
 CREATE INDEX IF NOT EXISTS idx_partnerships_business_b ON public.business_partnerships (business_b_id);
-
 ALTER TABLE public.business_partnerships ENABLE ROW LEVEL SECURITY;
-
 GRANT ALL ON public.business_partnerships TO service_role;

@@ -11,17 +11,13 @@ create table if not exists public.invite_tokens (
   used_by_email text,
   used_by_business_id uuid references public.businesses(id)
 );
-
 -- Index for fast token lookups during onboarding validation
 create index if not exists idx_invite_tokens_token on public.invite_tokens(token);
-
 -- Index for listing active/unused tokens in the admin UI
 create index if not exists idx_invite_tokens_unused
   on public.invite_tokens(created_at desc)
   where used_at is null;
-
 -- RLS
 alter table public.invite_tokens enable row level security;
-
 -- Only service role can access invite tokens (Edge Functions use service role key)
--- No public RLS policies needed since all access goes through Edge Functions.
+-- No public RLS policies needed since all access goes through Edge Functions.;

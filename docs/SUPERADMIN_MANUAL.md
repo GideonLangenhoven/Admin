@@ -39,6 +39,11 @@ You must sign in with a Super Admin account. Some Super Admin actions (like onbo
 
 | Role | Scope | Can do | Cannot do |
 |---|---|---|---|
+
+
+
+
+
 | **Operator** | One business | Bookings, inbox, manifest/check-in, refunds, marketing, photos, weather | Settings, billing, team management, platform admin |
 | **Main Admin** | One business | Everything for their business: settings, billing, team, integrations, reports | Reach any Super Admin route or other tenants' data |
 | **Super Admin** | Whole platform | Create/manage all tenants, set subscriptions, seats, landing pages, email billing, OTA drift; exempt from subscription suspension | — |

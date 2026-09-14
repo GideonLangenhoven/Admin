@@ -6,49 +6,35 @@
 -- Advisor-driven hot foreign-key indexes.
 create index concurrently if not exists idx_bookings_slot_id
   on public.bookings(slot_id);
-
 create index concurrently if not exists idx_bookings_tour_id
   on public.bookings(tour_id);
-
 create index concurrently if not exists idx_bookings_invoice_id
   on public.bookings(invoice_id);
-
 create index concurrently if not exists idx_holds_booking_id
   on public.holds(booking_id);
-
 create index concurrently if not exists idx_holds_slot_id
   on public.holds(slot_id);
-
 create index concurrently if not exists idx_invoices_booking_id
   on public.invoices(booking_id);
-
 create index concurrently if not exists idx_invoices_business_id
   on public.invoices(business_id);
-
 create index concurrently if not exists idx_chat_messages_business_id
   on public.chat_messages(business_id);
-
 alter table public.marketing_queue
   add column if not exists processing_started_at timestamptz,
   add column if not exists updated_at timestamptz not null default now();
-
 alter table public.marketing_queue
   drop constraint if exists marketing_queue_status_check;
-
 alter table public.marketing_queue
   add constraint marketing_queue_status_check
   check (status in ('pending', 'processing', 'sent', 'failed'));
-
 create index concurrently if not exists idx_marketing_queue_status_retry_created
   on public.marketing_queue(status, next_retry_at, created_at)
   where status = 'pending';
-
 create index concurrently if not exists idx_marketing_queue_campaign_id
   on public.marketing_queue(campaign_id);
-
 create index concurrently if not exists idx_marketing_queue_contact_id
   on public.marketing_queue(contact_id);
-
 -- SECURITY DEFINER views bypass caller RLS unless made invoker-safe.
 do $$
 begin
@@ -56,7 +42,6 @@ begin
     execute 'alter view public.tour_review_stats set (security_invoker = true)';
   end if;
 end $$;
-
 -- Guard against search_path hijacking in public functions. This does not change
 -- function privileges; exposed SECURITY DEFINER RPCs still need a dedicated
 -- compatibility refactor where browser-callable RPCs are split from privileged RPCs.
@@ -73,7 +58,6 @@ begin
     execute format('alter function %s set search_path = public, pg_temp', fn.regproc);
   end loop;
 end $$;
-
 -- Atomic capacity adjustment used by Edge Functions that bypass RLS with the
 -- service role. This removes read-then-write races around slots.booked/held.
 create or replace function public.adjust_slot_capacity(
@@ -105,10 +89,8 @@ begin
   return updated_slot;
 end;
 $$;
-
 revoke all on function public.adjust_slot_capacity(uuid, uuid, integer, integer) from public, anon, authenticated;
 grant execute on function public.adjust_slot_capacity(uuid, uuid, integer, integer) to service_role;
-
 -- Atomic marketing queue claim. Concurrent dispatch invocations claim distinct
 -- rows using row locks rather than select-then-update races.
 create or replace function public.claim_marketing_queue(
@@ -142,6 +124,5 @@ begin
   returning q.*;
 end;
 $$;
-
 revoke all on function public.claim_marketing_queue(integer, integer) from public, anon, authenticated;
 grant execute on function public.claim_marketing_queue(integer, integer) to service_role;

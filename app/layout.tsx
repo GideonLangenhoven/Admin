@@ -1,37 +1,55 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import AppShell from "../components/AppShell";
 import AppNotifications from "../components/AppNotifications";
 import ThemeProvider from "../components/ThemeProvider";
 
-const inter = Inter({ subsets: ["latin"] });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display" });
+/* Brand type system (docs/BRAND.md + docs/ADMIN_REDESIGN_SPEC.md):
+   Satoshi — geometric display face for page titles and hero numerals.
+   Plus Jakarta Sans — all UI and data. Geist Mono — the instrument voice (labels, timestamps).
+
+   The pairing works on measured metrics, not vibes: Satoshi cap-height 0.740em vs
+   Plus Jakarta Sans 0.745em (0.7% apart), so titles, hero numerals and body text sit on
+   the same optical line with no size-adjust needed. Satoshi's x-height is 7% smaller,
+   which is why it stays on display duty only — Plus Jakarta Sans's taller lowercase is
+   what keeps the 11-13px table text legible.
+
+   Satoshi is self-hosted: it is a Fontshare (Indian Type Foundry) face, not on Google
+   Fonts, and CSP is `font-src 'self' data:`. next/font serves it same-origin, so no CSP
+   change. Licence: app/fonts/Satoshi-LICENSE.txt (free for commercial use). */
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
+// ponytail: one variable woff2 (42KB) covers 300-900. Italic axis skipped — no italic titles today.
+const satoshi = localFont({
+  src: "./fonts/Satoshi-Variable.woff2",
+  weight: "300 900",
+  display: "swap",
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "BookingTours Admin",
-  description: "BookingTours Admin Dashboard — Built for adventure operators",
+  description: "BookingTours Admin Dashboard: built for adventure operators",
 };
 
 const nav = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
-  { href: "/bookings/pending-reschedules", label: "Pending Reschedules", icon: "Clock" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
-  { href: "/guide", label: "Guide", icon: "Users" },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },
-  { href: "/notifications", label: "Notifications", icon: "Warning", privilegedOnly: true },
   { href: "/vouchers", label: "Vouchers", icon: "Ticket" },
   { href: "/invoices", label: "Invoices", icon: "Receipt" },
-  { href: "/weather", label: "Weather", icon: "CloudSun" },
-  { href: "/photos", label: "Photos", icon: "Camera" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
+  { href: "/ai-usage", label: "AI Usage", icon: "LineChart", privilegedOnly: true },
+  { href: "/partnerships", label: "Partners", icon: "Users", privilegedOnly: true },
   { href: "/reviews", label: "Reviews", icon: "Star" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },
@@ -48,7 +66,7 @@ const nav = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`light ${inter.className} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`light ${jakarta.className} ${jakarta.variable} ${geistMono.variable} ${satoshi.variable}`} suppressHydrationWarning>
       <body className="bg-[var(--ck-bg)] text-[var(--ck-text)] antialiased transition-colors duration-200">
         <ThemeProvider>
           <AppNotifications />
