@@ -125,12 +125,14 @@ it.each([
   ["MAIN_ADMIN", "other", 403],
   ["OPS", "operator", 403],
   ["SUPER_IMPOSTOR", "operator", 403],
-])("restricts HMAC administration to authorised roles (%s, %s)", async (role, businessId, status) => {
+  ["MAIN_ADMIN", "operator", 403, true],
+  ["SUPER_ADMIN", "other", 403, true],
+])("restricts HMAC administration to active authorised roles (%s, %s)", async (role, businessId, status, suspended = false) => {
   const rpc = vi.fn(async () => ({ error: null }));
   const db = {
     auth: { getUser: async () => ({ data: { user: { id: "user" } } }) }, rpc,
     from: (table: string) => {
-      const data = table === "admin_users" ? [{ business_id: businessId, role }] : { business_id: "operator" };
+      const data = table === "admin_users" ? [{ business_id: businessId, role, suspended }] : { business_id: "operator" };
       const query: any = { select: () => query, eq: () => query, maybeSingle: async () => ({ data }),
         then: (resolve: any) => Promise.resolve({ data }).then(resolve) };
       return query;

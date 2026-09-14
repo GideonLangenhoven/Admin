@@ -569,8 +569,9 @@ Deno.serve(async (req: Request) => {
       if (!credentialId) return respond(400, { success: false, code: "MISSING_CREDENTIAL_ID", message: "credential_id required" });
       if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
 
-      const { data: adminRows } = await db.from("admin_users").select("business_id, role").eq("user_id", user.id);
-      if (!adminRows?.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an admin user" });
+      const { data: memberships } = await db.from("admin_users").select("business_id, role, suspended").eq("user_id", user.id);
+      const adminRows = (memberships || []).filter((row: { suspended?: boolean | null }) => !row.suspended);
+      if (!adminRows.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an active admin user" });
 
       const { data: cred } = await db.from("external_booking_credentials").select("business_id").eq("id", credentialId).maybeSingle();
       if (!cred) return respond(404, { success: false, code: "NOT_FOUND", message: "Credential not found" });
