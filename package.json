@@ -6,6 +6,7 @@
     "dev": "node scripts/predev-port-check.mjs; next dev --webpack -H 127.0.0.1",
     "dev:turbo": "next dev -H 127.0.0.1 -p 3000",
     "dev:clean": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true && rm -rf .next && next dev --webpack -H 127.0.0.1 -p 3000",
+    "prebuild": "node scripts/check-service-auth.mjs",
     "build": "next build --webpack",
     "build:turbo": "next build",
     "start": "next start",
