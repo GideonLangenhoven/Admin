@@ -1,7 +1,7 @@
 # Outstanding fixes deployed — 14 September 2026
 
-All outstanding application fixes identified against the 13 September release
-are deployed. The admin and six edge functions changed. The booking app already
+The application fixes listed below are deployed. The admin and six edge
+functions changed. The booking app already
 matched its deployed release; no storefront deployment or schema migration was
 needed. Existing Yoco payment safeguards remain live.
 
@@ -64,8 +64,10 @@ decrypted successfully before deployment. No credential migration was needed.
   cancel requests. The temporary credential and its test events were removed.
   These checks created no bookings, payments, refunds or customer notifications.
 - All four production browser smoke tests passed: tenant tours, chat opening,
-  admin login and password reset. These do not constitute an authenticated
-  visual walkthrough of every settings control.
+  admin login-page rendering and password-reset-page rendering. These did not
+  exercise reset-email submission, password replacement or authenticated login.
+  The subsequent production credential failure and its verification are recorded
+  in [Password reset follow-up](PASSWORD_RESET_RELEASE_2026-09-14.md).
 - At 04:11 UTC, the preceding ten minutes contained 14 scheduled HTTP responses,
   all HTTP 200 without timeouts. The changed functions had no matching runtime
   error logs since verification started at 04:07 UTC. Both OTA jobs were paused.
