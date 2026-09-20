@@ -1,7 +1,7 @@
 {
   "task_id": "DEMO-AUTH-01",
   "backlog_ids": ["SEC-11"],
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED_TASK_SCOPE",
   "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
   "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"e2a7b735b809c37a633f1d44438ef7ba501a9a03"},
   "objective": "Ensure read-only identities can browse only their bound synthetic tenant through shared Next.js/Edge authorization and downstream role-based selectors, even if a role is misconfigured as SUPER_ADMIN, while preserving ordinary SUPER_ADMIN support and deliberate demo browsing.",
@@ -50,5 +50,11 @@
   ],
   "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
   "migration_order": [],
-  "rollback_strategy": "Source rollback only; never restore or rewrite customer data."
+  "rollback_strategy": "Source rollback only; never restore or rewrite customer data.",
+  "result": {
+    "commit": "37f94bc2374fe987226055ecb810253addcf5faf",
+    "patch_sha256": "3a41282e20147206e70c3da3e228cf6840934bba83f2c7724036da61d65a3faa",
+    "independent_review": "APPROVE_TASK",
+    "scope_limit": "Partial SEC-11 only; database/RLS/Storage and deployed evidence remain open."
+  }
 }
