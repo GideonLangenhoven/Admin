@@ -1,0 +1,54 @@
+{
+  "task_id": "DEMO-AUTH-01",
+  "backlog_ids": ["SEC-11"],
+  "status": "IN_PROGRESS",
+  "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"e2a7b735b809c37a633f1d44438ef7ba501a9a03"},
+  "objective": "Ensure read-only identities can browse only their bound synthetic tenant through shared Next.js/Edge authorization and downstream role-based selectors, even if a role is misconfigured as SUPER_ADMIN, while preserving ordinary SUPER_ADMIN support and deliberate demo browsing.",
+  "owned_paths": [
+    "app/lib/api-auth.ts",
+    "supabase/functions/_shared/auth.ts",
+    "tests/unit/demo-account-read-only.test.ts"
+  ],
+  "read_dependencies": [
+    "components/AuthGate.tsx",
+    "supabase/migrations/20260907071000_operator_access_boundaries.sql",
+    "supabase/migrations/20260914190000_demo_account_read_only.sql",
+    "scripts/provision-demo-account.mjs"
+  ],
+  "contract_clauses": ["A2","A4","A5","A6","C1","D2"],
+  "current_evidence": [
+    "getCallerAdmin permits a read-only SUPER_ADMIN GET request to override its bound tenant.",
+    "canAccessBusiness grants any SUPER_ADMIN all tenants without considering auth.readOnly.",
+    "Routes such as OTA GET accept a foreign query selector whenever the shared helper returns SUPER_ADMIN, even without an x-admin-business-id header.",
+    "The actual demo provisioner sets MAIN_ADMIN; this correction protects the invariant against role drift without changing that account."
+  ],
+  "behavior_to_preserve": [
+    "Read-only demo users can browse their own synthetic tenant.",
+    "Read-only users remain denied by mutating Next.js and Edge boundaries.",
+    "Non-read-only SUPER_ADMIN users retain validated cross-tenant support.",
+    "The synthetic date refresh and customer-facing chatbot configuration remain unchanged."
+  ],
+  "forbidden_behavior": [
+    "Read-only cross-tenant access through a role or browser-selected tenant",
+    "Blocking legitimate own-tenant demo browsing",
+    "Removing normal SUPER_ADMIN support",
+    "Changing database migrations before ledger/order validation"
+  ],
+  "failing_before_test": "npm run test:unit -- --run tests/unit/demo-account-read-only.test.ts",
+  "acceptance_tests": [
+    "Read-only SUPER_ADMIN own-tenant GET/browse remains permitted.",
+    "Read-only SUPER_ADMIN foreign header target is denied by getCallerAdmin, and its downstream effective role cannot authorize a foreign query selector.",
+    "The actual getCallerAdmin result composed with OTA GET permits the own tenant and denies a foreign tenant before service-client access.",
+    "Read-only SUPER_ADMIN foreign target is denied by canAccessBusiness.",
+    "Writable SUPER_ADMIN validated foreign target remains permitted.",
+    "Existing demo read-only and synthetic-refresh tests remain green."
+  ],
+  "existing_customer_cases": [
+    "No identity, role, business relationship, record, password, or commercial setting is changed.",
+    "Ordinary platform support retains its existing foreign-tenant access."
+  ],
+  "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
+  "migration_order": [],
+  "rollback_strategy": "Source rollback only; never restore or rewrite customer data."
+}

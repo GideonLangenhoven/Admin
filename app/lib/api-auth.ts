@@ -41,6 +41,10 @@ export async function getCallerAdmin(
   // operators cannot pivot away from the business bound to their identity.
   const target = req.headers.get("x-admin-business-id")?.trim();
   if (target && target !== adminRow.business_id) {
+    // Read-only is an authority ceiling independent of role. A shared demo
+    // identity must stay on its synthetic tenant even if its role is
+    // accidentally promoted or stale client state claims another tenant.
+    if (adminRow.read_only) return null;
     if (adminRow.role !== "SUPER_ADMIN" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)) return null;
     const { data: business, error: businessError } = await admin.from("businesses")
       .select("id").eq("id", target).maybeSingle();
@@ -59,7 +63,14 @@ export async function getCallerAdmin(
     if (!sub.active) return null;
   }
 
-  return { id: adminRow.id, role: adminRow.role, business_id: adminRow.business_id };
+  // Downstream GET handlers commonly use SUPER_ADMIN as their cross-tenant
+  // switch. Keep the stored role intact, but expose only tenant-admin authority
+  // to a read-only identity so a missing target header cannot restore platform
+  // access through a route-specific query or body selector.
+  const effectiveRole = adminRow.read_only && adminRow.role === "SUPER_ADMIN"
+    ? "MAIN_ADMIN"
+    : adminRow.role;
+  return { id: adminRow.id, role: effectiveRole, business_id: adminRow.business_id };
 }
 
 // Which subscription states keep privileged API access. PAST_DUE is deliberately

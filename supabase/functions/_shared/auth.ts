@@ -55,12 +55,18 @@ export async function requireAuth(req: Request, options: { allowReadOnly?: boole
   return {
     userId: data.user.id,
     businessId: admin.business_id,
-    role: admin.role,
+    // Treat read-only as an authority ceiling for every downstream caller,
+    // including functions that branch directly on SUPER_ADMIN instead of using
+    // canAccessBusiness(). The stored role is not changed.
+    role: admin.read_only && admin.role === "SUPER_ADMIN" ? "MAIN_ADMIN" : admin.role,
     isServiceRole: false,
     readOnly: admin.read_only === true,
   };
 }
 
 export function canAccessBusiness(auth: AuthResult, businessId: string): boolean {
-  return Boolean(businessId) && (auth.isServiceRole || auth.role === "SUPER_ADMIN" || auth.businessId === businessId);
+  if (!businessId) return false;
+  if (auth.isServiceRole) return true;
+  if (auth.readOnly) return auth.businessId === businessId;
+  return auth.role === "SUPER_ADMIN" || auth.businessId === businessId;
 }

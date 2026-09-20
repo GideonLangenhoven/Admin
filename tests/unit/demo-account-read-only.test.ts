@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { sourceExports } from "../helpers/source-handler";
 
@@ -39,6 +39,85 @@ describe("shared demo account boundaries", () => {
     ).toBeNull();
   });
 
+  it("never lets a read-only role override its bound tenant through the shared API helper", async () => {
+    const ownBusiness = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const foreignBusiness = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    let row = {
+      id: "demo",
+      role: "SUPER_ADMIN",
+      business_id: ownBusiness,
+      suspended: false,
+      read_only: true,
+    };
+    const createClient = () => ({
+      auth: { getUser: async () => ({ data: { user: { id: "user" } } }) },
+      from: (table: string) => {
+        const q: any = {
+          select: () => q,
+          eq: () => q,
+          maybeSingle: async () => table === "admin_users"
+            ? { data: { ...row }, error: null }
+            : { data: { id: foreignBusiness }, error: null },
+        };
+        return q;
+      },
+    });
+    const auth = sourceExports("app/lib/api-auth.ts", {
+      "@supabase/supabase-js": { createClient },
+      "./role-utils": {},
+    }).getCallerAdmin as (request: Request) => Promise<Record<string, unknown> | null>;
+    const request = (target?: string) => new Request("https://test.invalid", {
+      method: "GET",
+      headers: {
+        authorization: "Bearer fixture",
+        cookie: "ck_demo_read_only=0",
+        ...(target ? { "x-admin-business-id": target } : {}),
+      },
+    });
+
+    const readOnlyCaller = await auth(request());
+    expect(readOnlyCaller).toMatchObject({ business_id: ownBusiness, role: "MAIN_ADMIN" });
+    await expect(auth(request(foreignBusiness))).resolves.toBeNull();
+
+    row = { ...row, read_only: false };
+    const writableCaller = await auth(request());
+    expect(writableCaller).toMatchObject({ business_id: ownBusiness, role: "SUPER_ADMIN" });
+    await expect(auth(request(foreignBusiness))).resolves.toMatchObject({ business_id: foreignBusiness });
+
+    async function otaGet(caller: Record<string, unknown> | null, businessId: string) {
+      const query: any = {
+        select: () => query,
+        eq: () => query,
+        maybeSingle: async () => ({ data: null, error: null }),
+      };
+      const serviceClient = vi.fn(() => ({ from: () => query }));
+      const route = sourceExports("app/api/ota/route.ts", {
+        "@supabase/supabase-js": { createClient: serviceClient },
+        "../../lib/api-auth": {
+          getCallerAdmin: async () => caller,
+          isPrivilegedRole: (role: string) => role === "MAIN_ADMIN" || role === "SUPER_ADMIN",
+        },
+        "../../../supabase/functions/_shared/ota-readiness": {
+          OTA_DIRECT_CONNECTIONS_AVAILABLE: false,
+          OTA_UNAVAILABLE_MESSAGE: "Not available",
+        },
+      }).GET as (request: Request & { nextUrl: URL }) => Promise<Response>;
+      const url = new URL("https://test.invalid/api/ota?business_id=" + businessId + "&channel=VIATOR");
+      const routeRequest = Object.assign(new Request(url), { nextUrl: url });
+      return { response: await route(routeRequest), serviceClient };
+    }
+
+    const denied = await otaGet(readOnlyCaller, foreignBusiness);
+    expect(denied.response.status).toBe(403);
+    expect(denied.serviceClient).not.toHaveBeenCalled();
+    const own = await otaGet(readOnlyCaller, ownBusiness);
+    expect(own.response.status).toBe(200);
+    expect(own.serviceClient).toHaveBeenCalledOnce();
+    const support = await otaGet(writableCaller, foreignBusiness);
+    expect(support.response.status).toBe(200);
+    expect(support.serviceClient).toHaveBeenCalledOnce();
+  });
+
   it("rejects demo sessions at the shared Edge-function boundary", async () => {
     const q: any = {
       select: () => q,
@@ -46,23 +125,28 @@ describe("shared demo account boundaries", () => {
       maybeSingle: async () => ({
         data: {
           business_id: "business",
-          role: "ADMIN",
+          role: "SUPER_ADMIN",
           suspended: false,
           read_only: true,
         },
       }),
     };
-    const requireAuth = sourceExports("supabase/functions/_shared/auth.ts", {
+    const edgeAuth = sourceExports("supabase/functions/_shared/auth.ts", {
       "https://esm.sh/@supabase/supabase-js@2": {
         createClient: () => ({
           auth: { getUser: async () => ({ data: { user: { id: "user" } } }) },
           from: () => q,
         }),
       },
-    }).requireAuth as (
+    });
+    const requireAuth = edgeAuth.requireAuth as (
       request: Request,
       options?: { allowReadOnly?: boolean },
-    ) => Promise<unknown>;
+    ) => Promise<{ businessId: string; role: string; readOnly: boolean }>;
+    const canAccessBusiness = edgeAuth.canAccessBusiness as (
+      auth: { businessId: string; role: string; isServiceRole: boolean; readOnly: boolean },
+      businessId: string,
+    ) => boolean;
 
     await expect(
       requireAuth(
@@ -71,14 +155,33 @@ describe("shared demo account boundaries", () => {
         }),
       ),
     ).rejects.toThrow("read-only");
-    await expect(
-      requireAuth(
+    const allowedDemo = await requireAuth(
         new Request("https://test.invalid", {
           headers: { authorization: "Bearer fixture" },
         }),
         { allowReadOnly: true },
-      ),
-    ).resolves.toMatchObject({ readOnly: true });
+      );
+    expect(allowedDemo).toMatchObject({ readOnly: true, role: "MAIN_ADMIN" });
+    expect(canAccessBusiness({ ...allowedDemo, role: "SUPER_ADMIN", isServiceRole: false }, "business")).toBe(true);
+    expect(canAccessBusiness({ ...allowedDemo, role: "SUPER_ADMIN", isServiceRole: false }, "foreign")).toBe(false);
+    expect(canAccessBusiness({
+      businessId: "business",
+      role: "SUPER_ADMIN",
+      isServiceRole: false,
+      readOnly: false,
+    }, "foreign")).toBe(true);
+    expect(canAccessBusiness({
+      businessId: "",
+      role: "service_role",
+      isServiceRole: true,
+      readOnly: false,
+    }, "foreign")).toBe(true);
+    expect(canAccessBusiness({
+      businessId: "",
+      role: "service_role",
+      isServiceRole: true,
+      readOnly: false,
+    }, "")).toBe(false);
   });
 
   it("keeps the AI guide available while replacing blanket form disabling", () => {
