@@ -8,10 +8,13 @@
   "owned_paths": [
     "supabase/functions/cron-tasks/index.ts",
     "supabase/functions/send-email/index.ts",
+    "supabase/migrations/20260920085900_durable_payment_reminder_email_intents.sql",
     "tests/unit/voucher-reminder-delivery.test.ts",
     "tests/unit/message-job-boundaries.test.ts",
     "tests/unit/voucher-checkout-email.test.ts",
-    "tests/unit/payment-link-optin.test.ts"
+    "tests/unit/payment-link-optin.test.ts",
+    "tests/fixtures/db-columns.json",
+    "tests/tenant-isolation/rollout.mjs"
   ],
   "read_dependencies": [
     "supabase/functions/auto-messages/index.ts",
@@ -24,6 +27,14 @@
     "A lost response or crash after Resend acceptance leaves the marker null and causes a duplicate retry because send-email supplies no provider idempotency key.",
     "The hold-expiry sibling also ignores the response and logs SENT; it has no durable retry state after the hold is expired."
   ],
+  "review_round_1": {
+    "disposition": "REQUEST_CHANGES",
+    "corrections": [
+      "Persist and reuse the exact provider payload so mutable branding or a transient branding lookup failure cannot change a retry under the same idempotency key.",
+      "Recheck voucher age immediately before each sequential send so a batch cannot cross the 24-hour deletion boundary.",
+      "Require a non-empty string provider ID at both the provider and internal-email acceptance boundaries."
+    ]
+  },
   "behavior_to_preserve": [
     "Only PENDING vouchers between 15 minutes and 24 hours old receive the one-time payment-link reminder.",
     "Tenant branding, recipient, amount, and original payment URL remain unchanged.",
@@ -45,6 +56,9 @@
     "Only a verified service caller can cause send-email to attach the derived voucher reminder Idempotency-Key.",
     "Expired vouchers are deleted without receiving a new reminder.",
     "The internal cron-to-email request has a bounded timeout; an unknown outcome remains retryable under the same provider key.",
+    "A retry after mutable tenant branding or a transient branding-query failure reuses the first persisted provider payload.",
+    "A sequential batch that crosses the deletion boundary skips the now-expiring voucher before provider submission.",
+    "Non-string and blank provider IDs are rejected at the provider and internal-email boundaries.",
     "The existing message boundary, voucher checkout, Edge, TypeScript, and build checks remain green."
   ],
   "existing_customer_cases": [
@@ -53,9 +67,13 @@
   ],
   "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
   "scope_limitations": [
-    "The sibling hold-expiry path now reports provider acceptance or failure and uses a stable provider key, but it still lacks durable rediscovery after the hold has expired. COR-04 remains open for that queue/claim design after migration-ledger verification.",
+    "The additive durable-intent migration is locally exercised only; its target ledger must be verified before deployment.",
+    "The sibling hold-expiry path now reports provider acceptance or failure and uses the durable intent, but it still lacks rediscovery after the hold has expired. COR-04 remains open for that queue/claim design.",
     "Provider behavior is simulated; no genuine email was sent and provider acceptance is not delivery."
   ],
-  "migration_order": [],
-  "rollback_strategy": "Source rollback only. Keep existing reminder markers and customer/payment data; never mass resend."
+  "migration_order": [
+    "Verify the target migration ledger, then apply 20260920085900_durable_payment_reminder_email_intents.sql before deploying either Edge Function.",
+    "The migration sorts before the locked 20260920090000 pricing migration so an untouched target can stop before that unapproved commercial change; an environment where 20260920090000 is already recorded requires explicit ledger reconciliation."
+  ],
+  "rollback_strategy": "Roll back the Edge Function source while leaving the additive intent schema in place until a separately reviewed migration can remove it. Keep existing reminder markers and customer/payment data; never mass resend."
 }

@@ -58,6 +58,39 @@ try {
   [id(11),id(101),id(1),id(12),id(102),id(2),id(13),id(103),id(14),id(104),id(15),id(105)]);
   await db.query("insert into reviews(id,business_id,booking_id,source,status,rating) values ($1,$2,$3,'NATIVE','APPROVED',5)", [id(31),id(2),id(71)]);
 
+  const reminderVoucherId = id(41);
+  const reminderIntentKey = 'voucher-payment-reminder/' + reminderVoucherId;
+  const originalReminderPayload = {from:'BookingTours <noreply@bookingtours.co.za>',to:['buyer@example.invalid'],subject:'Original operator',html:'<p>Original</p>',text:'Original'};
+  const changedReminderPayload = {...originalReminderPayload,subject:'Renamed operator',html:'<p>Renamed</p>',text:'Renamed'};
+  await db.query("insert into vouchers(id,business_id,code,status,buyer_email,payment_url,created_at) values ($1,$2,'REMIND01','PENDING','buyer@example.invalid','https://pay.example.invalid/original',now()-interval '20 minutes')",[reminderVoucherId,id(1)]);
+  await check('E1 payment reminder intent freezes the first provider payload and accepted ID',()=>as('service_role',null,{},async()=>{
+    const claimSql="select claim_payment_reminder_email_intent($1,$2,'VOUCHER',$3,$4::jsonb) result";
+    const first=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,originalReminderPayload])).rows[0].result;
+    assert.equal(first.ok,true);
+    assert.deepEqual(first.provider_payload,originalReminderPayload);
+    const retry=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,changedReminderPayload])).rows[0].result;
+    assert.deepEqual(retry.provider_payload,originalReminderPayload);
+    assert.equal((await db.query('select record_payment_reminder_email_acceptance($1,$2) result',[reminderIntentKey,'email-fixture-1'])).rows[0].result.ok,true);
+    const replay=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,changedReminderPayload])).rows[0].result;
+    assert.equal(replay.provider_message_id,'email-fixture-1');
+    assert.equal((await db.query('select record_payment_reminder_email_acceptance($1,$2) result',[reminderIntentKey,'different-id'])).rows[0].result.error,'provider_message_id_mismatch');
+  }));
+  await check('E1 payment reminder intent derives authority from the source tenant and age',()=>as('service_role',null,{},async()=>{
+    const foreign=(await db.query("select claim_payment_reminder_email_intent($1,$2,'VOUCHER',$3,$4::jsonb) result",[reminderIntentKey,id(2),reminderVoucherId,originalReminderPayload])).rows[0].result;
+    assert.equal(foreign.error,'voucher_not_found');
+    await db.query("update vouchers set created_at=now()-interval '23 hours 59 minutes' where id=$1",[reminderVoucherId]);
+    const expiring=(await db.query("select claim_payment_reminder_email_intent($1,$2,'VOUCHER',$3,$4::jsonb) result",[reminderIntentKey,id(1),reminderVoucherId,originalReminderPayload])).rows[0].result;
+    assert.equal(expiring.error,'voucher_not_eligible');
+  }));
+  for (const role of ['anon','authenticated']) {
+    await check(`E1 ${role} cannot read payment reminder intents`,()=>as(role,role==='authenticated'?101:null,{},async()=>{
+      await assert.rejects(db.query('select * from payment_reminder_email_intents'),{code:'42501'});
+    }));
+    await check(`E1 ${role} cannot invoke payment reminder intents`,()=>as(role,role==='authenticated'?101:null,{},async()=>{
+      await assert.rejects(db.query("select claim_payment_reminder_email_intent($1,$2,'VOUCHER',$3,$4::jsonb)",[reminderIntentKey,id(1),reminderVoucherId,originalReminderPayload]),{code:'42501'});
+    }));
+  }
+
   for (const [user, foreign] of [[101,2],[102,1]]) {
     await check(`R04 authenticated operator ${user} cannot read foreign business with forged headers`, () => as('authenticated', user, {'x-tenant-business-id':id(foreign)}, async () => {
       assert.equal((await db.query('select * from businesses where id=$1', [id(foreign)])).rowCount, 0);

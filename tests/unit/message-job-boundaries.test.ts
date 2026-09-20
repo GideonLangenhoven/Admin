@@ -10,6 +10,7 @@ import * as voucherBalances from "../../supabase/functions/_shared/voucher-balan
 
 const serviceKey = "fixture-service-credential-not-real";
 const secretKey = "sb_secret_fixture-not-a-real-key";
+const reminderBusinessId = "22222222-2222-4222-8222-222222222222";
 const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: serviceKey, SUPABASE_SECRET_KEYS: JSON.stringify({ default: secretKey }), RESEND_API_KEY: "fixture-resend", SEND_EMAIL_HOOK_SECRET: "fixture-hook" };
 const endpoints = ["send-email", "send-whatsapp-text", "auto-messages", "cron-tasks", "marketing-dispatch", "marketing-automation-dispatch"];
 const message = { business_id: "a", to: "fixture-phone", message: "Reminder", type: "MARKETING_TEST", data: { business_id: "a", email: "guest@fixture.invalid", html_content: "<p>Hello</p>" } };
@@ -25,13 +26,14 @@ function fixture() {
       { user_id: "suspended", business_id: "a", role: "SUPER_ADMIN", suspended: true },
       { user_id: "orphan", business_id: null, role: "ADMIN", suspended: false },
     ],
-    businesses: ["a", "b"].map(id => ({ id, name: "Operator " + id, business_name: "Operator " + id, subscription_status: "ACTIVE", booking_site_url: "https://" + id + ".fixture.invalid" })),
+    businesses: ["a", "b", reminderBusinessId].map((id) => ({ id, name: "Operator " + id, business_name: "Operator " + id, subscription_status: "ACTIVE", booking_site_url: "https://" + id + ".fixture.invalid" })),
     bookings: ["a", "b"].map(id => ({ id: "booking-" + id, business_id: id, status: "PAID", customer_name: "Guest " + id, email: "guest-" + id + "@fixture.invalid", phone: "phone-" + id, payment_url: "https://pay.fixture.invalid/" + id, total_amount: 100, qty: 1, tours: { name: "Tour " + id }, slots: { start_time: "2027-01-01T10:00:00Z" } })),
     marketing_campaigns: ["a", "b"].map(id => ({ id: "campaign-" + id, business_id: id, status: "scheduled", scheduled_at: "2020-01-01T00:00:00Z", template_id: "template-" + id, total_recipients: 1, marketing_templates: { business_id: id, html_content: "<html><body>Hello {{first_name}}</body></html>", subject_line: "Hello" } })),
     marketing_contacts: ["a", "b"].map(id => ({ id: "contact-" + id, business_id: id, email: "guest-" + id + "@gmail.com", status: "active", first_name: "Guest " + id })),
     marketing_automations: ["a", "b"].map(id => ({ id: "auto-" + id, business_id: id, status: "active", trigger_type: "manual" })),
     marketing_automation_steps: ["a", "b"].map(id => ({ id: "step-" + id, automation_id: "auto-" + id, position: 0, step_type: "send_email", config: { template_id: "template-" + id } })),
     marketing_templates: ["a", "b"].map(id => ({ id: "template-" + id, business_id: id, html_content: "<html><body>Template " + id + "</body></html>", subject_line: "Hello" })),
+    payment_reminder_email_intents: [],
   };
   const writes: Array<{ table: string; value: any }> = [];
   const queries: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
@@ -42,6 +44,11 @@ function fixture() {
   let claimError = false;
   let internalEmailFailureStatus: number | null = null;
   let providerResponse: { body: Record<string, unknown>; status: number } | null = null;
+  let failNextBusinessQuery = false;
+  let failNextAcceptanceRecord = false;
+  let enforceProviderIdempotency = false;
+  const reminderIntents = new Map<string, { payload: Record<string, unknown>; providerId: string | null }>();
+  const providerIdempotency = new Map<string, { body: string; id: string }>();
   const db = {
     auth: { getUser: async (token: string) => ({ data: { user: token === "anon" ? null : { id: token } }, error: null }) },
     from(table: string) {
@@ -50,6 +57,10 @@ function fixture() {
       const predicates: Array<(row: any) => boolean> = [];
       let value: any, action = "select", single = false, start = 0, end = Infinity;
       const execute = async () => {
+        if (table === "businesses" && failNextBusinessQuery) {
+          failNextBusinessQuery = false;
+          return { data: single ? null : [], error: { message: "fixture branding unavailable" }, count: 0 };
+        }
         let data = (rows[table] || []).filter(row => predicates.every(p => p(row))).slice(start, end);
         if (action === "insert" || action === "upsert") {
           data = (Array.isArray(value) ? value : [value]).map(v => ({ id: "inserted-" + table, ...v }));
@@ -86,6 +97,32 @@ function fixture() {
     },
     rpc: async (name: string, args: any) => {
       rpcCalls.push({ name, args });
+      if (name === "claim_payment_reminder_email_intent") {
+        const existing = reminderIntents.get(args.p_intent_key);
+        const intent = existing || { payload: structuredClone(args.p_provider_payload), providerId: null };
+        reminderIntents.set(args.p_intent_key, intent);
+        if (!existing) rows.payment_reminder_email_intents.push({
+          intent_key: args.p_intent_key,
+          business_id: args.p_business_id,
+          source_type: args.p_source_type,
+          source_id: args.p_source_id,
+          provider_payload: structuredClone(intent.payload),
+          provider_message_id: null,
+        });
+        return { data: { ok: true, provider_payload: structuredClone(intent.payload), provider_message_id: intent.providerId }, error: null };
+      }
+      if (name === "record_payment_reminder_email_acceptance") {
+        if (failNextAcceptanceRecord) {
+          failNextAcceptanceRecord = false;
+          return { data: null, error: { message: "fixture acceptance write unavailable" } };
+        }
+        const intent = reminderIntents.get(args.p_intent_key);
+        if (!intent) return { data: { ok: false, error: "intent_not_found" }, error: null };
+        intent.providerId = args.p_provider_message_id;
+        const stored = rows.payment_reminder_email_intents.find((row) => row.intent_key === args.p_intent_key);
+        if (stored) stored.provider_message_id = args.p_provider_message_id;
+        return { data: { ok: true }, error: null };
+      }
       const table = name === "claim_marketing_queue" ? "marketing_queue" : name === "claim_marketing_automation_enrollments" ? "marketing_automation_enrollments" : "";
       return { data: table ? (rows[table] || []).filter(row => !args.p_business_id || row.business_id === args.p_business_id) : null, error: table && claimError ? { message: "fixture unavailable" } : null };
     },
@@ -122,6 +159,16 @@ function fixture() {
     if (String(url).includes("api.resend.com") && providerResponse) {
       return Response.json(providerResponse.body, { status: providerResponse.status });
     }
+    if (String(url).includes("api.resend.com") && enforceProviderIdempotency) {
+      const key = new Headers(init?.headers).get("Idempotency-Key") || "";
+      const serialized = JSON.stringify(body);
+      const existing = providerIdempotency.get(key);
+      if (existing && existing.body !== serialized) return Response.json({ name: "invalid_idempotent_request", message: "payload differs" }, { status: 409 });
+      if (existing) return Response.json({ id: existing.id });
+      const accepted = { body: serialized, id: "stable-provider-id" };
+      providerIdempotency.set(key, accepted);
+      return Response.json({ id: accepted.id });
+    }
     return Response.json(Array.isArray(body) ? { data: body.map((_, i) => ({ id: "sent-" + i })) } : { id: "sent", ok: true });
   });
   const invoke = (name: string, body: any = message, token = "a", method = "POST", headers: Record<string, string> = {}) => {
@@ -143,6 +190,9 @@ function fixture() {
     failClaims: () => { claimError = true; },
     rejectInternalEmail: (status: number) => { internalEmailFailureStatus = status; },
     setProviderResponse: (body: Record<string, unknown>, status = 200) => { providerResponse = { body, status }; },
+    failBrandingOnce: () => { failNextBusinessQuery = true; },
+    failAcceptanceRecordOnce: () => { failNextAcceptanceRecord = true; },
+    enforceIdempotency: () => { enforceProviderIdempotency = true; },
   };
 }
 
@@ -259,29 +309,63 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
   });
   it("derives a stable provider idempotency key only for service-issued voucher reminders", async () => {
     const id = "11111111-1111-4111-8111-111111111111";
-    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, voucher_id: id, payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
+    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: id, payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
     const service = fixture();
     expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
     expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
     expect(service.providerRequests[0].headers.get("Idempotency-Key")).toBe("voucher-payment-reminder/" + id);
-    expect(service.providerRequests[1].headers.get("Idempotency-Key")).toBe("voucher-payment-reminder/" + id);
-    expect(service.providerRequests[1].body).toEqual(service.providerRequests[0].body);
+    expect(service.providerRequests).toHaveLength(1);
 
     const admin = fixture();
-    expect((await admin.invoke("send-email", body, "a")).status).toBe(200);
+    const adminBody = { ...body, data: { ...body.data, business_id: "a" } };
+    expect((await admin.invoke("send-email", adminBody, "a")).status).toBe(200);
     expect(admin.providerRequests[0].headers.get("Idempotency-Key")).toBeNull();
 
     const hold = fixture();
     const holdId = "33333333-3333-4333-8333-333333333333";
-    expect((await hold.invoke("send-email", { type: "PAYMENT_LINK", data: { ...message.data, hold_id: holdId, booking_id: "booking-a", payment_url: "https://pay.fixture.invalid/original", ref: "A", tour_name: "Tour", total_amount: "100.00" } }, serviceKey)).status).toBe(200);
+    expect((await hold.invoke("send-email", { type: "PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, hold_id: holdId, booking_id: "booking-a", payment_url: "https://pay.fixture.invalid/original", ref: "A", tour_name: "Tour", total_amount: "100.00" } }, serviceKey)).status).toBe(200);
     expect(hold.providerRequests[0].headers.get("Idempotency-Key")).toBe("hold-expiry-payment-link/" + holdId);
   });
   it("rejects a provider 2xx response that has no accepted message ID", async () => {
+    for (const id of [undefined, "", "   ", 42, true, { invalid: true }]) {
+      const f = fixture();
+      f.setProviderResponse({ ok: true, ...(id === undefined ? {} : { id }) });
+      const response = await f.invoke("send-email", { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } }, serviceKey);
+      expect(response.status).toBe(502);
+      expect(await response.json()).toMatchObject({ ok: false, error: "invalid_provider_response" });
+    }
+  });
+  it("reuses the persisted provider payload when tenant branding changes after acceptance-record failure", async () => {
     const f = fixture();
-    f.setProviderResponse({ ok: true });
-    const response = await f.invoke("send-email", { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } }, serviceKey);
-    expect(response.status).toBe(502);
-    expect(await response.json()).toMatchObject({ ok: false, error: "invalid_provider_response" });
+    f.enforceIdempotency();
+    f.failAcceptanceRecordOnce();
+    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(503);
+    f.rows.businesses.find((row) => row.id === reminderBusinessId).business_name = "Renamed Operator";
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(200);
+    const provider = f.providerRequests.filter((request) => request.url.includes("api.resend.com"));
+    expect(provider).toHaveLength(2);
+    expect(provider[1].body).toEqual(provider[0].body);
+  });
+  it("reuses the persisted provider payload when branding lookup fails during a retry", async () => {
+    const f = fixture();
+    f.enforceIdempotency();
+    f.failAcceptanceRecordOnce();
+    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(503);
+    f.failBrandingOnce();
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(200);
+    const provider = f.providerRequests.filter((request) => request.url.includes("api.resend.com"));
+    expect(provider).toHaveLength(2);
+    expect(provider[1].body).toEqual(provider[0].body);
+  });
+  it("does not persist or send a durable reminder while tenant branding is unavailable", async () => {
+    const f = fixture();
+    f.failBrandingOnce();
+    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(503);
+    expect(f.providerRequests.filter((request) => request.url.includes("api.resend.com"))).toHaveLength(0);
+    expect((await f.invoke("send-email", body, serviceKey)).status).toBe(200);
   });
   it("prevents admins forging authentication or platform-billing messages", async () => {
     for (const type of ["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING", "POPIA_EXPORT_READY"]) {

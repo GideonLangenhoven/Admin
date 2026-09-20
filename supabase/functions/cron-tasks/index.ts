@@ -25,11 +25,11 @@ async function sendInternalEmail(type: string, data: Record<string, unknown>): P
     // derived provider idempotency key makes the later retry safe.
     signal: AbortSignal.timeout(10_000),
   });
-  const result = await response.json().catch(() => null) as { ok?: boolean; id?: string; error?: string } | null;
-  if (!response.ok || result?.ok !== true || !String(result.id || "").trim()) {
+  const result = await response.json().catch(() => null) as { ok?: boolean; id?: unknown; error?: string } | null;
+  if (!response.ok || result?.ok !== true || typeof result.id !== "string" || !result.id.trim()) {
     throw new Error("email_not_accepted status=" + response.status + " error=" + String(result?.error || "invalid_response"));
   }
-  return { providerId: String(result.id) };
+  return { providerId: result.id.trim() };
 }
 
 async function cleanupExpiredHolds() {
@@ -214,16 +214,17 @@ async function cleanupAbandonedVouchers() {
   const now = Date.now();
   const reminderCutoff = new Date(now - 15 * 60 * 1000).toISOString();
   const abandonedCutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const reminderFreshCutoff = new Date(now - (24 * 60 * 60 * 1000 - 60_000)).toISOString();
   const { data: unpaidVouchers } = await supabase
     .from("vouchers")
-    .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url")
+    .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url, created_at")
     .eq("status", "PENDING")
     .is("payment_reminder_sent_at", null)
     .not("payment_url", "is", null)
     // Never send a fresh reminder to historical work that this same sweep is
     // about to delete. It would surprise the buyer and outlive Resend's 24h
     // idempotency window.
-    .gt("created_at", abandonedCutoff)
+    .gt("created_at", reminderFreshCutoff)
     .lt("created_at", reminderCutoff)
     .order("created_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
@@ -233,6 +234,11 @@ async function cleanupAbandonedVouchers() {
     if (!voucherEmail.includes("@") || !(v as any).business_id) {
       results.voucher_reminder_failures += 1;
       console.error("VOUCHER_PAYMENT_REMINDER_INVALID_TARGET voucher=" + (v as any).id);
+      continue;
+    }
+    const createdAt = Date.parse(String((v as any).created_at || ""));
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt >= 24 * 60 * 60 * 1000 - 60_000) {
+      console.log("VOUCHER_PAYMENT_REMINDER_SKIP_EXPIRING voucher=" + (v as any).id);
       continue;
     }
     try {
@@ -596,7 +602,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
   // Check-ins begin only AFTER service authentication, never from a public ping.
   const checkInId = await captureCheckIn("cron-tasks", "in_progress");
-  const results: any = { reminders: null, hold_cleanup: 0, hold_payment_link_reminders_accepted: 0, hold_payment_link_reminder_failures: 0, expired_manual: 0, vouchers_cleaned: 0, voucher_reminders_accepted: 0, voucher_reminder_failures: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
+  const results: any = { reminders: null, hold_cleanup: 0, hold_payment_link_reminders_accepted: 0, hold_payment_link_reminder_failures: 0, expired_manual: 0, vouchers_cleaned: 0, voucher_reminders_accepted: 0, voucher_reminder_failures: 0, payment_reminder_intents_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
   // cancels past-deadline PENDING bookings without releasing slot capacity,
@@ -641,6 +647,14 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     if (voucherCleanup.voucher_reminder_failures > 0) results.errors.push(voucherCleanup.voucher_reminder_failures + " voucher reminder(s) were not accepted");
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+  try {
+    const intentCleanup = await supabase.rpc("cleanup_payment_reminder_email_intents", { p_limit: CRON_BATCH_SIZE });
+    if (intentCleanup.error) throw intentCleanup.error;
+    results.payment_reminder_intents_cleaned = Number(intentCleanup.data || 0);
+  } catch (error) {
+    console.error("PAYMENT_REMINDER_INTENT_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

@@ -972,6 +972,20 @@
     "created_at",
     "period_key"
   ],
+  "payment_reminder_email_intents": [
+    "accepted_at",
+    "attempts",
+    "business_id",
+    "created_at",
+    "intent_key",
+    "last_attempt_at",
+    "last_error",
+    "provider_message_id",
+    "provider_payload",
+    "source_id",
+    "source_type",
+    "updated_at"
+  ],
   "peak_period_prices": [
     "id",
     "peak_period_id",

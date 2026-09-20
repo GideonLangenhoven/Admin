@@ -59,12 +59,19 @@ function isValidEmail(email: string): boolean {
 // See: https://resend.com/docs/dashboard/webhooks/introduction
 // This lets you mark bad emails in the database and stop future sends to them.
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string, idempotencyKey?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
-  // Validate email format before attempting to send
-  if (!to || !isValidEmail(to)) {
-    console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
-    return { ok: false, error: "invalid_email_format", message: "Email address '" + to + "' has an invalid format" };
-  }
+type ResendPayload = {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+  text: string;
+  reply_to?: string;
+  bcc?: string[];
+  attachments?: Array<{ filename: string; content: string }>;
+  headers?: Record<string, string>;
+};
+
+function buildResendPayload(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string): ResendPayload {
   // Always send FROM a platform-controlled domain to pass DMARC/SPF.
   // The tenant's email goes in Reply-To so customers reply to the right place.
   // Every send here was HTML-only, no plain-text MIME alternative — a real
@@ -72,7 +79,7 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   // scoring factor, and Resend derives it automatically when omitted, so a
   // simple tag-stripped fallback costs nothing and removes the gap.
   const text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  const payload: Record<string, unknown> = { from: fromEmail || FROM_EMAIL, to: [to], subject, html, text };
+  const payload: ResendPayload = { from: fromEmail || FROM_EMAIL, to: [to], subject, html, text };
   if (replyTo && isValidEmail(replyTo)) payload.reply_to = replyTo;
   if (bcc) payload.bcc = [bcc];
   if (attachments && attachments.length > 0) payload.attachments = attachments;
@@ -85,6 +92,29 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     };
   }
+  return payload;
+}
+
+function isResendPayload(value: unknown): value is ResendPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const payload = value as Record<string, unknown>;
+  return typeof payload.from === "string"
+    && Array.isArray(payload.to)
+    && payload.to.length === 1
+    && typeof payload.to[0] === "string"
+    && typeof payload.subject === "string"
+    && typeof payload.html === "string"
+    && typeof payload.text === "string";
+}
+
+async function sendResend(payload: ResendPayload, idempotencyKey?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
+  const to = payload.to[0];
+  const fromEmail = payload.from;
+  const subject = payload.subject;
+  if (!to || !isValidEmail(to)) {
+    console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
+    return { ok: false, error: "invalid_email_format", message: "Email address '" + to + "' has an invalid format" };
+  }
   let res: Response;
   try {
     const requestHeaders: Record<string, string> = { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" };
@@ -93,6 +123,7 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
       method: "POST",
       headers: requestHeaders,
       body: JSON.stringify(payload),
+      ...(idempotencyKey ? { signal: AbortSignal.timeout(10_000) } : {}),
     });
   } catch (netErr) {
     console.error("RESEND_NETWORK_ERR to=" + to + ":", netErr);
@@ -114,27 +145,41 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
       message: (data as any)?.message || ("HTTP " + res.status),
     };
   }
-  const providerId = String((data as any)?.id || "").trim();
-  if (!providerId) {
+  const rawProviderId = (data as Record<string, unknown>)?.id;
+  if (typeof rawProviderId !== "string" || !rawProviderId.trim()) {
     console.error("RESEND_INVALID_RESPONSE to=" + to + " subject=" + subject);
     return { ok: false, status: res.status, error: "invalid_provider_response", message: "Provider response did not include an email ID" };
   }
+  const providerId = rawProviderId.trim();
   console.log("RESEND_OK id=" + providerId + " to=" + to + " subject=" + subject);
   return { ok: true, id: providerId };
 }
 
-function providerIdempotencyKey(type: string, data: Record<string, unknown>, isServiceCaller: boolean): string | undefined {
-  // Resend retains a key for 24 hours. Voucher reminders are deliberately
-  // limited to the remaining <24h lifetime of a PENDING voucher, and hold
-  // expiry uses the immutable hold ID. Browser callers cannot choose a key.
-  if (!isServiceCaller) return undefined;
+type PaymentReminderIntent = {
+  key: string;
+  businessId: string;
+  sourceType: "VOUCHER" | "HOLD";
+  sourceId: string;
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function paymentReminderIntent(type: string, data: Record<string, unknown>, isServiceCaller: boolean): PaymentReminderIntent | null {
+  // Only the authenticated service workflow can request provider
+  // idempotency. Browser callers cannot select an intent key or source row.
+  if (!isServiceCaller) return null;
   const source = type === "VOUCHER_PAYMENT_LINK"
-    ? { prefix: "voucher-payment-reminder", id: String(data.voucher_id || "") }
+    ? { prefix: "voucher-payment-reminder", sourceType: "VOUCHER" as const, id: data.voucher_id }
     : type === "PAYMENT_LINK" && data.hold_id
-      ? { prefix: "hold-expiry-payment-link", id: String(data.hold_id || "") }
+      ? { prefix: "hold-expiry-payment-link", sourceType: "HOLD" as const, id: data.hold_id }
       : null;
-  if (!source || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(source.id)) return undefined;
-  return source.prefix + "/" + source.id.toLowerCase();
+  if (!source) return null;
+  const sourceId = typeof source.id === "string" ? source.id.trim().toLowerCase() : "";
+  const businessId = typeof data.business_id === "string" ? data.business_id.trim().toLowerCase() : "";
+  if (!UUID_PATTERN.test(sourceId) || !UUID_PATTERN.test(businessId)) {
+    throw new Error("Invalid payment reminder identity");
+  }
+  return { key: source.prefix + "/" + sourceId, businessId, sourceType: source.sourceType, sourceId };
 }
 
 // Default email images — empty means no image shown unless business uploads one via Settings
@@ -216,6 +261,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     console.warn("BRANDING_FALLBACK: no businessId or no supabase client");
     const fallbackBrand = String(d.business_name || d.brand_name || "Your Booking");
     return {
+      resolvedFromDatabase: false,
       businessId: "",
       brandName: fallbackBrand,
       timezone: "UTC",
@@ -262,6 +308,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
 
   const brandName = String(data?.business_name || data?.name || d.business_name || d.brand_name || "Your Booking");
   return {
+    resolvedFromDatabase: Boolean(data),
     businessId,
     brandName,
     timezone: String((data as Record<string, unknown> | null)?.timezone || "UTC"),
@@ -2641,13 +2688,46 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       if (d[fk] && typeof d[fk] === "string") d[fk] = escHtml(d[fk] as string);
     }
 
+    let durableIntent: PaymentReminderIntent | null;
+    try {
+      durableIntent = paymentReminderIntent(type, d, isServiceCaller);
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: "invalid_payment_reminder_identity" }), { status: 400, headers: getCors(req) });
+    }
+
+    let persistedProviderPayload: ResendPayload | null = null;
+    if (durableIntent) {
+      if (!supabase) return new Response(JSON.stringify({ ok: false, error: "email_intent_store_unavailable" }), { status: 503, headers: getCors(req) });
+      const stored = await supabase.from("payment_reminder_email_intents")
+        .select("provider_payload")
+        .eq("intent_key", durableIntent.key)
+        .eq("business_id", durableIntent.businessId)
+        .eq("source_type", durableIntent.sourceType)
+        .eq("source_id", durableIntent.sourceId)
+        .maybeSingle();
+      if (stored.error) {
+        console.error("PAYMENT_REMINDER_INTENT_LOOKUP_ERR", durableIntent.key, stored.error);
+        return new Response(JSON.stringify({ ok: false, error: "email_intent_store_unavailable" }), { status: 503, headers: getCors(req) });
+      }
+      if (stored.data) {
+        if (!isResendPayload(stored.data.provider_payload)) {
+          console.error("PAYMENT_REMINDER_INTENT_INVALID_PAYLOAD", durableIntent.key);
+          return new Response(JSON.stringify({ ok: false, error: "email_intent_payload_invalid" }), { status: 503, headers: getCors(req) });
+        }
+        persistedProviderPayload = stored.data.provider_payload;
+      }
+    }
+
     let branding: Awaited<ReturnType<typeof loadEmailBranding>>;
     try {
       branding = await loadEmailBranding(d);
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { resolvedFromDatabase: false, businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+    }
+    if (durableIntent && !branding.resolvedFromDatabase && !persistedProviderPayload) {
+      return new Response(JSON.stringify({ ok: false, error: "tenant_branding_unavailable" }), { status: 503, headers: getCors(req) });
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER") {
@@ -2933,24 +3013,71 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     const unsubForHeader = isMarketingClass && typeof d.unsubscribe_url === "string" && d.unsubscribe_url
       ? String(d.unsubscribe_url)
       : undefined;
-    const result = await sendResend(
-      d.email as string,
-      branding.fromEmail,
-      branded.subject,
-      branded.html,
-      bcc,
-      attachments,
-      branding.replyToEmail,
-      unsubForHeader,
-      providerIdempotencyKey(type, d, isServiceCaller),
-    );
+    let providerPayload = persistedProviderPayload || buildResendPayload(
+        d.email as string,
+        branding.fromEmail,
+        branded.subject,
+        branded.html,
+        bcc,
+        attachments,
+        branding.replyToEmail,
+        unsubForHeader,
+      );
+    if (durableIntent) {
+      if (!supabase) return new Response(JSON.stringify({ ok: false, error: "email_intent_store_unavailable" }), { status: 503, headers: getCors(req) });
+      const claim = await supabase.rpc("claim_payment_reminder_email_intent", {
+        p_intent_key: durableIntent.key,
+        p_business_id: durableIntent.businessId,
+        p_source_type: durableIntent.sourceType,
+        p_source_id: durableIntent.sourceId,
+        p_provider_payload: providerPayload,
+      });
+      if (claim.error) {
+        console.error("PAYMENT_REMINDER_INTENT_CLAIM_ERR", durableIntent.key, claim.error);
+        return new Response(JSON.stringify({ ok: false, error: "email_intent_store_unavailable" }), { status: 503, headers: getCors(req) });
+      }
+      const claimed = claim.data as Record<string, unknown> | null;
+      if (!claimed?.ok) {
+        return new Response(JSON.stringify({ ok: false, error: String(claimed?.error || "email_intent_not_claimed") }), { status: 409, headers: getCors(req) });
+      }
+      if (!isResendPayload(claimed.provider_payload)) {
+        console.error("PAYMENT_REMINDER_INTENT_INVALID_PAYLOAD", durableIntent.key);
+        return new Response(JSON.stringify({ ok: false, error: "email_intent_payload_invalid" }), { status: 503, headers: getCors(req) });
+      }
+      providerPayload = claimed.provider_payload;
+      if (claimed.provider_message_id !== null && claimed.provider_message_id !== undefined) {
+        if (typeof claimed.provider_message_id !== "string" || !claimed.provider_message_id.trim()) {
+          return new Response(JSON.stringify({ ok: false, error: "email_intent_provider_id_invalid" }), { status: 503, headers: getCors(req) });
+        }
+        return new Response(JSON.stringify({ ok: true, id: claimed.provider_message_id.trim(), replayed: true }), { status: 200, headers: getCors(req) });
+      }
+    }
+
+    const result = await sendResend(providerPayload, durableIntent?.key);
     if (!result.ok) {
+      if (durableIntent && supabase) {
+        const recorded = await supabase.rpc("record_payment_reminder_email_failure", {
+          p_intent_key: durableIntent.key,
+          p_error: result.error || result.message || "send_failed",
+        });
+        if (recorded.error) console.error("PAYMENT_REMINDER_INTENT_FAILURE_RECORD_ERR", durableIntent.key, recorded.error);
+      }
       // Surface the upstream failure to the caller as a non-2xx so that
       // supabase.functions.invoke sets `.error` and callers can't mistake a
       // failed send for success. Body keeps the original Resend status for
       // diagnostics. (Auth-hook "skipped" and invalid_email stay 200 — those
       // are not Resend send failures.)
       return new Response(JSON.stringify({ ok: false, error: result.error || "send_failed", message: result.message, status: result.status }), { status: 502, headers: getCors(req) });
+    }
+    if (durableIntent && supabase) {
+      const accepted = await supabase.rpc("record_payment_reminder_email_acceptance", {
+        p_intent_key: durableIntent.key,
+        p_provider_message_id: result.id,
+      });
+      if (accepted.error || !accepted.data?.ok) {
+        console.error("PAYMENT_REMINDER_INTENT_ACCEPTANCE_RECORD_ERR", durableIntent.key, accepted.error || accepted.data?.error);
+        return new Response(JSON.stringify({ ok: false, error: "email_acceptance_not_recorded" }), { status: 503, headers: getCors(req) });
+      }
     }
     return new Response(JSON.stringify({ ok: true, id: result.id }), { status: 200, headers: getCors(req) });
   } catch (err: unknown) {

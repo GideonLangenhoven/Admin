@@ -19,9 +19,9 @@ type Voucher = {
 const voucherId = "11111111-1111-4111-8111-111111111111";
 const businessId = "22222222-2222-4222-8222-222222222222";
 
-function fixture(fetchImpl: typeof fetch, ageMinutes = 20) {
-  const voucher: Voucher = {
-    id: voucherId,
+function fixture(fetchImpl: typeof fetch, ageMinutes = 20, count = 1) {
+  const vouchers: Voucher[] = Array.from({ length: count }, (_, index) => ({
+    id: index === 0 ? voucherId : `33333333-3333-4333-8333-${String(index).padStart(12, "0")}`,
     business_id: businessId,
     buyer_name: "Fixture Buyer",
     buyer_email: "buyer@fixture.invalid",
@@ -33,7 +33,8 @@ function fixture(fetchImpl: typeof fetch, ageMinutes = 20) {
     payment_reminder_sent_at: null,
     status: "PENDING",
     created_at: new Date(Date.now() - ageMinutes * 60_000).toISOString(),
-  };
+  }));
+  const voucher = vouchers[0];
   let failNextUpdate = false;
   const updates: Array<Record<string, unknown>> = [];
   const deletes: string[] = [];
@@ -45,7 +46,7 @@ function fixture(fetchImpl: typeof fetch, ageMinutes = 20) {
       let operation: "select" | "update" | "delete" = "select";
       let patch: Record<string, unknown> = {};
       const execute = async (single = false) => {
-        const matching = [voucher].filter((row) => predicates.every((predicate) => predicate(row)));
+        const matching = vouchers.filter((row) => predicates.every((predicate) => predicate(row)));
         if (operation === "update") {
           if (failNextUpdate) {
             failNextUpdate = false;
@@ -80,6 +81,7 @@ function fixture(fetchImpl: typeof fetch, ageMinutes = 20) {
 
   const sharedBindings = {
     AbortSignal,
+    Date,
     SUPABASE_URL: "https://fixture.invalid",
     SUPABASE_KEY: "fixture-service-not-real",
     CRON_BATCH_SIZE: 500,
@@ -92,7 +94,7 @@ function fixture(fetchImpl: typeof fetch, ageMinutes = 20) {
     sendInternalEmail,
   }) as () => Promise<Record<string, number>>;
 
-  return { voucher, updates, deletes, cleanup, failNextStamp: () => { failNextUpdate = true; } };
+  return { voucher, vouchers, updates, deletes, cleanup, failNextStamp: () => { failNextUpdate = true; } };
 }
 
 describe("voucher payment reminder delivery state", () => {
@@ -135,6 +137,20 @@ describe("voucher payment reminder delivery state", () => {
     }
   });
 
+  it("rejects every non-string or blank provider acceptance ID", async () => {
+    for (const body of [
+      { ok: true, id: { invalid: true } },
+      { ok: true, id: true },
+      { ok: true, id: 42 },
+      { ok: true, id: "   " },
+      { ok: true },
+    ]) {
+      const f = fixture(vi.fn(async () => Response.json(body)));
+      expect(await f.cleanup()).toMatchObject({ voucher_reminders_accepted: 0, voucher_reminder_failures: 1 });
+      expect(f.voucher.payment_reminder_sent_at).toBeNull();
+    }
+  });
+
   it("records provider acceptance only after the tenant-scoped marker succeeds", async () => {
     const send = vi.fn(async () => Response.json({ ok: true, id: "email-accepted" }));
     const f = fixture(send);
@@ -169,5 +185,25 @@ describe("voucher payment reminder delivery state", () => {
     expect(send).not.toHaveBeenCalled();
     expect(f.deletes).toEqual([voucherId]);
     expect(result.vouchers_cleaned).toBe(1);
+  });
+
+  it("rechecks age before each send when a sequential batch crosses the deletion cutoff", async () => {
+    const startedAt = Date.now();
+    let clock = startedAt;
+    const now = vi.spyOn(Date, "now").mockImplementation(() => clock);
+    try {
+      const send = vi.fn(async () => {
+        clock += 70_000;
+        return Response.json({ ok: true, id: "accepted-once" });
+      });
+      const f = fixture(send, 24 * 60 - 65 / 60, 2);
+      const result = await f.cleanup();
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(f.vouchers[0].payment_reminder_sent_at).toMatch(/^\d{4}-/);
+      expect(f.vouchers[1].payment_reminder_sent_at).toBeNull();
+      expect(result).toMatchObject({ voucher_reminders_accepted: 1, voucher_reminder_failures: 0 });
+    } finally {
+      now.mockRestore();
+    }
   });
 });
