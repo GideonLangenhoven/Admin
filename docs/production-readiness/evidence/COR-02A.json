@@ -1,0 +1,84 @@
+{
+  "evidence_schema": "2.0",
+  "evidence_id": "COR-02A-LOCAL-20260920",
+  "task_or_gate": "COR-02A/COR-02 and partial COR-04",
+  "status": "PASS_TASK_SCOPE",
+  "stage": "UNIT_AND_DISPOSABLE_DB",
+  "source": {
+    "repository": "GideonLangenhoven/Admin",
+    "branch": "feature/launch-rollout-2026-09-20",
+    "base_commit": "3ed4a28a62aa620fc5a5c00ca77e0c5340368035",
+    "commit": "90eed5ee936252077a611b8cbe602c1fc761c301",
+    "tree": "64a90161f7ebd207a520d57d101c62b84edee994",
+    "patch_sha256": "306dc54d90177fb7586b8a0eb360891efb12b0406b8f41f372a4220ed8a1e4cd",
+    "patch_scope": "Owned implementation and regression-test paths; coordination documents excluded.",
+    "lockfile_sha256": "8620bb3a03e3efd78ce5c39e7d500a79a88849fc397fcd6a9d450f923eef9757",
+    "migration_sha256": "37b43d78d2baa3481ae67aef7fd3c0f94886aaec2cccffad0c0dce39bff56f58",
+    "migration_set_sha256": "49e4103ebc0f9fcb54c37e5519d772465764eaaad7c61ef78a26e432b8a041d9",
+    "fixture_schema_sha256": "382183bf16a7fedbbd12ec41d537d562a5f57fe082cb249856c6aaccfc1707d3",
+    "db_columns_sha256": "4d4d65a77d7760b4ceff21e6d4b556f5e1fb7095a4b737098df437bdd57b311d"
+  },
+  "environment": {
+    "id": "local-isolated-worktree-and-disposable-postgresql",
+    "production": false,
+    "synthetic_data": true,
+    "real_outbound_effects": false,
+    "booking_companion": "Plain export of CI pin 460e58d952ad570c9036bc13118eec66a2591918, temporarily symlinked only for tests.",
+    "database": "Disposable local PostgreSQL 17 on a private temporary socket; no shared or deployed database was contacted."
+  },
+  "execution": {
+    "before_command": "npm run test:unit -- --run tests/unit/voucher-reminder-delivery.test.ts tests/unit/message-job-boundaries.test.ts",
+    "focused_command": "npm run test:unit -- --run tests/unit/voucher-reminder-delivery.test.ts tests/unit/message-job-boundaries.test.ts tests/unit/voucher-checkout-email.test.ts tests/unit/payment-link-optin.test.ts tests/unit/reminder-orchestration.test.ts tests/unit/email-time-format.test.ts, with booking temporarily linked to the CI-pinned export",
+    "database_command": "ROLLOUT_TEST_HOST=/private/tmp/capekayak-db-test-XaNAf6 ROLLOUT_TEST_PORT=55432 ROLLOUT_TEST_USER=gideonlangenhoven npm run test:isolation:local",
+    "edge_command": "npm run check:edge",
+    "typescript_command": "npx tsc --noEmit --incremental false",
+    "lint_command": "npx eslint supabase/functions/cron-tasks/index.ts supabase/functions/send-email/index.ts tests/unit/voucher-reminder-delivery.test.ts tests/unit/message-job-boundaries.test.ts tests/tenant-isolation/rollout.mjs",
+    "build_command": "NEXT_PUBLIC_SUPABASE_URL=https://fixture.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=fixture-anon-not-a-real-key npm run build",
+    "full_unit_command": "npm run test:unit with booking temporarily linked to exported CI pin 460e58d952ad570c9036bc13118eec66a2591918",
+    "completed_at_utc": "2026-09-20T13:21:03Z"
+  },
+  "result": {
+    "assertions": [
+      "The original two-file regression failed 9 of 87 tests because rejected, malformed, or uncertain email outcomes could still be stamped and an expired voucher could still be submitted.",
+      "The final six-file focused suite passed 115 of 115 tests.",
+      "Provider rejection, non-2xx, malformed success, timeout, invalid provider-ID type, and post-acceptance stamp failure no longer become false success; retries use the same server-derived key.",
+      "The first accepted provider payload is persisted and reused across tenant-branding drift or a later branding lookup failure; a first-attempt branding failure does not submit a provider request.",
+      "Voucher age is rechecked immediately before each sequential send and by the claim RPC, so a row crossing the 24-hour boundary is not newly submitted.",
+      "After source and tenant identity validation, a delayed overlapping worker can replay a recorded acceptance after another worker stamps the source without another provider submission, duplicate accepted count, or false failure; unaccepted work still requires current eligibility.",
+      "The disposable PostgreSQL suite applied the additive intent migration and passed 164 of 164 checks, including service-only permissions, source-derived authority, payload freezing, and accepted-intent replay.",
+      "Edge checks, TypeScript, targeted ESLint with 13 pre-existing warnings and no errors, diff checks, and the production build with synthetic public configuration passed.",
+      "The full unit suite passed 1176 tests, failed the same 3 pinned-companion UI-contract assertions as baseline, and skipped 1."
+    ],
+    "failed_assertions": [
+      "Three pre-existing mobile-first companion-source contract assertions remain failed and block a fully green release suite."
+    ],
+    "skips": ["One existing unit test is skipped."],
+    "limitations": [
+      "No genuine email provider, delivery receipt, shared database, staging, production, browser E2E, load, soak, deployment, or canary operation was exercised.",
+      "Provider behavior was simulated; provider acceptance is not delivery.",
+      "The additive migration is locally exercised only and its actual target migration ledger must be verified before deployment, especially relative to the locked 20260920090000 pricing migration.",
+      "The hold-expiry sibling now reports provider acceptance or failure and uses a durable intent, but rediscovery after expiry, claim/lease fairness, and backlog recovery remain open under COR-04.",
+      "The independent reviewer's requested model and effort were supplied by the host, but effective runtime metadata was not independently observable."
+    ]
+  },
+  "artifacts": [
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-before.log","sha256":"efda5279d0fd5337c3123139a7aeddf39716c5fbbfa62bedcf6fedbdb836a960","exit_code":1,"notes":"9 failed, 78 passed."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-focused.log","sha256":"7fb7fa28451ea342dd5446226ae6ee38cece4899700424e33318ba5f53ce5321","exit_code":0,"notes":"115 passed."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-tsc.log","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","exit_code":0,"notes":"Successful TypeScript emits no output."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-eslint.log","sha256":"81be2843bd9e4c1f4dee989039329674148148779902793be9d0735517a27e04","exit_code":0,"notes":"13 pre-existing warnings, no errors."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-edge.log","sha256":"a630d7971fc35c37d7fd4fd27e131c8c61659e5630acf5d771e2a7ba447fee85","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-build.log","sha256":"62b0f49d5ffe0d778d1ae236ce64546570f50af2ff1e5add106c08502ded1016","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-full-unit.log","sha256":"e9bcc45aebf660c0ccfff501573532ab3e569ef8c8d16b380f946356c923d3d6","exit_code":1,"notes":"1176 pass, 3 unchanged companion UI-contract failures, 1 skip."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/cor-02a-followup-isolation.log","sha256":"04843a1428f0e0f8314db983f32ea0f6ff9e729621bf4e7abe048ddc90c4ccd5","exit_code":0,"notes":"164 database checks passed."}
+  ],
+  "independent_review": {
+    "requested_reviewer_model": "gpt-6-astra",
+    "requested_effort": "high",
+    "observed_runtime": null,
+    "disposition": "APPROVE_TASK",
+    "rounds": ["REQUEST_CHANGES", "REQUEST_CHANGES", "APPROVE_TASK"],
+    "limitations": "Approval covers COR-02A only, including the narrow COR-04 sibling hardening; it is not deployment or release approval."
+  },
+  "redaction_confirmed": true,
+  "invalidated_by": []
+}
