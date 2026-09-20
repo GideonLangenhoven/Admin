@@ -76,13 +76,6 @@ BEGIN
     IF NOT FOUND OR v_business_id IS DISTINCT FROM p_business_id THEN
       RETURN jsonb_build_object('ok', false, 'error', 'voucher_not_found');
     END IF;
-    -- One-minute guard exceeds the bounded 10-second provider request and
-    -- prevents a sequential batch racing the 24-hour deletion sweep.
-    IF v_status <> 'PENDING' OR v_reminder_sent_at IS NOT NULL
-       OR v_created_at > now() - interval '15 minutes'
-       OR v_created_at <= now() - interval '23 hours 59 minutes' THEN
-      RETURN jsonb_build_object('ok', false, 'error', 'voucher_not_eligible');
-    END IF;
   ELSE
     IF p_intent_key <> 'hold-expiry-payment-link/' || p_source_id::text THEN
       RETURN jsonb_build_object('ok', false, 'error', 'invalid_intent_key');
@@ -96,9 +89,45 @@ BEGIN
     IF NOT FOUND OR v_business_id IS DISTINCT FROM p_business_id THEN
       RETURN jsonb_build_object('ok', false, 'error', 'hold_not_found');
     END IF;
-    IF v_status NOT IN ('HELD', 'PENDING') THEN
-      RETURN jsonb_build_object('ok', false, 'error', 'hold_not_eligible');
+  END IF;
+
+  -- An accepted intent is authoritative even if another worker has since
+  -- stamped the source. Validate the immutable identity first, then replay
+  -- that acceptance without applying fresh-send eligibility a second time.
+  SELECT * INTO v_intent
+    FROM public.payment_reminder_email_intents
+   WHERE intent_key = p_intent_key
+   FOR UPDATE;
+  IF FOUND THEN
+    IF v_intent.business_id IS DISTINCT FROM p_business_id
+       OR v_intent.source_type IS DISTINCT FROM p_source_type
+       OR v_intent.source_id IS DISTINCT FROM p_source_id THEN
+      RAISE EXCEPTION 'payment reminder intent identity mismatch' USING ERRCODE = '23505';
     END IF;
+    IF v_intent.provider_message_id IS NOT NULL THEN
+      UPDATE public.payment_reminder_email_intents
+         SET attempts = attempts + 1,
+             last_attempt_at = now(),
+             updated_at = now()
+       WHERE intent_key = p_intent_key;
+      RETURN jsonb_build_object(
+        'ok', true,
+        'provider_payload', v_intent.provider_payload,
+        'provider_message_id', v_intent.provider_message_id
+      );
+    END IF;
+  END IF;
+
+  IF p_source_type = 'VOUCHER' THEN
+    -- One-minute guard exceeds the bounded 10-second provider request and
+    -- prevents a sequential batch racing the 24-hour deletion sweep.
+    IF v_status <> 'PENDING' OR v_reminder_sent_at IS NOT NULL
+       OR v_created_at > now() - interval '15 minutes'
+       OR v_created_at <= now() - interval '23 hours 59 minutes' THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'voucher_not_eligible');
+    END IF;
+  ELSIF v_status NOT IN ('HELD', 'PENDING') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'hold_not_eligible');
   END IF;
 
   INSERT INTO public.payment_reminder_email_intents (

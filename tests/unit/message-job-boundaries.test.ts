@@ -312,7 +312,9 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, business_id: reminderBusinessId, voucher_id: id, payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
     const service = fixture();
     expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
-    expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
+    const replay = await service.invoke("send-email", body, serviceKey);
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ ok: true, id: "sent", replayed: true });
     expect(service.providerRequests[0].headers.get("Idempotency-Key")).toBe("voucher-payment-reminder/" + id);
     expect(service.providerRequests).toHaveLength(1);
 

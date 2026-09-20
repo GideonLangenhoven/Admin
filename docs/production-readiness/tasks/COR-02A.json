@@ -35,6 +35,10 @@
       "Require a non-empty string provider ID at both the provider and internal-email acceptance boundaries."
     ]
   },
+  "review_round_2": {
+    "disposition": "REQUEST_CHANGES",
+    "correction": "Replay a previously recorded provider acceptance after validating source tenant and intent identity, without reapplying fresh-send eligibility; preserve eligibility checks for every unaccepted intent and cover the delayed overlapping-worker path in PostgreSQL and handler tests."
+  },
   "behavior_to_preserve": [
     "Only PENDING vouchers between 15 minutes and 24 hours old receive the one-time payment-link reminder.",
     "Tenant branding, recipient, amount, and original payment URL remain unchanged.",
@@ -59,6 +63,7 @@
     "A retry after mutable tenant branding or a transient branding-query failure reuses the first persisted provider payload.",
     "A sequential batch that crosses the deletion boundary skips the now-expiring voucher before provider submission.",
     "Non-string and blank provider IDs are rejected at the provider and internal-email boundaries.",
+    "A delayed overlapping worker replays a recorded acceptance after the source stamp without another provider submission, duplicate acceptance count, or false failure; a foreign tenant cannot replay it.",
     "The existing message boundary, voucher checkout, Edge, TypeScript, and build checks remain green."
   ],
   "existing_customer_cases": [

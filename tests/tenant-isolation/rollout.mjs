@@ -63,7 +63,7 @@ try {
   const originalReminderPayload = {from:'BookingTours <noreply@bookingtours.co.za>',to:['buyer@example.invalid'],subject:'Original operator',html:'<p>Original</p>',text:'Original'};
   const changedReminderPayload = {...originalReminderPayload,subject:'Renamed operator',html:'<p>Renamed</p>',text:'Renamed'};
   await db.query("insert into vouchers(id,business_id,code,status,buyer_email,payment_url,created_at) values ($1,$2,'REMIND01','PENDING','buyer@example.invalid','https://pay.example.invalid/original',now()-interval '20 minutes')",[reminderVoucherId,id(1)]);
-  await check('E1 payment reminder intent freezes the first provider payload and accepted ID',()=>as('service_role',null,{},async()=>{
+  await check('E1 payment reminder intent freezes payload and replays acceptance after the source stamp',()=>as('service_role',null,{},async()=>{
     const claimSql="select claim_payment_reminder_email_intent($1,$2,'VOUCHER',$3,$4::jsonb) result";
     const first=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,originalReminderPayload])).rows[0].result;
     assert.equal(first.ok,true);
@@ -71,8 +71,11 @@ try {
     const retry=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,changedReminderPayload])).rows[0].result;
     assert.deepEqual(retry.provider_payload,originalReminderPayload);
     assert.equal((await db.query('select record_payment_reminder_email_acceptance($1,$2) result',[reminderIntentKey,'email-fixture-1'])).rows[0].result.ok,true);
+    await db.query('update vouchers set payment_reminder_sent_at=now() where id=$1',[reminderVoucherId]);
     const replay=(await db.query(claimSql,[reminderIntentKey,id(1),reminderVoucherId,changedReminderPayload])).rows[0].result;
     assert.equal(replay.provider_message_id,'email-fixture-1');
+    const foreignReplay=(await db.query(claimSql,[reminderIntentKey,id(2),reminderVoucherId,changedReminderPayload])).rows[0].result;
+    assert.equal(foreignReplay.error,'voucher_not_found');
     assert.equal((await db.query('select record_payment_reminder_email_acceptance($1,$2) result',[reminderIntentKey,'different-id'])).rows[0].result.error,'provider_message_id_mismatch');
   }));
   await check('E1 payment reminder intent derives authority from the source tenant and age',()=>as('service_role',null,{},async()=>{

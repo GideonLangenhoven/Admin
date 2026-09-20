@@ -178,6 +178,35 @@ describe("voucher payment reminder delivery state", () => {
     expect(bodies[1]).toBe(bodies[0]);
   });
 
+  it("keeps a delayed overlapping replay neutral after another worker stamps acceptance", async () => {
+    let signalSecondStarted!: () => void;
+    const secondStarted = new Promise<void>((resolve) => { signalSecondStarted = resolve; });
+    let releaseSecond!: () => void;
+    const secondMayReturn = new Promise<void>((resolve) => { releaseSecond = resolve; });
+    let call = 0;
+    const send = vi.fn(async () => {
+      call += 1;
+      if (call === 1) {
+        await secondStarted;
+        return Response.json({ ok: true, id: "same-email" });
+      }
+      signalSecondStarted();
+      await secondMayReturn;
+      return Response.json({ ok: true, id: "same-email", replayed: true });
+    });
+    const f = fixture(send);
+    const first = f.cleanup();
+    const second = f.cleanup();
+    await Promise.race([first, second]);
+    releaseSecond();
+    const results = await Promise.all([first, second]);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(f.updates).toHaveLength(1);
+    expect(results.reduce((sum, result) => sum + result.voucher_reminders_accepted, 0)).toBe(1);
+    expect(results.reduce((sum, result) => sum + result.voucher_reminder_failures, 0)).toBe(0);
+  });
+
   it("deletes a voucher already past the 24-hour policy without sending a new reminder", async () => {
     const send = vi.fn(async () => Response.json({ ok: true, id: "must-not-send" }));
     const f = fixture(send, 25 * 60);
