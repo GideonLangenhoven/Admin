@@ -12,7 +12,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 describe("payment-link opt-in", () => {
   it("create-checkout gates the BOOKING link on send_payment_link, not skip", () => {
     const src = read("supabase/functions/create-checkout/index.ts");
-    expect(src).toMatch(/type === "BOOKING" && bookingId && sendPaymentLink/);
+    expect(src).toMatch(/canonicalType === "BOOKING" && bookingId && sendPaymentLink/);
     expect(src).toMatch(/const sendPaymentLink = body\.send_payment_link === true/);
   });
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
+import PlatformOperations from "../../components/PlatformOperations";
 
 type OnboardForm = {
   businessName: string;
@@ -29,7 +30,7 @@ const DEFAULT_FORM: OnboardForm = {
   subdomain: "",
   adminName: "",
   adminEmail: "",
-  timezone: "UTC",
+  timezone: "Africa/Johannesburg",
   currency: "ZAR",
   logoUrl: "",
   waToken: "",
@@ -61,17 +62,11 @@ type BusinessRow = {
 export default function SuperAdminPage() {
   const { role, refreshBusiness } = useBusinessContext();
 
-  if (role !== "SUPER_ADMIN") {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-[var(--ck-text-muted)] text-sm">You do not have permission to view this page.</p>
-      </div>
-    );
-  }
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPassword, setRequesterPassword] = useState("");
   const [form, setForm] = useState<OnboardForm>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const onboardingRequest = useRef<string | null>(null);
   const [createdClient, setCreatedClient] = useState<{ businessId: string; businessName: string; adminEmail: string } | null>(null);
 
   // Business admin seat management
@@ -85,6 +80,8 @@ export default function SuperAdminPage() {
   const [bizDetail, setBizDetail] = useState<Record<string, any> | null>(null);
   const [bizDetailLoading, setBizDetailLoading] = useState(false);
   const [bizDetailSaving, setBizDetailSaving] = useState(false);
+  const detailRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current += 1; }, []);
   const [bizTours, setBizTours] = useState<any[]>([]);
   const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
   const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean; settings_permissions: Record<string, boolean> | null }>>([]);
@@ -122,6 +119,8 @@ export default function SuperAdminPage() {
       const { data: admins, error } = await supabase
         .from("admin_users")
         .select("business_id")
+        .eq("suspended", false)
+        .neq("role", "SUPER_ADMIN")
         .range(from, from + PAGE - 1);
       if (error) break;
       const page = (admins || []) as { business_id: string }[];
@@ -133,21 +132,17 @@ export default function SuperAdminPage() {
   }
 
   async function updateSeatLimit(businessId: string, newLimit: number) {
+    const business = businesses.find(b => b.id === businessId);
+    if (!business || !await confirmAction({ title: `Change seats: ${business.business_name}`, message: `Set the seat limit to ${newLimit}? Billing is adjusted for the remaining billing period. Active staff cannot exceed the new limit.`, tone: "warning", confirmLabel: "Change seats" })) return;
     setSavingSeatId(businessId);
-    const val = Math.max(1, newLimit);
-    const { error } = await supabase
-      .from("businesses")
-      .update({ max_admin_seats: val })
-      .eq("id", businessId);
-    if (error) {
-      notify({ title: "Failed", message: error.message, tone: "error" });
-    } else {
-      notify({ title: "Updated", message: "Admin seat limit updated.", tone: "success" });
-      setBusinesses((prev) =>
-        prev.map((b) => (b.id === businessId ? { ...b, max_admin_seats: val } : b))
-      );
-    }
-    setSavingSeatId(null);
+    try {
+      const response = await fetch("/api/billing/seats", { method: "POST", headers: await getAuthHeaders(businessId), body: JSON.stringify({ delta: newLimit - business.max_admin_seats }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not change seats");
+      setBusinesses(prev => prev.map(b => b.id === businessId ? { ...b, max_admin_seats: result.new_seats } : b));
+      notify({ title: "Seats updated", message: business.business_name, tone: "success" });
+    } catch (error: any) { notify({ title: "Seats unchanged", message: error.message, tone: "error" }); }
+    finally { setSavingSeatId(null); }
   }
 
   async function saveSubdomain(businessId: string, raw: string) {
@@ -171,7 +166,7 @@ export default function SuperAdminPage() {
       notify({ title: "Subdomain saved", message: `${slug}.${BOOKING_DOMAIN}: all 6 booking URLs regenerated`, tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === businessId ? { ...b, subdomain: slug } : b));
       // Refresh expanded detail if this is the open one
-      if (expandedBiz === businessId) await loadBizDetail(businessId);
+      if (expandedBiz === businessId) await loadBizDetail(businessId, true);
     }
     setEditingSubdomain(null);
     setSavingSubdomain(false);
@@ -193,39 +188,50 @@ export default function SuperAdminPage() {
       notify({ title: "Regenerate failed", message: error.message, tone: "error" });
     } else {
       notify({ title: "URLs regenerated", message: "All 6 booking-site URLs reset to match the subdomain.", tone: "success" });
-      if (expandedBiz === businessId) await loadBizDetail(businessId);
+      if (expandedBiz === businessId) await loadBizDetail(businessId, true);
     }
   }
 
   async function toggleSubscriptionStatus(bizId: string, current: string) {
-    setTogglingStatusId(bizId);
     const next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
-    const { error } = await supabase.from("businesses").update({ subscription_status: next }).eq("id", bizId);
-    if (error) {
-      notify({ title: "Failed", message: error.message, tone: "error" });
-    } else {
+    const business = businesses.find(b => b.id === bizId);
+    if (!await confirmAction({ title: `${next === "SUSPENDED" ? "Suspend" : "Reactivate"}: ${business?.business_name}`, message: next === "SUSPENDED" ? "Stop new bookings and marketing for this business? Existing customer obligations remain. This manual suspension is recorded and will not be cleared automatically by a payment." : "Allow this business to accept new bookings again? Check its payment connection and outstanding issues first.", tone: "warning", confirmLabel: next === "SUSPENDED" ? "Suspend business" : "Reactivate business" })) return;
+    const reason = window.prompt("Why are you changing this business's access? This reason is saved in the audit trail.");
+    if (!reason) return;
+    setTogglingStatusId(bizId);
+    try {
+      const response = await fetch("/api/super-admin/business", { method: "POST", headers: await getAuthHeaders(bizId), body: JSON.stringify({ action: "status", business_id: bizId, status: next, expected_status: current, reason }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not change status");
       notify({ title: next === "SUSPENDED" ? "Suspended" : "Reactivated", message: "Subscription status updated to " + next + ".", tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === bizId ? { ...b, subscription_status: next } : b));
-    }
-    setTogglingStatusId(null);
+      await refreshBusiness?.();
+    } catch (error: any) { notify({ title: "Status unchanged", message: error.message, tone: "error" }); }
+    finally { setTogglingStatusId(null); }
   }
 
-  async function loadBizDetail(bizId: string) {
-    if (expandedBiz === bizId) { setExpandedBiz(null); return; }
+  async function loadBizDetail(bizId: string, refresh = false) {
+    const request = ++detailRequest.current;
+    if (expandedBiz === bizId && !refresh) { setExpandedBiz(null); setBizDetail(null); return; }
     setBizDetailLoading(true);
+    setBizDetail(null);
+    setBizTours([]);
+    setBizAdmins([]);
+    setBizFaqs([]);
     setExpandedBiz(bizId);
-
-    const { data } = await supabase.from("businesses").select("*").eq("id", bizId).single();
-    setBizDetail(data || {});
-
-    // Load tours
-    const { data: tours } = await supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order");
-    setBizTours(tours || []);
-
-    // Load admin users (hide the platform superadmin's own accounts — it's
-    // attached to every business's admin_users but should never appear here)
-    const { data: admins } = await supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role");
-    setBizAdmins((admins || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
+    try {
+    const [business, tours, admins] = await Promise.all([
+      supabase.from("businesses").select("*").eq("id", bizId).single(),
+      supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order"),
+      supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role"),
+    ]);
+    if (request !== detailRequest.current) return;
+    if (business.error || tours.error || admins.error) throw business.error || tours.error || admins.error;
+    const data = business.data;
+    if (!data || data.id !== bizId) throw new Error("Business details could not be verified. Refresh and try again.");
+    setBizDetail(data);
+    setBizTours(tours.data || []);
+    setBizAdmins((admins.data || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
 
     // Parse FAQs
     const faqRaw = data?.faq_json;
@@ -237,11 +243,15 @@ export default function SuperAdminPage() {
       }
     } else { setBizFaqs([]); }
 
-    setBizDetailLoading(false);
+    } catch (error: any) {
+      if (request === detailRequest.current) notify({ title: "Could not load this business", message: error.message, tone: "error" });
+    } finally {
+      if (request === detailRequest.current) setBizDetailLoading(false);
+    }
   }
 
   async function saveBizDetail() {
-    if (!bizDetail || !expandedBiz) return;
+    if (!bizDetail || !expandedBiz || bizDetail.id !== expandedBiz || bizDetailLoading) return;
     setBizDetailSaving(true);
 
     // Rebuild faq_json from array
@@ -314,27 +324,29 @@ export default function SuperAdminPage() {
   }
 
   async function resetAdminPassword(adminId: string, adminEmail: string) {
-    const newPassword = window.prompt(`Enter new password for ${adminEmail}:`);
-    if (!newPassword) return;
-    if (newPassword.length < 6) {
-      notify({ title: "Too short", message: "Password must be at least 6 characters.", tone: "error" });
-      return;
-    }
+    const targetBusiness = expandedBiz;
+    if (!targetBusiness || !await confirmAction({ title: "Send password setup link", message: `Send a secure password setup email to ${adminEmail}?`, confirmLabel: "Send link" })) return;
     setResettingPasswordId(adminId);
     try {
-      const res = await fetch("/api/admin/update", {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "reset_password", admin_id: adminId, password: newPassword }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Could not reset password.");
-      notify({ title: "Password reset", message: `Password updated for ${adminEmail}.`, tone: "success" });
-    } catch (err: any) {
-      notify({ title: "Reset failed", message: err.message || "Could not reset password.", tone: "error" });
-    } finally {
-      setResettingPasswordId(null);
-    }
+      await sendAdminSetupLink({ id: adminId, email: adminEmail }, "RESET", targetBusiness);
+      notify({ title: "Setup link sent", message: adminEmail, tone: "success" });
+    } catch (error: any) { notify({ title: "Could not send link", message: error.message, tone: "error" }); }
+    finally { setResettingPasswordId(null); }
+  }
+
+  async function setAdminSuspended(admin: typeof bizAdmins[number]) {
+    const targetBusiness = expandedBiz;
+    if (!targetBusiness || !await confirmAction({ title: admin.suspended ? "Reactivate staff member" : "Suspend staff member", message: `${admin.email}: ${admin.suspended ? "allow sign-in again, using an available seat" : "block access and revoke refresh sessions"}? Their records will be kept.`, tone: "warning", confirmLabel: admin.suspended ? "Reactivate" : "Suspend" })) return;
+    setChangingRoleId(admin.id);
+    try {
+      const response = await fetch("/api/admin/update", { method: "POST", headers: await getAuthHeaders(targetBusiness), body: JSON.stringify({ action: "set_suspended", admin_id: admin.id, suspended: !admin.suspended }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not update access");
+      setBizAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, suspended: !admin.suspended } : a));
+      await loadBusinesses();
+      notify({ title: "Staff access updated", message: admin.email, tone: "success" });
+    } catch (error: any) { notify({ title: "Access unchanged", message: error.message, tone: "error" }); }
+    finally { setChangingRoleId(null); }
   }
 
   async function changeAdminRole(admin: { id: string; email: string; name: string | null }, newRole: "ADMIN" | "MAIN_ADMIN") {
@@ -417,9 +429,11 @@ export default function SuperAdminPage() {
     }
 
     setSubmitting(true);
+    onboardingRequest.current ||= crypto.randomUUID();
     try {
       const res = await supabase.functions.invoke("super-admin-onboard", {
         body: {
+          idempotency_key: onboardingRequest.current,
           requester_email: requesterEmail,
           requester_password: requesterPassword,
           business_name: form.businessName,
@@ -469,6 +483,7 @@ export default function SuperAdminPage() {
         adminEmail: admin?.email || form.adminEmail,
       });
       setForm(DEFAULT_FORM);
+      onboardingRequest.current = null;
       setRequesterPassword("");
       notify({ title: "Client created", message: "The tenant environment was created successfully.", tone: "success" });
       // The sidebar's tenant switcher fetches operators once on session load —
@@ -538,6 +553,7 @@ export default function SuperAdminPage() {
             <div className="flex items-center gap-0">
               <input
                 value={form.subdomain}
+                required
                 onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
                 className="ui-control rounded-r-none rounded-lg px-3 py-2 text-sm outline-none flex-1"
                 placeholder="atlas-adventures"
@@ -577,7 +593,7 @@ export default function SuperAdminPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">WhatsApp Token</label>
-            <textarea value={form.waToken} onChange={(e) => setForm({ ...form, waToken: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="EAAG..." />
+            <input type="password" autoComplete="off" aria-label="WhatsApp token" value={form.waToken} onChange={(e) => setForm({ ...form, waToken: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="WhatsApp token" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">WhatsApp Phone ID</label>
@@ -585,11 +601,11 @@ export default function SuperAdminPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Secret Key</label>
-            <textarea value={form.yocoSecretKey} onChange={(e) => setForm({ ...form, yocoSecretKey: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="sk_live_..." />
+            <input type="password" autoComplete="off" aria-label="Yoco live secret key" value={form.yocoSecretKey} onChange={(e) => setForm({ ...form, yocoSecretKey: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="sk_live_..." />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Yoco Webhook Secret</label>
-            <textarea value={form.yocoWebhookSecret} onChange={(e) => setForm({ ...form, yocoWebhookSecret: e.target.value })} rows={4} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="whsec_..." />
+            <input type="password" autoComplete="off" aria-label="Yoco webhook secret" value={form.yocoWebhookSecret} onChange={(e) => setForm({ ...form, yocoWebhookSecret: e.target.value })} className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="whsec_..." />
           </div>
         </div>
 
@@ -1024,7 +1040,8 @@ export default function SuperAdminPage() {
                                         {admin.email} · {admin.role}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                                    <div className="flex flex-wrap items-center justify-end gap-2 ml-3">
+                                      {admin.role !== "SUPER_ADMIN" && <button onClick={() => setAdminSuspended(admin)} disabled={changingRoleId === admin.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">{admin.suspended ? "Reactivate" : "Suspend"}</button>}
                                       {admin.role !== "SUPER_ADMIN" && (
                                         <button
                                           onClick={() => changeAdminRole(admin, admin.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
@@ -1047,7 +1064,7 @@ export default function SuperAdminPage() {
                                         disabled={resettingPasswordId === admin.id}
                                         className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50 whitespace-nowrap"
                                       >
-                                        {resettingPasswordId === admin.id ? "Resetting..." : "Reset Password"}
+                                        {resettingPasswordId === admin.id ? "Sending..." : "Send setup link"}
                                       </button>
                                     </div>
                                   </div>
@@ -1099,10 +1116,11 @@ export default function SuperAdminPage() {
       <LandingPageManager businesses={businesses} />
 
       {/* ── Email Usage & Billing ── */}
+      <PlatformOperations />
       <EmailUsageBilling />
 
       {/* ── Platform Invoices (BookingTours -> operator monthly billing) ── */}
-      <PlatformInvoicesBilling />
+      <div id="platform-invoices"><PlatformInvoicesBilling /></div>
 
       {/* ── Platform Settings (BookingTours' own logo + banking) ── */}
       <PlatformSettingsPanel />
@@ -1780,7 +1798,6 @@ function EmailUsageBilling() {
   const [loading, setLoading] = useState(false);
   const [editingRate, setEditingRate] = useState<{ id: string; value: string } | null>(null);
   const [savingRate, setSavingRate] = useState(false);
-  const [generatingInvoice, setGeneratingInvoice] = useState<string | null>(null);
 
   async function loadUsage() {
     setLoading(true);
@@ -1807,7 +1824,7 @@ function EmailUsageBilling() {
 
     const combined: EmailUsageRow[] = bizData.map((b: any) => {
       const sent = usageMap.get(b.id) || 0;
-      const included = Number(b.marketing_included_emails || 500);
+      const included = Number(b.marketing_included_emails ?? 20);
       const rate = Number(b.marketing_overage_rate_zar || 0.15);
       const overage = Math.max(0, sent - included);
       return {
@@ -1848,52 +1865,6 @@ function EmailUsageBilling() {
     setSavingRate(false);
   }
 
-  async function generateInvoice(row: EmailUsageRow) {
-    if (row.overage_cost <= 0) {
-      notify({ title: "No overage", message: "This business has no overage charges for this period.", tone: "warning" });
-      return;
-    }
-    setGeneratingInvoice(row.business_id);
-
-    try {
-      // Create invoice in invoices table
-      const periodLabel = new Date(row.period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
-
-      // Get next invoice number
-      const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: row.business_id });
-      if (invNumRes.error) console.warn("next_invoice_number RPC failed, using fallback");
-      const invNum = invNumRes.data || `MKT-${row.period}-${row.business_id.substring(0, 4).toUpperCase()}`;
-
-      const { data: inv, error: invErr } = await supabase.from("invoices").insert({
-        business_id: row.business_id,
-        invoice_number: invNum,
-        customer_name: row.business_name,
-        customer_email: "",
-        tour_name: "Marketing Email Overage",
-        qty: row.overage,
-        unit_price: row.rate_zar,
-        subtotal: row.overage_cost,
-        total_amount: row.overage_cost,
-        payment_method: "Pending",
-        discount_type: null,
-        discount_percent: 0,
-        discount_amount: 0,
-        discount_notes: `${row.emails_sent} emails sent in ${periodLabel}. ${row.included} included, ${row.overage} overage at R${row.rate_zar.toFixed(2)}/email.`,
-      }).select("id, invoice_number").single();
-
-      if (invErr) throw invErr;
-
-      notify({
-        title: "Invoice created",
-        message: `Invoice ${inv.invoice_number} for R${row.overage_cost.toFixed(2)} covers ${row.overage} overage emails in ${periodLabel}`,
-        tone: "success",
-      });
-    } catch (err: any) {
-      notify({ title: "Invoice failed", message: err.message || "Unknown error", tone: "error" });
-    }
-    setGeneratingInvoice(null);
-  }
-
   const totalSent = rows.reduce((s, r) => s + r.emails_sent, 0);
   const totalOverageCost = rows.reduce((s, r) => s + r.overage_cost, 0);
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
@@ -1903,7 +1874,7 @@ function EmailUsageBilling() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Usage & Billing</h2>
-          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track emails sent per business, set per-email pricing, and generate overage invoices.</p>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track usage and pricing. Email overages are included once in the monthly Platform Invoice below.</p>
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -2020,13 +1991,7 @@ function EmailUsageBilling() {
 
               {/* Invoice button */}
               <div className="col-span-2 text-center">
-                <button
-                  onClick={() => generateInvoice(r)}
-                  disabled={r.overage_cost <= 0 || generatingInvoice === r.business_id}
-                  className="ui-btn ui-btn-primary !h-7 !px-3 !text-xs disabled:opacity-30"
-                >
-                  {generatingInvoice === r.business_id ? "..." : r.overage_cost > 0 ? "Generate Invoice" : "No charge"}
-                </button>
+                <a href="#platform-invoices" className="text-xs text-[var(--ck-accent)] underline">Monthly invoice</a>
               </div>
             </div>
           ))}
@@ -2042,6 +2007,7 @@ function EmailUsageBilling() {
    ══════════════════════════════════════════════════════════════ */
 
 type PlatformInvoiceRow = {
+  voided_invoices?: Array<{ id: string; invoice_number: string; amount_zar: number; void_reason: string }>;
   business_id: string;
   business_name: string;
   has_subscription: boolean;
@@ -2086,6 +2052,7 @@ function PlatformInvoicesBilling() {
   useEffect(() => { loadInvoices(); }, [period]);
 
   async function generate(row: PlatformInvoiceRow) {
+    if (!await confirmAction({ title: "Generate monthly invoice", message: `${row.business_name}: create a draft for ${period}? Review the amount before sending. This does not take payment.`, confirmLabel: "Generate draft" })) return;
     setBusyId(row.business_id);
     try {
       const res = await fetch("/api/platform-invoices/generate", {
@@ -2146,6 +2113,7 @@ function PlatformInvoicesBilling() {
 
   async function sendEmail(row: PlatformInvoiceRow) {
     if (!row.existing_invoice) return;
+    if (!await confirmAction({ title: "Send invoice email", message: `Send ${row.business_name}'s invoice for R${Number(row.existing_invoice.amount_zar).toFixed(2)} to their billing contact?`, confirmLabel: "Send invoice" })) return;
     setBusyId(row.business_id);
     try {
       const res = await fetch("/api/platform-invoices/send", {
@@ -2161,6 +2129,21 @@ function PlatformInvoicesBilling() {
       notify({ title: "Send failed", message: err.message, tone: "error" });
     }
     setBusyId(null);
+  }
+
+  async function voidInvoice(row: PlatformInvoiceRow) {
+    if (!row.existing_invoice) return;
+    const reason = window.prompt(`Why are you voiding ${row.business_name}'s draft? The original stays in the audit trail. Payment-linked invoices require provider cancellation first.`);
+    if (!reason) return;
+    setBusyId(row.business_id);
+    try {
+      const response = await fetch("/api/platform-invoices/void", { method: "POST", headers: await getAuthHeaders(row.business_id), body: JSON.stringify({ platform_invoice_id: row.existing_invoice.id, reason }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not void invoice");
+      await loadInvoices();
+      notify({ title: "Draft voided", message: "Correct the settings, then generate a replacement for the same month.", tone: "success" });
+    } catch (error: any) { notify({ title: "Invoice unchanged", message: error.message, tone: "error" }); }
+    finally { setBusyId(null); }
   }
 
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
@@ -2216,15 +2199,17 @@ function PlatformInvoicesBilling() {
                   {invoice && invoice.status !== "PAID" && invoice.status !== "PAID_MANUALLY" && (
                     <>
                       <button onClick={() => createPaymentLink(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">
-                        {invoice.yoco_payment_link_url ? "Recreate Link" : "Payment Link"}
+                        {invoice.yoco_payment_link_url ? "Recover Link" : "Payment Link"}
                       </button>
                       <button onClick={() => markPaidManually(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Mark Paid</button>
                       <button onClick={() => sendEmail(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Send</button>
+                      <button onClick={() => voidInvoice(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Void draft</button>
                     </>
                   )}
                   {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
                     <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
                   )}
+                  {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · R{Number(old.amount_zar).toFixed(2)} · {old.void_reason}</p>)}</details>}
                 </div>
               </div>
             );

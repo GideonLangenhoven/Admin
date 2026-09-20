@@ -83,12 +83,12 @@ describe("process-refund reissues on every cancellation path it owns", () => {
   });
 
   it("voucher-only bookings get a reissue instead of a dead-end error", () => {
-    expect(PR).toContain("maxCashRefund <= 0 && voucherPaid > 0");
+    expect(PR).toContain("totalCaptured <= 0 && voucherPaid > 0");
     expect(PR).toContain('channel: "voucher"');
   });
 
   it("the customer is told about the reissued voucher", () => {
-    expect(PR).toContain("reissued as voucher ");
-    expect(PR).toContain("voucher_code: reissued.code");
+    expect(PR).toContain("Voucher credit: ");
+    expect(PR).toContain("voucher_code: reissued?.code");
   });
 });

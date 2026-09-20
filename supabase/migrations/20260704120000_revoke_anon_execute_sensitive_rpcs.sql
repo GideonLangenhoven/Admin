@@ -41,4 +41,4 @@ GRANT  EXECUTE ON FUNCTION public.set_yoco_test_credentials(uuid, text, text, te
 -- deduct_voucher_balance: admin booking-detail page calls it directly as an
 -- authenticated user, so keep authenticated; strip PUBLIC/anon.
 REVOKE EXECUTE ON FUNCTION public.deduct_voucher_balance(uuid, numeric) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.deduct_voucher_balance(uuid, numeric) TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION public.deduct_voucher_balance(uuid, numeric) TO authenticated, service_role;;

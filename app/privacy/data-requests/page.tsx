@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { getAuthHeaders } from "../../lib/admin-auth";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
 
@@ -45,14 +45,12 @@ export default function DataRequestsPage() {
   }, []);
 
   async function authHeaders() {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    return getAuthHeaders(businessId);
   }
 
   async function load() {
     setLoading(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = await getAuthHeaders(businessId);
     const r = await fetch("/api/admin/data-requests", { headers });
     if (r.ok) {
       const data = await r.json();
@@ -241,7 +239,7 @@ export default function DataRequestsPage() {
                   {isPrivileged && ["CONFIRMED", "IN_REVIEW"].includes(r.status) && (
                     <div className="flex gap-1.5 shrink-0">
                       {r.request_type === "ACCESS" && (
-                        <button
+                        <button data-demo-action="privacy.export"
                           onClick={() => handleExport(r.id)}
                           disabled={actionLoading}
                           className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px]"
@@ -250,7 +248,7 @@ export default function DataRequestsPage() {
                         </button>
                       )}
                       {r.request_type === "DELETION" && (
-                        <button
+                        <button data-demo-action="privacy.fulfill"
                           onClick={() => handleFulfill(r.id)}
                           disabled={actionLoading}
                           className="ui-btn ui-btn-danger !h-8 !px-3 !text-[12.5px]"
@@ -279,7 +277,7 @@ export default function DataRequestsPage() {
                       placeholder="Reason for rejection (e.g. active refund dispute)"
                       className="ui-control flex-1 text-sm"
                     />
-                    <button
+                    <button data-demo-action="privacy.reject"
                       onClick={() => handleReject(r.id)}
                       disabled={actionLoading || rejectReason.trim().length < 5}
                       className="ui-btn ui-btn-danger !px-3 !text-[12.5px]"

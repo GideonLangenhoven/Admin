@@ -135,7 +135,7 @@ export type BlockBInput = {
   terminology?: unknown;          // businesses.terminology (object)
   faqJson?: unknown;              // businesses.faq_json (object)
   bookingUrl?: string | null;
-  tours: Array<{ name: string; price: number; durationMinutes: number; description?: string | null }>;
+  tours: Array<{ name: string; price: number; durationMinutes: number; description?: string | null; meetingPoint?: string | null }>;
 };
 
 export type BlockCInput = {
@@ -183,7 +183,8 @@ export function buildBlockB(input: BlockBInput): string {
   if (tours.length > 0) {
     parts.push("### TOURS\n" + tours.map((t) => {
       const desc = String(t.description || "").trim().replace(/\s+/g, " ").slice(0, 200);
-      return "• " + t.name + ": R" + Math.round(Number(t.price) || 0) + " per person, " + formatDuration(t.durationMinutes) + (desc ? ". " + desc : "");
+      const meetingPoint = String(t.meetingPoint || "").trim();
+      return "• " + t.name + ": R" + Math.round(Number(t.price) || 0) + " per person, " + formatDuration(t.durationMinutes) + (desc ? ". " + desc : "") + (meetingPoint ? ". Meeting point: " + meetingPoint : "");
     }).join("\n"));
   }
 

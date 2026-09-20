@@ -21,19 +21,16 @@
 --    service_role — so drop the policy entirely.
 
 BEGIN;
-
 -- 1. reviews -----------------------------------------------------------------
 DROP POLICY IF EXISTS reviews_authenticated_read ON public.reviews;
 CREATE POLICY reviews_authenticated_read ON public.reviews
   FOR SELECT TO authenticated
   USING (business_id = ANY (public.current_business_ids()));
-
 DROP POLICY IF EXISTS reviews_authenticated_update ON public.reviews;
 CREATE POLICY reviews_authenticated_update ON public.reviews
   FOR UPDATE TO authenticated
   USING (business_id = ANY (public.current_business_ids()))
   WITH CHECK (business_id = ANY (public.current_business_ids()));
-
 -- 2. vouchers anon insert — may only create PENDING (unspendable) vouchers -----
 DROP POLICY IF EXISTS vouchers_anon_insert ON public.vouchers;
 CREATE POLICY vouchers_anon_insert ON public.vouchers
@@ -42,8 +39,6 @@ CREATE POLICY vouchers_anon_insert ON public.vouchers
     status = 'PENDING'
     AND business_id::text = public.bt_request_header('x-tenant-business-id')
   );
-
 -- 3. vouchers anon update — no legitimate anon voucher mutation exists ---------
 DROP POLICY IF EXISTS vouchers_anon_update ON public.vouchers;
-
 COMMIT;

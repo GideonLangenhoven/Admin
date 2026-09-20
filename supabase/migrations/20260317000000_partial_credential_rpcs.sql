@@ -28,10 +28,8 @@ begin
   end if;
 end;
 $$;
-
 grant execute on function public.set_wa_credentials(uuid, text, text) to service_role;
 revoke execute on function public.set_wa_credentials(uuid, text, text) from anon, authenticated;
-
 -- ── Yoco only ──────────────────────────────────────────────────────────────
 create or replace function public.set_yoco_credentials(
   p_business_id           uuid,
@@ -55,6 +53,5 @@ begin
   end if;
 end;
 $$;
-
 grant execute on function public.set_yoco_credentials(uuid, text, text) to service_role;
 revoke execute on function public.set_yoco_credentials(uuid, text, text) from anon, authenticated;

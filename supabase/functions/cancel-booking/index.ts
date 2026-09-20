@@ -41,10 +41,10 @@ async function verifyAdminSession(req: any) {
     if (authErr || !userRes?.user) return null;
     const { data: admin } = await supabase
       .from("admin_users")
-      .select("id, business_id, role, suspended")
+      .select("id, business_id, role, suspended, read_only")
       .eq("user_id", userRes.user.id)
       .maybeSingle();
-    if (!admin || admin.suspended) return null;
+    if (!admin || admin.suspended || admin.read_only) return null;
     return {
       user_id: userRes.user.id as string,
       business_id: admin.business_id as string,
@@ -109,59 +109,20 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ error: "You can only cancel bookings for your own business" }), { status: 403, headers: getCors(req) });
     }
 
-    if (booking.status === "CANCELLED") {
-      return new Response(JSON.stringify({ error: "Booking is already cancelled" }), { status: 400, headers: getCors(req) });
-    }
-
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
     const cancelReason = String(reason || "Cancelled by admin").trim() || "Cancelled by admin";
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
-    const isPaid = ["PAID", "CONFIRMED"].includes(booking.status);
-    const refundAmount = isPaid ? Number(booking.total_amount || 0) : 0;
-    const nowIso = new Date().toISOString();
-
-    // 24h forfeit rule: a cancellation within 24 hours of the trip start (or
-    // after it) forfeits the booking — no reschedule/voucher/refund choice —
-    // unless the admin explicitly grants it via allow_late_choice.
-    const slotStartIso = (booking as any).slots?.start_time as string | undefined;
-    const isLate = !!slotStartIso && new Date(slotStartIso).getTime() - Date.now() < 24 * 60 * 60 * 1000;
-    const offerChoice = isPaid && refundAmount > 0 && (!isLate || allow_late_choice === true);
-    const isForfeit = isPaid && refundAmount > 0 && !offerChoice;
-
-    // Update booking row (mirrors weather-cancel's refund_status=ACTION_REQUIRED pattern)
-    const { error: updErr } = await supabase.from("bookings").update({
-      status: "CANCELLED",
-      cancellation_reason: cancelReason,
-      cancelled_at: nowIso,
-      ...(offerChoice ? {
-        refund_status: "ACTION_REQUIRED",
-        refund_amount: refundAmount,
-        refund_notes: "Admin cancellation. Customer to choose: reschedule, voucher, or refund via My Bookings",
-      } : {}),
-      ...(isForfeit ? {
-        refund_notes: "Cancelled within 24h of trip start. Booking forfeited per cancellation policy",
-      } : {}),
-    }).eq("id", booking_id);
-
-    if (updErr) {
-      return new Response(JSON.stringify({ error: "Failed to update booking: " + updErr.message }), { status: 500, headers: getCors(req) });
-    }
-
-    // Cancel any active holds
-    await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", booking_id).eq("status", "ACTIVE");
-
-    // Release slot capacity (atomic single update)
-    if (booking.slot_id) {
-      // S3: atomic RPC, no read-modify-write
-      const qty = Number(booking.qty || 0);
-      await supabase.rpc("adjust_slot_capacity", {
-        p_slot_id: booking.slot_id,
-        p_business_id: booking.business_id,
-        p_booked_delta: -qty,
-        p_held_delta: booking.status === "HELD" ? -qty : 0,
-      });
-    }
+    const cancelled = await supabase.rpc("cancel_booking_transaction", {
+      p_booking_id: booking_id, p_business_id: booking.business_id, p_reason: cancelReason,
+      p_allow_late_choice: allow_late_choice === true, p_weather: false,
+    });
+    if (cancelled.error || !cancelled.data?.ok) return new Response(JSON.stringify({ error: cancelled.data?.error || "Could not cancel booking" }), { status: 409, headers: getCors(req) });
+    if (cancelled.data.already_cancelled) return new Response(JSON.stringify(cancelled.data), { headers: getCors(req) });
+    const isPaid = cancelled.data.is_paid;
+    const refundAmount = Number(cancelled.data.refund_amount || 0);
+    const offerChoice = cancelled.data.refund_action_required;
+    const isForfeit = cancelled.data.late_forfeit;
 
     const ref = String(booking_id).substring(0, 8).toUpperCase();
     const tourName = (booking as any).tours?.name || "Tour";

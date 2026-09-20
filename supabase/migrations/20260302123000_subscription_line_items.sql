@@ -79,13 +79,11 @@ begin
   return null;
 end;
 $$;
-
 drop trigger if exists ck_subscriptions_after_write on public.subscriptions;
 create trigger ck_subscriptions_after_write
 after insert on public.subscriptions
 for each row
 execute function public.ck_after_subscription_write();
-
 insert into public.billing_line_items (
   business_id,
   source_type,
@@ -117,7 +115,6 @@ where s.status = 'ACTIVE'
       and li.source_id = s.id
       and li.kind = 'RECURRING'
   );
-
 insert into public.billing_line_items (
   business_id,
   source_type,

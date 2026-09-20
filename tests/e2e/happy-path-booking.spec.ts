@@ -13,12 +13,17 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
   test.setTimeout(120_000);
 
   test.beforeAll(() => {
-    if (process.env.LIVE_PAYMENT_E2E === "1") requireAdminCreds();
+    if (process.env.LIVE_PAYMENT_E2E === "1") {
+      requireAdminCreds();
+      expect(process.env.BASE_URL, "Dedicated test storefront URL required").toBeTruthy();
+      expect(process.env.ADMIN_URL, "Dedicated test administrator URL required").toBeTruthy();
+      expect(process.env.TEST_CUSTOMER_EMAIL, "Approved test email required").toBeTruthy();
+      expect(process.env.TEST_CUSTOMER_PHONE, "Approved test phone required").toBeTruthy();
+    }
   });
 
   test("end-to-end booking via Yoco test card", async ({ browser }) => {
-    // No tenant has Yoco TEST keys configured, so the TEST-MODE guard below can
-    // never pass unattended. Opt in explicitly once a sandbox tenant exists.
+    // Provider payments are a separate, explicitly invoked release gate.
     test.skip(
       process.env.LIVE_PAYMENT_E2E !== "1",
       "Set LIVE_PAYMENT_E2E=1 (plus ADMIN_EMAIL/ADMIN_PASSWORD and a tenant with Yoco test keys) to run.",
@@ -28,18 +33,30 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     // ============================================================
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
-    await assertAdminTestModeOn(adminPage, ADMIN_URL, ADMIN_EMAIL, ADMIN_PASSWORD);
+    const testBusinessId = await assertAdminTestModeOn(adminPage, ADMIN_URL, ADMIN_EMAIL, ADMIN_PASSWORD);
 
     // ============================================================
     // STEP 1 — Customer lands on booking site, picks a tour
     // ============================================================
     const customerContext = await browser.newContext();
     const page = await customerContext.newPage();
+    // Abort before inserting anything if the supplied storefront is not the
+    // dedicated business whose TEST configuration was just verified.
+    await page.route("**/rest/v1/bookings*", async route => {
+      if (route.request().method() === "POST") {
+        const draft = route.request().postDataJSON();
+        if (draft?.business_id !== testBusinessId) {
+          await route.abort();
+          throw new Error("ABORT: storefront and test administrator belong to different businesses");
+        }
+      }
+      await route.continue();
+    });
     await page.goto(BASE_URL + "/");
     await page.waitForLoadState("networkidle");
 
     // Wait for tour data to load, then click "Book Now" on the first tour card
-    const bookBtn = page.getByText(/book now/i).first();
+    const bookBtn = page.locator('button[data-shot="tour-card"]').first();
     await expect(bookBtn).toBeVisible({ timeout: 20_000 });
     await bookBtn.click();
 
@@ -56,18 +73,14 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
       // Wait for calendar to load
       await page.waitForTimeout(800);
       const dateButtons = page.locator(
-        "button:not([disabled]).aspect-square",
+        'button[data-shot="calendar-day"]:not([disabled])',
       );
       const count = await dateButtons.count();
       for (let i = 0; i < count; i++) {
         const btn = dateButtons.nth(i);
-        // Check the button has the green dot indicator (available date)
-        const dot = btn.locator("span.bg-teal-500");
-        if ((await dot.count()) > 0) {
-          await btn.click();
-          datePicked = true;
-          break;
-        }
+        await btn.click();
+        datePicked = true;
+        break;
       }
       if (!datePicked) {
         // Click next-month arrow
@@ -103,16 +116,12 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     await page.locator("#book-email").fill(TEST_CUSTOMER.email);
     await page.locator("#book-phone").fill(TEST_CUSTOMER.phone);
 
-    // Check marketing opt-in if visible
-    const optIn = page.getByText(/agree to receive/i);
-    if (await optIn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await optIn.click();
-    }
+    await page.getByRole("checkbox", { name: /I accept the.*Terms/i }).check();
 
     // ============================================================
     // STEP 5 — Click "Pay R__ Securely"
     // ============================================================
-    const payBtn = page.locator("button").filter({ hasText: /Pay R\d+.*Securely/i });
+    const payBtn = page.getByRole("button", { name: /^Pay R[\d,.]+ now/ });
     await expect(payBtn).toBeVisible({ timeout: 5_000 });
     await expect(payBtn).toBeEnabled();
     await payBtn.click();
@@ -120,16 +129,8 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     // ============================================================
     // STEP 6 — Intermediate "Finalizing Checkout" screen
     // ============================================================
-    await expect(page.getByText(/Finalizing Checkout/i)).toBeVisible({ timeout: 10_000 });
-    const portalLink = page.getByText(/Proceed to Secure Portal/i);
-    await expect(portalLink).toBeVisible({ timeout: 10_000 });
-
-    // Navigate to Yoco hosted checkout
-    const portalHref = await portalLink.getAttribute("href");
-    expect(portalHref, "Yoco checkout URL should be present").toBeTruthy();
-
-    // Follow the link — Yoco hosted checkout is on a different domain
-    await page.goto(portalHref!);
+    // The current storefront redirects automatically after reserving the seat.
+    await page.waitForURL(url => url.hostname === "payments.yoco.com" || url.hostname.endsWith(".yoco.com"), { timeout: 30_000 });
     await page.waitForLoadState("domcontentloaded");
 
     // ============================================================
@@ -183,11 +184,12 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     // Extract booking reference from URL or page content
     const successUrl = page.url();
     const refParam = new URL(successUrl).searchParams.get("ref");
+    expect(refParam, "A specific booking reference is required").toBeTruthy();
 
     // ============================================================
     // STEP 9 — Verify booking appears in admin dashboard
     // ============================================================
-    await adminPage.goto(ADMIN_URL + "/bookings", {
+    await adminPage.goto(ADMIN_URL + "/bookings/" + refParam, {
       waitUntil: "domcontentloaded",
     });
     await adminPage.waitForLoadState("networkidle");
@@ -222,11 +224,7 @@ test.describe("Happy path: customer books, admin sees, confirmation queued", () 
     // Verify a PAID booking exists for this customer email.
     // (Other rows with the same email may be EXPIRED — filter for the one
     //  that is also PAID.)
-    const paidRow = adminPage
-      .locator("tr")
-      .filter({ hasText: TEST_CUSTOMER.email })
-      .filter({ hasText: /PAID/i })
-      .first();
+    const paidRow = adminPage.getByText(/^PAID$/i).first();
     await expect(paidRow, "Expected a PAID booking row for the customer email").toBeVisible({
       timeout: 10_000,
     });

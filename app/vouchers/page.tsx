@@ -229,7 +229,7 @@ export default function Vouchers() {
       </div>
 
       <div className="anim-fade-up anim-d1 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <form onSubmit={createVoucher} className="ui-card p-4">
+        <form data-demo-submit="voucher.create" onSubmit={createVoucher} className="ui-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Create voucher</h3>

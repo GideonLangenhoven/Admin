@@ -84,3 +84,13 @@ describe("subscription gate — which statuses trade", () => {
     expect(auth).toContain('return { active: false, status: "UNKNOWN" }');
   });
 });
+
+describe("single-plan pricing fallback", () => {
+  const billing = readFileSync("app/api/billing/subscription/route.ts", "utf8");
+
+  it("falls back to Standard at R2,000 with one included seat and R500 additional seats", () => {
+    expect(billing).toContain('name: "Standard", monthly_price_zar: 2000, extra_seat_price_zar: 500, included_seats: 1');
+    expect(billing).toContain('sub?.plan_id || "standard"');
+    expect(billing).not.toContain('monthly_price_zar: 1500');
+  });
+});

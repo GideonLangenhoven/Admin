@@ -11,6 +11,7 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
+import { bookingVoucherBalances } from "../_shared/voucher-balances.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,19 +34,26 @@ Deno.serve(async (req: any) => {
     const supabase = createServiceClient();
     const body = await req.json();
     const bookingId = String(body.booking_id || "");
+    const businessId = req.headers.get("x-tenant-business-id") || "";
+    const bookingToken = typeof body.booking_token === "string" ? body.booking_token : "";
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: cors() });
+    }
+    if (!businessId || !bookingToken) {
+      return new Response(JSON.stringify({ error: "Booking proof required" }), { status: 403, headers: cors() });
     }
 
     const br = await supabase
       .from("bookings")
       .select("*, slots(start_time), tours(name)")
       .eq("id", bookingId)
+      .eq("business_id", businessId)
+      .eq("waiver_token", bookingToken)
       .maybeSingle();
 
     if (!br.data) {
-      return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: cors() });
+      return new Response(JSON.stringify({ error: "Booking proof invalid" }), { status: 403, headers: cors() });
     }
 
     const booking = br.data;
@@ -125,6 +133,32 @@ Deno.serve(async (req: any) => {
     let emailSent = false;
     let waError = "";
     let emailError = "";
+
+    // Voucher-only checkout used to send arbitrary email payloads from the
+    // anonymous browser. Keep the notification, but derive both recipient and
+    // balance here after the paid-booking/idempotency checks. Cash + voucher
+    // payments already send this from the payment webhook.
+    if (booking.email && Number(booking.total_amount) === 0 && Number(booking.voucher_amount_paid) > 0) {
+      try {
+        const balances = await bookingVoucherBalances(supabase, booking.id, booking.business_id);
+        for (const voucher of balances || []) {
+          const { error } = await supabase.functions.invoke("send-email", {
+            body: { type: "VOUCHER_BALANCE", data: {
+              business_id: booking.business_id,
+              email: booking.email,
+              customer_name: booking.customer_name,
+              voucher_code: voucher.code,
+              original_value: voucher.value,
+              amount_used: voucher.amount_used,
+              remaining_balance: voucher.current_balance,
+              booking_ref: ref,
+              tour_name: tourName,
+            } },
+          });
+          if (error) console.error("VOUCHER_BALANCE_EMAIL_ERR:", error);
+        }
+      } catch (error) { console.error("VOUCHER_BALANCE_EMAIL_ERR:", error); }
+    }
 
     // Email is the canonical confirmation; WhatsApp only when no email on file.
     if (!booking.email && booking.phone) {

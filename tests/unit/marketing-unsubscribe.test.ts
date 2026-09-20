@@ -37,12 +37,12 @@ describe("marketing unsubscribe (item 10)", () => {
   });
 
   it("campaign dispatch re-checks contact status at send time, not just at enqueue time", () => {
-    expect(dispatch).toContain("unsubscribedContactIds.has(item.contact_id)");
+    expect(dispatch).toContain('contact.status !== "active"');
     expect(dispatch).toContain("Recipient unsubscribed before send");
   });
 
   it("automation dispatch exits an enrollment when the contact has unsubscribed", () => {
-    expect(automationDispatch).toContain('contact.status === "unsubscribed"');
+    expect(automationDispatch).toContain('contact.status !== "active"');
     expect(automationDispatch).toContain('status: "exited"');
   });
 });

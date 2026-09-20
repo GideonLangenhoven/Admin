@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
-import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime } from "../lib/admin-timezone";
+import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime, normalize24HourTime } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -15,6 +15,27 @@ import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+function TimeInput({ name, value, onChange }: { name?: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      name={name}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={5}
+      placeholder="HH:MM"
+      value={value}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        const normalized = normalize24HourTime(value);
+        if (normalized) onChange(normalized);
+      }}
+      className="ui-control mt-1 w-full tabular-nums"
+    />
+  );
+}
 
 export default function SlotsPage() {
   return (
@@ -414,8 +435,9 @@ function Slots() {
 
   async function saveSlotEdit() {
     if (!selectedSlot) return;
-    if (!editForm.time) {
-      notify({ title: "Time required", message: "Please enter a valid time.", tone: "warning" });
+    const normalizedTime = normalize24HourTime(editForm.time);
+    if (!normalizedTime) {
+      notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" });
       return;
     }
 
@@ -423,7 +445,7 @@ function Slots() {
 
     const priceVal = editForm.price.trim() === "" ? null : Number(editForm.price);
 
-    const [newHours, newMins] = editForm.time.split(":").map(Number);
+    const [newHours, newMins] = normalizedTime.split(":").map(Number);
     const tz = getAdminTimezone();
     const originalLocal = utcToLocalParts(selectedSlot.start_time, tz);
     const originalHrs = originalLocal.hours;
@@ -463,7 +485,7 @@ function Slots() {
         if (conflict) {
           notify({
             title: "Time already taken",
-            message: `There's already a slot at ${editForm.time} for this tour on this date. Pick a different time.`,
+            message: `There's already a slot at ${normalizedTime} for this tour on this date. Pick a different time.`,
             tone: "warning",
           });
           setSaving(false);
@@ -547,6 +569,12 @@ function Slots() {
       return;
     }
 
+    const normalizedBulkTime = bulkForm.newTime === "" ? "" : normalize24HourTime(bulkForm.newTime);
+    if (normalizedBulkTime === null) {
+      notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" });
+      return;
+    }
+
     setSavingBulk(true);
 
     const baseUpdates: any = {};
@@ -557,7 +585,7 @@ function Slots() {
     }
 
     try {
-      if (bulkForm.newTime !== "") {
+      if (normalizedBulkTime !== "") {
         // Need to fetch slots to manually calculate new start_time keeping the same date
         let fetchQuery = supabase
           .from("slots")
@@ -571,7 +599,7 @@ function Slots() {
         if (fetchErr) throw fetchErr;
 
         if (slotsToUpdate) {
-          const [newHours, newMins] = bulkForm.newTime.split(":").map(Number);
+          const [newHours, newMins] = normalizedBulkTime.split(":").map(Number);
           const tz = getAdminTimezone();
           const promises = slotsToUpdate.map(slot => {
             return supabase.from("slots").update({
@@ -612,12 +640,13 @@ function Slots() {
   async function saveAddSlot() {
     if (!addForm.tourId) { notify({ title: "Tour required", message: "Please select a tour.", tone: "warning" }); return; }
     if (addForm.ranges.some((r) => !r.start || !r.end)) { notify({ title: "Date range required", message: "Every date range needs a start and an end date.", tone: "warning" }); return; }
-    if (!addForm.time) { notify({ title: "Time required", message: "Please enter a time.", tone: "warning" }); return; }
+    const normalizedAddTime = normalize24HourTime(addForm.time);
+    if (!normalizedAddTime) { notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" }); return; }
     if (!addForm.capacity || Number(addForm.capacity) <= 0) { notify({ title: "Invalid capacity", message: "Please enter a valid capacity.", tone: "warning" }); return; }
 
     setSavingAdd(true);
 
-    const [hours, mins] = addForm.time.split(":").map(Number);
+    const [hours, mins] = normalizedAddTime.split(":").map(Number);
     const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
     const tz = getAdminTimezone();
 
@@ -834,12 +863,8 @@ function Slots() {
             <div className="space-y-4">
               <label className="block text-sm text-gray-600">
                 Time
-                <input
-                  type="time"
-                  value={editForm.time}
-                  onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
-                  className="ui-control mt-1 w-full"
-                />
+                <span className="mb-1 block text-xs text-gray-400">24-hour time, for example 14:00.</span>
+                <TimeInput value={editForm.time} onChange={(time) => setEditForm({ ...editForm, time })} />
               </label>
 
               <label className="block text-sm text-gray-600">
@@ -871,7 +896,7 @@ function Slots() {
             {/* Save time/capacity/price changes — never affects status/bookings */}
             <div className="mt-6 grid grid-cols-2 gap-2">
               <button onClick={() => setSelectedSlot(null)} className="ui-btn ui-btn-ghost">Close window</button>
-              <button onClick={saveSlotEdit} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+              <button data-demo-action="slot.save" onClick={saveSlotEdit} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
                 {saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -881,7 +906,7 @@ function Slots() {
               <p className="ui-mono-label !text-[10px] mb-2">Manage this slot</p>
               <div className="space-y-2">
                 {selectedSlot.status === "OPEN" ? (
-                  <button
+                  <button data-demo-action="slot.close"
                     onClick={() => closeSlot(selectedSlot)}
                     disabled={slotStatusSaving || cancellingSlot}
                     className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
@@ -890,7 +915,7 @@ function Slots() {
                     <span className="font-semibold">Close slot</span>
                   </button>
                 ) : (
-                  <button
+                  <button data-demo-action="slot.reopen"
                     onClick={() => reopenSlot(selectedSlot)}
                     disabled={slotStatusSaving || cancellingSlot}
                     className="ui-btn ui-btn-ghost w-full justify-start disabled:opacity-50"
@@ -899,14 +924,14 @@ function Slots() {
                     <span className="font-semibold">Reopen slot</span>
                   </button>
                 )}
-                <button
+                <button data-demo-action="slot.cancel"
                   onClick={() => cancelSlotAndRefund(selectedSlot)}
                   disabled={cancellingSlot || slotStatusSaving}
                   className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
                 >
                   <span className="font-semibold">{cancellingSlot ? "Cancelling…" : "Cancel & notify guests"}</span>
                 </button>
-                <button
+                <button data-demo-action="slot.weather"
                   onClick={() => cancelSlotAndRefund(selectedSlot, true)}
                   disabled={cancellingSlot || slotStatusSaving}
                   className="ui-btn ui-btn-danger w-full justify-start disabled:opacity-50"
@@ -961,13 +986,11 @@ function Slots() {
 
               <label className="block text-sm text-gray-600">
                 New Time
-                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times.</span>
-                <input
+                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times. Use 24-hour time, for example 14:00.</span>
+                <TimeInput
                   name="bulk_new_time"
-                  type="time"
                   value={bulkForm.newTime}
-                  onChange={(e) => setBulkForm({ ...bulkForm, newTime: e.target.value })}
-                  className="ui-control mt-1 w-full"
+                  onChange={(newTime) => setBulkForm({ ...bulkForm, newTime })}
                 />
               </label>
 
@@ -1006,7 +1029,7 @@ function Slots() {
               >
                 Cancel
               </button>
-              <button
+              <button data-demo-action="slot.bulk"
                 onClick={saveBulkEdit}
                 data-help-submit=""
                 disabled={savingBulk || !bulkForm.startDate || !bulkForm.endDate}
@@ -1044,13 +1067,11 @@ function Slots() {
               </label>
 
               <label className="block text-sm text-gray-600">
-                Time (SA Time)
-                <input
+                Time (24-hour SA time)
+                <TimeInput
                   name="slot_time"
-                  type="time"
                   value={addForm.time}
-                  onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
-                  className="ui-control mt-1 w-full"
+                  onChange={(time) => setAddForm({ ...addForm, time })}
                 />
               </label>
 
@@ -1124,7 +1145,7 @@ function Slots() {
               >
                 Cancel
               </button>
-              <button
+              <button data-demo-action="slot.create"
                 onClick={saveAddSlot}
                 data-help-submit=""
                 disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
@@ -1161,7 +1182,7 @@ function Slots() {
               >
                 Go Back
               </button>
-              <button
+              <button data-demo-action="slot.cancel-days"
                 onClick={handleCancelDay}
                 disabled={cancellingWeather || selectedCancelDates.length === 0}
                 className="ui-btn disabled:opacity-50"
@@ -1200,7 +1221,7 @@ function Slots() {
               >
                 Cancel
               </button>
-              <button
+              <button data-demo-action="slot.reopen-days"
                 onClick={handleReopenDay}
                 disabled={reopeningDay || selectedCancelDates.length === 0}
                 className="ui-btn ui-btn-primary disabled:opacity-50"

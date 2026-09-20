@@ -18,7 +18,6 @@ DROP POLICY IF EXISTS bookings_anon_insert ON public.bookings;
 CREATE POLICY bookings_anon_insert ON public.bookings
   FOR INSERT TO anon
   WITH CHECK (status IN ('DRAFT', 'PENDING'));
-
 -- P1 — combo_bookings had SELECT policy "Anyone can read combo_bookings"
 -- (FOR SELECT TO public USING (true)) while anon holds the table SELECT grant, so
 -- any anonymous client could page every tenant's combo bookings including

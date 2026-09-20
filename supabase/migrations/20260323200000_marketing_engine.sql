@@ -18,34 +18,25 @@ CREATE TABLE IF NOT EXISTS public.marketing_contacts (
 
   CONSTRAINT unique_contact_per_business UNIQUE (business_id, email)
 );
-
 CREATE INDEX IF NOT EXISTS idx_marketing_contacts_business ON public.marketing_contacts (business_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_contacts_status   ON public.marketing_contacts (business_id, status);
-
 ALTER TABLE public.marketing_contacts ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.marketing_contacts TO service_role;
-
 CREATE POLICY marketing_contacts_service
   ON public.marketing_contacts FOR ALL
   USING (auth.role() = 'service_role');
-
 CREATE POLICY marketing_contacts_select_own
   ON public.marketing_contacts FOR SELECT
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_contacts_insert_own
   ON public.marketing_contacts FOR INSERT
   WITH CHECK (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_contacts_update_own
   ON public.marketing_contacts FOR UPDATE
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_contacts_delete_own
   ON public.marketing_contacts FOR DELETE
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
-
 ---------------------------------------------------------------------------
 -- 2. marketing_templates
 ---------------------------------------------------------------------------
@@ -61,33 +52,24 @@ CREATE TABLE IF NOT EXISTS public.marketing_templates (
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_marketing_templates_business ON public.marketing_templates (business_id);
-
 ALTER TABLE public.marketing_templates ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.marketing_templates TO service_role;
-
 CREATE POLICY marketing_templates_service
   ON public.marketing_templates FOR ALL
   USING (auth.role() = 'service_role');
-
 CREATE POLICY marketing_templates_select_own
   ON public.marketing_templates FOR SELECT
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_templates_insert_own
   ON public.marketing_templates FOR INSERT
   WITH CHECK (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_templates_update_own
   ON public.marketing_templates FOR UPDATE
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_templates_delete_own
   ON public.marketing_templates FOR DELETE
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
-
 ---------------------------------------------------------------------------
 -- 3. marketing_campaigns
 ---------------------------------------------------------------------------
@@ -108,30 +90,22 @@ CREATE TABLE IF NOT EXISTS public.marketing_campaigns (
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_business ON public.marketing_campaigns (business_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_status   ON public.marketing_campaigns (status);
-
 ALTER TABLE public.marketing_campaigns ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.marketing_campaigns TO service_role;
-
 CREATE POLICY marketing_campaigns_service
   ON public.marketing_campaigns FOR ALL
   USING (auth.role() = 'service_role');
-
 CREATE POLICY marketing_campaigns_select_own
   ON public.marketing_campaigns FOR SELECT
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_campaigns_insert_own
   ON public.marketing_campaigns FOR INSERT
   WITH CHECK (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
 CREATE POLICY marketing_campaigns_update_own
   ON public.marketing_campaigns FOR UPDATE
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
-
 ---------------------------------------------------------------------------
 -- 4. marketing_queue
 ---------------------------------------------------------------------------
@@ -147,51 +121,39 @@ CREATE TABLE IF NOT EXISTS public.marketing_queue (
   sent_at       timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_marketing_queue_dispatch
   ON public.marketing_queue (status, created_at)
   WHERE status = 'pending';
-
 CREATE INDEX IF NOT EXISTS idx_marketing_queue_campaign ON public.marketing_queue (campaign_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_queue_business ON public.marketing_queue (business_id);
-
 ALTER TABLE public.marketing_queue ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.marketing_queue TO service_role;
-
 CREATE POLICY marketing_queue_service
   ON public.marketing_queue FOR ALL
   USING (auth.role() = 'service_role');
-
 CREATE POLICY marketing_queue_select_own
   ON public.marketing_queue FOR SELECT
   USING (business_id IN (SELECT au.business_id FROM public.admin_users au WHERE au.id = auth.uid()));
-
-
 ---------------------------------------------------------------------------
 -- 5. Billing: add marketing_email_usage to businesses
 ---------------------------------------------------------------------------
 ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS marketing_email_usage int NOT NULL DEFAULT 0;
-
-
 ---------------------------------------------------------------------------
 -- 6. Storage bucket for marketing assets (images, logos, etc.)
 ---------------------------------------------------------------------------
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('marketing-assets', 'marketing-assets', true)
 ON CONFLICT (id) DO NOTHING;
-
 CREATE POLICY marketing_assets_select
   ON storage.objects FOR SELECT
   USING (bucket_id = 'marketing-assets');
-
 CREATE POLICY marketing_assets_insert
   ON storage.objects FOR INSERT
   WITH CHECK (
     bucket_id = 'marketing-assets'
     AND auth.role() IN ('authenticated', 'service_role')
   );
-
 CREATE POLICY marketing_assets_delete
   ON storage.objects FOR DELETE
   USING (

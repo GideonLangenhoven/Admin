@@ -1,16 +1,19 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
+import { fetchAllRows } from "../supabase/functions/_shared/pagination";
 
 const PUBLIC_PATHS = ["/change-password", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
 const SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 30 * 60 * 1000;
+const DEMO_EMAIL = "info@bookingtours.co.za";
+const DEMO_PASSWORD = "TEST123!";
 
 interface OperatorOption {
   id: string;
@@ -38,6 +41,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Business context from login/session
   const [businessId, setBusinessId] = useState("");
+  const contextRequestRef = useRef(0);
   const [businessName, setBusinessName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
@@ -45,15 +49,31 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [operators, setOperators] = useState<OperatorOption[]>([]);
   const [subscriptionStatus, setSubscriptionStatus] = useState("ACTIVE");
   const [yocoTestMode, setYocoTestMode] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
   const [notice, setNotice] = useState("");
+  const [demoLoginAttempted, setDemoLoginAttempted] = useState(false);
   // Set when the host names a different operator than the signed-in session.
   const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
     setHasHint(document.cookie.includes("ck_session_hint=1"));
-    validateSession();
+    validateSession().catch((error) => {
+      console.error("Session validation failed:", error);
+      setError("We couldn't verify your account. Please try signing in again.");
+      setChecking(false);
+    });
     checkLockout();
   }, []);
+
+  useEffect(() => {
+    if (checking || authed || demoLoginAttempted || new URLSearchParams(window.location.search).get("demo") !== "1") return;
+    setDemoLoginAttempted(true);
+    setEmail(DEMO_EMAIL);
+    setPass(DEMO_PASSWORD);
+    login(DEMO_EMAIL, DEMO_PASSWORD);
+  // login is intentionally omitted: the one-shot flag prevents repeat attempts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checking, authed, demoLoginAttempted]);
 
   function checkLockout() {
     const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
@@ -70,16 +90,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
     const targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
-    const baseQuery = supabase
-      .from("businesses")
-      .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
-      .order("business_name", { ascending: true });
-
-    const businessesRes = isMultiOperator
-      ? await baseQuery
-      : await baseQuery.eq("id", defaultBusinessId);
-
-    const businessRows = (businessesRes.data || []) as Array<{
+    const businessRows = await fetchAllRows((from, to) => {
+      let query = supabase.from("businesses")
+        .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
+        .order("business_name", { ascending: true }).order("id").range(from, to);
+      if (!isMultiOperator) query = query.eq("id", defaultBusinessId);
+      return query;
+    }) as Array<{
       id: string;
       name: string | null;
       business_name: string | null;
@@ -144,7 +161,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     const { data } = await supabase
       .from("admin_users")
-      .select("role, business_id, name, settings_permissions")
+      .select("role, business_id, name, settings_permissions, read_only")
       .eq("email", savedEmail)
       .maybeSingle();
 
@@ -158,6 +175,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setOperators(context.operators);
       setSubscriptionStatus(context.subscriptionStatus);
       setYocoTestMode(context.yocoTestMode || false);
+      setReadOnly(data.read_only === true);
       setHostMismatch(context.hostMismatch);
       localStorage.setItem("ck_admin_role", data.role);
       localStorage.setItem("ck_admin_business_id", context.businessId);
@@ -167,9 +185,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setAuthed(true);
       document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
       document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+      document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
     } else if (data) {
       // Admin exists but no business_id — legacy admin, still allow access
       setRole(data.role);
+      setReadOnly(data.read_only === true);
       setTimezone("UTC");
       setOperators([]);
       localStorage.setItem("ck_admin_role", data.role);
@@ -178,6 +198,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setAuthed(true);
       document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
       document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+      document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
     } else {
       await clearSession();
     }
@@ -185,6 +206,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function clearSession() {
+    contextRequestRef.current++;
     try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
@@ -197,6 +219,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("ck_admin_settings_perms");
     document.cookie = "ck_session_hint=;path=/;max-age=0";
     document.cookie = "ck_admin_role=;path=/;max-age=0";
+    document.cookie = "ck_demo_read_only=;path=/;max-age=0";
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
@@ -206,10 +229,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setOperators([]);
     setSubscriptionStatus("ACTIVE");
     setYocoTestMode(false);
+    setReadOnly(false);
     setHostMismatch(null);
   }
 
-  async function login() {
+  async function login(loginEmail = email, loginPassword = pass) {
     const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
     if (lockUntil > Date.now()) {
       setLocked(true);
@@ -222,11 +246,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setNotice("");
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmail = loginEmail.trim().toLowerCase();
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, password: pass }),
+        body: JSON.stringify({ email: normalizedEmail, password: loginPassword }),
       });
       const data: any = await res.json().catch(() => ({}));
 
@@ -292,9 +316,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
 
       setRole(adminInfo.role);
+      setReadOnly(adminInfo.read_only === true);
       // Set ck_admin_role cookie immediately so proxy.ts page-gating works on the
       // very next navigation (without waiting for validateSession to run on next mount).
       document.cookie = "ck_admin_role=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
+      document.cookie = "ck_demo_read_only=" + (adminInfo.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
 
       if (adminInfo.business_id) {
         const context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
@@ -311,6 +337,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       setAuthed(true);
+      if (new URLSearchParams(window.location.search).get("demo") === "1") {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("demo");
+        window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+      }
     } catch (err: any) {
       console.error("LOGIN_ERR", err);
       setError(err?.message || "Login failed. Please try again.");
@@ -337,10 +368,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   function switchOperator(nextBusinessId: string) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
-    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
+    contextRequestRef.current++;
+    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+    localStorage.setItem("ck_admin_business_id", nextBusinessId);
     setBusinessId(nextOperator.id);
     setBusinessName(nextOperator.name);
     setLogoUrl(nextOperator.logoUrl || "");
@@ -358,7 +390,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (hasHint) {
       // Skeleton of the real shell: pine rail + paper content
       return (
-        <div className="flex min-h-screen">
+        <div role="main" className="flex min-h-screen">
           <div
             className="hidden md:block w-64 shrink-0 border-r"
             style={{
@@ -388,7 +420,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card w-full max-w-sm p-8 text-center">
           <BrandMark size={40} className="mx-auto mb-4 animate-pulse" />
           <p className="text-sm ui-text-muted">Checking admin session...</p>
@@ -402,7 +434,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!authed) return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div role="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="anim-fade-up w-full max-w-sm">
         <div className="ui-card relative overflow-hidden p-8 text-center" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
           {/* Pine crown with the brand trail — the card wears the badge */}
@@ -436,6 +468,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
                 placeholder="Email address"
+                aria-label="Email address"
                 autoComplete="email"
                 className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
@@ -443,13 +476,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
                 placeholder="Password"
+                aria-label="Password"
                 autoComplete="current-password"
                 className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
 
               {error && <p className="mb-3 text-xs" style={{ color: "var(--ck-danger)" }}>{error}</p>}
               {notice && <p className="mb-3 text-xs" style={{ color: "var(--ck-success)" }}>{notice}</p>}
 
-              <button onClick={login} disabled={loading} className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50">
+              <button onClick={() => login()} disabled={loading} className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50">
                 {loading ? "Signing in..." : "Sign In"}
               </button>
 
@@ -469,7 +503,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (hostMismatch) {
     const ownHost = hostMismatch.ownSub + ".admin.bookingtours.co.za";
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
           <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"></path></svg>
@@ -495,7 +529,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const allowedWhileSuspended = pathname === "/billing" && role === "MAIN_ADMIN";
   if ((subscriptionStatus === "SUSPENDED" || subscriptionStatus === "PAUSED") && role !== "SUPER_ADMIN" && !allowedWhileSuspended) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
         <div className="ui-card anim-fade-up w-full max-w-md p-8 text-center space-y-4">
           <div className="ui-icon-chip mx-auto !h-12 !w-12 !rounded-full" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,48V208a16,16,0,0,1-16,16H164a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h36A16,16,0,0,1,216,48ZM92,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H92a16,16,0,0,0,16-16V48A16,16,0,0,0,92,32Z"></path></svg>
@@ -527,8 +561,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     // until a hard reload. Re-running loadBusinessContext (without any role
     // change) reseeds the active operator and the sidebar updates in place.
     if (!businessId) return;
+    const requestId = ++contextRequestRef.current;
     try {
       const context = await loadBusinessContext(role, businessId);
+      if (requestId !== contextRequestRef.current) return;
       setBusinessId(context.businessId);
       setBusinessName(context.businessName);
       setLogoUrl(context.logoUrl);
@@ -543,7 +579,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, operators, switchOperator, refreshBusiness }}>
+    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>
       {children}
     </BusinessProvider>
   );

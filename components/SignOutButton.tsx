@@ -5,6 +5,7 @@ export default function SignOutButton({ variant = "sidebar" }: { variant?: "side
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
     localStorage.removeItem("ck_admin_email");
+    document.cookie = "ck_demo_read_only=;path=/;max-age=0";
     window.location.reload();
   }
 

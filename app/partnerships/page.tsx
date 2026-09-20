@@ -417,7 +417,7 @@ export default function PartnershipsPage() {
             placeholder="Partner operator's admin email"
             className="ui-control flex-1 text-sm"
           />
-          <button onClick={invitePartner} disabled={inviting || !inviteEmail.trim()} className="ui-btn ui-btn-primary">
+          <button data-demo-action="partner.invite" onClick={invitePartner} disabled={inviting || !inviteEmail.trim()} className="ui-btn ui-btn-primary">
             {inviting ? "Sending…" : "Invite Partner"}
           </button>
         </div>
@@ -442,10 +442,10 @@ export default function PartnershipsPage() {
                 </div>
                 <span className={"ui-status " + (p.status === "ACTIVE" ? "ui-pill-success" : p.status === "PENDING" ? "ui-pill-warning" : "ui-pill-neutral")}>{p.status}</span>
                 {p.status === "PENDING" && p.initiated_by !== businessId && (
-                  <button onClick={() => partnershipAction("accept", p.id)} disabled={busy === p.id} className="ui-btn ui-btn-primary !py-1.5 text-[12px]">Accept</button>
+                  <button data-demo-action="partner.accept" onClick={() => partnershipAction("accept", p.id)} disabled={busy === p.id} className="ui-btn ui-btn-primary !py-1.5 text-[12px]">Accept</button>
                 )}
                 {p.status !== "REVOKED" && (
-                  <button onClick={() => partnershipAction("revoke", p.id)} disabled={busy === p.id} className="ui-btn ui-btn-danger !py-1.5 text-[12px]">Revoke</button>
+                  <button data-demo-action="partner.revoke" onClick={() => partnershipAction("revoke", p.id)} disabled={busy === p.id} className="ui-btn ui-btn-danger !py-1.5 text-[12px]">Revoke</button>
                 )}
               </div>
             ))}
@@ -571,7 +571,7 @@ export default function PartnershipsPage() {
             <div className="rounded-xl border p-3" style={{ borderColor: "var(--ck-border)" }}>
               <RuleFields value={newRules} onChange={(patch) => setNewRules((d) => ({ ...d, ...patch }))} />
             </div>
-            <button onClick={createOffer} disabled={savingOffer} className="ui-btn ui-btn-primary">{savingOffer ? "Creating…" : "Create Offer"}</button>
+            <button data-demo-action="partner.offer" onClick={createOffer} disabled={savingOffer} className="ui-btn ui-btn-primary">{savingOffer ? "Creating…" : "Create Offer"}</button>
           </div>
         )}
 
@@ -599,14 +599,14 @@ export default function PartnershipsPage() {
                   >
                     {rulesFor === o.id ? "Close" : "Rules"}
                   </button>
-                  <button onClick={() => toggleOffer(o)} disabled={busy === o.id} className="ui-btn !py-1.5 text-[12px]">
+                  <button data-demo-action={o.active ? "partner.deactivate" : "partner.activate"} onClick={() => toggleOffer(o)} disabled={busy === o.id} className="ui-btn !py-1.5 text-[12px]">
                     {o.active ? "Deactivate" : "Activate"}
                   </button>
                 </div>
                 {rulesFor === o.id && (
                   <div className="mt-3 space-y-3 rounded-xl border p-3" style={{ borderColor: "var(--ck-border)" }}>
                     <RuleFields value={rulesDraft} onChange={(patch) => setRulesDraft((d) => ({ ...d, ...patch }))} />
-                    <button onClick={() => saveRules(o)} disabled={busy === o.id} className="ui-btn ui-btn-primary !py-1.5 text-[12px]">
+                    <button data-demo-action="partner.rules" onClick={() => saveRules(o)} disabled={busy === o.id} className="ui-btn ui-btn-primary !py-1.5 text-[12px]">
                       {busy === o.id ? "Saving…" : "Save rules"}
                     </button>
                   </div>
@@ -741,7 +741,7 @@ export default function PartnershipsPage() {
                     </a>
                   )}
                   {owedToMe > 0 && (!pendingToMe || amountChanged) && (
-                    <button
+                    <button data-demo-action="partner.link"
                       onClick={() => generatePaymentLink(s)}
                       disabled={linkBusy === s.partner_id}
                       className="ui-btn ui-btn-primary !py-1.5 text-[12px]"
@@ -762,7 +762,7 @@ export default function PartnershipsPage() {
                   value={settleNotes[s.partner_id] || ""}
                   onChange={(e) => setSettleNotes((n) => ({ ...n, [s.partner_id]: e.target.value }))}
                 />
-                <button onClick={() => markSettled(s)} disabled={settling === s.partner_id} className="ui-btn ui-btn-primary">
+                <button data-demo-action="partner.settle" onClick={() => markSettled(s)} disabled={settling === s.partner_id} className="ui-btn ui-btn-primary">
                   {settling === s.partner_id ? "Recording…" : `Mark ${s.unsettled_count} Settled`}
                 </button>
               </div>

@@ -17,9 +17,7 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists enforce_chat_booking_pricing on public.bookings;
-
 create trigger enforce_chat_booking_pricing
 before insert or update of source, qty, unit_price, original_total, total_amount, status
 on public.bookings

@@ -1,13 +1,11 @@
 // Unified LLM completion for the chat bots (WhatsApp + web chat).
 //
 // Primary:  OpenRouter — env OPENROUTER_API_KEY, model env OPENROUTER_MODEL
-//           (default deepseek/deepseek-v4-flash). OpenAI-compatible, so the
+//           (default openai/gpt-5.6-luna). OpenAI-compatible, so the
 //           model can be swapped without any code change.
-// Thinking: OFF by default for every model. The bots answer short, grounded,
-//           retrieval-backed questions under a 60-word cap; chain-of-thought
-//           bills as output tokens and forces a 45s timeout floor, which is
-//           the wrong trade for a chat reply. Set OPENROUTER_REASONING_EFFORT
-//           (high|xhigh) to turn it back on globally.
+// Thinking: HIGH by default. Set OPENROUTER_REASONING_EFFORT=off to disable it
+//           globally; thinking calls get a 45s timeout floor and extra token
+//           budget so reasoning does not consume the customer-facing reply.
 // Fallback: Google Gemini — legacy path, env GEMINI_API_KEY + GEMINI_MODEL.
 //
 // Every completion is metered into llm_usage (business_id, call-site label,
@@ -50,12 +48,10 @@ export const QUOTA_FNS = ["wa-faq", "wa-ask", "web-faq", "wa-v2"];
 const HARD_CEILING_MULTIPLE = 3;
 
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
-const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") || "deepseek/deepseek-v4-flash";
-// "xhigh" is OpenRouter's maximum effort and maps to DeepSeek Think Max
-// ("max" itself is not a valid OpenRouter effort value).
-const REASONING_EFFORT = (Deno.env.get("OPENROUTER_REASONING_EFFORT") || "off")
+const OPENROUTER_MODEL = Deno.env.get("OPENROUTER_MODEL") || "openai/gpt-5.6-luna";
+const REASONING_EFFORT = (Deno.env.get("OPENROUTER_REASONING_EFFORT") || "high")
   .toLowerCase()
-  .replace(/^max$/, "xhigh"); // accept "max" — that's DeepSeek's marketing name for it
+  .replace(/^max$/, "xhigh");
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
@@ -175,12 +171,12 @@ export async function llmText(opts: LlmOpts): Promise<string | null> {
           // message.content, so replies stay clean with thinking on or off.
           reasoning: thinking ? { enabled: true, effort } : { enabled: false },
           messages: [{ role: "system", content: opts.system }, ...msgs],
-          max_tokens: opts.maxTokens ?? 150,
+          max_tokens: (opts.maxTokens ?? 150) * (thinking ? 5 : 1),
           temperature: opts.temperature ?? 0.7,
           // OpenRouter has no session/sticky-routing field — `user` is a
           // stable end-user identifier used for abuse detection. It does NOT
-          // control prompt-cache affinity; DeepSeek caching is automatic and
-          // keyed on the prompt prefix.
+          // control prompt-cache affinity; provider caching is keyed on the
+          // prompt prefix.
           ...(opts.userKey ? { user: opts.userKey } : {}),
           // POPIA provider constraints (all envs unset = no-op); see openrouter-provider.ts
           ...(OPENROUTER_PROVIDER_PREFS ? { provider: OPENROUTER_PROVIDER_PREFS } : {}),

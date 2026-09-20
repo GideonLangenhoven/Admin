@@ -9,18 +9,10 @@ export async function cancelBookingAction(bookingId: string, opts: { reason?: st
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return { ok: false, error: "Session expired" };
 
-    if (opts.weather) {
-      const wRes = await supabase.functions.invoke("weather-cancel", {
-        body: { booking_ids: [bookingId], reason: opts.reason || "weather conditions" },
-      });
-      if (wRes.error) return { ok: false, error: wRes.error.message };
-      return { ok: true, data: wRes.data };
-    }
-
     const res = await fetch(SU + "/functions/v1/cancel-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-      body: JSON.stringify({ booking_id: bookingId, reason: opts.reason || "Cancelled by admin" }),
+      body: JSON.stringify({ booking_id: bookingId, reason: (opts.weather ? "Weather cancellation: " : "") + (opts.reason || "Cancelled by admin"), allow_late_choice: opts.weather === true }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.error) return { ok: false, error: data?.error || res.statusText };
@@ -32,36 +24,9 @@ export async function cancelBookingAction(bookingId: string, opts: { reason?: st
 
 export async function refundBookingAction(bookingId: string): Promise<ActionResult> {
   try {
-    const { data: booking } = await supabase.from("bookings").select("total_amount, yoco_checkout_id").eq("id", bookingId).single();
-    if (!booking) return { ok: false, error: "Booking not found" };
-
-    const amount = Number(booking.total_amount || 0);
-    if (amount <= 0) return { ok: false, error: "Nothing to refund" };
-
-    if (booking.yoco_checkout_id) {
-      // process-refund authorizes the caller — send the admin's session JWT.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return { ok: false, error: "Session expired" };
-      const res = await fetch(SU + "/functions/v1/process-refund", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ booking_id: bookingId, amount }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error) return { ok: false, error: data?.error || res.statusText };
-      return { ok: true, data };
-    }
-
-    const { error } = await supabase.from("bookings").update({
-      status: "CANCELLED",
-      refund_status: "PROCESSED",
-      refund_amount: amount,
-      refund_notes: "Full manual refund via bulk action: R" + amount.toFixed(2),
-      cancellation_reason: "Auto-cancelled: refund processed by admin (bulk)",
-      cancelled_at: new Date().toISOString(),
-    }).eq("id", bookingId);
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    const response = await supabase.functions.invoke("process-refund", { body: { booking_id: bookingId } });
+    if (response.error || !response.data?.ok) return { ok: false, error: response.data?.error || response.error?.message || "Refund request failed" };
+    return { ok: true, data: response.data };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };
   }
@@ -70,7 +35,7 @@ export async function refundBookingAction(bookingId: string): Promise<ActionResu
 export async function markPaidAction(bookingId: string): Promise<ActionResult> {
   try {
     const res = await supabase.functions.invoke("manual-mark-paid", {
-      body: { action: "mark_paid", booking_id: bookingId },
+      body: { action: "mark_paid", booking_id: bookingId, payment_method: "EFT" },
     });
     if (res.error) return { ok: false, error: res.error.message };
     if (res.data?.error) return { ok: false, error: res.data.error };
@@ -82,8 +47,10 @@ export async function markPaidAction(bookingId: string): Promise<ActionResult> {
 
 export async function checkInAction(bookingId: string): Promise<ActionResult> {
   try {
-    const { error } = await supabase.from("bookings").update({ status: "CONFIRMED" }).eq("id", bookingId);
+    const { data, error } = await supabase.from("bookings").update({ checked_in: true, checked_in_at: new Date().toISOString() })
+      .eq("id", bookingId).in("status", ["PAID", "CONFIRMED"]).eq("waiver_status", "SIGNED").select("id").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "Check-in requires a confirmed booking and signed waiver" };
     return { ok: true };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
 
+import { OTA_DIRECT_CONNECTIONS_AVAILABLE, OTA_UNAVAILABLE_MESSAGE } from "../../../supabase/functions/_shared/ota-readiness";
+
 const VALID_CHANNELS = ["VIATOR", "GETYOURGUIDE"];
 
 function serviceClient() {
@@ -35,10 +37,12 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     channel,
+    available: OTA_DIRECT_CONNECTIONS_AVAILABLE,
+    unavailable_reason: OTA_DIRECT_CONNECTIONS_AVAILABLE ? null : OTA_UNAVAILABLE_MESSAGE,
     configured: !!data?.api_key_encrypted,
     secret_configured: !!data?.api_secret_encrypted,
     webhook_configured: !!data?.webhook_secret_encrypted,
-    enabled: data?.enabled ?? false,
+    enabled: OTA_DIRECT_CONNECTIONS_AVAILABLE && (data?.enabled ?? false),
     test_mode: data?.test_mode ?? true,
     last_sync_at: data?.last_sync_at ?? null,
     last_sync_status: data?.last_sync_status ?? null,
@@ -52,11 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
   }
 
-  const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
-  if (!encryptionKey || encryptionKey.length < 32) {
-    return NextResponse.json({ error: "SETTINGS_ENCRYPTION_KEY not configured" }, { status: 500 });
-  }
-
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
@@ -68,9 +67,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not your business" }, { status: 403 });
   }
 
+  // Disabling remains possible, including for previously enabled rows. No
+  // operator credentials or test-mode setting can bypass provider certification.
+  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE && !(action === "toggle_enabled" && enabled === false)) {
+    return NextResponse.json({ code: "OTA_NOT_READY", error: OTA_UNAVAILABLE_MESSAGE }, { status: 409 });
+  }
+
   const supabase = serviceClient();
 
   if (action === "save_credentials") {
+    const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
+    if (!encryptionKey || encryptionKey.length < 32) {
+      return NextResponse.json({ error: "SETTINGS_ENCRYPTION_KEY not configured" }, { status: 500 });
+    }
     if (!api_key?.trim()) return NextResponse.json({ error: "API key / Client ID is required" }, { status: 400 });
     const { error: rpcErr } = await supabase.rpc("set_ota_credentials", {
       p_business_id: business_id,

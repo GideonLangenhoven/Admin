@@ -7,8 +7,6 @@
 --
 -- Fix: suffix each anonymized conversation phone with its row id so it stays
 -- unique, and make the update idempotent on re-runs. No other changes.
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.anonymize_customer(
   p_customer_id uuid, p_business_id uuid, p_request_id uuid, p_admin_id uuid, p_email text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
@@ -69,6 +67,4 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.anonymize_customer(uuid, uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;
-
-COMMIT;
+REVOKE ALL ON FUNCTION public.anonymize_customer(uuid, uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;;

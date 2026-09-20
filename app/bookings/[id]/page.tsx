@@ -749,7 +749,7 @@ export default function BookingDetailPage() {
             >
               {markPaidOpen ? "Cancel" : "Mark as Paid"}
             </button>
-            <button
+            <button data-demo-action="booking.payment"
               onClick={resendPaymentLink}
               disabled={resendingPayment}
               className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
@@ -805,7 +805,7 @@ export default function BookingDetailPage() {
             >
               Cancel
             </button>
-            <button
+            <button data-demo-action="booking.paid"
               onClick={markBookingPaid}
               disabled={markPaidLoading}
               className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
@@ -836,7 +836,7 @@ export default function BookingDetailPage() {
                 }} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                   Cancel
                 </button>
-                <button onClick={saveCustomerDetails} disabled={savingCustomer} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50">
+                <button data-demo-action="booking.contact" onClick={saveCustomerDetails} disabled={savingCustomer} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50">
                   {savingCustomer ? "Saving..." : "Save"}
                 </button>
               </>
@@ -960,7 +960,7 @@ export default function BookingDetailPage() {
                 >
                   Cancel
                 </button>
-                <button
+                <button data-demo-action="booking.reduce"
                   onClick={reduceGuests}
                   disabled={reduceGuestsLoading}
                   className="ui-btn !h-8 !px-3 !text-xs disabled:opacity-50"
@@ -1070,7 +1070,7 @@ export default function BookingDetailPage() {
                   maxLength={20}
                   className="ui-control flex-1 font-mono uppercase placeholder:normal-case"
                 />
-                <button
+                <button data-demo-action="booking.code"
                   onClick={applyCode}
                   disabled={codeApplying || !codeInput.trim()}
                   className="ui-btn ui-btn-primary whitespace-nowrap disabled:opacity-50"
@@ -1086,7 +1086,7 @@ export default function BookingDetailPage() {
 
               {/* Resend Payment Link */}
               {isPending && Number(booking.total_amount) > 0 && (
-                <button
+                <button data-demo-action="booking.payment"
                   onClick={resendPaymentLink}
                   disabled={resendingPayment}
                   className="ui-btn w-full mt-3 disabled:opacity-50"

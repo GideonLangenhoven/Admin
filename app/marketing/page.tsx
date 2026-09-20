@@ -409,7 +409,7 @@ export default function MarketingOverview() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {canCancel ? (
-                          <button
+                          <button data-demo-action={c.status === "scheduled" ? "campaign.cancel" : "campaign.pause"}
                             type="button"
                             onClick={() => cancelCampaign(c)}
                             className="ui-btn ui-btn-danger h-7 px-2.5 text-[11px]"

@@ -15,10 +15,9 @@ test.describe("Smoke", () => {
 
   test("booking site home renders with at least one tour", async ({ page }) => {
     await gotoWithAbortRetry(page, BASE_URL + "/");
-    // Tour cards expose accessible labels like "Book <tour name>". .first():
-    // any tenant with 2+ tours renders multiple matches, which strict mode
-    // rejects even for a visibility check.
-    await expect(page.getByRole("button", { name: /^Book / }).first()).toBeVisible({ timeout: 45_000 });
+    // Card names derive from the visible tenant copy, including prices and
+    // descriptions. Use the stable tour hook across different client wording.
+    await expect(page.locator('button[data-shot="tour-card"]').first()).toBeVisible({ timeout: 45_000 });
   });
 
   test("chat widget opens and shows input", async ({ page }) => {

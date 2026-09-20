@@ -6,6 +6,7 @@ import AuthGate from "../components/AuthGate";
 import AppShell from "../components/AppShell";
 import AppNotifications from "../components/AppNotifications";
 import ThemeProvider from "../components/ThemeProvider";
+import { DEMO_BOOKING_SITE_URL } from "./lib/demo-guide";
 
 /* Brand type system (docs/BRAND.md + docs/ADMIN_REDESIGN_SPEC.md):
    Satoshi — geometric display face for page titles and hero numerals.
@@ -37,11 +38,15 @@ export const metadata: Metadata = {
 
 const nav = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: DEMO_BOOKING_SITE_URL, label: "Booking Site", icon: "Globe", demoOnly: true, external: true },
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
+  { href: "/guide", label: "Guide App", icon: "Check", demoOnly: true },
+  { href: "/photos", label: "Trip Photos", icon: "Camera", demoOnly: true },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },
+  { href: "/customers", label: "Customers", icon: "Users", demoOnly: true },
   { href: "/vouchers", label: "Vouchers", icon: "Ticket" },
   { href: "/invoices", label: "Invoices", icon: "Receipt" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
@@ -56,6 +61,8 @@ const nav = [
   // MVP: temporarily hidden — uncomment + remove from HIDDEN_FOR_MVP in proxy.ts to re-enable
   // { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
   { href: "/settings/chat-faq", label: "Chat FAQ", icon: "MessageCircle", privilegedOnly: true },
+  { href: "/notifications", label: "Failed Notifications", icon: "Warning", privilegedOnly: true, demoOnly: true },
+  { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true, demoOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   // superAdminOnly — visible to SUPER_ADMIN only
   // MVP: temporarily hidden — uncomment + remove from HIDDEN_FOR_MVP in proxy.ts to re-enable

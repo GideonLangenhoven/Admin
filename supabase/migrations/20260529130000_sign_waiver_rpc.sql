@@ -50,6 +50,5 @@ BEGIN
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.sign_waiver(uuid, uuid, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.sign_waiver(uuid, uuid, text, jsonb) TO anon, authenticated, service_role;

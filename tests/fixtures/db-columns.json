@@ -33,6 +33,7 @@
     "onboarding_completed_at",
     "password_hash",
     "password_set_at",
+    "read_only",
     "role",
     "settings_permissions",
     "setup_token_expires_at",
@@ -104,6 +105,8 @@
     "cancelled_at",
     "checked_in",
     "checked_in_at",
+    "checkout_priced_at",
+    "checkout_request",
     "combo_booking_id",
     "completed_at",
     "confirmation_sent_at",
@@ -126,6 +129,7 @@
     "id",
     "invoice_id",
     "is_combo",
+    "last_amendment_id",
     "marketing_opt_in",
     "original_total",
     "ota_channel",
@@ -148,6 +152,7 @@
     "refund_error",
     "refund_notes",
     "refund_processed_at",
+    "refund_request_id",
     "refund_status",
     "reminder_queued",
     "reschedule_count",
@@ -175,6 +180,7 @@
     "waiver_token",
     "waiver_token_expires_at",
     "yoco_checkout_id",
+    "yoco_mode",
     "yoco_payment_id"
   ],
   "broadcasts": [
@@ -575,6 +581,7 @@
   ],
   "holds": [
     "booking_id",
+    "checkout_request",
     "created_at",
     "expires_at",
     "hold_type",
@@ -986,6 +993,8 @@
     "completed_at",
     "created_at",
     "diff",
+    "expected_amount_cents",
+    "expected_currency",
     "expired_at",
     "hold_id",
     "id",
@@ -995,7 +1004,9 @@
     "new_tour_id",
     "new_unit_price",
     "old_slot_id",
-    "status"
+    "status",
+    "yoco_checkout_id",
+    "yoco_mode"
   ],
   "pii_anonymization_log": [
     "affected_tables",
@@ -1273,6 +1284,7 @@
     "buyer_email",
     "buyer_name",
     "buyer_phone",
+    "checkout_request",
     "code",
     "created_at",
     "current_balance",
@@ -1295,7 +1307,8 @@
     "type",
     "value",
     "value_amount",
-    "yoco_checkout_id"
+    "yoco_checkout_id",
+    "yoco_mode"
   ],
   "wa_messages": [
     "body",
@@ -1331,5 +1344,32 @@
     "last_activity_at",
     "session_id",
     "state_data"
+  ],
+  "refund_operations": [
+    "id",
+    "business_id",
+    "booking_id",
+    "request_id",
+    "source_business_id",
+    "checkout_id",
+    "amount",
+    "currency",
+    "mode",
+    "status",
+    "provider_id",
+    "error",
+    "keep_booking",
+    "created_at",
+    "updated_at"
+  ],
+  "voucher_reservations": [
+    "id",
+    "voucher_id",
+    "booking_id",
+    "business_id",
+    "amount",
+    "status",
+    "created_at",
+    "expires_at"
   ]
 }

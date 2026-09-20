@@ -12,7 +12,6 @@
 -- has. It is unrelated to combo bookings (separate tables, cross-tenant by
 -- design; this feature is single-tenant only).
 BEGIN;
-
 -- Simplify back to pure direct-capacity math (the resource_capacity CTE and
 -- its LEAST() clamp are removed; list_available_slots/slot_has_capacity call
 -- this function and need no changes themselves).
@@ -26,8 +25,6 @@ AS $function$
   from public.slots s
   where s.id = p_slot_id
 $function$;
-
 DROP TABLE IF EXISTS public.tour_resources;
 DROP TABLE IF EXISTS public.resources;
-
 COMMIT;

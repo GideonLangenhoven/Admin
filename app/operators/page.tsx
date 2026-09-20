@@ -28,7 +28,7 @@ function MarketingView() {
           <div className="ui-card p-6">
             <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{plan.name}</h2>
             <p className="font-display mt-2 text-[30px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{zar(plan.price)}<span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>/month</span></p>
-            <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Setup fee: {zar(3500)} once-off</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>R0 setup fee · 1 admin seat included</p>
             <ul className="mt-4 space-y-2 text-sm" style={{ color: "var(--ck-text)" }}>
               <li>{plan.seats} admin seat included</li>
               <li>{zar(plan.extraSeat)}/month per additional seat</li>

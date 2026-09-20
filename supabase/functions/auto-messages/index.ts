@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { withSentry } from "../_shared/sentry.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -37,13 +38,15 @@ async function logSent(businessId: string, bookingId: string, phone: string, typ
   return (data || []).length > 0;
 }
 
-async function getBusinesses() {
+async function getBusinesses(businessId: string | null) {
   // Paginate past the PostgREST 1000-row cap so tenants beyond #1000 are not
   // silently skipped.
   const pageSize = 1000;
   const all: Array<{ id: string }> = [];
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await db.from("businesses").select("id").range(from, from + pageSize - 1);
+    let query = db.from("businesses").select("id").order("id").range(from, from + pageSize - 1);
+    if (businessId) query = query.eq("id", businessId);
+    const { data, error } = await query;
     if (error) throw error;
     const rows = data || [];
     all.push(...rows as Array<{ id: string }>);
@@ -571,10 +574,12 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
 // Manual, per-booking payment reminder — fired from the Bookings page action menu.
 // Sends regardless of the enabled/window gates (the admin explicitly asked), and
 // records a PAYMENT_REMINDER so the automated sweep won't pile a duplicate on top.
-async function sendOnePaymentReminder(bookingId: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: b } = await db.from("bookings")
+async function sendOnePaymentReminder(bookingId: string, businessId: string | null): Promise<{ ok: boolean; error?: string }> {
+  let query = db.from("bookings")
     .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, tours(name), slots(start_time)")
-    .eq("id", bookingId).maybeSingle();
+    .eq("id", bookingId);
+  if (businessId) query = query.eq("business_id", businessId);
+  const { data: b } = await query.maybeSingle();
   if (!b) return { ok: false, error: "Booking not found" };
   if (!(b as any).payment_url) return { ok: false, error: "This booking has no payment link to send." };
   const bk: any = b;
@@ -614,6 +619,11 @@ async function sendOnePaymentReminder(bookingId: string): Promise<{ ok: boolean;
 
 Deno.serve(withSentry("auto-messages", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getHeaders(req.headers.get("origin")) });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: getHeaders(req.headers.get("origin")) });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getHeaders(req.headers.get("origin")) }); }
+  const businessId = auth.isServiceRole || auth.role === "SUPER_ADMIN" ? null : auth.businessId;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -623,11 +633,11 @@ Deno.serve(withSentry("auto-messages", async (req) => {
     if (action === "payment_reminder_one") {
       const bookingId = String(body.booking_id || "");
       if (!bookingId) return new Response(JSON.stringify({ ok: false, error: "booking_id required" }), { status: 400, headers: getHeaders(req.headers.get("origin")) });
-      const r = await sendOnePaymentReminder(bookingId);
+      const r = await sendOnePaymentReminder(bookingId, businessId);
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: getHeaders(req.headers.get("origin")) });
     }
 
-    const businesses = await getBusinesses();
+    const businesses = await getBusinesses(businessId);
     const results: Record<string, number> = {
       reminders: 0,
       reviews: 0,

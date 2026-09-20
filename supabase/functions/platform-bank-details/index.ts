@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Mirrors supabase/functions/bank-details/index.ts's get/set shape, but for
 // the platform_settings singleton (BookingTours' own bank account, not any
@@ -8,6 +9,7 @@
 // that Next.js route.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -23,7 +25,11 @@ function fail(msg: string, status = 400) {
   return new Response(JSON.stringify({ error: msg }), { status, headers: { "Content-Type": "application/json" } });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentry("platform-bank-details", async (req) => {
+  // Gateway verification is disabled: enforce service-only access here too.
+  if (req.method !== "POST") return fail("Method not allowed", 405);
+  try { if (!(await requireAuth(req)).isServiceRole) return fail("Service access required", 403); }
+  catch { return fail("Unauthorized", 401); }
   if (!SETTINGS_ENCRYPTION_KEY) return fail("Encryption key not configured", 503);
 
   let body: any;
@@ -63,4 +69,4 @@ Deno.serve(async (req) => {
   }
 
   return fail("Unknown action: " + action);
-});
+}));

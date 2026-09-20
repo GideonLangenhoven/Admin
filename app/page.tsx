@@ -527,7 +527,7 @@ export default function Dashboard() {
             fetchManifest(today, tomorrow),
             fetchManifest(tomorrow, dayAfter),
             // ACTION_REQUIRED excluded — those await the customer's remediation choice, not operator action
-            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).eq("refund_status", "REQUESTED"),
+            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"]),
             supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
             Promise.all([
                 supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
@@ -631,7 +631,7 @@ export default function Dashboard() {
 
     /* ── skeleton — mirrors the real layout, no spinners ── */
     if (loading) return (
-        <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
+        <div className="flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6">
             <div className="flex items-end justify-between gap-4 pt-2 mb-8">
                 <div className="space-y-2.5">
                     <div className="ui-skeleton h-3 w-44" />
@@ -656,16 +656,16 @@ export default function Dashboard() {
     );
 
     return (
-        <div className="space-y-6 max-w-[1400px] mx-auto pb-10">
+        <div className="flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6">
             {/* Dashboard Header */}
-            <div className="anim-fade-up flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pt-2">
+            <div className="anim-fade-up order-0 flex items-end justify-between gap-4 pt-1 lg:pt-2">
                 <div>
                     <p className="ui-mono-label mb-2">
                         {new Date(now).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: getAdminTimezone() })}
                     </p>
                     <h2 className="font-display text-[28px] md:text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Dashboard</h2>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="hidden items-center gap-3 sm:flex">
                     <Link href="/new-booking" className="ui-btn ui-btn-primary">
                         Add Booking
                     </Link>
@@ -673,14 +673,14 @@ export default function Dashboard() {
             </div>
 
             {/* ── Hero band: north-star pax + revenue with sparkline ── */}
-            <div className="anim-fade-up anim-d1 grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="contents lg:grid lg:grid-cols-5 lg:gap-6">
                 {/* Today's Pax — the north-star number on the night surface */}
-                <Link href="/bookings" className="bg-bt-dark ui-card-hover group relative block overflow-hidden rounded-2xl p-6 lg:col-span-2 text-white" style={{ border: "1px solid rgba(244, 241, 232, 0.09)", boxShadow: "var(--ck-shadow-hero)" }}>
-                    <TopoLines className="absolute inset-0 h-full w-full" />
-                    <TrailMotif className="absolute right-5 top-5 h-14 w-14" />
+                <Link href="/bookings" className="bg-bt-dark ui-card-hover anim-fade-up anim-d1 group relative order-1 block overflow-hidden rounded-2xl p-4 text-white lg:order-none lg:col-span-2 lg:p-6" style={{ border: "1px solid rgba(244, 241, 232, 0.09)", boxShadow: "var(--ck-shadow-hero)" }}>
+                    <TopoLines className="absolute inset-0 hidden h-full w-full lg:block" />
+                    <TrailMotif className="absolute right-5 top-5 hidden h-14 w-14 lg:block" />
                     <div className="relative">
                         <span className="ui-mono-label !text-white/60">Today&apos;s Pax</span>
-                        <div className="font-display mt-6 mb-4 text-[56px] font-semibold leading-none tabular-nums text-white">
+                        <div className="font-display my-2 text-[38px] font-semibold leading-none tabular-nums text-white lg:mb-4 lg:mt-6 lg:text-[56px]">
                             {todayPax}
                         </div>
                         <div className="flex items-center gap-2 text-[12.5px] text-white/55">
@@ -693,29 +693,29 @@ export default function Dashboard() {
 
                 {/* Revenue at a glance — today, last 7 days, this month + month sparkline */}
                 {!hideRevenue && (
-                <Link href="/reports" className="ui-card ui-card-hover group block p-6 lg:col-span-3">
-                    <div className="flex items-center justify-between mb-5">
+                <Link href="/reports" className="ui-card ui-card-hover anim-fade-up anim-d1 group order-3 block p-4 lg:order-none lg:col-span-3 lg:p-6">
+                    <div className="mb-3 flex items-center justify-between lg:mb-5">
                         <h3 className="ui-mono-label">Revenue</h3>
                         <span className="ui-mono-label !tracking-[0.06em] flex items-center gap-1.5 transition-colors group-hover:!text-[var(--ck-text-strong)]">
                             View reports
                         </span>
                     </div>
-                    <div className="grid grid-cols-3 divide-x" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                        <div className="pr-4">
-                            <p className="ui-mono-label !text-[10px]">Today</p>
-                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                    <div className="divide-y lg:grid lg:grid-cols-3 lg:divide-x lg:divide-y-0" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                        <div className="flex items-baseline justify-between py-2 lg:block lg:py-0 lg:pr-4">
+                            <p className="ui-mono-label !text-[11px]">Today</p>
+                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
                         </div>
-                        <div className="px-4">
-                            <p className="ui-mono-label !text-[10px]">Last 7 days</p>
-                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        <div className="flex items-baseline justify-between py-2 lg:block lg:px-4 lg:py-0">
+                            <p className="ui-mono-label !text-[11px]">Last 7 days</p>
+                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
                         </div>
-                        <div className="pl-4">
-                            <p className="ui-mono-label !text-[10px]">This month</p>
-                            <p className="font-display mt-1.5 text-[28px] font-semibold leading-tight tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}</p>
+                        <div className="flex items-baseline justify-between py-2 lg:block lg:py-0 lg:pl-4">
+                            <p className="ui-mono-label !text-[11px]">This month</p>
+                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
                         </div>
                     </div>
                     {revSeries.length > 0 && (
-                        <div className="mt-5 pt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                        <div className="mt-3 hidden border-t pt-4 sm:block lg:mt-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             <Sparkline data={revSeries} />
                             <p className="ui-mono-label mt-1.5 !text-[9.5px]">This month, daily</p>
                         </div>
@@ -725,7 +725,7 @@ export default function Dashboard() {
             </div>
 
             {/* ── KPI row ── */}
-            <div className="anim-fade-up anim-d2 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="anim-fade-up anim-d2 order-4 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:order-none lg:gap-6">
                 {/* Refunds */}
                 <Link href="/refunds" className="ui-card ui-card-hover group block p-5">
                     <div className="flex items-start justify-between mb-5">
@@ -778,7 +778,7 @@ export default function Dashboard() {
                 </Link>
             </div>
 
-            <div className="anim-fade-up anim-d3 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="anim-fade-up anim-d3 order-2 grid grid-cols-1 gap-4 lg:order-none lg:grid-cols-2 lg:gap-6">
                 {/* ── Today's Manifest (pax per slot) ── */}
                 <div className="ui-card flex flex-col overflow-hidden">
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
@@ -822,7 +822,35 @@ export default function Dashboard() {
                                 <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>New bookings will appear here as they come in.</p>
                             </div>
                         ) : (
-                            <table className="w-full text-sm">
+                            <>
+                            <div className="divide-y md:hidden" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                                {slotGroups.map((slot, i) => {
+                                    const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < now);
+                                    const complete = slot.checkedIn === slot.totalPax && slot.totalPax > 0;
+                                    return (
+                                        <button
+                                            key={slot.timeRaw}
+                                            type="button"
+                                            onClick={() => { setActiveSlotIdx(i); setManualSlotNav(true); }}
+                                            className="flex min-h-[76px] w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-[var(--ck-surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ck-accent)]"
+                                            style={{ opacity: isPast ? 0.62 : 1 }}
+                                            aria-label={`${slot.time}, ${slot.tourName}, ${slot.totalPax} guests, ${slot.checkedIn} checked in`}
+                                        >
+                                            <span className="min-w-0">
+                                                <span className="block text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</span>
+                                                <span className="mt-1 block text-sm font-medium leading-snug" style={{ color: "var(--ck-text)" }}>{slot.tourName}</span>
+                                            </span>
+                                            <span className="shrink-0 text-right">
+                                                <span className="block text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax} guests</span>
+                                                <span className={`ui-status mt-1 ${complete ? "ui-pill-success" : "ui-pill-amber"}`}>
+                                                    {slot.checkedIn}/{slot.totalPax} present
+                                                </span>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <table className="hidden w-full text-sm md:table">
                                 <thead>
                                     <tr>
                                         <th className="px-5 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Time</th>
@@ -884,6 +912,7 @@ export default function Dashboard() {
                                     </tr>
                                 </tfoot>
                             </table>
+                            </>
                         )}
                     </div>
                 </div>
@@ -939,7 +968,33 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <>
-                                <table className="w-full text-sm">
+                                <div className="divide-y md:hidden" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                                    {activeSlot.bookings.map((b) => (
+                                        <div key={b.id} className="flex min-h-[72px] items-center gap-3 px-4 py-3" style={{ background: b.checked_in ? "var(--ck-success-soft)" : "" }}>
+                                            <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
+                                                type="button"
+                                                role="checkbox"
+                                                aria-checked={b.checked_in}
+                                                aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark ${b.customer_name} as present`}
+                                                onClick={() => toggleCheckIn(b.id, b.checked_in)}
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
+                                                style={b.checked_in
+                                                    ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
+                                                    : { background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)" }}
+                                            >
+                                                {b.checked_in && <Check size={18} weight="bold" color="#ffffff" />}
+                                            </button>
+                                            <div className="min-w-0 flex-1">
+                                                <p className={`text-base font-semibold leading-snug ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                                                <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
+                                            </div>
+                                            <span className={`ui-status shrink-0 ${b.checked_in ? "ui-pill-success" : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent" : "ui-pill-amber"}`}>
+                                                {b.checked_in ? "Present" : b.status}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <table className="hidden w-full text-sm md:table">
                                     <thead>
                                         <tr>
                                             <th className="w-12 px-3 py-3.5 text-center text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}></th>
@@ -957,7 +1012,7 @@ export default function Dashboard() {
                                                 style={{ background: b.checked_in ? "var(--ck-success-soft)" : "" }}
                                             >
                                                 <td className="px-3 py-3.5 text-center">
-                                                    <button
+                                                    <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
                                                         type="button"
                                                         role="checkbox"
                                                         aria-checked={b.checked_in}
@@ -1032,7 +1087,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
+            <div className="order-5 grid grid-cols-1 gap-6 lg:order-none">
                 {/* ── Weather Block ── */}
                 <div className="ui-card flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
@@ -1067,7 +1122,7 @@ export default function Dashboard() {
                                 ))}
                             </select>
                             {location && !location.isDefault && (
-                                <button onClick={setDefaultLocation} disabled={savingLocations} className="ui-btn ui-btn-ghost !h-9 !px-3 !text-[12.5px] whitespace-nowrap">
+                                <button data-demo-action="weather.default" onClick={setDefaultLocation} disabled={savingLocations} className="ui-btn ui-btn-ghost !h-9 !px-3 !text-[12.5px] whitespace-nowrap">
                                     {savingLocations ? "Saving..." : "Set as default"}
                                 </button>
                             )}
@@ -1145,7 +1200,7 @@ export default function Dashboard() {
                                                             </div>
                                                             <div className="flex items-center gap-3">
                                                                 {l.isDefault && <span className="ui-status ui-pill-success">Default</span>}
-                                                                <button onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
+                                                                <button data-demo-action="weather.remove" onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1156,7 +1211,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
 
-                                <form onSubmit={handleAddLocation} className="border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                <form data-demo-submit="weather.add" onSubmit={handleAddLocation} className="border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
                                     <input required value={newLocName} onChange={e => setNewLocName(e.target.value)} onBlur={() => { if (newLocName.trim() && !newLocLat && !newLocLon) handleGeocode(); }} className="ui-control w-full text-[13px] font-medium mb-2" placeholder="Name (e.g. Cape Town)" />
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                                         <input required type="number" step="any" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} className="ui-control w-full text-[13px] font-medium" placeholder="Lat (-33.9)" />

@@ -1,13 +1,11 @@
-// v2 bot completion: JSON contract, non-thinking, prefix-cache friendly.
+// v2 bot completion: JSON contract, prefix-cache friendly.
 //
-// Primary:  OpenRouter — env OPENROUTER_BOT_MODEL (default deepseek/deepseek-v4-flash,
-//           $0.14/M in, $0.28/M out, cached reads 0.1x). reasoning disabled: the
-//           contract's "plan" field replaces chain-of-thought on this bounded task.
-//           DeepSeek prompt caching is automatic and keyed on the prompt prefix —
-//           the byte-stable block ordering (invariants + BLOCK_A + blockB before
-//           any per-request content) is what earns the cache hits. OpenRouter has
-//           no session/sticky-routing field; `user` is a stable end-user
-//           identifier (abuse detection), sent for parity with _shared/llm.ts.
+// Primary:  OpenRouter — env OPENROUTER_BOT_MODEL (default openai/gpt-5.6-luna)
+//           with high reasoning by default. The byte-stable block ordering
+//           (invariants + BLOCK_A + blockB before any per-request content) keeps
+//           prefix caching effective. OpenRouter has no session/sticky-routing
+//           field; `user` is a stable end-user identifier (abuse detection), sent
+//           for parity with _shared/llm.ts.
 // Contract: the model returns ONE JSON object (see BLOCK_A OUTPUT CONTRACT).
 //           We do NOT send response_format — OpenRouter structured outputs are
 //           json_schema-typed with per-provider support that varies for DeepSeek;
@@ -43,7 +41,11 @@ export type BotUsage = {
 };
 
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
-const BOT_MODEL = Deno.env.get("OPENROUTER_BOT_MODEL") || "deepseek/deepseek-v4-flash";
+const BOT_MODEL = Deno.env.get("OPENROUTER_BOT_MODEL") || "openai/gpt-5.6-luna";
+const REASONING_EFFORT = (Deno.env.get("OPENROUTER_REASONING_EFFORT") || "high")
+  .toLowerCase()
+  .replace(/^max$/, "xhigh");
+const THINKING = REASONING_EFFORT === "high" || REASONING_EFFORT === "xhigh";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 
@@ -111,10 +113,10 @@ async function callOpenRouter(
       signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         model: BOT_MODEL,
-        reasoning: { enabled: false },
+        reasoning: THINKING ? { enabled: true, effort: REASONING_EFFORT } : { enabled: false },
         user: userKey,
         messages: [{ role: "system", content: system }, ...msgs],
-        max_tokens: 400,
+        max_tokens: THINKING ? 2000 : 400,
         temperature: 0.2,
         // POPIA provider constraints (all envs unset = no-op); see openrouter-provider.ts
         ...(OPENROUTER_PROVIDER_PREFS ? { provider: OPENROUTER_PROVIDER_PREFS } : {}),
@@ -184,7 +186,7 @@ export async function botReply(opts: {
   label: string;
   timeoutMs?: number;
 }): Promise<{ out: BotOut; usage: BotUsage } | null> {
-  const timeoutMs = opts.timeoutMs ?? 15000; // non-thinking, but 400 JSON tokens
+  const timeoutMs = THINKING ? Math.max(opts.timeoutMs ?? 45000, 45000) : (opts.timeoutMs ?? 15000);
   const msgs: Msg[] = [...(opts.history || []), { role: "user", content: opts.user }];
 
   if (OPENROUTER_API_KEY) {

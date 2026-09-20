@@ -1,9 +1,11 @@
 "use client";
 
+import { TZDateMini } from "@date-fns/tz/date/mini";
+
 const TZ_FMT_OPTS: Intl.DateTimeFormatOptions = {
   year: "numeric", month: "2-digit", day: "2-digit",
   hour: "2-digit", minute: "2-digit", second: "2-digit",
-  hour12: false, hourCycle: "h23",
+  hourCycle: "h23",
 };
 
 export function getAdminTimezone() {
@@ -27,10 +29,10 @@ export function tzParts(d: Date, tz: string) {
 
 export function zonedToUtc(localIso: string, tz: string): number {
   const wall = new Date(localIso + "Z");
-  const wallMs = wall.getTime();
-  const local = tzParts(wall, tz);
-  const localMs = Date.UTC(local.year, local.month - 1, local.day, local.hours, local.mins, local.secs);
-  return wallMs - (localMs - wallMs);
+  return new TZDateMini(
+    wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate(),
+    wall.getUTCHours(), wall.getUTCMinutes(), wall.getUTCSeconds(), wall.getUTCMilliseconds(), tz,
+  ).getTime();
 }
 
 export function utcToLocalParts(utcIso: string, tz: string) {
@@ -43,6 +45,28 @@ export function changeLocalTime(utcIso: string, tz: string, hours: number, mins:
   const l = utcToLocalParts(utcIso, tz);
   const iso = `${l.year}-${String(l.month).padStart(2, "0")}-${String(l.day).padStart(2, "0")}T${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
   return new Date(zonedToUtc(iso, tz)).toISOString();
+}
+
+export function normalize24HourTime(value: string): string | null {
+  const input = value.trim();
+  let hours: number;
+  let mins: number;
+
+  if (/^\d{1,2}$/.test(input)) {
+    hours = Number(input);
+    mins = 0;
+  } else if (/^\d{3,4}$/.test(input)) {
+    hours = Number(input.slice(0, -2));
+    mins = Number(input.slice(-2));
+  } else {
+    const match = /^(\d{1,2}):(\d{1,2})$/.exec(input);
+    if (!match) return null;
+    hours = Number(match[1]);
+    mins = Number(match[2]);
+  }
+
+  if (hours > 23 || mins > 59) return null;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
 export const COMMON_TIMEZONES: ReadonlyArray<{ value: string; label: string }> = [

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
-import { getCallerAdmin, isPrivilegedRole } from "../../../lib/api-auth";
+import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
+import { setAdminAuthPassword } from "../../../lib/admin-password";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const action = String(body.action || "");
-  if (!["update_permissions", "update_role", "reset_password", "change_password"].includes(action)) {
+  if (!["update_permissions", "update_role", "reset_password", "change_password", "set_suspended"].includes(action)) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
@@ -36,6 +37,16 @@ export async function POST(req: NextRequest) {
     db = adminClient();
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Server misconfigured" }, { status: 500 });
+  }
+
+  if (action === "set_suspended") {
+    const caller = await getCallerAdmin(req, { skipSubscriptionCheck: true });
+    if (caller?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Super Admin required" }, { status: 403 });
+    if (typeof body.suspended !== "boolean" || !body.admin_id) return NextResponse.json({ error: "Administrator and suspension state required" }, { status: 400 });
+    const { data: target } = await db.from("admin_users").select("business_id").eq("id", body.admin_id).maybeSingle();
+    if (!target || target.business_id !== caller.business_id) return NextResponse.json({ error: "Select this administrator's business first" }, { status: 403 });
+    const { data, error } = await db.rpc("platform_suspend_admin", { p_admin_id: body.admin_id, p_actor_id: caller.id, p_suspended: body.suspended });
+    return NextResponse.json(error ? { error: error.message } : data, { status: error ? 409 : 200 });
   }
 
   // --- update_permissions: MAIN_ADMIN/SUPER_ADMIN sets another admin's settings_permissions ---
@@ -51,10 +62,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "admin_id and permissions are required" }, { status: 400 });
     }
 
-    const { data: target } = await db.from("admin_users").select("id, business_id").eq("id", targetId).maybeSingle();
+    const { data: target } = await db.from("admin_users").select("id, role, business_id").eq("id", targetId).maybeSingle();
     if (!target) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-    if (caller.role !== "SUPER_ADMIN" && target.business_id !== caller.business_id) {
-      return NextResponse.json({ error: "Cannot modify admins from another business" }, { status: 403 });
+    if (!canManageAdmin(caller, target)) {
+      return NextResponse.json({ error: "Cannot modify this administrator" }, { status: 403 });
     }
 
     const { error: updErr } = await db.from("admin_users").update({ settings_permissions: perms }).eq("id", targetId);
@@ -82,8 +93,8 @@ export async function POST(req: NextRequest) {
 
     const { data: target } = await db.from("admin_users").select("id, role, business_id").eq("id", targetId).maybeSingle();
     if (!target) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-    if (caller.role !== "SUPER_ADMIN" && target.business_id !== caller.business_id) {
-      return NextResponse.json({ error: "Cannot modify admins from another business" }, { status: 403 });
+    if (!canManageAdmin(caller, target)) {
+      return NextResponse.json({ error: "Cannot modify this administrator" }, { status: 403 });
     }
     if (target.role === "SUPER_ADMIN") {
       return NextResponse.json({ error: "Super Admin role cannot be changed here" }, { status: 403 });
@@ -97,7 +108,8 @@ export async function POST(req: NextRequest) {
       const { count } = await db.from("admin_users")
         .select("*", { count: "exact", head: true })
         .eq("business_id", target.business_id)
-        .in("role", ["MAIN_ADMIN", "SUPER_ADMIN"])
+        .eq("suspended", false)
+        .eq("role", "MAIN_ADMIN")
         .neq("id", targetId);
       if ((count ?? 0) < 1) {
         return NextResponse.json({ error: "This is the last admin with full access. Promote another admin first." }, { status: 400 });
@@ -134,23 +146,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
-    const { data: target } = await db.from("admin_users").select("id, business_id, user_id").eq("id", targetId).maybeSingle();
+    const { data: target } = await db.from("admin_users").select("id, email, role, business_id, user_id").eq("id", targetId).maybeSingle();
     if (!target) return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-    if (caller.role !== "SUPER_ADMIN" && target.business_id !== caller.business_id) {
-      return NextResponse.json({ error: "Cannot modify admins from another business" }, { status: 403 });
+    if (!canManageAdmin(caller, target)) {
+      return NextResponse.json({ error: "Cannot modify this administrator" }, { status: 403 });
     }
 
+    let authUserId: string;
+    try { authUserId = await setAdminAuthPassword(db, target, newPassword); }
+    catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
+    }
     const hashed = sha256(newPassword);
     const { error: updErr } = await db.from("admin_users").update({
+      user_id: authUserId,
       password_hash: hashed,
       must_set_password: false,
       password_set_at: new Date().toISOString(),
     }).eq("id", targetId);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-
-    if (target.user_id) {
-      await db.auth.admin.updateUserById(target.user_id, { password: newPassword }).catch(() => {});
-    }
 
     return NextResponse.json({ ok: true });
   }
@@ -170,7 +184,7 @@ export async function POST(req: NextRequest) {
     const currentHash = sha256(currentPassword);
     const { data: user } = await db
       .from("admin_users")
-      .select("id, user_id")
+      .select("id, email, user_id")
       .eq("email", email)
       .eq("password_hash", currentHash)
       .maybeSingle();
@@ -179,8 +193,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Incorrect email or current password" }, { status: 401 });
     }
 
+    let authUserId: string;
+    try { authUserId = await setAdminAuthPassword(db, user, newPassword); }
+    catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
+    }
     const newHash = sha256(newPassword);
     const { error: updErr } = await db.from("admin_users").update({
+      user_id: authUserId,
       password_hash: newHash,
       password_set_at: new Date().toISOString(),
       must_set_password: false,
@@ -188,10 +208,6 @@ export async function POST(req: NextRequest) {
       setup_token_expires_at: null,
     }).eq("id", user.id);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-
-    if (user.user_id) {
-      await db.auth.admin.updateUserById(user.user_id, { password: newPassword }).catch(() => {});
-    }
 
     return NextResponse.json({ ok: true });
   }

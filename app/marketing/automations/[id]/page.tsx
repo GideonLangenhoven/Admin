@@ -702,7 +702,7 @@ export default function AutomationBuilderPage() {
 
         {/* Status + Save */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
-          <button
+          <button data-demo-action="automation.save"
             onClick={saveAutomation}
             disabled={saving}
             className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -710,7 +710,7 @@ export default function AutomationBuilderPage() {
             {saving ? "Saving..." : "Save"}
           </button>
           {automation.status !== "archived" && (
-            <button
+            <button data-demo-action={automation.status === "active" ? "automation.pause" : "automation.activate"}
               onClick={toggleAutomationStatus}
               disabled={activating}
               className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"} disabled:opacity-50`}
@@ -736,7 +736,7 @@ export default function AutomationBuilderPage() {
               Actions column wasn't discoverable on narrow viewports. */}
           <div className="ml-auto flex items-center gap-2">
             {steps.some((s) => s.step_type === "send_email" && s.config?.template_id) && (
-              <button
+              <button data-demo-action="automation.test"
                 onClick={testSendAllSteps}
                 disabled={testSending}
                 className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
@@ -746,7 +746,7 @@ export default function AutomationBuilderPage() {
               </button>
             )}
             {automation.status === "active" && (
-              <button
+              <button data-demo-action="automation.dispatch"
                 onClick={runDispatchNow}
                 disabled={dispatching}
                 className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
@@ -756,7 +756,7 @@ export default function AutomationBuilderPage() {
               </button>
             )}
             {automation.status === "archived" ? (
-              <button
+              <button data-demo-action="automation.restore"
                 onClick={unarchiveAutomation}
                 className="ui-btn ui-btn-ghost !h-9"
                 title="Restore to draft"
@@ -764,7 +764,7 @@ export default function AutomationBuilderPage() {
                 Unarchive
               </button>
             ) : (
-              <button
+              <button data-demo-action="automation.archive"
                 onClick={archiveAutomation}
                 className="ui-btn ui-btn-ghost !h-9"
                 title="Hide from active list, preserve history"
@@ -772,7 +772,7 @@ export default function AutomationBuilderPage() {
                 Archive
               </button>
             )}
-            <button
+            <button data-demo-action="automation.delete"
               onClick={deleteAutomation}
               className="ui-btn ui-btn-danger !h-9"
               title="Delete permanently"
@@ -833,7 +833,7 @@ export default function AutomationBuilderPage() {
               <span className="text-xs" style={{ color: "var(--ck-text)" }}>{triggerSentence(automation)}</span>
             </div>
           </div>
-          <button
+          <button data-demo-action="automation.activate"
             onClick={toggleAutomationStatus}
             disabled={activating}
             className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -1216,7 +1216,7 @@ export default function AutomationBuilderPage() {
                   <span className="text-sm" style={{ color: "var(--ck-text)" }}>
                     {c.email} {c.first_name ? `(${c.first_name} ${c.last_name || ""})` : ""}
                   </span>
-                  <button
+                  <button data-demo-action="automation.enroll"
                     onClick={() => enrollContact(c.id)}
                     disabled={enrolling}
                     className="rounded-lg px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"

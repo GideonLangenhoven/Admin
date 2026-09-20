@@ -160,7 +160,7 @@ export default function InlineSlotManager({
                  
                  <div className="flex items-center gap-3">
                    {editingBundleTime === timeKey ? (
-                     <form onSubmit={(e) => handleBundleEdit(e, timeKey, items)} className="flex items-center gap-2 border-[var(--ck-border-strong)] pl-3 border-l">
+                     <form data-demo-submit="slot.capacity" onSubmit={(e) => handleBundleEdit(e, timeKey, items)} className="flex items-center gap-2 border-[var(--ck-border-strong)] pl-3 border-l">
                        <label className="text-[10px] text-[var(--ck-text-muted)] uppercase tracking-wider font-semibold">New Capacity:</label>
                        <input type="number" required min="1" autoFocus value={editCap} onChange={e => setEditCap(Number(e.target.value))} className="ui-control px-2 py-1 text-xs rounded-md w-16" />
                        <button type="submit" disabled={savingEdit} className="text-xs font-semibold text-white bg-[var(--ck-accent)] hover:bg-[var(--ck-accent-hover)] px-3 py-1 rounded-md transition-colors">Save</button>
@@ -177,7 +177,7 @@ export default function InlineSlotManager({
                        
                        <div className="w-px h-6 bg-[var(--ck-border-strong)] hidden sm:block"></div>
                        
-                       <button type="button" onClick={() => handleBundleDelete(timeKey, items)} disabled={openItems.length === 0 || editingBundleTime === timeKey} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-red-50" title={openItems.length === 0 ? "Cannot delete times that only contain booked slots" : "Delete all upcoming empty slots at this time"}>
+                       <button data-demo-action="slot.delete-open" type="button" onClick={() => handleBundleDelete(timeKey, items)} disabled={openItems.length === 0 || editingBundleTime === timeKey} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-red-50" title={openItems.length === 0 ? "Cannot delete times that only contain booked slots" : "Delete all upcoming empty slots at this time"}>
                          Delete Open
                        </button>
                      </div>

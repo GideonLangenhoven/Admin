@@ -22,10 +22,47 @@ import {
   sanitizeUserInput,
   KB_REFUSAL_REPLY,
   INJECTION_REFUSAL_REPLY,
+  formatTourMeetingPoints,
+  isAvailabilityQuery,
   MEDIA_FALLBACK_REPLY,
   MAX_USER_INPUT_LENGTH,
   STALE_SESSION_HOURS,
 } from "../../supabase/functions/_shared/bot-guards";
+
+describe("Natural customer facts", () => {
+  it.each([
+    "I want to know I can go on a trip tomorrow",
+    "Can we join a tour on Saturday?",
+    "Do you have availability tomorrow at 9am?",
+    "Any open slots this week?",
+  ])("recognises availability: %s", (message) => {
+    expect(isAvailabilityQuery(message)).toBe(true);
+  });
+
+  it.each([
+    "Where do we meet tomorrow?",
+    "What should I bring tomorrow?",
+    "My trip is tomorrow",
+    "Can I reschedule my booking tomorrow?",
+  ])("does not misroute logistics or existing bookings: %s", (message) => {
+    expect(isAvailabilityQuery(message)).toBe(false);
+  });
+
+  const tours = [
+    { name: "Table Mountain Sunrise Hike", meeting_point: "Kloof Corner parking area" },
+    { name: "Lion's Head Sunset Walk", meeting_point: "Lion's Head trail parking" },
+  ];
+
+  it("lists per-tour meeting points when an operator has more than one", () => {
+    expect(formatTourMeetingPoints(tours)).toContain("Table Mountain Sunrise Hike: Kloof Corner parking area");
+    expect(formatTourMeetingPoints(tours)).toContain("Lion's Head Sunset Walk: Lion's Head trail parking");
+  });
+
+  it("returns only the named tour's meeting point when the question is specific", () => {
+    expect(formatTourMeetingPoints(tours, "Where does the sunrise hike meet?"))
+      .toBe("📍 Table Mountain Sunrise Hike: Kloof Corner parking area");
+  });
+});
 
 // ── Required regression inputs (the contract) ───────────────────────
 // These are the inputs called out in the MVP test plan WB7.

@@ -101,6 +101,9 @@ export async function POST(req: NextRequest) {
         if (!yoco_secret_key?.trim() || !yoco_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Secret Key and Webhook Signing Secret are required." }, { status: 400 });
         }
+        if (!yoco_secret_key.trim().startsWith("sk_live_")) {
+            return NextResponse.json({ error: "Live credentials require a Yoco live key (sk_live_...). Save test keys under Yoco Test Credentials and enable Test Mode." }, { status: 400 });
+        }
         const { error: yocoErr } = await supabase.rpc("set_yoco_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_yoco_secret_key: yoco_secret_key.trim(), p_yoco_webhook_secret: yoco_webhook_secret.trim(),
         });
@@ -108,6 +111,9 @@ export async function POST(req: NextRequest) {
     } else if (section === "yoco_test") {
         if (!yoco_test_secret_key?.trim() || !yoco_test_webhook_secret?.trim()) {
             return NextResponse.json({ error: "Both Yoco Test Secret Key and Test Webhook Signing Secret are required." }, { status: 400 });
+        }
+        if (!yoco_test_secret_key.trim().startsWith("sk_test_")) {
+            return NextResponse.json({ error: "Test credentials require a Yoco test key (sk_test_...). Save live keys under Yoco Credentials." }, { status: 400 });
         }
         const { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
             p_business_id: business_id, p_key: encryptionKey, p_test_secret_key: yoco_test_secret_key.trim(), p_test_webhook_secret: yoco_test_webhook_secret.trim(),

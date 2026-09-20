@@ -59,7 +59,8 @@ type CredentialRecord = {
   source: string;
   api_key_hash: string;
   api_key_last4: string | null;
-  hmac_secret: string | null;
+  hmac_secret_encrypted: string | null;
+  hmac_secret?: string | null;
   active: boolean;
 };
 
@@ -219,7 +220,7 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
   const apiKeyHash = await sha256Hex(apiKey);
   const { data, error } = await db
     .from("external_booking_credentials")
-    .select("id, business_id, source, api_key_hash, api_key_last4, hmac_secret, active")
+    .select("id, business_id, source, api_key_hash, api_key_last4, hmac_secret_encrypted, active")
     .eq("source", source)
     .eq("api_key_hash", apiKeyHash)
     .eq("active", true)
@@ -230,24 +231,16 @@ async function findCredentialByApiKey(source: string, apiKey: string): Promise<C
 
   const credential = data as CredentialRecord;
 
-  if (SETTINGS_ENCRYPTION_KEY) {
-    const { data: rpcData } = await db.rpc("get_external_booking_credentials", {
+  if (credential.hmac_secret_encrypted) {
+    if (!SETTINGS_ENCRYPTION_KEY) throw new Error("External booking encryption is not configured");
+    const { data: rpcData, error: rpcError } = await db.rpc("get_external_booking_credentials", {
       p_credential_id: credential.id,
       p_key: SETTINGS_ENCRYPTION_KEY,
     });
+    if (rpcError) throw rpcError;
     const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (row?.hmac_secret) {
-      credential.hmac_secret = row.hmac_secret;
-      return credential;
-    }
-
-    if (credential.hmac_secret) {
-      db.rpc("set_external_booking_credentials", {
-        p_credential_id: credential.id,
-        p_key: SETTINGS_ENCRYPTION_KEY,
-        p_hmac_secret: credential.hmac_secret,
-      }).then(undefined, (err: unknown) => console.error("AUTO_MIGRATE_HMAC_ERR:", err));
-    }
+    if (!row?.hmac_secret) throw new Error("External booking HMAC secret could not be decrypted");
+    credential.hmac_secret = row.hmac_secret;
   }
 
   return credential;
@@ -576,14 +569,16 @@ Deno.serve(async (req: Request) => {
       if (!credentialId) return respond(400, { success: false, code: "MISSING_CREDENTIAL_ID", message: "credential_id required" });
       if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
 
-      const { data: adminRows } = await db.from("admin_users").select("business_id, role").eq("user_id", user.id);
-      if (!adminRows?.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an admin user" });
+      const { data: memberships } = await db.from("admin_users").select("business_id, role, suspended, read_only").eq("user_id", user.id);
+      const adminRows = (memberships || []).filter((row: { suspended?: boolean | null }) => !row.suspended);
+      if (!adminRows.length) return respond(403, { success: false, code: "FORBIDDEN", message: "Not an active admin user" });
+      if (adminRows.some((row: { read_only?: boolean | null }) => row.read_only)) return respond(403, { success: false, code: "READ_ONLY", message: "This demonstration account is read-only" });
 
       const { data: cred } = await db.from("external_booking_credentials").select("business_id").eq("id", credentialId).maybeSingle();
       if (!cred) return respond(404, { success: false, code: "NOT_FOUND", message: "Credential not found" });
 
-      const isSuperAdmin = adminRows.some((r: { role: string | null }) => (r.role || "").toUpperCase().startsWith("SUPER"));
-      if (!isSuperAdmin && !adminRows.some((r: { business_id: string }) => r.business_id === cred.business_id)) {
+      const isSuperAdmin = adminRows.some((r: { role: string | null }) => r.role === "SUPER_ADMIN");
+      if (!isSuperAdmin && !adminRows.some((r: { business_id: string; role: string | null }) => r.business_id === cred.business_id && r.role === "MAIN_ADMIN")) {
         return respond(403, { success: false, code: "FORBIDDEN", message: "No access to this business" });
       }
 
@@ -600,29 +595,10 @@ Deno.serve(async (req: Request) => {
       return respond(200, { success: true });
     }
 
-    // ── Internal: backfill plaintext → encrypted (service_role only) ──
+    // The plaintext column has been retired. Never run an unauthenticated
+    // migration from this public endpoint.
     if (rawAction === "backfill_hmac") {
-      if (!SETTINGS_ENCRYPTION_KEY) return respond(503, { success: false, code: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption not configured" });
-
-      const { data: rows } = await db
-        .from("external_booking_credentials")
-        .select("id, hmac_secret")
-        .not("hmac_secret", "is", null);
-
-      let migrated = 0;
-      for (const row of (rows || [])) {
-        const { data: check } = await db.from("external_booking_credentials").select("hmac_secret_encrypted").eq("id", row.id).maybeSingle();
-        if (check?.hmac_secret_encrypted) continue;
-
-        const { error: setErr } = await db.rpc("set_external_booking_credentials", {
-          p_credential_id: row.id,
-          p_key: SETTINGS_ENCRYPTION_KEY,
-          p_hmac_secret: row.hmac_secret,
-        });
-        if (!setErr) migrated++;
-        else console.error("BACKFILL_HMAC_ERR:", row.id, setErr);
-      }
-      return respond(200, { success: true, migrated });
+      return respond(410, { success: false, code: "ACTION_RETIRED", message: "Use the documented credential migration procedure" });
     }
 
     source = normalizeSource(req, body);

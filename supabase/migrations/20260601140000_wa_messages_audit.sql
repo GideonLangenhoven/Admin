@@ -16,15 +16,12 @@ create table if not exists public.wa_messages (
   error text,
   created_at timestamptz not null default now()
 );
-
 create index if not exists wa_messages_business_created_idx
   on public.wa_messages (business_id, created_at desc);
 create index if not exists wa_messages_provider_msg_idx
   on public.wa_messages (provider_message_id)
   where provider_message_id is not null;
-
 alter table public.wa_messages enable row level security;
-
 -- Audit log holds customer phone numbers and message bodies. Default privileges
 -- grant anon full DML; revoke it so anon has no table-level access (mirrors the
 -- internal-only auto_messages / idempotency_keys tables).

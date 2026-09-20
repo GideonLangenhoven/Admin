@@ -19,7 +19,7 @@ function adminClient() {
 // for pricing — a hardcoded PLAN_PRICING map used to live here too, which was
 // its own drift risk (it didn't even match plans.monthly_price_zar). Both
 // this route and /api/billing/seats now read pricing from the same place.
-const FALLBACK_PLAN = { name: "Pro", monthly_price_zar: 1500, extra_seat_price_zar: 500, included_seats: 1 };
+const FALLBACK_PLAN = { name: "Standard", monthly_price_zar: 2000, extra_seat_price_zar: 500, included_seats: 1 };
 
 export async function GET(req: NextRequest) {
   // A suspended tenant must still see their billing status to reactivate.
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   const biz = bizRes.data as any;
   const sub = subRes.data as any | null;
 
-  const planId = String(sub?.plan_id || "pro").toLowerCase();
+  const planId = String(sub?.plan_id || "standard").toLowerCase();
   const planRes = await db.from("plans")
     .select("name, monthly_price_zar, extra_seat_price_zar, seat_limit")
     .eq("id", planId)

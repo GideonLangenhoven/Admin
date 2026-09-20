@@ -34,11 +34,11 @@ async function verifyAdmin(req: Request, businessId: string) {
   if (error || !user) return null;
   const { data: row } = await db
     .from("admin_users")
-    .select("id")
+    .select("id, read_only")
     .eq("user_id", user.id)
     .eq("business_id", businessId)
     .maybeSingle();
-  return row ? user : null;
+  return row ? { user, readOnly: row.read_only === true } : null;
 }
 
 Deno.serve(async (req) => {
@@ -60,8 +60,9 @@ Deno.serve(async (req) => {
   const { action, business_id } = body;
   if (!business_id) return fail(req, "business_id required");
 
-  const user = await verifyAdmin(req, business_id);
-  if (!user) return fail(req, "Unauthorized", 401);
+  const admin = await verifyAdmin(req, business_id);
+  if (!admin) return fail(req, "Unauthorized", 401);
+  if (admin.readOnly && action !== "get") return fail(req, "This demonstration account is read-only", 403);
 
   if (action === "get") {
     const { data, error } = await db.rpc("get_business_bank_details", {

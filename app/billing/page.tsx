@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { confirmAction, notify } from "../lib/app-notify";
 
@@ -58,8 +58,7 @@ export default function BillingPage() {
 
   async function load() {
     setLoading(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = await getAuthHeaders(businessId);
 
     const [subRes, histRes] = await Promise.all([
       fetch("/api/billing/subscription", { headers }),
@@ -84,8 +83,7 @@ export default function BillingPage() {
   useEffect(() => { load(); }, [businessId]);
 
   async function authHeaders() {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    return getAuthHeaders(businessId);
   }
 
   async function changeSeats(delta: number) {
@@ -235,7 +233,7 @@ export default function BillingPage() {
         </div>
         <p className="mt-2 font-display text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>{sub.plans?.name ?? "Custom"}</p>
         <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
-          R{sub.plans?.monthly_price_zar ?? 0}/month base · R{sub.plans?.extra_seat_price_zar ?? 0}/extra seat
+          R{sub.plans?.monthly_price_zar ?? 2000}/month base · R{sub.plans?.extra_seat_price_zar ?? 500}/additional seat
         </p>
 
         {(sub.status === "ACTIVE" || sub.status === "TRIAL") && plansAvailable.length > 1 && (
@@ -243,7 +241,7 @@ export default function BillingPage() {
             <div className="ui-mono-label !text-[10px] mb-2">Change plan</div>
             <div className="grid grid-cols-3 gap-2">
               {plansAvailable.map((p) => (
-                <button
+                <button data-demo-action="billing.plan"
                   key={p.id}
                   onClick={() => !p.current && changePlan(p.id, p.name, p.monthly_price_zar)}
                   disabled={actionLoading || p.current}
@@ -277,21 +275,21 @@ export default function BillingPage() {
 
         {sub.status === "ACTIVE" && (
           <div className="mt-4 flex gap-2 flex-wrap">
-            <button
+            <button data-demo-action="billing.add"
               onClick={() => changeSeats(+1)}
               disabled={actionLoading}
               className="ui-btn ui-btn-primary disabled:opacity-50"
             >
               + Add seat (R{sub.plans?.extra_seat_price_zar ?? 500})
             </button>
-            <button
+            <button data-demo-action="billing.remove"
               onClick={() => changeSeats(-1)}
               disabled={actionLoading || sub.seats_purchased <= 1 || usedSeats >= sub.seats_purchased}
               className="ui-btn ui-btn-ghost disabled:opacity-50"
             >
               – Remove seat
             </button>
-            <button
+            <button data-demo-action="billing.pause"
               onClick={pauseSubscription}
               disabled={actionLoading}
               className="ui-btn ui-btn-ghost ml-auto disabled:opacity-50"
@@ -307,7 +305,7 @@ export default function BillingPage() {
               Subscription paused{sub.paused_at ? ` since ${new Date(sub.paused_at).toLocaleDateString("en-ZA")}` : ""}.
               No billing while paused.
             </span>
-            <button
+            <button data-demo-action="billing.resume"
               onClick={resumeSubscription}
               disabled={actionLoading}
               className="ui-btn ui-btn-primary ml-auto disabled:opacity-50"

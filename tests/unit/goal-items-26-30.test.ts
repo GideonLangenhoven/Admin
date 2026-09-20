@@ -73,15 +73,15 @@ describe("item 30 — operator-cancellation remediation", () => {
     expect(rebook).toContain("body.new_qty ?? booking.qty");
     expect(rebook).toContain("newUnitPrice * newQty");
     // the excess refund skips the 5% fee when the operator cancelled
-    expect(rebook).toContain("isCreditClaim ? 1 : 0.95");
+    expect(readFileSync("supabase/migrations/20260911180000_immediate_booking_changes.sql", "utf8")).toContain("CASE WHEN cancelled THEN 100");
   });
   it("capacity is validated against the chosen qty", () => {
     expect(rebook).toContain("available < newQty");
   });
-  it("the upgrade webhook finalises qty and hold with new_qty", () => {
-    expect(webhook).toContain("pr.new_qty || rBooking.qty");
-    expect(webhook).toContain("qty: finalQty");
-    expect(cronTasks).toContain("new_qty");
+  it("the upgrade webhook finalises qty and hold through the atomic uplift RPC", () => {
+    expect(webhook).toContain('supabase.rpc("confirm_booking_uplift"');
+    expect(webhook).toContain("p_pending_reschedule_id: pr.id");
+    expect(cronTasks).toContain("expire_single_hold");
   });
   it("full refund on operator cancels — no 5% label on the claim panel", () => {
     expect(card).not.toContain("* 0.95");
@@ -89,7 +89,7 @@ describe("item 30 — operator-cancellation remediation", () => {
   });
   it("OTA-sourced bookings are excluded from self-service remediation", () => {
     expect(weatherCancel).toContain('startsWith("OTA_")');
-    expect(weatherCancel).toContain("isPaid && !isOta");
+    expect(readFileSync("supabase/migrations/20260911150000_booking_cancellation.sql","utf8")).toContain("paid AND b.source NOT LIKE 'OTA_%'");
   });
 
   it("the refund queue only shows customer-chosen refunds, never pending decisions", () => {
@@ -97,7 +97,7 @@ describe("item 30 — operator-cancellation remediation", () => {
     for (const f of ["app/refunds/page.tsx", "components/RefundBadge.tsx", "app/page.tsx"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).not.toContain('"ACTION_REQUIRED"');
-      expect(src, f).toContain('.eq("refund_status", "REQUESTED")');
+      expect(src, f).toMatch(/\.(?:eq|in)\("refund_status", (?:\[)?"REQUESTED"/);
     }
   });
 

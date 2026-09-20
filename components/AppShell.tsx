@@ -15,7 +15,9 @@ import { isNavItemActive } from "./nav-active";
 import WaFailureWatcher from "./WaFailureWatcher";
 import HelpChat from "./HelpChat";
 import WelcomeChecklist from "./WelcomeChecklist";
+import DemoActionGuide from "./DemoActionGuide";
 import { isSectionHidden } from "@/app/lib/operator-sections";
+import { DEMO_BOOKING_SITE_URL, isDemoPathVisible } from "@/app/lib/demo-guide";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
   SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
@@ -39,6 +41,8 @@ interface NavItem {
   icon: string;
   privilegedOnly?: boolean;
   superAdminOnly?: boolean;
+  demoOnly?: boolean;
+  external?: boolean;
 }
 
 const MARKETING_PATHS = ["/operators", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools"];
@@ -61,11 +65,12 @@ function isSuspendedAllowed(path: string) {
    rules are unchanged; groups whose items are all hidden don't render. */
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
-  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
-  { label: "Customers", hrefs: ["/inbox", "/refunds", "/vouchers", "/reviews"] },
+  { label: "Customer view", hrefs: [DEMO_BOOKING_SITE_URL] },
+  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
+  { label: "Customers", hrefs: ["/inbox", "/customers", "/refunds", "/vouchers", "/reviews", "/notifications"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
-  { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/privacy/data-requests", "/super-admin"] },
+  { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/settings/ota", "/privacy/data-requests", "/super-admin"] },
 ];
 
 function groupNav(items: NavItem[]) {
@@ -90,7 +95,7 @@ const SIDEBAR_BG = [
 
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
-  const { businessId, businessName, logoUrl, role, subscriptionStatus, yocoTestMode, operators, switchOperator } = useBusinessContext();
+  const { businessId, businessName, logoUrl, role, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
   const [clock, setClock] = useState("");
@@ -128,6 +133,11 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
   } catch { /* SSR / malformed — treat as nothing hidden */ }
 
   const visibleNav = nav.filter((n) => {
+    if (readOnly) return n.external === true || isDemoPathVisible(n.href);
+    // The external Claire storefront link belongs only to the guided demo.
+    // Internal destinations tagged in layout remain available to entitled
+    // real operators; demo visibility is governed by isDemoPathVisible above.
+    if (n.demoOnly && !readOnly && n.external) return false;
     if (n.superAdminOnly) return role === "SUPER_ADMIN";
     // Main-Admin-controlled hiding applies to operator-level admins only.
     if (!isPrivilegedRole(role) && isSectionHidden(operatorPerms, n.href)) return false;
@@ -182,8 +192,13 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
   // The Guide app renders standalone (its own full-screen PWA shell) — no admin
   // sidebar/topbar. It still sits inside AuthGate so it keeps auth + business
   // context, but the chrome is entirely its own.
-  if (pathname === "/guide" || pathname.startsWith("/guide/")) {
-    return <main className="min-h-screen">{children}</main>;
+  if (!readOnly && (pathname === "/guide" || pathname.startsWith("/guide/"))) {
+    return (
+      <main className="min-h-screen">
+        {readOnly && <HelpChat />}
+        {readOnly ? <DemoActionGuide>{children}</DemoActionGuide> : children}
+      </main>
+    );
   }
 
   // Longest-prefix match against the visible nav → topbar breadcrumb label
@@ -193,18 +208,23 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
   const visibleHrefs = visibleNav.map((n) => n.href);
+  const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
+  const mobilePrimaryNav = mobilePrimaryHrefs
+    .map((href) => visibleNav.find((item) => item.href === href))
+    .filter(Boolean) as NavItem[];
+  const mobileMoreActive = !mobilePrimaryNav.some((item) => isNavItemActive(pathname, item.href, visibleHrefs));
   function isNavActive(href: string) {
     return isNavItemActive(pathname, href, visibleHrefs);
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh min-h-0 overflow-hidden">
       {/* Surfaces failed WhatsApp sends as in-the-moment toasts (replaces the
           removed Notifications tab). Renders nothing. */}
       <WaFailureWatcher />
       {/* Floating help assistant + one-time first-login welcome. */}
       <HelpChat />
-      <WelcomeChecklist />
+      {!readOnly && <WelcomeChecklist />}
       {/* Sidebar starts at lg, not md: at 768px it would eat 256px of an
           already-768px tablet, leaving 512px for the md: row/grid layouts that
           fire at the same breakpoint. Tablets use the drawer instead. */}
@@ -296,18 +316,21 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   const navBlocked = isSuspended && !isSuspendedAllowed(n.href);
                   return (
                     <Link key={n.href} href={navBlocked ? pathname : n.href}
+                      target={n.external ? "_blank" : undefined}
+                      rel={n.external ? "noopener noreferrer" : undefined}
                       className={`group flex items-center rounded-[8px] px-2.5 py-[7px] text-[13.5px] transition-colors ${collapsed ? "justify-center" : "gap-2.5"} ${isActive
                           ? "ui-nav-active font-semibold"
                           : "font-medium text-[var(--ck-sidebar-text)] hover:bg-[var(--ck-sidebar-hover)] hover:text-[var(--ck-sidebar-active-text)]"
                         } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
                       aria-disabled={navBlocked}
                       tabIndex={navBlocked ? -1 : undefined}
-                      title={collapsed ? n.label : undefined}
+                      title={collapsed ? `${n.label}${n.external ? " (opens in a new tab)" : ""}` : undefined}
                     >
                       <span className={`flex items-center justify-center${!(isActive && n.href === "/") ? " sidebar-icon" : ""}`} style={{ color: isActive ? "var(--ck-sidebar-icon-active)" : "var(--ck-sidebar-icon)" }}>
                         <Icon size={18} weight={isActive ? "fill" : "regular"} />
                       </span>
                       {!collapsed && <span className="flex-1 tracking-tight">{n.label}</span>}
+                      {!collapsed && n.external && <span aria-hidden="true" className="text-[12px]">↗</span>}
                       {n.href === "/inbox" && <NotificationBadge />}
                       {n.href === "/refunds" && <RefundBadge />}
                     </Link>
@@ -359,20 +382,16 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             <SignOutButton variant="header" />
           </div>
         </header>
-        <header className="ui-glass lg:hidden flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <MobileMenuDrawer nav={visibleNav} />
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <header className="ui-glass lg:hidden flex min-h-14 items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
+          <Link href="/" className="flex min-w-0 items-center gap-2 hover:opacity-80 transition-opacity">
             {logoUrl ? (
               <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
             ) : (
               <BrandMark size={22} className="shrink-0" />
             )}
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
+            <h1 className="truncate text-base font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
           </Link>
-          <div className="flex items-center gap-3">
-            <ThemeToggle size="sm" />
-            <SignOutButton variant="header" />
-          </div>
+          <span className="ui-mono-label max-w-[42%] truncate text-right !text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{sectionLabel}</span>
         </header>
         {isSuspended && (
           <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
@@ -386,41 +405,67 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             <p className="text-xs font-medium" style={{ color: "var(--ck-warning)" }}>Your subscription is paused for off-season. <a href="/billing" className="underline font-semibold">Resume</a> to take new bookings.</p>
           </div>
         )}
-        {yocoTestMode && (
+        {yocoTestMode && !readOnly && (
           <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber-bright) 30%, transparent)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" style={{ color: "var(--ck-amber)" }}><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
             <p className="text-xs font-medium" style={{ color: "var(--ck-amber)" }}>TEST MODE: Yoco payments are using sandbox keys. No real charges will be processed.</p>
           </div>
         )}
+        {readOnly && (
+          <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex flex-wrap items-center gap-x-3 gap-y-2" role="status" style={{ background: "var(--ck-accent-soft)", borderColor: "color-mix(in srgb, var(--ck-accent) 25%, transparent)" }}>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <ShieldCheck size={16} weight="fill" className="shrink-0" style={{ color: "var(--ck-accent)" }} aria-hidden="true" />
+              <p className="text-xs font-medium" style={{ color: "var(--ck-accent)" }}>
+                <span className="lg:hidden">Guided demo · No changes or messages are sent.</span>
+                <span className="hidden lg:inline">Guided demo · Browse features and try the forms. Action buttons explain what happens without saving changes or contacting guests.</span>
+              </p>
+            </div>
+            <a
+              href={DEMO_BOOKING_SITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition-colors hover:bg-[var(--ck-surface)] lg:inline-flex"
+              style={{ borderColor: "color-mix(in srgb, var(--ck-accent) 35%, transparent)", color: "var(--ck-accent)" }}
+            >
+              View Claire&apos;s booking site ↗
+            </a>
+          </div>
+        )}
         <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">
-          {routeBlocked ? (
+          {readOnly && !isDemoPathVisible(pathname) ? (
+            <div className="ui-card mx-auto max-w-md p-8 text-center">
+              <h2 className="text-lg font-semibold">This section is not part of the demo</h2>
+              <Link href="/bookings" className="mt-4 inline-block underline underline-offset-4">Explore bookings</Link>
+            </div>
+          ) : routeBlocked ? (
             <div className="flex items-center justify-center min-h-[50vh]">
               <div className="ui-card px-10 py-9 text-center max-w-sm">
                 <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Feature Unavailable</h2>
                 <p className="text-sm text-[var(--ck-text-muted)]">This section is not accessible while your subscription is suspended. You can still access Reports, Invoices, Refunds, and Settings.</p>
               </div>
             </div>
-          ) : children}
+          ) : readOnly ? <DemoActionGuide>{children}</DemoActionGuide> : children}
         </main>
 
-        <nav className="ui-glass lg:hidden shrink-0 overflow-x-auto border-t py-2 no-scrollbar" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <div className="flex min-w-max px-2">
-          {visibleNav.map((n) => {
+        <nav className="ui-glass lg:hidden shrink-0 border-t px-1 pt-1" aria-label="Primary" style={{ borderColor: "var(--ck-border-subtle)", paddingBottom: "max(0.25rem, env(safe-area-inset-bottom))" }}>
+          <div className="flex w-full">
+          {mobilePrimaryNav.map((n) => {
             const Icon = iconMap[n.icon] || Circle;
             const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
             const mobileBlocked = isSuspended && !isSuspendedAllowed(n.href);
             return (
-              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex w-[74px] shrink-0 flex-col items-center rounded-lg px-1 py-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
+              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center rounded-lg px-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                 <div className="relative mb-1">
                   <Icon size={20} weight={isActive ? "fill" : "regular"} />
                   {n.href === "/inbox" && <div className="absolute -top-1 -right-2 transform scale-75"><NotificationBadge /></div>}
                   {n.href === "/refunds" && <div className="absolute -top-1 -right-2 transform scale-75"><RefundBadge /></div>}
                 </div>
-                <span className="truncate">{n.label}</span>
+                <span className="max-w-full whitespace-nowrap">{n.href === "/" ? "Today" : n.label}</span>
                 {isActive && <span className="absolute -bottom-0.5 h-[3px] w-[3px] rounded-full" style={{ background: "var(--ck-amber-bright)" }} aria-hidden="true" />}
               </Link>
             );
           })}
+          <MobileMenuDrawer nav={visibleNav} active={mobileMoreActive} />
           </div>
         </nav>
       </div>

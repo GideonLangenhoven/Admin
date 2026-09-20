@@ -286,7 +286,7 @@ export default function PeakPricingPage() {
             <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Tour rate table</h2>
             <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Base pricing is your always-on rate. Peak pricing is used when you apply a seasonal range below.</p>
           </div>
-          <button onClick={saveTourPricing} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+          <button data-demo-action="pricing.save" onClick={saveTourPricing} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
             {saving ? "Saving..." : "Save tour prices"}
           </button>
         </div>
@@ -383,7 +383,7 @@ export default function PeakPricingPage() {
           ))}
         </div>
 
-        <button onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
+        <button data-demo-action="pricing.apply" onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
           className="ui-btn ui-btn-primary w-full disabled:opacity-50">
           {saving ? "Applying..." : "Apply Peak Pricing"}
         </button>
@@ -414,7 +414,7 @@ export default function PeakPricingPage() {
                     </p>
                   )}
                 </div>
-                <button onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
+                <button data-demo-action="pricing.remove" onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
                   className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
                   Remove
                 </button>
@@ -442,7 +442,7 @@ export default function PeakPricingPage() {
                   </p>
                   <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{r.count} slots {r.price ? "@ R" + r.price : ""}</p>
                 </div>
-                <button onClick={() => removePeakRange(r.startDate, r.endDate)}
+                <button data-demo-action="pricing.remove" onClick={() => removePeakRange(r.startDate, r.endDate)}
                   className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
                   Remove
                 </button>

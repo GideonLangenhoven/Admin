@@ -23,7 +23,7 @@ type BotModeState = {
 };
 
 export default function WhatsAppBotSection() {
-  const { businessId, role } = useBusinessContext();
+  const { businessId, role, readOnly } = useBusinessContext();
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const [state, setState] = useState<BotModeState | null>(null);
   const [selectedMode, setSelectedMode] = useState("");
@@ -216,9 +216,9 @@ export default function WhatsAppBotSection() {
       </div>
 
       {isPrivileged ? (
-        <button
+        <button data-demo-action="whatsapp.save"
           onClick={save}
-          disabled={!canSave}
+          disabled={!readOnly && !canSave}
           className="mt-6 rounded-xl px-6 py-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save changes"}

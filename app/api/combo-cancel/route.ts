@@ -27,10 +27,10 @@ async function verifyAdminSession(req: NextRequest, supabase: any) {
     if (authErr || !userRes?.user) return null;
     const { data: admin } = await supabase
       .from("admin_users")
-      .select("id, business_id, role, suspended")
+      .select("id, business_id, role, suspended, read_only")
       .eq("user_id", userRes.user.id)
       .maybeSingle();
-    if (!admin || admin.suspended) return null;
+    if (!admin || admin.suspended || admin.read_only) return null;
     return { user_id: userRes.user.id as string, business_id: admin.business_id as string, role: admin.role as string };
   } catch {
     return null;

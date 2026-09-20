@@ -1,7 +1,9 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -48,8 +50,15 @@ function buildInviteLink(onboardingUrl: unknown, token: string) {
   return base ? `${base}?token=${token}` : null;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentry("generate-invite-token", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return respond(405, { success: false, error: "Method not allowed" });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return respond(401, { success: false, error: "Unauthorized" }); }
+  if (auth.role !== "SUPER_ADMIN" || auth.isServiceRole) {
+    return respond(403, { success: false, error: "Only signed-in super admins can manage invite tokens" });
+  }
 
   try {
     const body = await req.json();
@@ -67,6 +76,7 @@ Deno.serve(async (req) => {
       .from("admin_users")
       .select("id, role, password_hash, suspended")
       .eq("email", requesterEmail)
+      .eq("user_id", auth.userId)
       .maybeSingle();
 
     if (requesterError) throw requesterError;
@@ -116,6 +126,7 @@ Deno.serve(async (req) => {
           // outside the TRADING set, so every payment gate fails closed until
           // the wizard's go-live step flips it.
           subscription_status: "ONBOARDING",
+          max_admin_seats: 1,
           ...derivedUrls(base),
         })
         .select("id, business_name, subdomain")
@@ -292,4 +303,4 @@ Deno.serve(async (req) => {
       error: error instanceof Error ? error.message : "Unhandled error",
     });
   }
-});
+}));

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+import { setAdminAuthPassword } from "../../../lib/admin-password";
 
 // Legacy SHA-256 hash check — matches what the browser admin-auth.ts produces.
 // Used only to verify pre-migration passwords; new passwords are stored by Supabase Auth (bcrypt internally).
@@ -27,10 +28,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const email = String(body.email || "").trim().toLowerCase();
+  const email = String(body.email || "")
+    .trim()
+    .toLowerCase();
   const password = String(body.password || "");
   if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Email and password are required" },
+      { status: 400 },
+    );
   }
 
   let admin;
@@ -38,14 +44,17 @@ export async function POST(req: NextRequest) {
     admin = adminClient();
   } catch (e: any) {
     console.error("ADMIN_LOGIN_CONFIG_ERR", e?.message);
-    return NextResponse.json({ error: e?.message || "Server misconfigured" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Server misconfigured" },
+      { status: 500 },
+    );
   }
 
   // 1. Look up admin row in admin_users (service role bypasses RLS)
   const { data: user, error: lookupErr } = await admin
     .from("admin_users")
     .select(
-      "id, email, name, role, business_id, password_hash, user_id, must_set_password, suspended, settings_permissions",
+      "id, email, name, role, business_id, password_hash, user_id, must_set_password, suspended, settings_permissions, read_only",
     )
     .eq("email", email)
     .maybeSingle();
@@ -58,7 +67,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
   if (user.suspended) {
-    return NextResponse.json({ error: "Account is suspended. Contact support." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Account is suspended. Contact support." },
+      { status: 403 },
+    );
   }
   if (user.must_set_password || !user.password_hash) {
     return NextResponse.json(
@@ -83,29 +95,17 @@ export async function POST(req: NextRequest) {
   // 3. Ensure admin has matching auth.users entry; create + link if not.
   let authUserId: string | null = user.user_id;
   if (!authUserId) {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { admin_id: user.id, business_id: user.business_id, role: user.role },
-    });
-
-    if (createErr) {
-      // Possibly already exists in auth.users from a prior partial migration — find and update.
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const existing = list?.users?.find((u) => u.email?.toLowerCase() === email);
-      if (existing) {
-        await admin.auth.admin.updateUserById(existing.id, { password, email_confirm: true });
-        authUserId = existing.id;
-      } else {
-        console.error("ADMIN_LOGIN_AUTH_CREATE_ERR", createErr.message);
-        return NextResponse.json(
-          { error: "Auth provisioning failed: " + createErr.message },
-          { status: 500 },
-        );
-      }
-    } else {
-      authUserId = created.user.id;
+    try {
+      authUserId = await setAdminAuthPassword(admin, user, password);
+    } catch (error) {
+      console.error(
+        "ADMIN_LOGIN_AUTH_CREATE_ERR",
+        error instanceof Error ? error.message : "Auth provisioning failed",
+      );
+      return NextResponse.json(
+        { error: "Could not prepare sign-in. Please try again." },
+        { status: 502 },
+      );
     }
 
     const { error: linkErr } = await admin
@@ -124,16 +124,27 @@ export async function POST(req: NextRequest) {
   const authClient = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: signin, error: signinErr } = await authClient.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data: signin, error: signinErr } =
+    await authClient.auth.signInWithPassword({
+      email,
+      password,
+    });
   if (signinErr || !signin?.session) {
     console.error("ADMIN_LOGIN_SIGNIN_ERR", signinErr?.message);
     return NextResponse.json(
       { error: "Sign-in failed" + (signinErr ? ": " + signinErr.message : "") },
       { status: 500 },
     );
+  }
+
+  if (user.read_only) {
+    const { error: refreshError } = await admin.rpc(
+      "refresh_claires_hiking_demo_dates",
+      { p_business_id: user.business_id },
+    );
+    if (refreshError) {
+      console.error("DEMO_DATE_REFRESH_ERR", refreshError.message);
+    }
   }
 
   return NextResponse.json({
@@ -149,6 +160,7 @@ export async function POST(req: NextRequest) {
       role: user.role,
       business_id: user.business_id,
       settings_permissions: user.settings_permissions,
+      read_only: user.read_only === true,
     },
   });
 }

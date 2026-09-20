@@ -23,7 +23,6 @@
 -- ════════════════════════════════════════════════════════════════════
 
 BEGIN;
-
 -- Drop any prior / conflicting policies. Names from FIX_automation_rls_policies.sql
 -- and 20260502053731_rls_fix_broken_auth_uid_lookup.sql are both included so a
 -- replay against either prior state is idempotent.
@@ -39,29 +38,22 @@ DROP POLICY IF EXISTS mkt_enrollments_auth_insert ON public.marketing_automation
 DROP POLICY IF EXISTS mkt_enrollments_auth_update ON public.marketing_automation_enrollments;
 DROP POLICY IF EXISTS mkt_enrollments_auth_delete ON public.marketing_automation_enrollments;
 DROP POLICY IF EXISTS mkt_enrollments_service ON public.marketing_automation_enrollments;
-
 CREATE POLICY mkt_enrollments_service ON public.marketing_automation_enrollments
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-
 CREATE POLICY mkt_enrollments_auth_select ON public.marketing_automation_enrollments
   FOR SELECT TO authenticated
   USING (business_id = ANY (public.current_business_ids()));
-
 CREATE POLICY mkt_enrollments_auth_insert ON public.marketing_automation_enrollments
   FOR INSERT TO authenticated
   WITH CHECK (business_id = ANY (public.current_business_ids()));
-
 CREATE POLICY mkt_enrollments_auth_update ON public.marketing_automation_enrollments
   FOR UPDATE TO authenticated
   USING (business_id = ANY (public.current_business_ids()))
   WITH CHECK (business_id = ANY (public.current_business_ids()));
-
 CREATE POLICY mkt_enrollments_auth_delete ON public.marketing_automation_enrollments
   FOR DELETE TO authenticated
   USING (business_id = ANY (public.current_business_ids()));
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.marketing_automation_enrollments TO authenticated;
-
 -- Same shape for the logs table.
 DROP POLICY IF EXISTS marketing_automation_logs_insert_own ON public.marketing_automation_logs;
 DROP POLICY IF EXISTS marketing_automation_logs_select_own ON public.marketing_automation_logs;
@@ -71,18 +63,13 @@ DROP POLICY IF EXISTS "Users can insert automation logs for their business" ON p
 DROP POLICY IF EXISTS mkt_auto_logs_auth_select ON public.marketing_automation_logs;
 DROP POLICY IF EXISTS mkt_auto_logs_auth_insert ON public.marketing_automation_logs;
 DROP POLICY IF EXISTS mkt_auto_logs_service ON public.marketing_automation_logs;
-
 CREATE POLICY mkt_auto_logs_service ON public.marketing_automation_logs
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-
 CREATE POLICY mkt_auto_logs_auth_select ON public.marketing_automation_logs
   FOR SELECT TO authenticated
   USING (business_id = ANY (public.current_business_ids()));
-
 CREATE POLICY mkt_auto_logs_auth_insert ON public.marketing_automation_logs
   FOR INSERT TO authenticated
   WITH CHECK (business_id = ANY (public.current_business_ids()));
-
 GRANT SELECT, INSERT ON public.marketing_automation_logs TO authenticated;
-
 COMMIT;

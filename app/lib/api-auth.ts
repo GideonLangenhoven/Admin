@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-export { isPrivilegedRole } from "./role-utils";
+export { isPrivilegedRole, canManageAdmin } from "./role-utils";
 
 export type CallerAdmin = {
   id: string;
@@ -28,11 +28,25 @@ export async function getCallerAdmin(
 
   const { data: adminRow } = await admin
     .from("admin_users")
-    .select("id, role, business_id, suspended")
+    .select("id, role, business_id, suspended, read_only")
     .eq("user_id", data.user.id)
     .maybeSingle();
 
   if (!adminRow || adminRow.suspended) return null;
+  // Shared demo credentials may browse GET-backed dashboard data, but can
+  // never use a service-role API route to mutate data or contact customers.
+  if (adminRow.read_only && req.method !== "GET") return null;
+
+  // A browser-selected tenant is a target, never proof of permission. Regular
+  // operators cannot pivot away from the business bound to their identity.
+  const target = req.headers.get("x-admin-business-id")?.trim();
+  if (target && target !== adminRow.business_id) {
+    if (adminRow.role !== "SUPER_ADMIN" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)) return null;
+    const { data: business, error: businessError } = await admin.from("businesses")
+      .select("id").eq("id", target).maybeSingle();
+    if (businessError || !business) return null;
+    adminRow.business_id = business.id;
+  }
 
   // A8: a tenant whose subscription is suspended/cancelled loses privileged API
   // access — enforced server-side here so it can't be bypassed by hitting the

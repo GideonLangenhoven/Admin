@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { Fragment, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
 import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { customerNotesTooltip } from "../lib/customer-notes";
+import { bookingDemoAction } from "../lib/demo-guide";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import { rescheduleUnitPrice } from "../lib/reschedule-price";
@@ -14,6 +15,7 @@ import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
+import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
@@ -177,6 +179,7 @@ export default function Bookings() {
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const loadRequestRef = useRef(0);
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
   const [cancellingWeatherId, setCancellingWeatherId] = useState<string | null>(null);
   const [resendingInvoiceId, setResendingInvoiceId] = useState<string | null>(null);
@@ -319,140 +322,117 @@ export default function Bookings() {
 
   async function loadBookings() {
     if (!businessId) return;
-    console.log("[BOOKINGS] loadBookings started", { businessId, rangeStart: rangeStart.toISOString(), rangeEnd: rangeEnd.toISOString() });
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
+    try {
+      // ponytail: re-fetch visible rows so actions/realtime refresh every loaded
+      // page coherently. Add a keyed page cache if thousands are routinely opened.
+      const visibleCount = (page + 1) * PAGE_SIZE;
+      const allBookings: any[] = [];
+      for (let from = 0; from < visibleCount + 1; from += 1000) {
+        const limit = Math.min(1000, visibleCount + 1 - from);
+        const { data, error } = await supabase.rpc("list_operator_bookings", {
+          p_business_id: businessId,
+          p_start: rangeStart.toISOString(),
+          p_end: rangeEnd.toISOString(),
+          p_limit: limit,
+          p_offset: from,
+        })
+          .select("id, created_at, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .order("created_at", { ascending: true }).order("id");
+        if (error) throw error;
+        if (requestId !== loadRequestRef.current) return;
+        if (data && !Array.isArray(data)) throw new Error("Unexpected booking list response");
+        const rows = data || [];
+        allBookings.push(...rows);
+        if (rows.length < limit) break;
+      }
 
-    // Step 1: Get slot IDs in the date range
-    const { data: slotRows, error: slotErr } = await supabase
-      .from("slots")
-      .select("id")
-      .eq("business_id", businessId)
-      .gte("start_time", rangeStart.toISOString())
-      .lte("start_time", rangeEnd.toISOString());
+      // Deduplicate
+      const seen = new Set<string>();
+      const deduped = allBookings.filter((b: any) => {
+        if (seen.has(b.id)) return false;
+        seen.add(b.id);
+        return true;
+      });
 
-    if (slotErr) {
-      console.error("[BOOKINGS] loadBookings slot fetch error:", slotErr.message, slotErr.code, slotErr.details);
-    }
-
-    const slotIds = (slotRows || []).map((s: { id: string }) => s.id);
-
-    // Step 2: Fetch bookings matching those slots (paginated)
-    const allBookings: any[] = [];
-    const rangeFrom = page * PAGE_SIZE;
-    const rangeTo = rangeFrom + PAGE_SIZE - 1;
-
-    if (slotIds.length > 0) {
-      const BATCH = 500;
-      for (let i = 0; i < slotIds.length; i += BATCH) {
-        const batch = slotIds.slice(i, i + BATCH);
-        const { data, error } = await supabase
-          .from("bookings")
-          .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
-          .eq("business_id", businessId)
-          .in("slot_id", batch)
-          .order("created_at", { ascending: true })
-          .range(rangeFrom, rangeTo + 1);
-        if (error) {
-          console.error("[BOOKINGS] loadBookings batch fetch error:", error.message, error.code, error.details, error.hint);
+      // Batch related rows without exceeding request/response limits.
+      const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+      const bookingIds = deduped.map((b: any) => b.id);
+      for (let from = 0; from < bookingIds.length; from += 200) {
+        const ids = bookingIds.slice(from, from + 200);
+        const addOnRows = await fetchAllRows((start, end) => supabase.from("booking_add_ons")
+          .select("booking_id, qty, add_ons(name)")
+          .in("booking_id", ids).order("id").range(start, end));
+        for (const row of (addOnRows || []) as any[]) {
+          const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
+          if (!ao?.name) continue;
+          (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
         }
-        if (data) allBookings.push(...data);
       }
-    }
 
-    // Step 3: Also fetch unslotted bookings (created in range, no slot assigned)
-    if (page === 0) {
-      const { data: unslotted } = await supabase
-        .from("bookings")
-        .select("id, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
-        .eq("business_id", businessId)
-        .is("slot_id", null)
-        .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"])
-        .gte("created_at", rangeStart.toISOString())
-        .order("created_at", { ascending: true })
-        .limit(50);
-      if (unslotted) allBookings.push(...unslotted);
-    }
-
-    // Deduplicate
-    const seen = new Set<string>();
-    const deduped = allBookings.filter((b: any) => {
-      if (seen.has(b.id)) return false;
-      seen.add(b.id);
-      return true;
-    });
-
-    // Fetch booking_add_ons in one round-trip and group by booking_id.
-    const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
-    const bookingIds = deduped.map((b: any) => b.id);
-    if (bookingIds.length > 0) {
-      const { data: addOnRows } = await supabase.from("booking_add_ons")
-        .select("booking_id, qty, add_ons(name)")
-        .in("booking_id", bookingIds);
-      for (const row of (addOnRows || []) as any[]) {
-        const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
-        if (!ao?.name) continue;
-        (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
+      // Fetch ACTIVE pending_reschedules so we can show a "Pending reschedule"
+      // badge on bookings that have a held-but-unpaid upgrade. Joined with the
+      // hold to pull expires_at and the new slot for context.
+      const pendingByBooking: Record<string, { newSlotStart: string | null; newTourName: string | null; diff: number; expiresAt: string | null; pendingId: string }> = {};
+      for (let from = 0; from < bookingIds.length; from += 200) {
+        const ids = bookingIds.slice(from, from + 200);
+        const prRows = await fetchAllRows((start, end) => supabase
+          .from("pending_reschedules")
+          .select("id, booking_id, new_slot_id, new_tour_id, diff, status, holds(expires_at, status), slots:new_slot_id(start_time), tours:new_tour_id(name)")
+          .in("booking_id", ids).eq("business_id", businessId)
+          .eq("status", "PENDING").order("id").range(start, end));
+        for (const row of (prRows || []) as any[]) {
+          const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
+          // Expired/lapsed holds stay visible: the upgrade fee is still owed if
+          // the customer wants the move — "Send link" issues a fresh checkout.
+          const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
+          // ponytail: skip reschedules whose target slot already departed —
+          // nothing is owed for a trip that can no longer happen.
+          if (slot?.start_time && new Date(slot.start_time).getTime() < Date.now()) continue;
+          const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
+          pendingByBooking[row.booking_id] = {
+            pendingId: row.id,
+            newSlotStart: slot?.start_time || null,
+            newTourName: tour?.name || null,
+            diff: Number(row.diff || 0),
+            expiresAt: hold?.expires_at || null,
+          };
+        }
       }
-    }
 
-    // Fetch ACTIVE pending_reschedules so we can show a "Pending reschedule"
-    // badge on bookings that have a held-but-unpaid upgrade. Joined with the
-    // hold to pull expires_at and the new slot for context.
-    const pendingByBooking: Record<string, { newSlotStart: string | null; newTourName: string | null; diff: number; expiresAt: string | null; pendingId: string }> = {};
-    if (bookingIds.length > 0) {
-      const { data: prRows } = await supabase
-        .from("pending_reschedules")
-        .select("id, booking_id, new_slot_id, new_tour_id, diff, status, holds(expires_at, status), slots:new_slot_id(start_time), tours:new_tour_id(name)")
-        .in("booking_id", bookingIds)
-        .eq("status", "PENDING");
-      for (const row of (prRows || []) as any[]) {
-        const hold = Array.isArray(row.holds) ? row.holds[0] : row.holds;
-        // Expired/lapsed holds stay visible: the upgrade fee is still owed if
-        // the customer wants the move — "Send link" issues a fresh checkout.
-        const slot = Array.isArray(row.slots) ? row.slots[0] : row.slots;
-        // ponytail: skip reschedules whose target slot already departed —
-        // nothing is owed for a trip that can no longer happen.
-        if (slot?.start_time && new Date(slot.start_time).getTime() < Date.now()) continue;
-        const tour = Array.isArray(row.tours) ? row.tours[0] : row.tours;
-        pendingByBooking[row.booking_id] = {
-          pendingId: row.id,
-          newSlotStart: slot?.start_time || null,
-          newTourName: tour?.name || null,
-          diff: Number(row.diff || 0),
-          expiresAt: hold?.expires_at || null,
-        };
-      }
-    }
+      const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
+        .map((b) => ({
+          ...b,
+          tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
+          slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
+          add_ons: addOnsByBooking[b.id] || [],
+          pending_reschedule: pendingByBooking[b.id] || null,
+        } as Booking));
 
-    const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
-      .map((b) => ({
-        ...b,
-        tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
-        slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
-        add_ons: addOnsByBooking[b.id] || [],
-        pending_reschedule: pendingByBooking[b.id] || null,
-      } as Booking));
-
-    console.log("[BOOKINGS] loadBookings complete", { totalBookings: normalized.length, slotCount: slotIds.length, page });
-    setHasMore(normalized.length > PAGE_SIZE);
-    const limited = normalized.slice(0, PAGE_SIZE);
-    if (page === 0) {
-      setBookings(limited as Booking[]);
-    } else {
-      setBookings(prev => [...prev, ...limited] as Booking[]);
+      if (requestId !== loadRequestRef.current) return;
+      setHasMore(normalized.length > visibleCount);
+      setBookings(normalized.slice(0, visibleCount));
+    } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+      console.error("[BOOKINGS] load failed:", error);
+      notify({ title: "Bookings could not be loaded", message: "Please try again.", tone: "error" });
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
     setPage(0);
+    setBookings([]);
+    setSelected(new Set());
   }, [rangeStart, rangeEnd, businessId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       loadBookings();
     }, 0);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); loadRequestRef.current++; };
   }, [rangeStart, rangeEnd, businessId, page]);
 
   // Auto-refresh when a booking status changes (e.g. payment received)
@@ -1517,30 +1497,26 @@ export default function Bookings() {
 
   return (
     <div className="space-y-4">
-      <div className="anim-fade-up flex items-center justify-between gap-4">
+      <div className="anim-fade-up flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="ui-mono-label mb-2">Operations</p>
           <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Bookings</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportCsv(false)}
-            className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]"
-            title="Export CSV (special requests masked)"
-          >
-            Export CSV
-          </button>
-          {isPrivilegedRole && (
-            <button
-              onClick={() => exportCsv(true)}
-              className="ui-btn !h-8 !px-3 !text-[12.5px]"
-              style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}
-              title="Export with sensitive data (special requests visible)"
-            >
-              Export with Sensitive Data
+        <details className="group relative">
+          <summary className="ui-btn ui-btn-ghost min-h-11 cursor-pointer list-none px-4 text-sm">Export</summary>
+          <div className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border py-1 shadow-lg" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
+            <button data-demo-action="booking.export" onClick={() => exportCsv(false)} className="min-h-12 w-full px-4 py-2 text-left text-sm font-medium hover:bg-[var(--ck-surface-sunken)]">
+              Export masked CSV
+              <span className="mt-0.5 block text-xs font-normal" style={{ color: "var(--ck-text-muted)" }}>Special requests stay protected.</span>
             </button>
-          )}
-        </div>
+            {isPrivilegedRole && (
+              <button data-demo-action="booking.export-sensitive" onClick={() => exportCsv(true)} className="min-h-12 w-full px-4 py-2 text-left text-sm font-medium hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-amber)" }}>
+                Export sensitive CSV
+                <span className="mt-0.5 block text-xs font-normal">Includes unmasked special requests.</span>
+              </button>
+            )}
+          </div>
+        </details>
       </div>
 
       {/* WhatsApp compose dialog */}
@@ -1566,7 +1542,7 @@ export default function Bookings() {
               >
                 Cancel
               </button>
-              <button
+              <button data-demo-action="booking.whatsapp"
                 onClick={sendWhatsAppGreeting}
                 disabled={waSending || !waMessage.trim()}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -1601,7 +1577,7 @@ export default function Bookings() {
               <button onClick={() => setRefundDialog(null)} disabled={refunding} className="ui-btn ui-btn-ghost disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={processRefund} disabled={refunding || !refundDialog.amount} className="ui-btn ui-btn-danger disabled:opacity-50">
+              <button data-demo-action="booking.refund" onClick={processRefund} disabled={refunding || !refundDialog.amount} className="ui-btn ui-btn-danger disabled:opacity-50">
                 {refunding ? "Processing…" : "Refund & Cancel Booking"}
               </button>
             </div>
@@ -1728,22 +1704,22 @@ export default function Bookings() {
             </span>
             <div className="flex-1" />
             {selectionAllPaid && (
-              <button onClick={() => runBulk("checkin")} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.checkin" onClick={() => runBulk("checkin")} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs">
                 Check in
               </button>
             )}
             {selectionAllUnpaid && (
-              <button onClick={() => runBulk("markpaid")} className="ui-btn !h-8 !px-3 !text-xs" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
+              <button data-demo-action="booking.paid" onClick={() => runBulk("markpaid")} className="ui-btn !h-8 !px-3 !text-xs" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                 Mark paid (EFT)
               </button>
             )}
             {selectionNoneCancelled && (
-              <button onClick={() => runBulk("cancel")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.cancel" onClick={() => runBulk("cancel")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
                 Cancel
               </button>
             )}
             {selectionAllPaid && (
-              <button onClick={() => runBulk("refund")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.refund" onClick={() => runBulk("refund")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
                 Refund
               </button>
             )}
@@ -1774,7 +1750,7 @@ export default function Bookings() {
 
                 <div className="ui-card overflow-x-auto no-scrollbar lg:overflow-visible">
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="hidden lg:table-header-group">
                       <tr className="border-b" style={{ background: "var(--ck-surface-sunken)" }}>
                         <th className="w-8 p-1.5 lg:p-3 text-center">
                           <input type="checkbox"
@@ -1830,7 +1806,7 @@ export default function Bookings() {
                         );
                       })}
 
-                      <tr className="border-t-2 font-semibold text-gray-700" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
+                      <tr className="hidden border-t-2 font-semibold text-gray-700 lg:table-row" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
                         <td className="p-3"></td>
                         <td className="p-3"><span className="ui-mono-label">Totals</span></td>
                         <td className="p-3 font-display tabular-nums">{day.totalPax}</td>
@@ -1978,7 +1954,7 @@ export default function Bookings() {
               <button onClick={() => setEditBooking(null)} className="ui-btn ui-btn-ghost">
                 Close
               </button>
-              <button
+              <button data-demo-action="booking.edit"
                 onClick={saveEditBooking}
                 disabled={actionBookingId === editBooking.id}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -2128,7 +2104,7 @@ export default function Bookings() {
               <button onClick={() => setRebookBooking(null)} className="ui-btn ui-btn-ghost">
                 Close
               </button>
-              <button
+              <button data-demo-action="booking.rebook"
                 onClick={saveRebook}
                 disabled={!rebookSlotId || actionBookingId === rebookBooking.id}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -2185,6 +2161,17 @@ export default function Bookings() {
     </div>
   );
 }
+
+type BookingRowAction = {
+  label: string;
+  mobileLabel?: string;
+  description: string;
+  run: () => void;
+  disabled?: boolean;
+  title?: string;
+  demoAction?: string;
+  tone?: "gray" | "blue" | "green" | "red" | "amber";
+};
 
 function SlotRows({
   slot,
@@ -2244,12 +2231,55 @@ function SlotRows({
     if (!openActions) return;
     function handleClick() { setOpenActions(null); }
     document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    window.addEventListener("ck:demo-explanation-open", handleClick);
+    return () => {
+      document.removeEventListener("click", handleClick);
+      window.removeEventListener("ck:demo-explanation-open", handleClick);
+    };
   }, [openActions]);
 
   return (
     <>
-      <tr className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)]" onClick={onToggle}>
+      <tr className="border-t border-gray-100 lg:hidden">
+        <td colSpan={9} className="p-0">
+          <div className="px-4 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <button type="button" onClick={onToggle} aria-expanded={isOpen} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]">
+                <span className="flex items-center justify-between gap-3">
+                  <span className="text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.timeLabel}</span>
+                  <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax} {slot.totalPax === 1 ? "guest" : "guests"}</span>
+                </span>
+                <span className="mt-1 block text-base font-semibold leading-snug" style={{ color: "var(--ck-text)" }}>{services || "No activity assigned"}</span>
+                <span className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
+                  <span>Paid {fmtCurrency(slot.totalPaid)}</span>
+                  <span className={slot.totalDue > 0 ? "font-semibold text-red-700" : "font-semibold text-green-700"}>Due {fmtCurrency(slot.totalDue)}</span>
+                </span>
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={onToggle} aria-expanded={isOpen} className="ui-btn ui-btn-ghost min-h-11 w-full">
+                {isOpen ? "Hide guests" : "View guests"}
+              </button>
+              <button type="button" onClick={() => setOpenActions(openActions === "departure" ? null : "departure")} aria-expanded={openActions === "departure"} className="ui-btn ui-btn-ghost min-h-11 w-full">
+                Departure actions
+              </button>
+            </div>
+          </div>
+          {openActions === "departure" && (
+            <MobileActionSheet title={`${slot.timeLabel} · ${services || "Departure"}`} onClose={() => setOpenActions(null)}>
+              <ActionButton
+                label={cancellingWeatherId === slot.bookings[0]?.slot_id ? "Cancelling…" : "Weather-cancel departure"}
+                demoAction="booking.weather"
+                description="Close this departure and notify every affected guest."
+                onClick={() => { onCancelSlot(slot); setOpenActions(null); }}
+                disabled={cancellingWeatherId === slot.bookings[0]?.slot_id}
+                tone="red"
+              />
+            </MobileActionSheet>
+          )}
+        </td>
+      </tr>
+      <tr className="hidden cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)] lg:table-row" onClick={onToggle}>
         <td className="w-8 p-1.5 lg:p-3 text-center" onClick={e => e.stopPropagation()}></td>
         <td className="p-1.5 lg:p-3 font-medium text-[12px] lg:text-sm" style={{ color: "var(--ck-ocean)" }}>
           <span className="mr-0.5 inline-block w-3 text-gray-400 transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>
@@ -2265,7 +2295,7 @@ function SlotRows({
         <td className="hidden p-3 text-right sm:table-cell">{fmtCurrency(slot.totalPaid)}</td>
         <td className={`p-1.5 lg:p-3 text-right font-semibold text-[11px] lg:text-sm ${slot.totalDue > 0 ? "text-red-600" : "text-green-600"}`}>{fmtCurrency(slot.totalDue)}</td>
         <td className="hidden p-3 lg:table-cell">
-          <button
+          <button data-demo-action="booking.weather"
             onClick={(e) => { e.stopPropagation(); onCancelSlot(slot); }}
             disabled={cancellingWeatherId === slot.bookings[0]?.slot_id}
             className="px-2 py-1 bg-red-50 text-red-600 font-medium rounded text-xs hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
@@ -2285,10 +2315,56 @@ function SlotRows({
           const isLoading = actionBookingId === b.id;
           const isResending = resendingInvoiceId === b.id;
           const isGeneratingLink = paymentLinkBookingId === b.id;
-          const hasPaymentLink = Boolean(b.yoco_checkout_id);
           const actionsOpen = openActions === b.id;
+          const bookingActions: BookingRowAction[] = [
+            { label: "View", mobileLabel: "View booking", description: "Open the complete booking record.", run: () => onView(b), tone: "blue" },
+            { label: "Edit", mobileLabel: "Edit booking", description: "Correct guest and reservation details.", run: () => onEdit(b), disabled: isLoading },
+            { label: "WhatsApp", description: "Start a message in the guest conversation.", run: () => onWhatsApp(b), disabled: !b.phone, tone: "green" },
+            { label: "Rebook", description: "Move this party to another available departure.", run: () => onRebook(b), disabled: isLoading },
+            { label: "Mark Paid", description: "Record money received outside online checkout.", run: () => onMarkPaid(b), disabled: isLoading || isPaid(b.status), tone: "green" },
+            { label: isGeneratingLink ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: "Create and send checkout for the amount due.", run: () => onSendPaymentLink(b), disabled: isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED", tone: "blue" },
+            { label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", run: () => onPaymentReminder(b), disabled: isLoading || isPaid(b.status) || b.status === "CANCELLED" || !b.payment_url, title: !b.payment_url ? "Send a payment link first." : undefined, tone: "amber" },
+            { label: b.allow_unpaid ? "Require Payment" : "Allow Without Payment", description: b.allow_unpaid ? "Restore reminders and the payment deadline." : "Keep the reservation valid for pay on arrival.", run: () => onToggleAllowUnpaid(b), disabled: isLoading || isPaid(b.status) || b.status === "CANCELLED" },
+            ...(b.pending_reschedule ? [{ label: "Reschedule Payment Link", demoAction: "booking.reschedule-link", description: "Collect the extra cost of the proposed move.", run: () => onSendRescheduleLink(b), disabled: quickResendingId === b.id, tone: "blue" as const }] : []),
+            { label: "Refund", demoAction: "booking.refund", description: "Review the eligible refund before submitting it.", run: () => onRefund(b), disabled: isLoading || !isPaid(b.status), title: !isPaid(b.status) ? "Nothing to refund: no payment received." : undefined, tone: "amber" },
+            { label: isResending ? "Resending…" : "Resend Invoice", demoAction: "booking.invoice", description: "Send the latest paid invoice again.", run: () => onResendInvoice(b.id), disabled: isResending || !isPaid(b.status), title: !isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined, tone: "blue" },
+            { label: "Cancel", description: "Cancel only this party and release its places.", run: () => onCancel(b), disabled: isLoading || b.status === "CANCELLED", tone: "red" },
+          ];
           return (
-            <tr key={b.id} className={"border-t border-gray-100 text-[11px] lg:text-xs text-gray-600 " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
+            <Fragment key={b.id}>
+            <tr className={"border-t border-gray-100 text-gray-600 lg:hidden " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
+              <td colSpan={9} className="p-0">
+                <div className="px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl">
+                      <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
+                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Select ${b.customer_name}`} />
+                    </label>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="text-base font-semibold leading-snug" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                        <StatusBadge status={b.status} />
+                      </div>
+                      <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.qty} {b.qty === 1 ? "guest" : "guests"} · Due {fmtCurrency(due)}</p>
+                      <p className="mt-1 break-words text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.waiver_status === "SIGNED" ? "Waiver signed" : "Waiver outstanding"}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5"><SourceBadge source={b.source} /><RefundBadge status={b.refund_status} /></div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setOpenActions(actionsOpen ? null : b.id)} aria-expanded={actionsOpen} className="ui-btn ui-btn-ghost mt-3 min-h-11 w-full">
+                    Guest actions
+                  </button>
+                </div>
+                {actionsOpen && (
+                  <MobileActionSheet title={b.customer_name} onClose={() => setOpenActions(null)}>
+                    {bookingActions.map((action) => (
+                      <ActionButton key={action.label} label={action.mobileLabel || action.label} demoAction={action.demoAction} description={action.description} onClick={() => { action.run(); setOpenActions(null); }} disabled={action.disabled} title={action.title} tone={action.tone} />
+                    ))}
+                  </MobileActionSheet>
+                )}
+              </td>
+            </tr>
+            <tr className={"hidden border-t border-gray-100 text-xs text-gray-600 lg:table-row " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
               <td className="w-8 p-1.5 lg:p-3 text-center align-top" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2296,12 +2372,7 @@ function SlotRows({
               </td>
               <td className="p-1.5 lg:p-3 pl-2 lg:pl-10 text-gray-400" colSpan={1}>
                 <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1 text-left lg:pointer-events-none"
-                    onClick={(e) => { e.stopPropagation(); setOpenActions(actionsOpen ? null : b.id); }}
-                  >
-                    <span className="inline-block w-2 text-gray-400 transition-transform lg:hidden" style={{ transform: actionsOpen ? "rotate(90deg)" : "none" }}>›</span>
+                  <div className="flex items-center gap-1 text-left">
                     <span
                       title={customerNotesTooltip(b.custom_fields)}
                       className={"font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
@@ -2314,7 +2385,7 @@ function SlotRows({
                       : <span title="Waiver not signed" className="shrink-0 text-[10px]" style={{ color: "var(--ck-amber)" }}>W</span>}
                     <StatusBadge status={b.status} />
                     {["PENDING", "PENDING PAYMENT"].includes(b.status) && !b.yoco_checkout_id && (
-                      <button
+                      <button data-demo-action="booking.payment"
                         type="button"
                         title="Quick send payment link"
                         disabled={quickResendingId === b.id}
@@ -2327,7 +2398,7 @@ function SlotRows({
                       </button>
                     )}
                     <SourceBadge source={b.source} />
-                  </button>
+                  </div>
                   {b.add_ons && b.add_ons.length > 0 && (
                     <div className="flex flex-wrap gap-1 pl-[18px] lg:pl-0">
                       {b.add_ons.map((ao, idx) => (
@@ -2351,7 +2422,7 @@ function SlotRows({
                         >
                           {label}
                         </span>
-                        <button
+                        <button data-demo-action="booking.reschedule-link"
                           type="button"
                           title="Send a fresh payment link for the reschedule difference (email + WhatsApp)"
                           disabled={quickResendingId === b.id}
@@ -2374,38 +2445,6 @@ function SlotRows({
                   </span>
                   {b.payment_deadline && !isPaid(b.status) && b.status !== "CANCELLED" && (
                     <PaymentExpiryBadge deadline={b.payment_deadline} />
-                  )}
-                  {/* Collapsible actions on mobile */}
-                  {actionsOpen && (
-                    <div className="mt-2 flex flex-wrap gap-1.5 pl-[18px] lg:hidden">
-                      <ActionButton label="View" onClick={() => onView(b)} tone="blue" />
-                      <ActionButton label="Edit" onClick={() => onEdit(b)} disabled={isLoading} />
-                      <ActionButton label="WhatsApp" onClick={() => onWhatsApp(b)} disabled={!b.phone} tone="green" />
-                      <ActionButton label="Rebook" onClick={() => onRebook(b)} disabled={isLoading} />
-                      <ActionButton label="Mark Paid" onClick={() => onMarkPaid(b)} disabled={isLoading || isPaid(b.status)} tone="green" />
-                      <ActionButton
-                        label={isGeneratingLink ? "..." : "Pay Link"}
-                        onClick={() => onSendPaymentLink(b)}
-                        disabled={isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED"}
-                        tone="blue"
-                      />
-                      <ActionButton
-                        label="Refund"
-                        onClick={() => onRefund(b)}
-                        disabled={isLoading || !isPaid(b.status)}
-                        title={!isPaid(b.status) ? "Nothing to refund: no payment received" : undefined}
-                        tone="amber"
-                      />
-                      <ActionButton label="Cancel" onClick={() => onCancel(b)} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
-                      <ActionButton
-                        label={isResending ? "Sending…" : "Resend Inv"}
-                        onClick={() => onResendInvoice(b.id)}
-                        disabled={isResending || !isPaid(b.status)}
-                        title={!isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined}
-                        tone="blue"
-                      />
-                      <RefundBadge status={b.refund_status} />
-                    </div>
                   )}
                 </div>
               </td>
@@ -2434,54 +2473,59 @@ function SlotRows({
                     </button>
                     {actionsOpen && (
                       <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 py-1 shadow-lg origin-top-right" style={{ background: "var(--ck-surface-elevated)" }} onClick={(e) => e.stopPropagation()}>
-                        <ActionMenuItem label="View" onClick={() => { onView(b); setOpenActions(null); }} tone="blue" />
-                        <ActionMenuItem label="Edit" onClick={() => { onEdit(b); setOpenActions(null); }} disabled={isLoading} />
-                        <ActionMenuItem label="WhatsApp" onClick={() => { onWhatsApp(b); setOpenActions(null); }} disabled={!b.phone} tone="green" />
-                        <ActionMenuItem label="Rebook" onClick={() => { onRebook(b); setOpenActions(null); }} disabled={isLoading} />
-                        <ActionMenuItem label="Mark Paid" onClick={() => { onMarkPaid(b); setOpenActions(null); }} disabled={isLoading || isPaid(b.status)} tone="green" />
-                        <ActionMenuItem
-                          label={isGeneratingLink ? "Generating..." : "Payment Link"}
-                          onClick={() => { onSendPaymentLink(b); setOpenActions(null); }}
-                          disabled={isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED"}
-                          tone="blue"
-                        />
-                        <ActionMenuItem
-                          label="Payment Reminder"
-                          onClick={() => { onPaymentReminder(b); setOpenActions(null); }}
-                          disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED" || !b.payment_url}
-                          title={!b.payment_url ? "No payment link on this booking. Send a Payment Link first." : "Send a friendly 'payment outstanding' reminder with the payment link"}
-                          tone="amber"
-                        />
-                        <ActionMenuItem
-                          label={b.allow_unpaid ? "Require Payment" : "Allow Without Payment"}
-                          onClick={() => { onToggleAllowUnpaid(b); setOpenActions(null); }}
-                          disabled={isLoading || isPaid(b.status) || b.status === "CANCELLED"}
-                          title={b.allow_unpaid ? "Re-enable reminders + auto-cancel for this booking" : "Let this trip go ahead unpaid (skips reminders and auto-cancel)"}
-                        />
-                        <ActionMenuItem
-                          label="Refund"
-                          onClick={() => { onRefund(b); setOpenActions(null); }}
-                          disabled={isLoading || !isPaid(b.status)}
-                          title={!isPaid(b.status) ? "Nothing to refund: no payment received" : undefined}
-                          tone="amber"
-                        />
-                        <ActionMenuItem label="Cancel" onClick={() => { onCancel(b); setOpenActions(null); }} disabled={isLoading || b.status === "CANCELLED"} tone="red" />
-                        <ActionMenuItem
-                          label={isResending ? "Resending..." : "Resend Invoice"}
-                          onClick={() => { onResendInvoice(b.id); setOpenActions(null); }}
-                          disabled={isResending || !isPaid(b.status)}
-                          title={!isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined}
-                          tone="blue"
-                        />
+                        {bookingActions.map((action) => (
+                          <ActionMenuItem key={action.label} label={action.label} demoAction={action.demoAction} onClick={() => { action.run(); setOpenActions(null); }} disabled={action.disabled} title={action.title} tone={action.tone} />
+                        ))}
                       </div>
                     )}
                   </div>
                 </div>
               </td>
             </tr>
+            </Fragment>
           );
         })}
     </>
+  );
+}
+
+function MobileActionSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden" onClick={(event) => event.stopPropagation()}>
+      <button type="button" aria-label="Close actions" onClick={onClose} className="absolute inset-0 h-full w-full bg-slate-950/45" />
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Actions for ${title}`} data-mobile-action-sheet className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,42rem)] overflow-y-auto rounded-t-2xl border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
+        <div className="mb-2 flex min-h-12 items-center justify-between gap-4 border-b pb-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
+          <div className="min-w-0"><p className="ui-mono-label mb-1">Available actions</p><h3 className="text-base font-semibold leading-snug" style={{ color: "var(--ck-text-strong)" }}>{title}</h3></div>
+          <button type="button" onClick={onClose} aria-label="Close actions" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ color: "var(--ck-text-muted)" }}>×</button>
+        </div>
+        <div className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -2490,12 +2534,16 @@ function ActionButton({
   onClick,
   disabled,
   title,
+  description,
+  demoAction,
   tone = "gray",
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   title?: string;
+  description?: string;
+  demoAction?: string;
   tone?: "gray" | "blue" | "green" | "red" | "amber";
 }) {
   const tones: Record<string, string> = {
@@ -2507,6 +2555,7 @@ function ActionButton({
   };
   return (
     <button
+      data-demo-action={demoAction || bookingDemoAction(label)}
       type="button"
       onClick={(e) => {
         // stopImmediatePropagation kills the document-level click handler
@@ -2518,9 +2567,10 @@ function ActionButton({
       }}
       disabled={disabled}
       title={title}
-      className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${tones[tone]}`}
+      className={`flex min-h-12 w-full flex-col justify-center px-3 py-2 text-left text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
     >
-      {label}
+      <span>{label}</span>
+      {description && <span className="mt-0.5 text-xs font-normal leading-snug opacity-75">{description}</span>}
     </button>
   );
 }
@@ -2569,12 +2619,14 @@ function ActionMenuItem({
   onClick,
   disabled,
   title,
+  demoAction,
   tone = "gray",
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   title?: string;
+  demoAction?: string;
   tone?: "gray" | "blue" | "green" | "red" | "amber";
 }) {
   const tones: Record<string, string> = {
@@ -2586,6 +2638,7 @@ function ActionMenuItem({
   };
   return (
     <button
+      data-demo-action={demoAction || bookingDemoAction(label)}
       type="button"
       onClick={(e) => {
         e.stopPropagation();

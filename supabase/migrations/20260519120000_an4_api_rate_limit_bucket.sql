@@ -12,12 +12,9 @@ create table if not exists public.api_rate_limits (
   count integer not null default 0,
   primary key (ip, endpoint, window_start)
 );
-
 alter table public.api_rate_limits enable row level security;
-
 revoke all on public.api_rate_limits from public, anon, authenticated;
 grant select, insert, update, delete on public.api_rate_limits to service_role;
-
 create or replace function public.check_rate_limit(
   p_ip text,
   p_endpoint text,
@@ -43,6 +40,5 @@ begin
 
   return cur_count <= p_max;
 end $$;
-
 revoke all on function public.check_rate_limit(text, text, integer) from public, anon, authenticated;
 grant execute on function public.check_rate_limit(text, text, integer) to service_role;

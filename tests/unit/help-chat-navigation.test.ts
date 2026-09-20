@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 
 // Reported live: clicking a link in the help assistant (an "Email Marketing"
 // source chip, route /marketing) closed the assistant mid-conversation — it
@@ -19,9 +20,18 @@ describe("help assistant survives following its own links", () => {
     // The unconditional close is what caused the report. Scoped to the links:
     // the header's X button uses the same inline form and SHOULD always close.
     expect(SRC).not.toContain("onNavigate={() => setOpen(false)}");
-    const chip = SRC.slice(SRC.indexOf("m.sources!.map"), SRC.indexOf("{busy &&"));
-    expect(chip).toContain("onClick={handleNavigate}");
-    expect(chip).not.toContain("setOpen(false)");
+    const ast = ts.createSourceFile("HelpChat.tsx", SRC, ts.ScriptTarget.Latest, true);
+    const chips: string[] = [];
+    function visit(node: ts.Node) {
+      if (ts.isJsxOpeningElement(node) && node.tagName.getText(ast) === "Link"
+        && node.attributes.properties.some(attr => attr.getText(ast) === "href={s.route}"))
+        chips.push(node.attributes.getText(ast));
+      ts.forEachChild(node, visit);
+    }
+    visit(ast);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toContain("onClick={handleNavigate}");
+    expect(chips[0]).not.toContain("setOpen(false)");
   });
 
   it("only closes on the mobile breakpoint", () => {

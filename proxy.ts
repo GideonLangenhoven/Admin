@@ -188,6 +188,7 @@ const HIDDEN_FOR_MVP: RegExp[] = [
 
 function checkMvpHidden(req: NextRequest): NextResponse | null {
   if (!HIDDEN_FOR_MVP.some((p) => p.test(req.nextUrl.pathname))) return null;
+  if (req.nextUrl.pathname.startsWith("/settings/ota") && req.cookies.get("ck_demo_read_only")?.value === "1") return null;
   const url = req.nextUrl.clone();
   url.pathname = "/";
   url.search = "";

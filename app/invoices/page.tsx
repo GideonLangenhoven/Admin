@@ -638,9 +638,9 @@ export default function Invoices() {
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Download</button>
-                        <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Print</button>
-                        <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
+                        <button data-demo-action="invoice.download" onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Download</button>
+                        <button data-demo-action="invoice.print" onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">Print</button>
+                        <button data-demo-action="booking.invoice" onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-auto !px-1.5 py-2 text-[11px] gap-1 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                       </div>
                     </div>
                   );
@@ -680,9 +680,9 @@ export default function Invoices() {
                             </button>
                             {openActions === inv.id && (
                               <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
-                                <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
-                                <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
-                                <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
+                                <button data-demo-action="invoice.download" onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
+                                <button data-demo-action="invoice.print" onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
+                                <button data-demo-action="booking.invoice" onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                               </div>
                             )}
                           </td>
@@ -696,9 +696,9 @@ export default function Invoices() {
                           <td className="hidden p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>{formatDate(inv.created_at)}</td>
                           <td className="hidden p-3 lg:table-cell">
                             <div className="flex flex-wrap gap-2">
-                              <button onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
-                              <button onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
-                              <button onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
+                              <button data-demo-action="invoice.download" onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>
+                              <button data-demo-action="invoice.print" onClick={() => handlePrint(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Print / PDF</button>
+                              <button data-demo-action="booking.invoice" onClick={() => handleResend(inv)} disabled={isBusy} className="ui-btn ui-btn-primary !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">{resendingId === inv.id ? "Resending…" : recentlySentId === inv.id ? "Sent" : "Resend"}</button>
                             </div>
                           </td>
                         </tr>

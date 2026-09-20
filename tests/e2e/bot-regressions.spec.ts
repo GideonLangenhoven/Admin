@@ -134,9 +134,16 @@ test.describe("bot booking regressions", () => {
     const slot = await findBookableSlot();
     const expectedTours = await bookableTourNames();
     const email = `webchat-regression-${Date.now()}@example.com`;
+    const sessionResponse = await request.post(`${FUNCTIONS_URL}/web-chat`, {
+      data: { action: "session", business_id: BUSINESS_ID },
+    });
+    expect(sessionResponse.ok()).toBe(true);
+    const { chat_session } = await sessionResponse.json();
+    expect(chat_session).toBeTruthy();
 
     const bookResponse = await request.post(`${FUNCTIONS_URL}/web-chat`, {
       data: {
+        chat_session,
         message: "book",
         state: { step: "IDLE" },
         business_id: BUSINESS_ID,
@@ -155,6 +162,8 @@ test.describe("bot booking regressions", () => {
 
     const staleResponse = await request.post(`${FUNCTIONS_URL}/web-chat`, {
       data: {
+        business_id: BUSINESS_ID,
+        chat_session,
         message: "confirm",
         buttonValue: "confirm",
         state: {

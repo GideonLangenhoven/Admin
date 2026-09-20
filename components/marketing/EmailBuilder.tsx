@@ -138,7 +138,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
   return (
     <div className="space-y-4">
       {/* Hidden file input */}
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      <input data-demo-action="template.image" ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
       {/* Template meta */}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -180,7 +180,7 @@ export default function EmailBuilder({ businessId, initialName, initialSubject, 
           <button onClick={() => setPreview(!preview)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1">
             {preview ? "Editor" : "Preview"}
           </button>
-          <button onClick={handleSave} className="ui-btn ui-btn-primary !h-8 !px-3 text-xs gap-1">
+          <button data-demo-action="template.save" onClick={handleSave} className="ui-btn ui-btn-primary !h-8 !px-3 text-xs gap-1">
             Save Template
           </button>
         </div>

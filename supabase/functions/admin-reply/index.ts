@@ -1,3 +1,4 @@
+import { withSentry } from "../_shared/sentry.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -84,7 +85,7 @@ function whatsappFailureHint(waData: any): string {
     }
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withSentry("admin-reply", async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: getCors(req) });
     }
@@ -368,4 +369,4 @@ Deno.serve(async (req: Request) => {
         console.error("admin-reply edge function error:", err);
         return new Response(JSON.stringify({ ok: false, error: (err as Error).message }), { status: 200, headers: getCors(req) });
     }
-});
+}));

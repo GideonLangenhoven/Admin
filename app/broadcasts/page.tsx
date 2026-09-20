@@ -398,7 +398,7 @@ export default function BroadcastsPage() {
                 <input type="text" value={weatherReason} onChange={e => setWeatherReason(e.target.value)}
                   className="ui-control w-full" />
               </div>
-              <button onClick={sendWeatherCancel} disabled={cancellingWeather || selectedSlotIds.length === 0}
+              <button data-demo-action="broadcast.weather" onClick={sendWeatherCancel} disabled={cancellingWeather || selectedSlotIds.length === 0}
                 className="ui-btn w-full !h-11 disabled:opacity-50"
                 style={{ background: "var(--ck-danger)", color: "#fff" }}>
                 {cancellingWeather
@@ -432,7 +432,7 @@ export default function BroadcastsPage() {
                     Use &#123;name&#125; for the customer&apos;s first name. Formatting helps the email version; WhatsApp sends a cleaned text version.
                   </p>
                 </div>
-                <button onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
+                <button data-demo-action="broadcast.send" onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
                   className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
                   {sending ? "Sending..." : "Send to " + bookings.length + " Customers (email + WhatsApp where possible)"}
                 </button>

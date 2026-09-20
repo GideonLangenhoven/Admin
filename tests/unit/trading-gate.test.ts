@@ -84,8 +84,10 @@ describe("billing enforcement (Fix 4)", () => {
 
   it("the manual mark-paid route carries the same restore rule", () => {
     const route = readFileSync("app/api/platform-invoices/mark-paid/route.ts", "utf8");
-    expect(route).toContain('status === "PAST_DUE" || (status === "SUSPENDED" && reason === "NON_PAYMENT")');
-    expect(route).toContain("BILLING_RESTORED");
+    expect(route).toContain('db.rpc("platform_record_invoice_payment"');
+    const migration = readFileSync("supabase/migrations/20260913100000_platform_admin_controls.sql", "utf8");
+    expect(migration).toContain("b.subscription_status='PAST_DUE' OR (b.subscription_status='SUSPENDED' AND b.suspension_reason='NON_PAYMENT')");
+    expect(migration).toContain("BILLING_RESTORED");
   });
 });
 

@@ -35,6 +35,40 @@ export const MEDIA_FALLBACK_REPLY =
 export const STALE_SESSION_GREETING =
   "Welcome back! It's been a while, so I'll start fresh. How can I help today?";
 
+// Natural availability phrasing shared by web chat and WhatsApp. Keep this
+// intent-specific: logistics such as "where do we meet tomorrow?" must not be
+// diverted into the booking flow just because they contain a date.
+export function isAvailabilityQuery(text: string): boolean {
+  const input = String(text || "").toLowerCase();
+  if (/\b(availab\w*|spaces?|slots?|openings?|open spots?)\b/.test(input)) return true;
+  const hasDate = /\b(today|tomorrow|weekend|next week|this week|morning|afternoon|evening|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(input) ||
+    /\b\d{1,2}(st|nd|rd|th)?\b/.test(input) || /\b\d{1,2}\s*(am|pm)\b/.test(input);
+  if (!hasDate) return false;
+  return /\b(?:can|could|may)\s+(?:i|we)?\s*(?:go|join|come|book)\b/.test(input) ||
+    /\b(?:book|join)\b.*\b(?:trip|tour|hike|activity|departure)\b/.test(input) ||
+    /\b(?:trips?|tours?|hikes?|activities|departures?)\b.*\b(?:running|open|free)\b/.test(input);
+}
+
+export function formatTourMeetingPoints(
+  tours: Array<{ name?: string | null; meeting_point?: string | null }>,
+  query = "",
+): string | null {
+  const points = (tours || []).map((tour) => ({
+    name: String(tour?.name || "").trim(),
+    point: String(tour?.meeting_point || "").trim(),
+  })).filter((tour) => tour.name && tour.point);
+  if (points.length === 0) return null;
+
+  const normalizedQuery = String(query || "").toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const specific = points.find((tour) => tour.name.toLowerCase().replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/).some((word) => word.length > 3 && !["tour", "trip", "hike", "walk"].includes(word) && normalizedQuery.includes(word)));
+  if (specific) return "📍 " + specific.name + ": " + specific.point;
+
+  const uniquePoints = [...new Set(points.map((tour) => tour.point))];
+  if (uniquePoints.length === 1) return "📍 " + uniquePoints[0];
+  return "Meeting points vary by tour:\n" + points.map((tour) => "• " + tour.name + ": " + tour.point).join("\n");
+}
+
 // ── Injection patterns ───────────────────────────────────────────────
 // Each pattern is keyed so logs/metrics can attribute hits.
 export const INJECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [

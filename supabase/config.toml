@@ -32,6 +32,31 @@ verify_jwt = false
 [functions.process-refund]
 verify_jwt = false
 
+# These validate active administrator sessions inside the handler (ES256 safe).
+[functions.cancel-booking]
+verify_jwt = false
+
+[functions.manual-mark-paid]
+verify_jwt = false
+
+# Validate ES256 sessions and tenant/platform ownership inside each handler.
+[functions.admin-reply]
+verify_jwt = false
+
+[functions.super-admin-onboard]
+verify_jwt = false
+
+[functions.generate-invite-token]
+verify_jwt = false
+
+# Requires independent booking proof and a matching tenant, never a reference alone.
+[functions.confirm-booking]
+verify_jwt = false
+
+# Requires a verified OTP/customer session inside the handler.
+[functions.my-bookings-lookup]
+verify_jwt = false
+
 [functions.marketing-dispatch]
 verify_jwt = false
 
@@ -86,6 +111,10 @@ verify_jwt = false
 # business_id check, server-side pricing), so gating at the gateway adds
 # no real protection.
 [functions.create-checkout]
+verify_jwt = false
+
+# Authenticates its own short-lived booking/operator-specific capability.
+[functions.booking-success]
 verify_jwt = false
 
 [functions.send-whatsapp-text]

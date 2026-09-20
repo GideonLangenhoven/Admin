@@ -17,17 +17,14 @@ create table if not exists pending_reschedules (
   completed_at timestamptz,
   expired_at timestamptz
 );
-
 -- Add hold_type to holds so we can distinguish reschedule holds from booking holds
 alter table holds add column if not exists hold_type text not null default 'BOOKING';
 -- Add metadata jsonb for storing extra context
 alter table holds add column if not exists metadata jsonb;
-
 -- Index for webhook lookups
 create index if not exists idx_pending_reschedules_booking_status
   on pending_reschedules(booking_id, status);
 create index if not exists idx_pending_reschedules_hold
   on pending_reschedules(hold_id);
-
 -- RLS
 alter table pending_reschedules enable row level security;

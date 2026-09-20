@@ -247,7 +247,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
           <div className="flex gap-2">
             {step > 1 && step < 4 && <button onClick={() => setStep((s) => (s - 1) as any)} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Back</button>}
             {step < 3 && <button disabled={step === 1 && selected.size === 0} onClick={() => setStep((s) => (s + 1) as any)} className="px-3 py-1.5 rounded bg-[var(--ck-accent)] text-white text-sm disabled:opacity-50">Next</button>}
-            {step === 3 && <button onClick={runGenerate} disabled={running || !ranges.some(r => r.start && r.end)} className="px-3 py-1.5 rounded bg-[var(--ck-accent-hover)] text-white text-sm disabled:opacity-50">Generate</button>}
+            {step === 3 && <button data-demo-action="slot.generate" onClick={runGenerate} disabled={running || !ranges.some(r => r.start && r.end)} className="px-3 py-1.5 rounded bg-[var(--ck-accent-hover)] text-white text-sm disabled:opacity-50">Generate</button>}
             {step === 4 && !running && <button onClick={onClose} className="px-3 py-1.5 rounded bg-[color:var(--ck-surface-sunken)] text-[color:var(--ck-text)] text-sm">Close</button>}
           </div>
         </footer>

@@ -1,0 +1,22 @@
+{
+  "name": "booking-tours-hero-film",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "still": "remotion still src/index.ts BookingToursHero out/preview.png --frame=450",
+    "render": "remotion render src/index.ts BookingToursHero out/booking-tours-hero.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.524",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.524"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

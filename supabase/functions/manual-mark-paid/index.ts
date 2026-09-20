@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -87,81 +87,19 @@ Deno.serve(async (req: Request) => {
     if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
 
     // Tenant guard: admin can only mark-paid bookings from their own business
-    if (!auth.isServiceRole && auth.businessId && booking.business_id !== auth.businessId) {
+    if (!canAccessBusiness(auth, booking.business_id)) {
       return new Response(JSON.stringify({ error: "You can only mark bookings for your own business as paid" }), { status: 403, headers: getCors(req) });
     }
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
 
-    // reserve_capacity: called by the admin New Booking form right after it
-    // inserts an unpaid booking, so pending admin bookings hold seats exactly
-    // like customer-checkout bookings do (hold row + slots.held).
-    if (body.action === "reserve_capacity") {
-      // Idempotent: a hold row (any status) created by this flow marks the
-      // booking's seats as already accounted for.
-      const existingHold = await supabase.from("holds").select("id, status").eq("booking_id", booking.id).in("status", ["ACTIVE", "CONVERTED"]).limit(1).maybeSingle();
-      if (existingHold.data) {
-        return new Response(JSON.stringify({ ok: true, message: "Already reserved", hold_id: existingHold.data.id }), { status: 200, headers: getCors(req) });
-      }
-
-      if (["PENDING", "PENDING PAYMENT", "HELD"].includes(booking.status)) {
-        const expiresAt = booking.payment_deadline && new Date(booking.payment_deadline).getTime() > Date.now()
-          ? booking.payment_deadline
-          : new Date(Date.now() + 24 * 3600000).toISOString();
-        const holdRes = await supabase.rpc("create_hold_with_capacity_check", {
-          p_booking_id: booking.id,
-          p_slot_id: booking.slot_id,
-          p_qty: Number(booking.qty),
-          p_expires_at: expiresAt,
-        });
-        if (holdRes.error || !holdRes.data?.success) {
-          return new Response(JSON.stringify({ error: holdRes.data?.error || holdRes.error?.message || "Not enough capacity", available: holdRes.data?.available ?? 0 }), { status: 409, headers: getCors(req) });
-        }
-        return new Response(JSON.stringify({ ok: true, hold_id: holdRes.data.hold_id }), { status: 200, headers: getCors(req) });
-      }
-
-      if (["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)) {
-        // Admin created the booking directly as paid: count the seats as
-        // booked. CONVERTED hold row = idempotency marker (reconciler only
-        // sums ACTIVE holds, so it never affects held).
-        const slotRow = await supabase.from("slots").select("capacity_total, booked, held").eq("id", booking.slot_id).maybeSingle();
-        const avail = slotRow.data ? Number(slotRow.data.capacity_total || 0) - Number(slotRow.data.booked || 0) - Number(slotRow.data.held || 0) : 0;
-        if (avail < Number(booking.qty)) {
-          return new Response(JSON.stringify({ error: "Not enough capacity (" + avail + " available, need " + booking.qty + ")", available: avail }), { status: 409, headers: getCors(req) });
-        }
-        await supabase.from("holds").insert({ booking_id: booking.id, slot_id: booking.slot_id, qty: Number(booking.qty), expires_at: new Date().toISOString(), status: "CONVERTED" });
-        await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: Number(booking.qty), p_held_delta: 0 });
-        return new Response(JSON.stringify({ ok: true, message: "Booked seats counted" }), { status: 200, headers: getCors(req) });
-      }
-
-      return new Response(JSON.stringify({ error: "Capacity not reservable for status: " + booking.status }), { status: 400, headers: getCors(req) });
-    }
-
-    if (booking.status === "PAID") {
-      return new Response(JSON.stringify({ ok: true, message: "Already paid" }), { status: 200, headers: getCors(req) });
-    }
-
-    const upd = await supabase.from("bookings")
-      .update({ status: "PAID", payment_status: "CAPTURED", payment_method: paymentMethod })
-      .eq("id", booking.id)
-      .neq("status", "PAID")
-      .select("id")
-      .maybeSingle();
-
-    if (!upd.data || upd.error) {
-      return new Response(JSON.stringify({ error: "Could not mark paid or already paid" }), { status: 400, headers: getCors(req) });
-    }
-
-    // Only convert as many held seats as this booking actually reserved —
-    // legacy admin PENDING bookings never held any, and blindly decrementing
-    // held would steal reserved seats from other customers' active holds.
-    const activeHolds = await supabase.from("holds").select("qty").eq("booking_id", booking.id).eq("status", "ACTIVE");
-    const heldQty = (activeHolds.data || []).reduce((s: number, h: any) => s + Number(h.qty || 0), 0);
-    await supabase.from("holds").update({ status: "CONVERTED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
-
-    // S3: atomic convert held -> booked (no read-modify-write)
-    await supabase.rpc("adjust_slot_capacity", { p_slot_id: booking.slot_id, p_business_id: booking.business_id, p_booked_delta: Number(booking.qty), p_held_delta: -heldQty });
+    const accounted = await supabase.rpc("account_manual_booking", {
+      p_booking_id: booking.id, p_business_id: booking.business_id,
+      p_mark_paid: body.action === "mark_paid", p_payment_method: paymentMethod,
+    });
+    if (accounted.error || !accounted.data?.ok) return new Response(JSON.stringify({ error: accounted.data?.error || accounted.error?.message || "Could not confirm booking" }), { status: 409, headers: getCors(req) });
+    if (body.action === "reserve_capacity" || accounted.data.already_paid) return new Response(JSON.stringify(accounted.data), { headers: getCors(req) });
 
     await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event: "payment_marked_manual", payload: { admin: true, payment_method: paymentMethod, payment_note: paymentNote || null, user_id: auth?.userId || null } });
     await supabase.from("conversations").update({ current_state: "IDLE", state_data: {}, updated_at: new Date().toISOString() }).eq("phone", booking.phone).eq("business_id", booking.business_id);

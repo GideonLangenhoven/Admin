@@ -152,8 +152,9 @@ Deno.serve(async (req: any) => {
     if (jwt && jwt !== SERVICE_ROLE_KEY) {
       const { data: { user: gUser }, error: gAuthErr } = await supabase.auth.getUser(jwt);
       if (gAuthErr || !gUser) return fail(req, "Unauthorized", 401);
-      const { data: gAdmin } = await supabase.from("admin_users").select("id").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
+      const { data: gAdmin } = await supabase.from("admin_users").select("id, read_only").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
       if (!gAdmin) return fail(req, "You are not an admin of this business", 403);
+      if (gAdmin.read_only && action !== "status") return fail(req, "This demonstration account is read-only", 403);
     } else if (!jwt) {
       return fail(req, "Authorization required", 401);
     }

@@ -577,7 +577,7 @@ export default function AutomationsPage() {
             </div>
           </div>
           <div className="mt-4 flex gap-3">
-            <button
+            <button data-demo-action="automation.template"
               onClick={() => createFromTemplate(t)}
               disabled={creating}
               className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -665,7 +665,7 @@ export default function AutomationsPage() {
 
         {/* Bottom CTA */}
         <div className="flex gap-3 pb-4">
-          <button
+          <button data-demo-action="automation.template"
             onClick={() => createFromTemplate(t)}
             disabled={creating}
             className="ui-btn ui-btn-primary !px-5 disabled:opacity-50"
@@ -758,7 +758,7 @@ export default function AutomationsPage() {
 
         {/* Blank automation option */}
         <div className="pt-2 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <button
+          <button data-demo-action="automation.create"
             onClick={createBlankAutomation}
             className="flex items-center gap-3 rounded-xl border border-dashed p-4 w-full text-left transition-all hover:border-[var(--ck-border-strong)] hover:bg-[var(--ck-surface-warm)]"
             style={{ borderColor: "var(--ck-border-strong)" }}
@@ -814,7 +814,7 @@ export default function AutomationsPage() {
           >
             Browse Templates
           </button>
-          <button
+          <button data-demo-action="automation.create"
             onClick={createBlankAutomation}
             className="ui-btn ui-btn-primary"
           >
@@ -982,7 +982,7 @@ export default function AutomationsPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {a.status !== "archived" && (
-                          <button
+                          <button data-demo-action={a.status === "active" ? "automation.pause" : "automation.activate"}
                             onClick={() => toggleStatus(a)}
                             className="inline-flex items-center justify-center rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-surface-sunken)]"
                             style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
@@ -992,7 +992,7 @@ export default function AutomationsPage() {
                           </button>
                         )}
                         {a.status === "archived" ? (
-                          <button
+                          <button data-demo-action="automation.restore"
                             onClick={() => unarchiveAutomation(a)}
                             className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Restore to draft"
@@ -1000,7 +1000,7 @@ export default function AutomationsPage() {
                             Unarchive
                           </button>
                         ) : (
-                          <button
+                          <button data-demo-action="automation.archive"
                             onClick={() => archiveAutomation(a)}
                             className="ui-btn ui-btn-ghost !h-8 !px-2 !text-[11px]"
                             title="Hide from active list, preserve history"
@@ -1008,7 +1008,7 @@ export default function AutomationsPage() {
                             Archive
                           </button>
                         )}
-                        <button
+                        <button data-demo-action="automation.delete"
                           onClick={() => deleteAutomation(a)}
                           className="inline-flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--ck-danger-soft)]"
                           style={{ color: "var(--ck-danger)" }}

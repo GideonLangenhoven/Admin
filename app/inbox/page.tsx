@@ -423,12 +423,12 @@ function InboxContent() {
                   {needsAttention(selected) && (
                     <div className="flex w-full gap-2 sm:w-auto">
                       {/^web(:|$)/.test(String(selected.phone)) && (
-                        <button onClick={() => endChat(selected.phone)}
+                        <button data-demo-action="inbox.end" onClick={() => endChat(selected.phone)}
                           className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
                           End chat &amp; rate
                         </button>
                       )}
-                      <button onClick={() => returnToBot(selected.id, selected.phone)}
+                      <button data-demo-action="inbox.bot" onClick={() => returnToBot(selected.id, selected.phone)}
                         className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
                         Return to Bot
                       </button>
@@ -479,10 +479,10 @@ function InboxContent() {
                   )}
                   <div className="p-3">
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
+                      <textarea data-demo-enter="inbox.reply" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
                         rows={2} placeholder={needsAttention(selected) ? "Type your reply... (Enter to send)" : "Reply to take over from the bot... (Enter to send)"}
                         className="ui-control flex-1 resize-none outline-none" />
-                      <button onClick={sendReply} disabled={sending || !reply.trim()}
+                      <button data-demo-action="inbox.reply" onClick={sendReply} disabled={sending || !reply.trim()}
                         className="ui-btn ui-btn-primary self-stretch !h-auto py-2.5 disabled:opacity-50 sm:self-end sm:!h-9 sm:!py-0">
                         {sending ? "..." : "Send"}
                       </button>

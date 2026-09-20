@@ -14,6 +14,8 @@ import dynamic from "next/dynamic";
 import { CaretDown } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
+import { DemoFeatureLink } from "../../components/DemoActionGuide";
+import { isDemoPathVisible } from "../lib/demo-guide";
 
 function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
     id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
@@ -21,9 +23,11 @@ function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false
 }) {
     const isOpen = openSections[id] ?? defaultOpen;
     return (
-        <div className="ui-card anim-fade-up overflow-hidden">
+        <div id={id} className="ui-card anim-fade-up scroll-mt-6 overflow-hidden">
             <button
                 type="button"
+                aria-expanded={isOpen}
+                aria-controls={`${id}-content`}
                 onClick={() => toggle(id)}
                 className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--ck-surface-sunken)]"
             >
@@ -33,7 +37,7 @@ function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false
                 </div>
                 <CaretDown size={18} weight="bold" className={"shrink-0 text-[var(--ck-text-muted)] transition-transform duration-200 " + (isOpen ? "rotate-180" : "")} />
             </button>
-            {isOpen && <div className="px-5 pb-5 pt-3 border-t border-[var(--ck-border-subtle)]">{children}</div>}
+            {isOpen && <div id={`${id}-content`} className="px-5 pb-5 pt-3 border-t border-[var(--ck-border-subtle)]"><DemoFeatureLink feature={id} />{children}</div>}
         </div>
     );
 }
@@ -150,7 +154,7 @@ function HelpAssistantSection() {
                 </p>
             </div>
             <label className="flex shrink-0 cursor-pointer items-center gap-2">
-                <input
+                <input data-demo-action="assistant.toggle"
                     type="checkbox"
                     checked={hidden === null ? true : !hidden}
                     disabled={hidden === null}
@@ -243,7 +247,7 @@ interface AddOn {
 }
 
 export default function SettingsPage() {
-    const { businessId, refreshBusiness } = useBusinessContext();
+    const { businessId, refreshBusiness, readOnly } = useBusinessContext();
     const [admins, setAdmins] = useState<any[]>([]);
     const [billingAdminId, setBillingAdminId] = useState<string>("");
     const [loading, setLoading] = useState(true);
@@ -254,6 +258,15 @@ export default function SettingsPage() {
     // Collapsible section state
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
     function toggleSection(id: string) { setOpenSections((prev) => ({ ...prev, [id]: !(prev[id] ?? false) })); }
+    useEffect(() => {
+        const openLinkedSection = () => {
+            const id = window.location.hash.slice(1);
+            if (id) setOpenSections(prev => ({ ...prev, [id]: true }));
+        };
+        openLinkedSection();
+        window.addEventListener("hashchange", openLinkedSection);
+        return () => window.removeEventListener("hashchange", openLinkedSection);
+    }, []);
 
     // New Admin Form
     const [newName, setNewName] = useState("");
@@ -298,6 +311,8 @@ export default function SettingsPage() {
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
     const [emailTagline, setEmailTagline] = useState("");
+    const [activityVerbPast, setActivityVerbPast] = useState("");
+    const [locationPhrase, setLocationPhrase] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
     const [emailImgUploading, setEmailImgUploading] = useState<string | null>(null);
     const [emailColor, setEmailColor] = useState("#1b3b36");
@@ -968,6 +983,8 @@ export default function SettingsPage() {
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
             setEmailTagline(data.email_tagline || "");
+            setActivityVerbPast(data.activity_verb_past || "");
+            setLocationPhrase(data.location_phrase || "");
             setSocialLinks({
                 facebook: data.social_facebook || "",
                 instagram: data.social_instagram || "",
@@ -1531,6 +1548,8 @@ export default function SettingsPage() {
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
             email_tagline: emailTagline.trim() || null,
+            activity_verb_past: activityVerbPast.trim() || null,
+            location_phrase: locationPhrase.trim() || null,
             email_img_payment: emailImgs.payment || null,
             email_img_confirm: emailImgs.confirm || null,
             email_img_invoice: emailImgs.invoice || null,
@@ -1610,7 +1629,7 @@ export default function SettingsPage() {
                         )}
                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "logo" ? " opacity-50 pointer-events-none" : "")}>
                             {uploadingField === "logo" ? "Uploading..." : (siteSettings.logo_url ? "Change logo" : "Upload logo")}
-                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            <input data-demo-action="logo.upload" type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (!file) return;
                                 setUploadingField("logo");
@@ -1624,7 +1643,7 @@ export default function SettingsPage() {
                             }} />
                         </label>
                         {siteSettings.logo_url && (
-                            <button type="button" onClick={async () => {
+                            <button data-demo-action="logo.remove" type="button" onClick={async () => {
                                 setSiteSettings(prev => ({ ...prev, logo_url: "" }));
                                 const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", businessId);
                                 notify(error ? { message: "Failed to remove logo: " + error.message, tone: "error" } : { message: "Logo removed.", tone: "success" });
@@ -1641,7 +1660,7 @@ export default function SettingsPage() {
                         </span>
                         <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Who receives BookingTours subscription invoices. Defaults to the first admin created on this account.">
                             Billing contact
-                            <select value={billingAdminId} onChange={e => saveBillingContact(e.target.value)} className="ui-control px-2 py-1.5 text-xs rounded-lg outline-none max-w-[180px]">
+                            <select data-demo-action="admin.billing" value={billingAdminId} onChange={e => saveBillingContact(e.target.value)} className="ui-control px-2 py-1.5 text-xs rounded-lg outline-none max-w-[180px]">
                                 <option value="">First admin (default)</option>
                                 {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
                             </select>
@@ -1675,7 +1694,7 @@ export default function SettingsPage() {
                                             </div>
                                             <div className="flex flex-wrap items-center gap-3">
                                                 {a.role !== "SUPER_ADMIN" && a.email !== myEmail && (
-                                                    <button
+                                                    <button data-demo-action={a.role === "MAIN_ADMIN" ? "admin.demote" : "admin.promote"}
                                                         onClick={() => handleChangeRole(a, a.role === "MAIN_ADMIN" ? "ADMIN" : "MAIN_ADMIN")}
                                                         disabled={changingRole === a.id}
                                                         className="text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
@@ -1693,7 +1712,7 @@ export default function SettingsPage() {
                                                     </button>
                                                 )}
                                                 {a.role !== "MAIN_ADMIN" && (
-                                                    <button
+                                                    <button data-demo-action={(a.must_set_password || !a.password_set_at) ? "admin.setup" : "admin.reset"}
                                                         onClick={() => handleResendSetup(a)}
                                                         disabled={resendingAdminId === a.id}
                                                         className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
@@ -1702,7 +1721,7 @@ export default function SettingsPage() {
                                                     </button>
                                                 )}
                                                 {a.role !== "MAIN_ADMIN" && (
-                                                    <button onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline whitespace-nowrap">
+                                                    <button data-demo-action="admin.remove" onClick={() => handleDelete(a.id, a.role)} className="text-[var(--ck-danger)] text-sm font-medium hover:underline whitespace-nowrap">
                                                         Remove
                                                     </button>
                                                 )}
@@ -1715,7 +1734,7 @@ export default function SettingsPage() {
                                                 <div className="grid grid-cols-2 gap-2">
                                                     {SETTINGS_SECTIONS.map(section => (
                                                         <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
-                                                            <input
+                                                            <input data-demo-action={perms[section.key] ? "admin.revoke" : "admin.grant"} data-demo-subject={section.label}
                                                                 type="checkbox"
                                                                 checked={perms[section.key] === true}
                                                                 onChange={() => {
@@ -1734,12 +1753,12 @@ export default function SettingsPage() {
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mt-5 mb-1">Dashboard sections visible to {a.name || a.email}</p>
                                                 <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide a section from this admin. Billing, Chat FAQ and Data Requests are always Main-Admin only.</p>
                                                 <div className="grid grid-cols-2 gap-2">
-                                                    {OPERATOR_HIDEABLE_SECTIONS.map(section => {
+                                                    {OPERATOR_HIDEABLE_SECTIONS.filter(section => !readOnly || !section.key.startsWith("/") || isDemoPathVisible(section.key)).map(section => {
                                                         const hideKey = `hide:${section.key}`;
                                                         const visible = perms[hideKey] !== true;
                                                         return (
                                                             <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
-                                                                <input
+                                                                <input data-demo-action={visible ? "admin.hide" : "admin.show"} data-demo-subject={section.label}
                                                                     type="checkbox"
                                                                     checked={visible}
                                                                     onChange={() => {
@@ -1772,7 +1791,7 @@ export default function SettingsPage() {
                 <div className="space-y-6">
                     <div className="flex items-center justify-between gap-4">
                         <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">Add New Admin</h2>
-                        <button
+                        <button data-demo-action={subscriptionStatus === "SUSPENDED" ? "admin.reactivate" : "admin.suspend"}
                             onClick={toggleSubscription}
                             disabled={togglingSubscription}
                             className={"text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap " +
@@ -1783,7 +1802,7 @@ export default function SettingsPage() {
                             {togglingSubscription ? "..." : (subscriptionStatus === "SUSPENDED" ? "Reactivate" : "Suspend")}
                         </button>
                     </div>
-                    <form onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                    <form data-demo-submit="admin.add" onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
                             <div className="p-3 rounded-xl text-sm" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)", border: "1px solid color-mix(in srgb, var(--ck-warning) 25%, transparent)" }}>
                                 You have reached the admin seat limit for your plan ({usageSnapshot?.seat_limit || 10}).
@@ -1821,7 +1840,7 @@ export default function SettingsPage() {
                     <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Marketing Test Email Recipient</h3>
                     <p className="text-xs text-[var(--ck-text-muted)] mb-3">Choose which admin receives test marketing emails when previewing templates.</p>
                     <div className="flex items-end gap-3">
-                        <select
+                        <select data-demo-action="admin.test-email"
                             value={marketingTestEmail}
                             onChange={(e) => handleSaveMarketingTestEmail(e.target.value)}
                             disabled={savingTestEmail}
@@ -1855,6 +1874,7 @@ export default function SettingsPage() {
                                 {tours.map((t, idx) => (
                                     <div key={t.id}
                                         draggable
+                                        data-demo-drag="tour.reorder"
                                         onDragStart={() => setDragIdx(idx)}
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={() => handleDrop(idx)}
@@ -1885,15 +1905,15 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 mt-2">
-                                            <button onClick={(e) => { e.stopPropagation(); handleToggleTour(t); }}
+                                            <button data-demo-action={t.active ? "tour.deactivate" : "tour.activate"} onClick={(e) => { e.stopPropagation(); handleToggleTour(t); }}
                                                 className={"text-xs font-medium hover:underline " + (t.active ? "text-orange-600" : "text-emerald-600")}>
                                                 {t.active ? "Deactivate" : "Activate"}
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleToggleHidden(t); }}
+                                            <button data-demo-action={t.hidden ? "tour.show" : "tour.hide"} onClick={(e) => { e.stopPropagation(); handleToggleHidden(t); }}
                                                 className={"text-xs font-medium hover:underline " + (t.hidden ? "text-[var(--ck-accent)]" : "text-amber-600")}>
                                                 {t.hidden ? "Show" : "Hide"}
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTour(t.id, t.name); }}
+                                            <button data-demo-action="tour.delete" onClick={(e) => { e.stopPropagation(); handleDeleteTour(t.id, t.name); }}
                                                 className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
                                             <a href={siteSettings.booking_site_url || DEFAULT_BOOKING_URL} target="_blank" rel="noopener noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
@@ -1911,7 +1931,7 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">
                             {editingTour ? "Edit Tour" : "Add New Tour"}
                         </h3>
-                        <form onSubmit={handleSaveTour} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <form data-demo-submit="tour.save" onSubmit={handleSaveTour} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour Name</label>
                                 <input type="text" required value={tourForm.name} onChange={e => setTourForm({ ...tourForm, name: e.target.value })}
@@ -1939,7 +1959,7 @@ export default function SettingsPage() {
                                     <div className="flex-1">
                                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "tour_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "tour_image" ? "Uploading..." : (tourForm.image_url ? "Change image" : "Upload image")}
-                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                            <input data-demo-action="tour.image" type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 setUploadingField("tour_image");
@@ -1949,7 +1969,7 @@ export default function SettingsPage() {
                                             }} />
                                         </label>
                                         {tourForm.image_url && (
-                                            <button type="button" onClick={() => setTourForm({ ...tourForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                            <button data-demo-action="tour.image-remove" type="button" onClick={() => setTourForm({ ...tourForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
                                         )}
                                     </div>
                                 </div>
@@ -1996,6 +2016,7 @@ export default function SettingsPage() {
 
                             {/* Last-minute deals */}
                             <div className="border-t border-[var(--ck-border-subtle)] pt-4">
+                                <DemoFeatureLink feature="tour.last-minute" />
                                 <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">Last-minute deal (optional)</label>
                                 <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats drop to the deal price between the start and the cut-off, then go back to the normal price. Leave blank to switch it off.</p>
                                 <div className="grid grid-cols-3 gap-4">
@@ -2079,14 +2100,14 @@ export default function SettingsPage() {
                                         ))}
                                     </div>
                                     <div className="flex gap-2 mt-1.5">
-                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [0, 1, 2, 3, 4, 5, 6] }))} className="text-[10px] text-[var(--ck-accent)] hover:underline">All</button>
-                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [1, 2, 3, 4, 5] }))} className="text-[10px] text-[var(--ck-accent)] hover:underline">Weekdays</button>
-                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [0, 6] }))} className="text-[10px] text-[var(--ck-accent)] hover:underline">Weekends</button>
-                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [] }))} className="text-[10px] text-[var(--ck-text-muted)] hover:underline">None</button>
+                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [0, 1, 2, 3, 4, 5, 6] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-accent)] hover:underline">All</button>
+                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [1, 2, 3, 4, 5] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-accent)] hover:underline">Weekdays</button>
+                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [0, 6] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-accent)] hover:underline">Weekends</button>
+                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-text-muted)] hover:underline">None</button>
                                     </div>
                                 </div>
                                 {editingTour && (
-                                    <button type="button" onClick={handleGenerateSlots} disabled={slotGenerating || !tourForm.slotStartDate || !tourForm.slotEndDate || !tourForm.slotTimes.some(t => t.trim() !== "") || tourForm.slotDays.length === 0}
+                                    <button data-demo-action="slot.generate" type="button" onClick={handleGenerateSlots} disabled={slotGenerating || !tourForm.slotStartDate || !tourForm.slotEndDate || !tourForm.slotTimes.some(t => t.trim() !== "") || tourForm.slotDays.length === 0}
                                         className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                                         {slotGenerating ? "Generating..." : "Generate Slots for " + editingTour.name}
                                     </button>
@@ -2186,7 +2207,7 @@ export default function SettingsPage() {
                             className="px-4 py-2 rounded-xl border border-[var(--ck-border-subtle)] text-sm font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-bg)]">
                             Add question
                         </button>
-                        <button type="button" disabled={questionsSaving} onClick={saveBookingQuestions}
+                        <button data-demo-action="questions.save" type="button" disabled={questionsSaving} onClick={saveBookingQuestions}
                             className="px-4 py-2 rounded-xl bg-[var(--ck-text-strong)] text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity">
                             {questionsSaving ? "Saving..." : "Save Questions"}
                         </button>
@@ -2211,6 +2232,7 @@ export default function SettingsPage() {
                                 {addOns.map((a, idx) => (
                                     <div key={a.id}
                                         draggable
+                                        data-demo-drag="addon.reorder"
                                         onDragStart={() => setAddOnDragIdx(idx)}
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={() => handleAddOnDrop(idx)}
@@ -2236,11 +2258,11 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 mt-2">
-                                            <button onClick={(e) => { e.stopPropagation(); handleToggleAddOn(a); }}
+                                            <button data-demo-action={a.active ? "addon.deactivate" : "addon.activate"} onClick={(e) => { e.stopPropagation(); handleToggleAddOn(a); }}
                                                 className={"text-xs font-medium hover:underline " + (a.active ? "text-orange-600" : "text-emerald-600")}>
                                                 {a.active ? "Deactivate" : "Activate"}
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteAddOn(a.id, a.name); }}
+                                            <button data-demo-action="addon.delete" onClick={(e) => { e.stopPropagation(); handleDeleteAddOn(a.id, a.name); }}
                                                 className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
                                         </div>
                                     </div>
@@ -2255,7 +2277,7 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">
                             {editingAddOn ? "Edit Add-On" : "Add New Add-On"}
                         </h3>
-                        <form onSubmit={handleSaveAddOn} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <form data-demo-submit="addon.save" onSubmit={handleSaveAddOn} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Name</label>
                                 <input type="text" required value={addOnForm.name} onChange={e => setAddOnForm({ ...addOnForm, name: e.target.value })}
@@ -2275,7 +2297,7 @@ export default function SettingsPage() {
                                     <div className="flex-1">
                                         <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "addon_image" ? " opacity-50 pointer-events-none" : "")}>
                                             {uploadingField === "addon_image" ? "Uploading..." : (addOnForm.image_url ? "Change image" : "Upload image")}
-                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                            <input data-demo-action="addon.image" type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 setUploadingField("addon_image");
@@ -2285,7 +2307,7 @@ export default function SettingsPage() {
                                             }} />
                                         </label>
                                         {addOnForm.image_url && (
-                                            <button type="button" onClick={() => setAddOnForm({ ...addOnForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                            <button data-demo-action="addon.image-remove" type="button" onClick={() => setAddOnForm({ ...addOnForm, image_url: "" })} className="ml-2 text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
                                         )}
                                     </div>
                                 </div>
@@ -2333,7 +2355,7 @@ export default function SettingsPage() {
             )}
 
             {canAccess("site") && <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="These settings directly affect the public booking page" openSections={openSections} toggle={toggleSection}>
-                <form onSubmit={handleSaveSiteSettings} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-8">
+                <form data-demo-submit="site.save" onSubmit={handleSaveSiteSettings} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-8">
 
                     {/* Legal & Text Policies */}
                     <div>
@@ -2402,7 +2424,7 @@ export default function SettingsPage() {
                                     )}
                                     <label className={"inline-flex items-center gap-2 cursor-pointer rounded-lg border border-[var(--ck-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ck-text-strong)] hover:bg-[var(--ck-surface-sunken)] transition-colors" + (uploadingField === "hero_bg" ? " opacity-50 pointer-events-none" : "")}>
                                         {uploadingField === "hero_bg" ? "Uploading..." : (siteSettings.hero_image ? "Change background" : "Upload background")}
-                                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                        <input data-demo-action="site.hero" type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
                                             if (file.size > 20 * 1024 * 1024) {
@@ -2422,7 +2444,7 @@ export default function SettingsPage() {
                                         }} />
                                     </label>
                                     {siteSettings.hero_image && (
-                                        <button type="button" onClick={async () => {
+                                        <button data-demo-action="site.hero-remove" type="button" onClick={async () => {
                                             setSiteSettings(prev => ({ ...prev, hero_image: "" }));
                                             const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
                                             notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. The site falls back to your first tour photo.", tone: "success" });
@@ -2629,6 +2651,7 @@ export default function SettingsPage() {
 
                     {/* Chatbot Avatar */}
                     <div>
+                        <DemoFeatureLink feature="site.avatar" />
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Chatbot Avatar</h3>
                         <div className="flex flex-wrap gap-4">
                             {chatbotAvatars.length === 0 && (
@@ -2703,7 +2726,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <button type="button" onClick={handleSaveRefundPolicy} disabled={refundSaving}
+                        <button data-demo-action="site.cancellation" type="button" onClick={handleSaveRefundPolicy} disabled={refundSaving}
                             className="rounded-xl px-6 bg-[var(--ck-text-strong)] py-2 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
                             {refundSaving ? "Saving..." : "Save Cancellation Policy"}
                         </button>
@@ -2725,7 +2748,7 @@ export default function SettingsPage() {
                             </p>
                             <div className="relative">
                                 <pre className="bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
-                                <button
+                                <button data-demo-action="embed.copy"
                                     type="button"
                                     onClick={async () => {
                                         const snippet = `<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`;
@@ -2754,7 +2777,7 @@ export default function SettingsPage() {
             </CollapsibleSection>}
 
             {canAccess("email") && <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
-                <form onSubmit={handleSaveEmailImages} className="space-y-6">
+                <form data-demo-submit="email.save" onSubmit={handleSaveEmailImages} className="space-y-6">
                     {/* Email Color Picker */}
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
                         <div className="mb-3">
@@ -2783,7 +2806,25 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
-                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
+                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Activity verb</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Past-tense word used in post-trip emails: &quot;Thank you for … with us.&quot; Leave blank for the neutral &quot;adventuring&quot;.</p>
+                                <input type="text" value={activityVerbPast} onChange={e => setActivityVerbPast(e.target.value)}
+                                    maxLength={40}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. paddling, exploring, riding" />
+                            </label>
+                            <label className="block">
+                                <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Location phrase</span>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Appended to &quot;We hope you had an incredible time …&quot; in the trip-photos email. Leave blank for no suffix.</p>
+                                <input type="text" value={locationPhrase} onChange={e => setLocationPhrase(e.target.value)}
+                                    maxLength={60}
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                    placeholder="e.g. on the water, in the bush" />
+                            </label>
+                        </div>
                         <label className="block">
                             <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
                             <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours). Set your own if the guess doesn&apos;t fit your activity.</p>
@@ -2834,7 +2875,7 @@ export default function SettingsPage() {
                                             ) : (
                                                 <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> Upload</>
                                             )}
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadEmailImage(key, f); e.target.value = ""; }} />
+                                            <input data-demo-action="email.image" data-demo-subject={label} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadEmailImage(key, f); e.target.value = ""; }} />
                                         </label>
                                         {emailImgs[key] && (
                                             <button type="button" onClick={() => setEmailImgs({ ...emailImgs, [key]: "" })}
@@ -2895,7 +2936,7 @@ export default function SettingsPage() {
             </CollapsibleSection>}
 
             {canAccess("site") && <CollapsibleSection id="operations" title="Operations & AI Configuration" subtitle="Meeting info, what to bring/wear, FAQ, and AI chatbot personality" openSections={openSections} toggle={toggleSection}>
-                <form onSubmit={async (e) => {
+                <form data-demo-submit="operations.save" onSubmit={async (e) => {
                     e.preventDefault();
                     setOpsSaving(true);
                     const faqObj: Record<string, string> = {};
@@ -2988,7 +3029,7 @@ export default function SettingsPage() {
             </CollapsibleSection>
 
             {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
-                <form onSubmit={async (e) => {
+                <form data-demo-submit="tags.save" onSubmit={async (e) => {
                     e.preventDefault();
                     setAutoTagSaving(true);
                     const { error } = await supabase.from("businesses").update({ automation_config: autoTagConfig }).eq("id", businessId);
@@ -3077,7 +3118,7 @@ export default function SettingsPage() {
             </CollapsibleSection>}
 
             {canAccess("invoice") && <CollapsibleSection id="invoice" title={isPrivileged(role) ? "Invoice & Banking Details" : "Invoice Details"} subtitle={isPrivileged(role) ? "Company info and banking details shown on pro forma invoices" : "Company information shown on pro forma invoices"} openSections={openSections} toggle={toggleSection}>
-                <form onSubmit={handleSaveInvoice} className="space-y-6">
+                <form data-demo-submit="invoice.settings" onSubmit={handleSaveInvoice} className="space-y-6">
                     <div>
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">Company Details</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3180,7 +3221,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
-                    <form onSubmit={handleSaveWa} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                    <form data-demo-submit="credentials.whatsapp" onSubmit={handleSaveWa} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
                             <div className="flex items-center gap-2">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[#25D366]"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
@@ -3217,7 +3258,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={waSaving || !waForm.token.trim() || !waForm.phoneId.trim()}
+                            disabled={!readOnly && (waSaving || !waForm.token.trim() || !waForm.phoneId.trim())}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {waSaving ? "Encrypting & saving..." : "Save WhatsApp Credentials"}
@@ -3225,7 +3266,7 @@ export default function SettingsPage() {
                     </form>
 
                     {/* Yoco */}
-                    <form onSubmit={handleSaveYoco} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                    <form data-demo-submit="credentials.yoco" onSubmit={handleSaveYoco} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
                             <div className="flex items-center gap-2">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--ck-accent)]"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
@@ -3262,7 +3303,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim()}
+                            disabled={!readOnly && (yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim())}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
@@ -3285,10 +3326,10 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] leading-relaxed">
                             When enabled, all Yoco payments will use sandbox (test) keys. No real charges will be processed. Use this to test the payment flow with Yoco test cards.
                         </p>
-                        <button
+                        <button data-demo-action={credStatus?.yoco_test_mode ? "credentials.test-off" : "credentials.test-on"}
                             type="button"
                             onClick={handleToggleTestMode}
-                            disabled={testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
+                            disabled={!readOnly && (testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode))}
                             className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
                                 ? "border border-[color-mix(in_srgb,var(--ck-amber-bright)_35%,transparent)] bg-[var(--ck-amber-soft)] text-[var(--ck-amber)] hover:bg-[color-mix(in_srgb,var(--ck-amber-bright)_18%,transparent)]"
                                 : "bg-orange-500 text-white hover:bg-orange-600")}
@@ -3301,7 +3342,7 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Yoco Test Credentials */}
-                    <form onSubmit={handleSaveYocoTest} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                    <form data-demo-submit="credentials.yoco-test" onSubmit={handleSaveYocoTest} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
                             <div className="flex items-center gap-2">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-400"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
@@ -3338,7 +3379,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim()}
+                            disabled={!readOnly && (yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim())}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoTestSaving ? "Encrypting & saving..." : "Save Yoco Test Credentials"}
@@ -3362,7 +3403,7 @@ export default function SettingsPage() {
                                     Connected as <span className="font-medium text-[var(--ck-text-strong)]">{gdriveEmail}</span>
                                 </p>
                                 <p className="text-xs text-[var(--ck-text-muted)]">Trip photo uploads go to your Google Drive. Disconnect to revoke access.</p>
-                                <button
+                                <button data-demo-action="credentials.drive-off"
                                     type="button"
                                     onClick={handleDisconnectGdrive}
                                     disabled={gdriveLoading}
@@ -3374,7 +3415,7 @@ export default function SettingsPage() {
                         ) : (
                             <>
                                 <p className="text-sm text-[var(--ck-text-muted)]">Connect Google Drive to upload trip photos directly from the Photos page.</p>
-                                <button
+                                <button data-demo-action="credentials.drive"
                                     type="button"
                                     onClick={handleConnectGdrive}
                                     disabled={gdriveLoading}
@@ -3387,7 +3428,7 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Google Reviews */}
-                    <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                    {!readOnly && <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
                             <div className="flex items-center gap-2">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-amber-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -3425,7 +3466,7 @@ export default function SettingsPage() {
                         >
                             {googlePlaceSaving ? "Saving..." : "Save Google Place ID"}
                         </button>
-                    </div>
+                    </div>}
 
                 </div>
 

@@ -67,83 +67,32 @@ Deno.serve(async (req: any) => {
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
 
     // 1. Close all slots
-    await supabase.from("slots").update({ status: "CLOSED" }).eq("business_id", business_id).in("id", slot_ids);
+    const closed = await supabase.from("slots").update({ status: "CLOSED" }).eq("business_id", business_id).in("id", slot_ids);
+    if (closed.error) throw closed.error;
 
     // 2. Fetch all active bookings on these slots
-    const { data: bookings } = await supabase
+    const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, customer_name, phone, email, qty, total_amount, status, yoco_checkout_id, source, tours(name), slots(start_time), slot_id")
+      .select("id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, original_total, converted_to_voucher_id, status, yoco_checkout_id, source, tours(name), slots(start_time), slot_id")
       .eq("business_id", business_id)
       .in("slot_id", slot_ids)
-      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING"]);
+      .in("status", ["PAID", "CONFIRMED", "HELD", "PENDING", "PENDING PAYMENT"]);
 
+    if (bookingsError) throw bookingsError;
     const affected = bookings || [];
-    const nowIso = new Date().toISOString();
-
-    // ── Phase 1: Cancel all bookings and compute per-slot capacity deltas ──
-    const slotDeltas: Record<string, { booked: number; held: number }> = {};
     const failedCancels: { id: string; error: string }[] = [];
-    for (let i = 0; i < affected.length; i++) {
-      const b = affected[i] as any;
-      const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
-      // OTA-sourced bookings (Viator/GetYourGuide): the OTA holds the money,
-      // so we can't offer self-service refund/voucher — the customer must go
-      // through the OTA. Don't mark ACTION_REQUIRED for them.
-      const isOta = String(b.source || "").startsWith("OTA_");
-      const refundAmount = isPaid && !isOta ? Number(b.total_amount || 0) : 0;
-
-      // Cancel the booking
-      const { error: cancelErr } = await supabase.from("bookings").update({
-        status: "CANCELLED",
-        cancellation_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
-        cancelled_at: nowIso,
-        ...(isPaid && refundAmount > 0 ? {
-          refund_status: "ACTION_REQUIRED",
-          refund_amount: refundAmount,
-          refund_notes: "Weather cancellation. Customer to choose: reschedule, voucher, or refund via My Bookings",
-        } : {}),
-      }).eq("business_id", business_id).eq("id", b.id);
-
-      // If the cancel did not persist (e.g. a DB trigger rejected it), the booking
-      // is still active — do NOT release its capacity or notify, and surface it so
-      // a PAID booking never silently survives on a CLOSED slot.
-      if (cancelErr) {
-        console.error("WEATHER_CANCEL_BOOKING_ERR", b.id, cancelErr.message);
-        failedCancels.push({ id: b.id, error: cancelErr.message });
-        continue;
-      }
-
-      // Accumulate capacity deltas per slot (avoids read-then-write race)
-      if (!slotDeltas[b.slot_id]) slotDeltas[b.slot_id] = { booked: 0, held: 0 };
-      slotDeltas[b.slot_id].booked += Number(b.qty || 0);
-      if (b.status === "HELD") slotDeltas[b.slot_id].held += Number(b.qty || 0);
-
-      // Cancel any active holds.
-      // No .eq("business_id") here: holds has no business_id column, it is
-      // scoped through booking_id. Filtering on a column that does not exist
-      // made PostgREST reject the whole statement, so weather cancellations
-      // never actually released their holds — the capacity sat reserved until
-      // the expiry cron swept it up. Tenant scoping is intact regardless:
-      // b.id comes from the business_id-filtered booking query above.
-      await supabase.from("holds").update({ status: "CANCELLED" }).eq("booking_id", b.id).eq("status", "ACTIVE");
-    }
-
-    const failedIds = new Set(failedCancels.map((f) => f.id));
-
-    // ── Phase 2: Release slot capacity in one atomic update per slot ──
-    for (const slotId of Object.keys(slotDeltas)) {
-      const delta = slotDeltas[slotId];
-      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-        p_slot_id: slotId,
-        p_business_id: business_id,
-        p_booked_delta: -delta.booked,
-        p_held_delta: -delta.held,
+    const outcomes = new Map<string, any>();
+    for (const b of affected) {
+      const cancelled = await supabase.rpc("cancel_booking_transaction", {
+        p_booking_id: b.id, p_business_id: business_id,
+        p_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
+        p_allow_late_choice: true, p_weather: true,
       });
-      if (rpcRes.error) {
-        // S3: no read-modify-write fallback (that reintroduces the race). Log only.
-        console.error("ADJUST_CAPACITY_RPC_ERR (weather-cancel) slot=" + slotId + " err=" + rpcRes.error.message);
-      }
+      if (cancelled.error || !cancelled.data?.ok) {
+        failedCancels.push({ id: b.id, error: cancelled.data?.error || cancelled.error?.message || "Cancellation failed" });
+      } else outcomes.set(b.id, cancelled.data);
     }
+    const failedIds = new Set(failedCancels.map(f => f.id));
 
     // ── Phase 3: Send notifications (after all DB state is consistent) ──
     // `notified` counts successful sends (one per channel), which the Broadcasts
@@ -151,10 +100,10 @@ Deno.serve(async (req: any) => {
     let notified = 0;
     for (let i = 0; i < affected.length; i++) {
       const b = affected[i] as any;
-      if (failedIds.has(b.id)) continue;
+      if (failedIds.has(b.id) || outcomes.get(b.id)?.already_cancelled) continue;
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
       const isOta = String(b.source || "").startsWith("OTA_");
-      const refundAmount = isPaid && !isOta ? Number(b.total_amount || 0) : 0;
+      const refundAmount = Number(outcomes.get(b.id)?.refund_amount || 0);
       const ref = b.id.substring(0, 8).toUpperCase();
       const tourName = b.tours?.name || "Tour";
       const startTime = b.slots?.start_time
@@ -172,7 +121,7 @@ Deno.serve(async (req: any) => {
               "Ref: " + ref + "\n\n" +
               "You booked through a travel platform (e.g. Viator/GetYourGuide). They will handle your refund or rebooking. Please contact them directly.\n\n" +
               ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
-            : isPaid
+            : refundAmount > 0
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
@@ -218,6 +167,8 @@ Deno.serve(async (req: any) => {
                 total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
                 is_weather: isWeather,
                 is_unpaid: !isPaid,
+                offer_choice: refundAmount > 0,
+                is_ota: isOta,
               },
             }),
           });
@@ -258,12 +209,12 @@ Deno.serve(async (req: any) => {
     }
 
     return new Response(JSON.stringify({
-      ok: true,
+      ok: failedCancels.length === 0,
       slots_closed: slot_ids.length,
       bookings_cancelled: affected.length - failedCancels.length,
       notified,
       failed_cancels: failedCancels,
-    }), { status: 200, headers: getCors(req) });
+    }), { status: failedCancels.length ? 409 : 200, headers: getCors(req) });
   } catch (err: any) {
     console.error("WEATHER_CANCEL_ERROR:", err);
     return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: getCors(req) });

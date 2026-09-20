@@ -1274,14 +1274,14 @@ export default function NewBookingPage() {
                         return next;
                       })}
                       disabled={aoQty === 0}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold disabled:opacity-30"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold disabled:opacity-30"
                       style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-strong)", color: "var(--ck-text)" }}
                     >-</button>
                     <span className="w-6 text-center text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{aoQty}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.id]: (prev[ao.id] || 0) + 1 }))}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold"
                       style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-strong)", color: "var(--ck-text)" }}
                     >+</button>
                   </div>
@@ -1403,7 +1403,7 @@ export default function NewBookingPage() {
       </div>
 
       <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        <button
+        <button data-demo-action="booking.create"
           onClick={createBooking}
           disabled={submitting || loadingTours || loadingSlots}
           className="ui-btn ui-btn-primary w-full !h-11 !px-5 disabled:opacity-50 sm:w-auto"

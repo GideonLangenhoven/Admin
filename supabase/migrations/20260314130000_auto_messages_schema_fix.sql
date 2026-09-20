@@ -5,7 +5,6 @@ ALTER TABLE public.auto_messages
   ADD COLUMN IF NOT EXISTS phone        text,
   ADD COLUMN IF NOT EXISTS type         text,
   ADD COLUMN IF NOT EXISTS created_at   timestamptz NOT NULL DEFAULT timezone('utc', now());
-
 -- Index for fast booking-level lookups (safe if already exists)
 CREATE INDEX IF NOT EXISTS idx_auto_messages_booking_id
   ON public.auto_messages (booking_id)

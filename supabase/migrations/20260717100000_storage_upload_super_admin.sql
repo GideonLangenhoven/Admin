@@ -18,7 +18,6 @@ AS $$
   SELECT business_id::text FROM admin_users
   WHERE user_id = auth.uid() AND NOT COALESCE(suspended, false);
 $$;
-
 CREATE OR REPLACE FUNCTION public.storage_is_super_admin()
 RETURNS boolean
 LANGUAGE sql
@@ -31,7 +30,6 @@ AS $$
     WHERE user_id = auth.uid() AND role = 'SUPER_ADMIN' AND NOT COALESCE(suspended, false)
   );
 $$;
-
 -- ── email-images ──
 DROP POLICY IF EXISTS "email-images: upload" ON storage.objects;
 DROP POLICY IF EXISTS "email-images: update" ON storage.objects;
@@ -39,13 +37,11 @@ DROP POLICY IF EXISTS "email-images: delete" ON storage.objects;
 DROP POLICY IF EXISTS email_images_authenticated_insert ON storage.objects;
 DROP POLICY IF EXISTS email_images_authenticated_update ON storage.objects;
 DROP POLICY IF EXISTS email_images_authenticated_delete ON storage.objects;
-
 CREATE POLICY email_images_authenticated_insert ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (
   bucket_id = 'email-images'
   AND ((storage.foldername(name))[1] IN (SELECT public.storage_admin_business_ids()) OR public.storage_is_super_admin())
 );
-
 CREATE POLICY email_images_authenticated_update ON storage.objects FOR UPDATE TO authenticated
 USING (
   bucket_id = 'email-images'
@@ -55,23 +51,19 @@ WITH CHECK (
   bucket_id = 'email-images'
   AND ((storage.foldername(name))[1] IN (SELECT public.storage_admin_business_ids()) OR public.storage_is_super_admin())
 );
-
 CREATE POLICY email_images_authenticated_delete ON storage.objects FOR DELETE TO authenticated
 USING (
   bucket_id = 'email-images'
   AND ((storage.foldername(name))[1] IN (SELECT public.storage_admin_business_ids()) OR public.storage_is_super_admin())
 );
-
 -- ── marketing-assets (fix broken au.id = auth.uid() comparison) ──
 DROP POLICY IF EXISTS marketing_assets_insert ON storage.objects;
 DROP POLICY IF EXISTS marketing_assets_delete ON storage.objects;
-
 CREATE POLICY marketing_assets_insert ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (
   bucket_id = 'marketing-assets'
   AND ((storage.foldername(name))[1] IN (SELECT public.storage_admin_business_ids()) OR public.storage_is_super_admin())
 );
-
 CREATE POLICY marketing_assets_delete ON storage.objects FOR DELETE TO authenticated
 USING (
   bucket_id = 'marketing-assets'

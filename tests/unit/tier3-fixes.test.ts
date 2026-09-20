@@ -81,8 +81,9 @@ describe("item 21 — Notifications tab removed, WA-failure toast + email fallba
   const layout = readFileSync("app/layout.tsx", "utf8");
   const appShell = readFileSync("components/AppShell.tsx", "utf8");
   const adminReply = readFileSync("supabase/functions/admin-reply/index.ts", "utf8");
-  it("the Notifications nav entry is gone", () => {
-    expect(layout).not.toContain('href: "/notifications"');
+  it("keeps Notifications out of ordinary operator navigation", () => {
+    expect(layout).toContain('{ href: "/notifications", label: "Failed Notifications", icon: "Warning", privilegedOnly: true, demoOnly: true }');
+    expect(appShell).toContain("n.demoOnly && !readOnly");
   });
   it("the WA-failure watcher is mounted", () => {
     expect(appShell).toContain("<WaFailureWatcher />");

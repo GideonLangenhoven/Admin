@@ -2,7 +2,8 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
-import { withSentry } from "../_shared/sentry.ts";
+import { withSentry, captureCheckIn } from "../_shared/sentry.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -33,119 +34,31 @@ async function cleanupExpiredHolds() {
     .limit(CRON_BATCH_SIZE);
 
   for (const hold of expiredHolds || []) {
-    // Check if the booking has already been paid — if so, convert the hold
-    // instead of expiring it. This handles the case where a webhook arrived
-    // but the hold wasn’t converted yet (or a manual mark-paid happened).
-    const bookingStatus = (hold.bookings as any)?.status;
-    const hasPaid = (hold.bookings as any)?.yoco_payment_id;
-    if (bookingStatus === "PAID" || bookingStatus === "COMPLETED" || hasPaid) {
-      // For reschedule holds, check if the pending_reschedule was already completed
-      if ((hold as any).hold_type === "RESCHEDULE") {
-        const { data: prCheck } = await supabase
-          .from("pending_reschedules")
-          .select("id, status")
-          .eq("hold_id", hold.id)
-          .single();
-        if (prCheck && prCheck.status === "COMPLETED") {
-          await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
-          console.log("RESCHEDULE_HOLD_EXPIRY_SKIP_COMPLETED hold=" + hold.id);
-          results.skipped_paid += 1;
-          continue;
-        }
-      }
-      await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
-      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id + " status=" + bookingStatus);
+    // R16: single authoritative expiry — expire_single_hold claims the row
+    // under lock (idempotent), enforces the 5-min grace, converts paid holds,
+    // and releases capacity tenant-checked. Skip branches the RPC handled.
+    const expiry = await supabase.rpc("expire_single_hold", { p_hold_id: hold.id });
+    const exRes = expiry.data || {};
+    if (expiry.error || !exRes.ok) {
+      if (exRes.error !== "in_grace") console.error("HOLD_EXPIRY_ERR", hold.id, expiry.error || exRes.error);
+      continue;
+    }
+    if (exRes.converted) {
+      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id);
       results.skipped_paid += 1;
       continue;
     }
+    if (exRes.already) continue;
 
-    // Pay-on-arrival: the admin allowed this booking to go ahead unpaid, so
-    // keep the seats — convert the hold (held → booked) exactly like a
-    // payment would, instead of expiring it and releasing capacity.
-    if ((hold as any).hold_type !== "RESCHEDULE" && (hold.bookings as any)?.allow_unpaid === true) {
-      await supabase.from("holds").update({ status: "CONVERTED" }).eq("id", hold.id);
-      const unpaidQty = Number((hold.bookings as any)?.qty || 0);
-      // business_id comes off the booking: holds has no such column, so the
-      // old `hold.business_id` was always undefined and this branch never ran.
-      const unpaidBizId = (Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as any)?.business_id;
-      if (unpaidQty > 0 && hold.slot_id && unpaidBizId) {
-        const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-          p_slot_id: hold.slot_id,
-          p_business_id: unpaidBizId,
-          p_booked_delta: unpaidQty,
-          p_held_delta: -unpaidQty,
-        });
-        if (rpcRes.error) console.error("ADJUST_CONVERT_RPC_ERR (allow_unpaid) slot=" + hold.slot_id + " err=" + rpcRes.error.message);
-      }
-      console.log("HOLD_EXPIRY_SKIP_ALLOW_UNPAID hold=" + hold.id + " booking=" + hold.booking_id);
-      results.skipped_paid += 1;
-      continue;
-    }
-
-    await supabase.from("holds").update({ status: "EXPIRED" }).eq("id", hold.id);
-
-    // ── RESCHEDULE hold expiry: cancel the pending reschedule, release new slot hold, keep original booking intact ──
-    if ((hold as any).hold_type === "RESCHEDULE") {
-      const { data: pendingReschedules } = await supabase
-        .from("pending_reschedules")
-        .select("id, booking_id, new_slot_id, business_id, new_qty")
-        .eq("hold_id", hold.id)
-        .eq("status", "PENDING");
-
-      for (const pr of pendingReschedules || []) {
-        await supabase.from("pending_reschedules").update({
-          status: "EXPIRED",
-          expired_at: cutoffIso,
-        }).eq("id", pr.id);
-
-        // Release held capacity on the new slot — remediation reschedules hold
-        // the (possibly reduced) new_qty rather than the booking's qty
-        const qty = Number((pr as any).new_qty || (hold.bookings as any)?.qty || 0);
-        if (qty > 0) {
-          const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-            p_slot_id: pr.new_slot_id,
-            p_business_id: pr.business_id,
-            p_booked_delta: 0,
-            p_held_delta: -qty,
-          });
-          if (rpcRes.error) {
-            // S3: no read-modify-write fallback — log; periodic reconcile heals it.
-            console.error("ADJUST_HELD_RPC_ERR (reschedule) slot=" + pr.new_slot_id + " err=" + rpcRes.error.message);
-          }
-        }
-
-        await supabase.from("logs").insert({
-          business_id: pr.business_id,
-          booking_id: pr.booking_id,
-          event: "reschedule_upgrade_expired",
-          payload: { hold_id: hold.id, pending_reschedule_id: pr.id },
-        });
-      }
-
-      console.log("RESCHEDULE_HOLD_EXPIRED hold=" + hold.id + " booking=" + hold.booking_id);
+    if (["RESCHEDULE", "ADD_GUESTS"].includes(String(hold.hold_type))) {
       results.reschedule_hold_cleanup += 1;
       results.hold_cleanup += 1;
-      // No WhatsApp notification — original booking stays intact
       continue;
     }
 
     // ── Regular booking hold expiry ──
+    // Capacity was already released tenant-checked by expire_single_hold.
     const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string; business_id?: string; tours?: unknown } | null;
-    // Release held capacity on the slot (mirrors the reschedule branch above)
-    const heldQty = Number(holdBooking?.qty || 0);
-    if (heldQty > 0 && hold.slot_id && (holdBooking as any)?.business_id) {
-      const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-        p_slot_id: hold.slot_id,
-        p_business_id: (holdBooking as any).business_id,
-        p_booked_delta: 0,
-        p_held_delta: -heldQty,
-      });
-      if (rpcRes.error) {
-        // S3: do NOT fall back to a read-modify-write (that reintroduces the
-        // race). Log; the periodic held reconcile at the end of this sweep heals it.
-        console.error("ADJUST_HELD_RPC_ERR slot=" + hold.slot_id + " err=" + rpcRes.error.message);
-      }
-    }
     const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
     // Tour name now arrives nested under the booking (holds has no FK to tours).
     const holdTourRaw = (holdBooking as any)?.tours;
@@ -208,22 +121,11 @@ async function cleanupExpiredManualBookings() {
     .limit(CRON_BATCH_SIZE);
 
   for (const booking of expiredBookings || []) {
-    // Cancel the booking
-    await supabase.from("bookings").update({
-      status: "CANCELLED",
-      cancellation_reason: "Auto-cancelled: payment deadline exceeded",
-      cancelled_at: new Date().toISOString(),
-    }).eq("id", booking.id);
-
-    // Release the capacity (decrement slot.booked)
-    const rpcRes = await supabase.rpc("adjust_slot_capacity", {
-      p_slot_id: booking.slot_id,
-      p_business_id: booking.business_id,
-      p_booked_delta: -Number(booking.qty || 0),
-      p_held_delta: 0,
+    const cancelled = await supabase.rpc("cancel_booking_transaction", {
+      p_booking_id: booking.id, p_business_id: booking.business_id,
+      p_reason: "Auto-cancelled: payment deadline exceeded", p_allow_late_choice: false, p_weather: false,
     });
-    // S7: no read-modify-write fallback (that reintroduces the race). Log only.
-    if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR (cron-tasks) slot=" + booking.slot_id + " err=" + rpcRes.error.message);
+    if (cancelled.error || !cancelled.data?.ok || cancelled.data.already_cancelled) continue;
 
     // Log the expiry
     await supabase.from("logs").insert({
@@ -656,7 +558,15 @@ async function cleanupStaleDraftBookings() {
   return results;
 }
 
-Deno.serve(withSentry("cron-tasks", async (_req) => {
+Deno.serve(withSentry("cron-tasks", async (req) => {
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: headers() });
+  let auth;
+  try { auth = await requireAuth(req); }
+  catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: headers() }); }
+  // This sweep performs platform-wide cleanup; there is no operator UI caller.
+  if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
+  // Check-ins begin only AFTER service authentication, never from a public ping.
+  const checkInId = await captureCheckIn("cron-tasks", "in_progress");
   const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
@@ -685,6 +595,7 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
       body: JSON.stringify({ action: "all" }),
     });
     results.reminders = await reminderRes.json().catch(() => null);
+    if (!reminderRes.ok || results.reminders?.ok === false || !results.reminders) throw new Error("Scheduled notifications did not complete successfully");
   } catch (error) {
     console.error("AUTO_MESSAGES_INVOKE_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
@@ -722,6 +633,17 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  // R20: 7-day retention for cron.job_run_details + net._http_response
+  // (best-effort; purge function guards missing schemas).
+  try {
+    const { data: purged, error: purgeErr } = await supabase.rpc("purge_operational_logs");
+    if (purgeErr) throw purgeErr;
+    results.operational_logs_purged = purged;
+  } catch (error) {
+    console.error("OPERATIONAL_LOG_PURGE_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   try {
     results.auto_tags = await autoTagContacts();
   } catch (error) {
@@ -749,6 +671,7 @@ Deno.serve(withSentry("cron-tasks", async (_req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  await captureCheckIn("cron-tasks", results.errors.length ? "error" : "ok", checkInId);
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
 

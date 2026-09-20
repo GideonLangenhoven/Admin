@@ -6,18 +6,15 @@
 --    18:00–02:00) as never-inside, flipping OUTSIDE_HOURS bots on during the
 --    configured open window.
 BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.processed_wa_messages (
   id           text PRIMARY KEY,
   processed_at timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.processed_wa_messages ENABLE ROW LEVEL SECURITY;
 -- Service-role only (wa-webhook); no client policies on purpose.
 
 CREATE INDEX IF NOT EXISTS idx_processed_wa_messages_processed_at
   ON public.processed_wa_messages (processed_at);
-
 CREATE OR REPLACE FUNCTION is_inside_business_hours(p_business_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -63,5 +60,4 @@ BEGIN
   RETURN v_local_time >= v_open AND v_local_time < v_close;
 END;
 $$;
-
 COMMIT;

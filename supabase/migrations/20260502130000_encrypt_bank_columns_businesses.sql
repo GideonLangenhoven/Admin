@@ -5,7 +5,6 @@
 -- from Prompt 10 don't auto-extend to new columns).
 
 BEGIN;
-
 -- ── Guard: refuse to run if any bank column has data ──
 DO $$
 BEGIN
@@ -20,21 +19,18 @@ BEGIN
     RAISE EXCEPTION 'Cannot clean-cutover: one or more bank columns have non-NULL data';
   END IF;
 END $$;
-
 -- ── Drop 5 plaintext columns ──
 ALTER TABLE public.businesses DROP COLUMN bank_account_owner;
 ALTER TABLE public.businesses DROP COLUMN bank_account_number;
 ALTER TABLE public.businesses DROP COLUMN bank_account_type;
 ALTER TABLE public.businesses DROP COLUMN bank_name;
 ALTER TABLE public.businesses DROP COLUMN bank_branch_code;
-
 -- ── Add 5 encrypted bytea columns ──
 ALTER TABLE public.businesses ADD COLUMN bank_account_owner_encrypted bytea;
 ALTER TABLE public.businesses ADD COLUMN bank_account_number_encrypted bytea;
 ALTER TABLE public.businesses ADD COLUMN bank_account_type_encrypted bytea;
 ALTER TABLE public.businesses ADD COLUMN bank_name_encrypted bytea;
 ALTER TABLE public.businesses ADD COLUMN bank_branch_code_encrypted bytea;
-
 -- ── RPC: decrypt and return all bank details for a business ──
 CREATE OR REPLACE FUNCTION public.get_business_bank_details(
   p_business_id uuid,
@@ -63,10 +59,8 @@ BEGIN
   WHERE b.id = p_business_id;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.get_business_bank_details(uuid, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_business_bank_details(uuid, text) TO service_role;
-
 -- ── RPC: encrypt and store bank details for a business ──
 CREATE OR REPLACE FUNCTION public.set_business_bank_details(
   p_business_id    uuid,
@@ -97,10 +91,7 @@ BEGIN
   END IF;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.set_business_bank_details(uuid, text, text, text, text, text, text) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_business_bank_details(uuid, text, text, text, text, text, text) TO service_role;
-
 NOTIFY pgrst, 'reload schema';
-
 COMMIT;

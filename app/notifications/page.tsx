@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
 
@@ -38,8 +38,7 @@ export default function NotificationsPage() {
   async function load() {
     if (!businessId) return;
     setLoading(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = await getAuthHeaders(businessId);
     const r = await fetch(`/api/admin/notifications?tab=${tab}`, { headers });
     if (r.ok) {
       const data = await r.json();
@@ -52,10 +51,9 @@ export default function NotificationsPage() {
 
   async function retryOne(id: string) {
     setRetrying(id);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
     const r = await fetch(`/api/admin/notifications/${id}/retry`, {
       method: "POST",
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: await getAuthHeaders(businessId),
     });
     const data = await r.json();
     setRetrying(null);

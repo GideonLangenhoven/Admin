@@ -6,10 +6,18 @@ export async function assertAdminTestModeOn(
   email: string,
   password: string,
 ) {
-  const warmup = await page.request.post(adminUrl + "/api/admin/login", {
+  const login = await page.request.post(adminUrl + "/api/admin/login", {
     data: { email, password },
     timeout: 30_000,
-  }).catch(() => null);
+  });
+  expect(login.ok(), "Dedicated test administrator must sign in").toBeTruthy();
+  const identity = await login.json();
+  expect(identity.admin?.role, "Use a tenant owner, not platform-wide access").toBe("MAIN_ADMIN");
+  const credentials = await page.request.get(adminUrl + "/api/credentials?business_id=" + identity.admin.business_id, {
+    headers: { Authorization: "Bearer " + identity.session.access_token },
+  });
+  expect(credentials.ok()).toBeTruthy();
+  expect(await credentials.json(), "Both Yoco TEST credentials and test mode are required").toMatchObject({ yoco_test: true, yoco_test_mode: true });
   await page.goto(adminUrl + "/", { waitUntil: "domcontentloaded" });
   await page.getByPlaceholder(/email/i).fill(email);
   await page.getByPlaceholder(/password/i).fill(password);
@@ -27,4 +35,5 @@ export async function assertAdminTestModeOn(
     "ABORT: Admin must show TEST MODE banner before E2E tests can run. " +
       "Enable Yoco test mode in Settings → Credentials.",
   ).toBeVisible({ timeout: 8_000 });
+  return identity.admin.business_id as string;
 }

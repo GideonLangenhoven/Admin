@@ -26,7 +26,7 @@ export default function WaFailureWatcher() {
 
     async function poll() {
       try {
-        const headers = await getAuthHeaders();
+        const headers = await getAuthHeaders(businessId);
         if (!headers.Authorization) return; // not signed in yet
         const res = await fetch("/api/admin/wa-failures?since=" + encodeURIComponent(since.current), { headers });
         if (!res.ok) return;

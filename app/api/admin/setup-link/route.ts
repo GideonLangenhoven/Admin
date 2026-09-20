@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes } from "crypto";
-import { getCallerAdmin, isPrivilegedRole } from "../../../lib/api-auth";
+import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
+import { setAdminAuthPassword } from "../../../lib/admin-password";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -47,22 +48,18 @@ export async function POST(req: NextRequest) {
     const adminId = body.admin_id ? String(body.admin_id) : "";
     const adminEmail = body.email ? String(body.email).trim().toLowerCase() : "";
     const reason = String(body.reason || "ADMIN_INVITE");
-    const businessId = body.business_id ? String(body.business_id) : null;
     if (!adminId && !adminEmail) return NextResponse.json({ error: "admin_id or email is required" }, { status: 400 });
 
     const isSelfReset = reason === "RESET" && !!adminEmail && !adminId;
+    const caller = isSelfReset ? null : await getCallerAdmin(req);
 
     if (!isSelfReset) {
-      const caller = await getCallerAdmin(req);
       if (!caller || !isPrivilegedRole(caller.role)) {
         return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required to send setup links" }, { status: 403 });
       }
-      if (caller.role !== "SUPER_ADMIN" && businessId && caller.business_id !== businessId) {
-        return NextResponse.json({ error: "You can only send setup links for your own business" }, { status: 403 });
-      }
     }
 
-    let lookupQuery = admin.from("admin_users").select("id, email, name");
+    let lookupQuery = admin.from("admin_users").select("id, email, name, role, business_id");
     if (adminId) {
       lookupQuery = lookupQuery.eq("id", adminId);
     } else {
@@ -73,6 +70,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    }
+    if (!isSelfReset && (!caller || !canManageAdmin(caller, user))) {
+      return NextResponse.json({ error: "Cannot send setup links for this administrator" }, { status: 403 });
     }
 
     const rawToken = hexToken(24);
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
           change_password_url: setupUrl,
           expires_at: expiresAt,
           reason,
-          ...(businessId ? { business_id: businessId } : {}),
+          ...(user.business_id ? { business_id: user.business_id } : {}),
         },
       },
     });
@@ -214,11 +214,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Link has expired" }, { status: 401 });
     }
 
+    let authUserId: string;
+    try { authUserId = await setAdminAuthPassword(admin, user, newPassword); }
+    catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
+    }
     const newHash = sha256(newPassword);
 
     const { error: updErr } = await admin
       .from("admin_users")
       .update({
+        user_id: authUserId,
         password_hash: newHash,
         password_set_at: new Date().toISOString(),
         must_set_password: false,
@@ -228,34 +234,6 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", user.id);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-
-    // Sync password to auth.users so future supabase.auth.signInWithPassword works.
-    let authUserId: string | null = user.user_id;
-    if (!authUserId) {
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password: newPassword,
-        email_confirm: true,
-        user_metadata: { admin_id: user.id },
-      });
-      if (createErr) {
-        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        const existing = list?.users?.find((u: any) => u.email?.toLowerCase() === email);
-        if (existing) {
-          await admin.auth.admin.updateUserById(existing.id, { password: newPassword, email_confirm: true });
-          authUserId = existing.id;
-        } else {
-          console.error("SETUP_AUTH_CREATE_ERR", createErr.message);
-        }
-      } else {
-        authUserId = created.user.id;
-      }
-      if (authUserId) {
-        await admin.from("admin_users").update({ user_id: authUserId }).eq("id", user.id);
-      }
-    } else {
-      await admin.auth.admin.updateUserById(authUserId, { password: newPassword, email_confirm: true });
-    }
 
     return NextResponse.json({ ok: true, id: user.id, email: user.email, name: user.name });
   }

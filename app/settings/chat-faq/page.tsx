@@ -189,7 +189,7 @@ export default function ChatFaqPage() {
           </label>
           <div className="flex gap-2 justify-end">
             <button onClick={() => { setShowAdd(false); setEditId(null); }} className="ui-btn ui-btn-ghost">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+            <button data-demo-action="faq.save" onClick={handleSave} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
               {saving ? "Saving..." : editId ? "Save changes" : "Save"}
             </button>
           </div>
@@ -211,11 +211,11 @@ export default function ChatFaqPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="font-mono text-[10px] uppercase tracking-[0.08em]" style={{ color: "var(--ck-text-muted)" }}>Sent {entry.use_count} {entry.use_count === 1 ? "time" : "times"}</span>
-                  <button onClick={() => toggleEnabled(entry)} className="text-xs px-2 py-1 rounded-md border transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}>
+                  <button data-demo-action={entry.enabled ? "faq.off" : "faq.on"} onClick={() => toggleEnabled(entry)} className="text-xs px-2 py-1 rounded-md border transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}>
                     {entry.enabled ? "Turn off" : "Turn on"}
                   </button>
                   <button onClick={() => startEdit(entry)} className="text-xs px-2 py-1 rounded-md border transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}>Edit</button>
-                  <button onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded-md transition-colors hover:bg-[var(--ck-danger-soft)]" style={{ color: "var(--ck-danger)" }}>Delete</button>
+                  <button data-demo-action="faq.delete" onClick={() => handleDelete(entry.id)} className="text-xs px-2 py-1 rounded-md transition-colors hover:bg-[var(--ck-danger-soft)]" style={{ color: "var(--ck-danger)" }}>Delete</button>
                 </div>
               </div>
             ))}

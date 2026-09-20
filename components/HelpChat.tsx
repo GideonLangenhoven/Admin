@@ -12,6 +12,7 @@ import { supabase } from "../app/lib/supabase";
 import { parseActions } from "./helpChatActions";
 import { useBusinessContext } from "./BusinessContext";
 import { WELCOME_TOUR_EVENT } from "./WelcomeChecklist";
+import { isDemoPathVisible } from "../app/lib/demo-guide";
 
 type Msg = {
   role: "user" | "assistant";
@@ -27,11 +28,20 @@ const SUGGESTED: { q: string; privilegedOnly?: boolean }[] = [
   { q: "Why can't I reply to a WhatsApp message?" },
 ];
 
+const DEMO_SUGGESTED = [
+  "Show me every part of the operator system",
+  "Walk me through a booking from sale to check-in",
+  "Explain payments, vouchers, cancellations and refunds",
+  "Show me WhatsApp, web chat and automated messages",
+  "Explain marketing campaigns, automations and trip photos",
+  "Show me settings, staff access and integrations",
+].map((q) => ({ q }));
+
 const GREETING =
   "Hi! I can explain how the dashboard works, open the right page for you, and even fill things in. Ask me anything, or try one of these:";
 
-const LINK_SPLIT_RE = /(\[[^\]]+\]\(\/[a-zA-Z0-9\-/_?=&]*\))/g;
-const LINK_MATCH_RE = /^\[([^\]]+)\]\((\/[a-zA-Z0-9\-/_?=&]*)\)$/;
+const LINK_SPLIT_RE = /(\[[^\]]+\]\(\/[a-zA-Z0-9\-/_?=&#]*\))/g;
+const LINK_MATCH_RE = /^\[([^\]]+)\]\((\/[a-zA-Z0-9\-/_?=&#]*)\)$/;
 
 // ---- assistant-driven actions ----------------------------------------------
 // The edge function's reply may end with directives the assistant uses to
@@ -81,15 +91,22 @@ function setField(el: HTMLElement, value: string): void {
 
 // Renders assistant text, turning internal markdown links [Label](/route)
 // into client-side <Link>s. Everything else is plain text — no HTML injection.
-function AnswerText({ text, onNavigate }: { text: string; onNavigate: () => void }) {
+function AnswerText({ text, onNavigate, readOnly }: { text: string; onNavigate: () => void; readOnly?: boolean }) {
   const parts = text.split(LINK_SPLIT_RE);
   return (
     <span className="whitespace-pre-wrap">
       {parts.map((part, i) => {
         const m = part.match(LINK_MATCH_RE);
         if (m) {
+          if (readOnly && !isDemoPathVisible(m[2])) return <span key={i}>{m[1]} (not included in this demo)</span>;
           return (
-            <Link key={i} href={m[2]} onClick={onNavigate} className="font-semibold underline underline-offset-2" style={{ color: "var(--ck-accent)" }}>
+            <Link key={i} href={m[2]} onClick={(event) => {
+              if (readOnly && m[2].startsWith(window.location.pathname + "#")) {
+                event.preventDefault();
+                window.location.hash = m[2].split("#")[1];
+              }
+              onNavigate();
+            }} className="font-semibold underline underline-offset-2" style={{ color: "var(--ck-accent)" }}>
               {m[1]}
             </Link>
           );
@@ -102,7 +119,7 @@ function AnswerText({ text, onNavigate }: { text: string; onNavigate: () => void
 }
 
 export default function HelpChat() {
-  const { businessId, role } = useBusinessContext();
+  const { businessId, role, readOnly } = useBusinessContext();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -154,10 +171,10 @@ export default function HelpChat() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (!businessId || hidden) return null;
+  if (!businessId || (hidden && !readOnly)) return null;
 
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
-  const suggestions = SUGGESTED.filter((s) => !s.privilegedOnly || isPrivileged);
+  const suggestions = readOnly ? DEMO_SUGGESTED : SUGGESTED.filter((s) => !s.privilegedOnly || isPrivileged);
 
   // Following a link out of the assistant used to close it unconditionally,
   // which reads as the bot quitting on you mid-conversation. It only needs to
@@ -177,11 +194,16 @@ export default function HelpChat() {
   // it happens in the admin's own session on the app's own pages, so every
   // role check and business_id scope applies exactly as for a manual click.
   async function runActions(openPath: string | null, fills: [string, string][], submit: boolean) {
-    if (openPath && openPath.startsWith("/")) {
-      router.push(openPath);
+    if (openPath && openPath.startsWith("/") && (!readOnly || isDemoPathVisible(openPath))) {
+      if (readOnly && openPath.split("#")[0] === pathname && openPath.includes("#")) window.location.hash = openPath.split("#")[1];
+      else router.push(openPath);
       handleNavigate();
     }
     if (fills.length === 0 && !submit) return;
+    if (readOnly) {
+      setMessages((m) => [...m, { role: "assistant", content: "This is the shared demo, so I can open pages and explain the workflow, but I will not fill or submit actions that could affect operator or guest data." }]);
+      return;
+    }
     const missed: string[] = [];
     let form: HTMLFormElement | null = null;
     for (const [name, value] of fills) {
@@ -249,19 +271,19 @@ export default function HelpChat() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Open AI help"
+          aria-label={readOnly ? "Open AI bot" : "Open AI help"}
           className="fixed bottom-20 right-4 z-40 flex h-12 items-center justify-center gap-2 rounded-full px-4 transition-transform hover:scale-105 md:bottom-6 md:right-6"
           style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
         >
           <ChatCircleDots size={24} weight="fill" />
-          <span className="text-sm font-semibold">AI help</span>
+          <span className="text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
         </button>
       )}
 
       {open && (
         <div
           role="dialog"
-          aria-label="AI help"
+          aria-label={readOnly ? "AI bot" : "AI help"}
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl md:inset-x-auto md:bottom-6 md:right-6 md:h-[560px] md:max-h-[calc(100dvh-48px)] md:w-[380px] md:rounded-2xl"
           style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-lg)" }}
         >
@@ -269,7 +291,7 @@ export default function HelpChat() {
           <div className="flex items-center justify-between px-4 py-3" style={{ background: "var(--ck-accent)", color: "#fff" }}>
             <div className="flex items-center gap-2">
               <div>
-                <div className="text-sm font-semibold leading-tight">AI help</div>
+                <div className="text-sm font-semibold leading-tight">{readOnly ? "AI bot" : "AI help"}</div>
                 <div className="text-[11px] opacity-80 leading-tight">Ask how anything works</div>
               </div>
             </div>
@@ -280,16 +302,18 @@ export default function HelpChat() {
 
           {/* Thread */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            <div className="text-sm" style={{ color: "var(--ck-text)" }}>{GREETING}</div>
+            <div className="text-sm" style={{ color: "var(--ck-text)" }}>{readOnly
+              ? "Hi! I am the demo AI bot. Ask how any feature works, what the operator does, or what the guest experiences. I can open the right page, but I will not change or send anything."
+              : GREETING}</div>
             {messages.length === 0 && (
               <div className="flex flex-col items-start gap-2">
                 <button
                   type="button"
-                  onClick={replayTour}
+                  onClick={() => readOnly ? ask("Show me every part of the operator system") : replayTour()}
                   className="rounded-full border px-3 py-1.5 text-left text-[13px] font-semibold transition-colors hover:border-transparent"
                   style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)", background: "var(--ck-success-soft, rgba(18,94,64,0.06))" }}
                 >
-                  Show me around the dashboard
+                  {readOnly ? "Give me the full product tour" : "Show me around the dashboard"}
                 </button>
                 {suggestions.map((s) => (
                   <button
@@ -312,10 +336,10 @@ export default function HelpChat() {
                     ? { background: "var(--ck-accent)", color: "#fff", borderBottomRightRadius: 6 }
                     : { background: "var(--ck-surface-warm)", color: "var(--ck-text-strong)", border: "1px solid var(--ck-border-subtle)", borderBottomLeftRadius: 6 }}
                 >
-                  {m.role === "assistant" ? <AnswerText text={m.content} onNavigate={handleNavigate} /> : m.content}
+                  {m.role === "assistant" ? <AnswerText text={m.content} onNavigate={handleNavigate} readOnly={readOnly} /> : m.content}
                   {m.role === "assistant" && (m.sources?.length || 0) > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {m.sources!.map((s) => (
+                      {m.sources!.filter(s => !readOnly || isDemoPathVisible(s.route)).map((s) => (
                         <Link
                           key={s.route}
                           href={s.route}

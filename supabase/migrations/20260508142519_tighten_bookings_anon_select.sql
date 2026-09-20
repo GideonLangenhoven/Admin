@@ -15,9 +15,7 @@ AS $$
     ''
   );
 $$;
-
 DROP POLICY IF EXISTS bookings_anon_select ON public.bookings;
-
 CREATE POLICY bookings_anon_select ON public.bookings
   FOR SELECT TO anon
   USING (

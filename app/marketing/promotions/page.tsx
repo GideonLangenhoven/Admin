@@ -324,7 +324,7 @@ export default function PromotionsPage() {
             <span className="text-sm" style={{ color: "var(--ck-text)" }}>Active</span>
           </label>
           <div className="flex gap-2 pt-2">
-            <button
+            <button data-demo-action="promo.save"
               onClick={savePromo}
               disabled={saving}
               className="ui-btn ui-btn-primary disabled:opacity-50"
@@ -396,7 +396,7 @@ export default function PromotionsPage() {
                         {p.used_count}{p.max_uses != null ? " / " + p.max_uses : ""}
                       </td>
                       <td className="px-4 py-3">
-                        <button onClick={() => toggleActive(p)}>
+                        <button data-demo-action={p.active ? "promo.deactivate" : "promo.activate"} onClick={() => toggleActive(p)}>
                           <span className={"ui-status cursor-pointer " +
                             (isExpired ? "ui-pill-danger" :
                              isExhausted ? "ui-pill-warning" :
@@ -413,7 +413,7 @@ export default function PromotionsPage() {
                           >
                             Edit
                           </button>
-                          <button onClick={() => deletePromo(p)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
+                          <button data-demo-action="promo.delete" onClick={() => deletePromo(p)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
                             <Trash size={14} />
                           </button>
                         </div>

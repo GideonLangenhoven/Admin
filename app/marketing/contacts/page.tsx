@@ -754,11 +754,11 @@ export default function ContactsPage() {
                       {c.total_received > 0 ? <span>{c.total_received} / {c.total_opens} / {c.total_clicks}</span> : "—"}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <button onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>{c.status}</button>
+                      <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>{c.status}</button>
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={saveEdit} disabled={editSaving} className="rounded-lg p-1" style={{ color: "var(--ck-success)" }} title="Save">
+                        <button data-demo-action="contact.save" onClick={saveEdit} disabled={editSaving} className="rounded-lg p-1" style={{ color: "var(--ck-success)" }} title="Save">
                           <Check size={16} weight="bold" />
                         </button>
                         <button onClick={() => setEditingId(null)} className="rounded-lg p-1" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
@@ -784,7 +784,7 @@ export default function ContactsPage() {
                       {(c.tags || []).map((tag) => (
                         <span key={tag} className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
                           {tag}
-                          <button onClick={() => removeTagFromContact(c.id, tag)} className="ml-0.5 transition-opacity hover:opacity-70">&times;</button>
+                          <button data-demo-action="contact.tag" onClick={() => removeTagFromContact(c.id, tag)} className="ml-0.5 transition-opacity hover:opacity-70">&times;</button>
                         </span>
                       ))}
                       {tagInput?.contactId === c.id ? (
@@ -802,7 +802,7 @@ export default function ContactsPage() {
                           placeholder="tag..."
                         />
                       ) : (
-                        <button
+                        <button data-demo-action="contact.tag"
                           onClick={() => setTagInput({ contactId: c.id, value: "" })}
                           className="rounded-full border px-1.5 py-0.5 text-xs"
                           style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text-muted)" }}
@@ -819,7 +819,7 @@ export default function ContactsPage() {
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>
+                    <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>
                       {c.status}
                     </button>
                   </td>
@@ -828,7 +828,7 @@ export default function ContactsPage() {
                       <button onClick={() => startEdit(c)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-text-muted)" }} title="Edit">
                         <PencilSimple size={14} />
                       </button>
-                      <button onClick={() => deleteContact(c.id)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-danger)" }} title="Delete">
+                      <button data-demo-action="contact.delete" onClick={() => deleteContact(c.id)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-danger)" }} title="Delete">
                         <Trash size={14} />
                       </button>
                     </div>
@@ -891,7 +891,7 @@ export default function ContactsPage() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button onClick={() => setShowAdd(false)} className="ui-btn ui-btn-ghost">Cancel</button>
-                <button onClick={addContact} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
+                <button data-demo-action="contact.add" onClick={addContact} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
                   {saving ? "Saving..." : "Add Contact"}
                 </button>
               </div>
@@ -1076,7 +1076,7 @@ export default function ContactsPage() {
                     <button onClick={() => setCsvStep("map")} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Back</button>
                     <div className="flex gap-2">
                       <button onClick={() => setShowImport(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
-                      <button onClick={importContacts} disabled={importing || csvRows.filter((r) => r.errors.length === 0).length === 0} className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+                      <button data-demo-action="contact.import" onClick={importContacts} disabled={importing || csvRows.filter((r) => r.errors.length === 0).length === 0} className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                         {importing ? "Importing..." : `Import ${csvRows.filter((r) => r.errors.length === 0).length} contacts`}
                       </button>
                     </div>
@@ -1122,7 +1122,7 @@ export default function ContactsPage() {
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <button onClick={() => setShowValidate(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
-              <button onClick={runValidation} disabled={validating} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
+              <button data-demo-action="contact.validate" onClick={runValidation} disabled={validating} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                 {validating ? "Validating..." : "Run Validation"}
               </button>
             </div>
@@ -1170,7 +1170,7 @@ export default function ContactsPage() {
                 </div>
                 <div className="flex justify-end gap-2 pt-3">
                   <button onClick={() => setShowCleanList(false)} className="ui-btn ui-btn-ghost">Cancel</button>
-                  <button onClick={deactivateStaleContacts} disabled={cleaning} className="ui-btn ui-btn-danger disabled:opacity-50">
+                  <button data-demo-action="contact.clean" onClick={deactivateStaleContacts} disabled={cleaning} className="ui-btn ui-btn-danger disabled:opacity-50">
                     {cleaning ? "Deactivating..." : `Deactivate ${staleContacts.length} Contacts`}
                   </button>
                 </div>
@@ -1204,7 +1204,7 @@ export default function ContactsPage() {
               >
                 Cancel
               </button>
-              <button
+              <button data-demo-action="contact.delete-all"
                 onClick={deleteAllContacts}
                 disabled={deleteConfirmText !== "DELETE" || deletingAll}
                 className="ui-btn ui-btn-danger disabled:opacity-50"

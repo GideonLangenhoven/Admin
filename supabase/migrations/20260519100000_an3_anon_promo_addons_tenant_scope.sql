@@ -12,7 +12,6 @@ create policy promotions_anon_select on public.promotions
   using (
     business_id::text = nullif(bt_request_header('x-tenant-business-id'), '')
   );
-
 drop policy if exists add_ons_anon_select on public.add_ons;
 create policy add_ons_anon_select on public.add_ons
   for select to anon

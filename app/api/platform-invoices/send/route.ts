@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const { data: invoice, error: invErr } = await db.from("platform_invoices").select("*").eq("id", invoiceId).maybeSingle();
   if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  if (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") {
+  if (!["DRAFT", "SENT"].includes(invoice.status)) {
     return NextResponse.json({ error: "This invoice is already paid, so there is nothing to send." }, { status: 400 });
   }
 
@@ -83,18 +83,17 @@ export async function POST(req: NextRequest) {
     yoco_payment_link_url: payUrl,
   };
 
-  const { error: sendErr } = await db.functions.invoke("send-email", {
+  const { data: sendData, error: sendErr } = await db.functions.invoke("send-email", {
     body: { type: "PLATFORM_INVOICE_OUTSTANDING", data: { ...emailData, email: target.email, name: target.name } },
   });
-  if (sendErr) {
-    console.error("PLATFORM_INVOICE_SEND_ERR invoice=" + invoiceId + " to=" + target.email + ": " + sendErr.message);
-    return NextResponse.json({ error: "Email send failed: " + sendErr.message }, { status: 502 });
+  if (sendErr || sendData?.ok === false || sendData?.error) {
+    return NextResponse.json({ error: "Email send failed. Check delivery logs before retrying." }, { status: 502 });
   }
 
   const { error: updateErr } = await db.from("platform_invoices").update({
     sent_at: new Date().toISOString(),
     status: invoice.status === "DRAFT" ? "SENT" : invoice.status,
-  }).eq("id", invoiceId);
+  }).eq("id", invoiceId).in("status", ["DRAFT", "SENT"]);
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, sent_to: [target.email] });

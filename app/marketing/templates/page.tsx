@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { resolveMarketingTestRecipient } from "../../lib/marketing-test-recipient";
+import { fetchAllRowsResult } from "../../../supabase/functions/_shared/pagination";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Trash, Copy, X } from "@phosphor-icons/react";
 import EmailBuilder from "../../../components/marketing/EmailBuilder";
@@ -59,10 +60,11 @@ export default function TemplatesPage() {
 
   // Load unique tags when send modal opens
   async function loadTags() {
-    const { data } = await supabase.from("marketing_contacts")
+    const { data, error } = await fetchAllRowsResult((from, to) => supabase.from("marketing_contacts")
       .select("tags")
       .eq("business_id", businessId)
-      .eq("status", "active");
+      .eq("status", "active").order("id").range(from, to));
+    if (error) { notify({ message: "Audience tags could not be loaded. Please retry.", tone: "error" }); return; }
     const tagSet = new Set<string>();
     for (const row of (data || []) as any[]) {
       const tags = row.tags;
@@ -199,41 +201,39 @@ export default function TemplatesPage() {
   }
 
   async function sendCampaign() {
-    if (!sending || !sendForm.name.trim()) return;
+    if (!sending || !sendForm.name.trim() || sendingInProgress) return;
     setSendingInProgress(true);
 
     const isScheduled = !!sendForm.scheduledAt;
 
-    // 1. Create campaign
+    const { data: contacts, error: audienceError } = await fetchAllRowsResult((from, to) => {
+      let query = supabase.from("marketing_contacts")
+        .select("id, email, first_name").eq("business_id", businessId)
+        .eq("status", "active").order("id").range(from, to);
+      if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
+        query = query.overlaps("tags", sendForm.selectedTags);
+      }
+      return query;
+    });
+    if (audienceError || !contacts?.length) {
+      notify({ message: audienceError ? "The audience could not be fully loaded. Please retry." : "No active contacts match the selected audience.", tone: audienceError ? "error" : "warning" });
+      setSendingInProgress(false);
+      return;
+    }
+
+    // Keep the campaign in draft until every recipient is queued. The worker
+    // must not finish a partially populated campaign between insert batches.
     const { data: campaign, error: campErr } = await supabase.from("marketing_campaigns").insert({
       business_id: businessId,
       template_id: sending.id,
       name: sendForm.name.trim(),
       subject_line: sendForm.subject.trim() || sending.subject_line,
-      status: isScheduled ? "scheduled" : "sending",
+      status: "draft",
       scheduled_at: isScheduled ? sendForm.scheduledAt : null,
-      started_at: isScheduled ? null : new Date().toISOString(),
+      started_at: null,
     }).select("id").single();
     if (campErr || !campaign) {
       notify({ message: campErr?.message || "Failed to create campaign", tone: "error" });
-      setSendingInProgress(false);
-      return;
-    }
-
-    // 2. Get audience contacts
-    let q = supabase.from("marketing_contacts")
-      .select("id, email, first_name")
-      .eq("business_id", businessId)
-      .eq("status", "active");
-    if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
-      q = q.overlaps("tags", sendForm.selectedTags);
-    }
-    const { data: contacts } = await q;
-
-    if (!contacts || contacts.length === 0) {
-      notify({ message: "No active contacts match the selected audience.", tone: "warning" });
-      await supabase.from("marketing_campaigns").update({ status: "cancelled" }).eq("id", campaign!.id);
-      setSending(null);
       setSendingInProgress(false);
       return;
     }
@@ -246,17 +246,27 @@ export default function TemplatesPage() {
       email: c.email,
       first_name: c.first_name || "",
     }));
-    const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows);
-    if (queueErr) {
-      // If partial insert due to dedup constraint, still proceed
-      console.warn("Queue insert warning:", queueErr.message);
+    for (let from = 0; from < queueRows.length; from += 500) {
+      const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows.slice(from, from + 500));
+      if (queueErr) {
+        await supabase.from("marketing_campaigns").update({ status: "cancelled" }).eq("id", campaign.id).eq("business_id", businessId);
+        notify({ message: "Campaign could not be queued completely. No emails were sent; please retry.", tone: "error" });
+        setSendingInProgress(false);
+        return;
+      }
     }
 
-    // 4. Update campaign totals
-    await supabase.from("marketing_campaigns").update({
+    // Publish the complete audience and the ready status in the same write.
+    const { error: readyError } = await supabase.from("marketing_campaigns").update({
+      status: isScheduled ? "scheduled" : "sending",
       total_recipients: contacts.length,
       ...(isScheduled ? {} : { started_at: new Date().toISOString() }),
-    }).eq("id", campaign!.id);
+    }).eq("id", campaign.id).eq("business_id", businessId).select("id").single();
+    if (readyError) {
+      notify({ message: "Campaign is saved but could not be started. Check Recent Campaigns before trying again.", tone: "error" });
+      setSendingInProgress(false);
+      return;
+    }
 
     // 5. For immediate sends, trigger the dispatch function directly
     //    (don't rely solely on the cron job — fire it now for instant delivery)
@@ -405,13 +415,13 @@ export default function TemplatesPage() {
                 <button onClick={() => openSendModal(t)} className="ui-btn ui-btn-primary !h-8 !px-2.5 !text-xs">
                   Send
                 </button>
-                <button onClick={() => sendTestEmail(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs" title="Send test to yourself">
+                <button data-demo-action="template.test" onClick={() => sendTestEmail(t)} className="ui-btn ui-btn-ghost !h-8 !px-2.5 !text-xs" title="Send test to yourself">
                   Test
                 </button>
-                <button onClick={() => duplicateTemplate(t)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" title="Duplicate">
+                <button data-demo-action="template.duplicate" onClick={() => duplicateTemplate(t)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" title="Duplicate">
                   <Copy size={12} />
                 </button>
-                <button onClick={() => deleteTemplate(t.id)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
+                <button data-demo-action="template.delete" onClick={() => deleteTemplate(t.id)} className="ui-btn ui-btn-danger !h-8 !w-8 !px-0" title="Delete">
                   <Trash size={12} />
                 </button>
               </div>
@@ -560,7 +570,7 @@ export default function TemplatesPage() {
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2">
                 <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost">Cancel</button>
-                <button
+                <button data-demo-action={sendForm.scheduledAt ? "template.schedule" : "template.send"}
                   onClick={sendCampaign}
                   disabled={!sendForm.name.trim() || sendingInProgress || (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length === 0)}
                   className="ui-btn ui-btn-primary disabled:opacity-50"

@@ -35,11 +35,9 @@ WITH ranked AS (
 )
 DELETE FROM public.promotion_uses
 WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
-
 -- ── 2. Hard DB constraint: one use per (promo, normalized email) ──
 CREATE UNIQUE INDEX IF NOT EXISTS promotion_uses_promo_email_uniq
   ON public.promotion_uses (promotion_id, LOWER(TRIM(email)));
-
 -- ── 3. Atomic apply RPC ──
 -- Returns: { ok: true, used_count: N } on success
 --          { ok: false, error: <reason> } on any failure.
@@ -109,7 +107,6 @@ BEGIN
     RETURN jsonb_build_object('ok', true, 'used_count', v_promo.used_count + 1);
 END;
 $$;
-
 -- ── 4. Stronger validate: always check per-email use ──
 CREATE OR REPLACE FUNCTION public.validate_promo_code(
     p_business_id UUID,
@@ -181,7 +178,6 @@ BEGIN
     );
 END;
 $$;
-
 -- Use explicit signatures — both functions were previously defined with
 -- different signatures, leaving overloads in place that make ambiguous
 -- GRANT statements fail with "function name is not unique" (42725).
