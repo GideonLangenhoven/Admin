@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bookingRealtimeFilter } from "@/app/lib/bookings-realtime";
 import { supabase } from "@/app/lib/supabase";
 import { loadSimpleDay, type SimpleDay } from "./simple-data";
@@ -9,25 +9,47 @@ export function useSimpleDay(businessId: string, date: string, timeZone: string)
   const [data, setData] = useState<SimpleDay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const scope = useMemo(() => ({ businessId, date, timeZone }), [businessId, date, timeZone]);
+  const activeRef = useRef<{ scope: typeof scope; request: number } | null>(null);
 
   const reload = useCallback(async (quiet = false) => {
-    if (!businessId || !date) return;
+    const active = activeRef.current;
+    if (!active || active.scope !== scope) return;
+    const request = ++active.request;
+    const isCurrent = () => activeRef.current === active && active.request === request;
+    if (!scope.businessId || !scope.date) {
+      if (isCurrent()) {
+        setData(null);
+        setLoading(false);
+        setError("");
+      }
+      return;
+    }
     if (!quiet) setLoading(true);
     setError("");
     try {
-      setData(await loadSimpleDay({ businessId, date, timeZone }));
+      const next = await loadSimpleDay(scope);
+      if (isCurrent()) setData(next);
     } catch (cause) {
+      if (!isCurrent()) return;
       console.error("Simple view day load failed", cause);
       setError("We couldn’t load this day. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [businessId, date, timeZone]);
-
-  useEffect(() => { reload(); }, [reload]);
+  }, [scope]);
 
   useEffect(() => {
-    if (!businessId) return;
+    const active = { scope, request: 0 };
+    activeRef.current = active;
+    reload();
+    return () => {
+      if (activeRef.current === active) activeRef.current = null;
+    };
+  }, [reload, scope]);
+
+  useEffect(() => {
+    if (!businessId || !date) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const refreshSoon = () => {
       if (timer) clearTimeout(timer);
