@@ -17,10 +17,12 @@ describe("gift voucher checkout email flow", () => {
     const cronSource = readFileSync("supabase/functions/cron-tasks/index.ts", "utf8");
     const sendEmailSource = readFileSync("supabase/functions/send-email/index.ts", "utf8");
 
-    expect(cronSource).toContain('type: "VOUCHER_PAYMENT_LINK"');
+    expect(cronSource).toContain('sendInternalEmail("VOUCHER_PAYMENT_LINK"');
+    expect(cronSource).toContain("voucher_id:");
     // Fires once: guarded on the reminder-sent stamp.
     expect(cronSource).toContain('.is("payment_reminder_sent_at", null)');
     expect(cronSource).toContain("payment_reminder_sent_at:");
+    expect(cronSource).toContain("voucher_reminders_accepted");
     expect(sendEmailSource).toContain('case "VOUCHER_PAYMENT_LINK"');
   });
 });

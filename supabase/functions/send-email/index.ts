@@ -59,7 +59,7 @@ function isValidEmail(email: string): boolean {
 // See: https://resend.com/docs/dashboard/webhooks/introduction
 // This lets you mark bad emails in the database and stop future sends to them.
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
+async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string, idempotencyKey?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
   // Validate email format before attempting to send
   if (!to || !isValidEmail(to)) {
     console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
@@ -87,9 +87,11 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   }
   let res: Response;
   try {
+    const requestHeaders: Record<string, string> = { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" };
+    if (idempotencyKey) requestHeaders["Idempotency-Key"] = idempotencyKey;
     res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+      headers: requestHeaders,
       body: JSON.stringify(payload),
     });
   } catch (netErr) {
@@ -112,8 +114,27 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
       message: (data as any)?.message || ("HTTP " + res.status),
     };
   }
-  console.log("RESEND_OK id=" + (data as any)?.id + " to=" + to + " subject=" + subject);
-  return { ok: true, id: (data as any)?.id };
+  const providerId = String((data as any)?.id || "").trim();
+  if (!providerId) {
+    console.error("RESEND_INVALID_RESPONSE to=" + to + " subject=" + subject);
+    return { ok: false, status: res.status, error: "invalid_provider_response", message: "Provider response did not include an email ID" };
+  }
+  console.log("RESEND_OK id=" + providerId + " to=" + to + " subject=" + subject);
+  return { ok: true, id: providerId };
+}
+
+function providerIdempotencyKey(type: string, data: Record<string, unknown>, isServiceCaller: boolean): string | undefined {
+  // Resend retains a key for 24 hours. Voucher reminders are deliberately
+  // limited to the remaining <24h lifetime of a PENDING voucher, and hold
+  // expiry uses the immutable hold ID. Browser callers cannot choose a key.
+  if (!isServiceCaller) return undefined;
+  const source = type === "VOUCHER_PAYMENT_LINK"
+    ? { prefix: "voucher-payment-reminder", id: String(data.voucher_id || "") }
+    : type === "PAYMENT_LINK" && data.hold_id
+      ? { prefix: "hold-expiry-payment-link", id: String(data.hold_id || "") }
+      : null;
+  if (!source || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(source.id)) return undefined;
+  return source.prefix + "/" + source.id.toLowerCase();
 }
 
 // Default email images — empty means no image shown unless business uploads one via Settings
@@ -2588,10 +2609,12 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     if (typeof type !== "string" || !type || !d || typeof d !== "object" || Array.isArray(d)) {
       return new Response(JSON.stringify({ error: "type and data are required" }), { status: 400, headers: getCors(req) });
     }
+    let isServiceCaller = false;
     if (!isAuthHook) {
       let auth;
       try { auth = await requireAuth(req); }
       catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) }); }
+      isServiceCaller = auth.isServiceRole;
       if (!auth.isServiceRole) {
         // Identity, privacy and platform billing messages are issued only by
         // their verified server workflows, never as arbitrary admin payloads.
@@ -2910,7 +2933,17 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     const unsubForHeader = isMarketingClass && typeof d.unsubscribe_url === "string" && d.unsubscribe_url
       ? String(d.unsubscribe_url)
       : undefined;
-    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail, unsubForHeader);
+    const result = await sendResend(
+      d.email as string,
+      branding.fromEmail,
+      branded.subject,
+      branded.html,
+      bcc,
+      attachments,
+      branding.replyToEmail,
+      unsubForHeader,
+      providerIdempotencyKey(type, d, isServiceCaller),
+    );
     if (!result.ok) {
       // Surface the upstream failure to the caller as a non-2xx so that
       // supabase.functions.invoke sets `.error` and callers can't mistake a

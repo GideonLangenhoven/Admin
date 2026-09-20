@@ -37,7 +37,9 @@ describe("payment-link opt-in", () => {
   it("hold-expiry (payment timeout) emails the payment link", () => {
     const src = read("supabase/functions/cron-tasks/index.ts");
     expect(src).toMatch(/stillUnpaid[\s\S]*payment_url/);
-    expect(src).toContain("HOLD_EXPIRY_PAYLINK_SENT");
+    expect(src).toContain('sendInternalEmail("PAYMENT_LINK"');
+    expect(src).toContain("hold_id: hold.id");
+    expect(src).toContain("HOLD_EXPIRY_PAYLINK_ACCEPTED");
   });
 
   it("3rd failed payment emails the payment link", () => {

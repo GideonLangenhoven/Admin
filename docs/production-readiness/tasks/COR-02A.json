@@ -1,0 +1,61 @@
+{
+  "task_id": "COR-02A",
+  "backlog_ids": ["COR-02", "COR-04"],
+  "status": "IMPLEMENTED_AWAITING_REVIEW",
+  "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"3ed4a28a62aa620fc5a5c00ca77e0c5340368035"},
+  "objective": "Record a voucher payment reminder only after the internal email service proves provider acceptance, make retries safe across lost responses and post-acceptance crashes using a stable provider idempotency key, and expose failures in the cron result without replaying historical reminders.",
+  "owned_paths": [
+    "supabase/functions/cron-tasks/index.ts",
+    "supabase/functions/send-email/index.ts",
+    "tests/unit/voucher-reminder-delivery.test.ts",
+    "tests/unit/message-job-boundaries.test.ts",
+    "tests/unit/voucher-checkout-email.test.ts",
+    "tests/unit/payment-link-optin.test.ts"
+  ],
+  "read_dependencies": [
+    "supabase/functions/auto-messages/index.ts",
+    "supabase/migrations/20260714120000_voucher_payment_reminder.sql",
+    "supabase/migrations/20260715080026_voucher_payment_reminder.sql"
+  ],
+  "contract_clauses": ["A1","A3","A4","A5","C4","E1","E3","E4"],
+  "current_evidence": [
+    "cleanupAbandonedVouchers marks payment_reminder_sent_at and increments sent after any resolved fetch, including 401, 429, 5xx, or a 200 body with ok:false.",
+    "A lost response or crash after Resend acceptance leaves the marker null and causes a duplicate retry because send-email supplies no provider idempotency key.",
+    "The hold-expiry sibling also ignores the response and logs SENT; it has no durable retry state after the hold is expired."
+  ],
+  "behavior_to_preserve": [
+    "Only PENDING vouchers between 15 minutes and 24 hours old receive the one-time payment-link reminder.",
+    "Tenant branding, recipient, amount, and original payment URL remain unchanged.",
+    "Pending vouchers are deleted by the existing 24-hour cleanup policy; no historical reminder is replayed.",
+    "Other service and administrator email types retain their existing behavior."
+  ],
+  "forbidden_behavior": [
+    "Marking a reminder after transport rejection, non-2xx, malformed response, or ok:false",
+    "Duplicate provider sends after an unknown outcome or database-stamp failure",
+    "Client-selected provider idempotency keys",
+    "Sending a reminder for a voucher already eligible for deletion",
+    "Treating provider acceptance as delivered"
+  ],
+  "failing_before_test": "npm run test:unit -- --run tests/unit/voucher-reminder-delivery.test.ts tests/unit/message-job-boundaries.test.ts",
+  "acceptance_tests": [
+    "401, 429, 5xx, 200 ok:false, malformed responses, and network failures leave the reminder marker null and surface a failure.",
+    "A provider-accepted response stamps exactly the same tenant-owned PENDING voucher and reports accepted, not delivered.",
+    "A database-stamp failure retries with the identical provider key and payload; the later successful attempt stamps once.",
+    "Only a verified service caller can cause send-email to attach the derived voucher reminder Idempotency-Key.",
+    "Expired vouchers are deleted without receiving a new reminder.",
+    "The internal cron-to-email request has a bounded timeout; an unknown outcome remains retryable under the same provider key.",
+    "The existing message boundary, voucher checkout, Edge, TypeScript, and build checks remain green."
+  ],
+  "existing_customer_cases": [
+    "No voucher ID, balance, status, buyer, recipient, payment URL, or commercial setting changes.",
+    "No historical reminder marker is cleared or replayed."
+  ],
+  "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
+  "scope_limitations": [
+    "The sibling hold-expiry path now reports provider acceptance or failure and uses a stable provider key, but it still lacks durable rediscovery after the hold has expired. COR-04 remains open for that queue/claim design after migration-ledger verification.",
+    "Provider behavior is simulated; no genuine email was sent and provider acceptance is not delivery."
+  ],
+  "migration_order": [],
+  "rollback_strategy": "Source rollback only. Keep existing reminder markers and customer/payment data; never mass resend."
+}

@@ -14,8 +14,26 @@ function headers() {
   return { "Content-Type": "application/json" };
 }
 
+type InternalEmailAcceptance = { providerId: string };
+
+async function sendInternalEmail(type: string, data: Record<string, unknown>): Promise<InternalEmailAcceptance> {
+  const response = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+    body: JSON.stringify({ type, data }),
+    // A timeout is an unknown provider outcome, not proof of failure. The
+    // derived provider idempotency key makes the later retry safe.
+    signal: AbortSignal.timeout(10_000),
+  });
+  const result = await response.json().catch(() => null) as { ok?: boolean; id?: string; error?: string } | null;
+  if (!response.ok || result?.ok !== true || !String(result.id || "").trim()) {
+    throw new Error("email_not_accepted status=" + response.status + " error=" + String(result?.error || "invalid_response"));
+  }
+  return { providerId: String(result.id) };
+}
+
 async function cleanupExpiredHolds() {
-  const results = { hold_cleanup: 0, skipped_paid: 0, reschedule_hold_cleanup: 0 };
+  const results = { hold_cleanup: 0, skipped_paid: 0, reschedule_hold_cleanup: 0, payment_link_reminders_accepted: 0, payment_link_reminder_failures: 0 };
   // Grace period: only expire holds 5 minutes AFTER their expires_at timestamp.
   // Holds are set to expire at created_at + 15 min, but we wait an extra 5 min
   // (total 20 min) before releasing. This prevents the race condition where the
@@ -73,28 +91,24 @@ async function cleanupExpiredHolds() {
       try {
         const tenant = await getTenantByBusinessId(supabase, (holdBooking as any).business_id);
         const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "";
-        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-          body: JSON.stringify({
-            type: "PAYMENT_LINK",
-            data: {
-              business_id: (holdBooking as any).business_id,
-              email: holdBooking.email,
-              booking_id: hold.booking_id,
-              customer_name: holdBooking.customer_name || "there",
-              ref: String(hold.booking_id || "").slice(0, 8).toUpperCase(),
-              tour_name: holdTour?.name || "your tour",
-              tour_date: slotLabel,
-              qty: Number(holdBooking.qty || 1),
-              total_amount: Number(holdBooking.total_amount || 0).toFixed(2),
-              payment_url: holdBooking.payment_url,
-            },
-          }),
+        const accepted = await sendInternalEmail("PAYMENT_LINK", {
+          hold_id: hold.id,
+          business_id: (holdBooking as any).business_id,
+          email: holdBooking.email,
+          booking_id: hold.booking_id,
+          customer_name: holdBooking.customer_name || "there",
+          ref: String(hold.booking_id || "").slice(0, 8).toUpperCase(),
+          tour_name: holdTour?.name || "your tour",
+          tour_date: slotLabel,
+          qty: Number(holdBooking.qty || 1),
+          total_amount: Number(holdBooking.total_amount || 0).toFixed(2),
+          payment_url: holdBooking.payment_url,
         });
-        console.log("HOLD_EXPIRY_PAYLINK_SENT hold=" + hold.id + " booking=" + hold.booking_id);
+        results.payment_link_reminders_accepted += 1;
+        console.log("HOLD_EXPIRY_PAYLINK_ACCEPTED hold=" + hold.id + " booking=" + hold.booking_id + " provider=" + accepted.providerId);
       } catch (error) {
-        console.error("HOLD_EXPIRY_PAYLINK_EMAIL_ERR", hold.id, error);
+        results.payment_link_reminder_failures += 1;
+        console.error("HOLD_EXPIRY_PAYLINK_NOT_ACCEPTED", hold.id, error);
       }
     }
     results.hold_cleanup += 1;
@@ -191,58 +205,73 @@ async function cleanupExpiredOtpAttempts() {
 }
 
 async function cleanupAbandonedVouchers() {
-  const results = { vouchers_cleaned: 0, voucher_reminders_sent: 0 };
+  const results = { vouchers_cleaned: 0, voucher_reminders_accepted: 0, voucher_reminder_failures: 0 };
 
   // Payment-link reminder: a voucher still PENDING 15 min after checkout means
   // the buyer didn't pay (or payment failed). Email the stored payment_url once.
   // This replaces the old eager email at checkout creation — mirrors the booking
   // hold-expiry sweep. The 24h delete below sweeps anything still unpaid after.
-  const reminderCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const now = Date.now();
+  const reminderCutoff = new Date(now - 15 * 60 * 1000).toISOString();
+  const abandonedCutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString();
   const { data: unpaidVouchers } = await supabase
     .from("vouchers")
     .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url")
     .eq("status", "PENDING")
     .is("payment_reminder_sent_at", null)
     .not("payment_url", "is", null)
+    // Never send a fresh reminder to historical work that this same sweep is
+    // about to delete. It would surprise the buyer and outlive Resend's 24h
+    // idempotency window.
+    .gt("created_at", abandonedCutoff)
     .lt("created_at", reminderCutoff)
     .order("created_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
 
   for (const v of unpaidVouchers || []) {
     const voucherEmail = String((v as any).buyer_email || "").trim().toLowerCase();
-    if (!voucherEmail.includes("@") || !(v as any).business_id) continue;
+    if (!voucherEmail.includes("@") || !(v as any).business_id) {
+      results.voucher_reminder_failures += 1;
+      console.error("VOUCHER_PAYMENT_REMINDER_INVALID_TARGET voucher=" + (v as any).id);
+      continue;
+    }
     try {
-      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-        body: JSON.stringify({
-          type: "VOUCHER_PAYMENT_LINK",
-          data: {
-            email: voucherEmail,
-            business_id: (v as any).business_id,
-            buyer_name: (v as any).buyer_name || "there",
-            recipient_name: (v as any).recipient_name || "your recipient",
-            tour_name: (v as any).tour_name || "Gift Voucher",
-            total_amount: Number((v as any).value || (v as any).purchase_amount || 0).toFixed(2),
-            payment_url: (v as any).payment_url,
-          },
-        }),
+      const accepted = await sendInternalEmail("VOUCHER_PAYMENT_LINK", {
+        voucher_id: (v as any).id,
+        email: voucherEmail,
+        business_id: (v as any).business_id,
+        buyer_name: (v as any).buyer_name || "there",
+        recipient_name: (v as any).recipient_name || "your recipient",
+        tour_name: (v as any).tour_name || "Gift Voucher",
+        total_amount: Number((v as any).value || (v as any).purchase_amount || 0).toFixed(2),
+        payment_url: (v as any).payment_url,
       });
-      await supabase.from("vouchers").update({ payment_reminder_sent_at: new Date().toISOString() }).eq("id", (v as any).id);
-      results.voucher_reminders_sent += 1;
-      console.log("VOUCHER_PAYMENT_REMINDER_SENT voucher=" + (v as any).id);
+      const marker = await supabase.from("vouchers")
+        .update({ payment_reminder_sent_at: new Date().toISOString() })
+        .eq("id", (v as any).id)
+        .eq("business_id", (v as any).business_id)
+        .eq("status", "PENDING")
+        .is("payment_reminder_sent_at", null)
+        .select("id")
+        .maybeSingle();
+      if (marker.error) throw marker.error;
+      // Another worker may have marked it, or payment may have completed while
+      // the provider request was in flight. Either way, do not miscount it.
+      if (!marker.data) continue;
+      results.voucher_reminders_accepted += 1;
+      console.log("VOUCHER_PAYMENT_REMINDER_ACCEPTED voucher=" + (v as any).id + " provider=" + accepted.providerId);
     } catch (remErr) {
-      console.error("VOUCHER_PAYMENT_REMINDER_ERR", (v as any).id, remErr);
+      results.voucher_reminder_failures += 1;
+      console.error("VOUCHER_PAYMENT_REMINDER_NOT_ACCEPTED", (v as any).id, remErr);
     }
   }
 
   // Delete PENDING vouchers older than 24 hours (abandoned checkout flows)
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: abandoned } = await supabase
     .from("vouchers")
     .select("id")
     .eq("status", "PENDING")
-    .lt("created_at", cutoff)
+    .lt("created_at", abandonedCutoff)
     .order("created_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
 
@@ -567,7 +596,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
   // Check-ins begin only AFTER service authentication, never from a public ping.
   const checkInId = await captureCheckIn("cron-tasks", "in_progress");
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
+  const results: any = { reminders: null, hold_cleanup: 0, hold_payment_link_reminders_accepted: 0, hold_payment_link_reminder_failures: 0, expired_manual: 0, vouchers_cleaned: 0, voucher_reminders_accepted: 0, voucher_reminder_failures: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
   // cancels past-deadline PENDING bookings without releasing slot capacity,
@@ -575,6 +604,9 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   try {
     const cleanup = await cleanupExpiredHolds();
     results.hold_cleanup = cleanup.hold_cleanup;
+    results.hold_payment_link_reminders_accepted = cleanup.payment_link_reminders_accepted;
+    results.hold_payment_link_reminder_failures = cleanup.payment_link_reminder_failures;
+    if (cleanup.payment_link_reminder_failures > 0) results.errors.push(cleanup.payment_link_reminder_failures + " hold payment-link reminder(s) were not accepted");
   } catch (error) {
     console.error("HOLD_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
@@ -604,6 +636,9 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   try {
     const voucherCleanup = await cleanupAbandonedVouchers();
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
+    results.voucher_reminders_accepted = voucherCleanup.voucher_reminders_accepted;
+    results.voucher_reminder_failures = voucherCleanup.voucher_reminder_failures;
+    if (voucherCleanup.voucher_reminder_failures > 0) results.errors.push(voucherCleanup.voucher_reminder_failures + " voucher reminder(s) were not accepted");
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));

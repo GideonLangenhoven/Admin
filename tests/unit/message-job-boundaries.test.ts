@@ -37,8 +37,11 @@ function fixture() {
   const queries: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
   const rpcCalls: Array<{ name: string; args: any }> = [];
   const emails: any[] = [];
+  const providerRequests: Array<{ url: string; headers: Headers; body: any }> = [];
   const whatsapp: any[] = [];
   let claimError = false;
+  let internalEmailFailureStatus: number | null = null;
+  let providerResponse: { body: Record<string, unknown>; status: number } | null = null;
   const db = {
     auth: { getUser: async (token: string) => ({ data: { user: token === "anon" ? null : { id: token } }, error: null }) },
     from(table: string) {
@@ -109,9 +112,16 @@ function fixture() {
       }
     },
   };
-  const fetchMock = vi.fn(async (_url: any, init?: RequestInit) => {
+  const fetchMock = vi.fn(async (url: any, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body || "{}"));
+    providerRequests.push({ url: String(url), headers: new Headers(init?.headers), body });
     emails.push(body);
+    if (String(url).includes("/functions/v1/send-email") && internalEmailFailureStatus) {
+      return Response.json({ ok: false, error: "fixture_rejected" }, { status: internalEmailFailureStatus });
+    }
+    if (String(url).includes("api.resend.com") && providerResponse) {
+      return Response.json(providerResponse.body, { status: providerResponse.status });
+    }
     return Response.json(Array.isArray(body) ? { data: body.map((_, i) => ({ id: "sent-" + i })) } : { id: "sent", ok: true });
   });
   const invoke = (name: string, body: any = message, token = "a", method = "POST", headers: Record<string, string> = {}) => {
@@ -128,7 +138,12 @@ function fixture() {
     }, env, fetchMock);
     return handler(new Request("https://fixture.invalid/" + name, { method, headers: { ...(token ? { authorization: "Bearer " + token } : {}), origin: "https://admin.fixture.invalid", ...headers }, ...(method === "POST" ? { body: JSON.stringify(body) } : {}) }));
   };
-  return { rows, writes, queries, rpcCalls, emails, whatsapp, invoke, failClaims: () => { claimError = true; } };
+  return {
+    rows, writes, queries, rpcCalls, emails, providerRequests, whatsapp, invoke,
+    failClaims: () => { claimError = true; },
+    rejectInternalEmail: (status: number) => { internalEmailFailureStatus = status; },
+    setProviderResponse: (body: Record<string, unknown>, status = 200) => { providerResponse = { body, status }; },
+  };
 }
 
 describe("R08 authenticated message/job entry points", () => {
@@ -184,6 +199,28 @@ describe("R08 authenticated message/job entry points", () => {
     expect((await f.invoke("cron-tasks", {}, serviceKey)).status).toBe(200);
     expect(f.rpcCalls.some(call => call.name === "apply_last_minute_deals")).toBe(true);
   });
+  it("the cleanup sweep reports an unaccepted voucher reminder instead of returning green", async () => {
+    const f = fixture();
+    f.rows.vouchers = [{
+      id: "11111111-1111-4111-8111-111111111111",
+      business_id: "a",
+      buyer_name: "Buyer",
+      buyer_email: "buyer@fixture.invalid",
+      recipient_name: "Guest",
+      tour_name: "Tour",
+      value: 100,
+      purchase_amount: 100,
+      payment_url: "https://pay.fixture.invalid/original",
+      payment_reminder_sent_at: null,
+      status: "PENDING",
+      created_at: new Date(Date.now() - 20 * 60_000).toISOString(),
+    }];
+    f.rejectInternalEmail(429);
+    const response = await f.invoke("cron-tasks", {}, serviceKey);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ voucher_reminders_accepted: 0, voucher_reminder_failures: 1 });
+    expect(f.rows.vouchers[0].payment_reminder_sent_at).toBeNull();
+  });
 });
 
 describe("R08 message tenant boundaries and legitimate user flows", () => {
@@ -219,6 +256,32 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     const f = fixture();
     expect((await f.invoke("send-email", { type: "BOOKING_UPDATED", data: { ...message.data, booking_id: "booking-a", ref: "A", tour_name: "Tour a" } })).status).toBe(200);
     expect(f.emails).toHaveLength(1);
+  });
+  it("derives a stable provider idempotency key only for service-issued voucher reminders", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const body = { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, voucher_id: id, payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } };
+    const service = fixture();
+    expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
+    expect((await service.invoke("send-email", body, serviceKey)).status).toBe(200);
+    expect(service.providerRequests[0].headers.get("Idempotency-Key")).toBe("voucher-payment-reminder/" + id);
+    expect(service.providerRequests[1].headers.get("Idempotency-Key")).toBe("voucher-payment-reminder/" + id);
+    expect(service.providerRequests[1].body).toEqual(service.providerRequests[0].body);
+
+    const admin = fixture();
+    expect((await admin.invoke("send-email", body, "a")).status).toBe(200);
+    expect(admin.providerRequests[0].headers.get("Idempotency-Key")).toBeNull();
+
+    const hold = fixture();
+    const holdId = "33333333-3333-4333-8333-333333333333";
+    expect((await hold.invoke("send-email", { type: "PAYMENT_LINK", data: { ...message.data, hold_id: holdId, booking_id: "booking-a", payment_url: "https://pay.fixture.invalid/original", ref: "A", tour_name: "Tour", total_amount: "100.00" } }, serviceKey)).status).toBe(200);
+    expect(hold.providerRequests[0].headers.get("Idempotency-Key")).toBe("hold-expiry-payment-link/" + holdId);
+  });
+  it("rejects a provider 2xx response that has no accepted message ID", async () => {
+    const f = fixture();
+    f.setProviderResponse({ ok: true });
+    const response = await f.invoke("send-email", { type: "VOUCHER_PAYMENT_LINK", data: { ...message.data, voucher_id: "11111111-1111-4111-8111-111111111111", payment_url: "https://pay.fixture.invalid/original", buyer_name: "Buyer", recipient_name: "Guest", total_amount: "100.00" } }, serviceKey);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ ok: false, error: "invalid_provider_response" });
   });
   it("prevents admins forging authentication or platform-billing messages", async () => {
     for (const type of ["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING", "POPIA_EXPORT_READY"]) {
