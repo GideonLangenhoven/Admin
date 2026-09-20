@@ -10,8 +10,8 @@ function adminClient() {
   return createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 }
 
-// Change a tenant's subscription plan tier (Starter/Growth/Pro). Privileged
-// only. Mirrors /api/billing/seats: the mid-cycle base-price difference is
+// Change a tenant's active subscription plan. Privileged only. Mirrors
+// /api/billing/seats: the mid-cycle base-price difference is
 // prorated into a PENDING billing_line_items entry (positive = charge on
 // upgrade, negative = credit on downgrade), and everything is audit-logged.
 export async function POST(req: NextRequest) {

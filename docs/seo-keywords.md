@@ -199,11 +199,9 @@ Aonyx Marine Experiences, E Kayaking Cape Town
 5. Blog author: will you (or someone on your team) review blog posts for factual accuracy before publish? Critical — AI-generated copy without a human factual review is the fastest way to earn a SpamBrain demotion.
 Yes I will review it at info@bookingtours.co.za
 
-6. Pricing confirm: Starter R1,500 / Growth R3,000 / Pro R6,500 per month — is this still current? (Seen on `app/operators/page.tsx:7–10`)
-remove the fee for pro, just say contact us for a quote. 
+6. Pricing confirm: one Standard plan at R2,000/month including one admin seat, plus R500/month per additional admin seat. No tiered plans and no setup fee.
 
-7. Setup fee: still R3,500 once-off? (Same file)
-No, setup is free, only with a landing page is it 3500 additionally. 
+7. Setup fee: R0. A separately requested landing-page build may still be quoted as an add-on.
 ---
 
 ## Keyword approval sign-off

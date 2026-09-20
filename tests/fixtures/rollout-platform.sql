@@ -2,7 +2,7 @@
 -- against the pre-release schema snapshot on 2026-09-13; no customer records.
 create table public.plans (
   id text primary key, name text not null, monthly_price_zar integer not null,
-  setup_fee_zar integer not null default 3500, seat_limit integer not null,
+  setup_fee_zar integer not null default 0, seat_limit integer not null,
   monthly_paid_booking_limit integer, uncapped_flag boolean not null default false,
   active boolean not null default true, extra_seat_price_zar integer not null default 500,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),

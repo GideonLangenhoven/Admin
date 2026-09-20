@@ -251,7 +251,7 @@ Resend tier limits:
 - **Pro ($20/mo):** 50,000 / month, 10 req/s. **Comfortable for 10–20 operators.**
 - **Business ($90/mo):** 100,000 / month, 10 req/s. For 30+ operators.
 
-**Headline:** Resend Free cannot carry 10 operators. Upgrading to Pro is mandatory before launch. At R1,500/month per operator, $20 Resend is 0.1% of one operator's fee.
+**Headline:** Resend Free cannot carry 10 operators. Upgrading to Pro is mandatory before launch. Evaluate its converted Rand cost against the R2,000/month operator base subscription.
 
 ### 5.3 Dispatch concurrency
 

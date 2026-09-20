@@ -5,10 +5,9 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 
 ## Creative Guardrails
 - Always show commercial terms clearly:
-  - Setup fee: `R3,500` once-off
-  - Starter: `R1,500/month`
-  - Growth: `R3,000/month`
-  - Pro: `R6,500/month`
+  - Standard: `R2,000/month`, including one admin seat
+  - Additional admin seats: `R500/month` each
+  - Setup fee: `R0`
 - Do not hide add-ons:
   - Landing page build: `R3,500` first page
   - Additional pages: `R1,500` each
@@ -48,7 +47,7 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 - Primary text:
   - All core features from day one. No feature gating.
   - You only scale when your team and paid bookings grow.
-  - Starter `R1,500/month` + `R3,500` setup. See full pricing.
+  - Standard `R2,000/month`, including one admin seat. Additional seats `R500/month`. R0 setup.
 - Headline:
   - All Features, Day One
 - Description:
@@ -57,7 +56,7 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 ### A2 (Operations Outcome)
 - Primary text:
   - From inquiry to paid booking to operations in one system.
-  - Starter, Growth, Pro with clear seat and paid booking limits.
+  - One Standard plan with clear additional-seat pricing and unlimited bookings.
   - Predictable pricing. No surprises.
 - Headline:
   - Turn Inquiries Into Paid Bookings
@@ -66,23 +65,22 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 
 ### A3 (Seat + Volume Clarity)
 - Primary text:
-  - Starter: 1 admin, 100 paid bookings.
-  - Growth: 3 admins, 500 paid bookings.
-  - Pro: 10 admins, uncapped paid bookings (fair-use).
+  - Standard includes one admin seat and unlimited bookings.
+  - Add admin seats for R500/month each.
 - Headline:
   - Scale Only When You Grow
 - Description:
   - Seats + paid volume pricing
 
-### A4 (Top-up Flexibility)
+### A4 (Seat Flexibility)
 - Primary text:
-  - Hit your booking cap? Buy top-up instantly or upgrade.
-  - Access unblocks immediately after payment.
-  - Keep operations moving in peak periods.
+  - All booking volume is included.
+  - Add an admin seat for R500/month when your team grows.
+  - Keep the same plan as you scale.
 - Headline:
-  - No Booking Bottlenecks
+  - Add Seats As You Grow
 - Description:
-  - Instant top-up options
+  - R500 per additional admin
 
 ### A5 (Add-on Upsell)
 - Primary text:
@@ -96,8 +94,8 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 
 ### A6 (Offer Summary)
 - Primary text:
-  - Setup `R3,500` once-off. All features included.
-  - Pick Starter, Growth, or Pro based on seats and paid booking volume.
+  - R0 setup. All core features included.
+  - Standard is R2,000/month with one admin seat; additional seats are R500/month.
   - Designed for activity operators who want predictable growth.
 - Headline:
   - Predictable SaaS Pricing
@@ -109,13 +107,13 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 ### V1 (Problem/Solution)
 - Scene 1 (0-5s): "Running bookings across chat, spreadsheets, and manual follow-up?"
 - Scene 2 (5-12s): "CapeKayak handles inquiry, payment, and operations in one flow."
-- Scene 3 (12-17s): "All features from day one. Scale by seats and paid bookings only."
+- Scene 3 (12-17s): "All core features and unlimited bookings. Add seats as your team grows."
 - Scene 4 (17-20s): "Book a demo. See the live workflow."
 
 ### V2 (Commercial Clarity)
-- Scene 1 (0-5s): "Simple plans: Starter, Growth, Pro."
-- Scene 2 (5-12s): "Starter `R1,500`, Growth `R3,000`, Pro `R6,500` + `R3,500` setup."
-- Scene 3 (12-17s): "Need more volume? Top-up instantly or upgrade."
+- Scene 1 (0-5s): "One simple Standard plan."
+- Scene 2 (5-12s): "R2,000/month including one admin. Extra seats R500/month."
+- Scene 3 (12-17s): "Unlimited bookings. R0 setup."
 - Scene 4 (17-20s): "Book your demo at `/operators`."
 
 ## LinkedIn Text Ads
@@ -124,7 +122,7 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 - Intro:
   - SaaS for activity operators: all core features included from day one.
 - Body:
-  - Scale only when your team and paid bookings grow. Starter from `R1,500/month`.
+  - R2,000/month includes one admin seat. Add seats for R500/month as your team grows.
 - CTA:
   - Book a demo
 
@@ -132,7 +130,7 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 - Intro:
   - Commercially clear pricing for operator teams.
 - Body:
-  - Starter `1` admin, Growth `3`, Pro `10`. Transparent add-ons and hosting policy.
+  - One admin seat included; additional admins are R500/month each. Transparent add-ons and hosting policy.
 - CTA:
   - Book a demo
 
@@ -150,11 +148,11 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 - All Features From Day One
 - Booking SaaS For Operators
 - Turn Inquiries Into Paid Bookings
-- Starter Plan From R1500/Month
-- Growth Plan For Team Operations
-- Pro Plan For High Booking Volume
-- Predictable Seats + Volume Pricing
-- Booking Cap Alerts + Instant Top-Ups
+- Standard Plan R2000/Month
+- Additional Seats R500/Month
+- Unlimited Booking Volume
+- Predictable Admin Seat Pricing
+- R0 Setup Fee
 - CapeKayak Operator Platform
 - Simple Pricing For Activity Teams
 - Tour Operator Booking Software
@@ -165,7 +163,7 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 
 ### Descriptions
 - All core features included. Scale only when your team and paid bookings grow.
-- Starter, Growth, and Pro plans with clear seat and paid booking limits.
+- One Standard plan: R2,000/month including one admin seat; additional seats R500/month.
 - Landing page add-on available: R3500 first page, R1500 extra pages, R500/month hosting.
 - Book a live demo and see inquiry-to-paid-booking operations in one workflow.
 
@@ -184,4 +182,3 @@ Drive qualified operator demos to `/operators` with transparent pricing and clea
 - Pause any creative below baseline CTR after 1,500+ impressions.
 - Shift budget to ads with best qualified-demo cost, not lowest click cost.
 - Refresh the worst-performing creative every 3-4 days in launch week.
-

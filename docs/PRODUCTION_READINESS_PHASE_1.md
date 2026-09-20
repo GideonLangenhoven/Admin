@@ -439,7 +439,7 @@ Once this is signed off, Phase 2 begins with the 5 cross-app journeys in your or
   - Free auto-pauses a project after 1 week of inactivity → edge functions (Yoco webhook, WhatsApp, cron) go offline during quiet weeks → instant breach of the 95% target.
   - No point-in-time backups on Free (a Pro-only feature). Operating a paid SaaS without recoverable backups is reckless.
   - 5 GB bandwidth / 500K edge-fn invocations / 200 concurrent realtime connections ceilings on Free are all single-digit-operators thin. `cron-tasks` alone consumes ~8.6K invocations/month at a 5-min interval before any payment webhooks or marketing dispatches.
-  - Cost of Pro (~R470/mo) is ~3% of one operator's R1,500 subscription. The economics are obvious.
+  - Cost of Pro (~R470/mo) must be included in unit economics against the R2,000 base subscription.
 
 **Investigated by Claude (user said "not sure", so I checked):**
 - Q2 (is the custom SHA-256 admin auth intentional?): **Yes, intentional.** Confirmed by:

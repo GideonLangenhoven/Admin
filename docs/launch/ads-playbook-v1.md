@@ -6,9 +6,9 @@ Generate qualified operator demos and paid onboarding starts while maintaining p
 ## Offer to Advertise
 - Core hook: all features included from day one.
 - Price clarity:
-  - Starter: R1,500/month + R3,500 once-off setup
-  - Growth: R3,000/month + R3,500 once-off setup
-  - Pro: R6,500/month + R3,500 once-off setup
+  - Standard: R2,000/month including one admin seat
+  - Additional admin seats: R500/month each
+  - Setup: R0
 - Add-on clarity:
   - Landing page build: R3,500 first page
   - Additional pages: R1,500 per page
@@ -44,7 +44,7 @@ Generate qualified operator demos and paid onboarding starts while maintaining p
 
 ## Creative and Messaging Matrix
 - Angle 1: "All features from day one"
-- Angle 2: "Scale seats and paid bookings only when you grow"
+- Angle 2: "Add R500 admin seats only when your team grows"
 - Angle 3: "From inquiry to paid booking to operations in one system"
 - Angle 4: "Predictable add-ons: landing page build and hosting clearly priced"
 
@@ -88,7 +88,7 @@ Generate qualified operator demos and paid onboarding starts while maintaining p
 - Paid booking conversion rate (north-star).
 
 ## What Makes Ads Work for This Launch
-- Offer clarity is non-negotiable: include setup fee and recurring pricing in ad-to-page flow.
+- Offer clarity is non-negotiable: state R2,000/month including one admin seat, R500/month per additional seat and R0 setup in the ad-to-page flow.
 - Fast follow-up is a multiplier: ad spend without sales speed wastes budget.
 - Retargeting should start on day one, not after launch week.
 

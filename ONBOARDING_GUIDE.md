@@ -626,25 +626,15 @@ The AI chat assistant's personality and knowledge base are fully configurable pe
 
 ---
 
-## 13. Pricing Model Suggestions
+## 13. Pricing Model
 
-### For Selling / Renting the Platform
+BookingTours uses one Standard plan:
 
-| Model | Structure | Best For |
-|-------|-----------|----------|
-| **Monthly SaaS** | R1,500–R5,000/month based on tier | Small–medium operators |
-| **Per-booking fee** | R5–R15 per confirmed booking | High-volume seasonal operators |
-| **Setup + monthly** | R10,000 setup + R2,000/month | Operators wanting customisation |
-| **Revenue share** | 2–3% of booking revenue | Large operators, low commitment |
-| **White-label license** | R50,000+ once-off + R3,000/month | Agencies reselling to clients |
+| Base subscription | Included | Additional admin seats | Setup |
+|---|---|---|---|
+| **R2,000/month** | All core features, unlimited bookings, 1 admin seat | **R500/month each** | **R0** |
 
-### Suggested Tiers
-
-| Tier | Bookings/month | Features | Price |
-|------|---------------|----------|-------|
-| **Starter** | Up to 100 | Core booking, email, 1 admin | R1,500/mo |
-| **Growth** | Up to 500 | + WhatsApp bot, vouchers, 3 admins | R3,000/mo |
-| **Pro** | Unlimited | + AI chat, broadcasts, analytics, 10 admins | R5,000/mo |
+There are no Starter, Growth or Pro tiers and no per-booking BookingTours commission. Quote separately requested services, such as a custom landing-page build, as add-ons rather than changing the platform subscription.
 
 ---
 

@@ -14,7 +14,7 @@ The site is significantly above average for an early-stage SaaS product. Credit 
 "Booking software built for the wild side of tourism." This is memorable, niche-specific, and has personality. It immediately tells the visitor: this isn't generic software — it's for YOU.
 
 **2. The one-liner under the hero is elite.**
-"R 2,500/month · pause for off-season at no charge · live in 48 hours." This answers the three questions every SaaS prospect has — price, risk, and timeline — in 13 words. Keep this exactly as is.
+"R2,000/month incl. 1 admin · R500/additional seat · zero commission." Keep these commercial terms consistent everywhere.
 
 **3. The competitive framing is bold and effective.**
 "Built for the things FareHarbor & Bokun ignore." Naming the enemy is a high-confidence move. It validates the prospect's frustration with incumbents and positions BookingTours as the answer.
@@ -99,14 +99,14 @@ The site should be tested at 375px and 320px. Tour operators research software o
 | **Xola** | No monthly fee. ~6% "partner fee" per booking. | No SA support | No | No | N/A | US-focused. No SA payments. No WhatsApp. |
 | **Checkfront** | $99/mo + 3% booking fees | Stripe (limited SA) | No | No | No | Expensive for what you get. Not adventure-specific. |
 | **Regiondo** | From $50/mo + 3% usage fee | EU-focused payments | No | No | No | EU-centric. No SA market presence. |
-| **BookingTours** | R1,500/mo flat. Zero commission. Zero setup. | Yoco native (ZAR, local cards, instant settlement) | Yes — Gemini AI reads intent, holds slots, sends pay links | Yes — one-click cancel, customer self-rebook/voucher/refund | Yes — pause billing at no charge | New. Smaller operator base. Needs to build trust and case studies. |
+| **BookingTours** | R2,000/mo incl. 1 admin; R500/additional seat. Zero commission. Zero setup. | Yoco native (ZAR, local cards, instant settlement) | Yes — Gemini AI reads intent, holds slots, sends pay links | Yes — one-click cancel, customer self-rebook/voucher/refund | Yes — pause billing at no charge | New. Smaller operator base. Needs to build trust and case studies. |
 
 ### BookingTours' Genuine Competitive Advantages
 
 These are the moats. These are what no competitor currently offers in combination:
 
 **1. Zero commission, flat fee, pause for off-season.**
-FareHarbor charges 6% per booking that you can't absorb — it goes on the customer's bill. On a R550 tour, that's R33 extra the customer sees. Bokun charges 1-1.5% plus monthly fees. BookingTours charges R1,500/month flat regardless of volume, takes zero commission, and lets you pause billing in winter. For an operator doing 200 bookings/month, BookingTours costs R7.50 per booking vs. FareHarbor's R33+. The more you grow, the cheaper BookingTours gets per booking. FareHarbor gets more expensive.
+FareHarbor charges 6% per booking that you can't absorb — it goes on the customer's bill. On a R550 tour, that's R33 extra the customer sees. Bokun charges 1-1.5% plus monthly fees. BookingTours charges R2,000/month including one admin seat, takes zero commission, and lets you pause billing in winter. For an operator doing 200 bookings/month, the BookingTours base costs R10 per booking vs. FareHarbor's R33+, before additional admin seats or provider charges.
 
 **2. AI WhatsApp booking — natural language, not forms.**
 No competitor has this. WhatsApp is the primary communication channel in South Africa (and most of Africa, Southeast Asia, Latin America). The customer messages "Need 5 spots for Saturday at 9" and the AI reads intent, checks availability, holds the slot, and drafts a reply with a payment link. This alone is a category-defining feature for the SA market.
@@ -132,11 +132,11 @@ capekayak.bookingtours.co.za looks and feels like the operator's own site. FareH
 
 ### Positioning Statement
 
-For **adventure and tour operators in Southern Africa** who are **losing bookings to slow replies, clunky software, and platforms that take a cut of every sale**, **BookingTours** is the **all-in-one booking, payments, and marketing platform** that lets them **take bookings via WhatsApp AI, cancel for weather in one click, and keep 100% of their revenue** — for a flat R1,500/month they can pause any time. Unlike **FareHarbor and Bokun**, BookingTours is **built in South Africa, runs on Yoco, speaks WhatsApp, and never charges commission.**
+For **adventure and tour operators in Southern Africa** who are **losing bookings to slow replies, clunky software, and platforms that take a cut of every sale**, **BookingTours** is the **all-in-one booking, payments, and marketing platform** that lets them **take bookings via WhatsApp AI, cancel for weather in one click, and keep 100% of their revenue** — for R2,000/month including one admin seat, plus R500/month per additional admin seat. Unlike **FareHarbor and Bokun**, BookingTours is **built in South Africa, runs on Yoco, speaks WhatsApp, and never charges commission.**
 
 ### The One-Liner (Elevator Pitch)
 
-"BookingTours replaces FareHarbor, Mailchimp, and the WhatsApp group chat — for a flat R1,500/month with zero commission. You're live in 48 hours."
+"BookingTours replaces disconnected booking admin — R2,000/month including one admin seat, R500 per additional seat, with zero BookingTours commission."
 
 ### Brand Voice
 
@@ -144,7 +144,7 @@ For **adventure and tour operators in Southern Africa** who are **losing booking
 
 **Voice rules:**
 - Lead with the operator's pain, not your feature
-- Be specific about money: "R33 per booking on FareHarbor vs. R7.50 on BookingTours at 200 bookings/month"
+- Be specific about money: "R33 per booking on FareHarbor vs. a R10 BookingTours base cost at 200 bookings/month, before additional seats and provider charges"
 - Name the competitors directly — you're not afraid of comparison
 - Use "you" more than "we"
 - Short sentences for impact. Specifics over generalities.
@@ -185,7 +185,7 @@ Take bookings on WhatsApp, cancel for weather in one click, and stop handing 6% 
 **Secondary CTA:** See it in action
 
 **Trust line (below CTAs):**
-R 1,500/month · pause for off-season at no charge · live in 48 hours
+R2,000/month incl. 1 admin · R500/month per additional seat · zero commission
 
 ---
 
@@ -212,7 +212,7 @@ Most operators sign up on Friday and have their first real, paid booking by Mond
 
 Replace the current stats bar with verifiable, specific claims:
 
-Trusted by adventure operators from sea kayaks to safari lodges · R1,500/month flat — zero commission, ever · Live in 48 hours · Pause billing for off-season at no charge
+Built for adventure operators · R2,000/month including one admin seat · R500/month per additional seat · zero BookingTours commission
 
 *(If "120+ operators" and "R28M processed" are real, verified numbers: keep them with added specificity — "120+ operators across 6 provinces" feels more real than a round number. If they're projections, remove them until they're true.)*
 
@@ -314,9 +314,9 @@ The maths on commission:
 An operator doing 200 bookings/month at R550 average:
 - FareHarbor: R6,600/month in commission (6% × R110,000) — paid by your customers as a visible surcharge
 - Bokun Plus: R2,700/month ($49 subscription + ~1.5% commission on R110,000)
-- BookingTours: R1,500/month flat. Zero commission. The more you grow, the cheaper it gets per booking.
+- BookingTours: R2,000/month including one admin seat, plus R500/month per additional seat. Zero BookingTours commission.
 
-At 200 bookings/month, BookingTours costs R7.50 per booking. FareHarbor costs R33. That gap widens every month you grow.
+At 200 bookings/month, the BookingTours base costs R10 per booking before additional seats and provider charges. FareHarbor costs R33 in this illustrative comparison.
 
 ---
 
@@ -366,7 +366,7 @@ We don't take a cut of your bookings — not now, not when you're doing 500 a mo
 Most operators are taking real bookings within 48 hours. We onboard you on a 90-minute Zoom call, import your tours, set up your subdomain, plug in Yoco, and you're live. We've had operators sign up Friday and take their first paid booking by Monday.
 
 **Do you take a commission per booking?**
-No. Zero percent. Not now, not ever. You pay R1,500/month flat regardless of whether you do 10 bookings or 1,000. The more you grow, the cheaper we get per booking. FareHarbor charges 6% on every booking, passed directly to your customers. Bokun charges 1-1.5% plus monthly fees. We think that model is broken.
+No. Zero percent BookingTours commission. You pay R2,000/month including one admin seat, plus R500/month for each additional admin seat, regardless of booking volume. Payment-processor fees apply separately.
 
 **What happens when we close for off-season?**
 Hit pause. Billing stops. Your data stays safe. When you're ready to come back, unpause and you're live again instantly. No reactivation fee, no catch.
@@ -415,7 +415,7 @@ BookingTours (bookingtours.co.za), a booking, payments, and marketing platform
 built specifically for adventure and tour operators in Southern Africa.
 
 PRODUCT FACTS:
-- R1,500/month flat fee. Zero commission — ever. Zero setup. Zero lock-in.
+- R2,000/month including 1 admin seat; R500/month per additional admin seat. Zero BookingTours commission. Zero setup. Zero lock-in.
 - Pause billing for off-season at no charge.
 - Branded subdomain white-label (operator.bookingtours.co.za)
 - AI WhatsApp booking: Gemini AI reads customer messages, checks availability,
@@ -454,8 +454,8 @@ KILLER STAT:
 At 200 bookings/month × R550 average:
   FareHarbor costs: R6,600/month (6% commission, customer-visible)
   Bokun Plus costs: ~R2,700/month ($49 + ~1.5% commission)
-  BookingTours costs: R1,500/month flat (R7.50 per booking, decreasing with
-  volume, invisible to customer)
+  BookingTours costs: R2,000/month including one admin seat (R10 base cost per
+  booking at this volume, before additional seats and provider charges)
 
 VOICE:
 - Direct, confident, slightly irreverent. Like a sharp operator who built the
@@ -501,17 +501,17 @@ NEVER:
 
 **Ad 1 — Commission pain:**
 Tour Booking Software — R0 Commission
-FareHarbor charges 6% per booking. We charge R1,500/month flat — no commission, ever. AI WhatsApp, weather-cancel, Yoco payments. Live in 48 hours.
+FareHarbor charges 6% per booking. BookingTours is R2,000/month including one admin seat, plus R500/month per additional seat — zero BookingTours commission.
 [Book a 20-min demo]
 
 **Ad 2 — WhatsApp-led:**
 AI WhatsApp Booking for Tour Operators
-Your customers WhatsApp you. Our AI reads it, holds the slot, sends a pay link — in 2 seconds. Built for SA adventure operators. Flat R1,500/mo.
+Your customers WhatsApp you. Our AI reads it, holds the slot and prepares the next step. Built for SA adventure operators. R2,000/month including one admin seat; additional seats R500/month.
 [See it in action]
 
 **Ad 3 — Weather pain:**
 Weather Cancelled Your Tours? One Click Fixes It
-Cancel slots, notify all customers, let them self-rebook — automatically. No manual emails. No lost revenue. BookingTours. R1,500/mo flat.
+Cancel slots, notify customers and offer self-service rebooking. BookingTours: R2,000/month including one admin seat; R500/month per additional seat.
 [Book a demo]
 
 ### Facebook / Instagram Ads
@@ -521,7 +521,7 @@ Your booking platform takes 6% of every sale.
 Your WhatsApp enquiries sit unread for hours.
 Your weather cancellation day takes 3 hours of admin.
 
-BookingTours: R1,500/month flat. AI WhatsApp. One-click weather cancel.
+BookingTours: R2,000/month including one admin seat. Additional seats R500/month. AI WhatsApp. Weather-cancellation workflow.
 Zero commission. Live in 48 hours.
 
 **Long-form (Feed):**
@@ -533,7 +533,7 @@ Every tour operator I know has the same three problems.
 
 We built BookingTours to kill all three.
 
-AI WhatsApp reads your customer's message, holds the slot, and drafts a reply with a payment link — in under 2 seconds. One click cancels every weather-affected slot and lets customers self-rebook. And we charge R1,500/month flat. No commission. Not today, not when you're doing 500 bookings a month.
+AI WhatsApp reads your customer's message, holds the slot, and drafts a reply with a payment link. One action cancels affected slots and lets customers self-rebook. BookingTours costs R2,000/month including one admin seat, plus R500/month per additional seat. No BookingTours commission.
 
 Book a 20-min demo. Most operators are live by Friday.
 
@@ -541,7 +541,7 @@ Book a 20-min demo. Most operators are live by Friday.
 
 ### Email Subject Lines (for outreach)
 
-- "You paid FareHarbor R[X] in commission last month. We'd charge R1,500."
+- "You paid FareHarbor R[X] in commission last month. Our base is R2,000 including one admin seat, plus R500 per additional seat."
 - "What if your WhatsApp replied to booking enquiries in 2 seconds?"
 - "The weather-cancellation email you'll never have to send again"
 - "Your booking platform is costing you R[X]/month. Here's the math."

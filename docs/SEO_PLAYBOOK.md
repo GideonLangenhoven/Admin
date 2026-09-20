@@ -33,7 +33,7 @@ We will NOT try to outrank FareHarbor for "tour booking software" globally. We w
 I can write copy, but I cannot invent facts. Please answer these in one reply (or a Google Doc):
 
 ### Business basics
-- [ ] Confirm pricing page copy: R1,500/month + R750/additional admin user — still accurate? Any tiered plans coming?
+- [x] Pricing confirmed: one Standard plan at R2,000/month including one admin seat, plus R500/month per additional admin seat. No setup fee.
 - [ ] Target customer segments (tick all that apply): kayak operators / safari lodges / wine-tour operators / whale-watching / quad-bike / hiking / fishing charter / other: ________
 - [ ] Geographic focus for year 1: SA only, or also Namibia/Botswana/Mauritius/Kenya?
 - [ ] Company registered address (needed for Google Business Profile schema)

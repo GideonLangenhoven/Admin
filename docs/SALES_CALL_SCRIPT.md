@@ -10,7 +10,7 @@
 - Open the **live demo dashboard** (your own account or a demo tenant)
 - Have the **booking site** open in a second tab
 - Know their business name and what activity they run (check their website/Instagram before the call)
-- Have pricing ready: R1,500/month starter, pause anytime, no lock-in
+- Have pricing ready: R2,000/month including one admin seat, R500/month per additional seat, no setup fee, no lock-in
 
 ---
 
@@ -179,7 +179,7 @@ Transition naturally:
 
 Answer their questions, then:
 
-> "Pricing is simple. R1,500 a month. That includes everything you've just seen — unlimited bookings, unlimited tours, WhatsApp chatbot, marketing, the lot. If you need extra admin logins, it's R750 each. No setup fee. No contracts."
+> "Pricing is simple. R2,000 a month includes everything you've just seen and one admin login. Each additional admin seat is R500 a month. There is no setup fee, booking commission or contract lock-in."
 
 ### Common Objections
 

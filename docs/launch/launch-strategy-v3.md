@@ -1,40 +1,25 @@
 # CapeKayak SaaS Launch Strategy v3 - Execution Pack
 
 ## Offer Snapshot
-- Setup fee: R3,500 once-off
-- Starter: R1,500/month, 1 admin, 100 paid bookings/month
-- Growth: R3,000/month, 3 admins, 500 paid bookings/month
-- Pro: R6,500/month, 10 admins, uncapped paid bookings (fair-use)
-- All core features are included on all plans.
+- Setup fee: R0
+- Standard: R2,000/month, including 1 admin seat and unlimited bookings
+- Additional admin seats: R500/month each
+- All core features are included. There are no Starter, Growth or Pro tiers.
 
 ## Add-ons
 - Landing page build: R3,500 for the first page
 - Additional landing pages: R1,500 per page
 - Landing page hosting: R500/month per business
 
-## Top-ups
-- R100 = +10 paid bookings (current cycle)
-- R500 = +60 paid bookings (current cycle)
-- R1,000 = +140 paid bookings (current cycle)
-- Top-ups expire at cycle end (no rollover)
-
-## Volume Rule
-Only paid bookings count toward monthly booking caps (`status = PAID` and `total_amount > 0`).
-
-## Cap Behavior
-- Starter/Growth: at cap, new paid bookings pause until quota is added.
-- Immediate in-app options at cap:
-  - Buy top-up
-  - Upgrade plan
-- Access restores instantly after successful payment.
-- Pro is not cap-blocked, but paid-booking usage is still tracked.
+## Booking volume
+The Standard plan has no monthly booking cap. Retired booking top-ups and tier upgrades are not part of the offer.
 
 ## Deployment-First Rollout
 Deployment is a launch phase, not just an engineering step. Complete production rollout and validation before public amplification.
 
 ### Phase 0 (Deployment)
 - Run DB migrations, function deploys, and frontend release using `docs/launch/deployment-runbook.md`.
-- Validate pricing, plan caps, seat limits, top-up crediting, and landing-page billing in production.
+- Validate Standard pricing, seat billing and landing-page add-on billing in production.
 - Confirm public pages are live:
   - `/operators`
   - `/case-study/cape-kayak`
@@ -44,8 +29,8 @@ Deployment is a launch phase, not just an engineering step. Complete production 
 
 ### Days 1-3
 - Finalize `/operators`, case study, and comparison pages
-- Confirm pricing and plan limits in production DB
-- Verify cap/seat/top-up enforcement in staging
+- Confirm the Standard plan and seat price in the production database
+- Verify included-seat and additional-seat billing in staging
 
 ### Days 4-6
 - Soft-launch with pilot operators
@@ -72,8 +57,7 @@ Deployment is a launch phase, not just an engineering step. Complete production 
   - Pilot follow-up sequence
   - Weekly launch recap with CTA to book demo/start onboarding
 - Product channel:
-  - In-app prompts at cap to buy top-up or upgrade
-  - Billing page as commercial control center
+  - Billing page for seat management and commercial visibility
 
 ### Rented Channels (distribution)
 - LinkedIn: founder/operator problem-solution posts linking to `/operators`
@@ -87,7 +71,7 @@ Deployment is a launch phase, not just an engineering step. Complete production 
 
 ## Offer Positioning (No-Brainer)
 - All core features included from day one on every plan.
-- Pricing scales only by admin seats and paid booking volume.
+- Pricing scales only by additional admin seats.
 - Add-ons are transparent and predictable:
   - Landing page build: R3,500 first page
   - Additional pages: R1,500/page
@@ -99,12 +83,12 @@ Deployment is a launch phase, not just an engineering step. Complete production 
   - Demo request rate
   - Trial-to-paid conversion
   - Time-to-first-paid-booking
-  - Starter -> Growth/Pro upgrade rate
+- Additional-seat adoption and retention
 
 ## Core Messaging
 - All features from day one. Scale only when your bookings and team grow.
 - From inquiry to paid booking to operations in one system.
-- Simple seats + volume pricing with predictable add-ons.
+- One Standard plan with predictable seat pricing and add-ons.
 
 ## Deployment
 - Deployment runbook: `docs/launch/deployment-runbook.md`
@@ -120,7 +104,7 @@ Deployment is a launch phase, not just an engineering step. Complete production 
 
 ### Day 0 (Deployment Day)
 - Deploy DB + functions + frontend using `deployment-runbook.md`.
-- Run smoke tests for cap enforcement, top-ups, and landing-page add-ons.
+- Run smoke tests for base pricing, seat billing and landing-page add-ons.
 - Confirm public pages are accessible and conversion CTAs are working.
 
 ### Days 1-3 (Activation)
@@ -130,8 +114,7 @@ Deployment is a launch phase, not just an engineering step. Complete production 
 
 ### Days 4-7 (Iteration)
 - Use `metrics-sql.md` to monitor:
-  - top-up purchases
-  - cap-reached accounts
+  - seat changes and prorations
   - landing-page add-on uptake
 - Refine pricing FAQ and objection handling based on real conversations.
 

@@ -2,6 +2,8 @@
 -- each additional admin seat is R500/month. Setup is free.
 BEGIN;
 
+ALTER TABLE public.plans ALTER COLUMN setup_fee_zar SET DEFAULT 0;
+
 INSERT INTO public.plans (
   id, name, monthly_price_zar, setup_fee_zar, seat_limit,
   extra_seat_price_zar, uncapped_flag, active

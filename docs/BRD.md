@@ -160,9 +160,9 @@ BookingTours exists to convert more enquiries into paid bookings, keep 100% of b
 - **Usage component:** marketing email allowance per month; overage billed per email by platform staff.
 - **Add-on:** done-for-you marketing service from R6,500/month.
 
-**Alignment work this decision creates:**
-- Code default plan is "Pro" at R1,500/month — the `plans` table and fallback constant must be updated to R2,000; a parked migration seeding R750/extra seat must be corrected or discarded.
-- Marketing copy variously says R1,500 / R2,000 / R2,500 — standardise every surface on **R2,000**.
+**Alignment status:**
+- Runtime fallbacks, the Standard plan migration, billing screens and active sales copy use **R2,000/month including one admin seat, plus R500/month per additional seat**.
+- Setup is free. Paid historical invoices remain historical; open legacy pricing rows are corrected by the current migration.
 - Platform subscriptions are currently **invoiced manually** — no automated recurring card charge is wired (Yoco is the intended rail). Acceptable for the first cohorts; automation threshold is an open question (§11).
 - A TRIAL subscription status exists in code with no expiry enforcement — trial policy is an open question (§11).
 
