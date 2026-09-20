@@ -1,9 +1,9 @@
 {
   "task_id": "GUIDE-PHOTO-01",
   "backlog_ids": ["SEC-07"],
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
-  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"a7010b777699f42bc2c8a3ef34c68cfae285a05b"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"a7010b777699f42bc2c8a3ef34c68cfae285a05b","result_sha":"a39079704d0ed9f892ad35541aba69a5a01d3716"},
   "objective": "Bound complete multipart requests below the deployed platform ceiling, fully decode supported still-image bytes rather than trusting headers, generate a safe correlated server filename, preserve tenant authorization, and distinguish definite rejection from provider/database outcome uncertainty.",
   "owned_paths": [
     "app/api/guide/photo-upload/route.ts",
@@ -53,5 +53,6 @@
   ],
   "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
   "migration_order": [],
-  "rollback_strategy": "Source rollback only. It does not delete existing photo records or Drive files. Any failed compensation remains an explicit operational error, never an automatic historical cleanup."
+  "rollback_strategy": "Source rollback only. It does not delete existing photo records or Drive files. Any failed compensation remains an explicit operational error, never an automatic historical cleanup.",
+  "review": {"requested_model":"gpt-6-astra","requested_effort":"high","observed_runtime":null,"disposition":"APPROVE_TASK","artifact":"../reviews/GUIDE-PHOTO-01.md"}
 }

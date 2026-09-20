@@ -1,0 +1,68 @@
+{
+  "evidence_schema": "2.0",
+  "evidence_id": "GUIDE-PHOTO-01-UNIT-20260920",
+  "task_or_gate": "GUIDE-PHOTO-01/SEC-07",
+  "status": "PASS_TASK_SCOPE",
+  "stage": "UNIT",
+  "source": {
+    "repository": "GideonLangenhoven/Admin",
+    "branch": "feature/launch-rollout-2026-09-20",
+    "base_commit": "a7010b777699f42bc2c8a3ef34c68cfae285a05b",
+    "commit": "a39079704d0ed9f892ad35541aba69a5a01d3716",
+    "patch_sha256": "504b397ce60f77c1508fdb069e6d914ed2aef36b2b3424b522ce95fba166f670",
+    "lockfile_sha256": "8620bb3a03e3efd78ce5c39e7d500a79a88849fc397fcd6a9d450f923eef9757"
+  },
+  "environment": {
+    "id": "local-isolated-worktree",
+    "production": false,
+    "synthetic_data": true,
+    "real_outbound_effects": false
+  },
+  "execution": {
+    "focused_command": "npm run test:unit -- --run tests/unit/guide-photo-upload.test.ts tests/unit/photo-delivery.test.ts",
+    "full_unit_command": "npm run test:unit with booking symlinked to exported CI pin 460e58d952ad570c9036bc13118eec66a2591918",
+    "build_command": "NEXT_PUBLIC_SUPABASE_URL=https://fixture.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=fixture-anon-not-a-real-key npm run build",
+    "completed_at_utc": "2026-09-20T09:17:56Z"
+  },
+  "result": {
+    "assertions": [
+      "The original focused regression failed 10 of 12 tests on the uncorrected path.",
+      "The final focused upload and photo-delivery suites passed 42 of 42 tests.",
+      "A clean npm ci from the candidate lockfile, TypeScript, diff check, targeted lint, and the exact production build passed; targeted lint retained two existing UI warnings.",
+      "The full unit suite passed 1157 tests, failed the same 3 companion UI-contract tests as baseline, and skipped 1.",
+      "Independent actual-handler checks covered supported formats, truncated content, eight SQLSTATE cases, same-token cleanup, operation correlation, and log redaction."
+    ],
+    "failed_assertions": [
+      "Three pre-existing mobile-first companion-source contract assertions remain failed and block a fully green release suite."
+    ],
+    "skips": ["One existing unit test is skipped."],
+    "limitations": [
+      "Database and Drive dependencies are mocked at this stage; no real provider, database, mobile/browser, deployment, or crash-recovery evidence is claimed.",
+      "Operation correlation is not durable provider idempotency.",
+      "Mobile capture and HEIC conversion are unverified; HEIC is explicitly not accepted by this candidate.",
+      "Complete decoding plus Drive preview isolation is not content sanitization or malware certification."
+    ]
+  },
+  "external_references": [
+    "https://vercel.com/docs/functions/limitations",
+    "https://vercel.com/docs/errors/function_payload_too_large"
+  ],
+  "artifacts": [
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-before.log","sha256":"7f213d2fed6594197df442453d222685d3fbd0526658c634d84a8b4c534d95c4","exit_code":1},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-npm-ci-final.log","sha256":"9e3fa7d827f44b7f69f1bdecc0f2a4c3ee51ac8940fca35aec0eee2ba2eaf733","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-after-final.log","sha256":"1512d56c9e24f07e5abde64bde5f676764aa0511b7394ad1e670581d0f045be9","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-tsc-final.log","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-eslint-final.log","sha256":"1f1cc18d88fcb67db43631e7d0ffbdcdf41cc08d8a954ec714971c3d44067c4e","exit_code":0,"notes":"Two existing UI warnings, no error."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-build-final.log","sha256":"1b51671799525964cd6993edeca1f36a2f0d27965c9aa90159a66e957ee98806","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-photo-full-unit-final.log","sha256":"91ff0bf0ed2b34d3e5fe79a37a356aac51d138ff00881a9ebf699565179e0702","exit_code":1,"notes":"1157 pass, 3 unchanged companion UI-contract failures, 1 skip."}
+  ],
+  "independent_review": {
+    "requested_reviewer_model": "gpt-6-astra",
+    "requested_effort": "high",
+    "observed_runtime": null,
+    "disposition": "APPROVE_TASK",
+    "limitations": "Reviewer runtime metadata was not exposed."
+  },
+  "redaction_confirmed": true,
+  "invalidated_by": []
+}
