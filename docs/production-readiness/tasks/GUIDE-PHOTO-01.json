@@ -1,0 +1,57 @@
+{
+  "task_id": "GUIDE-PHOTO-01",
+  "backlog_ids": ["SEC-07"],
+  "status": "IN_PROGRESS",
+  "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"a7010b777699f42bc2c8a3ef34c68cfae285a05b"},
+  "objective": "Bound complete multipart requests below the deployed platform ceiling, fully decode supported still-image bytes rather than trusting headers, generate a safe correlated server filename, preserve tenant authorization, and distinguish definite rejection from provider/database outcome uncertainty.",
+  "owned_paths": [
+    "app/api/guide/photo-upload/route.ts",
+    "app/guide/photos/[slotId]/page.tsx",
+    "tests/unit/guide-photo-upload.test.ts",
+    "package.json",
+    "package-lock.json"
+  ],
+  "read_dependencies": [
+    "app/lib/api-auth.ts",
+    "app/guide/photos/[slotId]/page.tsx",
+    "supabase/functions/google-drive/index.ts",
+    "supabase/migrations/20260504170000_guide_pwa.sql"
+  ],
+  "contract_clauses": ["A1","A2","A4","A5","A6","C5","D5","E1"],
+  "current_evidence": [
+    "The handler trusts the browser filename extension and MIME declaration.",
+    "It reads the complete file into memory without a file-size bound.",
+    "A successful Drive upload followed by a trip_photos insert failure leaves an untracked remote object.",
+    "Vercel documents a 4.5 MB Function request-payload ceiling; the old route and UI did not state an achievable limit."
+  ],
+  "behavior_to_preserve": [
+    "Authenticated active staff can upload a supported photo to an own-tenant slot.",
+    "Read-only demo, anonymous, suspended, inactive-subscription, and foreign-tenant callers remain denied by the existing authorization boundary.",
+    "Google Drive credentials and files remain tenant-scoped, and successful trip_photos records retain the existing identifiers and links.",
+    "The guide UI continues to report per-file failures without sending messages or changing customer records."
+  ],
+  "forbidden_behavior": [
+    "Buffering an unbounded multipart body or forwarding an over-limit file",
+    "Accepting executable, declared-only, malformed, or mismatched image content",
+    "Using a client filename or extension in the Drive object name",
+    "Fetching tenant credentials or uploading for a foreign slot",
+    "Deleting a Drive object after an outcome-unknown insert or inviting a blind retry after provider/browser response loss",
+    "Leaving a definite rejected insert's new Drive object silently untracked"
+  ],
+  "failing_before_test": "npm run test:unit -- --run tests/unit/guide-photo-upload.test.ts",
+  "acceptance_tests": [
+    "Missing authority and foreign slots cause no provider effect.",
+    "Absent/dishonest Content-Length, ignored fields, empty/oversized files, header-valid truncation, unsupported types, and MIME mismatch are bounded or rejected before credential/upload calls.",
+    "A decoded supported image is uploaded with a server-generated name and detected content type, then recorded for the verified tenant and actor.",
+    "Definite provider rejection creates no database record; response loss/5xx/malformed success is correlated and reported unknown without retry guidance.",
+    "Only a definite database rejection triggers same-token Drive deletion; transport/commit uncertainty never deletes, and cleanup uncertainty is non-retryable."
+  ],
+  "existing_customer_cases": [
+    "Existing trip_photos rows and Drive files are untouched.",
+    "No migration or customer re-onboarding is required."
+  ],
+  "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
+  "migration_order": [],
+  "rollback_strategy": "Source rollback only. It does not delete existing photo records or Drive files. Any failed compensation remains an explicit operational error, never an automatic historical cleanup."
+}
