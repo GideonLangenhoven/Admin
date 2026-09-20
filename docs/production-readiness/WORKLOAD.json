@@ -1,0 +1,48 @@
+{
+  "profile_id": "BT2000-LAUNCH-V2",
+  "version": "2.0",
+  "status": "PROPOSED_NOT_EXECUTED",
+  "source": "09_WORKLOAD_PROPOSAL.json",
+  "candidate": "76d00f3157acb2c73159bef6b8d40a108a9e767d",
+  "approval": {
+    "workload_and_thresholds": false,
+    "cost_and_environment": false,
+    "approval_reference": null
+  },
+  "scope": {
+    "distinct_authenticated_staff_accounts": 2000,
+    "concurrent_active_staff_sessions": 2000,
+    "synthetic_businesses": 200,
+    "accounts_per_business": 10,
+    "steady_meaningful_actions_per_second": 200,
+    "realtime_connections": 2000,
+    "certifies_2000_operator_businesses": false
+  },
+  "concurrent_traffic": {
+    "public_browse_availability_actions_per_second": 20,
+    "checkout_creations_per_second": 2,
+    "controlled_webhook_deliveries_per_second": 5,
+    "transactional_jobs_over_600_seconds": 2000,
+    "background_marketing_active": true
+  },
+  "sequence": {
+    "ramp_sessions": [100, 500, 1000, 2000],
+    "full_load_seconds": 3600,
+    "spike_multiplier": 2,
+    "spike_seconds": 300,
+    "recovery_max_seconds": 600,
+    "soak_seconds": 86400
+  },
+  "qualification_blockers": [
+    "No positively identified isolated staging environment",
+    "No approved representative dataset or cost ceiling",
+    "Companion/deployed release manifest unresolved",
+    "Functional, security, continuity, restore, provider, and monitoring gates incomplete"
+  ],
+  "safety": {
+    "production_load_authorized": false,
+    "live_messages_or_payments_blocked": true,
+    "provider_doubles_required_for_volume": true,
+    "threshold_reduction_after_failure_allowed": false
+  }
+}

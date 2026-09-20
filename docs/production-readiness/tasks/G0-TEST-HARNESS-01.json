@@ -1,0 +1,22 @@
+{
+  "task_id": "G0-TEST-HARNESS-01",
+  "status": "VERIFIED",
+  "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"76d00f3157acb2c73159bef6b8d40a108a9e767d"},
+  "objective": "Restore the disposable tenant-isolation harness after the demo read-only migration added a Storage trigger, without weakening the production migration.",
+  "owned_paths": ["tests/fixtures/rollout-schema.sql","tests/fixtures/rollout-cron.sql","tests/tenant-isolation/rollout.mjs"],
+  "read_dependencies": ["tests/tenant-isolation/rollout.mjs","supabase/migrations/20260914190000_demo_account_read_only.sql"],
+  "contract_clauses": ["A2","A4","A5","A6","B2","B3","D2","D3"],
+  "failing_before_test": "ROLLOUT_TEST_HOST=<validated disposable socket> ROLLOUT_TEST_PORT=55432 npm run test:isolation:local -> 3F000 schema storage does not exist",
+  "acceptance_tests": ["Complete local isolation suite applies current migrations and passes","Normal staff retain the local Storage mutation path","Demo identity can browse its own tenant but cannot mutate tenant data or Storage","No production host, credential, or record is reachable"],
+  "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
+  "rollback_strategy": "Remove the fixture-only schema representation; no application or production database change.",
+  "result": {
+    "before_exit": 1,
+    "after_exit": 0,
+    "checks_passed": 158,
+    "patch_sha256": "d6b1d227bc28012d5fd4f9c6e48679e31dc15c0527ca2ba128346a23256698ff",
+    "independent_review": "APPROVE_TASK",
+    "review_path": "docs/production-readiness/reviews/G0-TEST-HARNESS-01.md"
+  }
+}

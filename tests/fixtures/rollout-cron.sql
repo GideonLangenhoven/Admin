@@ -6,6 +6,20 @@ create table cron.job(jobid bigint primary key, jobname text, schedule text, com
 create function cron.alter_job(job_id bigint, command text) returns void language sql as $$
   update cron.job set command = $2 where jobid = $1
 $$;
+create function cron.unschedule(job_name text) returns boolean language plpgsql as $$
+declare removed_count bigint;
+begin
+  delete from cron.job where jobname = job_name;
+  get diagnostics removed_count = row_count;
+  return removed_count > 0;
+end $$;
+create function cron.schedule(job_name text, job_schedule text, job_command text) returns bigint language plpgsql as $$
+declare new_id bigint;
+begin
+  select coalesce(max(jobid), 0) + 1 into new_id from cron.job;
+  insert into cron.job(jobid,jobname,schedule,command) values (new_id,job_name,job_schedule,job_command);
+  return new_id;
+end $$;
 create table vault.decrypted_secrets(name text primary key, decrypted_secret text);
 insert into vault.decrypted_secrets values ('edge_jobs_service_role_key','local-fixture-server-only-not-a-real-key');
 create table net.fixture_requests(url text, headers jsonb, body jsonb, timeout_milliseconds integer);

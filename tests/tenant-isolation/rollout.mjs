@@ -49,12 +49,13 @@ try {
   }
   await db.query("select set_config('request.jwt.claim.role','service_role',false)");
   await db.query("insert into businesses(id,name,operator_email,subscription_status) values ($1,'Operator A','a@example.invalid','ACTIVE'),($2,'Operator B','b@example.invalid','ACTIVE')", [id(1), id(2)]);
-  await db.query(`insert into admin_users(id,user_id,business_id,email,password_hash,role,suspended) values
-    ($1,$2,$3,'main-a@example.invalid','fixture','MAIN_ADMIN',false),
-    ($4,$5,$6,'main-b@example.invalid','fixture','MAIN_ADMIN',false),
-    ($7,$8,$3,'platform@example.invalid','fixture','SUPER_ADMIN',false),
-    ($9,$10,$3,'suspended@example.invalid','fixture','SUPER_ADMIN',true)`,
-  [id(11),id(101),id(1),id(12),id(102),id(2),id(13),id(103),id(14),id(104)]);
+  await db.query(`insert into admin_users(id,user_id,business_id,email,password_hash,role,suspended,read_only) values
+    ($1,$2,$3,'main-a@example.invalid','fixture','MAIN_ADMIN',false,false),
+    ($4,$5,$6,'main-b@example.invalid','fixture','MAIN_ADMIN',false,false),
+    ($7,$8,$3,'platform@example.invalid','fixture','SUPER_ADMIN',false,false),
+    ($9,$10,$3,'suspended@example.invalid','fixture','SUPER_ADMIN',true,false),
+    ($11,$12,$3,'demo@example.invalid','fixture','OPERATOR',false,true)`,
+  [id(11),id(101),id(1),id(12),id(102),id(2),id(13),id(103),id(14),id(104),id(15),id(105)]);
   await db.query("insert into reviews(id,business_id,booking_id,source,status,rating) values ($1,$2,$3,'NATIVE','APPROVED',5)", [id(31),id(2),id(71)]);
 
   for (const [user, foreign] of [[101,2],[102,1]]) {
@@ -82,6 +83,18 @@ try {
   }));
   await check('R10 ordinary operator settings remain editable', () => as('authenticated', 101, {}, async () => {
     assert.equal((await db.query("update businesses set name='New operator name' where id=$1",[id(1)])).rowCount, 1);
+  }));
+  await check('A6 read-only demo retains own-tenant browsing', () => as('authenticated', 105, {}, async () => {
+    assert.equal((await db.query('select id,name from businesses where id=$1',[id(1)])).rowCount, 1);
+  }));
+  await check('A6 read-only demo cannot mutate its tenant', () => as('authenticated', 105, {}, async () => {
+    await assert.rejects(db.query("update businesses set name='Forged demo write' where id=$1",[id(1)]), {code:'42501'});
+  }));
+  await check('A6 ordinary operator retains the Storage mutation path', () => as('authenticated', 101, {}, async () => {
+    assert.equal((await db.query("insert into storage.objects(bucket_id,name,owner) values ('guide-photos','fixture.jpg',$1)",[id(101)])).rowCount, 1);
+  }));
+  await check('A6 read-only demo cannot mutate Storage', () => as('authenticated', 105, {}, async () => {
+    await assert.rejects(db.query("insert into storage.objects(bucket_id,name,owner) values ('guide-photos','forged.jpg',$1)",[id(105)]), {code:'42501'});
   }));
   await check('R10 operators cannot change platform billing fields', () => as('authenticated', 101, {}, async () => {
     await assert.rejects(db.query('update businesses set max_admin_seats=999 where id=$1',[id(1)]), {code:'42501'});
@@ -118,6 +131,18 @@ try {
   }
   await check('R08 scheduler migration leaves unrelated jobs unchanged', async () => {
     assert.deepEqual((await db.query('select schedule,command from cron.job where jobid=5')).rows[0], {schedule:'0 0 * * *',command:'select 42'});
+  });
+  await check('A6 demo date refresh is scheduled once with the constrained function', async () => {
+    const rows = (await db.query("select schedule,command from cron.job where jobname='refresh-claires-hiking-demo-daily'")).rows;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].schedule, '5 22 * * *');
+    assert.match(rows[0].command, /refresh_claires_hiking_demo_dates\(id\)/);
+  });
+  await check('A6 demo date refresh schedule is safe to reapply', async () => {
+    const unrelated = (await db.query("select schedule,command from cron.job where jobname='unrelated-fixture-job'")).rows[0];
+    await db.query(readFileSync('supabase/migrations/20260917090000_schedule_claires_demo_refresh.sql','utf8'));
+    assert.equal((await db.query("select * from cron.job where jobname='refresh-claires-hiking-demo-daily'")).rowCount, 1);
+    assert.deepEqual((await db.query("select schedule,command from cron.job where jobname='unrelated-fixture-job'")).rows[0], unrelated);
   });
   await check('scheduler timeout correction is safe to reapply', async () => {
     const before = (await db.query('select * from cron.job order by jobid')).rows;

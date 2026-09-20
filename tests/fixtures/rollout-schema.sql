@@ -6,6 +6,7 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
 end $$;
 create schema auth;
+create schema storage;
 create type public.whatsapp_bot_mode as enum ('OFF', 'ALWAYS_ON', 'OUTSIDE_HOURS');
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
@@ -18,6 +19,19 @@ $$;
 create function public.bt_request_header(p_name text) returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.headers', true), '')::jsonb ->> p_name, '')
 $$;
+
+-- Minimal local representation of Supabase Storage. Production Storage owns
+-- the real table; this fixture only needs the mutation boundary exercised by
+-- the read-only demo migration.
+create table storage.objects (
+  id uuid default gen_random_uuid() primary key,
+  bucket_id text not null,
+  name text not null,
+  owner uuid,
+  metadata jsonb default '{}'::jsonb not null
+);
+grant usage on schema storage to authenticated, service_role;
+grant select, insert, update, delete on storage.objects to authenticated, service_role;
 
 create table public.add_ons (
   id uuid default gen_random_uuid() not null,

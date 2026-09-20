@@ -1,0 +1,35 @@
+{
+  "updated_at_utc": "2026-09-20T06:52:15Z",
+  "candidate": "76d00f3157acb2c73159bef6b8d40a108a9e767d",
+  "authorized": {
+    "isolated_source_changes": true,
+    "local_tests_with_synthetic_data": true,
+    "production_mutation": false,
+    "deployment": false,
+    "real_messages": false,
+    "real_financial_operations": false,
+    "provider_account_changes": false,
+    "paid_resource_changes": false,
+    "production_or_paid_load": false,
+    "destructive_cleanup": false
+  },
+  "unresolved_product_decisions": [
+    {
+      "id": "REFUND_OPERATOR_POLICY",
+      "question": "May OPERATOR continue to initiate and complete refunds, as the current User Manual and refunds help page state?",
+      "impact": "Blocks SEC-03 authorization changes; current documentation conflicts with the older SECURITY_MODEL role table."
+    },
+    {
+      "id": "STANDARD_PLAN_EXISTING_CUSTOMERS",
+      "question": "Which existing subscriptions, prices, seat limits, and open setup fees may the 20260920090000 migration change?",
+      "impact": "Blocks application or modification of the pricing migration."
+    }
+  ],
+  "missing_external_approvals": [
+    "Named isolated staging environment and outbound guard",
+    "BT2000-LAUNCH-V2 workload, cost, dataset, and window",
+    "Genuine provider sandbox recipients and transaction budget",
+    "Restore rehearsal target",
+    "Production deployment and limited canary"
+  ]
+}
