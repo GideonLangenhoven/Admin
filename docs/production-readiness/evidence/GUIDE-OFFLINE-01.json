@@ -1,0 +1,63 @@
+{
+  "evidence_schema": "2.0",
+  "evidence_id": "GUIDE-OFFLINE-01-UNIT-20260920",
+  "task_or_gate": "GUIDE-OFFLINE-01/COR-05",
+  "status": "PASS_TASK_SCOPE",
+  "stage": "UNIT",
+  "source": {
+    "repository": "GideonLangenhoven/Admin",
+    "branch": "feature/launch-rollout-2026-09-20",
+    "base_commit": "ae6ce521b5500730f4798506305afa2781f8fd8d",
+    "commit": "2d6ce9826647a61bcd8f30c815b4a6b212c84df0",
+    "patch_sha256": "79dbe62a4727dfa65e953168dd5bf067775b89e1d88c4788d58abc0e7f0a7cee",
+    "lockfile_sha256": "03f462aa55fff63a71e5544a2c394395505cf1b14dfd826656819ba23d9cdbda"
+  },
+  "environment": {
+    "id": "local-isolated-worktree",
+    "production": false,
+    "synthetic_data": true,
+    "real_outbound_effects": false
+  },
+  "execution": {
+    "focused_command": "npm run test:unit -- --run tests/unit/guide-offline-queue.test.ts",
+    "full_unit_command": "npm run test:unit with booking symlinked to exported CI pin 460e58d952ad570c9036bc13118eec66a2591918",
+    "build_command": "NEXT_PUBLIC_SUPABASE_URL=https://fixture.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=fixture-anon-not-a-real-key npm run build",
+    "completed_at_utc": "2026-09-20T08:25:47Z"
+  },
+  "result": {
+    "assertions": [
+      "Original focused regression failed 12 of 12 tests on the uncorrected path.",
+      "Reviewer-discovered starvation regression failed before its correction.",
+      "Final focused regression passed 26 of 26 tests.",
+      "TypeScript, service-worker syntax, diff check, targeted lint, and production build passed.",
+      "Full unit suite passed 1126 tests, failed the same 3 companion UI-contract tests as baseline, and skipped 1."
+    ],
+    "failed_assertions": [
+      "Three pre-existing mobile-first companion-source contract assertions remain failed and block a fully green release suite."
+    ],
+    "skips": ["One existing unit test is skipped."],
+    "limitations": [
+      "Queue and API dependencies are mocked in this stage.",
+      "No genuine database, authenticated browser, provider, deployed, or production evidence is claimed.",
+      "Synthetic public Supabase build values prove compilation only."
+    ]
+  },
+  "artifacts": [
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-before.log","sha256":"506899860bd16839dc51424925b326132980a41fdcd86ee23f4dae971d6f5282","exit_code":1},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-starvation-before.log","sha256":"e513aff2812e1dbcd32616c2341f4addc3c1ae303e9320a1096f8ae9416dbdb9","exit_code":1},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-after-final.log","sha256":"4d05b0668f7372ff806114b0d51db493a2ea9a34a3c00441e2ece839197f0aac","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-tsc-final.log","sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-eslint-final.log","sha256":"98cfc2bb2672664d67c2e4ea9d56a53fced95267b10aaf0cbbc42ca9b45c91a4","exit_code":0,"notes":"Three pre-existing warnings, no new warning."},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-build-exact.log","sha256":"2268ddf073cb46e79a8a92f2243481c78dd19f5c3b627c71c7e4108f4870c4aa","exit_code":0},
+    {"path":"/private/tmp/bookingtours-readiness-evidence-76d00f3/guide-offline-full-unit-final.log","sha256":"f76ddf5581550bb4fe78519cbeb2a5d5890aea6cf4e4b87391f244f8de5ca3ef","exit_code":1,"notes":"1126 pass, 3 unchanged companion UI-contract failures, 1 skip."}
+  ],
+  "independent_review": {
+    "requested_reviewer_model": "gpt-6-astra",
+    "requested_effort": "high",
+    "observed_runtime": null,
+    "disposition": "APPROVE_TASK",
+    "limitations": "Reviewer runtime metadata was not exposed."
+  },
+  "redaction_confirmed": true,
+  "invalidated_by": []
+}

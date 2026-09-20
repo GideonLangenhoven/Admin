@@ -1,9 +1,9 @@
 {
   "task_id": "GUIDE-OFFLINE-01",
   "backlog_ids": ["COR-05"],
-  "status": "IN_PROGRESS",
+  "status": "VERIFIED",
   "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
-  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"ae6ce521b5500730f4798506305afa2781f8fd8d"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"ae6ce521b5500730f4798506305afa2781f8fd8d","result_sha":"2d6ce9826647a61bcd8f30c815b4a6b212c84df0"},
   "objective": "Keep offline guide check-ins recoverable and account/tenant-bound, surface terminal failures, and make the idempotent API converge after an interrupted booking update.",
   "owned_paths": [
     "public/guide/sw.js",
@@ -52,5 +52,7 @@
   ],
   "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
   "migration_order": [],
-  "rollback_strategy": "A source rollback leaves the separate guide-queue-v2 database intact but pauses its replay; use a reviewed forward correction to resume it. The legacy guide-queue database remains at version 1, so old open tabs are not blocked or forced through an incompatible version downgrade."
+  "rollback_strategy": "A source rollback leaves the separate guide-queue-v2 database intact but pauses its replay; use a reviewed forward correction to resume it. The legacy guide-queue database remains at version 1, so old open tabs are not blocked or forced through an incompatible version downgrade.",
+  "evidence": "../evidence/GUIDE-OFFLINE-01.json",
+  "independent_review": "../reviews/GUIDE-OFFLINE-01.md"
 }
