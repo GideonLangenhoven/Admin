@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 
 const nav = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: "/simple", label: "Simple view", icon: "ListChecks" },
   { href: DEMO_BOOKING_SITE_URL, label: "Booking Site", icon: "Globe", demoOnly: true, external: true },
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },

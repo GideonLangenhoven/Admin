@@ -16,11 +16,12 @@ import WaFailureWatcher from "./WaFailureWatcher";
 import HelpChat from "./HelpChat";
 import WelcomeChecklist from "./WelcomeChecklist";
 import DemoActionGuide from "./DemoActionGuide";
+import SimpleViewShell from "./SimpleViewShell";
 import { isSectionHidden } from "@/app/lib/operator-sections";
 import { DEMO_BOOKING_SITE_URL, isDemoPathVisible } from "@/app/lib/demo-guide";
 import {
   ArrowsLeftRight, Check, Circle, Star, GlobeSimple, WarningCircle,
-  SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
+  SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank, ListChecks,
   ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
   UsersThree, Clock, CaretDoubleLeft, CaretDoubleRight, CaretDown,
@@ -32,7 +33,7 @@ const iconMap: Record<string, PhosphorIcon> = {
   MessageSquareText: ChatText, Ticket, Receipt, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck,
   ArrowLeftRight: ArrowsLeftRight, Check, Circle, Users: UsersThree, Star, Globe: GlobeSimple, Warning: WarningCircle,
-  Clock,
+  Clock, ListChecks,
 };
 
 interface NavItem {
@@ -66,7 +67,7 @@ function isSuspendedAllowed(path: string) {
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
   { label: "Customer view", hrefs: [DEMO_BOOKING_SITE_URL] },
-  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
+  { label: "Operations", hrefs: ["/simple", "/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
   { label: "Customers", hrefs: ["/inbox", "/customers", "/refunds", "/vouchers", "/reviews", "/notifications"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
@@ -189,6 +190,10 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     return <main className="min-h-screen">{children}</main>;
   }
 
+  if (!readOnly && (pathname === "/simple" || pathname.startsWith("/simple/"))) {
+    return <SimpleViewShell>{children}</SimpleViewShell>;
+  }
+
   // The Guide app renders standalone (its own full-screen PWA shell) — no admin
   // sidebar/topbar. It still sits inside AuthGate so it keeps auth + business
   // context, but the chrome is entirely its own.
@@ -208,7 +213,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
   const visibleHrefs = visibleNav.map((n) => n.href);
-  const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
+  const mobilePrimaryHrefs = ["/", "/simple", "/new-booking", "/inbox"];
   const mobilePrimaryNav = mobilePrimaryHrefs
     .map((href) => visibleNav.find((item) => item.href === href))
     .filter(Boolean) as NavItem[];

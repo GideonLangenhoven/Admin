@@ -1,0 +1,108 @@
+{
+  "template_version": "2.1",
+  "task_id": "FIN-AUTH-01",
+  "status": "PROPOSED_WAITING_FOR_G0_AND_ROLE_MATRIX",
+  "routing": {
+    "implementation_model": "gpt-5.6-sol",
+    "implementation_effort": "max",
+    "observed_model": null,
+    "observed_effort": null,
+    "verification_evidence": null,
+    "independent_review_model": "gpt-6-astra",
+    "independent_review_effort": "high"
+  },
+  "source": {
+    "repository": "GideonLangenhoven/Admin",
+    "branch": "feature/launch-rollout-2026-09-20",
+    "review_baseline": "76d00f3157acb2c73159bef6b8d40a108a9e767d",
+    "execution_base_sha": null,
+    "candidate_sha_or_patch_hash": null,
+    "worktree": null
+  },
+  "objective": "Enforce the approved refund action policy before service elevation and derive batch audit ownership from validated authority/records.",
+  "dependencies": [
+    "G0 verified routing, source and isolated worktree",
+    "Verified non-production synthetic fixtures and outbound negative guards",
+    "Approved refund role/action/tenant matrix resolving conflicting OPERATOR and legacy ADMIN documentation"
+  ],
+  "role_policy_decision_reference": null,
+  "owned_paths": [
+    "supabase/functions/process-refund/index.ts",
+    "supabase/functions/batch-refund/index.ts"
+  ],
+  "owned_test_paths": [],
+  "read_dependencies": [
+    "supabase/functions/_shared/auth.ts",
+    "app/lib/api-auth.ts",
+    "app/lib/booking-actions.ts",
+    "app/refunds/page.tsx",
+    "docs/USER_MANUAL.md",
+    "docs/admin-help/refunds.md",
+    "docs/SECURITY_MODEL.md",
+    "docs/TECHNICAL_SPEC.md",
+    "Applicable refund callers, customer-choice flows and RLS/RPC migrations"
+  ],
+  "required_reads": [
+    "01_SOL_TAKEOVER.md",
+    "03_RELEASE_CONTRACT.md section A and all named clauses",
+    "04_REVALIDATION_BACKLOG.md",
+    "Complete relevant handlers and invoked authorization/persistence/provider boundaries"
+  ],
+  "contract_clauses": ["A1", "A2", "A3", "A4", "A5", "A6", "B4", "C3", "C6", "D2", "E1", "E2"],
+  "current_evidence": [
+    "Individual refund authorization accepts same-business active staff and uses a substring privileged-role match.",
+    "Batch already checks authentication, suspension/read-only and ordinary callers' booking ownership; it lacks an explicit refund action allowlist before service elevation.",
+    "Progress/completion audit upserts trust body.business_id and do not validate persistence results.",
+    "Docs disagree on OPERATOR refunds; current OPERATOR access alone is not proof of unauthorized behavior."
+  ],
+  "behavior_to_preserve": [
+    "Every refund role/action approved by the resolved matrix, including OPERATOR if approved and compatible legacy ADMIN behavior",
+    "Legitimate customer choices and explicitly constrained platform/service flows",
+    "Recorded-capture checks, transaction locks, durable reservations and stable operation/provider IDs",
+    "Original payment mode, amount, currency and pending/unknown state semantics",
+    "Read-only demo browsing with no real financial/message effects",
+    "Existing identities, tenant relationships and pending refunds"
+  ],
+  "forbidden_behavior": [
+    "Anonymous, suspended, demo, unknown-role or policy-denied financial effects",
+    "Foreign-tenant booking access or forged audit ownership",
+    "Service wrapper or RPC bypass of the original caller's approved authority",
+    "Refund replay to repair audit records or summaries"
+  ],
+  "failing_before_test": null,
+  "acceptance_tests": [
+    "Policy-denied callers cause zero provider calls and zero unauthorized DB effects",
+    "Every permitted own-tenant role passes single and batch positive cases",
+    "Forged business_id cannot redirect audit ownership; foreign bookings remain denied",
+    "Demo and suspended identities remain denied through direct and wrapped calls",
+    "Audit persistence failure is visible and never causes a refund resubmission",
+    "Existing pending operations retain stable references; results remain truthful",
+    "Before/after behavioral evidence and independent Astra/high review"
+  ],
+  "permissions": {
+    "source_write": "assigned isolated worktree only",
+    "production_mutation": false,
+    "real_messages": false,
+    "real_financial_operations": false,
+    "paid_resource_changes": false,
+    "destructive_actions": false
+  },
+  "test_environment": {
+    "verified_nonproduction": false,
+    "environment_id": null,
+    "synthetic_data_evidence": null,
+    "outbound_guard_evidence": null
+  },
+  "migration_order": [
+    "Prefer existing helpers/contracts. Record a revised packet before editing shared helpers or schema; resolve material policy/authority changes with the owner."
+  ],
+  "rollback_strategy": "Reviewed compatible source rollback or forward correction; no security downgrade, customer recreation, payment replay or database reset.",
+  "required_handoff": [
+    "Base/candidate SHA or patch hash, worktree and observed routing",
+    "Changed paths and root cause",
+    "Before/after commands, exits and artifact hashes",
+    "Positive/negative and existing-customer cases",
+    "Migration/rollback and customer impact",
+    "Independent review disposition and exact remaining blockers"
+  ]
+}

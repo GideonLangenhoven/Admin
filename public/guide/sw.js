@@ -49,6 +49,7 @@ function syncCheckIns() {
       chain = chain.then(function() {
         const headers = { 'Content-Type': 'application/json' };
         if (item.token) headers['Authorization'] = 'Bearer ' + item.token;
+        if (item.payload && item.payload.business_id) headers['x-admin-business-id'] = item.payload.business_id;
         return fetch('/api/guide/check-in', {
           method: 'POST',
           headers: headers,

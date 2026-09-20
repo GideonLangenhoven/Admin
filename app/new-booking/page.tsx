@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
+import { addDaysToDateKey, businessDayRange, isDateKey, safeSimpleReturn } from "../lib/simple-view";
 import AvailabilityCalendar from "../../components/AvailabilityCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { CaretDown, Check } from "@phosphor-icons/react";
@@ -89,9 +90,7 @@ function dateKey(iso: string | Date) {
 }
 
 function addDays(dateInput: string, days: number) {
-  const date = new Date(`${dateInput}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return dateKey(date);
+  return addDaysToDateKey(dateInput, days);
 }
 
 function formatDayLabel(dateInput: string) {
@@ -123,10 +122,7 @@ function isValidSAPhone(phone: string): boolean {
 }
 
 function dayRange(dateInput: string) {
-  const start = new Date(`${dateInput}T00:00:00`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { startIso: start.toISOString(), endIso: end.toISOString() };
+  return businessDayRange(dateInput, getAdminTimezone());
 }
 
 interface CustomDropdownProps {
@@ -263,6 +259,26 @@ export default function NewBookingPage() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [availableAddOns, setAvailableAddOns] = useState<AddOn[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
+  const [contextReady, setContextReady] = useState(false);
+  const [returnTo, setReturnTo] = useState("/bookings");
+  const prefillRef = useRef({ tourId: "", slotId: "" });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedDate = params.get("date");
+    const requestedTour = params.get("tour") || "";
+    const requestedSlot = params.get("slot") || "";
+    if (isDateKey(requestedDate)) {
+      setBookingDate(requestedDate);
+      setMatrixStartDate(requestedDate);
+    }
+    prefillRef.current = {
+      tourId: /^[0-9a-f-]{36}$/i.test(requestedTour) ? requestedTour : "",
+      slotId: /^[0-9a-f-]{36}$/i.test(requestedSlot) ? requestedSlot : "",
+    };
+    setReturnTo(safeSimpleReturn(params.get("returnTo"), "/bookings"));
+    setContextReady(true);
+  }, []);
 
   function formatSupabaseError(err: { message?: string; details?: string; hint?: string; code?: string } | null) {
     if (!err) return "Unknown error";
@@ -298,7 +314,11 @@ export default function NewBookingPage() {
     const rows = (data || []) as Tour[];
     console.log("[NEW_BOOKING] loadTours complete", { tourCount: rows.length });
     setTours(rows);
-    if (!selectedTourId && rows[0]?.id) setSelectedTourId(rows[0].id);
+    setSelectedTourId((current) => {
+      if (current) return current;
+      const requested = prefillRef.current.tourId;
+      return rows.some((tour) => tour.id === requested) ? requested : rows[0]?.id || "";
+    });
     setLoadingTours(false);
   }
 
@@ -338,10 +358,16 @@ export default function NewBookingPage() {
     console.log("[NEW_BOOKING] loadSlots complete", { slotCount: nextSlots.length });
     setSlots(nextSlots);
     setSelectedSlotId((current) => {
-      const desiredSlotId = pendingMatrixSelection?.day === bookingDate ? pendingMatrixSelection.slotId : current;
+      const requestedSlotId = prefillRef.current.slotId;
+      const desiredSlotId = pendingMatrixSelection?.day === bookingDate
+        ? pendingMatrixSelection.slotId
+        : requestedSlotId || current;
       if (desiredSlotId && nextSlots.some((slot) => slot.id === desiredSlotId)) return desiredSlotId;
       return current && nextSlots.some((slot) => slot.id === current) ? current : "";
     });
+    if (prefillRef.current.slotId && nextSlots.some((slot) => slot.id === prefillRef.current.slotId)) {
+      prefillRef.current.slotId = "";
+    }
     if (pendingMatrixSelection?.day === bookingDate) {
       setPendingMatrixSelection(null);
     }
@@ -356,15 +382,14 @@ export default function NewBookingPage() {
     }
 
     setLoadingAvailabilityPreview(true);
-    const start = new Date(`${matrixStartDate}T00:00:00`);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 5);
+    const { startIso } = businessDayRange(matrixStartDate, getAdminTimezone());
+    const { startIso: endIso } = businessDayRange(addDays(matrixStartDate, 5), getAdminTimezone());
 
     const data = await listAvailableSlots({
       businessId,
       tourId: selectedTourId,
-      startIso: start.toISOString(),
-      endIso: end.toISOString(),
+      startIso,
+      endIso,
     });
 
     setAvailabilityPreviewSlots((data || []) as AvailabilityPreviewSlot[]);
@@ -383,27 +408,30 @@ export default function NewBookingPage() {
   }
 
   useEffect(() => {
+    if (!contextReady) return;
     const t = setTimeout(() => {
       loadTours();
       loadBusinessSettings();
       loadAddOns();
     }, 0);
     return () => clearTimeout(t);
-  }, [businessId]);
+  }, [businessId, contextReady]);
 
   useEffect(() => {
+    if (!contextReady) return;
     const t = setTimeout(() => {
       loadSlots();
     }, 0);
     return () => clearTimeout(t);
-  }, [bookingDate, selectedTourId, businessId]);
+  }, [bookingDate, selectedTourId, businessId, contextReady]);
 
   useEffect(() => {
+    if (!contextReady) return;
     const t = setTimeout(() => {
       loadAvailabilityPreview();
     }, 0);
     return () => clearTimeout(t);
-  }, [matrixStartDate, selectedTourId, businessId]);
+  }, [matrixStartDate, selectedTourId, businessId, contextReady]);
 
   const selectedTour = useMemo(() => tours.find((t) => t.id === selectedTourId) || null, [tours, selectedTourId]);
   const selectedSlot = useMemo(() => slots.find((s) => s.id === selectedSlotId) || null, [slots, selectedSlotId]);
@@ -907,7 +935,7 @@ export default function NewBookingPage() {
         tone: "success",
         duration: 7000,
       });
-      router.push("/bookings");
+      router.push(returnTo);
 
       setCustomerName("");
       setMobile("");
@@ -933,9 +961,9 @@ export default function NewBookingPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div className="anim-fade-up">
-        <p className="ui-mono-label mb-2">Operations</p>
-        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>New Booking</h2>
-        <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Create manual bookings and send confirmation with payment link.</p>
+        <p className="ui-mono-label mb-2">{returnTo === "/bookings" ? "Operations" : "Simple view"}</p>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>{returnTo === "/bookings" ? "New Booking" : "Add walk-in"}</h2>
+        <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Create a booking and send its confirmation or payment link.</p>
       </div>
 
       <div className="ui-card anim-fade-up anim-d1 p-5">
@@ -1409,6 +1437,9 @@ export default function NewBookingPage() {
           className="ui-btn ui-btn-primary w-full !h-11 !px-5 disabled:opacity-50 sm:w-auto"
         >
           {submitting ? "Processing…" : `Create Booking · ${fmtCurrency(totalAmount)}`}
+        </button>
+        <button type="button" onClick={() => router.push(returnTo)} disabled={submitting} className="ui-btn ui-btn-ghost !h-11 !px-5 disabled:opacity-50">
+          Cancel
         </button>
       </div>
     </div>

@@ -98,6 +98,7 @@ interface Booking {
   phone: string;
   email: string;
   qty: number;
+  arrived_count: number;
   total_amount: number;
   voucher_amount_paid: number | null;
   status: string;
@@ -286,7 +287,10 @@ export default function Bookings() {
         case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
         case "refund":   result = await refundBookingAction(id); break;
         case "markpaid": result = await markPaidAction(id); break;
-        case "checkin":  result = await checkInAction(id); break;
+        case "checkin":  result = await checkInAction(id, businessId, {
+          expectedArrivedCount: bookingsById[id]?.arrived_count ?? null,
+          slotId: bookingsById[id]?.slot_id || null,
+        }); break;
       }
       setBulkProgress(prev =>
         prev?.map(e => e.id === id ? { ...e, status: result.ok ? "ok" : "error", error: result.error } : e) ?? null,
@@ -358,9 +362,18 @@ export default function Bookings() {
 
       // Batch related rows without exceeding request/response limits.
       const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
+      const arrivalsByBooking: Record<string, number> = {};
       const bookingIds = deduped.map((b: any) => b.id);
       for (let from = 0; from < bookingIds.length; from += 200) {
         const ids = bookingIds.slice(from, from + 200);
+        const { data: arrivalRows, error: arrivalError } = await supabase.from("bookings")
+          .select("id, qty, arrived_count, checked_in")
+          .eq("business_id", businessId)
+          .in("id", ids);
+        if (arrivalError) throw arrivalError;
+        for (const row of arrivalRows || []) {
+          arrivalsByBooking[row.id] = Math.min(row.qty || 0, Math.max(0, Number(row.arrived_count ?? (row.checked_in ? row.qty : 0))));
+        }
         const addOnRows = await fetchAllRows((start, end) => supabase.from("booking_add_ons")
           .select("booking_id, qty, add_ons(name)")
           .in("booking_id", ids).order("id").range(start, end));
@@ -404,6 +417,7 @@ export default function Bookings() {
       const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
         .map((b) => ({
           ...b,
+          arrived_count: arrivalsByBooking[b.id] || 0,
           tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
           slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
           add_ons: addOnsByBooking[b.id] || [],

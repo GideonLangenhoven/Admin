@@ -341,6 +341,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("demo");
         window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+      } else if (pathname === "/simple" || pathname.startsWith("/simple/")) {
+        // Simple view is entered deliberately from the full app. A restored
+        // authenticated session may keep a deep link, but a fresh sign-in
+        // always starts on the full dashboard.
+        window.location.replace("/");
       }
     } catch (err: any) {
       console.error("LOGIN_ERR", err);

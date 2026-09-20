@@ -15,7 +15,7 @@ import {
   Circle, SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
   ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
-  UsersThree, GlobeSimple, WarningCircle, DotsThree,
+  UsersThree, GlobeSimple, WarningCircle, DotsThree, ListChecks,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
@@ -23,13 +23,13 @@ const iconMap: Record<string, PhosphorIcon> = {
   LayoutDashboard: SquaresFour, ClipboardList: Clipboard, PlusSquare, CalendarRange: CalendarBlank, Landmark: Bank,
   MessageSquareText: ChatText, Ticket, Receipt, Camera, Megaphone,
   BadgeDollarSign: CurrencyCircleDollar, LineChart: ChartLine, Mail: Envelope, Settings: GearSix, Shield: ShieldCheck, Circle,
-  Users: UsersThree, Globe: GlobeSimple, Warning: WarningCircle, Check: Clipboard,
+  Users: UsersThree, Globe: GlobeSimple, Warning: WarningCircle, Check: Clipboard, ListChecks,
 };
 
 type NavItem = { href: string; label: string; icon: string; external?: boolean };
 
 const GROUPS = [
-  { label: "Operations", hrefs: ["/", "/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
+  { label: "Operations", hrefs: ["/", "/simple", "/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
   { label: "Customers", hrefs: ["/inbox", "/customers", "/refunds", "/vouchers", "/reviews", "/notifications"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },

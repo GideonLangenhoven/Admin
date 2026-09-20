@@ -12,6 +12,7 @@ type Booking = {
   customer_name: string;
   phone: string;
   qty: number;
+  arrived_count: number;
   checked_in: boolean;
   checked_in_at: string | null;
   waiver_status: string | null;
@@ -42,7 +43,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
     const { data } = await supabase
       .from("bookings")
-      .select("id, customer_name, phone, qty, custom_fields, checked_in, checked_in_at, waiver_status")
+      .select("id, customer_name, phone, qty, custom_fields, arrived_count, checked_in, checked_in_at, waiver_status")
       .eq("slot_id", slotId)
       .eq("business_id", businessId)
       .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
@@ -67,6 +68,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       customer_name: b.customer_name || "Guest",
       phone: b.phone || "",
       qty: b.qty || 1,
+      arrived_count: Math.min(b.qty || 1, Math.max(0, Number(b.arrived_count ?? (b.checked_in ? b.qty : 0)))),
       checked_in: !!b.checked_in,
       checked_in_at: b.checked_in_at || null,
       waiver_status: b.waiver_status || null,
@@ -77,12 +79,21 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
   }
 
   async function checkIn(bookingId: string) {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
     const clientEventId = crypto.randomUUID();
-    const payload = { booking_id: bookingId, slot_id: slotId, client_event_id: clientEventId };
+    const payload = {
+      booking_id: bookingId,
+      business_id: businessId,
+      slot_id: slotId,
+      arrived_count: null,
+      expected_arrived_count: booking.arrived_count,
+      client_event_id: clientEventId,
+    };
 
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: true, checked_in_at: new Date().toISOString() } : b));
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, arrived_count: b.qty, checked_in: true, checked_in_at: new Date().toISOString() } : b));
 
-    const revert = () => setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: false, checked_in_at: null } : b));
+    const revert = () => setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, arrived_count: booking.arrived_count, checked_in: booking.checked_in, checked_in_at: booking.checked_in_at } : b));
 
     if (!navigator.onLine) {
       const { data: { session } } = await supabase.auth.getSession();
@@ -108,6 +119,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-admin-business-id": businessId,
         },
         body: JSON.stringify(payload),
       });
@@ -126,9 +138,9 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     }
   }
 
-  const checkedCount = bookings.filter(b => b.checked_in).length;
+  const checkedCount = bookings.reduce((sum, b) => sum + b.arrived_count, 0);
   const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
-  const pct = bookings.length ? Math.round((checkedCount / bookings.length) * 100) : 0;
+  const pct = totalPax ? Math.round((checkedCount / totalPax) * 100) : 0;
 
   return (
     <div className="pt-5">
@@ -141,8 +153,8 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
               <p className="font-display text-[28px] font-semibold leading-none tabular-nums mt-0.5">{new Date(slotInfo.start_time).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="font-display text-[24px] font-semibold leading-none tabular-nums">{checkedCount}<span className="text-[16px]" style={{ color: "rgba(246,243,234,0.55)" }}>/{bookings.length}</span></p>
-              <p className="ui-mono-label mt-1" style={{ color: "rgba(246,243,234,0.75)" }}>checked in</p>
+              <p className="font-display text-[24px] font-semibold leading-none tabular-nums">{checkedCount}<span className="text-[16px]" style={{ color: "rgba(246,243,234,0.55)" }}>/{totalPax}</span></p>
+              <p className="ui-mono-label mt-1" style={{ color: "rgba(246,243,234,0.75)" }}>guests arrived</p>
             </div>
           </div>
           <div className="mt-3 h-2 rounded-full bg-white/15 overflow-hidden">
@@ -181,6 +193,9 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                 </div>
                 <div className="flex items-center gap-3 text-[12px] mt-1">
                   <span className="font-semibold ui-text-muted">{b.qty} guest{b.qty !== 1 ? "s" : ""}</span>
+                  <span className="font-semibold" style={{ color: b.arrived_count > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
+                    {b.arrived_count} of {b.qty} arrived
+                  </span>
                   {b.phone && (
                     <>
                       <a href={"tel:" + b.phone} className="inline-flex items-center gap-1 font-semibold" style={{ color: "var(--ck-ocean)" }}>
@@ -210,7 +225,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                 </div>
               ) : (
                 <button onClick={() => checkIn(b.id)} className="ui-btn ui-btn-primary shrink-0">
-                  Check in
+                  {b.arrived_count > 0 ? "Check in rest" : "Check in"}
                 </button>
               )}
             </div>

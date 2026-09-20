@@ -55,6 +55,73 @@ try {
     ($7,$8,$3,'platform@example.invalid','fixture','SUPER_ADMIN',false),
     ($9,$10,$3,'suspended@example.invalid','fixture','SUPER_ADMIN',true)`,
   [id(11),id(101),id(1),id(12),id(102),id(2),id(13),id(103),id(14),id(104)]);
+
+  // Shared partial-arrival contract: one conflict-checked absolute count, one
+  // audit row, and compatibility for old boolean writers and booking moves.
+  await db.query("insert into tours(id,business_id,name,base_price_per_person,default_capacity) values ($1,$2,'Arrival tour',100,10),($3,$4,'Foreign arrival tour',100,10)", [id(701),id(1),id(702),id(2)]);
+  await db.query("insert into slots(id,business_id,tour_id,start_time,capacity_total) values ($1,$2,$3,now()+interval '1 day',10),($4,$2,$3,now()+interval '2 days',10),($5,$6,$7,now()+interval '1 day',10)", [id(711),id(1),id(701),id(712),id(721),id(2),id(702)]);
+  await db.query("insert into bookings(id,business_id,tour_id,slot_id,customer_name,email,qty,unit_price,total_amount,status,waiver_status) values ($1,$2,$3,$4,'Arrival fixture','arrival@fixture.invalid',6,100,600,'PAID','SIGNED'),($5,$2,$3,$4,'Concurrent fixture','concurrent@fixture.invalid',6,100,600,'PAID','SIGNED')", [id(731),id(1),id(701),id(711),id(732)]);
+  const arrivalSql = "select record_booking_arrival($1,$2,$3,$4,$5,$6,$7,$8,$9) result";
+  const arrivalArgs = (booking, target, expected, event, business=id(1), slot=id(711)) => [booking,business,id(11),target,expected,event,'rollout-test',null,slot];
+
+  await check('partial arrivals progress 0 to 4 with an atomic audit row',()=>as('service_role',null,{},async()=>{
+    const result=(await db.query(arrivalSql,arrivalArgs(id(731),4,0,'arrival-1'))).rows[0].result;
+    assert.equal(result.ok,true); assert.equal(result.arrived_count,4); assert.equal(result.checked_in,false);
+    assert.deepEqual((await db.query('select arrived_count_before,arrived_count_after from slot_check_ins where booking_id=$1',[id(731)])).rows,[{arrived_count_before:0,arrived_count_after:4}]);
+  }));
+  // The prior check rolls back, so persist the state for the remaining checks.
+  await db.query(arrivalSql,arrivalArgs(id(731),4,0,'arrival-1'));
+  await check('arrival event replay is idempotent even when the retried target differs',()=>as('service_role',null,{},async()=>{
+    const result=(await db.query(arrivalSql,arrivalArgs(id(731),6,0,'arrival-1'))).rows[0].result;
+    assert.equal(result.ok,true); assert.equal(result.replay,true); assert.equal(result.arrived_count,4);
+    assert.equal((await db.query('select count(*)::int count from slot_check_ins where booking_id=$1',[id(731)])).rows[0].count,1);
+  }));
+  await check('stale arrival updates return canonical state without an audit event',()=>as('service_role',null,{},async()=>{
+    const result=(await db.query(arrivalSql,arrivalArgs(id(731),6,0,'arrival-stale'))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'STALE'); assert.equal(result.arrived_count,4);
+    assert.equal((await db.query("select count(*)::int count from slot_check_ins where client_event_id='arrival-stale'")).rows[0].count,0);
+  }));
+  await check('partial arrivals complete the group and derive the legacy flag',()=>as('service_role',null,{},async()=>{
+    const result=(await db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-2'))).rows[0].result;
+    assert.equal(result.ok,true); assert.equal(result.arrived_count,6); assert.equal(result.checked_in,true); assert(result.checked_in_at);
+  }));
+  await db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-2'));
+  await check('quantity growth preserves arrivals while a reduction below arrivals is rejected',()=>as('service_role',null,{},async()=>{
+    const grown=(await db.query('update bookings set qty=8 where id=$1 returning qty,arrived_count,checked_in,checked_in_at',[id(731)])).rows[0];
+    assert.deepEqual(grown,{qty:8,arrived_count:6,checked_in:false,checked_in_at:null});
+    await assert.rejects(db.query('update bookings set qty=5 where id=$1',[id(731)]),{code:'23514'});
+  }));
+  await check('legacy boolean writers still set and undo the whole current group',()=>as('service_role',null,{},async()=>{
+    assert.deepEqual((await db.query('update bookings set checked_in=false where id=$1 returning arrived_count,checked_in',[id(731)])).rows[0],{arrived_count:0,checked_in:false});
+    assert.deepEqual((await db.query('update bookings set checked_in=true where id=$1 returning arrived_count,checked_in',[id(731)])).rows[0],{arrived_count:6,checked_in:true});
+  }));
+  await check('moving a booking resets attendance for the new departure',()=>as('service_role',null,{},async()=>{
+    const moved=(await db.query('update bookings set slot_id=$1 where id=$2 returning slot_id,arrived_count,checked_in,checked_in_at',[id(712),id(731)])).rows[0];
+    assert.deepEqual(moved,{slot_id:id(712),arrived_count:0,checked_in:false,checked_in_at:null});
+  }));
+  await check('arrival RPC does not reveal or mutate a booking through a foreign tenant id',()=>as('service_role',null,{},async()=>{
+    const result=(await db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-foreign',id(2)))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'NOT_FOUND');
+  }));
+  for (const [role,user] of [['anon',null],['authenticated',101]]) {
+    await check(`${role} cannot invoke the service-only arrival RPC`,()=>as(role,user,{},async()=>{
+      await assert.rejects(db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-forged')),{code:'42501'});
+    }));
+  }
+  await check('concurrent absolute arrival updates cannot silently overwrite each other',async()=>{
+    const clients=[new pg.Client({...connection,database}),new pg.Client({...connection,database})];
+    try {
+      await Promise.all(clients.map(client=>client.connect().then(()=>client.query('set role service_role'))));
+      const results=await Promise.all([
+        clients[0].query(arrivalSql,arrivalArgs(id(732),4,0,'arrival-concurrent-a')),
+        clients[1].query(arrivalSql,arrivalArgs(id(732),5,0,'arrival-concurrent-b')),
+      ]);
+      const payloads=results.map(result=>result.rows[0].result);
+      assert.equal(payloads.filter(result=>result.ok).length,1);
+      assert.equal(payloads.filter(result=>result.code==='STALE').length,1);
+      assert.equal((await db.query('select count(*)::int count from slot_check_ins where booking_id=$1',[id(732)])).rows[0].count,1);
+    } finally { await Promise.all(clients.map(client=>client.end())); }
+  });
   await db.query("insert into reviews(id,business_id,booking_id,source,status,rating) values ($1,$2,$3,'NATIVE','APPROVED',5)", [id(31),id(2),id(71)]);
 
   for (const [user, foreign] of [[101,2],[102,1]]) {

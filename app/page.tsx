@@ -7,6 +7,8 @@ import { customerNotesTooltip } from "./lib/customer-notes";
 import { useBusinessContext } from "../components/BusinessContext";
 import { isPrivilegedRole } from "./lib/role-utils";
 import { isSectionHidden } from "./lib/operator-sections";
+import { setArrivedCountAction } from "./lib/booking-actions";
+import { bookingRealtimeFilter } from "./lib/bookings-realtime";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -138,6 +140,8 @@ interface ManifestBooking {
     customer_name: string;
     phone: string;
     qty: number;
+    slot_id: string;
+    arrived_count: number;
     total_amount: number;
     status: string;
     checked_in: boolean;
@@ -416,7 +420,7 @@ export default function Dashboard() {
         const result: SlotSummary[] = [];
         for (const [timeRaw, bookings] of groups) {
             const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
-            const checkedIn = bookings.filter(b => b.checked_in).reduce((s, b) => s + b.qty, 0);
+            const checkedIn = bookings.reduce((s, b) => s + b.arrived_count, 0);
             result.push({
                 time: timeRaw !== "unknown" ? fmtTime(timeRaw) : "—",
                 timeRaw,
@@ -457,7 +461,7 @@ export default function Dashboard() {
     useEffect(() => {
         if (!businessId) return;
         const ch = supabase.channel("dash-bookings-" + businessId)
-            .on("postgres_changes" as any, { event: "*", schema: "public", table: "bookings" }, () => load())
+            .on("postgres_changes" as any, { event: "*", schema: "public", table: "bookings", filter: bookingRealtimeFilter(businessId) }, () => load())
             .subscribe();
         return () => { supabase.removeChannel(ch); };
     }, [businessId]);
@@ -480,7 +484,7 @@ export default function Dashboard() {
             // (slot reservations that never got paid for) and CANCELLED bookings
             // were inflating "Today's Pax" by ~50% on busy days.
             const { data: bks } = await supabase.from("bookings")
-                .select("id, customer_name, phone, qty, total_amount, status, checked_in, custom_fields, slots(start_time), tours(name)")
+                .select("id, customer_name, phone, qty, total_amount, status, slot_id, arrived_count, checked_in, custom_fields, slots(start_time), tours(name)")
                 .eq("business_id", businessId)
                 .in("status", ["PAID", "CONFIRMED", "COMPLETED", "PENDING"])
                 .in("slot_id", slotIds)
@@ -499,6 +503,7 @@ export default function Dashboard() {
             }
             return (bks || []).map((b: any) => ({
                 ...b,
+                arrived_count: Math.min(b.qty || 0, Math.max(0, Number(b.arrived_count ?? (b.checked_in ? b.qty : 0)))),
                 tours: Array.isArray(b.tours) ? b.tours[0] : b.tours,
                 slots: Array.isArray(b.slots) ? b.slots[0] : b.slots,
                 add_ons: addOnsByBooking[b.id] || [],
@@ -592,38 +597,42 @@ export default function Dashboard() {
         setLoading(false);
     }
 
-    async function toggleCheckIn(bookingId: string, currentValue: boolean) {
-        const newValue = !currentValue;
+    async function toggleCheckIn(booking: ManifestBooking) {
+        const targetCount = booking.checked_in ? 0 : booking.qty;
+        const newValue = targetCount === booking.qty;
         // Optimistic update
         setManifest(prev => prev.map(b =>
-            b.id === bookingId
-                ? { ...b, checked_in: newValue }
+            b.id === booking.id
+                ? { ...b, arrived_count: targetCount, checked_in: newValue }
                 : b
         ));
         setTomorrowManifest(prev => prev.map(b =>
-            b.id === bookingId
-                ? { ...b, checked_in: newValue }
+            b.id === booking.id
+                ? { ...b, arrived_count: targetCount, checked_in: newValue }
                 : b
         ));
-        const { error } = await supabase
-            .from("bookings")
-            .update({
-                checked_in: newValue,
-                checked_in_at: newValue ? new Date().toISOString() : null,
-            })
-            .eq("id", bookingId);
-        if (error) {
+        const result = await setArrivedCountAction({
+            bookingId: booking.id,
+            businessId,
+            arrivedCount: targetCount,
+            expectedArrivedCount: booking.arrived_count,
+            slotId: booking.slot_id,
+            source: "dashboard",
+        });
+        if (!result.ok) {
             // Revert on error
             setManifest(prev => prev.map(b =>
-                b.id === bookingId
-                    ? { ...b, checked_in: currentValue }
+                b.id === booking.id
+                    ? { ...b, arrived_count: booking.arrived_count, checked_in: booking.checked_in }
                     : b
             ));
             setTomorrowManifest(prev => prev.map(b =>
-                b.id === bookingId
-                    ? { ...b, checked_in: currentValue }
+                b.id === booking.id
+                    ? { ...b, arrived_count: booking.arrived_count, checked_in: booking.checked_in }
                     : b
             ));
+            notify({ title: "Check-in not saved", message: result.error || "Refresh and try again.", tone: "error" });
+            if (result.data?.code === "STALE" || result.data?.code === "STALE_SLOT") load();
         }
     }
 
@@ -905,7 +914,7 @@ export default function Dashboard() {
                                         <td className="px-5 py-3">
                                             <div className="flex items-center justify-end">
                                                 <span className="ui-status ui-pill-neutral">
-                                                    {activeManifest.filter(b => b.checked_in).reduce((s, b) => s + b.qty, 0)}/{manifestDate === "TODAY" ? todayPax : tomorrowPax}
+                                                    {activeManifest.reduce((s, b) => s + b.arrived_count, 0)}/{manifestDate === "TODAY" ? todayPax : tomorrowPax}
                                                 </span>
                                             </div>
                                         </td>
@@ -974,9 +983,9 @@ export default function Dashboard() {
                                             <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
                                                 type="button"
                                                 role="checkbox"
-                                                aria-checked={b.checked_in}
-                                                aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark ${b.customer_name} as present`}
-                                                onClick={() => toggleCheckIn(b.id, b.checked_in)}
+                                                aria-checked={b.checked_in ? true : b.arrived_count > 0 ? "mixed" : false}
+                                                aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark all of ${b.customer_name}'s group as present`}
+                                                onClick={() => toggleCheckIn(b)}
                                                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
                                                 style={b.checked_in
                                                     ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
@@ -989,7 +998,7 @@ export default function Dashboard() {
                                                 <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
                                             </div>
                                             <span className={`ui-status shrink-0 ${b.checked_in ? "ui-pill-success" : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent" : "ui-pill-amber"}`}>
-                                                {b.checked_in ? "Present" : b.status}
+                                                {b.checked_in ? "Present" : b.arrived_count > 0 ? `${b.arrived_count}/${b.qty} arrived` : b.status}
                                             </span>
                                         </div>
                                     ))}
@@ -1015,9 +1024,9 @@ export default function Dashboard() {
                                                     <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
                                                         type="button"
                                                         role="checkbox"
-                                                        aria-checked={b.checked_in}
-                                                        aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark ${b.customer_name} as present`}
-                                                        onClick={() => toggleCheckIn(b.id, b.checked_in)}
+                                                        aria-checked={b.checked_in ? true : b.arrived_count > 0 ? "mixed" : false}
+                                                        aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark all of ${b.customer_name}'s group as present`}
+                                                        onClick={() => toggleCheckIn(b)}
                                                         className="mx-auto flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 transition-all"
                                                         style={b.checked_in
                                                             ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
@@ -1058,7 +1067,7 @@ export default function Dashboard() {
                                                         : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent"
                                                         : "ui-pill-amber"
                                                     }`}>
-                                                        {b.checked_in ? "Present" : b.status}
+                                                        {b.checked_in ? "Present" : b.arrived_count > 0 ? `${b.arrived_count}/${b.qty} arrived` : b.status}
                                                     </span>
                                                 </td>
                                             </tr>

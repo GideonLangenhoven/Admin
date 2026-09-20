@@ -6,6 +6,9 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
 end $$;
 create schema auth;
+-- Minimal Supabase Storage surface used by the read-only account trigger.
+create schema storage;
+create table storage.objects (id uuid primary key default gen_random_uuid(), name text);
 create type public.whatsapp_bot_mode as enum ('OFF', 'ALWAYS_ON', 'OUTSIDE_HOURS');
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
