@@ -3,6 +3,15 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import {
+  clearGuideQueueAuthContext,
+  createGuideQueueItem,
+  currentGuideQueueAuthGeneration,
+  guideQueueAuthContext,
+  postGuideQueueAuthContext,
+  queueGuideCheckIn,
+  registerGuideCheckInSync,
+} from "@/app/lib/guide-offline";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
 import { Check } from "@phosphor-icons/react";
@@ -77,28 +86,35 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
   }
 
   async function checkIn(bookingId: string) {
+    const authGeneration = currentGuideQueueAuthGeneration();
     const clientEventId = crypto.randomUUID();
     const payload = { booking_id: bookingId, slot_id: slotId, client_event_id: clientEventId };
 
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: true, checked_in_at: new Date().toISOString() } : b));
 
     const revert = () => setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checked_in: false, checked_in_at: null } : b));
-
-    if (!navigator.onLine) {
-      const { data: { session } } = await supabase.auth.getSession();
-      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime(), token: session?.access_token || null });
-      if ("serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        try { await (reg as any).sync?.register("sync-check-ins"); } catch (_) {}
-      }
+    const { data: { session } } = await supabase.auth.getSession();
+    const auth = guideQueueAuthContext(session, businessId);
+    if (!auth) {
+      await clearGuideQueueAuthContext(authGeneration);
+      revert();
+      notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
       return;
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || null;
-    if (!token) {
-      revert();
-      notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
+    const queueForRetry = async () => {
+      try {
+        await queueGuideCheckIn(createGuideQueueItem(payload, auth));
+        await postGuideQueueAuthContext(auth, authGeneration);
+        await registerGuideCheckInSync();
+      } catch {
+        revert();
+        notify({ tone: "error", message: "Check-in could not be saved offline. Please reconnect and try again." });
+      }
+    };
+
+    if (!navigator.onLine) {
+      await queueForRetry();
       return;
     }
 
@@ -107,22 +123,24 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${auth.accessToken}`,
+          "x-admin-business-id": auth.businessId,
         },
         body: JSON.stringify(payload),
       });
       if (!r.ok) {
-        // Auth/validation failures are not retryable — revert and surface, never queue.
+        if ([408, 425, 429].includes(r.status)) throw new Error("retryable_client_error");
         if (r.status >= 400 && r.status < 500) {
           revert();
+          if (r.status === 401) await clearGuideQueueAuthContext(authGeneration);
           notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in. Please sign in again." : "Check-in was rejected. Please refresh and try again." });
           return;
         }
         throw new Error("server_error");
       }
-    } catch (_) {
+    } catch {
       // True network/offline or server (5xx) failure — queue for background sync.
-      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime(), token });
+      await queueForRetry();
     }
   }
 
@@ -227,18 +245,4 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       )}
     </div>
   );
-}
-
-async function queueLocally(item: { id: string; payload: any; queuedAt: number; token?: string | null }) {
-  return new Promise<void>((resolve, reject) => {
-    const req = indexedDB.open("guide-queue", 1);
-    req.onupgradeneeded = () => req.result.createObjectStore("check-ins", { keyPath: "id" });
-    req.onsuccess = () => {
-      const tx = req.result.transaction("check-ins", "readwrite");
-      tx.objectStore("check-ins").put(item);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e);
-    };
-    req.onerror = (e) => reject(e);
-  });
 }

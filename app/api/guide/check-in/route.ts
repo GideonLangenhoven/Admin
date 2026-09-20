@@ -22,14 +22,18 @@ export async function POST(req: NextRequest) {
   const db = adminClient();
 
   const { data: bk } = await db.from("bookings")
-    .select("id, business_id, slot_id")
+    .select("id, business_id, slot_id, checked_in, checked_in_at")
     .eq("id", booking_id)
     .maybeSingle();
 
   if (!bk || bk.business_id !== caller.business_id) {
     return NextResponse.json({ error: "Booking not found" }, { status: 403 });
   }
+  if (slot_id && slot_id !== bk.slot_id) {
+    return NextResponse.json({ error: "slot_id does not match booking" }, { status: 400 });
+  }
 
+  const checkedInAt = new Date().toISOString();
   const { error: insertErr } = await db.from("slot_check_ins").insert({
     booking_id,
     slot_id: slot_id || bk.slot_id,
@@ -37,20 +41,40 @@ export async function POST(req: NextRequest) {
     actor_admin_id: caller.id,
     client_event_id: client_event_id || null,
     notes: notes || null,
-    checked_in_at: new Date().toISOString(),
+    checked_in_at: checkedInAt,
   });
 
-  if (insertErr && insertErr.code === "23505") {
-    return NextResponse.json({ ok: true, replay: true });
-  }
-  if (insertErr) {
+  const replay = !!(insertErr && insertErr.code === "23505" && client_event_id);
+  if (insertErr && !replay) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
-  await db.from("bookings").update({
-    checked_in: true,
-    checked_in_at: new Date().toISOString(),
-  }).eq("id", booking_id);
+  if (bk.checked_in && bk.checked_in_at) {
+    return NextResponse.json({ ok: true, ...(replay ? { replay: true } : { already_checked_in: true }) });
+  }
 
-  return NextResponse.json({ ok: true });
+  let eventCheckedInAt = checkedInAt;
+  if (replay) {
+    const { data: existingEvent, error: eventError } = await db.from("slot_check_ins")
+      .select("checked_in_at")
+      .eq("booking_id", booking_id)
+      .eq("business_id", caller.business_id)
+      .eq("client_event_id", client_event_id)
+      .maybeSingle();
+    if (eventError || !existingEvent?.checked_in_at) {
+      return NextResponse.json({ error: "Existing check-in event could not be verified" }, { status: 500 });
+    }
+    eventCheckedInAt = existingEvent.checked_in_at;
+  }
+
+  const { error: updateErr } = await db.from("bookings").update({
+    checked_in: true,
+    checked_in_at: eventCheckedInAt,
+  }).eq("id", booking_id).eq("business_id", caller.business_id);
+
+  if (updateErr) {
+    return NextResponse.json({ error: "Check-in state is pending retry" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, ...(replay ? { replay: true } : {}) });
 }

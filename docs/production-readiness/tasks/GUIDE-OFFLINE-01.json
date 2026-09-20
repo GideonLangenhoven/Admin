@@ -1,0 +1,56 @@
+{
+  "task_id": "GUIDE-OFFLINE-01",
+  "backlog_ids": ["COR-05"],
+  "status": "IN_PROGRESS",
+  "routing": {"requested_model":"gpt-5.6-sol","requested_effort":"max","observed_model":"gpt-5.6-sol","observed_effort":"max"},
+  "source": {"repository":"GideonLangenhoven/Admin","branch":"feature/launch-rollout-2026-09-20","execution_base_sha":"ae6ce521b5500730f4798506305afa2781f8fd8d"},
+  "objective": "Keep offline guide check-ins recoverable and account/tenant-bound, surface terminal failures, and make the idempotent API converge after an interrupted booking update.",
+  "owned_paths": [
+    "public/guide/sw.js",
+    "app/guide/slot/[slotId]/page.tsx",
+    "app/api/guide/check-in/route.ts",
+    "app/lib/guide-offline.ts",
+    "components/GuideServiceWorker.tsx",
+    "components/AuthGate.tsx",
+    "tests/unit/guide-offline-queue.test.ts"
+  ],
+  "read_dependencies": ["app/lib/api-auth.ts","components/BusinessContext.tsx","supabase/migrations/20260504170000_guide_pwa.sql"],
+  "contract_clauses": ["A1","A2","A4","A5","A6","C5","C6","D5","E1"],
+  "current_evidence": [
+    "The service worker deletes every 4xx response, including 401 and 429.",
+    "Queued records contain a stale bearer token but no user or tenant binding.",
+    "Online network/5xx fallback queues work without registering background sync.",
+    "The API returns success for a duplicate event without retrying a prior failed booking update, and ignores booking update errors."
+  ],
+  "behavior_to_preserve": [
+    "Active own-tenant staff can check in guests online and offline.",
+    "Stable client_event_id prevents duplicate check-in records.",
+    "Read-only demo and foreign-tenant callers remain denied by existing server boundaries.",
+    "Existing queued work is retained; legacy unbound work is quarantined rather than silently replayed or deleted."
+  ],
+  "forbidden_behavior": [
+    "Deleting recoverable 401, 429, network, or 5xx work",
+    "Replaying one account or tenant's queued work under another active context",
+    "Persisting a bearer token on each new queue item",
+    "Treating a failed booking-state update as a completed check-in",
+    "Silently deleting terminal failures"
+  ],
+  "failing_before_test": "npm run test:unit -- --run tests/unit/guide-offline-queue.test.ts",
+  "acceptance_tests": [
+    "200 deletes exactly the completed item",
+    "401 is retained, marked for reauthentication, and current auth is cleared",
+    "429/network/5xx are retained and cause retryable sync failure",
+    "Other terminal 4xx are retained with a durable failed state and visible status",
+    "Owner/tenant mismatch and legacy unbound items cause no fetch and remain quarantined",
+    "Matching work uses the current bound token and tenant header, not a queued stale token",
+    "API retries booking update after a duplicate client event and returns 5xx while convergence is incomplete",
+    "Online/offline authorized positive paths remain available"
+  ],
+  "existing_customer_cases": [
+    "Legacy v1 queued records remain stored and are never silently replayed under a new account.",
+    "Existing check-in client_event_id values remain the idempotency key."
+  ],
+  "permissions": {"source_write":"isolated worktree only","production_mutation":false,"real_messages":false,"real_financial_operations":false,"paid_resource_changes":false},
+  "migration_order": [],
+  "rollback_strategy": "A source rollback leaves the separate guide-queue-v2 database intact but pauses its replay; use a reviewed forward correction to resume it. The legacy guide-queue database remains at version 1, so old open tabs are not blocked or forced through an incompatible version downgrade."
+}

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
+import { clearGuideQueueAuthContext } from "../app/lib/guide-offline";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 import { fetchAllRows } from "../supabase/functions/_shared/pagination";
@@ -207,6 +208,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   async function clearSession() {
     contextRequestRef.current++;
+    try { await clearGuideQueueAuthContext(); } catch { /* local sign-out must still proceed */ }
     try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
     localStorage.removeItem("ck_admin_auth");
     localStorage.removeItem("ck_admin_role");
@@ -370,6 +372,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
     const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
+    clearGuideQueueAuthContext().catch(() => {});
     contextRequestRef.current++;
     localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
     localStorage.setItem("ck_admin_business_id", nextBusinessId);

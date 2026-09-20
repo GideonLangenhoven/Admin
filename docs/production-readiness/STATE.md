@@ -28,5 +28,5 @@ Verdict: `IN_PROGRESS`
 - Refund work is locked pending an owner policy decision: current User Manual/help say `OPERATOR` may refund; the older security model says `ADMIN+`. Batch auth and tenant prevalidation already exist and must not be misreported as absent.
 - Pricing migration `20260920090000_enforce_standard_plan_pricing.sql` is locked pending the approved scope and actual migration ledger.
 - Completed: `G0-TEST-HARNESS-01`, independently approved for its narrow disposable-harness scope. Patch SHA-256 `d6b1d227bc28012d5fd4f9c6e48679e31dc15c0527ca2ba128346a23256698ff`.
-- Active writer lock: `COR-05` offline guide queue only. Next: create the bounded task packet and failing behavioral service-worker tests before implementation.
+- Active writer lock: `GUIDE-OFFLINE-01` (`COR-05`) paths listed in its bounded task packet. Next: establish failing service-worker/API behavioral tests, then implement the minimal queue and convergence correction.
 - No task is release-verified. No load, soak, restore, genuine-provider, deployment, monitoring receipt, or canary evidence exists.
