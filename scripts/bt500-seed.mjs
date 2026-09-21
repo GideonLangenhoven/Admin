@@ -38,12 +38,38 @@ async function issueSessions(identities) {
     const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email: identity.email });
     if (linkError || !link.properties?.hashed_token) throw linkError || new Error("missing token hash");
     const { data, error } = await auth.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: "magiclink" });
-    if (error || !data.session?.access_token) throw error || new Error("missing access token");
+    if (error || !data.session?.access_token || !data.session.refresh_token || !data.session.expires_at) throw error || new Error("missing refreshable session");
     completed++;
     if (completed % 50 === 0) console.log(JSON.stringify({ status: "SESSION_PROGRESS", completed }));
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return { user_id: identity.user_id, business_id: identity.business.id, access_token: data.session.access_token };
+    return {
+      staff_index: i,
+      user_id: identity.user_id,
+      business_id: identity.business.id,
+      booking_id: identity.booking.id,
+      slot_id: identity.booking.slot_id,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at
+    };
   }));
+}
+
+function assignWriteBookings(identities, bookings) {
+  const byBusiness = new Map();
+  for (const booking of bookings) byBusiness.set(booking.business_id, [...(byBusiness.get(booking.business_id) || []), booking]);
+  for (const rows of byBusiness.values()) rows.sort((a, b) => a.email.localeCompare(b.email));
+  const next = new Map();
+  return identities.map(identity => {
+    const index = next.get(identity.business.id) || 0;
+    const booking = byBusiness.get(identity.business.id)?.[index];
+    if (!booking) throw new Error(`missing owned write booking for ${identity.email}`);
+    if (booking.qty < 2 || booking.waiver_status !== "SIGNED" || !["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)) {
+      throw new Error(`write booking for ${identity.email} is not arrival-eligible; run the guarded BT500 reseed first`);
+    }
+    next.set(identity.business.id, index + 1);
+    return { ...identity, booking };
+  });
 }
 
 async function saveCredentials(credentials) {
@@ -86,7 +112,10 @@ if (process.argv.includes("--sessions")) {
   const { data: rows, error } = await admin.from("admin_users").select("email,user_id,business_id").like("email", `${marker}-%@example.invalid`).order("email");
   fail("load marker users", error);
   if (rows.length !== 500) throw new Error(`expected 500 marker users, found ${rows.length}`);
-  const credentials = await issueSessions(rows.map(row => ({ email: row.email, user_id: row.user_id, business: { id: row.business_id } })));
+  const { data: bookings, error: bookingsError } = await admin.from("bookings").select("id,business_id,slot_id,email,qty,status,waiver_status").like("email", `${marker}-%@example.invalid`).order("email");
+  fail("load marker write bookings", bookingsError);
+  const identities = assignWriteBookings(rows.map(row => ({ email: row.email, user_id: row.user_id, business: { id: row.business_id } })), bookings);
+  const credentials = await issueSessions(identities);
   await saveCredentials(credentials);
   console.log(JSON.stringify({ status: "SESSIONS_COMPLETE", marker, users: credentials.length, credentials_file: output }));
   process.exit(0);
@@ -135,15 +164,22 @@ const bookingRows = businesses.flatMap((business, businessIndex) => Array.from({
   slot_id: slotsByBusiness.get(business.id)[bookingIndex % 4].id,
   customer_name: `BT500 Guest ${businessIndex + 1}-${bookingIndex + 1}`,
   email: `${marker}-${businessIndex + 1}-${bookingIndex + 1}@example.invalid`,
-  qty: 1,
+  qty: 2,
   unit_price: 500,
-  total_amount: 500,
-  status: "PENDING",
+  total_amount: 1000,
+  status: "CONFIRMED",
   source: "ADMIN",
-  waiver_status: "PENDING",
+  waiver_status: "SIGNED",
+  waiver_signed_at: new Date().toISOString(),
+  waiver_signed_name: "BT500 Synthetic Guest",
   created_at: new Date(Date.now() - bookingIndex * 60000).toISOString()
 })));
-for (const group of chunks(bookingRows, 500)) fail("insert bookings", (await admin.from("bookings").insert(group)).error);
+const insertedBookings = [];
+for (const group of chunks(bookingRows, 500)) {
+  const { data, error } = await admin.from("bookings").insert(group).select("id,business_id,slot_id,email,qty,status,waiver_status");
+  fail("insert bookings", error);
+  insertedBookings.push(...data);
+}
 
 const specs = Array.from({ length: 500 }, (_, i) => ({
   email: `${marker}-${String(i + 1).padStart(3, "0")}@example.invalid`,
@@ -167,6 +203,6 @@ for (const group of chunks(identities.map((identity, i) => ({
   onboarding_completed_at: new Date().toISOString()
 })), 100)) fail("upsert admin users", (await admin.from("admin_users").upsert(group, { onConflict: "email" })).error);
 
-const credentials = await issueSessions(identities);
+const credentials = await issueSessions(assignWriteBookings(identities, insertedBookings));
 await saveCredentials(credentials);
 console.log(JSON.stringify({ status: "SEED_COMPLETE", marker, businesses: businesses.length, users: credentials.length, slots: insertedSlots.length, bookings: bookingRows.length, credentials_file: output }));
