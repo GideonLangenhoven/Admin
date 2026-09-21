@@ -6,6 +6,7 @@
     "local_tests_with_synthetic_data": true,
     "bt500_shared_read_smoke": true,
     "bt500_marker_only_synthetic_mutation": true,
+    "current_prelaunch_project_synthetic_reset_and_testing": true,
     "production_mutation": false,
     "deployment_or_push": false,
     "real_messages": false,
@@ -45,11 +46,11 @@
     "Exact production deployment, migration, rollback and canary authorization"
   ],
   "latest_scope_steering": {
-    "request": "Fix the remaining local gaps and report what is complete.",
+    "request": "Use the current environment for pre-launch qualification because there are no real customers; its synthetic data may be overwritten without a separate staging environment.",
     "section5_status": "Local corrective implementation is committed; external acceptance and service-specific work remain.",
     "section6_status": "100-account local continuity passed; deployed role and provider gates remain.",
     "section7_status": "500-session authenticated read smoke passed; mixed load, spike and soak remain.",
-    "section8_status": "A concrete recovery and release packet is prepared; execution is awaiting external targets and approval.",
+    "section8_status": "The current environment is authorized for pre-launch testing. A separate target is still required only for the restore drill; live provider effects and public launch remain separately gated.",
     "section9_status": "Handoff passes with an IN_PROGRESS verdict."
   }
 }
