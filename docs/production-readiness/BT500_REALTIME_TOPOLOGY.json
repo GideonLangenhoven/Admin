@@ -1,7 +1,7 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
   "recorded_at_utc": "2026-09-21T12:54:38Z",
-  "status": "SOURCE_MAPPED_BROWSER_MEASUREMENT_OPEN",
+  "status": "SOURCE_SCOPE_APPROVED_BROWSER_MEASUREMENT_OPEN",
   "client_model": {
     "authenticated_browser_sessions": 500,
     "supabase_realtime_websockets": 500,
@@ -39,6 +39,6 @@
       "database Realtime authorization and resource use"
     ]
   },
-  "approval": false,
-  "blocking_reason": "The source footprint is mapped, but an exact-candidate browser measurement and final route mix are still required."
+  "approval": true,
+  "blocking_reason": "The source-derived scope is frozen. An exact-candidate browser measurement of that scope and its route mix is still required for qualification."
 }

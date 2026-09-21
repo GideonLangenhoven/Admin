@@ -49,7 +49,7 @@
   ],
   "missing_external_approvals": [
     "Exact candidate deployment and remote migration authorization",
-    "BT500 generator/application regions, metric definitions, Realtime topology and no-paid-scaling cost rule",
+    "BT500 deployed URLs, observed capacity denominators and provider-double runtime proof",
     "Separate restore target",
     "Exact production deployment, migration, rollback and canary authorization"
   ],

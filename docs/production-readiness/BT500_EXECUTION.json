@@ -3,7 +3,7 @@
   "status": "READY_AFTER_EXACT_DEPLOYMENT_AND_TOPOLOGY_FREEZE",
   "candidate_commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
   "candidate_tree": "765a79c3876c6e458974b6de374f359b5f7e7d91",
-  "candidate_worktree_clean": false,
+  "candidate_worktree_clean": true,
   "environment": {
     "classification": "user_authorized_prelaunch_no_customers",
     "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
@@ -26,8 +26,8 @@
     "reference": "user-session-2026-09-21-prelaunch-qualification",
     "approved_at": "2026-09-21T12:54:38Z",
     "workload_and_thresholds": true,
-    "metric_definitions": false,
-    "realtime_scope": false,
+    "metric_definitions": true,
+    "realtime_scope": true,
     "cost_environment_and_window": true
   },
   "outbound_controls": {
