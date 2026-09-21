@@ -1,0 +1,33 @@
+{
+  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "candidate_commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "status": "LOCAL_CORRECTIVE_IMPLEMENTATION_COMPLETE_EXTERNAL_ACCEPTANCE_OPEN",
+  "completed_local_workstreams": [
+    "OPERATOR refund authority and truthful single/bulk UI outcomes",
+    "durable guide offline queue, account-bound revocation and truthful sign-out",
+    "MFA enforcement for bank, WhatsApp and Yoco changes with audited SUPER_ADMIN assistance and recovery",
+    "new-subscriptions-only versioned pricing preservation",
+    "arrival auditing and direct-write privilege hardening",
+    "mobile Admin and storefront reconciliation",
+    "dependency remediation to zero npm audit findings",
+    "500-session read-smoke tooling and login architecture correction"
+  ],
+  "validation": {
+    "unit": "1324 pass, 0 fail, 1 skip",
+    "typescript": "pass",
+    "edge": "pass",
+    "database": "172 checks pass",
+    "browser": "4/4 pass",
+    "builds": "Admin and booking pass",
+    "npm_audit": "0 vulnerabilities"
+  },
+  "remaining": [
+    "Real Supabase Auth enrollment, challenge and assisted-recovery lifecycle in an isolated deployed environment",
+    "Genuine Yoco and WhatsApp sandbox journeys",
+    "Notification durability/fairness work tracked as NOTIFY-01",
+    "Candidate-specific CI and exact deployed artifact/schema/config equivalence",
+    "Fresh external acceptance for release-critical integrated behavior"
+  ],
+  "production_mutated": false,
+  "pushed_or_deployed": false
+}

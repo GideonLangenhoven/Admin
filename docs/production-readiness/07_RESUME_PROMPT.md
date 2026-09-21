@@ -1,5 +1,7 @@
 # Resume prompt — Sol/max
 
+> Current-session override (21 September 2026): start with [00_START_HERE.md](00_START_HERE.md) and [STATE.md](STATE.md). Their source, routing, resolved policy and evidence supersede historical values below. Customer-protection and release-qualification gates remain in force.
+
 Select `gpt-5.6-sol` / `max`, then paste:
 
 ```text

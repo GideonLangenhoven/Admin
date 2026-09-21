@@ -1,0 +1,66 @@
+{
+  "profile_id": "BT500-READ-SMOKE-V1",
+  "completed_at_utc": "2026-09-21T06:20:54Z",
+  "status": "PASS_READ_SMOKE_SINGLE_IP_AUTH_THROTTLE_OBSERVED",
+  "target": {
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "classification": "user-authorized shared project with no irreplaceable live data",
+    "before_and_after_counts": {"businesses":2,"admin_users":2,"tours":5,"bookings":50,"slots":34,"customers":50,"wa_messages":0}
+  },
+  "synthetic_seed": {
+    "marker": "bt500-20260921",
+    "businesses": 167,
+    "staff_identities": 500,
+    "tours": 167,
+    "slots": 668,
+    "bookings": 5010,
+    "existing_rows_deleted": 0,
+    "teardown_complete": true,
+    "seat_control": "Preserved the enforced maximum of three active staff per business; final business had two."
+  },
+  "auth": {
+    "burst_result": "The single-origin generator hit the configured per-IP boundary at request33.",
+    "session_preparation": "Temporarily set rate_limit_verify to800 and issued one session per second.",
+    "restored_before_load": true,
+    "verified_final_rate_limit_verify": 30,
+    "interpretation": "The read smoke used500 distinct authenticated users. The observed throttle did not test distributed user origins. Source correction AUTH-LOGIN-RATE-01 moves session minting from the shared app server to each browser; deployed distributed-origin proof remains open."
+  },
+  "run": {
+    "runner": "tests/stress/bt500-read-smoke.k6.js",
+    "maximum_concurrent_vus": 500,
+    "ramp": "0->100 in30s;100->250 in30s;250->500 in30s",
+    "steady_500_duration": "5m",
+    "ramp_down": "30s",
+    "completed_actions": 17356,
+    "completed_actions_per_second_overall_including_ramps": 40.583326,
+    "steady_action_target_per_second": 50,
+    "http_requests": 69424,
+    "checks": 52068,
+    "check_failures": 0,
+    "http_failure_rate": 0,
+    "dropped_iterations": 0,
+    "read_latency_ms": {"p95":415.21,"p99":1280,"max":3171.24},
+    "action_latency_ms": {"p95":559,"p99":1470,"max":3172},
+    "messages": 0,
+    "payments_or_refunds": 0,
+    "provider_calls": 0,
+    "writes_during_load": 0
+  },
+  "thresholds": {
+    "checks_rate_eq_1": "PASS",
+    "http_failure_rate_lt_0_001": "PASS",
+    "read_p95_lt_750_ms": "PASS",
+    "read_p99_lt_1500_ms": "PASS",
+    "action_p95_lt_1500_ms": "PASS",
+    "action_p99_lt_3000_ms": "PASS",
+    "dropped_iterations_eq_0": "PASS"
+  },
+  "evidence": {
+    "root": "/private/tmp/bookingtours-simple-view-evidence-1812677/resume-20260921/bt500-read-smoke",
+    "k6_log_sha256": "3aecbff287606cf5332de229c286717ea2f0c9b1c957a73361ec300f9eacb036",
+    "sessions_log_sha256": "66507187b2306b8d48b18052c9c99dec86959606497875f2082d51405db673f1",
+    "summary_sha256": "9b8965b41cc2f8d51a7045b381ad9aec3413720b433a2c21e0f8a89b8cf79c76",
+    "teardown_log_sha256": "ee3fbda8aef3a10edbe6c104b76c0c71471ddbf97900d5e576177fed2758441a"
+  },
+  "qualification_effect": "This passes the500-user authenticated read smoke only. Overall action rate was40.58/s including ramps; steady50/s was not independently tagged or certified. BT500-LAUNCH-V1 remains incomplete because representative dataset size, write/checkout/webhook/job mixes,60-minute target, double-rate spike, recovery, Realtime, providers and24-hour soak were not executed."
+}

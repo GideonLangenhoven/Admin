@@ -1,0 +1,55 @@
+{
+  "updated_at_utc": "2026-09-21T11:34:12Z",
+  "candidate": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "authorized": {
+    "isolated_source_changes": true,
+    "local_tests_with_synthetic_data": true,
+    "bt500_shared_read_smoke": true,
+    "bt500_marker_only_synthetic_mutation": true,
+    "production_mutation": false,
+    "deployment_or_push": false,
+    "real_messages": false,
+    "real_charges_or_refunds": false,
+    "provider_account_changes": false,
+    "paid_resource_changes": false,
+    "production_or_paid_load": false,
+    "destructive_existing_resource_operations": false
+  },
+  "resolved_product_decisions": [
+    {
+      "id": "REFUND_OPERATOR_POLICY",
+      "decision": "Active authorized OPERATOR staff retain own-tenant refund initiation and completion. Legacy ADMIN, MAIN_ADMIN and exact SUPER_ADMIN support remain."
+    },
+    {
+      "id": "SENSITIVE_ACTION_MFA_SCOPE",
+      "decision": "MFA is required for invoice bank-account changes and WhatsApp or Yoco linking. Ordinary booking work remains available while recovery is pending."
+    },
+    {
+      "id": "MFA_RECOVERY",
+      "decision": "Verified SUPER_ADMIN-assisted recovery. SUPER_ADMIN may change protected details on behalf of an operator using the SUPER_ADMIN own MFA, an explicit target business and durable attribution."
+    },
+    {
+      "id": "STANDARD_PLAN_EXISTING_CUSTOMERS",
+      "decision": "Pricing changes apply to new subscriptions only; preserve existing subscriptions and open billing lines."
+    },
+    {
+      "id": "BT500_TARGET",
+      "decision": "Section 7 uses 500 authenticated sessions. Replaceable synthetic data is permitted; live messages, payments, refunds and provider changes remain blocked."
+    }
+  ],
+  "missing_external_approvals": [
+    "Named isolated staging environment and identities",
+    "Approved Yoco and WhatsApp sandbox accounts, recipients and transaction budget",
+    "BT500 mixed-load regions, cost ceiling, window, metrics, spike and soak",
+    "Separate restore target and monitoring receiver",
+    "Exact production deployment, migration, rollback and canary authorization"
+  ],
+  "latest_scope_steering": {
+    "request": "Fix the remaining local gaps and report what is complete.",
+    "section5_status": "Local corrective implementation is committed; external acceptance and service-specific work remain.",
+    "section6_status": "100-account local continuity passed; deployed role and provider gates remain.",
+    "section7_status": "500-session authenticated read smoke passed; mixed load, spike and soak remain.",
+    "section8_status": "A concrete recovery and release packet is prepared; execution is awaiting external targets and approval.",
+    "section9_status": "Handoff passes with an IN_PROGRESS verdict."
+  }
+}

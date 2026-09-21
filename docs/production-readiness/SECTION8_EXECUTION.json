@@ -1,0 +1,37 @@
+{
+  "profile_id": "BT-RELEASE-RECOVERY-V1",
+  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "status": "READY_FOR_EXTERNAL_INPUT_AND_APPROVAL",
+  "candidates": {
+    "admin": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+    "booking": "2ff1d82"
+  },
+  "required_inputs": {
+    "restore_target": null,
+    "monitoring_receiver": null,
+    "deployment_target": null,
+    "window": null,
+    "cost_ceiling_zar": null,
+    "approval_reference": null
+  },
+  "migration_order": [
+    "20260920090000_enforce_standard_plan_pricing.sql",
+    "20260920100000_partial_booking_arrivals.sql",
+    "20260921120000_mfa_sensitive_business_columns.sql"
+  ],
+  "canary_steps": [
+    5,
+    25,
+    100,
+    250,
+    500
+  ],
+  "executed": {
+    "restore": false,
+    "alert_drill": false,
+    "deployment": false,
+    "migration": false,
+    "canary": false
+  },
+  "production_mutated": false
+}

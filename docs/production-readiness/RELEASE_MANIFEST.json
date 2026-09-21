@@ -1,0 +1,52 @@
+{
+  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "verdict": "IN_PROGRESS",
+  "admin_candidate": {
+    "repository": "capekayak",
+    "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
+    "commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+    "tree": "bcf595ebf0090da175882e038a92ccba66009faa",
+    "worktree": "/private/tmp/bookingtours-simple-view-1812677",
+    "package_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534"
+  },
+  "booking_candidate": {
+    "repository": "capekayak-booking",
+    "branch": "codex/bookingtours-mobile-readiness-2026-09-21",
+    "commit": "2ff1d82",
+    "base": "460e58d952ad570c9036bc13118eec66a2591918",
+    "worktree": "/private/tmp/bookingtours-booking-mobile-460e58d"
+  },
+  "validation": {
+    "unit": "1324 pass, 1 skip",
+    "typescript": "pass",
+    "edge": "pass",
+    "database": "172 checks pass",
+    "simple_view_browser": "4/4 pass",
+    "admin_build": "pass, 91 routes",
+    "booking_build": "pass",
+    "booking_check_ways": "pass",
+    "npm_audit": "0 vulnerabilities"
+  },
+  "database_changes": [
+    "20260920090000_enforce_standard_plan_pricing.sql",
+    "20260920100000_partial_booking_arrivals.sql",
+    "20260921120000_mfa_sensitive_business_columns.sql"
+  ],
+  "production_equivalence_verified": false,
+  "release_actions": {
+    "pushed": false,
+    "deployed": false,
+    "migration_applied": false,
+    "provider_called": false,
+    "production_mutated": false,
+    "restore_run": false,
+    "canary_started": false
+  },
+  "active_sections": [
+    5,
+    6,
+    7,
+    8,
+    9
+  ]
+}

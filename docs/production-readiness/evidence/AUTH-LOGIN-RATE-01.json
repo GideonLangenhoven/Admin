@@ -1,0 +1,24 @@
+{
+  "id": "AUTH-LOGIN-RATE-01",
+  "recorded_at_utc": "2026-09-21T06:35:51Z",
+  "status": "SOURCE_FIXED_NOT_DEPLOYED_OR_LOAD_RETESTED",
+  "finding": "The browser posted credentials to /api/admin/login and that shared app server called Supabase signInWithPassword. Supabase therefore applied its per-IP token bucket to the shared server egress and rejected the33rd burst request.",
+  "correction": [
+    "The server still verifies the legacy password, creates or links the Auth user when required, and returns only auth_ready plus authorized admin context.",
+    "The browser now calls Supabase signInWithPassword directly inside the existing account-transition lock, so normal login and refresh traffic uses the user's network IP.",
+    "A429 is reported as a network throttle and does not increment the bad-password lockout counter.",
+    "No permanent Supabase rate-limit increase was made; rate_limit_verify remains30."
+  ],
+  "verification": {
+    "focused_tests": "135/135 pass",
+    "typescript": "PASS",
+    "diff_check": "PASS",
+    "source_hashes_sha256": {
+      "app/api/admin/login/route.ts": "0cebe9650e9b923c747df5905f7b3ab60019fdc0e6327251e6f1722a61c95413",
+      "components/AuthGate.tsx": "2257c045da3771ec6dedf75c3bdc242490e8cca8c444c6872c547c86d9cd1d2c",
+      "tests/unit/admin-account-boundaries.test.ts": "8b1dcdb57a12a58851851a925d83d54e54cf84f4f94dc7938da172e8a9b9f021",
+      "tests/unit/guide-offline-queue.test.ts": "d15eb0872b112ea72da390fbc9315b08e73345b3bcbf80390712247379b230d7"
+    }
+  },
+  "remaining_proof": "Deploy an accepted candidate and run a distributed-origin login test. A legitimate shared network can still reach Supabase's intentional per-IP limit and should receive the new retry message."
+}

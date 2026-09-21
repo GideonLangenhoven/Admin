@@ -1,0 +1,91 @@
+{
+  "profile_id": "BT-HANDOFF-6-7-8-9-2026-09-21",
+  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "handoff_validation": "PASS",
+  "verdict": "IN_PROGRESS",
+  "candidate": {
+    "admin_commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+    "admin_tree": "bcf595ebf0090da175882e038a92ccba66009faa",
+    "booking_commit": "2ff1d82",
+    "deployable_candidate_accepted": false,
+    "reason": "Local candidate is exact and verified; external release gates remain."
+  },
+  "routing": {
+    "requested": "Astra/xhigh orchestration and review; Sol/max implementation",
+    "attestation": "Historical local turn metadata only."
+  },
+  "accepted_fixes": [
+    "SIMPLE-DAY-01",
+    "GUIDE-OFFLINE-01",
+    "AUTH-LOGIN-RATE-01",
+    "REFUND-AUTHORITY-01",
+    "REFUND-UI-OUTCOMES-01",
+    "MFA-SENSITIVE-ACTIONS-01",
+    "PRICING-NEW-ONLY-01",
+    "ARRIVAL-01",
+    "SEC-DEV-DEPENDENCIES-01",
+    "BOOKING-PRESERVED-MOBILE-01"
+  ],
+  "test_results": {
+    "unit": "1324 pass, 0 fail, 1 skip",
+    "typescript": "pass",
+    "edge": "pass",
+    "database": "172 checks pass",
+    "browser": "4/4 pass",
+    "builds": "pass",
+    "npm_audit": "0 vulnerabilities"
+  },
+  "section6": {
+    "coverage_map": "PASS",
+    "local_continuity": "PASS_100_OF_100",
+    "release_gate": "FAIL_EXTERNAL_GATES",
+    "evidence": "../SECTION6_COVERAGE.json"
+  },
+  "section7": {
+    "contract": "PASS",
+    "executed": false,
+    "read_smoke": "PASS_500_AUTHENTICATED_USERS",
+    "remaining": "mixed writes, steady target, spike, recovery and soak",
+    "evidence": "../BT500_EXECUTION.json"
+  },
+  "section8": {
+    "packet": "READY_FOR_EXTERNAL_INPUT_AND_APPROVAL",
+    "executed": false,
+    "evidence": "../SECTION8_EXECUTION.json"
+  },
+  "existing_customer_continuity": {
+    "required_accounts": 100,
+    "completed_accounts": 100,
+    "status": "LOCAL_SYNTHETIC_PASSED"
+  },
+  "migration_provider_restore": {
+    "pricing_new_subscriptions_only": "LOCAL_DB_PASSED",
+    "arrival_audit": "LOCAL_DB_PASSED",
+    "mfa_migration": "LOCAL_DB_PASSED",
+    "genuine_provider_journeys": "NOT_RUN",
+    "restore_rehearsal": "NOT_RUN"
+  },
+  "deployment_canary": {
+    "deployed": false,
+    "canary_hours": 0,
+    "status": "NOT_RUN"
+  },
+  "residual_risks": [
+    "Real Auth/provider/deployed-role evidence is absent.",
+    "Notification and candidate-specific CI work remain.",
+    "Mixed-load qualification, restore, deployment and canary are unexecuted.",
+    "Production artifact, Edge, schema and config equivalence are unproven."
+  ],
+  "approvals": {
+    "production_mutation": false,
+    "deployment_or_push": false,
+    "provider_transactions": false,
+    "full_qualification_execution": false
+  },
+  "scope_override": {
+    "source": "User instruction: Section 9 may pass without having tested Section 7.",
+    "section9_may_complete_without_section7": true,
+    "does_not_waive_qualification": true,
+    "meaning": "Handoff completeness may pass while the release verdict remains IN_PROGRESS."
+  }
+}

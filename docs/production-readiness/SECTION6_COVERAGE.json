@@ -1,0 +1,220 @@
+{
+  "profile_id": "BT-FUNCTIONAL-CONTINUITY-V1",
+  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "candidate": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "status": "LOCAL_CONTINUITY_PASSED_EXTERNAL_GATES_OPEN",
+  "meaning": "Local synthetic continuity and the mapped regression suite pass. Genuine provider and complete deployed browser-role proof remain external release gates.",
+  "identities": [
+    {
+      "id": "super_admin",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/platform-admin-controls.test.ts",
+        "tests/unit/mfa-sensitive-actions.test.ts"
+      ]
+    },
+    {
+      "id": "operator",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/refund-authority-runtime.test.ts",
+        "tests/unit/settings-page-gate.test.ts"
+      ]
+    },
+    {
+      "id": "guide",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/guide-offline-queue.test.ts",
+        "tests/e2e/simple-view-mocked.spec.ts"
+      ]
+    },
+    {
+      "id": "public_customer",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/e2e/happy-path-booking.spec.ts",
+        "tests/unit/my-bookings-lookup.test.ts"
+      ]
+    },
+    {
+      "id": "suspended_staff",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/admin-account-boundaries.test.ts"
+      ]
+    },
+    {
+      "id": "cross_tenant_actor",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/tenant-isolation/rollout.mjs",
+        "tests/unit/admin-account-boundaries.test.ts"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "onboarding",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/onboarding-session-boundaries.test.ts",
+        "tests/unit/platform-admin-controls.test.ts"
+      ]
+    },
+    {
+      "id": "auth_recovery",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/e2e/auth.spec.ts",
+        "tests/unit/mfa-wait-lifecycle.test.ts"
+      ]
+    },
+    {
+      "id": "availability",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/e2e/happy-path-booking.spec.ts"
+      ]
+    },
+    {
+      "id": "walkin_online_booking",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/e2e/bookings.spec.ts",
+        "tests/e2e/happy-path-booking.spec.ts"
+      ]
+    },
+    {
+      "id": "pricing_discounts",
+      "status": "LOCAL_DB_PASSED",
+      "evidence": [
+        "tests/unit/chat-booking-pricing.test.ts",
+        "tests/unit/platform-billing.test.ts",
+        "tests/tenant-isolation/rollout.mjs"
+      ]
+    },
+    {
+      "id": "holds_contention",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/storefront-checkout-updates.test.ts"
+      ]
+    },
+    {
+      "id": "checkout_webhooks",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/payment-idempotency-hardening.test.ts",
+        "tests/stress/webhook-replay.k6.js"
+      ]
+    },
+    {
+      "id": "invoices_payments",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/payment-accounting-runtime.test.ts",
+        "tests/unit/yoco-credential-settings.test.ts"
+      ]
+    },
+    {
+      "id": "vouchers",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/admin-voucher-purchase.test.ts",
+        "tests/unit/voucher-refund-branching.test.ts"
+      ]
+    },
+    {
+      "id": "refunds_weather",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/refund-authority-runtime.test.ts",
+        "tests/unit/decline-refund.test.ts"
+      ]
+    },
+    {
+      "id": "reschedule",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/rebook-auth.test.ts"
+      ]
+    },
+    {
+      "id": "waivers",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/waiver-dob.test.ts",
+        "tests/unit/waiver-redirect-runtime.test.ts"
+      ]
+    },
+    {
+      "id": "arrivals",
+      "status": "LOCAL_DB_PASSED",
+      "evidence": [
+        "tests/fixtures/db-columns.json",
+        "tests/tenant-isolation/rollout.mjs"
+      ]
+    },
+    {
+      "id": "reports",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/report-accounting.test.ts"
+      ]
+    },
+    {
+      "id": "settings_integrations",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/settings-page-gate.test.ts",
+        "tests/unit/yoco-credential-settings.test.ts",
+        "tests/unit/mfa-sensitive-actions.test.ts"
+      ]
+    },
+    {
+      "id": "messages_marketing",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/message-job-boundaries.test.ts",
+        "tests/unit/marketing-throughput.test.ts"
+      ]
+    },
+    {
+      "id": "photos_offline",
+      "status": "LOCAL_PASSED",
+      "evidence": [
+        "tests/unit/photo-delivery.test.ts",
+        "tests/unit/guide-offline-queue.test.ts"
+      ]
+    }
+  ],
+  "local_results": {
+    "unit": "1324 pass, 0 fail, 1 intentional skip",
+    "typescript": "pass",
+    "edge_typecheck": "pass",
+    "database_fixture": "172 checks pass",
+    "simple_view_browser": "4/4 pass across phone, tablet and desktop",
+    "admin_production_build": "pass, 91 routes",
+    "booking_build": "pass",
+    "npm_audit": "0 vulnerabilities"
+  },
+  "continuity": {
+    "required_accounts": 100,
+    "completed_accounts": 100,
+    "status": "LOCAL_SYNTHETIC_PASSED",
+    "reason": "The same 100 pre-existing synthetic staff records across 34 businesses retained IDs, Auth links, tenants, emails, password hashes, roles, names, settings and suspension state through the full migration ledger. This is local disposable PostgreSQL proof."
+  },
+  "browser_role_matrix": {
+    "completed": false,
+    "status": "PARTIAL_LOCAL",
+    "completed_scope": "Simple View mocked acceptance 4/4 plus unit role boundaries.",
+    "reason": "A complete deployed matrix using real SUPER_ADMIN, OPERATOR, guide, suspended and cross-tenant identities has not run."
+  },
+  "provider_journeys": {
+    "genuine_sandbox_completed": false,
+    "status": "BLOCKED_EXTERNAL",
+    "reason": "Payment and messaging sandbox accounts, approved recipients and a transaction budget are absent."
+  },
+  "release_gate": "FAIL"
+}

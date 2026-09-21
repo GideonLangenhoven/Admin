@@ -1,0 +1,44 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "status": "PARTIAL_PASS_READ_SMOKE",
+  "candidate_commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "candidate_tree": "bcf595ebf0090da175882e038a92ccba66009faa",
+  "candidate_worktree_clean": false,
+  "environment": {
+    "classification": "user_authorized_shared_no_irreplaceable_data",
+    "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
+    "admin_url": null,
+    "booking_url": null,
+    "generator_region": null,
+    "application_region": null
+  },
+  "cost": {
+    "ceiling_zar": null
+  },
+  "window": {
+    "starts_at": null,
+    "ends_at": null
+  },
+  "approval": {
+    "reference": null,
+    "approved_at": null,
+    "workload_and_thresholds": false,
+    "metric_definitions": false,
+    "realtime_scope": false,
+    "cost_environment_and_window": false
+  },
+  "outbound_controls": {
+    "live_messages_blocked": false,
+    "live_payments_blocked": false,
+    "provider_doubles_enabled": false
+  },
+  "required_artifacts": {
+    "action_mapping": null,
+    "realtime_topology": null,
+    "quota_budget": null,
+    "outbound_guard_evidence": null
+  },
+  "executed": false,
+  "smoke_executed": true,
+  "result": "evidence/BT500_READ_SMOKE_RESULT.json"
+}

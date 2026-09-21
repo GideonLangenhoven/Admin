@@ -1,5 +1,7 @@
 # Corrected branch findings and implementation order
 
+> Current-session override (21 September 2026): start with [00_START_HERE.md](00_START_HERE.md) and [STATE.md](STATE.md). Their source, routing, resolved policy and evidence supersede historical values below. Customer-protection and release-qualification gates remain in force.
+
 Source: `GideonLangenhoven/Admin`, `feature/launch-rollout-2026-09-20`, inspected commit `76d00f3157acb2c73159bef6b8d40a108a9e767d`. Prepared 20 September 2026.
 
 The local branch/HEAD and all 17 file blob hashes from the supplied source manifest matched during review. An independent Astra/high source review checked refund authorization, attribution, pending results and browser bulk behavior. No application tests, live database inspection, provider operations, load, restore or deployment were performed. Remote HEAD and current Actions history were not reverified. The original report's zero branch Actions runs is historical evidence only. Revalidate against actual execution HEAD; nothing here is verified fixed.

@@ -1,0 +1,25 @@
+{
+  "id": "PRESERVED-SIMPLE-MOBILE-01",
+  "status": "READY_AFTER_AUTH_UI_WRITERS",
+  "snapshot": "/private/tmp/bookingtours-simple-view-evidence-1812677/preserved-original-20260921/manifest.json",
+  "scope": "Reconcile original legitimate Admin Simple View/staff-name/report/mobile and nested booking mobile changes into isolated candidate(s); do not overwrite accepted fixes or originals.",
+  "constraints": [
+    "Sol/max implementation; independent Astra/xhigh review. Apply Ponytail and Impeccable for UI work.",
+    "Admin AuthGate can be touched only after offline patch is accepted/frozen; MFA currently owns settings and Super Admin.",
+    "Arrival migration/fixtures are a separate serialized task. Preserve candidate Simple Day request-order fix and offline/auth revocation.",
+    "Nested booking original HEAD99b71f0 with7 changes versus exact remote release460e58d; use pinned remote base plus reviewed dirty differences, not old remote main or starter folder.",
+    "Do not copy .env files, node_modules, generated outputs or unrelated dirty changes into candidate."
+  ],
+  "known_findings": [
+    "Mobile app/book page hides inline Continue/Pay below md but omits replacement bars when embed=true; preserve mobile embed action access.",
+    "Original AuthGate switches fresh-login same-origin route from window.location.replace to router.replace; reconcile intent with accepted offline changes and real canonical-host behavior.",
+    "Admin mobile-first contract currently fails one primary-nav assertion; verify actual intended navigation rather than simply weakening test.",
+    "Original Simple View shell uses contextual date/returnTo via useSearchParams and Suspense; keep safe return routes, staff/business distinction, day request race protection."
+  ],
+  "acceptance": [
+    "Before/after source inventory and no loss of original legitimate functionality.",
+    "Actual local synthetic browser viewports including320/375/desktop, keyboard/focus, light/dark, embedded booking, single and combo flow, reduced motion, chat and booking bar overlap.",
+    "Money/provider/Auth interactions remain synthetic; never call live services from UI fixtures.",
+    "Focused tests plus full Admin and actual companion type/build checks, exact revision/hash evidence and fresh review."
+  ]
+}

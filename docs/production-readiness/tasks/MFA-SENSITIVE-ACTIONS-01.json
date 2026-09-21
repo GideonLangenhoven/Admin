@@ -1,0 +1,35 @@
+{
+  "id": "MFA-SENSITIVE-ACTIONS-01",
+  "status": "IMPLEMENTING",
+  "approved_actions": [
+    "change invoice bank-account details",
+    "link/change WhatsApp API credentials",
+    "link/change Yoco API credentials"
+  ],
+  "approved_support": "Exact active SUPER_ADMIN with own MFA may act for an explicitly selected operator business and provide verified MFA recovery. No target impersonation.",
+  "normal_operations": "AAL1 retains ordinary authorized booking access; enroll/challenge before protected action only.",
+  "recovery": "Verified platform-admin-assisted. Durable attributable audit before factor reset; no reset if audit cannot be persisted. Preserve partial failure/retry truth. Require new enrollment for operator protected actions.",
+  "source_findings": [
+    "No MFA flow exists yet. Installed supabase-js/auth-js supports mfa.enroll/challengeAndVerify/listFactors/getAuthenticatorAssuranceLevel(jwt) and admin.mfa.listFactors/deleteFactor.",
+    "app/api/credentials/route.ts handles WhatsApp/Yoco changes with existing privileged/tenant guard.",
+    "supabase/functions/bank-details/index.ts currently lacks exact role/suspension guard and cannot represent explicit super-admin foreign-tenant support.",
+    "app/api/platform-settings/route.ts forwards bank changes to service-only platform-bank-details. Must verify original human MFA before escalation.",
+    "Bank/credential setters are service-role RPCs; inventory direct business-column updates and inherited grants before enforcement.",
+    "getAuthenticatorAssuranceLevel(jwt) validates via getUser but initializes nextLevel=currentLevel; it does not prove a verified factor still exists when a stale JWT is aal2. Require verified current factors for recovery/revocation safety."
+  ],
+  "official_sources": [
+    "https://supabase.com/docs/guides/auth/auth-mfa/totp",
+    "https://supabase.com/docs/reference/javascript/auth-mfa-getauthenticatorassurancelevel",
+    "https://supabase.com/docs/reference/javascript/auth-admin-deletefactor"
+  ],
+  "acceptance": [
+    "Server/Edge validates signed user and AAL2; client/localStorage flags never authority",
+    "Active exact roles, own tenant or explicit SUPER_ADMIN target",
+    "AAL1 blocked before credentials/provider/DB effect, AAL2 preserved permitted flow",
+    "Suspended/demo/unknown/foreign roles denied",
+    "Enrollment/challenge cancel/error remains usable; no lost edits or secret persistence",
+    "Recovery verifies target linkage, denies self-reset and unapproved platform-peer reset, audit and factor partial failures truthful",
+    "Super Admin acts using own auth with actor+target audit and no credential/plain bank details in logs",
+    "No production changes; provider/Auth doubles labelled until isolated real Auth environment exists"
+  ]
+}

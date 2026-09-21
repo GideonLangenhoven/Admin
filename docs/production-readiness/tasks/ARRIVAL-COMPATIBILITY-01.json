@@ -1,0 +1,34 @@
+{
+  "id": "ARRIVAL-COMPATIBILITY-01",
+  "status": "READY_AFTER_SCHEMA_WRITER",
+  "preserved_source": "/Users/gideonlangenhoven/dev/capekayak",
+  "candidate": "/private/tmp/bookingtours-simple-view-1812677",
+  "scope": [
+    "supabase/migrations/20260920100000_partial_booking_arrivals.sql",
+    "tests/fixtures/db-columns.json",
+    "tests/tenant-isolation/rollout.mjs",
+    "focused arrival behavioral/privilege tests"
+  ],
+  "findings": [
+    "Original dirty migration tightens slot_check_ins DML, adds direct update compatibility audit, increase-only payment/waiver guards and denies direct partial count changes. These are legitimate changes to reconcile, not yet reviewed/ported.",
+    "Review effective table AND column grants, PUBLIC/inherited privileges, low-privilege insert/update/delete/truncate of audit rows.",
+    "Review role-aware trigger execution and spoofable custom-GUC audit suppression path; do not assume caller-controllable setting is trusted.",
+    "Preserve legacy checked_in toggles, move/qty reset semantics, canonical conflict response and idempotent replay; check no double audit."
+  ],
+  "acceptance": [
+    "Run old/new/mixed client flows with actual low-privilege PostgreSQL roles.",
+    "Preserve identity, existing arrival counts, payment/waiver meaning and exact event ownership; no production test.",
+    "Fresh independent Astra review after Sol/max implementation and schema serialization."
+  ],
+  "pre_review_evidence": {
+    "directory": "/private/tmp/bookingtours-simple-view-evidence-1812677/arrival-preserved-review-20260921",
+    "result": "CHANGES_REQUIRED from reproduced failures; reviewer final report was interrupted by an automated security flag, so no independent acceptance verdict exists.",
+    "probe_scope": "15 actual local PostgreSQL17 checks; synthetic fixture DB was dropped. Original source hashes match preserved snapshot.",
+    "findings": [
+      "Caller-settable custom setting suppresses audit for permitted legacy checked_in update.",
+      "Authenticated booking INSERT can initialize partial arrived_count without corresponding audit.",
+      "Under explicit simulated legacy grants, authenticated TRUNCATE and PUBLIC table/column DML/TRUNCATE survive partial revokes; these grants were test preconditions, not observations of production grants.",
+      "Positive legacy/RPC/replay/conflict/foreign-tenant/move/qty/correction checks passed. Direct authenticated column INSERT/UPDATE grants were removed by table REVOKE in actual PG17; do not falsely claim survival."
+    ]
+  }
+}

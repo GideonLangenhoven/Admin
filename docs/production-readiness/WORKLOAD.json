@@ -1,9 +1,7 @@
 {
-  "profile_id": "BT2000-LAUNCH-V2",
-  "status": "SUPERSEDED_BY_BT500_LAUNCH_V1",
-  "superseded_at_utc": "2026-09-21T05:40:00Z",
-  "superseded_by": "WORKLOAD.json",
-  "version": "2.1",
+  "profile_id": "BT500-LAUNCH-V1",
+  "version": "1.0",
+  "status": "PROPOSED_NOT_EXECUTED",
   "approval": {
     "workload_and_thresholds": false,
     "cost_and_environment": false,
@@ -12,15 +10,16 @@
     "realtime_topology_and_scope": false
   },
   "scope": {
-    "distinct_authenticated_staff_accounts": 2000,
-    "concurrent_active_staff_sessions": 2000,
-    "synthetic_businesses": 200,
-    "accounts_per_business": 10,
-    "certifies_2000_operator_businesses": false,
+    "distinct_authenticated_staff_accounts": 500,
+    "concurrent_active_staff_sessions": 500,
+    "synthetic_businesses": 167,
+    "accounts_per_business_max": 3,
+    "final_business_accounts": 2,
+    "certifies_500_operator_businesses": false,
     "public_traffic_included_only_as_specified": true
   },
   "staff_actions": {
-    "steady_actions_per_second": 200,
+    "steady_actions_per_second": 50,
     "approximate_seconds_between_actions_per_session": 10,
     "mix": {
       "reads": 0.7,
@@ -30,38 +29,37 @@
     "backend_request_rate": "Measure endpoint fan-out from actual browser journeys, not static assets.",
     "shared_demo_credentials_allowed_for_load": false,
     "authorization_and_limits_enabled": true,
-    "realtime_connections_if_one_per_active_session": 2000,
+    "realtime_connections_if_one_per_active_session": 500,
     "realtime_topology": {
       "observed_product_topology": null,
       "required_connections": null,
       "required_channels": null,
-      "rule": "F1: 2,000 authenticated Realtime connections if the product needs one per active session. Determine and approve the real footprint before qualification; no silent omission or fabricated idle connections."
+      "rule": "F1: 500 authenticated Realtime connections if the product needs one per active session. Determine and approve the real footprint before qualification; no silent omission or fabricated idle connections."
     }
   },
   "concurrent_extra_traffic": {
-    "public_browse_availability_actions_per_second": 20,
-    "checkout_creations_per_second": 2,
-    "controlled_webhook_deliveries_per_second": 5,
-    "transactional_jobs_burst": 2000,
+    "public_browse_availability_actions_per_second": 5,
+    "checkout_creations_per_second": 0.5,
+    "controlled_webhook_deliveries_per_second": 1.25,
+    "transactional_jobs_burst": 500,
     "transactional_jobs_burst_seconds": 600,
     "background_marketing_active": true,
     "marketing_rate": "Approve and fix provider-aware offered rate before qualification."
   },
   "dataset_minimum": {
-    "bookings": 1000000,
-    "slots": 250000,
-    "customer_relationships": 100000,
-    "message_and_audit_records": 2000000,
-    "busy_tenant_bookings": 100000,
+    "bookings": 250000,
+    "slots": 62500,
+    "customer_relationships": 25000,
+    "message_and_audit_records": 500000,
+    "busy_tenant_bookings": 25000,
     "requires_representative_history_statuses_and_skew": true,
     "existing_accounts_for_upgrade_regression": 100
   },
   "execution": {
     "ramp_session_levels": [
       100,
-      500,
-      1000,
-      2000
+      250,
+      500
     ],
     "steady_full_load_seconds": 3600,
     "spike_action_rate_multiplier": 2,
@@ -70,7 +68,7 @@
     "soak_elapsed_seconds": 86400,
     "soak_activity_cycle": "Document an approved realistic activity cycle before testing; full-target steady qualification remains separately required.",
     "qualification_dropped_iterations": 0,
-    "soak_active_staff_sessions": 2000,
+    "soak_active_staff_sessions": 500,
     "soak_realtime_footprint": "Retain the approved staff_actions.realtime_topology footprint continuously for the soak."
   },
   "thresholds": {
@@ -131,6 +129,33 @@
     "latency_observation_points": null,
     "error_denominators_and_rolling_failure_windows": null,
     "provisioned_bottlenecks_and_headroom_calculations": null,
-    "note": "Freeze and approve all definitions before qualification. Failures, discarded work and simulated delivery cannot be relabelled as successful completion."
+    "note": "Freeze and approve all definitions before qualification. Failures, discarded work and simulated delivery cannot be relabelled as successful completion.",
+    "proposed_for_approval": {
+      "action_latency": "Measure from client action initiation to required visible result; retain retries and backend fan-out in separate request metrics. Report each critical journey independently.",
+      "valid_traffic_errors": "Unexpected status, transport failure, timeout, invalid response or unmet normal-work outcome divided by all scheduled valid actions; report steady aggregate and60-second rolling windows. Expected negative/contention actions have separate tags and denominator.",
+      "terminal_outcomes": "For volume provider doubles, successful terminal means the business effect is committed and the explicitly labelled double acknowledgement is recorded. Failed, discarded, unsubmitted and unresolved items do not drain the successful burst. Genuine delivery is separate and unexecuted.",
+      "headroom": "Record each provisioned CPU/memory/connection/worker/provider quota and observed usage; require at least30% unused capacity at steady target. No guessed denominators.",
+      "spike_scope": "Twice the approved action rates for300 seconds while maintaining500 distinct active staff sessions; preserve the documented account scope.",
+      "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
+    }
+  },
+  "updated_at_utc": "2026-09-21T05:33:39Z",
+  "candidate_accepted_base": "718dee28df58df0cab527eb3f4aea7f8ae513389",
+  "candidate_status": "Dirty corrective patch set frozen; exact deployable candidate not yet accepted.",
+  "active_sections": [6, 7, 9],
+  "deferred_sections": {
+    "8": "Deployment, recovery, and release gate"
+  },
+  "execution_readiness": {
+    "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
+    "executed": false,
+    "reason": [
+      "Section5 correctness/security corrections and acceptance incomplete",
+      "Isolated staging app URLs/database project, regions, quotas, compute/storage cost ceiling and window unspecified",
+      "Product Realtime topology, action-to-endpoint mapping, marketing offered rate and metric definitions await validation/approval",
+      "Effective outbound guards and a complete candidate-specific runner are not established"
+    ],
+    "legacy_harness": "The new authenticated read-smoke runner passed at500 VUs. Existing tests/stress probes remain insufficient for the full BT500-LAUNCH-V1 mixed-load qualification.",
+    "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json"
   }
 }
