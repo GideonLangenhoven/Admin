@@ -498,16 +498,18 @@ Deno.serve(async (req) => {
         const rawToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
           .map((b) => b.toString(16).padStart(2, "0")).join("");
         const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const { error: tokErr } = await supabase.from("admin_users").update({
-          setup_token_hash: await sha256Hex(rawToken),
-          setup_token_expires_at: expiresAt,
-          invite_sent_at: new Date().toISOString(),
-          must_set_password: true,
-        }).eq("id", adminId);
+        const { data: issued, error: tokErr } = await supabase.rpc("issue_admin_setup_token", {
+          p_admin_id: adminId,
+          p_token_hash: await sha256Hex(rawToken),
+          p_expires_at: expiresAt,
+          p_force_setup: true,
+        });
         if (tokErr) throw tokErr;
+        const tokenIssued = issued?.status === "ISSUED";
+        if (!tokenIssued && issued?.status !== "BUSY") throw new Error("Password setup link could not be issued");
 
         const adminOrigin = adminOriginFor(business.subdomain);
-        if (adminOrigin) {
+        if (adminOrigin && tokenIssued) {
           const setupUrl = `${adminOrigin}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
           const { error: mailErr } = await supabase.functions.invoke("send-email", {
             body: {

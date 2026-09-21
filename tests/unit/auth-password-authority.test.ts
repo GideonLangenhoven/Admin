@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { sourceHandler } from "../helpers/source-handler";
+import { readFileSync } from "node:fs";
+import { sourceFunction, sourceHandler } from "../helpers/source-handler";
 
 const ADMIN = {
   id: "admin-a",
@@ -66,6 +67,25 @@ function loginFixture(user: Record<string, unknown>) {
 }
 
 describe("Supabase Auth is authoritative after legacy migration", () => {
+  it("reauthenticates through an isolated client without replacing the shared browser session", async () => {
+    const signInWithPassword = vi.fn(async () => ({
+      data: { session: { access_token: "fresh-password-token" } },
+      error: null,
+    }));
+    const createClient = vi.fn(() => ({ auth: { signInWithPassword } }));
+    const reauthenticate = sourceFunction("app/lib/admin-auth.ts", "reauthenticateAdminPassword", {
+      createClient,
+      process: { env: { NEXT_PUBLIC_SUPABASE_URL: "https://fixture.invalid", NEXT_PUBLIC_SUPABASE_ANON_KEY: "fixture-anon" } },
+    });
+
+    await expect(reauthenticate(" Staff@Example.Invalid ", "current-password")).resolves.toBe("fresh-password-token");
+    expect(createClient).toHaveBeenCalledWith("https://fixture.invalid", "fixture-anon", {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: "staff@example.invalid", password: "current-password" });
+    expect(readFileSync("app/change-password/page.tsx", "utf8")).not.toContain('from "../lib/supabase"');
+  });
+
   it("accepts a linked account from its verified Auth session without reading the password hash", async () => {
     const f = loginFixture({ ...ADMIN, password_hash: hash("unrelated-password") });
     const response = await f.invoke({}, "linked-session");

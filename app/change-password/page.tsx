@@ -4,10 +4,9 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   completeAdminPasswordSetup,
-  getAuthHeaders,
+  reauthenticateAdminPassword,
   validateAdminSetupToken,
 } from "../lib/admin-auth";
-import { supabase } from "../lib/supabase";
 import { BrandMark } from "../../components/BrandLogo";
 
 function ChangePasswordForm() {
@@ -136,14 +135,17 @@ function ChangePasswordForm() {
     setLoading(true);
 
     try {
-      const signIn = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: currentPass });
-      if (signIn.error || !signIn.data.session) {
+      const accessToken = await reauthenticateAdminPassword(email, currentPass);
+      if (!accessToken) {
         setLoading(false);
         return setError("Incorrect email or current password.");
       }
       const res = await fetch("/api/admin/update", {
         method: "POST",
-        headers: await getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + accessToken,
+        },
         body: JSON.stringify({
           action: "change_password",
           new_password: newPass,

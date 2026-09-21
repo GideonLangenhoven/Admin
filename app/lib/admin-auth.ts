@@ -1,6 +1,31 @@
 "use client";
 
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+
+export async function reauthenticateAdminPassword(email: string, password: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error("Admin authentication is not configured");
+
+  // Password confirmation must not replace the shared browser session. That
+  // session is coordinated with the selected tenant and offline guide queue by
+  // AuthGate; this short-lived client exists only long enough to obtain a fresh
+  // password-authenticated access token for the password-change request.
+  const reauth = createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  const { data, error } = await reauth.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+  if (error || !data.session) return null;
+  return data.session.access_token;
+}
 
 export async function getAuthHeaders(businessId?: string): Promise<Record<string, string>> {
   // Capture the target before awaiting the session: switching operator while

@@ -25,6 +25,20 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
     },
     functions: { invoke: async (_name: string, body: unknown) => { emails.push(body); return { error: null }; } },
     rpc: async (name: string, args: Record<string, any>) => {
+      if (name === "issue_admin_setup_token") {
+        const claimedAt = Date.parse(String(target.setup_token_claimed_at || ""));
+        if (target.setup_token_claim_id && Number.isFinite(claimedAt) && claimedAt > Date.now() - 5 * 60 * 1000) {
+          return { data: { status: "BUSY" }, error: null };
+        }
+        Object.assign(target, {
+          setup_token_hash: args.p_token_hash,
+          setup_token_expires_at: args.p_expires_at,
+          setup_token_claim_id: null,
+          setup_token_claimed_at: null,
+          ...(args.p_force_setup ? { must_set_password: true } : {}),
+        });
+        return { data: { status: "ISSUED" }, error: null };
+      }
       if (name === "claim_admin_setup_token") {
         if (target.setup_token_hash !== args.p_token_hash) return { data: { status: "INVALID" }, error: null };
         if (target.setup_token_claim_id && target.setup_token_claim_id !== args.p_claim_id) {
@@ -133,6 +147,18 @@ describe("R02/R03 administrator boundaries", () => {
     expect((await f.invoke("setup-link", { action: "send", reason: "RESET", email: "staff@example.invalid", business_id: "forged-brand" })).status).toBe(200);
     expect(f.target.must_set_password).toBeUndefined();
     expect(f.emails[0].body.data.business_id).toBe("business-b");
+  });
+  it("does not rotate or email a setup token while its password completion owns the claim", async () => {
+    const f = fixture();
+    Object.assign(f.target, {
+      setup_token_hash: "active-token",
+      setup_token_claim_id: "11111111-1111-4111-8111-111111111111",
+      setup_token_claimed_at: new Date().toISOString(),
+    });
+    const response = await f.invoke("setup-link", { action: "send", admin_id: "target" });
+    expect(response.status).toBe(409);
+    expect(f.target.setup_token_hash).toBe("active-token");
+    expect(f.emails).toEqual([]);
   });
 });
 

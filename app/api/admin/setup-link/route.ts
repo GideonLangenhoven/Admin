@@ -80,17 +80,20 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     const shouldForceSetup = reason !== "RESET";
 
-    const updatePayload: Record<string, any> = {
-      setup_token_hash: tokenHash,
-      setup_token_expires_at: expiresAt,
-      setup_token_claim_id: null,
-      setup_token_claimed_at: null,
-      invite_sent_at: new Date().toISOString(),
-    };
-    if (shouldForceSetup) updatePayload.must_set_password = true;
-
-    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", user.id);
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    const { data: issued, error: issueError } = await admin.rpc("issue_admin_setup_token", {
+      p_admin_id: user.id,
+      p_token_hash: tokenHash,
+      p_expires_at: expiresAt,
+      p_force_setup: shouldForceSetup,
+    });
+    if (issueError) return NextResponse.json({ error: "Password setup is temporarily unavailable" }, { status: 503 });
+    if (issued?.status === "BUSY") {
+      if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
+      return NextResponse.json({ error: "Password setup is already being completed. Try again shortly." }, { status: 409 });
+    }
+    if (issued?.status !== "ISSUED") {
+      return NextResponse.json({ error: "Password setup link could not be issued" }, { status: 409 });
+    }
 
     const origin = req.nextUrl.origin || req.headers.get("origin") || "";
     const setupUrl =

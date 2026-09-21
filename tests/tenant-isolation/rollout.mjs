@@ -118,12 +118,37 @@ try {
   await check('setup-token claim functions are service-only',async()=>{
     for(const role of ['anon','authenticated']) {
       const privileges=(await db.query(`select
+        has_function_privilege($1,'public.issue_admin_setup_token(uuid,text,timestamptz,boolean)','EXECUTE') issue,
         has_function_privilege($1,'public.claim_admin_setup_token(text,text,uuid)','EXECUTE') claim,
         has_function_privilege($1,'public.complete_admin_setup_token(uuid,text,uuid,uuid)','EXECUTE') complete,
         has_function_privilege($1,'public.release_admin_setup_token_claim(uuid,uuid)','EXECUTE') release`,[role])).rows[0];
-      assert.deepEqual(privileges,{claim:false,complete:false,release:false});
+      assert.deepEqual(privileges,{issue:false,claim:false,complete:false,release:false});
     }
+    assert.equal((await db.query("select has_function_privilege('service_role','public.issue_admin_setup_token(uuid,text,timestamptz,boolean)','EXECUTE') allowed")).rows[0].allowed,true);
     assert.equal((await db.query("select has_function_privilege('service_role','public.claim_admin_setup_token(text,text,uuid)','EXECUTE') allowed")).rows[0].allowed,true);
+  });
+  await check('setup-token rotation respects an active claim and a claimed token can finish after expiry',async()=>{
+    const adminId=id(901003);
+    const tokenHash='claimed-token-hash';
+    const replacementHash='replacement-token-hash';
+    const claimId=id(903006);
+    await db.query(`update admin_users set setup_token_hash=$2,
+      setup_token_expires_at=now()+interval '1 hour',setup_token_claim_id=null,
+      setup_token_claimed_at=null where id=$1`,[adminId,tokenHash]);
+    assert.equal((await db.query(
+      'select claim_admin_setup_token($1,$2,$3) result',
+      ['continuity-3@example.invalid',tokenHash,claimId],
+    )).rows[0].result.status,'CLAIMED');
+    assert.equal((await db.query(
+      "select issue_admin_setup_token($1,$2,now()+interval '2 hours',true) result",
+      [adminId,replacementHash],
+    )).rows[0].result.status,'BUSY');
+    assert.equal((await db.query('select setup_token_hash from admin_users where id=$1',[adminId])).rows[0].setup_token_hash,tokenHash);
+    await db.query("update admin_users set setup_token_expires_at=now()-interval '1 second' where id=$1",[adminId]);
+    assert.equal((await db.query(
+      'select complete_admin_setup_token($1,$2,$3,$4) completed',
+      [adminId,tokenHash,claimId,id(902003)],
+    )).rows[0].completed,true);
   });
   await check('only one concurrent setup-token claim reaches password mutation',async()=>{
     const adminId=id(901001);
