@@ -6,8 +6,8 @@
     "workload_and_thresholds": true,
     "cost_and_environment": true,
     "approval_reference": "user-session-2026-09-21-prelaunch-qualification",
-    "metric_definitions": false,
-    "realtime_topology_and_scope": false
+    "metric_definitions": true,
+    "realtime_topology_and_scope": true
   },
   "scope": {
     "distinct_authenticated_staff_accounts": 500,
@@ -31,10 +31,10 @@
     "authorization_and_limits_enabled": true,
     "realtime_connections_if_one_per_active_session": 500,
     "realtime_topology": {
-      "observed_product_topology": null,
-      "required_connections": null,
-      "required_channels": null,
-      "rule": "F1: 500 authenticated Realtime connections if the product needs one per active session. Determine and approve the real footprint before qualification; no silent omission or fabricated idle connections."
+      "observed_product_topology": "one multiplexed Supabase Realtime WebSocket per active browser session",
+      "required_connections": 500,
+      "required_channels": "at least 1000 shell bindings plus route bindings from the approved route mix",
+      "rule": "Measure the source-derived footprint in an exact-candidate browser run; do not replace it with idle sockets."
     }
   },
   "concurrent_extra_traffic": {
@@ -124,10 +124,10 @@
   "measurement_definitions": {
     "webhook_ack_timer": "Request arrival at ingress through signature verification and durable acceptance to acknowledgement.",
     "burst_drain_timer": "All tagged burst jobs reach approved terminal outcomes within 600 seconds of the last scheduled enqueue. Record scheduled and actual admission; delayed admission cannot extend the deadline.",
-    "terminal_outcomes": null,
-    "action_endpoint_mapping": null,
-    "latency_observation_points": null,
-    "error_denominators_and_rolling_failure_windows": null,
+    "terminal_outcomes": "For provider doubles, successful terminal means the business effect and labelled acknowledgement are durable. Failed, discarded, unsubmitted and unresolved items do not count as drained.",
+    "action_endpoint_mapping": "Frozen in BT500_ACTION_MAPPING.json; the mixed-staff runner tags each request and critical journey.",
+    "latency_observation_points": "Client/generator action start through required parsed/durable result, including token refresh, request fan-out and retries; request latency is also reported separately.",
+    "error_denominators_and_rolling_failure_windows": "Unexpected failures divided by scheduled valid actions, split by phase, kind and journey; report steady aggregate and 60-second windows. Label negative/contention cases separately.",
     "provisioned_bottlenecks_and_headroom_calculations": null,
     "note": "Freeze and approve all definitions before qualification. Failures, discarded work and simulated delivery cannot be relabelled as successful completion.",
     "proposed_for_approval": {
@@ -139,10 +139,14 @@
       "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
     }
   },
-  "updated_at_utc": "2026-09-21T12:54:38Z",
-  "candidate_accepted_base": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
-  "candidate_status": "Exact local source candidate committed and verified; deployment is pending.",
-  "active_sections": [6, 7, 9],
+  "updated_at_utc": "2026-09-21T18:15:43Z",
+  "candidate_accepted_base": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "candidate_status": "Exact local application source candidate committed, fully locally verified and independently accepted; deployment is pending.",
+  "active_sections": [
+    6,
+    7,
+    9
+  ],
   "deferred_sections": {
     "8": "Deployment, recovery, and release gate"
   },
@@ -150,12 +154,13 @@
     "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
     "executed": false,
     "reason": [
-      "Exact candidate and authoritative Auth migration are not deployed",
-      "Generator/application regions and production-equivalent quotas are unverified; paid scaling is not authorized",
-      "Product Realtime topology, action-to-endpoint mapping, marketing offered rate and metric definitions await validation/approval",
-      "Effective outbound guards and a complete candidate-specific runner are not established"
+      "Exact Admin, storefront, Edge and five-migration candidate is not deployed",
+      "Provider-double public checkout/webhook/background harness and runtime outbound-guard proof remain open",
+      "Production-equivalent quota denominators and at least 30% headroom are unverified at the ZAR 0 ceiling",
+      "Realtime browser footprint has not been measured on the exact candidate"
     ],
-    "legacy_harness": "The new authenticated read-smoke runner passed at500 VUs. Existing tests/stress probes remain insufficient for the full BT500-LAUNCH-V1 mixed-load qualification.",
-    "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json"
+    "legacy_harness": "The 500-session authenticated read smoke passed. The mixed-staff runner is source-complete and independently reviewed but unexecuted.",
+    "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json",
+    "mixed_staff_runner": "OFFLINE_INSPECTION_PASS; scripts/bt500-run-mixed.mjs"
   }
 }

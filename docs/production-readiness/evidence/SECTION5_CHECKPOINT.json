@@ -1,6 +1,6 @@
 {
-  "recorded_at_utc": "2026-09-21T12:54:38Z",
-  "candidate_commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
+  "candidate_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "status": "LOCAL_CORRECTIVE_IMPLEMENTATION_COMPLETE_EXTERNAL_ACCEPTANCE_OPEN",
   "completed_local_workstreams": [
     "OPERATOR refund authority and truthful single/bulk UI outcomes",
@@ -11,23 +11,26 @@
     "mobile Admin and storefront reconciliation",
     "dependency remediation to zero npm audit findings",
     "500-session read-smoke tooling and login architecture correction",
-    "authoritative Supabase Auth, isolated password reauthentication, atomic setup-token issuance/claims and expiry-safe finalization"
+    "authoritative Supabase Auth, isolated password reauthentication, atomic setup-token issuance/claims and expiry-safe finalization",
+    "durable tenant-fair transactional notification jobs with stable provider idempotency, bounded retries, crash recovery and audited manual retry",
+    "phase- and journey-scoped BT500 mixed-staff qualification runner with paginated 500-session issuance"
   ],
   "validation": {
-    "unit": "1333 pass, 0 fail, 1 skip",
+    "unit": "1355 pass, 0 fail, 1 skip",
     "typescript": "pass",
     "edge": "pass",
-    "database": "176 checks pass",
+    "database": "181 checks pass",
     "browser": "4/4 pass",
     "builds": "Admin and booking pass",
     "npm_audit": "0 vulnerabilities",
-    "independent_auth_review": "fresh-context Astra/xhigh accepted commit 7d3e7b3 after 49 focused tests and an installed-SDK session-storage/cross-tab probe"
+    "independent_auth_review": "fresh-context Astra/xhigh accepted commit 7d3e7b3 after 49 focused tests and an installed-SDK session-storage/cross-tab probe",
+    "independent_notification_and_runner_review": "fresh-context Astra/xhigh accepted the final frozen source"
   },
   "remaining": [
-    "Real Supabase Auth enrollment, challenge and assisted-recovery lifecycle in an isolated deployed environment",
-    "Genuine Yoco and WhatsApp sandbox journeys",
-    "Notification durability/fairness work tracked as NOTIFY-01",
-    "Candidate-specific CI and exact deployed artifact/schema/config equivalence",
+    "Real Supabase Auth enrollment, challenge and assisted-recovery lifecycle in the exact deployed environment",
+    "Genuine Yoco test-mode, email and WhatsApp scoped journeys",
+    "Candidate-specific CI and exact deployed artifact/schema/scheduler/config equivalence",
+    "Full BT500 provider-double, Realtime, steady, spike, recovery and soak execution",
     "Fresh final acceptance for deployed release-critical integrated behavior"
   ],
   "production_mutated": false,

@@ -1,23 +1,25 @@
 {
-  "recorded_at_utc": "2026-09-21T13:32:41Z",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
   "target_project_ref": "ukdsrndqhsatjkmxijuj",
   "remote_ledger_entries": 208,
   "remote_ledger_latest": "20260917090000",
-  "controlled_package": "/private/tmp/bookingtours-exact-migrations-authfix",
-  "command": "supabase db push --dry-run --workdir /private/tmp/bookingtours-exact-migrations-authfix",
+  "controlled_package": "/private/tmp/bookingtours-exact-migrations-notifyfix",
+  "command": "supabase db push --dry-run --workdir /private/tmp/bookingtours-exact-migrations-notifyfix",
   "exit_code": 0,
   "would_push_only": [
     "20260920090000_enforce_standard_plan_pricing.sql",
     "20260920100000_partial_booking_arrivals.sql",
     "20260921120000_mfa_sensitive_business_columns.sql",
-    "20260921130000_authoritative_auth_passwords.sql"
+    "20260921130000_authoritative_auth_passwords.sql",
+    "20260921140000_durable_notification_jobs.sql"
   ],
   "sha256": {
     "20260920090000_enforce_standard_plan_pricing.sql": "bff91f5b1a4fbaaa99c13db46c3d99e96f7dbe90c24252d1c4a7d7517d35bf7a",
     "20260920100000_partial_booking_arrivals.sql": "b81fc4cb61061254d39a5448e4fedf889883c50d63665c7108f5be37bf21bee4",
     "20260921120000_mfa_sensitive_business_columns.sql": "a7b45da389209e76d8a9b187946922474a2fe3d7ebc38dae26a5cf6caccc1691",
-    "20260921130000_authoritative_auth_passwords.sql": "434d0cb347ca8844c88a9c1a7cee5958b4436d0504378ccf81799df8bfbf7eb0"
+    "20260921130000_authoritative_auth_passwords.sql": "434d0cb347ca8844c88a9c1a7cee5958b4436d0504378ccf81799df8bfbf7eb0",
+    "20260921140000_durable_notification_jobs.sql": "5c5f09b00c554c1c2135aa811d9fe9bcc0bacc5fed4993259ca029418bbf6827"
   },
   "applied": false,
-  "note": "A blanket include-all push is prohibited because the linked ledger omits older local files. The controlled package represents every recorded remote version with an empty placeholder and contains only the four reviewed pending migrations."
+  "note": "A blanket include-all push is prohibited because the linked ledger omits older local files. The controlled package represents every recorded remote version with an empty placeholder and contains only the five reviewed pending migrations."
 }

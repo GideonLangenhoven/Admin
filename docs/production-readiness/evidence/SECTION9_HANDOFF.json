@@ -1,11 +1,11 @@
 {
   "profile_id": "BT-HANDOFF-6-7-8-9-2026-09-21",
-  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
   "handoff_validation": "PASS",
   "verdict": "IN_PROGRESS",
   "candidate": {
-    "admin_commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
-    "admin_tree": "765a79c3876c6e458974b6de374f359b5f7e7d91",
+    "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "admin_tree": "6f4e3403ba6fab20767521529152a972907e1b81",
     "booking_commit": "2ff1d82",
     "deployable_candidate_accepted": false,
     "reason": "Local candidate is exact and verified; external release gates remain."
@@ -25,17 +25,20 @@
     "ARRIVAL-01",
     "SEC-DEV-DEPENDENCIES-01",
     "BOOKING-PRESERVED-MOBILE-01",
-    "AUTH-AUTHORITATIVE-01"
+    "AUTH-AUTHORITATIVE-01",
+    "NOTIFY-01",
+    "PERF-BT500-RUNNER"
   ],
   "test_results": {
-    "unit": "1333 pass, 0 fail, 1 skip",
+    "unit": "1355 pass, 0 fail, 1 skip",
     "typescript": "pass",
     "edge": "pass",
-    "database": "176 checks pass",
+    "database": "181 checks pass",
     "browser": "4/4 pass",
     "builds": "pass",
     "npm_audit": "0 vulnerabilities",
-    "independent_auth_review": "ACCEPTED_7d3e7b3"
+    "independent_auth_review": "ACCEPTED_7d3e7b3",
+    "independent_notification_and_runner_review": "ACCEPTED_71da036"
   },
   "section6": {
     "coverage_map": "PASS",
@@ -47,8 +50,9 @@
     "contract": "PASS",
     "executed": false,
     "read_smoke": "PASS_500_AUTHENTICATED_USERS",
-    "remaining": "mixed writes, steady target, spike, recovery and soak",
-    "evidence": "../BT500_EXECUTION.json"
+    "remaining": "exact deployment, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
+    "evidence": "../BT500_EXECUTION.json",
+    "mixed_staff_runner": "OFFLINE_INSPECTION_PASS"
   },
   "section8": {
     "packet": "READY_FOR_EXTERNAL_INPUT_AND_APPROVAL",
@@ -64,9 +68,9 @@
     "pricing_new_subscriptions_only": "LOCAL_DB_PASSED",
     "arrival_audit": "LOCAL_DB_PASSED",
     "mfa_migration": "LOCAL_DB_PASSED",
-    "exact_four_migration_dry_run": "PASS",
     "genuine_provider_journeys": "NOT_RUN",
-    "restore_rehearsal": "NOT_RUN"
+    "restore_rehearsal": "NOT_RUN",
+    "exact_five_migration_dry_run": "PASS"
   },
   "deployment_canary": {
     "deployed": false,
@@ -75,9 +79,8 @@
   },
   "residual_risks": [
     "Real Auth/provider/deployed-role evidence is absent.",
-    "Notification and candidate-specific CI work remain.",
-    "Mixed-load qualification, restore, deployment and canary are unexecuted.",
-    "Production artifact, Edge, schema and config equivalence are unproven."
+    "Candidate-specific CI, mixed-load qualification, restore, deployment and canary are unexecuted.",
+    "Production artifact, Edge, schema, scheduler and config equivalence are unproven."
   ],
   "approvals": {
     "production_mutation": false,

@@ -1,9 +1,9 @@
 {
   "profile_id": "BT-RELEASE-RECOVERY-V1",
-  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
   "status": "READY_FOR_EXACT_DEPLOYMENT_APPROVAL",
   "candidates": {
-    "admin": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+    "admin": "71da0361db65dd63f90b5110648b96b2c4ff3567",
     "booking": "2ff1d82"
   },
   "required_inputs": {
@@ -18,21 +18,22 @@
     "20260920090000_enforce_standard_plan_pricing.sql",
     "20260920100000_partial_booking_arrivals.sql",
     "20260921120000_mfa_sensitive_business_columns.sql",
-    "20260921130000_authoritative_auth_passwords.sql"
+    "20260921130000_authoritative_auth_passwords.sql",
+    "20260921140000_durable_notification_jobs.sql"
   ],
   "migration_dry_run": {
-    "status": "PASS_EXACT_FOUR_ONLY",
+    "status": "PASS_EXACT_FIVE_ONLY",
     "evidence": "docs/production-readiness/evidence/MIGRATION_DRY_RUN.json",
     "blanket_include_all_prohibited": true
   },
   "deployment_order": [
     "reconfirm remote migration ledger and pre-deployment inventory",
-    "apply the controlled four-migration package",
+    "apply the controlled five-migration package",
     "deploy candidate Edge Functions without pruning unrelated functions",
-    "deploy Admin commit 7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+    "deploy Admin commit 71da0361db65dd63f90b5110648b96b2c4ff3567",
     "deploy booking commit 2ff1d82",
-    "run Auth, role, MFA, refund, booking and outbound-guard smoke checks",
-    "record exact URLs and start the 24-hour qualification clock"
+    "run Auth, role, MFA, refund, booking, notification-scheduler and outbound-guard smoke checks",
+    "record exact URLs and start the qualification clock"
   ],
   "canary_steps": [
     5,

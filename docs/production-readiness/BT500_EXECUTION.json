@@ -1,8 +1,8 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
-  "status": "READY_AFTER_EXACT_DEPLOYMENT_AND_TOPOLOGY_FREEZE",
-  "candidate_commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
-  "candidate_tree": "765a79c3876c6e458974b6de374f359b5f7e7d91",
+  "status": "BLOCKED_ON_EXACT_DEPLOYMENT_AND_FULL_HARNESS",
+  "candidate_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "candidate_tree": "6f4e3403ba6fab20767521529152a972907e1b81",
   "candidate_worktree_clean": true,
   "environment": {
     "classification": "user_authorized_prelaunch_no_customers",

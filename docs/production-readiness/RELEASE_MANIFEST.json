@@ -1,11 +1,11 @@
 {
-  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
   "verdict": "IN_PROGRESS",
   "admin_candidate": {
     "repository": "capekayak",
     "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
-    "commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
-    "tree": "765a79c3876c6e458974b6de374f359b5f7e7d91",
+    "commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "tree": "6f4e3403ba6fab20767521529152a972907e1b81",
     "worktree": "/private/tmp/bookingtours-simple-view-1812677",
     "package_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534"
   },
@@ -17,23 +17,25 @@
     "worktree": "/private/tmp/bookingtours-booking-mobile-460e58d"
   },
   "validation": {
-    "unit": "1333 pass, 1 skip",
+    "unit": "1355 pass, 1 skip",
     "typescript": "pass",
     "edge": "pass",
-    "database": "176 checks pass",
+    "database": "181 checks pass",
     "simple_view_browser": "4/4 pass",
     "admin_build": "pass, 91 routes",
     "booking_build": "pass",
     "booking_check_ways": "pass",
     "npm_audit": "0 vulnerabilities",
     "independent_auth_review": "fresh-context Astra/xhigh accepted 7d3e7b3 after 49 focused tests and installed-SDK session isolation probe",
-    "controlled_migration_dry_run": "exactly four pending migrations"
+    "controlled_migration_dry_run": "exactly five pending migrations",
+    "independent_notification_and_bt500_review": "fresh-context Astra/xhigh accepted the frozen notification and mixed-staff runner source after 29 notification tests, 6 runner tests, offline action-timing probes and diff review"
   },
   "database_changes": [
     "20260920090000_enforce_standard_plan_pricing.sql",
     "20260920100000_partial_booking_arrivals.sql",
     "20260921120000_mfa_sensitive_business_columns.sql",
-    "20260921130000_authoritative_auth_passwords.sql"
+    "20260921130000_authoritative_auth_passwords.sql",
+    "20260921140000_durable_notification_jobs.sql"
   ],
   "production_equivalence_verified": false,
   "observed_hosted_state": {
@@ -62,5 +64,12 @@
     7,
     8,
     9
-  ]
+  ],
+  "migration_sha256": {
+    "20260920090000_enforce_standard_plan_pricing.sql": "bff91f5b1a4fbaaa99c13db46c3d99e96f7dbe90c24252d1c4a7d7517d35bf7a",
+    "20260920100000_partial_booking_arrivals.sql": "b81fc4cb61061254d39a5448e4fedf889883c50d63665c7108f5be37bf21bee4",
+    "20260921120000_mfa_sensitive_business_columns.sql": "a7b45da389209e76d8a9b187946922474a2fe3d7ebc38dae26a5cf6caccc1691",
+    "20260921130000_authoritative_auth_passwords.sql": "434d0cb347ca8844c88a9c1a7cee5958b4436d0504378ccf81799df8bfbf7eb0",
+    "20260921140000_durable_notification_jobs.sql": "5c5f09b00c554c1c2135aa811d9fe9bcc0bacc5fed4993259ca029418bbf6827"
+  }
 }

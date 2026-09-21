@@ -1,6 +1,6 @@
 {
-  "updated_at_utc": "2026-09-21T12:54:38Z",
-  "candidate": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+  "updated_at_utc": "2026-09-21T18:15:43Z",
+  "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "issues": [
     {
       "id": "REL-PROVENANCE",
@@ -20,8 +20,8 @@
       "id": "AUTH-01",
       "severity": "high",
       "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
-      "evidence": "Linked staff use verified Supabase Auth identity; legacy SHA-256 passwords migrate once and are cleared; self-change uses an isolated nonpersistent password session; setup-token issuance respects active claims; and a still-owned claim can finalize after expiry. Unit, production build, Edge and 176-check database rehearsal pass. A fresh Astra/xhigh reviewer accepted 7d3e7b3 after 49 focused tests and an installed-SDK session isolation probe.",
-      "next": "Deploy 7d3e7b3 and run real Auth login, recovery, MFA and distributed-origin checks."
+      "evidence": "Linked staff use verified Supabase Auth identity; legacy SHA-256 passwords migrate once and are cleared; self-change uses an isolated nonpersistent password session; setup-token issuance respects active claims; and a still-owned claim can finalize after expiry. Unit, production build, Edge and 181-check database rehearsal pass. A fresh Astra/xhigh reviewer accepted 7d3e7b3 after 49 focused tests and an installed-SDK session isolation probe.",
+      "next": "Deploy the exact candidate and run real Auth login, recovery, MFA and distributed-origin checks."
     },
     {
       "id": "REFUND-01",
@@ -33,15 +33,15 @@
     {
       "id": "NOTIFY-01",
       "severity": "high",
-      "status": "BACKLOG",
-      "evidence": "Notification reclaim, fairness and provider delivery evidence are not complete.",
-      "next": "Implement and validate against the reconciled ledger."
+      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
+      "evidence": "Durable tenant-fair notification jobs, transactional intent, stable provider idempotency, bounded retries/timeouts, crash recovery, stale-payload cancellation, legacy reminder suppression and atomic privileged retry audit pass 32 focused tests and the 181-check database rehearsal. Fresh Astra/xhigh review accepted the frozen source.",
+      "next": "Apply the exact migration and Edge candidate, verify the authenticated one-minute schedule, then run scoped genuine delivery and worker-failure probes."
     },
     {
       "id": "ARRIVAL-01",
       "severity": "high",
       "status": "LOCAL_DB_PASSED",
-      "evidence": "Arrival compatibility, audit and direct privilege checks pass the 176-check disposable database run.",
+      "evidence": "Arrival compatibility, audit and direct privilege checks pass the 181-check disposable database run.",
       "next": "Rehearse against an isolated target restored from the intended ledger."
     },
     {
@@ -103,9 +103,9 @@
     {
       "id": "BT500-LAUNCH-V1",
       "severity": "qualification",
-      "status": "PARTIAL_READ_SMOKE_PASS",
-      "evidence": "500 authenticated read sessions passed with zero failed checks; steady mixed writes, spike, recovery and soak are open.",
-      "next": "Run the approved distributed mixed-load profile."
+      "status": "STAFF_RUNNER_READY_EXECUTION_OPEN",
+      "evidence": "The 500-session read smoke passed. The guarded mixed-staff runner now enforces 70/20/10 actions, 100/250/500 ramp, 60-minute steady, 2x spike, recovery, 24-hour soak, zero dropped iterations, phase/journey latency and failure thresholds, marker isolation and post-run invariants. It has passed offline inspection but has not run against a deployed candidate.",
+      "next": "Deploy the exact candidate, complete provider-double/public/Realtime harnesses and quota proof, then execute the approved profile."
     },
     {
       "id": "RESTORE-01",
