@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHash } from "crypto";
 import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
 import { setAdminAuthPassword } from "../../../lib/admin-password";
 
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
+function hasRecentPasswordVerification(req: Request) {
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  try {
+    const encoded = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
+    return Array.isArray(payload.amr) && payload.amr.some((method: { method?: string; timestamp?: number }) => {
+      const verifiedAt = Number(method.timestamp) * 1000;
+      return method.method === "password" && Number.isFinite(verifiedAt)
+        && verifiedAt <= Date.now() + 30_000 && verifiedAt >= Date.now() - 5 * 60 * 1000;
+    });
+  } catch {
+    return false;
+  }
 }
 
 function adminClient() {
@@ -157,10 +167,9 @@ export async function POST(req: NextRequest) {
     catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
     }
-    const hashed = sha256(newPassword);
     const { error: updErr } = await db.from("admin_users").update({
       user_id: authUserId,
-      password_hash: hashed,
+      password_hash: null,
       must_set_password: false,
       password_set_at: new Date().toISOString(),
     }).eq("id", targetId);
@@ -169,39 +178,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // --- change_password: self-service (auth via email + current_password) ---
+  // --- change_password: the browser first reauthenticates with Supabase Auth,
+  //     then sends that newly issued verified session here. ---
   if (action === "change_password") {
-    const email = String(body.email || "").trim().toLowerCase();
-    const currentPassword = String(body.current_password || "");
     const newPassword = String(body.new_password || "");
-    if (!email || !currentPassword || !newPassword) {
-      return NextResponse.json({ error: "email, current_password, and new_password are required" }, { status: 400 });
-    }
+    if (!newPassword) return NextResponse.json({ error: "new_password is required" }, { status: 400 });
     if (newPassword.length < 8) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
-
-    const currentHash = sha256(currentPassword);
-    const { data: user } = await db
-      .from("admin_users")
-      .select("id, email, user_id")
-      .eq("email", email)
-      .eq("password_hash", currentHash)
-      .maybeSingle();
-
-    if (!user) {
-      return NextResponse.json({ error: "Incorrect email or current password" }, { status: 401 });
-    }
+    const caller = await getCallerAdmin(req, { skipSubscriptionCheck: true });
+    if (!caller || !hasRecentPasswordVerification(req)) return NextResponse.json({ error: "Sign in with your current password again" }, { status: 401 });
+    const { data: user } = await db.from("admin_users").select("id, email, user_id").eq("id", caller.id).maybeSingle();
+    if (!user?.user_id) return NextResponse.json({ error: "Account setup is incomplete" }, { status: 409 });
 
     let authUserId: string;
     try { authUserId = await setAdminAuthPassword(db, user, newPassword); }
     catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
     }
-    const newHash = sha256(newPassword);
     const { error: updErr } = await db.from("admin_users").update({
       user_id: authUserId,
-      password_hash: newHash,
+      password_hash: null,
       password_set_at: new Date().toISOString(),
       must_set_password: false,
       setup_token_hash: null,

@@ -22,12 +22,6 @@ function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function sha256Hex(input: string) {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 async function requireCredentialMfa(req: Request, adminId: string, userId: string) {
   const token = (req.headers.get("authorization") || "").match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) return { error: "Sign in again before linking credentials", status: 401 } as const;
@@ -74,8 +68,6 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
   try {
     const body = await req.json();
     const idempotencyKey = String(body.idempotency_key || "").trim();
-    const requesterEmail = String(body.requester_email || "").trim().toLowerCase();
-    const requesterPassword = String(body.requester_password || "");
     const businessName = String(body.business_name || "").trim();
     const businessTagline = String(body.business_tagline || "").trim();
     const adminName = String(body.admin_name || "").trim();
@@ -89,28 +81,22 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
     const yocoWebhookSecret = String(body.yoco_webhook_secret || "").trim() || null;
     const customDomain = String(body.custom_domain || "").trim() || null;
 
-    if (!requesterEmail || !requesterPassword || !businessName || !adminName || !adminEmail) {
-      return respond(400, { success: false, error: "requester_email, requester_password, business_name, admin_name, and admin_email are required" });
+    if (!businessName || !adminName || !adminEmail) {
+      return respond(400, { success: false, error: "business_name, admin_name, and admin_email are required" });
     }
 
     const { data: requester, error: requesterError } = await supabase
       .from("admin_users")
-      .select("id, role, password_hash, suspended")
-      .eq("email", requesterEmail)
+      .select("id, role, suspended")
       .eq("user_id", auth.userId)
       .maybeSingle();
     if (requesterError) throw requesterError;
-    if (!requester || !/super/i.test(String(requester.role || ""))) {
+    if (!requester || requester.role !== "SUPER_ADMIN") {
       return respond(403, { success: false, error: "Only super admins can create new tenants" });
     }
     if (requester.suspended) {
       return respond(403, { success: false, error: "Account is suspended" });
     }
-    const requesterHash = await sha256Hex(requesterPassword);
-    if (!requester.password_hash || requester.password_hash !== requesterHash) {
-      return respond(403, { success: false, error: "Super admin password verification failed" });
-    }
-
     const subdomain = String(body.subdomain || "").trim().toLowerCase();
     if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain)) return respond(400, { success: false, error: "A valid booking subdomain is required" });
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idempotencyKey)) return respond(400, { success: false, error: "A valid onboarding request ID is required" });

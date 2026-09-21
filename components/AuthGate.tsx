@@ -379,7 +379,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       });
       const data: any = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
+      const linkedAuthRequired = !res.ok && data?.code === "AUTH_REQUIRED";
+      if (!res.ok && !linkedAuthRequired) {
         // Special: account exists but needs password setup
         if (data?.code === "MUST_SET_PASSWORD" && data?.admin_id) {
           try {
@@ -412,8 +413,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const adminInfo = data?.admin;
-      if (data?.auth_ready !== true || !adminInfo) {
+      let adminInfo = data?.admin;
+      if (!linkedAuthRequired && (data?.auth_ready !== true || !adminInfo)) {
         setError("Login response was malformed");
         setLoading(false);
         return;
@@ -443,6 +444,25 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               : "Failed to start session: " + (signInRes.error?.message || "missing session"));
           }
           establishedSession = signInRes.data.session;
+
+          // Linked accounts are authorized by their verified Auth identity.
+          // The unauthenticated request above intentionally never consults the
+          // old password hash; resolve the staff row only after browser Auth.
+          if (linkedAuthRequired) {
+            const verifiedResponse = await fetch("/api/admin/login", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + establishedSession.access_token,
+              },
+              body: "{}",
+            });
+            const verified = await verifiedResponse.json().catch(() => ({}));
+            if (!verifiedResponse.ok || verified?.auth_ready !== true || !verified?.admin) {
+              throw new Error(verified?.error || "This sign-in is not linked to an administrator account.");
+            }
+            adminInfo = verified.admin;
+          }
 
           // This authenticated lookup must stay in the lock: releasing between sign-in and
           // queue activation would let stale validation sign out the newly established account.

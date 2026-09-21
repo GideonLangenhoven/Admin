@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHash, randomBytes } from "crypto";
 import { getCallerAdmin, isPrivilegedRole } from "../../../lib/api-auth";
-
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
 
 export async function POST(req: NextRequest) {
   const caller = await getCallerAdmin(req);
@@ -44,14 +39,12 @@ export async function POST(req: NextRequest) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const tempHash = sha256(randomBytes(24).toString("hex"));
-
   const { data: inserted, error: insertErr } = await admin
     .from("admin_users")
     .insert({
       name,
       email,
-      password_hash: tempHash,
+      password_hash: null,
       role: "ADMIN",
       business_id: businessId,
       must_set_password: true,

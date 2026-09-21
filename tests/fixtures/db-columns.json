@@ -36,6 +36,8 @@
     "read_only",
     "role",
     "settings_permissions",
+    "setup_token_claim_id",
+    "setup_token_claimed_at",
     "setup_token_expires_at",
     "setup_token_hash",
     "setup_token_hash_used",

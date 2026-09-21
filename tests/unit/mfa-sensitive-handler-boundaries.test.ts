@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { sourceHandler } from "../helpers/source-handler";
 
@@ -215,15 +214,12 @@ describe("platform bank Next boundary", () => {
 });
 
 describe("credential-bearing Super Admin onboarding", () => {
-  const password = "fixture-password";
-  const passwordHash = createHash("sha256").update(password).digest("hex");
-
   function onboardingHandler(level: "aal1" | "aal2") {
     const rpc = vi.fn(async () => ({ data: { success: true, business: { id: BUSINESS }, admin: { id: TARGET } }, error: null }));
     const db = {
       from(table: string) {
         const chain: any = { select: () => chain, eq: () => chain, maybeSingle: async () => ({
-          data: table === "admin_users" ? { id: ACTOR, role: "SUPER_ADMIN", password_hash: passwordHash, suspended: false } : null,
+          data: table === "admin_users" ? { id: ACTOR, role: "SUPER_ADMIN", suspended: false } : null,
           error: null,
         }) };
         return chain;
@@ -241,7 +237,7 @@ describe("credential-bearing Super Admin onboarding", () => {
     const request = (credentials = false) => new Request("https://fixture.invalid", {
       method: "POST", headers: { authorization: "Bearer signed-fixture" },
       body: JSON.stringify({
-        idempotency_key: OPERATION, requester_email: "super@example.test", requester_password: password,
+        idempotency_key: OPERATION,
         business_name: "Fixture Tours", subdomain: "fixture-tours", admin_name: "Owner", admin_email: "owner@example.test",
         timezone: "Africa/Johannesburg", currency: "ZAR",
         ...(credentials ? { yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "whsec_fixture" } : {}),

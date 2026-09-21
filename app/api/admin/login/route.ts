@@ -28,16 +28,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const email = String(body.email || "")
-    .trim()
-    .toLowerCase();
+  const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  if (!email || !password) {
-    return NextResponse.json(
-      { error: "Email and password are required" },
-      { status: 400 },
-    );
-  }
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!token && (!email || !password)) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
 
   let admin;
   try {
@@ -50,14 +44,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 1. Look up admin row in admin_users (service role bypasses RLS)
-  const { data: user, error: lookupErr } = await admin
-    .from("admin_users")
-    .select(
-      "id, email, name, role, business_id, password_hash, user_id, must_set_password, suspended, settings_permissions, read_only",
-    )
-    .eq("email", email)
-    .maybeSingle();
+  let authUserId = "";
+  if (token) {
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data.user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    authUserId = data.user.id;
+  }
+
+  // Linked accounts are resolved from the verified Auth identity. Email and a
+  // duplicate password digest are used only for one-time legacy migration.
+  let lookup = admin.from("admin_users").select(
+    "id, email, name, role, business_id, password_hash, user_id, must_set_password, suspended, settings_permissions, read_only",
+  );
+  lookup = token ? lookup.eq("user_id", authUserId) : lookup.eq("email", email);
+  const { data: user, error: lookupErr } = await lookup.maybeSingle();
 
   if (lookupErr) {
     console.error("ADMIN_LOGIN_LOOKUP_ERR", lookupErr.message);
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
-  if (user.must_set_password || !user.password_hash) {
+  if (user.must_set_password) {
     return NextResponse.json(
       {
         error: "Password setup required",
@@ -85,16 +85,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Verify password against legacy SHA-256 hash.
-  // After this passes, we lazy-migrate the user into Supabase Auth (which uses bcrypt internally).
-  const incomingHash = sha256(password);
-  if (user.password_hash !== incomingHash) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  }
+  if (!token) {
+    if (user.user_id) {
+      return NextResponse.json({ error: "Authenticate with Supabase Auth", code: "AUTH_REQUIRED" }, { status: 401 });
+    }
+    if (!user.password_hash || user.password_hash !== sha256(password)) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
 
-  // 3. Ensure admin has matching auth.users entry; create + link if not.
-  let authUserId: string | null = user.user_id;
-  if (!authUserId) {
     try {
       authUserId = await setAdminAuthPassword(admin, user, password);
     } catch (error) {
@@ -110,11 +108,11 @@ export async function POST(req: NextRequest) {
 
     const { error: linkErr } = await admin
       .from("admin_users")
-      .update({ user_id: authUserId })
+      .update({ user_id: authUserId, password_hash: null })
       .eq("id", user.id);
     if (linkErr) {
       console.error("ADMIN_LOGIN_LINK_ERR", linkErr.message);
-      // Non-fatal — auth.users exists, we'll keep going. Future logins will retry.
+      return NextResponse.json({ error: "Could not finish sign-in migration. Please try again." }, { status: 502 });
     }
   }
 

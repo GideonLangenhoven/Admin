@@ -60,8 +60,6 @@ export default function SuperAdminPage() {
   const { role, readOnly, refreshBusiness } = useBusinessContext();
   const onboardingMfa = useSensitiveActionMfa(Boolean(readOnly) || !/super/i.test(role || ""), "super-admin-onboarding");
 
-  const [requesterEmail, setRequesterEmail] = useState("");
-  const [requesterPassword, setRequesterPassword] = useState("");
   const [form, setForm] = useState<OnboardForm>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
   const onboardingRequest = useRef<string | null>(null);
@@ -403,7 +401,6 @@ export default function SuperAdminPage() {
   }
 
   useEffect(() => {
-    setRequesterEmail(localStorage.getItem("ck_admin_email") || "");
     if (/super/i.test(role || "")) loadBusinesses();
   }, [role]);
 
@@ -423,14 +420,6 @@ export default function SuperAdminPage() {
       notify({ title: "Access denied", message: "Only super admins can onboard new clients.", tone: "error" });
       return;
     }
-    if (!requesterEmail) {
-      notify({ title: "Missing session email", message: "Sign in again before creating a new tenant.", tone: "warning" });
-      return;
-    }
-    if (!requesterPassword) {
-      notify({ title: "Password required", message: "Enter your current password to authorize this onboarding action.", tone: "warning" });
-      return;
-    }
     const linksCredentials = Boolean(form.waToken || form.waPhoneId || form.yocoSecretKey || form.yocoWebhookSecret);
     if (linksCredentials && !await onboardingMfa.requireMfa("Link credentials while creating this client")) return;
 
@@ -440,8 +429,6 @@ export default function SuperAdminPage() {
       const res = await supabase.functions.invoke("super-admin-onboard", {
         body: {
           idempotency_key: onboardingRequest.current,
-          requester_email: requesterEmail,
-          requester_password: requesterPassword,
           business_name: form.businessName,
           business_tagline: form.businessTagline,
           subdomain: form.subdomain || null,
@@ -490,7 +477,6 @@ export default function SuperAdminPage() {
       });
       setForm(DEFAULT_FORM);
       onboardingRequest.current = null;
-      setRequesterPassword("");
       notify({ title: "Client created", message: "The tenant environment was created successfully.", tone: "success" });
       // The sidebar's tenant switcher fetches operators once on session load —
       // without this, a newly created tenant stays invisible until a hard reload.
@@ -535,17 +521,6 @@ export default function SuperAdminPage() {
       )}
 
       <form onSubmit={handleSubmit} className="ui-card anim-fade-up anim-d1 p-6 space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
-            <input value={requesterEmail} onChange={(e) => setRequesterEmail(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="superadmin@example.com" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Confirm Your Password</label>
-            <input type="password" value={requesterPassword} onChange={(e) => setRequesterPassword(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Current admin password" />
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Business Name</label>
@@ -1174,8 +1149,6 @@ type InviteRow = {
 const INVITE_FORM = { clientName: "", clientEmail: "", subdomain: "", expiresInHours: "48" };
 
 function OnboardingInvitesPanel() {
-  const [requesterEmail, setRequesterEmail] = useState("");
-  const [requesterPassword, setRequesterPassword] = useState("");
   const [form, setForm] = useState(INVITE_FORM);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<{ businessName: string; token: string; inviteLink: string | null; expiresAt: string } | null>(null);
@@ -1183,14 +1156,9 @@ function OnboardingInvitesPanel() {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => { setRequesterEmail(localStorage.getItem("ck_admin_email") || ""); }, []);
-
-  // Every action re-verifies the super admin's password, so the list can only be
-  // loaded once the password field is filled in — no auto-load on mount.
   async function callInvites(body: Record<string, unknown>) {
-    if (!requesterEmail || !requesterPassword) throw new Error("Enter your super admin email and password first.");
     const res = await supabase.functions.invoke("generate-invite-token", {
-      body: { requester_email: requesterEmail, requester_password: requesterPassword, ...body },
+      body,
     });
     if (res.error) {
       // functions.invoke gives a generic "non-2xx" message; the real reason is in the response body.
@@ -1306,17 +1274,6 @@ function OnboardingInvitesPanel() {
       </div>
 
       <form onSubmit={generateInvite} className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Super Admin Email</label>
-            <input value={requesterEmail} onChange={(e) => setRequesterEmail(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="superadmin@example.com" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Confirm Your Password</label>
-            <input type="password" value={requesterPassword} onChange={(e) => setRequesterPassword(e.target.value)} required className="ui-control w-full rounded-lg px-3 py-2 text-sm outline-none" placeholder="Current admin password" />
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ck-text-muted)]">Client Name</label>

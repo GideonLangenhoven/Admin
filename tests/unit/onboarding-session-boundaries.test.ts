@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { sourceHandler } from "../helpers/source-handler";
 
@@ -13,7 +12,6 @@ for (const name of ["super-admin-onboard", "generate-invite-token"]) {
         eq: (key: string, value: unknown) => { filters[key] = value; return query; },
         maybeSingle: async () => ({ data: filters.user_id === expectedUser ? {
           id: "admin", role: "SUPER_ADMIN", suspended: false,
-          password_hash: createHash("sha256").update("fixture-password").digest("hex"),
         } : null, error: null }),
       };
       const handler = sourceHandler("supabase/functions/" + name + "/index.ts", {
@@ -35,14 +33,14 @@ for (const name of ["super-admin-onboard", "generate-invite-token"]) {
     it("allows a signed-in platform owner to reach input validation", async () => {
       const f = fixture("SUPER_ADMIN");
       expect((await f.invoke({})).status).toBe(400);
-      expect(f.from).not.toHaveBeenCalled();
+      expect(f.from).toHaveBeenCalledTimes(name === "generate-invite-token" ? 1 : 0);
     });
 
-    it("binds password reconfirmation to the signed-in administrator", async () => {
+    it("binds the operation to the signed-in administrator", async () => {
       const f = fixture("SUPER_ADMIN", "different-platform-admin");
-      const response = await f.invoke({ requester_email: "owner@fixture.invalid", requester_password: "fixture-password", business_name: "Fixture", admin_name: "Owner", admin_email: "new@fixture.invalid" });
+      const response = await f.invoke({ business_name: "Fixture", admin_name: "Owner", admin_email: "new@fixture.invalid" });
       expect(response.status).toBe(403);
-      expect(f.filters).toMatchObject({ user_id: "platform", email: "owner@fixture.invalid" });
+      expect(f.filters).toMatchObject({ user_id: "platform" });
       expect(f.from).toHaveBeenCalledTimes(1);
     });
 

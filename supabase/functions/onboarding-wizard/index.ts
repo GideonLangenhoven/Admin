@@ -488,7 +488,7 @@ Deno.serve(async (req) => {
             name: invite.client_name || business.business_name,
             email: clientEmail,
             role: "MAIN_ADMIN",
-            password_hash: "",
+            password_hash: null,
             must_set_password: true,
           }).select("id").single();
           if (error) throw error;

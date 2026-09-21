@@ -115,6 +115,76 @@ try {
       where a.email like 'continuity-%@example.invalid'
     `)).rows[0].count,0);
   });
+  await check('setup-token claim functions are service-only',async()=>{
+    for(const role of ['anon','authenticated']) {
+      const privileges=(await db.query(`select
+        has_function_privilege($1,'public.claim_admin_setup_token(text,text,uuid)','EXECUTE') claim,
+        has_function_privilege($1,'public.complete_admin_setup_token(uuid,text,uuid,uuid)','EXECUTE') complete,
+        has_function_privilege($1,'public.release_admin_setup_token_claim(uuid,uuid)','EXECUTE') release`,[role])).rows[0];
+      assert.deepEqual(privileges,{claim:false,complete:false,release:false});
+    }
+    assert.equal((await db.query("select has_function_privilege('service_role','public.claim_admin_setup_token(text,text,uuid)','EXECUTE') allowed")).rows[0].allowed,true);
+  });
+  await check('only one concurrent setup-token claim reaches password mutation',async()=>{
+    const adminId=id(901001);
+    const tokenHash='setup-token-hash';
+    const claimIds=[id(903001),id(903002)];
+    await db.query(`update admin_users set
+      password_hash='legacy-hash',must_set_password=true,setup_token_hash=$2,
+      setup_token_expires_at=now()+interval '1 hour',setup_token_hash_used=null,
+      setup_token_claim_id=null,setup_token_claimed_at=null
+      where id=$1`,[adminId,tokenHash]);
+    const clients=[new pg.Client({...connection,database}),new pg.Client({...connection,database})];
+    try {
+      await Promise.all(clients.map(client=>client.connect().then(()=>client.query('set role service_role'))));
+      const claims=await Promise.all(clients.map((client,index)=>client.query(
+        'select claim_admin_setup_token($1,$2,$3) result',
+        ['continuity-1@example.invalid',tokenHash,claimIds[index]],
+      )));
+      const results=claims.map(result=>result.rows[0].result);
+      assert.equal(results.filter(result=>result.status==='CLAIMED').length,1);
+      assert.equal(results.filter(result=>result.status==='BUSY').length,1);
+      const winningIndex=results.findIndex(result=>result.status==='CLAIMED');
+      assert.equal((await clients[winningIndex].query(
+        'select complete_admin_setup_token($1,$2,$3,$4) completed',
+        [adminId,tokenHash,claimIds[winningIndex],id(902001)],
+      )).rows[0].completed,true);
+      const row=(await db.query(`select user_id,password_hash,must_set_password,setup_token_hash,
+        setup_token_hash_used,setup_token_claim_id from admin_users where id=$1`,[adminId])).rows[0];
+      assert.deepEqual(row,{
+        user_id:id(902001),password_hash:null,must_set_password:false,setup_token_hash:null,
+        setup_token_hash_used:tokenHash,setup_token_claim_id:null,
+      });
+      assert.equal((await clients[1-winningIndex].query(
+        'select claim_admin_setup_token($1,$2,$3) result',
+        ['continuity-1@example.invalid',tokenHash,claimIds[1-winningIndex]],
+      )).rows[0].result.status,'COMPLETED');
+    } finally { await Promise.all(clients.map(client=>client.end())); }
+  });
+  await check('a failed setup attempt can release only its own claim',async()=>{
+    const adminId=id(901002);
+    const tokenHash='retryable-setup-token-hash';
+    const claimId=id(903003);
+    await db.query(`update admin_users set setup_token_hash=$2,
+      setup_token_expires_at=now()+interval '1 hour',setup_token_claim_id=null,
+      setup_token_claimed_at=null where id=$1`,[adminId,tokenHash]);
+    assert.equal((await db.query(
+      'select claim_admin_setup_token($1,$2,$3) result',
+      ['continuity-2@example.invalid',tokenHash,claimId],
+    )).rows[0].result.status,'CLAIMED');
+    assert.equal((await db.query(
+      'select release_admin_setup_token_claim($1,$2) released',
+      [adminId,id(903004)],
+    )).rows[0].released,false);
+    assert.equal((await db.query(
+      'select release_admin_setup_token_claim($1,$2) released',
+      [adminId,claimId],
+    )).rows[0].released,true);
+    assert.equal((await db.query(
+      'select claim_admin_setup_token($1,$2,$3) result',
+      ['continuity-2@example.invalid',tokenHash,id(903005)],
+    )).rows[0].result.status,'CLAIMED');
+  });
   await check('pricing migration preserves existing subscriptions, plans, and open billing lines', async()=>{
     const after=(await db.query(`
       select jsonb_build_object(
