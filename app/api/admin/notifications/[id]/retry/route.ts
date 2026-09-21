@@ -26,11 +26,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isPrivilegedRole(caller.role)) return NextResponse.json({ error: "MAIN_ADMIN required" }, { status: 403 });
 
-  const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
-  if (!encryptionKey || encryptionKey.length < 32) {
-    return NextResponse.json({ error: "SETTINGS_ENCRYPTION_KEY is not configured on the server." }, { status: 500 });
-  }
-
   const { id } = await params;
   const db = adminClient();
 
@@ -40,7 +35,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("business_id", caller.business_id)
     .maybeSingle();
 
-  if (!row) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+  if (!row) {
+    const { data: emailJob, error: emailError } = await db.from("notification_jobs")
+      .select("id, status, business_id")
+      .eq("id", id)
+      .eq("business_id", caller.business_id)
+      .maybeSingle();
+    if (emailError) return NextResponse.json({ error: emailError.message }, { status: 500 });
+    if (!emailJob) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+    if (emailJob.status !== "FAILED") return NextResponse.json({ error: "Only FAILED email jobs can be retried" }, { status: 400 });
+    const { data: retryResult, error: retryError } = await db.rpc("retry_notification_job", {
+      p_job_id: emailJob.id,
+      p_business_id: caller.business_id,
+      p_actor_id: caller.id,
+    });
+    if (retryError) return NextResponse.json({ error: retryError.message }, { status: 500 });
+    if (!retryResult?.ok) {
+      if (retryResult?.status === "RECONCILIATION_REQUIRED") {
+        return NextResponse.json({ error: "Provider acceptance is uncertain and the idempotency window expired. Reconcile this email in Resend before retrying." }, { status: 409 });
+      }
+      if (retryResult?.status === "RETRY_WINDOW_EXPIRED") {
+        return NextResponse.json({ error: "The provider idempotency window expired. Create a new notification instead of retrying this delivery." }, { status: 409 });
+      }
+      if (retryResult?.status === "FORBIDDEN") return NextResponse.json({ error: "Not authorized to retry this notification" }, { status: 403 });
+      if (retryResult?.status === "RETRY_LIMIT") return NextResponse.json({ error: "Manual retry limit reached" }, { status: 409 });
+      return NextResponse.json({ error: "Notification can no longer be retried" }, { status: retryResult?.status === "NOT_FOUND" ? 404 : 409 });
+    }
+    return NextResponse.json({ ok: true, outcome: "queued" });
+  }
+  const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
+  if (!encryptionKey || encryptionKey.length < 32) {
+    return NextResponse.json({ error: "SETTINGS_ENCRYPTION_KEY is not configured on the server." }, { status: 500 });
+  }
   if (!["FAILED", "EXPIRED"].includes(row.status)) {
     return NextResponse.json({ error: "Only FAILED or EXPIRED rows can be retried" }, { status: 400 });
   }
@@ -92,7 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await db.from("outbox").update({ status: "FAILED", attempts, error: metaError }).eq("id", row.id);
   }
 
-  await db.from("audit_logs").insert({
+  const { error: auditError } = await db.from("audit_logs").insert({
     actor_id: caller.id,
     business_id: caller.business_id,
     action_type: "OUTBOX_RETRY",
@@ -100,6 +126,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     target_id: id,
     metadata: { outcome },
   });
+  if (auditError) return NextResponse.json({ error: "Notification retry completed, but its audit log could not be recorded: " + auditError.message }, { status: 500 });
 
   if (outcome === "failed") {
     console.error("OUTBOX_RETRY_ERR", id, metaError);

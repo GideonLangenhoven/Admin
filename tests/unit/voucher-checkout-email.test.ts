@@ -17,10 +17,14 @@ describe("gift voucher checkout email flow", () => {
     const cronSource = readFileSync("supabase/functions/cron-tasks/index.ts", "utf8");
     const sendEmailSource = readFileSync("supabase/functions/send-email/index.ts", "utf8");
 
-    expect(cronSource).toContain('type: "VOUCHER_PAYMENT_LINK"');
-    // Fires once: guarded on the reminder-sent stamp.
-    expect(cronSource).toContain('.is("payment_reminder_sent_at", null)');
-    expect(cronSource).toContain("payment_reminder_sent_at:");
+    expect(cronSource).toContain('rpc("enqueue_voucher_payment_reminders"');
+    expect(cronSource).toContain('rpc("claim_notification_jobs"');
+    expect(cronSource).toContain('rpc("finish_notification_job"');
+    // A current checkout/email fingerprint is queued once; changed payment
+    // details produce a fresh stable key, and provider acceptance stamps source.
+    const migration = readFileSync("supabase/migrations/20260921140000_durable_notification_jobs.sql", "utf8");
+    expect(migration).toContain("'voucher-payment-link/' || v.id::text");
+    expect(migration).toContain("payment_reminder_sent_at = COALESCE(payment_reminder_sent_at, now())");
     expect(sendEmailSource).toContain('case "VOUCHER_PAYMENT_LINK"');
   });
 });

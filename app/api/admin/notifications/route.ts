@@ -36,7 +36,35 @@ export async function GET(req: NextRequest) {
     q = q.in("status", ["FAILED", "EXPIRED"]);
   }
 
-  const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ rows: data || [] });
+  let emailJobs = db.from("notification_jobs")
+    .select("id, recipient, template_type, status, attempts, last_error, next_attempt_at, accepted_at, created_at, booking_id")
+    .eq("business_id", caller.business_id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (tab === "waiting") emailJobs = emailJobs.in("status", ["QUEUED", "PROCESSING"]);
+  else if (tab === "recent") {
+    emailJobs = emailJobs.eq("status", "ACCEPTED").gte("accepted_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  } else emailJobs = emailJobs.in("status", ["FAILED", "CANCELLED"]);
+
+  const [{ data, error }, { data: emailData, error: emailError }] = await Promise.all([q, emailJobs]);
+  if (error || emailError) return NextResponse.json({ error: error?.message || emailError?.message }, { status: 500 });
+  const rows = [
+    ...(data || []).map(row => ({ ...row, channel: "WHATSAPP", destination: row.phone })),
+    ...(emailData || []).map(row => ({
+      id: row.id,
+      phone: "",
+      destination: row.recipient,
+      channel: "EMAIL",
+      message_type: row.template_type,
+      message_body: null,
+      status: row.status,
+      attempts: row.attempts,
+      error: row.last_error,
+      scheduled_for: row.next_attempt_at,
+      sent_at: row.accepted_at,
+      created_at: row.created_at,
+      booking_id: row.booking_id,
+    })),
+  ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 100);
+  return NextResponse.json({ rows });
 }

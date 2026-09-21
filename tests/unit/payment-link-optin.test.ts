@@ -21,7 +21,6 @@ describe("payment-link opt-in", () => {
       "supabase/functions/web-chat/index.ts",
       "supabase/functions/wa-webhook/index.ts",
       "supabase/functions/external-booking/index.ts",
-      "booking/app/book/page.tsx",
     ]) {
       expect(read(p), p).not.toContain("send_payment_link");
     }
@@ -34,10 +33,12 @@ describe("payment-link opt-in", () => {
   });
 
   // The two automatic customer-facing payment-link emails (the only ones):
-  it("hold-expiry (payment timeout) emails the payment link", () => {
-    const src = read("supabase/functions/cron-tasks/index.ts");
-    expect(src).toMatch(/stillUnpaid[\s\S]*payment_url/);
-    expect(src).toContain("HOLD_EXPIRY_PAYLINK_SENT");
+  it("hold-expiry transactionally queues the payment link for the durable worker", () => {
+    const migration = read("supabase/migrations/20260921140000_durable_notification_jobs.sql");
+    const worker = read("supabase/functions/cron-tasks/index.ts");
+    expect(migration).toMatch(/CREATE OR REPLACE FUNCTION public\.expire_single_hold[\s\S]*INSERT INTO notification_jobs[\s\S]*'HOLD_PAYMENT_REMINDER'[\s\S]*'PAYMENT_LINK'/);
+    expect(migration).toContain("'hold-payment-link/' || h.id::text");
+    expect(worker).toMatch(/rpc\("claim_notification_jobs"[\s\S]*rpc\("validate_notification_job"[\s\S]*type: job\.template_type[\s\S]*delivery_idempotency_key: job\.dedupe_key[\s\S]*rpc\("finish_notification_job"/);
   });
 
   it("3rd failed payment emails the payment link", () => {
