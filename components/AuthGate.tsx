@@ -3,6 +3,16 @@ import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
+import {
+  activateGuideQueueAuthContext,
+  clearGuideQueueAuthContext,
+  currentGuideQueueAuthority,
+  currentGuideQueueAuthGeneration,
+  guideQueueAuthContext,
+  isCurrentGuideQueueAuthClear,
+  sameGuideAuthSession,
+  withGuideAuthTransitionLock,
+} from "../app/lib/guide-offline";
 import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 import { fetchAllRows } from "../supabase/functions/_shared/pagination";
@@ -14,6 +24,7 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 30 * 60 * 1000;
 const DEMO_EMAIL = "info@bookingtours.co.za";
 const DEMO_PASSWORD = "TEST123!";
+const PROTECTED_SIGN_OUT_EVENT = "bookingtours:protected-sign-out";
 
 interface OperatorOption {
   id: string;
@@ -23,6 +34,8 @@ interface OperatorOption {
   subscriptionStatus: string;
   yocoTestMode: boolean;
 }
+
+type AuthSession = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -42,7 +55,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   // Business context from login/session
   const [businessId, setBusinessId] = useState("");
   const contextRequestRef = useRef(0);
+  const guideAuthorityEpochRef = useRef<number | null>(null);
+  const authSessionRef = useRef<AuthSession>(null);
+  const authTransitionAbortRef = useRef<AbortController | null>(null);
   const [businessName, setBusinessName] = useState("");
+  const [staffName, setStaffName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [role, setRole] = useState("");
@@ -56,13 +73,34 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
+    const authTransitionAbort = new AbortController();
+    authTransitionAbortRef.current = authTransitionAbort;
     setHasHint(document.cookie.includes("ck_session_hint=1"));
-    validateSession().catch((error) => {
+    validateSession(authTransitionAbort.signal).catch((error) => {
+      if (authTransitionAbort.signal.aborted) return;
       console.error("Session validation failed:", error);
       setError("We couldn't verify your account. Please try signing in again.");
       setChecking(false);
     });
     checkLockout();
+    return () => {
+      authTransitionAbort.abort();
+      if (authTransitionAbortRef.current === authTransitionAbort) authTransitionAbortRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onSignOutRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        handled: boolean;
+        complete: (success: boolean) => void;
+      }>).detail;
+      if (!detail || typeof detail.complete !== "function") return;
+      detail.handled = true;
+      clearSession().then(detail.complete).catch(() => detail.complete(false));
+    };
+    window.addEventListener(PROTECTED_SIGN_OUT_EVENT, onSignOutRequest);
+    return () => window.removeEventListener(PROTECTED_SIGN_OUT_EVENT, onSignOutRequest);
   }, []);
 
   useEffect(() => {
@@ -141,20 +179,41 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }
 
-  async function validateSession() {
+  async function bindValidatedGuideAuthority(
+    observedSession: AuthSession,
+    expectedGuideEpoch: number,
+    targetBusinessId: string,
+    readOnlyAccount: boolean,
+    signal: AbortSignal,
+    onBound: () => void,
+  ) {
+    return withGuideAuthTransitionLock(async () => {
+      if (signal.aborted) return false;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!sameGuideAuthSession(observedSession, currentSession)) return false;
+      const guideContext = guideQueueAuthContext(currentSession, targetBusinessId);
+      const guideEpoch = readOnlyAccount || !targetBusinessId
+        ? await clearGuideQueueAuthContext(expectedGuideEpoch)
+        : guideContext && await activateGuideQueueAuthContext(guideContext, expectedGuideEpoch, () => !signal.aborted);
+      if (guideEpoch === null || signal.aborted) return false;
+      guideAuthorityEpochRef.current = guideEpoch;
+      authSessionRef.current = currentSession;
+      onBound();
+      return true;
+    }, signal);
+  }
+
+  async function validateSession(signal: AbortSignal) {
+    const expectedGuideEpoch = currentGuideQueueAuthGeneration();
+    const { data: { session: observedSession } } = await supabase.auth.getSession();
+    if (signal.aborted) return;
     const savedEmail = localStorage.getItem("ck_admin_email");
     const savedTime = localStorage.getItem("ck_admin_time");
 
-    if (!savedEmail || !savedTime || Date.now() - Number(savedTime) > SESSION_TIMEOUT) {
-      await clearSession();
-      setChecking(false);
-      return;
-    }
-
-    // Confirm we still have a Supabase Auth session (set during login or auto-restored from storage).
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session) {
-      await clearSession();
+    if (!savedEmail || !savedTime || Date.now() - Number(savedTime) > SESSION_TIMEOUT || !observedSession) {
+      if (signal.aborted) return;
+      await clearSession(expectedGuideEpoch, observedSession);
+      if (signal.aborted) return;
       setChecking(false);
       return;
     }
@@ -164,73 +223,138 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       .select("role, business_id, name, settings_permissions, read_only")
       .eq("email", savedEmail)
       .maybeSingle();
+    if (signal.aborted) return;
 
+    let bound = false;
     if (data && data.business_id) {
       const context = await loadBusinessContext(data.role, data.business_id);
-      setRole(data.role);
-      setBusinessId(context.businessId);
-      setBusinessName(context.businessName);
-      setLogoUrl(context.logoUrl);
-      setTimezone(context.timezone);
-      setOperators(context.operators);
-      setSubscriptionStatus(context.subscriptionStatus);
-      setYocoTestMode(context.yocoTestMode || false);
-      setReadOnly(data.read_only === true);
-      setHostMismatch(context.hostMismatch);
-      localStorage.setItem("ck_admin_role", data.role);
-      localStorage.setItem("ck_admin_business_id", context.businessId);
-      localStorage.setItem("ck_admin_timezone", context.timezone);
-      localStorage.setItem("ck_admin_name", data.name || "");
-      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
-      setAuthed(true);
-      document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
-      document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
-      document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+      if (signal.aborted) return;
+      bound = await bindValidatedGuideAuthority(
+        observedSession,
+        expectedGuideEpoch,
+        context.businessId,
+        data.read_only === true,
+        signal,
+        () => {
+          setRole(data.role);
+          setStaffName(data.name || "");
+          setBusinessId(context.businessId);
+          setBusinessName(context.businessName);
+          setLogoUrl(context.logoUrl);
+          setTimezone(context.timezone);
+          setOperators(context.operators);
+          setSubscriptionStatus(context.subscriptionStatus);
+          setYocoTestMode(context.yocoTestMode || false);
+          setReadOnly(data.read_only === true);
+          setHostMismatch(context.hostMismatch);
+          localStorage.setItem("ck_admin_role", data.role);
+          localStorage.setItem("ck_admin_business_id", context.businessId);
+          localStorage.setItem("ck_admin_timezone", context.timezone);
+          localStorage.setItem("ck_admin_name", data.name || "");
+          localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
+          setAuthed(true);
+          document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
+          document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+          document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+        },
+      );
     } else if (data) {
-      // Admin exists but no business_id — legacy admin, still allow access
-      setRole(data.role);
-      setReadOnly(data.read_only === true);
-      setTimezone("UTC");
-      setOperators([]);
-      localStorage.setItem("ck_admin_role", data.role);
-      localStorage.setItem("ck_admin_name", data.name || "");
-      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
-      setAuthed(true);
-      document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
-      document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
-      document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+      // Admin exists but no business_id — legacy admin, still allow access.
+      bound = await bindValidatedGuideAuthority(observedSession, expectedGuideEpoch, "", true, signal, () => {
+        setRole(data.role);
+        setStaffName(data.name || "");
+        setReadOnly(data.read_only === true);
+        setTimezone("UTC");
+        setOperators([]);
+        localStorage.setItem("ck_admin_role", data.role);
+        localStorage.setItem("ck_admin_name", data.name || "");
+        localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
+        setAuthed(true);
+        document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
+        document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+        document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+      });
     } else {
-      await clearSession();
+      if (signal.aborted) return;
+      await clearSession(expectedGuideEpoch, observedSession);
+      if (signal.aborted) return;
+      setChecking(false);
+      return;
     }
+    if (signal.aborted) return;
+    if (!bound) setError("Account changed in another tab. Refresh before continuing.");
     setChecking(false);
   }
 
-  async function clearSession() {
+  async function clearSession(expectedGuideEpoch?: number, expectedSession?: AuthSession) {
     contextRequestRef.current++;
-    try { await supabase.auth.signOut(); } catch { /* swallow — local cleanup must always run */ }
-    localStorage.removeItem("ck_admin_auth");
-    localStorage.removeItem("ck_admin_role");
-    localStorage.removeItem("ck_admin_email");
-    localStorage.removeItem("ck_admin_time");
-    localStorage.removeItem("ck_admin_business_id");
-    localStorage.removeItem("ck_admin_timezone");
-    localStorage.removeItem("ck_operator_override_business_id");
-    localStorage.removeItem("ck_admin_name");
-    localStorage.removeItem("ck_admin_settings_perms");
-    document.cookie = "ck_session_hint=;path=/;max-age=0";
-    document.cookie = "ck_admin_role=;path=/;max-age=0";
-    document.cookie = "ck_demo_read_only=;path=/;max-age=0";
-    setAuthed(false);
-    setBusinessId("");
-    setBusinessName("");
-    setLogoUrl("");
-    setTimezone("UTC");
-    setRole("");
-    setOperators([]);
-    setSubscriptionStatus("ACTIVE");
-    setYocoTestMode(false);
-    setReadOnly(false);
-    setHostMismatch(null);
+    const intentionalGlobalSignOut = expectedGuideEpoch === undefined;
+    const requestedSession = intentionalGlobalSignOut ? authSessionRef.current : expectedSession ?? null;
+    const requestedAuthority = currentGuideQueueAuthority();
+    const requestedEpoch = expectedGuideEpoch ?? currentGuideQueueAuthGeneration();
+    const signal = authTransitionAbortRef.current?.signal;
+    if (!signal) {
+      setError("This browser cannot safely change accounts.");
+      return false;
+    }
+    try {
+      return await withGuideAuthTransitionLock(async () => {
+        if (signal.aborted) return false;
+        const { data: { session: observedSession } } = await supabase.auth.getSession();
+        if (!sameGuideAuthSession(requestedSession, observedSession)) return false;
+        const currentAuthority = currentGuideQueueAuthority();
+        if (requestedAuthority
+          ? !currentAuthority
+            || currentAuthority.generation !== requestedAuthority.generation
+            || currentAuthority.authorityId !== requestedAuthority.authorityId
+            || currentAuthority.userId !== requestedAuthority.userId
+            || currentAuthority.businessId !== requestedAuthority.businessId
+          : currentAuthority || currentGuideQueueAuthGeneration() !== requestedEpoch) return false;
+        const clearedEpoch = requestedAuthority
+          ? await clearGuideQueueAuthContext(requestedEpoch, requestedAuthority)
+          : await clearGuideQueueAuthContext(requestedEpoch);
+        if (clearedEpoch === null) throw new Error("Unable to revoke guide queue authority");
+        if (!isCurrentGuideQueueAuthClear(clearedEpoch) || signal.aborted) return false;
+        const { data: { session: sessionBeforeSignOut } } = await supabase.auth.getSession();
+        if (!sameGuideAuthSession(observedSession, sessionBeforeSignOut)
+            || !isCurrentGuideQueueAuthClear(clearedEpoch) || signal.aborted) return false;
+        guideAuthorityEpochRef.current = clearedEpoch;
+        const signOutResult = await supabase.auth.signOut();
+        if (signOutResult?.error) throw signOutResult.error;
+        if (!isCurrentGuideQueueAuthClear(clearedEpoch) || signal.aborted) return false;
+        localStorage.removeItem("ck_admin_auth");
+        localStorage.removeItem("ck_admin_role");
+        localStorage.removeItem("ck_admin_email");
+        localStorage.removeItem("ck_admin_time");
+        localStorage.removeItem("ck_admin_business_id");
+        localStorage.removeItem("ck_admin_timezone");
+        localStorage.removeItem("ck_operator_override_business_id");
+        localStorage.removeItem("ck_admin_name");
+        localStorage.removeItem("ck_admin_settings_perms");
+        authSessionRef.current = null;
+        document.cookie = "ck_session_hint=;path=/;max-age=0";
+        document.cookie = "ck_admin_role=;path=/;max-age=0";
+        document.cookie = "ck_demo_read_only=;path=/;max-age=0";
+        setAuthed(false);
+        setBusinessId("");
+        setBusinessName("");
+        setStaffName("");
+        setLogoUrl("");
+        setTimezone("UTC");
+        setRole("");
+        setOperators([]);
+        setSubscriptionStatus("ACTIVE");
+        setYocoTestMode(false);
+        setReadOnly(false);
+        setHostMismatch(null);
+        return true;
+      }, signal);
+    } catch (error) {
+      if (!signal.aborted && (error as { name?: string })?.name !== "AbortError") {
+        setError("This browser cannot safely change accounts.");
+      }
+      return false;
+    }
   }
 
   async function login(loginEmail = email, loginPassword = pass) {
@@ -240,6 +364,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setError("");
       return;
     }
+    const expectedGuideEpoch = currentGuideQueueAuthGeneration();
 
     setLoading(true);
     setError("");
@@ -287,56 +412,105 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const session = data?.session;
       const adminInfo = data?.admin;
-      if (!session?.access_token || !adminInfo) {
+      if (data?.auth_ready !== true || !adminInfo) {
         setError("Login response was malformed");
         setLoading(false);
         return;
       }
 
-      // Set Supabase Auth session — every subsequent supabase-js call now goes as the authenticated user.
-      const setRes = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-      if (setRes.error) {
-        setError("Failed to start session: " + setRes.error.message);
-        setLoading(false);
+      const signal = authTransitionAbortRef.current?.signal;
+      if (!signal) throw new Error("Safe account transition unavailable");
+      const established = await withGuideAuthTransitionLock(async () => {
+        if (signal.aborted || currentGuideQueueAuthGeneration() !== expectedGuideEpoch) return false;
+        const transitionEpoch = await clearGuideQueueAuthContext(expectedGuideEpoch);
+        if (transitionEpoch === null || !isCurrentGuideQueueAuthClear(transitionEpoch)) return false;
+
+        let establishedSession: AuthSession = null;
+        let establishedGuideEpoch = transitionEpoch;
+        try {
+          // Mint the session from the browser so Supabase applies its per-IP
+          // token limit to the user's network, not the shared app-server IP.
+          const signInRes = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password: loginPassword,
+          });
+          if (signInRes.error || !signInRes.data.session) {
+            const rateLimited = signInRes.error?.status === 429
+              || /rate limit|too many requests/i.test(signInRes.error?.message || "");
+            throw new Error(rateLimited
+              ? "Too many sign-in attempts from this network. Please wait a moment and try again."
+              : "Failed to start session: " + (signInRes.error?.message || "missing session"));
+          }
+          establishedSession = signInRes.data.session;
+
+          // This authenticated lookup must stay in the lock: releasing between sign-in and
+          // queue activation would let stale validation sign out the newly established account.
+          let context: Awaited<ReturnType<typeof loadBusinessContext>> | null = null;
+          if (adminInfo.business_id) context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (!sameGuideAuthSession(establishedSession, currentSession)) return false;
+          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const guideContext = context && guideQueueAuthContext(currentSession, context.businessId);
+          const guideEpoch = adminInfo.read_only === true || !context
+            ? transitionEpoch
+            : guideContext && await activateGuideQueueAuthContext(guideContext, transitionEpoch, () => !signal.aborted);
+          if (guideEpoch === null) throw new Error("Guide authority changed during login");
+          establishedGuideEpoch = guideEpoch;
+          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+          guideAuthorityEpochRef.current = guideEpoch;
+          authSessionRef.current = currentSession;
+
+          localStorage.removeItem("ck_fail_count");
+          localStorage.removeItem("ck_lock_until");
+          localStorage.setItem("ck_admin_auth", "true");
+          localStorage.setItem("ck_admin_role", adminInfo.role);
+          localStorage.setItem("ck_admin_email", adminInfo.email);
+          localStorage.setItem("ck_admin_time", String(Date.now()));
+          localStorage.setItem("ck_admin_name", adminInfo.name || "");
+          localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
+
+          setRole(adminInfo.role);
+          setStaffName(adminInfo.name || "");
+          setReadOnly(adminInfo.read_only === true);
+          document.cookie = "ck_admin_role=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
+          document.cookie = "ck_demo_read_only=" + (adminInfo.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+
+          if (context) {
+            localStorage.setItem("ck_admin_business_id", context.businessId);
+            localStorage.setItem("ck_admin_timezone", context.timezone);
+            setBusinessId(context.businessId);
+            setBusinessName(context.businessName);
+            setLogoUrl(context.logoUrl);
+            setTimezone(context.timezone);
+            setOperators(context.operators);
+            setSubscriptionStatus(context.subscriptionStatus);
+            setYocoTestMode(context.yocoTestMode || false);
+            setHostMismatch(context.hostMismatch);
+          }
+
+          setAuthed(true);
+          return true;
+        } catch (error) {
+          if (establishedSession) {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            if (sameGuideAuthSession(establishedSession, currentSession)) {
+              const cleanupEpoch = await clearGuideQueueAuthContext(establishedGuideEpoch).catch(() => null);
+              if (cleanupEpoch === null || !isCurrentGuideQueueAuthClear(cleanupEpoch)) {
+                throw new Error("Login cleanup could not revoke offline guide authority. This session was kept active for safety.");
+              }
+              try { await supabase.auth.signOut(); } catch { /* the queue authority is already durably clear */ }
+              authSessionRef.current = null;
+            }
+          }
+          throw error;
+        }
+      }, signal);
+      if (!established) {
+        setError("Account changed in another tab. Refresh before continuing.");
         return;
       }
 
-      localStorage.removeItem("ck_fail_count");
-      localStorage.removeItem("ck_lock_until");
-      localStorage.setItem("ck_admin_auth", "true");
-      localStorage.setItem("ck_admin_role", adminInfo.role);
-      localStorage.setItem("ck_admin_email", adminInfo.email);
-      localStorage.setItem("ck_admin_time", String(Date.now()));
-      localStorage.setItem("ck_admin_name", adminInfo.name || "");
-      localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
-
-      setRole(adminInfo.role);
-      setReadOnly(adminInfo.read_only === true);
-      // Set ck_admin_role cookie immediately so proxy.ts page-gating works on the
-      // very next navigation (without waiting for validateSession to run on next mount).
-      document.cookie = "ck_admin_role=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
-      document.cookie = "ck_demo_read_only=" + (adminInfo.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
-
-      if (adminInfo.business_id) {
-        const context = await loadBusinessContext(adminInfo.role, adminInfo.business_id);
-        localStorage.setItem("ck_admin_business_id", context.businessId);
-        localStorage.setItem("ck_admin_timezone", context.timezone);
-        setBusinessId(context.businessId);
-        setBusinessName(context.businessName);
-        setLogoUrl(context.logoUrl);
-        setTimezone(context.timezone);
-        setOperators(context.operators);
-        setSubscriptionStatus(context.subscriptionStatus);
-        setYocoTestMode(context.yocoTestMode || false);
-        setHostMismatch(context.hostMismatch);
-      }
-
-      setAuthed(true);
       if (new URLSearchParams(window.location.search).get("demo") === "1") {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("demo");
@@ -345,7 +519,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         // Simple view is entered deliberately from the full app. A restored
         // authenticated session may keep a deep link, but a fresh sign-in
         // always starts on the full dashboard.
-        window.location.replace("/");
+        window.history.replaceState({}, "", "/");
+        window.location.reload();
       }
     } catch (err: any) {
       console.error("LOGIN_ERR", err);
@@ -371,20 +546,45 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setResetSent(true);
   }
 
-  function switchOperator(nextBusinessId: string) {
+  async function switchOperator(nextBusinessId: string) {
     if (!nextBusinessId || nextBusinessId === businessId) return;
     const nextOperator = operators.find((operator) => operator.id === nextBusinessId);
     if (!nextOperator) return;
-    contextRequestRef.current++;
-    localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-    localStorage.setItem("ck_admin_business_id", nextBusinessId);
-    setBusinessId(nextOperator.id);
-    setBusinessName(nextOperator.name);
-    setLogoUrl(nextOperator.logoUrl || "");
-    setTimezone(nextOperator.timezone || "UTC");
-    setSubscriptionStatus(nextOperator.subscriptionStatus || "ACTIVE");
-    setYocoTestMode(nextOperator.yocoTestMode || false);
-    localStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
+    const expectedGuideEpoch = guideAuthorityEpochRef.current;
+    if (expectedGuideEpoch === null) return;
+    const signal = authTransitionAbortRef.current?.signal;
+    if (!signal) {
+      setError("This browser cannot safely switch operators.");
+      return;
+    }
+    const switched = await withGuideAuthTransitionLock(async () => {
+      if (signal.aborted) return false;
+      const currentGuideAuthority = currentGuideQueueAuthority();
+      if (!currentGuideAuthority || currentGuideAuthority.generation !== expectedGuideEpoch
+          || currentGuideAuthority.businessId !== businessId) return false;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!sameGuideAuthSession(authSessionRef.current, session)) return false;
+      const guideContext = guideQueueAuthContext(session, nextBusinessId);
+      if (!guideContext || guideContext.userId !== currentGuideAuthority.userId) return false;
+      const guideEpoch = await activateGuideQueueAuthContext(guideContext, expectedGuideEpoch, () => !signal.aborted);
+      if (guideEpoch === null || signal.aborted) return false;
+      guideAuthorityEpochRef.current = guideEpoch;
+      authSessionRef.current = session;
+      contextRequestRef.current++;
+      localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+      localStorage.setItem("ck_admin_business_id", nextBusinessId);
+      setBusinessId(nextOperator.id);
+      setBusinessName(nextOperator.name);
+      setLogoUrl(nextOperator.logoUrl || "");
+      setTimezone(nextOperator.timezone || "UTC");
+      setSubscriptionStatus(nextOperator.subscriptionStatus || "ACTIVE");
+      setYocoTestMode(nextOperator.yocoTestMode || false);
+      localStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
+      return true;
+    }, signal).catch(() => false);
+    if (!switched) {
+      setError("Account changed in another tab. Refresh before switching operators.");
+    }
   }
 
   if (PUBLIC_PATHS.includes(pathname)) {
@@ -523,7 +723,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           <a href={"https://" + ownHost + pathname} className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
             Go to my console
           </a>
-          <button onClick={clearSession} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
+          <button onClick={() => clearSession()} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
             Sign out and use this one instead
           </button>
         </div>
@@ -552,7 +752,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               Go to Billing
             </a>
           )}
-          <button onClick={clearSession} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
+          <button onClick={() => clearSession()} className="block mx-auto mt-3 text-xs text-[var(--ck-text-muted)] hover:underline">
             Sign out
           </button>
         </div>
@@ -584,7 +784,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>
+    <BusinessProvider value={{ businessId, businessName, staffName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>
       {children}
     </BusinessProvider>
   );

@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 interface BusinessContextValue {
     businessId: string;
     businessName: string;
+    staffName?: string;
     role: string;
     logoUrl: string;
     timezone: string;

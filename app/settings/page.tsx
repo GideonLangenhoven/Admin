@@ -16,6 +16,7 @@ import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
 import { DemoFeatureLink } from "../../components/DemoActionGuide";
 import { isDemoPathVisible } from "../lib/demo-guide";
+import { MfaStatus, useSensitiveActionMfa } from "../../components/MfaSensitiveAction";
 
 function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
     id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
@@ -357,8 +358,11 @@ export default function SettingsPage() {
     // Invoice & Banking state
     const [invoiceForm, setInvoiceForm] = useState({ company_name: "", address_line1: "", address_line2: "", address_line3: "", reg_number: "", vat_number: "" });
     const [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
+    const [bankDirty, setBankDirty] = useState(false);
     const [invoiceSaving, setInvoiceSaving] = useState(false);
     const [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
+    const bankMfa = useSensitiveActionMfa(readOnly || !isPrivileged(role), `bank:${businessId}`);
+    const credentialMfa = useSensitiveActionMfa(readOnly || !isPrivileged(role), `credentials:${businessId}`);
 
     // Marketing test email recipient
     const [marketingTestEmail, setMarketingTestEmail] = useState("");
@@ -1008,6 +1012,7 @@ export default function SettingsPage() {
             // Bank details fetched separately via encrypted edge function
             supabase.functions.invoke("bank-details", {
                 body: { action: "get", business_id: businessId },
+                headers: role === "SUPER_ADMIN" ? { "x-admin-business-id": businessId } : undefined,
             }).then(({ data: bankData }) => {
                 if (bankData) {
                     setBankForm({
@@ -1017,6 +1022,7 @@ export default function SettingsPage() {
                         bank_name: bankData.bank_name || "",
                         branch_code: bankData.branch_code || "",
                     });
+                    setBankDirty(false);
                 }
             });
             // Load operations & AI config
@@ -1201,6 +1207,8 @@ export default function SettingsPage() {
 
     async function handleSaveInvoice(e: React.FormEvent) {
         e.preventDefault();
+        if (readOnly) return;
+        if (isPrivileged(role) && bankDirty && !await bankMfa.requireMfa("Save banking details")) return;
         setInvoiceSaving(true);
         setInvoiceMessage({ type: "", text: "" });
 
@@ -1220,24 +1228,28 @@ export default function SettingsPage() {
             return;
         }
 
-        const { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
-            body: {
-                action: "set",
-                business_id: businessId,
-                account_owner: bankForm.account_owner || null,
-                account_number: bankForm.account_number || null,
-                account_type: bankForm.account_type || null,
-                bank_name: bankForm.bank_name || null,
-                branch_code: bankForm.branch_code || null,
-            },
-        });
-        if (bankErr || !bankData?.success) {
-            setInvoiceMessage({ type: "error", text: "Bank details failed: " + (bankErr?.message || bankData?.error || "Unknown error") });
-            setInvoiceSaving(false);
-            return;
+        if (isPrivileged(role) && bankDirty) {
+            const { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
+                body: {
+                    action: "set",
+                    business_id: businessId,
+                    account_owner: bankForm.account_owner || null,
+                    account_number: bankForm.account_number || null,
+                    account_type: bankForm.account_type || null,
+                    bank_name: bankForm.bank_name || null,
+                    branch_code: bankForm.branch_code || null,
+                },
+                headers: role === "SUPER_ADMIN" ? { "x-admin-business-id": businessId } : undefined,
+            });
+            if (bankErr || !bankData?.success) {
+                setInvoiceMessage({ type: "error", text: "Bank details failed: " + (bankErr?.message || bankData?.error || "Unknown error") });
+                setInvoiceSaving(false);
+                return;
+            }
+            setBankDirty(false);
         }
 
-        setInvoiceMessage({ type: "success", text: "Invoice & banking details saved!" });
+        setInvoiceMessage({ type: "success", text: bankDirty ? "Invoice and banking details saved." : "Invoice details saved." });
         setTimeout(() => setInvoiceMessage({ type: "", text: "" }), 3000);
         setInvoiceSaving(false);
     }
@@ -1245,7 +1257,7 @@ export default function SettingsPage() {
 
     async function fetchCredStatus() {
         try {
-            const headers = await getAuthHeaders();
+            const headers = await getAuthHeaders(businessId);
             const res = await fetch("/api/credentials?business_id=" + businessId, { headers });
             if (res.ok) setCredStatus(await res.json());
         } catch (e) {
@@ -1255,12 +1267,13 @@ export default function SettingsPage() {
 
     async function handleSaveWa(e: React.FormEvent) {
         e.preventDefault();
+        if (readOnly || !await credentialMfa.requireMfa("Save WhatsApp credentials")) return;
         setWaSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
             const res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: await getAuthHeaders(),
+                headers: await getAuthHeaders(businessId),
                 body: JSON.stringify({ business_id: businessId, section: "wa", wa_token: waForm.token, wa_phone_id: waForm.phoneId }),
             });
             const d = await res.json();
@@ -1276,12 +1289,13 @@ export default function SettingsPage() {
 
     async function handleSaveYoco(e: React.FormEvent) {
         e.preventDefault();
+        if (readOnly || !await credentialMfa.requireMfa("Save Yoco credentials")) return;
         setYocoSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
             const res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: await getAuthHeaders(),
+                headers: await getAuthHeaders(businessId),
                 body: JSON.stringify({ business_id: businessId, section: "yoco", yoco_secret_key: yocoForm.secretKey, yoco_webhook_secret: yocoForm.webhookSecret }),
             });
             const d = await res.json();
@@ -1296,20 +1310,20 @@ export default function SettingsPage() {
     }
 
     async function handleToggleTestMode() {
+        if (readOnly || !await credentialMfa.requireMfa("Change Yoco test mode")) return;
         setTestModeToggling(true);
         setCredMessage({ type: "", text: "" });
         const newMode = !(credStatus?.yoco_test_mode);
         try {
             const res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: await getAuthHeaders(),
+                headers: await getAuthHeaders(businessId),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test_mode", yoco_test_mode: newMode }),
             });
             const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
             setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled. Sandbox keys will be used for payments." : "Yoco TEST MODE disabled. Live keys are active." });
             fetchCredStatus();
-            window.location.reload();
         } catch (err: any) {
             setCredMessage({ type: "error", text: String(err?.message || "Failed to toggle test mode.") });
         }
@@ -1318,12 +1332,13 @@ export default function SettingsPage() {
 
     async function handleSaveYocoTest(e: React.FormEvent) {
         e.preventDefault();
+        if (readOnly || !await credentialMfa.requireMfa("Save Yoco test credentials")) return;
         setYocoTestSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
             const res = await fetch("/api/credentials", {
                 method: "POST",
-                headers: await getAuthHeaders(),
+                headers: await getAuthHeaders(businessId),
                 body: JSON.stringify({ business_id: businessId, section: "yoco_test", yoco_test_secret_key: yocoTestForm.secretKey, yoco_test_webhook_secret: yocoTestForm.webhookSecret }),
             });
             const d = await res.json();
@@ -3168,30 +3183,33 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
-                                <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); }}
+                                <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
-                                <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); }}
+                                <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. 070631824" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
-                                <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); }}
+                                <input type="text" value={bankForm.account_type} onChange={e => { setBankForm({ ...bankForm, account_type: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. Current / Cheque" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bank name</span>
-                                <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); }}
+                                <input type="text" value={bankForm.bank_name} onChange={e => { setBankForm({ ...bankForm, bank_name: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. Standard Bank" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
-                                <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); }}
+                                <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. 020909" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
+
+                        {!readOnly && <MfaStatus status={bankMfa.status} />}
+                        {!readOnly && bankMfa.panel}
 
                     </div>
                     </>}
@@ -3208,7 +3226,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    <button type="submit" disabled={invoiceSaving}
+                    <button type="submit" disabled={readOnly || invoiceSaving || bankMfa.busy}
                         className="rounded-lg bg-[var(--ck-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
                         {invoiceSaving ? "Saving..." : "Save invoice details"}
                     </button>
@@ -3218,6 +3236,10 @@ export default function SettingsPage() {
             {/* Privileged-only: credential saves are hard-gated to MAIN_ADMIN/SUPER_ADMIN
                 server-side, so never show this section to a delegated admin. */}
             {isPrivileged(role) && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
+                <div className="mb-5 space-y-3">
+                    {!readOnly && <MfaStatus status={credentialMfa.status} />}
+                    {!readOnly && credentialMfa.panel}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
@@ -3258,7 +3280,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={!readOnly && (waSaving || !waForm.token.trim() || !waForm.phoneId.trim())}
+                            disabled={readOnly || credentialMfa.busy || waSaving || !waForm.token.trim() || !waForm.phoneId.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {waSaving ? "Encrypting & saving..." : "Save WhatsApp Credentials"}
@@ -3303,7 +3325,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={!readOnly && (yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim())}
+                            disabled={readOnly || credentialMfa.busy || yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
@@ -3329,7 +3351,7 @@ export default function SettingsPage() {
                         <button data-demo-action={credStatus?.yoco_test_mode ? "credentials.test-off" : "credentials.test-on"}
                             type="button"
                             onClick={handleToggleTestMode}
-                            disabled={!readOnly && (testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode))}
+                            disabled={readOnly || credentialMfa.busy || testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
                             className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
                                 ? "border border-[color-mix(in_srgb,var(--ck-amber-bright)_35%,transparent)] bg-[var(--ck-amber-soft)] text-[var(--ck-amber)] hover:bg-[color-mix(in_srgb,var(--ck-amber-bright)_18%,transparent)]"
                                 : "bg-orange-500 text-white hover:bg-orange-600")}
@@ -3379,7 +3401,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={!readOnly && (yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim())}
+                            disabled={readOnly || credentialMfa.busy || yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoTestSaving ? "Encrypting & saving..." : "Save Yoco Test Credentials"}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
+import { requireSensitiveMfa } from "@/app/lib/mfa-sensitive";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -35,6 +36,11 @@ export async function POST(req: NextRequest) {
 
   const db = adminClient();
 
+  if (body.bank) {
+    const mfa = await requireSensitiveMfa(req, { allowedRoles: ["SUPER_ADMIN"], expectedActorId: caller.id });
+    if (!mfa.ok) return NextResponse.json({ error: mfa.message, code: mfa.code }, { status: mfa.status });
+  }
+
   if ("logo_url" in body) {
     const { error } = await db.from("platform_settings").update({ logo_url: body.logo_url || null, updated_at: new Date().toISOString() }).eq("id", true);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (body.bank) {
     const { account_owner, account_number, account_type, bank_name, branch_code } = body.bank;
     const { data, error } = await db.functions.invoke("platform-bank-details", {
-      body: { action: "set", account_owner, account_number, account_type, bank_name, branch_code },
+      body: { action: "set", actor_id: caller.id, account_owner, account_number, account_type, bank_name, branch_code },
     });
     if (error) return NextResponse.json({ error: error.message || "Failed to save bank details" }, { status: 500 });
     if (data?.error) return NextResponse.json({ error: data.error }, { status: 400 });

@@ -238,9 +238,34 @@ export default function Bookings() {
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   type BulkAction = "cancel" | "refund" | "markpaid" | "checkin";
-  type ProgressEvent = { id: string; name: string; status: "pending" | "ok" | "error"; error?: string };
+  type ProgressStatus = "submitting" | "completed" | "pending" | "manual_action" | "failed" | "unknown" | "unprocessed";
+  type ProgressEvent = { id: string; name: string; status: ProgressStatus; error?: string };
   const [bulkProgress, setBulkProgress] = useState<ProgressEvent[] | null>(null);
   const [bulkActionInFlight, setBulkActionInFlight] = useState<BulkAction | null>(null);
+  const [bulkAuditError, setBulkAuditError] = useState<string | null>(null);
+  const bulkRunRef = useRef<{ businessId: string; cancelled: boolean } | null>(null);
+  const businessIdRef = useRef(businessId);
+  const mountedRef = useRef(false);
+  businessIdRef.current = businessId;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (bulkRunRef.current) bulkRunRef.current.cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const run = bulkRunRef.current;
+    if (run && run.businessId !== businessId) {
+      run.cancelled = true;
+      bulkRunRef.current = null;
+    }
+    setBulkProgress(null);
+    setBulkActionInFlight(null);
+    setBulkAuditError(null);
+  }, [businessId]);
 
   function toggleSelect(id: string) {
     setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -258,70 +283,101 @@ export default function Bookings() {
 
   async function runBulk(action: BulkAction) {
     const ids = Array.from(selected);
-    if (ids.length === 0) return;
+    if (ids.length === 0 || bulkRunRef.current) return;
+    const run = { businessId, cancelled: false };
+    bulkRunRef.current = run;
+    const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
 
-    const confirmText: Record<BulkAction, string> = {
-      cancel: "Cancel " + ids.length + " booking(s)? Each paid customer gets an email to choose reschedule, voucher, or refund. Bookings within 24h of the trip are forfeited instead.",
-      refund: "Refund " + ids.length + " booking(s)? Each will be processed via Yoco or marked as manual refund.",
-      markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
-      checkin: "Check in " + ids.length + " guest(s)?",
-    };
-    if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" })) return;
-
-    let reason = "operator-cancel";
-    let weather = false;
-    if (action === "cancel") {
-      weather = confirm("Is this a weather cancel? (Weather cancels override the policy and refund 100%.)");
-      const prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
-      reason = prompted || "operator-cancel";
-    }
-
-    setBulkActionInFlight(action);
-    const init: ProgressEvent[] = ids.map(id => ({ id, name: bookingsById[id]?.customer_name || id.slice(0, 8), status: "pending" as const }));
-    setBulkProgress(init);
-
-    for (let i = 0; i < ids.length; i++) {
-      const id = ids[i];
-      let result: ActionResult;
-      switch (action) {
-        case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
-        case "refund":   result = await refundBookingAction(id); break;
-        case "markpaid": result = await markPaidAction(id); break;
-        case "checkin":  result = await checkInAction(id, businessId, {
-          expectedArrivedCount: bookingsById[id]?.arrived_count ?? null,
-          slotId: bookingsById[id]?.slot_id || null,
-        }); break;
-      }
-      setBulkProgress(prev =>
-        prev?.map(e => e.id === id ? { ...e, status: result.ok ? "ok" : "error", error: result.error } : e) ?? null,
-      );
-      if (i < ids.length - 1) await new Promise(r => setTimeout(r, 120));
-    }
-
-    setBulkActionInFlight(null);
-
-    // Log bulk summary
     try {
-      const final = init.map(e => {
-        const match = bulkProgress?.find(p => p.id === e.id);
-        return match || e;
-      });
-      await supabase.from("logs").insert({
-        business_id: businessId,
-        event: "bulk_action_" + action,
-        payload: {
-          bulk: true,
-          action,
-          booking_ids: ids,
-          succeeded: ids.filter((_, idx) => init[idx]?.status !== "error"),
-          total: ids.length,
-          reason: action === "cancel" ? reason : undefined,
-          weather: action === "cancel" ? weather : undefined,
-        },
-      });
-    } catch { /* audit log failure should not block */ }
+      const confirmText: Record<BulkAction, string> = {
+        cancel: "Cancel " + ids.length + " booking(s)? Each paid customer gets an email to choose reschedule, voucher, or refund. Bookings within 24h of the trip are forfeited instead.",
+        refund: "Submit " + ids.length + " refund(s)? Card refunds may remain pending and bank transfers still require confirmation. Keep this page open while each item is submitted.",
+        markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
+        checkin: "Check in " + ids.length + " guest(s)?",
+      };
+      if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" }) || !isCurrent()) return;
 
-    await loadBookings();
+      let reason = "operator-cancel";
+      let weather = false;
+      if (action === "cancel") {
+        weather = confirm("Is this a weather cancel? (Weather cancels override the policy and refund 100%.)");
+        const prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
+        reason = prompted || "operator-cancel";
+      }
+
+      setBulkActionInFlight(action);
+      setBulkAuditError(null);
+      const final: ProgressEvent[] = ids.map(id => ({
+        id,
+        name: bookingsById[id]?.customer_name || id.slice(0, 8),
+        status: "unprocessed",
+        error: "Not submitted yet. Keep this page open.",
+      }));
+      setBulkProgress(final.map(item => ({ ...item })));
+
+      for (let i = 0; i < ids.length; i++) {
+        if (!isCurrent()) return;
+        const id = ids[i];
+        final[i] = { ...final[i], status: "submitting", error: undefined };
+        setBulkProgress(final.map(item => ({ ...item })));
+        let result: ActionResult;
+        try {
+          switch (action) {
+            case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
+            case "refund":   result = await refundBookingAction(id, { canSubmit: isCurrent }); break;
+            case "markpaid": result = await markPaidAction(id); break;
+            case "checkin":  result = await checkInAction(id, run.businessId, {
+              expectedArrivedCount: bookingsById[id]?.arrived_count ?? null,
+              slotId: bookingsById[id]?.slot_id || null,
+            }); break;
+          }
+        } catch (error: any) {
+          result = action === "refund"
+            ? { ok: false, outcome: "unknown", error: "Refund outcome is unknown. Refresh and reconcile this booking before retrying the existing refund reference." }
+            : { ok: false, error: error?.message || "Action failed" };
+        }
+        const status: ProgressStatus = action === "refund"
+          ? result.outcome || (result.ok ? "completed" : "failed")
+          : result.ok ? "completed" : "failed";
+        final[i] = { ...final[i], status, error: result.error || result.message };
+        if (isCurrent()) setBulkProgress(final.map(item => ({ ...item })));
+        if (i < ids.length - 1) await new Promise(resolve => setTimeout(resolve, 120));
+      }
+
+      if (!isCurrent()) return;
+      const idsWithStatus = (status: ProgressStatus) => final.filter(item => item.status === status).map(item => item.id);
+      try {
+        const audit = await supabase.from("logs").insert({
+          business_id: run.businessId,
+          event: "bulk_action_" + action,
+          payload: {
+            bulk: true,
+            action,
+            booking_ids: ids,
+            results: final.map(item => ({ booking_id: item.id, status: item.status, error: item.error })),
+            submitted: final.filter(item => item.status !== "unprocessed").map(item => item.id),
+            succeeded: idsWithStatus("completed"),
+            pending: idsWithStatus("pending"),
+            manual_action: idsWithStatus("manual_action"),
+            failed: idsWithStatus("failed"),
+            unknown: idsWithStatus("unknown"),
+            unprocessed: idsWithStatus("unprocessed"),
+            total: ids.length,
+            reason: action === "cancel" ? reason : undefined,
+            weather: action === "cancel" ? weather : undefined,
+          },
+        });
+        if (audit.error) throw audit.error;
+      } catch {
+        if (isCurrent()) setBulkAuditError("Results are shown, but the bulk audit log could not be saved.");
+      }
+
+      if (isCurrent()) await loadBookings();
+    } finally {
+      const current = isCurrent();
+      if (bulkRunRef.current === run) bulkRunRef.current = null;
+      if (current) setBulkActionInFlight(null);
+    }
   }
 
   async function loadBookings() {
@@ -1718,22 +1774,22 @@ export default function Bookings() {
             </span>
             <div className="flex-1" />
             {selectionAllPaid && (
-              <button data-demo-action="booking.checkin" onClick={() => runBulk("checkin")} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.checkin" onClick={() => runBulk("checkin")} disabled={!!bulkActionInFlight} className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-40">
                 Check in
               </button>
             )}
             {selectionAllUnpaid && (
-              <button data-demo-action="booking.paid" onClick={() => runBulk("markpaid")} className="ui-btn !h-8 !px-3 !text-xs" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
+              <button data-demo-action="booking.paid" onClick={() => runBulk("markpaid")} disabled={!!bulkActionInFlight} className="ui-btn !h-8 !px-3 !text-xs disabled:opacity-40" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                 Mark paid (EFT)
               </button>
             )}
             {selectionNoneCancelled && (
-              <button data-demo-action="booking.cancel" onClick={() => runBulk("cancel")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.cancel" onClick={() => runBulk("cancel")} disabled={!!bulkActionInFlight} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs disabled:opacity-40">
                 Cancel
               </button>
             )}
             {selectionAllPaid && (
-              <button data-demo-action="booking.refund" onClick={() => runBulk("refund")} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs">
+              <button data-demo-action="booking.refund" onClick={() => runBulk("refund")} disabled={!!bulkActionInFlight} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs disabled:opacity-40">
                 Refund
               </button>
             )}
@@ -1853,32 +1909,47 @@ export default function Bookings() {
 
       {/* Bulk progress dialog */}
       {bulkProgress && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="bulk-progress-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="ui-card max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>
-              {bulkActionInFlight ? "Running " + bulkActionInFlight + "..." : "Done"}
+            <h2 id="bulk-progress-title" className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+              {bulkActionInFlight ? "Submitting " + bulkActionInFlight + " items..." : "Bulk action results"}
             </h2>
-            <div className="mt-3 space-y-1.5 max-h-80 overflow-auto">
-              {bulkProgress.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
-                  {p.status === "ok" && <CheckCircle className="w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-success)" }} />}
-                  {p.status === "error" && <XCircle className="w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-danger)" }} />}
-                  {p.status === "pending" && <Spinner className="w-4 h-4 shrink-0 animate-spin" style={{ color: "var(--ck-text-muted)" }} />}
-                  <span className="font-medium text-gray-800 truncate">{p.name}</span>
-                  <span className="font-mono text-[10px] text-gray-400">{p.id.slice(0, 8)}</span>
-                  {p.error && <span className="text-[11px] text-red-700 truncate ml-auto">{p.error}</span>}
-                </div>
-              ))}
+            <div aria-live="polite" className="mt-3 space-y-2 max-h-80 overflow-auto">
+              {bulkProgress.map(p => {
+                const label = p.status === "completed" ? "Completed"
+                  : p.status === "pending" ? "Pending"
+                    : p.status === "manual_action" ? "Manual action required"
+                      : p.status === "failed" ? "Failed"
+                        : p.status === "unknown" ? "Outcome unknown"
+                          : p.status === "unprocessed" ? "Not submitted"
+                            : "Submitting";
+                return (
+                  <div key={p.id} className="flex items-start gap-2 text-sm">
+                    {p.status === "completed" && <CheckCircle className="mt-0.5 w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-success)" }} />}
+                    {p.status === "failed" && <XCircle className="mt-0.5 w-4 h-4 shrink-0" weight="fill" style={{ color: "var(--ck-danger)" }} />}
+                    {p.status === "submitting" && <Spinner className="mt-0.5 w-4 h-4 shrink-0 animate-spin" style={{ color: "var(--ck-text-muted)" }} />}
+                    {["pending", "manual_action", "unknown", "unprocessed"].includes(p.status) && <SpinnerGap className="mt-0.5 w-4 h-4 shrink-0" style={{ color: "var(--ck-warning)" }} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-gray-800 truncate">{p.name}</span>
+                        <span className="font-mono text-[10px] text-gray-400">{p.id.slice(0, 8)}</span>
+                        <span className="ml-auto shrink-0 text-[11px] font-medium" style={{ color: p.status === "completed" ? "var(--ck-success)" : p.status === "failed" ? "var(--ck-danger)" : "var(--ck-warning)" }}>{label}</span>
+                      </div>
+                      {p.error && <p className="mt-0.5 text-[11px]" style={{ color: p.status === "failed" ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{p.error}</p>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             {!bulkActionInFlight && (() => {
-              const ok = bulkProgress.filter(p => p.status === "ok").length;
-              const err = bulkProgress.filter(p => p.status === "error").length;
+              const count = (status: ProgressStatus) => bulkProgress.filter(p => p.status === status).length;
               return (
                 <p className="mt-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  <span className="font-display tabular-nums">{ok}</span> succeeded · <span className="font-display tabular-nums">{err}</span> failed
+                  <span className="font-display tabular-nums">{count("completed")}</span> completed · {count("pending")} pending · {count("manual_action")} manual · {count("failed")} failed · {count("unknown")} unknown · {count("unprocessed")} not submitted
                 </p>
               );
             })()}
+            {bulkAuditError && <p role="alert" className="mt-3 rounded-lg p-3 text-xs" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>{bulkAuditError}</p>}
             <div className="mt-4 flex gap-2 justify-end">
               {!bulkActionInFlight && (
                 <button onClick={() => { setBulkProgress(null); clearSelection(); }}

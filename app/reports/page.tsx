@@ -69,6 +69,19 @@ function statusPill(status: string) {
   return `ui-status ${STATUS_PILL[status] || "ui-pill-neutral"}`;
 }
 
+function arrivedGuests(booking: { qty?: number | null; arrived_count?: number | null; checked_in?: boolean | null }) {
+  const qty = Math.max(0, Number(booking.qty || 0));
+  return Math.min(qty, Math.max(0, Number(booking.arrived_count ?? (booking.checked_in ? qty : 0))));
+}
+
+function attendanceLabel(booking: { qty?: number | null; arrived_count?: number | null; checked_in?: boolean | null }) {
+  const qty = Math.max(0, Number(booking.qty || 0));
+  const arrived = arrivedGuests(booking);
+  if (qty > 0 && arrived === qty) return "Present";
+  if (arrived > 0) return `${arrived}/${qty} arrived`;
+  return "Not arrived";
+}
+
 // Standardized select chevron (muted ink) — matches the Dashboard's controls.
 const selectChevronStyle: React.CSSProperties = {
   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2366736B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`,
@@ -174,7 +187,7 @@ export default function Reports() {
       for (let from = 0; from < CEILING; from += PAGE) {
         let query = supabase
           .from("bookings")
-          .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), " + slotRelation)
+          .select("id, customer_name, phone, email, qty, unit_price, total_amount, original_total, discount_type, discount_percent, discount_amount, status, yoco_payment_id, payfast_m_payment_id, source, created_at, arrived_count, checked_in, checked_in_at, waiver_status, waiver_signed_at, waiver_signed_name, total_captured, total_refunded, refund_amount, refund_status, refund_processed_at, payment_method, voucher_code, voucher_amount_paid, promo_code, is_combo, ota_channel, ota_gross_amount, ota_net_amount, cancelled_at, cancellation_reason, created_by_admin_name, customer_vat_number, allow_unpaid, tours(name), " + slotRelation)
           .eq("business_id", businessId);
         if (filterBy === "slot") {
           query = query.eq("slots.business_id", businessId).gte("slots.start_time", startIso).lt("slots.start_time", endIso);
@@ -281,12 +294,13 @@ export default function Reports() {
       // Three buckets so the visual reconciles with the top "Pax" stat tile.
       // Previously: Checked + Not-checked excluded cancelled entirely, so
       // 6 + 88 = 94 against a 99-pax total looked like a math bug.
-      const checkedIn = filtered.filter((b) => b.checked_in && b.status !== "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
-      const notCheckedIn = filtered.filter((b) => !b.checked_in && b.status !== "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
+      const active = filtered.filter((b) => b.status !== "CANCELLED");
+      const checkedIn = active.reduce((sum, b) => sum + arrivedGuests(b), 0);
+      const notCheckedIn = active.reduce((sum, b) => sum + Math.max(0, Number(b.qty || 0) - arrivedGuests(b)), 0);
       const cancelled = filtered.filter((b) => b.status === "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
       return [
         { label: "Checked in", value: checkedIn },
-        { label: "Not checked in", value: notCheckedIn },
+        { label: "Not arrived", value: notCheckedIn },
         { label: "Cancelled", value: cancelled },
       ];
     }
@@ -415,7 +429,7 @@ export default function Reports() {
   function downloadCSV() {
     if (activeTab === "attendance") {
       const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
-      const headers = ["Tour Date", "Time", "Tour", "Customer", "Phone", "Pax", "Checked In", "Checked In At", "Status"];
+      const headers = ["Tour Date", "Time", "Tour", "Customer", "Phone", "Pax", "Arrived", "Fully Checked In", "Checked In At", "Status"];
       const rows = activeBookings.map(b => [
         b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "",
         b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "",
@@ -423,6 +437,7 @@ export default function Reports() {
         b.customer_name || "",
         b.phone || "",
         b.qty || 0,
+        arrivedGuests(b),
         b.checked_in ? "Yes" : "No",
         b.checked_in_at ? fmtDateTime(b.checked_in_at, activeTimezone) : "",
         b.status || ""
@@ -761,13 +776,14 @@ export default function Reports() {
     if (activeTab === "attendance") {
       const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
       title = `Attendance Report (${startDate} to ${endDate})`;
-      headers = ["Date", "Time", "Tour", "Customer", "Pax", "Checked In", "Status"];
+      headers = ["Date", "Time", "Tour", "Customer", "Pax", "Arrived", "Fully Checked In", "Status"];
       rows = activeBookings.map(b => [
         b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—",
         b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—",
         b.tours?.name || "—",
         b.customer_name || "—",
         b.qty,
+        arrivedGuests(b),
         b.checked_in ? "Yes" : "No",
         b.status
       ]);
@@ -1236,7 +1252,7 @@ export default function Reports() {
         (() => {
           const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
           const totalPax = activeBookings.reduce((s, b) => s + Number(b.qty || 0), 0);
-          const checkedInPax = activeBookings.filter(b => b.checked_in).reduce((s, b) => s + Number(b.qty || 0), 0);
+          const checkedInPax = activeBookings.reduce((s, b) => s + arrivedGuests(b), 0);
           const noShowPax = totalPax - checkedInPax;
           return (
             <div className="space-y-4">
@@ -1244,7 +1260,7 @@ export default function Reports() {
                 {[
                   { label: "Total Pax", value: totalPax, color: "var(--ck-text-strong)" },
                   { label: "Checked In", value: checkedInPax, color: "var(--ck-success)" },
-                  { label: "No Show", value: noShowPax, color: "var(--ck-danger)" },
+                  { label: "Not Arrived", value: noShowPax, color: "var(--ck-danger)" },
                   { label: "Attendance Rate", value: `${totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%`, color: "var(--ck-text-strong)" },
                 ].map(c => (
                   <div key={c.label} className="ui-card p-4">
@@ -1255,15 +1271,15 @@ export default function Reports() {
               </div>
               <div className="space-y-3 md:hidden">
                 {activeBookings.map(b => (
-                  <div key={b.id} className="ui-card p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : undefined}>
+                  <div key={b.id} className="ui-card p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" } : undefined}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
                         <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
                         <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
-                        {b.checked_in ? "Present" : "No Show"}
+                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : "ui-pill-danger"}`}>
+                        {attendanceLabel(b)}
                       </span>
                     </div>
                     <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
@@ -1289,7 +1305,7 @@ export default function Reports() {
                   </thead>
                   <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                     {activeBookings.map(b => (
-                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.checked_in ? { background: "var(--ck-success-soft)" } : undefined}>
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.checked_in ? { background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { background: "var(--ck-amber-soft)" } : undefined}>
                         <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
                         <td className="whitespace-nowrap p-3 tabular-nums" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
                         <td className="p-3" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
@@ -1297,8 +1313,8 @@ export default function Reports() {
                         <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</td>
                         <td className="p-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : "ui-pill-danger"}`}>
-                            {b.checked_in ? "Present" : "No Show"}
+                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : "ui-pill-danger"}`}>
+                            {attendanceLabel(b)}
                           </span>
                         </td>
                         <td className="hidden whitespace-nowrap p-3 text-xs lg:table-cell" style={{ color: "var(--ck-text-muted)" }}>

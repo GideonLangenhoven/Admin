@@ -62,10 +62,16 @@ describe("runtime dependency security floors", () => {
     expect(lockedVersions("next").every((version) => versionAtLeast(version, "16.3.3"))).toBe(true);
   });
 
-  it("deliberately leaves the separately tracked xlsx dependency unchanged", () => {
-    expect(manifest.dependencies?.xlsx).toBe("^0.18.5");
-    expect(lock.packages[""].dependencies?.xlsx).toBe("^0.18.5");
-    expect(lock.packages["node_modules/xlsx"].version).toBe("0.18.5");
-    expect(installedVersion("xlsx")).toBe("0.18.5");
+  it("uses patched test tooling and replaces the vulnerable xlsx reader", () => {
+    expect(manifest.devDependencies?.vitest).toBe("^4.1.11");
+    expect(manifest.devDependencies?.vite).toBe("^7.1.7");
+    expect(versionAtLeast(installedVersion("vitest"), "4.1.11")).toBe(true);
+    expect(versionAtLeast(installedVersion("vite"), "7.1.7")).toBe(true);
+
+    expect(manifest.dependencies?.xlsx).toBeUndefined();
+    expect(lock.packages["node_modules/xlsx"]).toBeUndefined();
+    expect(manifest.dependencies?.["read-excel-file"]).toBe("^9.3.10");
+    expect(lock.packages[""].dependencies?.["read-excel-file"]).toBe("^9.3.10");
+    expect(installedVersion("read-excel-file")).toBe("9.3.10");
   });
 });

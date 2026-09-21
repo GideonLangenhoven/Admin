@@ -140,4 +140,13 @@ describe("password reset completion", () => {
     expect(pages).toEqual([1, 2]);
     expect(passwords).toEqual(["found"]);
   });
+  it("prepares browser authentication without minting a session on the shared server IP", async () => {
+    const f = fixture();
+    f.target.password_hash = createHash("sha256").update("Previous-password").digest("hex");
+    const response = await f.invoke("login", { email: f.target.email, password: "Previous-password" });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.auth_ready).toBe(true);
+    expect(body.session).toBeUndefined();
+  });
 });

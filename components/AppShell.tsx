@@ -213,7 +213,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
   const visibleHrefs = visibleNav.map((n) => n.href);
-  const mobilePrimaryHrefs = ["/", "/simple", "/new-booking", "/inbox"];
+  const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
   const mobilePrimaryNav = mobilePrimaryHrefs
     .map((href) => visibleNav.find((item) => item.href === href))
     .filter(Boolean) as NavItem[];

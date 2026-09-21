@@ -1,12 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
+import { processRefundAction, type ActionResult, type RefundOutcome } from "../lib/booking-actions";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { CaretDown, CaretRight } from "@phosphor-icons/react";
 
-const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+type RefundUiOutcome = RefundOutcome | "unprocessed";
+type RefundUiResult = Omit<ActionResult, "outcome"> & { outcome: RefundUiOutcome };
+
+const UNKNOWN_REFUND_RESULT: RefundUiResult = {
+  ok: false,
+  outcome: "unknown",
+  error: "Refund outcome is unknown. Refresh and reconcile this booking before retrying the existing refund reference.",
+};
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone() });
@@ -18,7 +26,7 @@ export default function Refunds() {
   const [processed, setProcessed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, any>>({});
+  const [results, setResults] = useState<Record<string, RefundUiResult>>({});
   const [showProcessed, setShowProcessed] = useState(false);
   const [editedAmounts, setEditedAmounts] = useState<Record<string, string>>({});
   const [confirmState, setConfirmState] = useState<null | {
@@ -27,31 +35,71 @@ export default function Refunds() {
     tone: "danger" | "default";
     onConfirm: () => Promise<void>;
   }>(null);
+  const mountedRef = useRef(false);
+  const businessIdRef = useRef(businessId);
+  const loadRequestRef = useRef(0);
+  const refundRunRef = useRef<{ businessId: string; cancelled: boolean } | null>(null);
+  businessIdRef.current = businessId;
 
-  useEffect(() => { load(); }, [businessId]);
+  const load = useCallback(async (expectedBusinessId = businessId) => {
+    const requestId = ++loadRequestRef.current;
+    try {
+      const { data: pending, error: pendingError } = await supabase.from("bookings")
+        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
+        .eq("business_id", expectedBusinessId)
+        // ACTION_REQUIRED deliberately excluded: those bookings are waiting for
+        // the CUSTOMER to choose refund / voucher / reschedule on My Bookings.
+        // Money only enters this queue once they pick "refund" (→ REQUESTED).
+        .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"])
+        .order("cancelled_at", { ascending: false });
+      if (pendingError) throw pendingError;
+      if (!mountedRef.current || businessIdRef.current !== expectedBusinessId || requestId !== loadRequestRef.current) return;
 
-  async function load() {
-    const { data: pending } = await supabase.from("bookings")
-      .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
-      .eq("business_id", businessId)
-      // ACTION_REQUIRED deliberately excluded: those bookings are waiting for
-      // the CUSTOMER to choose refund / voucher / reschedule on My Bookings.
-      // Money only enters this queue once they pick "refund" (→ REQUESTED).
-      .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"])
-      .order("cancelled_at", { ascending: false });
-    setRefunds(pending || []);
+      const { data: done, error: doneError } = await supabase.from("bookings")
+        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancelled_at, slots(start_time), tours(name)")
+        .eq("business_id", expectedBusinessId)
+        // REFUNDED is the Yoco auto-refund's terminal status; PROCESSED is the
+        // manual-EFT one. Both mean "refund made" and must show in this list.
+        .in("refund_status", ["PROCESSED", "REFUNDED", "DECLINED"])
+        .order("cancelled_at", { ascending: false })
+        .limit(20);
+      if (doneError) throw doneError;
+      if (!mountedRef.current || businessIdRef.current !== expectedBusinessId || requestId !== loadRequestRef.current) return;
+      setRefunds(pending || []);
+      setProcessed(done || []);
+    } catch (error: any) {
+      if (mountedRef.current && businessIdRef.current === expectedBusinessId && requestId === loadRequestRef.current) {
+        notify({ title: "Refund queue could not be loaded", message: error?.message || "Please refresh and try again.", tone: "error" });
+      }
+    } finally {
+      if (mountedRef.current && businessIdRef.current === expectedBusinessId && requestId === loadRequestRef.current) setLoading(false);
+    }
+  }, [businessId]);
 
-    const { data: done } = await supabase.from("bookings")
-      .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancelled_at, slots(start_time), tours(name)")
-      .eq("business_id", businessId)
-      // REFUNDED is the Yoco auto-refund's terminal status; PROCESSED is the
-      // manual-EFT one. Both mean "refund made" and must show in this list.
-      .in("refund_status", ["PROCESSED", "REFUNDED", "DECLINED"])
-      .order("cancelled_at", { ascending: false })
-      .limit(20);
-    setProcessed(done || []);
-    setLoading(false);
-  }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadRequestRef.current += 1;
+      if (refundRunRef.current) refundRunRef.current.cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const run = refundRunRef.current;
+    if (run && run.businessId !== businessId) {
+      run.cancelled = true;
+      refundRunRef.current = null;
+    }
+    setProcessing(null);
+    setRefunds([]);
+    setProcessed([]);
+    setResults({});
+    setEditedAmounts({});
+    setConfirmState(null);
+    setLoading(true);
+    void load(businessId);
+  }, [businessId, load]);
 
   function getRefundAmount(b: any): number {
     const edited = editedAmounts[b.id];
@@ -60,65 +108,96 @@ export default function Refunds() {
   }
 
   async function executeAutoRefund(id: string) {
+    if (refundRunRef.current) return;
     const booking = refunds.find(b => b.id === id);
     const amount = booking ? getRefundAmount(booking) : 0;
+    const run = { businessId, cancelled: false };
+    refundRunRef.current = run;
+    const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
+    if (!isCurrent()) {
+      refundRunRef.current = null;
+      return;
+    }
     setProcessing(id);
     try {
-      // process-refund authorizes the caller — send the admin's session JWT.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setResults(prev => ({ ...prev, [id]: { error: "Session expired. Please sign in again." } }));
-        setProcessing(null);
-        return;
-      }
-      const r = await fetch(SU + "/functions/v1/process-refund", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ booking_id: id, amount: booking?.refund_status === "REFUND_PENDING" ? undefined : amount, resume_refund: booking?.refund_status === "REFUND_PENDING" }),
+      const result = await processRefundAction({
+        bookingId: id,
+        amount: booking?.refund_status === "REFUND_PENDING" ? undefined : amount,
+        resumeRefund: booking?.refund_status === "REFUND_PENDING",
+        canSubmit: isCurrent,
       });
-      const d = await r.json();
-      setResults(prev => ({ ...prev, [id]: d }));
-      load();
-    } catch (e) {
-      setResults(prev => ({ ...prev, [id]: { error: String(e) } }));
+      if (!isCurrent()) return;
+      setResults(prev => ({ ...prev, [id]: result as RefundUiResult }));
+      await load(run.businessId);
+    } catch {
+      if (isCurrent()) setResults(prev => ({ ...prev, [id]: UNKNOWN_REFUND_RESULT }));
+    } finally {
+      const current = isCurrent();
+      if (refundRunRef.current === run) refundRunRef.current = null;
+      if (current) setProcessing(null);
     }
-    setProcessing(null);
   }
 
   async function executeManualRefund(id: string) {
+    if (refundRunRef.current) return;
     const booking = refunds.find(b => b.id === id);
     const amount = booking ? getRefundAmount(booking) : 0;
+    const run = { businessId, cancelled: false };
+    refundRunRef.current = run;
+    const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
+    if (!isCurrent()) {
+      refundRunRef.current = null;
+      return;
+    }
     setProcessing(id);
     try {
-      const response = await supabase.functions.invoke("process-refund", { body: { booking_id: id, amount, action: "confirm_manual" } });
-      setResults(prev => ({ ...prev, [id]: response.error ? { error: response.error.message } : response.data }));
-      await load();
-    } finally { setProcessing(null); }
+      const result = await processRefundAction({ bookingId: id, amount, action: "confirm_manual", canSubmit: isCurrent });
+      if (!isCurrent()) return;
+      setResults(prev => ({ ...prev, [id]: result as RefundUiResult }));
+      await load(run.businessId);
+    } catch {
+      if (isCurrent()) setResults(prev => ({ ...prev, [id]: UNKNOWN_REFUND_RESULT }));
+    } finally {
+      const current = isCurrent();
+      if (refundRunRef.current === run) refundRunRef.current = null;
+      if (current) setProcessing(null);
+    }
   }
 
   async function executeRefundAll() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      notify({ title: "Session expired", message: "Please sign in again and try again.", tone: "error" });
-      return;
+    if (refundRunRef.current || refunds.length === 0) return;
+    const queued = [...refunds];
+    const run = { businessId, cancelled: false };
+    refundRunRef.current = run;
+    const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
+    if (isCurrent()) {
+      setResults(prev => {
+        const next = { ...prev };
+        for (const refund of queued) next[refund.id] = { ok: false, outcome: "unprocessed", message: "Not submitted yet. Keep this page open." };
+        return next;
+      });
     }
-    for (const r of refunds) {
-      setProcessing(r.id);
-      try {
-        const res = await fetch(SU + "/functions/v1/process-refund", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-          body: JSON.stringify({ booking_id: r.id }),
-        });
-        const d = await res.json();
-        setResults(prev => ({ ...prev, [r.id]: d }));
-      } catch (e) {
-        setResults(prev => ({ ...prev, [r.id]: { error: String(e) } }));
+    try {
+      for (let index = 0; index < queued.length; index++) {
+        if (!isCurrent()) return;
+        const refund = queued[index];
+        setProcessing(refund.id);
+        let result: RefundUiResult;
+        try {
+          result = await processRefundAction({ bookingId: refund.id, canSubmit: isCurrent }) as RefundUiResult;
+        } catch {
+          result = UNKNOWN_REFUND_RESULT;
+        }
+        if (!isCurrent()) return;
+        setResults(prev => ({ ...prev, [refund.id]: result }));
+        if (index < queued.length - 1) await new Promise(resolve => setTimeout(resolve, 500));
       }
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (isCurrent()) await load(run.businessId);
+    } finally {
+      const current = isCurrent();
+      if (refundRunRef.current === run) refundRunRef.current = null;
+      if (current) setProcessing(null);
     }
-    setProcessing(null);
-    load();
   }
 
   function autoRefund(id: string) {
@@ -129,8 +208,8 @@ export default function Refunds() {
     setConfirmState({
       title: isPartial ? "Confirm partial automatic refund" : "Confirm automatic refund",
       message: isPartial
-        ? `Process a Yoco refund of R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid? The customer will be notified.`
-        : "Process this refund now? Bank transfers remain in the queue until you confirm the transfer.",
+        ? `Submit a Yoco refund of R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid? It may remain pending while the provider confirms it.`
+        : "Submit this refund? Card refunds may remain pending, and bank transfers remain in the queue until you confirm the transfer.",
       tone: "danger",
       onConfirm: async () => {
         setConfirmState(null);
@@ -146,8 +225,8 @@ export default function Refunds() {
     setConfirmState({
       title: isPartial ? "Confirm partial manual refund" : "Mark refund as processed",
       message: isPartial
-        ? `Mark a manual refund of R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid as completed?`
-        : "Mark this refund as manually processed?",
+        ? `Only continue after transferring R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid. Mark that bank transfer as completed?`
+        : "Only continue after the bank transfer has been made. Mark this refund as manually completed?",
       tone: "default",
       onConfirm: async () => {
         setConfirmState(null);
@@ -201,8 +280,8 @@ export default function Refunds() {
 
   function refundAll() {
     setConfirmState({
-      title: "Process all refunds",
-      message: `Process all ${refunds.length} pending refunds through Yoco? Customers will be notified as each refund completes.`,
+      title: "Submit all refunds",
+      message: `Submit all ${refunds.length} queued refunds one at a time? Card refunds may remain pending and bank transfers still require confirmation. Keep this page open until every item has been submitted.`,
       tone: "danger",
       onConfirm: async () => {
         setConfirmState(null);
@@ -225,7 +304,7 @@ export default function Refunds() {
         </div>
         {refunds.length > 1 && (
           <button data-demo-action="refund.all" disabled={!!processing} onClick={refundAll} className="ui-btn ui-btn-danger w-full sm:w-auto">
-            Refund All ({refunds.length})
+            Submit All ({refunds.length})
           </button>
         )}
       </div>
@@ -259,6 +338,21 @@ export default function Refunds() {
           {refunds.map((b: any) => {
             const res = results[b.id];
             const isProcessing = processing === b.id;
+            const actionInFlight = !!processing;
+            const resultLabel = res?.outcome === "completed" ? "Refund completed"
+              : res?.outcome === "pending" ? "Refund pending"
+                : res?.outcome === "manual_action" ? "Manual action required"
+                  : res?.outcome === "failed" ? "Refund failed"
+                    : res?.outcome === "unknown" ? "Refund outcome unknown"
+                      : "Not submitted";
+            const resultMessage = res?.message || res?.error || (res?.outcome === "unprocessed"
+              ? "This item has not been submitted. Keep this browser open while the queue runs."
+              : "Refresh the refund queue before taking another action.");
+            const resultStyle = res?.outcome === "completed"
+              ? { background: "var(--ck-success-soft)", color: "var(--ck-success)" }
+              : res?.outcome === "failed"
+                ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
+                : { background: "var(--ck-warning-soft)", color: "var(--ck-warning)" };
 
             return (
               <div key={b.id} className="ui-card p-4">
@@ -279,7 +373,7 @@ export default function Refunds() {
                           step="0.01"
                           min="0"
                           max={Number(b.total_captured || b.total_amount || 0)}
-                          disabled={isProcessing || ["REFUND_PENDING", "MANUAL_EFT_REQUIRED"].includes(b.refund_status)}
+                          disabled={actionInFlight || ["REFUND_PENDING", "MANUAL_EFT_REQUIRED"].includes(b.refund_status)}
                           aria-label="Refund amount"
                           value={editedAmounts[b.id] !== undefined ? editedAmounts[b.id] : String(b.refund_amount || 0)}
                           onChange={e => setEditedAmounts({ ...editedAmounts, [b.id]: e.target.value })}
@@ -299,16 +393,16 @@ export default function Refunds() {
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-col">
                       {b.refund_status !== "MANUAL_EFT_REQUIRED" && (
-                        <button data-demo-action={b.refund_status === "REFUND_PENDING" ? "refund.check" : "refund.process"} onClick={() => autoRefund(b.id)} disabled={isProcessing}
+                        <button data-demo-action={b.refund_status === "REFUND_PENDING" ? "refund.check" : "refund.process"} onClick={() => autoRefund(b.id)} disabled={actionInFlight}
                           className="ui-btn ui-btn-danger whitespace-nowrap disabled:opacity-40">
-                          {isProcessing ? "Processing..." : b.refund_status === "REFUND_PENDING" ? "Check status" : "Process refund"}
+                          {isProcessing ? "Submitting..." : b.refund_status === "REFUND_PENDING" ? "Check status" : "Submit refund"}
                         </button>
                       )}
-                      {b.refund_status === "MANUAL_EFT_REQUIRED" && <button data-demo-action="refund.manual" onClick={() => manualRefund(b.id)} disabled={isProcessing}
-                        className="ui-btn ui-btn-ghost whitespace-nowrap">
+                      {b.refund_status === "MANUAL_EFT_REQUIRED" && <button data-demo-action="refund.manual" onClick={() => manualRefund(b.id)} disabled={actionInFlight}
+                        className="ui-btn ui-btn-ghost whitespace-nowrap disabled:opacity-40">
                         Confirm bank transfer
                       </button>}
-                      <button data-demo-action="refund.decline" onClick={() => declineRefund(b.id)} disabled={isProcessing || !["REQUESTED", "FAILED"].includes(b.refund_status)}
+                      <button data-demo-action="refund.decline" onClick={() => declineRefund(b.id)} disabled={actionInFlight || !["REQUESTED", "FAILED"].includes(b.refund_status)}
                         className="ui-btn ui-btn-ghost whitespace-nowrap disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}>
                         Decline
                       </button>
@@ -316,8 +410,8 @@ export default function Refunds() {
                   </div>
                 </div>
                 {res && (
-                  <div className="mt-3 rounded-lg p-3 text-sm" style={res.ok ? { background: "var(--ck-success-soft)", color: "var(--ck-success)" } : { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-                    {res.ok ? (res.pending ? "Refund is pending confirmation. It remains in this queue." : "Refund processed.") : (res.error || res.message || "Failed")}
+                  <div role={res.outcome === "failed" || res.outcome === "unknown" ? "alert" : "status"} className="mt-3 rounded-lg p-3 text-sm" style={resultStyle}>
+                    <span className="font-semibold">{resultLabel}.</span> {resultMessage}
                   </div>
                 )}
               </div>

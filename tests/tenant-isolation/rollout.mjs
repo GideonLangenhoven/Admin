@@ -35,6 +35,8 @@ try {
   await db.query(readFileSync('tests/fixtures/rollout-marketing.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-cron.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-platform.sql', 'utf8'));
+  await db.query("create function public.ck_current_period_key() returns date language sql stable as 'select current_date'");
+  await db.query(readFileSync('supabase/migrations/20260302123000_subscription_line_items.sql', 'utf8'));
   const platformInvoiceSchema = readFileSync('supabase/migrations/20260714172241_platform_invoices.sql', 'utf8');
   // Use the actual invoice schema and grants, without the unrelated encryption RPCs.
   await db.query(platformInvoiceSchema.slice(0, platformInvoiceSchema.indexOf('-- ── RPC:')) + '\nCOMMIT;');
@@ -43,10 +45,97 @@ try {
   // Use the real policy calculator for customer/operator refund positive paths.
   const refundPolicy = readFileSync('supabase/migrations/20260504000000_refund_policy.sql', 'utf8');
   await db.query(refundPolicy.slice(refundPolicy.indexOf('CREATE OR REPLACE FUNCTION public.calculate_refund_percent'), refundPolicy.indexOf('CREATE OR REPLACE FUNCTION public.calculate_booking_refund')));
+  const existingPricingBusiness = id(900001);
+  const futurePricingBusiness = id(900002);
+  await db.query("update plans set name='Legacy Standard',monthly_price_zar=1400,setup_fee_zar=3500,extra_seat_price_zar=250 where id='standard'");
+  await db.query("insert into businesses(id,name,operator_email,subscription_status) values ($1,'Existing pricing fixture','existing-pricing@example.invalid','ACTIVE'),($2,'Future pricing fixture','future-pricing@example.invalid','ACTIVE')", [existingPricingBusiness, futurePricingBusiness]);
+  await db.query("insert into subscriptions(business_id,plan_id,status,period_start) values($1,'standard','ACTIVE','2026-08-01')", [existingPricingBusiness]);
+  const existingPricingSnapshot = (await db.query(`
+    select jsonb_build_object(
+      'plan',(select to_jsonb(p) from plans p where id='standard'),
+      'subscription',(select to_jsonb(s) from subscriptions s where business_id=$1),
+      'lines',(select jsonb_agg(to_jsonb(li) order by li.kind,li.id) from billing_line_items li where business_id=$1)
+    ) snapshot`, [existingPricingBusiness])).rows[0].snapshot;
+  await db.query(`
+    insert into businesses(id,name,operator_email,subscription_status)
+    select
+      ('00000000-0000-4000-8000-' || lpad((900100 + g)::text,12,'0'))::uuid,
+      'Continuity business ' || g,
+      'continuity-business-' || g || '@example.invalid',
+      'ACTIVE'
+    from generate_series(1,34) g
+  `);
+  await db.query(`
+    insert into admin_users(id,user_id,business_id,email,password_hash,role,name,settings_permissions,suspended)
+    select
+      ('00000000-0000-4000-8000-' || lpad((901000 + g)::text,12,'0'))::uuid,
+      ('00000000-0000-4000-8000-' || lpad((902000 + g)::text,12,'0'))::uuid,
+      ('00000000-0000-4000-8000-' || lpad((900100 + ceil(g / 3.0)::int)::text,12,'0'))::uuid,
+      'continuity-' || g || '@example.invalid',
+      'legacy-hash-' || g,
+      (array['OPERATOR','ADMIN','MAIN_ADMIN'])[1 + ((g - 1) % 3)],
+      'Continuity user ' || g,
+      jsonb_build_object('reports', (g % 2 = 0), 'settings', (g % 3 = 0)),
+      false
+    from generate_series(1,100) g
+  `);
+  const continuitySnapshot = (await db.query(`
+    select jsonb_agg(
+      jsonb_build_object(
+        'id', id, 'user_id', user_id, 'business_id', business_id, 'email', email,
+        'password_hash', password_hash, 'role', role, 'name', name,
+        'settings_permissions', settings_permissions, 'suspended', suspended
+      ) order by email
+    ) snapshot
+    from admin_users
+    where email like 'continuity-%@example.invalid'
+  `)).rows[0].snapshot;
   for (const file of readdirSync('supabase/migrations').filter(x => /^\d{14}_.*\.sql$/.test(x) && x >= '20260907071000_').sort()) {
     await db.query(readFileSync('supabase/migrations/' + file, 'utf8'));
     console.log('APPLIED ' + file);
   }
+  await check('100 pre-existing staff accounts preserve identity, Auth links, roles, and settings across the migration ledger', async()=>{
+    const result = await db.query(`
+      select count(*)::int count, jsonb_agg(
+        jsonb_build_object(
+          'id', id, 'user_id', user_id, 'business_id', business_id, 'email', email,
+          'password_hash', password_hash, 'role', role, 'name', name,
+          'settings_permissions', settings_permissions, 'suspended', suspended
+        ) order by email
+      ) snapshot
+      from admin_users
+      where email like 'continuity-%@example.invalid'
+    `);
+    assert.equal(result.rows[0].count,100);
+    assert.deepEqual(result.rows[0].snapshot,continuitySnapshot);
+    assert.equal((await db.query(`
+      select count(*)::int count
+      from mfa_recovery_state r
+      join admin_users a on a.id=r.admin_id
+      where a.email like 'continuity-%@example.invalid'
+    `)).rows[0].count,0);
+  });
+  await check('pricing migration preserves existing subscriptions, plans, and open billing lines', async()=>{
+    const after=(await db.query(`
+      select jsonb_build_object(
+        'plan',(select to_jsonb(p) from plans p where id='standard'),
+        'subscription',(select to_jsonb(s) from subscriptions s where business_id=$1),
+        'lines',(select jsonb_agg(to_jsonb(li) order by li.kind,li.id) from billing_line_items li where business_id=$1)
+      ) snapshot`,[existingPricingBusiness])).rows[0].snapshot;
+    assert.deepEqual(after,existingPricingSnapshot);
+  });
+  await check('future subscriptions use the versioned R2000 cohort with free setup',async()=>{
+    const result=(await db.query('select platform_complete_business_setup($1,null) result',[futurePricingBusiness])).rows[0].result;
+    assert.equal(result.subscription_created,true);
+    const sub=(await db.query('select plan_id,status from subscriptions where business_id=$1',[futurePricingBusiness])).rows[0];
+    assert.deepEqual(sub,{plan_id:'standard-2026-09-21',status:'ACTIVE'});
+    assert.deepEqual((await db.query('select kind,amount_zar::numeric::text amount,status from billing_line_items where business_id=$1 order by kind',[futurePricingBusiness])).rows,[
+      {kind:'ONE_OFF',amount:'0.00',status:'PENDING'},
+      {kind:'RECURRING',amount:'2000.00',status:'ACTIVE'},
+    ]);
+    await db.query(readFileSync('supabase/migrations/20260920090000_enforce_standard_plan_pricing.sql','utf8'));
+    assert.equal((await db.query('select count(*)::int count from subscriptions where business_id=$1',[futurePricingBusiness])).rows[0].count,1);
+  });
   await db.query("select set_config('request.jwt.claim.role','service_role',false)");
   await db.query("insert into businesses(id,name,operator_email,subscription_status) values ($1,'Operator A','a@example.invalid','ACTIVE'),($2,'Operator B','b@example.invalid','ACTIVE')", [id(1), id(2)]);
   await db.query(`insert into admin_users(id,user_id,business_id,email,password_hash,role,suspended) values
@@ -108,6 +197,38 @@ try {
       await assert.rejects(db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-forged')),{code:'42501'});
     }));
   }
+  await check('authenticated clients cannot bypass conflict checks with a direct partial-count update',()=>as('authenticated',101,{},async()=>{
+    await assert.rejects(db.query('update bookings set arrived_count=2 where id=$1',[id(731)]),{code:'42501'});
+  }));
+  await check('legacy authenticated whole-group toggles remain coherent and audited',()=>as('authenticated',101,{},async()=>{
+    const row=(await db.query('update bookings set checked_in=false where id=$1 returning arrived_count,checked_in',[id(731)])).rows[0];
+    assert.deepEqual(row,{arrived_count:0,checked_in:false});
+    const audit=(await db.query("select source,arrived_count_before,arrived_count_after from slot_check_ins where booking_id=$1 and source='legacy-admin'",[id(731)])).rows;
+    assert.deepEqual(audit,[{source:'legacy-admin',arrived_count_before:6,arrived_count_after:0}]);
+  }));
+  await check('authenticated clients cannot suppress compatibility audit with a custom setting',()=>as('authenticated',101,{},async()=>{
+    await db.query("select set_config('bookingtours.arrival_rpc','1',true)");
+    await db.query('update bookings set checked_in=false where id=$1',[id(731)]);
+    assert.equal((await db.query("select count(*)::int count from slot_check_ins where booking_id=$1 and source='legacy-admin'",[id(731)])).rows[0].count,1);
+  }));
+  await check('authenticated booking inserts cannot initialize unaudited arrivals',()=>as('authenticated',101,{},async()=>{
+    await assert.rejects(db.query("insert into bookings(id,business_id,tour_id,slot_id,customer_name,email,qty,unit_price,total_amount,status,waiver_status,arrived_count) values($1,$2,$3,$4,'Forged arrival','forged-arrival@example.invalid',6,100,600,'PAID','SIGNED',2)",[id(734),id(1),id(701),id(711)]),{code:'42501'});
+  }));
+  await check('authenticated clients cannot forge arrival audit rows',()=>as('authenticated',101,{},async()=>{
+    await assert.rejects(db.query("insert into slot_check_ins(business_id,booking_id,slot_id,source) values($1,$2,$3,'forged')",[id(1),id(731),id(711)]),{code:'42501'});
+  }));
+  await check('arrival migration removes legacy table and PUBLIC column grants',async()=>{
+    await db.query('grant insert,update,delete,truncate on slot_check_ins to authenticated');
+    await db.query('grant insert(business_id,booking_id,slot_id,actor_admin_id,source,client_event_id),update(notes) on slot_check_ins to public');
+    await db.query(readFileSync('supabase/migrations/20260920100000_partial_booking_arrivals.sql','utf8'));
+    for(const role of ['anon','authenticated']) {
+      const privileges=(await db.query(`select
+        has_table_privilege($1,'slot_check_ins','INSERT,UPDATE,DELETE,TRUNCATE') table_dml,
+        has_column_privilege($1,'slot_check_ins','booking_id','INSERT') column_insert,
+        has_column_privilege($1,'slot_check_ins','notes','UPDATE') column_update`,[role])).rows[0];
+      assert.deepEqual(privileges,{table_dml:false,column_insert:false,column_update:false});
+    }
+  });
   await check('concurrent absolute arrival updates cannot silently overwrite each other',async()=>{
     const clients=[new pg.Client({...connection,database}),new pg.Client({...connection,database})];
     try {

@@ -118,25 +118,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4. Sign in via Supabase Auth (anon-key client) to mint a session.
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const authClient = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: signin, error: signinErr } =
-    await authClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-  if (signinErr || !signin?.session) {
-    console.error("ADMIN_LOGIN_SIGNIN_ERR", signinErr?.message);
-    return NextResponse.json(
-      { error: "Sign-in failed" + (signinErr ? ": " + signinErr.message : "") },
-      { status: 500 },
-    );
-  }
-
   if (user.read_only) {
     const { error: refreshError } = await admin.rpc(
       "refresh_claires_hiking_demo_dates",
@@ -148,11 +129,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    session: {
-      access_token: signin.session.access_token,
-      refresh_token: signin.session.refresh_token,
-      expires_at: signin.session.expires_at,
-    },
+    auth_ready: true,
     admin: {
       id: user.id,
       email: user.email,

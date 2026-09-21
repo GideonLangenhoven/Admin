@@ -100,6 +100,7 @@
   ],
   "bookings": [
     "allow_unpaid",
+    "arrived_count",
     "business_id",
     "cancellation_reason",
     "cancelled_at",
@@ -827,6 +828,22 @@
     "id",
     "period",
     "updated_at"
+  ],
+  "mfa_recovery_state": [
+    "actor_id",
+    "admin_id",
+    "business_id",
+    "completed_at",
+    "deleted_count",
+    "failed_count",
+    "lease_expires_at",
+    "operation_id",
+    "remaining_count",
+    "requested_factor_count",
+    "started_at",
+    "status",
+    "updated_at",
+    "verification_reference"
   ],
   "messages": [
     "body",

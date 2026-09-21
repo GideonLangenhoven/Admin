@@ -8,6 +8,7 @@ import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
 import PlatformOperations from "../../components/PlatformOperations";
+import { MfaStatus, useSensitiveActionMfa } from "../../components/MfaSensitiveAction";
 
 type OnboardForm = {
   businessName: string;
@@ -41,13 +42,9 @@ const DEFAULT_FORM: OnboardForm = {
 
 const BOOKING_DOMAIN = "booking.bookingtours.co.za";
 
-// Single pricing model — mirrors the 'standard' row in the plans table:
-// R2000/month includes 1 admin seat, R500/month per additional seat.
-const PLAN_BASE_ZAR = 2000;
-const PLAN_INCLUDED_SEATS = 1;
-const PLAN_EXTRA_SEAT_ZAR = 500;
-function monthlyCostZar(seats: number) {
-  return PLAN_BASE_ZAR + Math.max(0, (seats || 1) - PLAN_INCLUDED_SEATS) * PLAN_EXTRA_SEAT_ZAR;
+type BillingPlan = { id: string; name: string; monthly_price_zar: number; seat_limit: number; extra_seat_price_zar: number };
+function monthlyCostZar(seats: number, plan: BillingPlan) {
+  return Number(plan.monthly_price_zar) + Math.max(0, (seats || 1) - Number(plan.seat_limit || 1)) * Number(plan.extra_seat_price_zar || 0);
 }
 
 type BusinessRow = {
@@ -60,7 +57,8 @@ type BusinessRow = {
 };
 
 export default function SuperAdminPage() {
-  const { role, refreshBusiness } = useBusinessContext();
+  const { role, readOnly, refreshBusiness } = useBusinessContext();
+  const onboardingMfa = useSensitiveActionMfa(Boolean(readOnly) || !/super/i.test(role || ""), "super-admin-onboarding");
 
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterPassword, setRequesterPassword] = useState("");
@@ -220,16 +218,22 @@ export default function SuperAdminPage() {
     setBizFaqs([]);
     setExpandedBiz(bizId);
     try {
-    const [business, tours, admins] = await Promise.all([
+    const [business, tours, admins, subscription] = await Promise.all([
       supabase.from("businesses").select("*").eq("id", bizId).single(),
       supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order"),
       supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role"),
+      supabase.from("subscriptions").select("plan_id").eq("business_id", bizId).maybeSingle(),
     ]);
     if (request !== detailRequest.current) return;
-    if (business.error || tours.error || admins.error) throw business.error || tours.error || admins.error;
+    if (business.error || tours.error || admins.error || subscription.error) throw business.error || tours.error || admins.error || subscription.error;
+    const plan = subscription.data?.plan_id
+      ? await supabase.from("plans").select("id, name, monthly_price_zar, seat_limit, extra_seat_price_zar").eq("id", subscription.data.plan_id).maybeSingle()
+      : { data: null, error: null };
+    if (request !== detailRequest.current) return;
+    if (plan.error) throw plan.error;
     const data = business.data;
     if (!data || data.id !== bizId) throw new Error("Business details could not be verified. Refresh and try again.");
-    setBizDetail(data);
+    setBizDetail({ ...data, billing_plan: plan.data || null });
     setBizTours(tours.data || []);
     setBizAdmins((admins.data || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
 
@@ -427,6 +431,8 @@ export default function SuperAdminPage() {
       notify({ title: "Password required", message: "Enter your current password to authorize this onboarding action.", tone: "warning" });
       return;
     }
+    const linksCredentials = Boolean(form.waToken || form.waPhoneId || form.yocoSecretKey || form.yocoWebhookSecret);
+    if (linksCredentials && !await onboardingMfa.requireMfa("Link credentials while creating this client")) return;
 
     setSubmitting(true);
     onboardingRequest.current ||= crypto.randomUUID();
@@ -517,6 +523,7 @@ export default function SuperAdminPage() {
         <p className="ui-mono-label mb-2">Platform Control</p>
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
         <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Hidden onboarding workspace for creating new client tenants without touching SQL manually.</p>
+        <a href="/super-admin/sensitive-actions" className="ui-btn ui-btn-ghost mt-4 inline-flex">MFA support and sensitive settings</a>
       </div>
 
       {createdClient && (
@@ -609,12 +616,17 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
+        <div className="space-y-3">
+          <MfaStatus status={onboardingMfa.status} />
+          {onboardingMfa.panel}
+        </div>
+
         <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-4 text-xs text-[var(--ck-text-muted)]">
           This creates a new business row, a main admin account, stores encrypted payment and WhatsApp credentials when supplied, and sends the main admin a password setup email.
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" disabled={submitting} className="ui-btn ui-btn-primary disabled:opacity-50">
+          <button type="submit" disabled={Boolean(readOnly) || submitting || onboardingMfa.busy} className="ui-btn ui-btn-primary disabled:opacity-50">
             {submitting ? "Creating client..." : "Add New Client"}
           </button>
         </div>
@@ -723,17 +735,19 @@ export default function SuperAdminPage() {
                 {/* ── Expanded Detail Panel ── */}
                 {expandedBiz === b.id && (
                   <div className="mt-3 border-t pt-4 space-y-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    {/* ── Monthly cost (single pricing model) ── */}
+                    {/* ── Monthly cost from this customer's referenced plan ── */}
                     <div className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
-                      <span className="font-semibold text-[var(--ck-text-strong)]">
-                        Monthly cost: R{monthlyCostZar(b.max_admin_seats).toLocaleString("en-ZA")}/month
-                      </span>
-                      <span className="ml-2 text-xs text-[var(--ck-text-muted)]">
-                        R{PLAN_BASE_ZAR.toLocaleString("en-ZA")} base (1 seat included)
-                        {b.max_admin_seats > PLAN_INCLUDED_SEATS
-                          ? ` + ${b.max_admin_seats - PLAN_INCLUDED_SEATS} extra seat${b.max_admin_seats - PLAN_INCLUDED_SEATS === 1 ? "" : "s"} × R${PLAN_EXTRA_SEAT_ZAR}`
-                          : ""}
-                      </span>
+                      {bizDetail?.billing_plan ? <>
+                        <span className="font-semibold text-[var(--ck-text-strong)]">
+                          Monthly cost: R{monthlyCostZar(b.max_admin_seats, bizDetail.billing_plan).toLocaleString("en-ZA")}/month
+                        </span>
+                        <span className="ml-2 text-xs text-[var(--ck-text-muted)]">
+                          {bizDetail.billing_plan.name}: R{Number(bizDetail.billing_plan.monthly_price_zar).toLocaleString("en-ZA")} base ({Number(bizDetail.billing_plan.seat_limit)} seat{Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} included)
+                          {b.max_admin_seats > Number(bizDetail.billing_plan.seat_limit)
+                            ? ` + ${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit)} extra seat${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} × R${Number(bizDetail.billing_plan.extra_seat_price_zar).toLocaleString("en-ZA")}`
+                            : ""}
+                        </span>
+                      </> : <span className="text-xs text-[var(--ck-text-muted)]">{bizDetailLoading ? "Loading subscription pricing…" : "No subscription pricing is available."}</span>}
                     </div>
                     {bizDetailLoading ? (
                       <div className="space-y-2 py-2"><div className="ui-skeleton h-4 w-3/4" /><div className="ui-skeleton h-4 w-1/2" /></div>
@@ -2232,6 +2246,8 @@ function PlatformSettingsPanel() {
   const [bank, setBank] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [bankDirty, setBankDirty] = useState(false);
+  const mfa = useSensitiveActionMfa(false, "platform-settings");
 
   async function load() {
     setLoading(true);
@@ -2247,6 +2263,7 @@ function PlatformSettingsPanel() {
         bank_name: data.bank?.bank_name || "",
         branch_code: data.bank?.branch_code || "",
       });
+      setBankDirty(false);
     } catch (err: any) {
       notify({ title: "Failed to load platform settings", message: err.message, tone: "error" });
     }
@@ -2263,15 +2280,17 @@ function PlatformSettingsPanel() {
   }
 
   async function save() {
+    if (bankDirty && !await mfa.requireMfa("Save platform banking details")) return;
     setSaving(true);
     try {
       const res = await fetch("/api/platform-settings", {
         method: "POST",
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ logo_url: logoUrl, bank }),
+        body: JSON.stringify({ logo_url: logoUrl, ...(bankDirty ? { bank } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to save");
+      setBankDirty(false);
       notify({ title: "Saved", message: "Platform settings updated.", tone: "success" });
     } catch (err: any) {
       notify({ title: "Save failed", message: err.message, tone: "error" });
@@ -2302,18 +2321,20 @@ function PlatformSettingsPanel() {
           </div>
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ck-text-muted)]">Banking Details</label>
-            <input value={bank.account_owner} onChange={(e) => setBank({ ...bank, account_owner: e.target.value })} placeholder="Account owner" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
-            <input value={bank.bank_name} onChange={(e) => setBank({ ...bank, bank_name: e.target.value })} placeholder="Bank name" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
-            <input value={bank.account_number} onChange={(e) => setBank({ ...bank, account_number: e.target.value })} placeholder="Account number" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.account_owner} onChange={(e) => { setBank({ ...bank, account_owner: e.target.value }); setBankDirty(true); }} placeholder="Account owner" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.bank_name} onChange={(e) => { setBank({ ...bank, bank_name: e.target.value }); setBankDirty(true); }} placeholder="Bank name" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+            <input value={bank.account_number} onChange={(e) => { setBank({ ...bank, account_number: e.target.value }); setBankDirty(true); }} placeholder="Account number" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             <div className="grid grid-cols-2 gap-2">
-              <input value={bank.account_type} onChange={(e) => setBank({ ...bank, account_type: e.target.value })} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
-              <input value={bank.branch_code} onChange={(e) => setBank({ ...bank, branch_code: e.target.value })} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+              <input value={bank.account_type} onChange={(e) => { setBank({ ...bank, account_type: e.target.value }); setBankDirty(true); }} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
+              <input value={bank.branch_code} onChange={(e) => { setBank({ ...bank, branch_code: e.target.value }); setBankDirty(true); }} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             </div>
+            <MfaStatus status={mfa.status} />
+            {mfa.panel}
           </div>
         </div>
       )}
       <div className="flex justify-end pt-4 mt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-        <button onClick={save} disabled={saving || loading} className="ui-btn ui-btn-primary disabled:opacity-50">
+        <button onClick={save} disabled={saving || loading || mfa.busy} className="ui-btn ui-btn-primary disabled:opacity-50">
           {saving ? "Saving..." : "Save Platform Settings"}
         </button>
       </div>
