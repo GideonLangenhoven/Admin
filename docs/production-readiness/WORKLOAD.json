@@ -1,11 +1,11 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
   "version": "1.0",
-  "status": "PROPOSED_NOT_EXECUTED",
+  "status": "APPROVED_SCOPE_BLOCKED_ON_DEPLOYMENT_AND_TOPOLOGY",
   "approval": {
-    "workload_and_thresholds": false,
-    "cost_and_environment": false,
-    "approval_reference": null,
+    "workload_and_thresholds": true,
+    "cost_and_environment": true,
+    "approval_reference": "user-session-2026-09-21-prelaunch-qualification",
     "metric_definitions": false,
     "realtime_topology_and_scope": false
   },
@@ -139,9 +139,9 @@
       "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
     }
   },
-  "updated_at_utc": "2026-09-21T05:33:39Z",
-  "candidate_accepted_base": "718dee28df58df0cab527eb3f4aea7f8ae513389",
-  "candidate_status": "Dirty corrective patch set frozen; exact deployable candidate not yet accepted.",
+  "updated_at_utc": "2026-09-21T12:54:38Z",
+  "candidate_accepted_base": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+  "candidate_status": "Exact local source candidate committed and verified; deployment is pending.",
   "active_sections": [6, 7, 9],
   "deferred_sections": {
     "8": "Deployment, recovery, and release gate"
@@ -150,8 +150,8 @@
     "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
     "executed": false,
     "reason": [
-      "Section5 correctness/security corrections and acceptance incomplete",
-      "Isolated staging app URLs/database project, regions, quotas, compute/storage cost ceiling and window unspecified",
+      "Exact candidate and authoritative Auth migration are not deployed",
+      "Generator/application regions and production-equivalent quotas are unverified; paid scaling is not authorized",
       "Product Realtime topology, action-to-endpoint mapping, marketing offered rate and metric definitions await validation/approval",
       "Effective outbound guards and a complete candidate-specific runner are not established"
     ],

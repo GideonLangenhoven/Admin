@@ -1,12 +1,17 @@
 {
-  "updated_at_utc": "2026-09-21T11:34:12Z",
-  "candidate": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "updated_at_utc": "2026-09-21T12:54:38Z",
+  "candidate": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
   "authorized": {
     "isolated_source_changes": true,
     "local_tests_with_synthetic_data": true,
     "bt500_shared_read_smoke": true,
     "bt500_marker_only_synthetic_mutation": true,
     "current_prelaunch_project_synthetic_reset_and_testing": true,
+    "current_prelaunch_project_bt500_qualification": true,
+    "immediate_24_hour_window_after_exact_deployment": true,
+    "scoped_test_email_and_whatsapp_recipient": true,
+    "monitoring_receiver_supplied": true,
+    "yoco_test_mode_requests": true,
     "production_mutation": false,
     "deployment_or_push": false,
     "real_messages": false,
@@ -36,21 +41,24 @@
     {
       "id": "BT500_TARGET",
       "decision": "Section 7 uses 500 authenticated sessions. Replaceable synthetic data is permitted; live messages, payments, refunds and provider changes remain blocked."
+    },
+    {
+      "id": "QUALIFICATION_WINDOW_AND_RECIPIENTS",
+      "decision": "Begin the 24-hour window immediately after the exact candidate is deployed. A single test email, WhatsApp recipient and monitoring receiver were supplied in-session and are intentionally not stored in Git. Yoco qualification remains test-mode-only."
     }
   ],
   "missing_external_approvals": [
-    "Named isolated staging environment and identities",
-    "Approved Yoco and WhatsApp sandbox accounts, recipients and transaction budget",
-    "BT500 mixed-load regions, cost ceiling, window, metrics, spike and soak",
-    "Separate restore target and monitoring receiver",
+    "Exact candidate deployment and remote migration authorization",
+    "BT500 generator/application regions, metric definitions, Realtime topology and no-paid-scaling cost rule",
+    "Separate restore target",
     "Exact production deployment, migration, rollback and canary authorization"
   ],
   "latest_scope_steering": {
     "request": "Use the current environment for pre-launch qualification because there are no real customers; its synthetic data may be overwritten without a separate staging environment.",
-    "section5_status": "Local corrective implementation is committed; external acceptance and service-specific work remain.",
+    "section5_status": "Local corrective implementation, authoritative Auth migration and atomic setup-token claims are committed; deployed acceptance remains.",
     "section6_status": "100-account local continuity passed; deployed role and provider gates remain.",
     "section7_status": "500-session authenticated read smoke passed; mixed load, spike and soak remain.",
-    "section8_status": "The current environment is authorized for pre-launch testing. A separate target is still required only for the restore drill; live provider effects and public launch remain separately gated.",
+    "section8_status": "The current environment and immediate post-deployment qualification window are authorized for pre-launch testing. A separate target is still required for the restore drill; live financial effects and public launch remain separately gated.",
     "section9_status": "Handoff passes with an IN_PROGRESS verdict."
   }
 }

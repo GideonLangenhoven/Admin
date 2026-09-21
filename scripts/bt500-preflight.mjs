@@ -59,18 +59,27 @@ function executionIssues(execution) {
   if (!/^[0-9a-f]{40}$/.test(execution.candidate_commit || "")) issues.push("an exact candidate_commit is required");
   if (!/^[0-9a-f]{40}$/.test(execution.candidate_tree || "")) issues.push("an exact candidate_tree is required");
   if (execution.candidate_worktree_clean !== true) issues.push("candidate worktree must be clean");
-  if (execution.environment?.classification !== "isolated_non_production") issues.push("environment must be classified isolated_non_production");
+  const authorizedPrelaunch = execution.environment?.classification === "user_authorized_prelaunch_no_customers"
+    && execution.approval?.reference === "user-session-2026-09-21-prelaunch-qualification";
+  if (execution.environment?.classification !== "isolated_non_production" && !authorizedPrelaunch) {
+    issues.push("environment must be isolated_non_production or the specifically approved pre-launch project");
+  }
   requiredText(execution.environment?.supabase_project_ref, "Supabase project ref");
-  if (productionProjectRefs.has(execution.environment?.supabase_project_ref)) issues.push("Supabase project ref points at production/shared");
+  if (productionProjectRefs.has(execution.environment?.supabase_project_ref) && !authorizedPrelaunch) {
+    issues.push("Supabase project ref points at production/shared without the recorded pre-launch authorization");
+  }
   safeUrl(execution.environment?.admin_url, "Admin URL", issues);
   safeUrl(execution.environment?.booking_url, "Booking URL", issues);
   requiredText(execution.environment?.generator_region, "generator region");
   requiredText(execution.environment?.application_region, "application region");
-  if (!(Number(execution.cost?.ceiling_zar) > 0)) issues.push("a positive cost ceiling is required");
+  if (!(Number(execution.cost?.ceiling_zar) >= 0) || !String(execution.cost?.rule || "").trim()) {
+    issues.push("a non-negative cost ceiling and abort rule are required");
+  }
   requiredText(execution.window?.starts_at, "window start");
   requiredText(execution.window?.ends_at, "window end");
   const start = Date.parse(execution.window?.starts_at || "");
   const end = Date.parse(execution.window?.ends_at || "");
+  if (!Number.isFinite(start) || !Number.isFinite(end)) issues.push("window must use exact ISO timestamps after deployment");
   if (Number.isFinite(start) && Number.isFinite(end) && end <= start) issues.push("window end must be after window start");
   requiredText(execution.approval?.reference, "approval reference");
   requiredText(execution.approval?.approved_at, "approval timestamp");
@@ -80,6 +89,7 @@ function executionIssues(execution) {
   if (execution.outbound_controls?.live_messages_blocked !== true) issues.push("live messages must be blocked");
   if (execution.outbound_controls?.live_payments_blocked !== true) issues.push("live payments must be blocked");
   if (execution.outbound_controls?.provider_doubles_enabled !== true) issues.push("provider doubles must be enabled");
+  if (execution.mixed_runner_complete !== true) issues.push("full mixed/write/spike/soak runner is not complete");
   for (const [label, path] of Object.entries(execution.required_artifacts || {})) {
     if (!path || !existsSync(root + path)) issues.push(label + " artifact is missing");
   }
@@ -99,7 +109,8 @@ const mode = process.argv[2] || "--contract";
 if (mode === "--self-test") {
   const workload = load(workloadPath);
   assert.deepEqual(contractIssues(workload), []);
-  const unsafe = load(executionPath);
+  const unsafe = structuredClone(load(executionPath));
+  unsafe.environment.classification = "unclassified";
   assert(executionIssues(unsafe).some(issue => issue.includes("production/shared")));
   assert(executionIssues(unsafe).some(issue => issue.includes("not APPROVED")));
   console.log("PASS BT500 preflight self-test");

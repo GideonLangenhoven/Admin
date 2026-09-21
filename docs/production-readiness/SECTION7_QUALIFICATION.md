@@ -1,6 +1,6 @@
 # Section 7: 500-user qualification packet
 
-Status: **500-user authenticated read smoke passed; full qualification incomplete**. Profile: `BT500-LAUNCH-V1` v1.0. [WORKLOAD.json](WORKLOAD.json) is the current machine-readable contract. The user replaced the earlier 2,000-session target with 500 sessions on 21 September 2026 and authorized replacement of synthetic test data. Live messages, real payments/refunds and provider-account changes remained blocked.
+Status: **500-user authenticated read smoke passed; full qualification incomplete**. Profile: `BT500-LAUNCH-V1` v1.0. [WORKLOAD.json](WORKLOAD.json) is the current machine-readable contract. The user replaced the earlier 2,000-session target with 500 sessions on 21 September 2026 and authorized replacement of synthetic test data. The current project is explicitly authorized as a pre-launch target with no customers. High-volume messages and payments remain blocked; one supplied email/WhatsApp recipient and Yoco test-mode journeys are separately approved.
 
 The read smoke reached500 distinct authenticated users across167 synthetic businesses. It completed17,356 actions and69,424 requests with zero failed checks, HTTP failures or dropped iterations. Overall action rate was40.58/s including ramps; the contract's steady50/s rate was not separately certified. Read latency was p95 415.21ms and p99 1.28s; action latency was p95 559ms and p99 1.47s. The single-origin generator hit Supabase's configured per-IP boundary at request33. For steady-session testing, the limit was temporarily raised, sessions were issued at one/second, and the limit was restored to30 before load. Marker teardown restored the original row counts. See [BT500_READ_SMOKE_RESULT.json](evidence/BT500_READ_SMOKE_RESULT.json).
 
@@ -34,7 +34,7 @@ WORKLOAD.json contains proposed observation points, failure denominators, rollin
 - Approved action mapping, product Realtime footprint, marketing rate, soak cycle and metric definitions.
 - Verified production-rejecting/outbound guards and a complete candidate-specific runner; the older `tests/stress` probes alone are insufficient.
 
-The temporary 500-user synthetic read-smoke fleet was seeded, exercised and removed with original row counts restored. No mixed write load, soak or provider action occurred. The currently linked production/shared Supabase project is not approved for the remaining qualification.
+The temporary 500-user synthetic read-smoke fleet was seeded, exercised and removed with original row counts restored. No mixed write load, soak or provider action occurred. The current Supabase project is approved for pre-launch qualification, but the exact candidate, full mixed runner, product Realtime topology and provider doubles must be in place before its 24-hour clock can start.
 
 ## Executable preflight
 

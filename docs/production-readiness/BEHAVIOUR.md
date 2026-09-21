@@ -1,6 +1,6 @@
 # Behaviour baseline
 
-Candidate: `04cf19e98271ea634a4fa68b16e89a0fae65ebd6`. This is a preservation contract and evidence map, not release certification.
+Candidate: `7d3e7b338afdcee4c06aa460ccfe206c726e6243`. This is a preservation contract and evidence map, not release certification.
 
 | Capability | Behaviour to preserve | Current evidence or gap | Required release proof |
 |---|---|---|---|
@@ -11,7 +11,7 @@ Candidate: `04cf19e98271ea634a4fa68b16e89a0fae65ebd6`. This is a preservation co
 | Refunds | Exact approved roles, active identity, tenant/object ownership, recorded capture, stable operation ID, truthful pending/complete outcome | OPERATOR policy, server authority, tenant/audit attribution and truthful UI outcomes pass local coverage | Complete the deployed role matrix and a genuine provider sandbox journey |
 | Booking bulk work | UI reflects actual item outcomes and accepted work survives browser loss | Mixed completed, pending, manual, failed, malformed and exceptional outcomes pass local regression coverage | Deployed interruption and provider checks |
 | Guide offline check-in | Stable event ID; 401/409/429 are retained for correct recovery; no cross-user replay; terminal rejection visible | 109 focused tests, the broader suite and local browser probes pass | Authenticated isolated-staging verification |
-| Arrivals | Partial counts, locks, expected-count conflicts, payment/waiver policy, move detection and boolean compatibility remain coherent | Compatibility, audit and direct-write privilege checks pass the 172-check disposable database run | Repeat against an isolated restore of the intended ledger |
+| Arrivals | Partial counts, locks, expected-count conflicts, payment/waiver policy, move detection and boolean compatibility remain coherent | Compatibility, audit and direct-write privilege checks pass the 176-check disposable database run | Repeat against an isolated restore of the intended ledger |
 | Notifications | Durable intent, stable dedupe, truthful accepted/delivered/failed state, bounded recovery and fairness | Prior reviewed correction is not integrated on this lineage; broader queue recovery open | Port, target-ledger tests, provider sandbox, scheduler/death/fairness tests |
 | Uploads and rendering | Byte/type/size/ownership validation and safe partial-failure handling without breaking supported media | Prior reviewed patch not integrated; CSP/dependency work open | Port/review, real storage/browser tests, CSP and advisory reachability |
 | New subscription pricing | Approved2000/month,one included seat,500 extra seat,zero setup applies only to new subscriptions; existing plans/subscriptions/open lines remain unchanged | Versioned future plan and old/new cohort preservation pass local database checks | Repeat against an isolated restore of the intended ledger |

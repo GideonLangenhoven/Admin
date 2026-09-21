@@ -1,6 +1,6 @@
 {
-  "recorded_at_utc": "2026-09-21T11:34:12Z",
-  "candidate_commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "candidate_commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
   "status": "LOCAL_CORRECTIVE_IMPLEMENTATION_COMPLETE_EXTERNAL_ACCEPTANCE_OPEN",
   "completed_local_workstreams": [
     "OPERATOR refund authority and truthful single/bulk UI outcomes",
@@ -10,23 +10,25 @@
     "arrival auditing and direct-write privilege hardening",
     "mobile Admin and storefront reconciliation",
     "dependency remediation to zero npm audit findings",
-    "500-session read-smoke tooling and login architecture correction"
+    "500-session read-smoke tooling and login architecture correction",
+    "authoritative Supabase Auth, isolated password reauthentication, atomic setup-token issuance/claims and expiry-safe finalization"
   ],
   "validation": {
-    "unit": "1324 pass, 0 fail, 1 skip",
+    "unit": "1333 pass, 0 fail, 1 skip",
     "typescript": "pass",
     "edge": "pass",
-    "database": "172 checks pass",
+    "database": "176 checks pass",
     "browser": "4/4 pass",
     "builds": "Admin and booking pass",
-    "npm_audit": "0 vulnerabilities"
+    "npm_audit": "0 vulnerabilities",
+    "independent_auth_review": "fresh-context Astra/xhigh accepted commit 7d3e7b3 after 49 focused tests and an installed-SDK session-storage/cross-tab probe"
   },
   "remaining": [
     "Real Supabase Auth enrollment, challenge and assisted-recovery lifecycle in an isolated deployed environment",
     "Genuine Yoco and WhatsApp sandbox journeys",
     "Notification durability/fairness work tracked as NOTIFY-01",
     "Candidate-specific CI and exact deployed artifact/schema/config equivalence",
-    "Fresh external acceptance for release-critical integrated behavior"
+    "Fresh final acceptance for deployed release-critical integrated behavior"
   ],
   "production_mutated": false,
   "pushed_or_deployed": false

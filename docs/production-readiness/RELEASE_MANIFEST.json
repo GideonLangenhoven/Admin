@@ -1,11 +1,11 @@
 {
-  "recorded_at_utc": "2026-09-21T11:34:12Z",
+  "recorded_at_utc": "2026-09-21T12:54:38Z",
   "verdict": "IN_PROGRESS",
   "admin_candidate": {
     "repository": "capekayak",
     "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
-    "commit": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
-    "tree": "bcf595ebf0090da175882e038a92ccba66009faa",
+    "commit": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
+    "tree": "765a79c3876c6e458974b6de374f359b5f7e7d91",
     "worktree": "/private/tmp/bookingtours-simple-view-1812677",
     "package_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534"
   },
@@ -17,22 +17,36 @@
     "worktree": "/private/tmp/bookingtours-booking-mobile-460e58d"
   },
   "validation": {
-    "unit": "1324 pass, 1 skip",
+    "unit": "1333 pass, 1 skip",
     "typescript": "pass",
     "edge": "pass",
-    "database": "172 checks pass",
+    "database": "176 checks pass",
     "simple_view_browser": "4/4 pass",
     "admin_build": "pass, 91 routes",
     "booking_build": "pass",
     "booking_check_ways": "pass",
-    "npm_audit": "0 vulnerabilities"
+    "npm_audit": "0 vulnerabilities",
+    "independent_auth_review": "fresh-context Astra/xhigh accepted 7d3e7b3 after 49 focused tests and installed-SDK session isolation probe",
+    "controlled_migration_dry_run": "exactly four pending migrations"
   },
   "database_changes": [
     "20260920090000_enforce_standard_plan_pricing.sql",
     "20260920100000_partial_booking_arrivals.sql",
-    "20260921120000_mfa_sensitive_business_columns.sql"
+    "20260921120000_mfa_sensitive_business_columns.sql",
+    "20260921130000_authoritative_auth_passwords.sql"
   ],
   "production_equivalence_verified": false,
+  "observed_hosted_state": {
+    "admin_commit": "6a630c0bb1cbfd583b30173bee9e602f219d8b9e",
+    "admin_deployment": "caepweb-admin-l5wcz5var-jerrys-projects-f4e4eaf9.vercel.app",
+    "admin_function_region": "iad1",
+    "booking_commit": "99b71f093486b13f6f9bed38f48d184a93b23ba6",
+    "booking_deployment": "booking-j3oyy0qs9-jerrys-projects-f4e4eaf9.vercel.app",
+    "booking_function_region": "cdg1",
+    "supabase_project": "ukdsrndqhsatjkmxijuj",
+    "supabase_region": "eu-west-3",
+    "matches_candidate": false
+  },
   "release_actions": {
     "pushed": false,
     "deployed": false,

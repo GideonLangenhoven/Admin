@@ -1,0 +1,26 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "status": "DISCOVERED_REGIONS_QUOTAS_OPEN",
+  "regions": {
+    "generator": "operator workstation, Africa/Johannesburg",
+    "admin_functions": "iad1",
+    "storefront_functions": "cdg1",
+    "supabase": "eu-west-3"
+  },
+  "cost": {
+    "ceiling_zar": 0,
+    "rule": "Use existing included capacity and abort before any paid scaling or overage authorization."
+  },
+  "required_headroom": 0.3,
+  "quotas": {
+    "supabase_database_and_pool": null,
+    "supabase_auth": null,
+    "supabase_realtime": null,
+    "supabase_edge": null,
+    "vercel_functions": null,
+    "message_workers": null
+  },
+  "approval": false,
+  "blocking_reason": "Plan limits and observed resource denominators are not available in the current read-only inventory. Headroom cannot be calculated from guesses."
+}

@@ -1,5 +1,10 @@
 # Pre-Rollout Stress Harness & Findings
 
+> Historical July evidence only. It does not certify the September candidate.
+> The current contract, execution state and blockers are recorded under
+> `docs/production-readiness/`; those records take precedence over the results
+> and deployment statements retained below for audit history.
+
 Reusable harness for the Pre-Rollout Stress Test Plan, plus the results of the
 first pass (2026-07-11, static + read-only-live verification — no load fired at
 prod). **Load runs (k6, fleet seed, soak) require a dedicated stress tenant, an

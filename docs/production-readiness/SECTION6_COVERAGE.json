@@ -1,7 +1,7 @@
 {
   "profile_id": "BT-FUNCTIONAL-CONTINUITY-V1",
   "recorded_at_utc": "2026-09-21T11:34:12Z",
-  "candidate": "04cf19e98271ea634a4fa68b16e89a0fae65ebd6",
+  "candidate": "7d3e7b338afdcee4c06aa460ccfe206c726e6243",
   "status": "LOCAL_CONTINUITY_PASSED_EXTERNAL_GATES_OPEN",
   "meaning": "Local synthetic continuity and the mapped regression suite pass. Genuine provider and complete deployed browser-role proof remain external release gates.",
   "identities": [
@@ -190,10 +190,10 @@
     }
   ],
   "local_results": {
-    "unit": "1324 pass, 0 fail, 1 intentional skip",
+    "unit": "1333 pass, 0 fail, 1 intentional skip",
     "typescript": "pass",
     "edge_typecheck": "pass",
-    "database_fixture": "172 checks pass",
+    "database_fixture": "176 checks pass",
     "simple_view_browser": "4/4 pass across phone, tablet and desktop",
     "admin_production_build": "pass, 91 routes",
     "booking_build": "pass",
@@ -203,7 +203,7 @@
     "required_accounts": 100,
     "completed_accounts": 100,
     "status": "LOCAL_SYNTHETIC_PASSED",
-    "reason": "The same 100 pre-existing synthetic staff records across 34 businesses retained IDs, Auth links, tenants, emails, password hashes, roles, names, settings and suspension state through the full migration ledger. This is local disposable PostgreSQL proof."
+    "reason": "The same 100 pre-existing synthetic staff records across 34 businesses retained IDs, Auth links, tenants, emails, password hashes, roles, names, settings and suspension state through the full migration ledger. Concurrent setup-token claim and recovery checks also passed. This is local disposable PostgreSQL proof."
   },
   "browser_role_matrix": {
     "completed": false,
@@ -214,7 +214,7 @@
   "provider_journeys": {
     "genuine_sandbox_completed": false,
     "status": "BLOCKED_EXTERNAL",
-    "reason": "Payment and messaging sandbox accounts, approved recipients and a transaction budget are absent."
+    "reason": "Scoped recipients and Yoco test-mode use are approved, but the exact candidate is not deployed and the genuine provider journey has not run."
   },
   "release_gate": "FAIL"
 }
