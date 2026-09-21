@@ -40,12 +40,16 @@ if (businessSizes.length !== 167 || businessSizes[0] !== 2 || businessSizes.at(-
 
 export const options = k6Options(config);
 
-const readDuration = new Trend("bt500_read_duration", true);
-const writeDuration = new Trend("bt500_write_duration", true);
+const readRequestDuration = new Trend("bt500_read_request_duration", true);
+const writeRequestDuration = new Trend("bt500_write_request_duration", true);
+const readActionDuration = new Trend("bt500_read_action_duration", true);
+const writeActionDuration = new Trend("bt500_write_action_duration", true);
+const otherActionDuration = new Trend("bt500_other_action_duration", true);
 const actionDuration = new Trend("bt500_action_duration", true);
 const offeredActions = new Counter("bt500_offered_actions");
 const completedActions = new Counter("bt500_completed_actions");
 const unexpectedFailure = new Rate("bt500_unexpected_failure");
+const journeyFailure = new Rate("bt500_journey_failure");
 const invariantViolations = new Counter("bt500_invariant_violations");
 const tokenRefreshes = new Counter("bt500_token_refreshes");
 let state;
@@ -92,19 +96,23 @@ function tenantRows(rows, businessId, tags) {
 function readAction(session, tags) {
   const base = `${input.url}/rest/v1`;
   const headers = restHeaders(session);
+  const journeys = ["identity", "business", "bookings", "slots"];
   const responses = http.batch([
     ["GET", `${base}/admin_users?select=id,role,business_id&user_id=eq.${session.user_id}`, null, { headers, tags: { ...tags, request: "identity" } }],
     ["GET", `${base}/businesses?select=id,name,subscription_status&id=eq.${session.business_id}`, null, { headers, tags: { ...tags, request: "business" } }],
     ["GET", `${base}/bookings?select=id,business_id,status,total_amount,created_at&business_id=eq.${session.business_id}&order=created_at.desc&limit=25`, null, { headers, tags: { ...tags, request: "bookings" } }],
     ["GET", `${base}/slots?select=id,business_id,start_time,booked,held,capacity_total,status&business_id=eq.${session.business_id}&order=start_time.asc&limit=25`, null, { headers, tags: { ...tags, request: "slots" } }],
   ]);
-  responses.forEach(response => readDuration.add(response.timings.duration, tags));
+  responses.forEach((response, index) => readRequestDuration.add(response.timings.duration, { ...tags, journey: journeys[index] }));
   const bodies = responses.map(json);
-  return responses.every(response => response.status === 200)
-    && Array.isArray(bodies[0]) && bodies[0].length === 1 && bodies[0][0].business_id === session.business_id
-    && Array.isArray(bodies[1]) && bodies[1].length === 1 && bodies[1][0].id === session.business_id
-    && tenantRows(bodies[2], session.business_id, tags)
-    && tenantRows(bodies[3], session.business_id, tags);
+  const valid = [
+    responses[0].status === 200 && Array.isArray(bodies[0]) && bodies[0].length === 1 && bodies[0][0].business_id === session.business_id,
+    responses[1].status === 200 && Array.isArray(bodies[1]) && bodies[1].length === 1 && bodies[1][0].id === session.business_id,
+    responses[2].status === 200 && tenantRows(bodies[2], session.business_id, tags),
+    responses[3].status === 200 && tenantRows(bodies[3], session.business_id, tags),
+  ];
+  valid.forEach((ok, index) => journeyFailure.add(!ok, { ...tags, journey: journeys[index] }));
+  return valid.every(Boolean);
 }
 
 function writeAction(session, tags) {
@@ -112,9 +120,12 @@ function writeAction(session, tags) {
     `${input.url}/rest/v1/bookings?select=id,business_id,slot_id,qty,arrived_count,status,waiver_status&id=eq.${session.booking_id}&business_id=eq.${session.business_id}`,
     { headers: restHeaders(session), tags: { ...tags, request: "arrival_state" } },
   );
-  readDuration.add(lookup.timings.duration, tags);
+  const lookupTags = { ...tags, journey: "arrival_state" };
+  readRequestDuration.add(lookup.timings.duration, lookupTags);
   const rows = json(lookup);
-  if (lookup.status !== 200 || !tenantRows(rows, session.business_id, tags) || rows.length !== 1) return false;
+  const lookupOk = lookup.status === 200 && tenantRows(rows, session.business_id, tags) && rows.length === 1;
+  journeyFailure.add(!lookupOk, lookupTags);
+  if (!lookupOk) return false;
   const booking = rows[0];
   if (booking.slot_id !== session.slot_id || booking.qty < 2 || booking.waiver_status !== "SIGNED" || !["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)) return false;
 
@@ -136,32 +147,47 @@ function writeAction(session, tags) {
     },
     tags: { ...tags, request: "record_arrival" },
   };
+  const requestTags = { ...tags, journey: "record_arrival" };
   let response = http.post(`${adminBase}/api/check-ins?source=simple-view`, body, params);
-  writeDuration.add(response.timings.duration, tags);
+  writeRequestDuration.add(response.timings.duration, requestTags);
   if (response.status === 0 || response.status >= 500) {
     response = http.post(`${adminBase}/api/check-ins?source=simple-view`, body, params);
-    writeDuration.add(response.timings.duration, tags);
+    writeRequestDuration.add(response.timings.duration, requestTags);
   }
   const result = json(response);
-  return response.status === 200 && result?.ok === true && Number(result.arrived_count) === target;
+  const ok = response.status === 200 && result?.ok === true && Number(result.arrived_count) === target;
+  journeyFailure.add(!ok, requestTags);
+  return ok;
+}
+
+function otherJourney(cycle) {
+  return cycle % 3 === 0 ? "session" : cycle % 3 === 1 ? "report" : "inbox";
 }
 
 function otherAction(session, tags, cycle) {
   const base = `${input.url}/rest/v1`;
-  if (cycle % 3 === 0) {
+  const journey = otherJourney(cycle);
+  if (journey === "session") {
     const response = http.get(`${input.url}/auth/v1/user`, {
       headers: { apikey: input.anon_key, Authorization: `Bearer ${session.access_token}` },
       tags: { ...tags, request: "session" },
     });
-    return response.status === 200 && json(response)?.id === session.user_id;
+    const requestTags = { ...tags, journey: "session" };
+    readRequestDuration.add(response.timings.duration, requestTags);
+    const ok = response.status === 200 && json(response)?.id === session.user_id;
+    journeyFailure.add(!ok, requestTags);
+    return { ok, journey };
   }
-  const resource = cycle % 3 === 1
+  const resource = journey === "report"
     ? `bookings?select=id,business_id,status,total_amount,created_at&business_id=eq.${session.business_id}&order=created_at.desc&limit=100`
     : `conversations?select=id,business_id,status,last_activity_at&business_id=eq.${session.business_id}&order=last_activity_at.desc&limit=50`;
-  const response = http.get(`${base}/${resource}`, { headers: restHeaders(session), tags: { ...tags, request: cycle % 3 === 1 ? "report" : "inbox" } });
-  readDuration.add(response.timings.duration, tags);
+  const response = http.get(`${base}/${resource}`, { headers: restHeaders(session), tags: { ...tags, request: journey } });
+  const requestTags = { ...tags, journey };
+  readRequestDuration.add(response.timings.duration, requestTags);
   const rows = json(response);
-  return response.status === 200 && tenantRows(rows, session.business_id, tags);
+  const ok = response.status === 200 && tenantRows(rows, session.business_id, tags);
+  journeyFailure.add(!ok, requestTags);
+  return { ok, journey };
 }
 
 export function setup() {
@@ -208,6 +234,8 @@ export default function () {
   const kind = bucket < 7 ? "read" : bucket < 9 ? "write" : "other";
   const tags = { phase, kind };
   const started = Date.now();
+  const otherCycle = Math.floor((__ITER + __VU - 1) / 10);
+  let selectedOtherJourney = kind === "other" ? otherJourney(otherCycle) : null;
   offeredActions.add(1, tags);
   invariantViolations.add(0, tags);
 
@@ -215,11 +243,19 @@ export default function () {
   if (ok) {
     if (kind === "read") ok = readAction(session, tags);
     else if (kind === "write") ok = writeAction(session, tags);
-    else ok = otherAction(session, tags, Math.floor((__ITER + __VU - 1) / 10));
+    else {
+      const result = otherAction(session, tags, otherCycle);
+      ok = result.ok;
+      selectedOtherJourney = result.journey;
+    }
   }
+  const elapsedMs = Date.now() - started;
+  if (kind === "read") readActionDuration.add(elapsedMs, { ...tags, journey: "dashboard_bundle" });
+  else if (kind === "write") writeActionDuration.add(elapsedMs, { ...tags, journey: "record_arrival" });
+  else otherActionDuration.add(elapsedMs, { ...tags, journey: selectedOtherJourney });
   unexpectedFailure.add(!ok, tags);
   if (ok) completedActions.add(1, tags);
-  actionDuration.add(Date.now() - started, tags);
+  actionDuration.add(elapsedMs, tags);
 
   const cadence = phase === "spike" ? 5 : 10;
   sleep(Math.max(0, cadence - (Date.now() - started) / 1000));

@@ -80,13 +80,34 @@ export function phaseAt(config, elapsedSeconds) {
 }
 
 export function k6Options(config) {
+  const phases = config.mode === "qualification" ? ["steady", "spike", "recovery", "soak"] : [];
+  const readJourneys = ["identity", "business", "bookings", "slots", "arrival_state", "session", "report", "inbox"];
+  const readBudget = ["p(95)<=750", "p(99)<=1500"];
+  const writeBudget = ["p(95)<=1500", "p(99)<=3000"];
   const thresholds = {
-    bt500_read_duration: ["p(95)<=750", "p(99)<=1500"],
-    bt500_write_duration: ["p(95)<=1500", "p(99)<=3000"],
+    bt500_read_action_duration: readBudget,
+    bt500_write_action_duration: writeBudget,
+    bt500_other_action_duration: readBudget,
     bt500_unexpected_failure: ["rate<0.001"],
     bt500_invariant_violations: ["count==0"],
     dropped_iterations: ["count==0"],
   };
+  for (const phase of phases) {
+    thresholds[`bt500_read_action_duration{phase:${phase},journey:dashboard_bundle}`] = readBudget;
+    thresholds[`bt500_write_action_duration{phase:${phase},journey:record_arrival}`] = writeBudget;
+    thresholds[`bt500_write_request_duration{phase:${phase},journey:record_arrival}`] = writeBudget;
+    for (const journey of ["session", "report", "inbox"]) {
+      thresholds[`bt500_other_action_duration{phase:${phase},journey:${journey}}`] = readBudget;
+    }
+    for (const kind of ["read", "write", "other"]) {
+      thresholds[`bt500_unexpected_failure{phase:${phase},kind:${kind}}`] = ["rate<0.001"];
+    }
+    for (const journey of readJourneys) {
+      thresholds[`bt500_read_request_duration{phase:${phase},journey:${journey}}`] = readBudget;
+      thresholds[`bt500_journey_failure{phase:${phase},journey:${journey}}`] = ["rate<0.001"];
+    }
+    thresholds[`bt500_journey_failure{phase:${phase},journey:record_arrival}`] = ["rate<0.001"];
+  }
   if (config.mode === "qualification") {
     thresholds["bt500_completed_actions{phase:steady}"] = [`count>=${config.seconds.steady * 50 - 500}`];
     thresholds["bt500_completed_actions{phase:spike}"] = [`count>=${config.seconds.spike * 100 - 500}`];

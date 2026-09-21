@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmod, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
+import { fetchAllPages } from "./bt500-pages.mjs";
 
 const marker = "bt500-20260921";
 const output = process.env.BT500_CREDENTIALS_FILE || "/private/tmp/bt500-credentials.json";
@@ -112,8 +113,17 @@ if (process.argv.includes("--sessions")) {
   const { data: rows, error } = await admin.from("admin_users").select("email,user_id,business_id").like("email", `${marker}-%@example.invalid`).order("email");
   fail("load marker users", error);
   if (rows.length !== 500) throw new Error(`expected 500 marker users, found ${rows.length}`);
-  const { data: bookings, error: bookingsError } = await admin.from("bookings").select("id,business_id,slot_id,email,qty,status,waiver_status").like("email", `${marker}-%@example.invalid`).order("email");
-  fail("load marker write bookings", bookingsError);
+  const businessSizes = [...rows.reduce((counts, row) => counts.set(row.business_id, (counts.get(row.business_id) || 0) + 1), new Map()).values()];
+  if (businessSizes.length !== 167 || businessSizes.some(size => size < 2 || size > 3)) throw new Error("expected 500 users across 167 businesses with two or three staff each");
+  const bookings = await fetchAllPages(async (from, to) => {
+    const { data, error: bookingsError } = await admin.from("bookings")
+      .select("id,business_id,slot_id,email,qty,status,waiver_status")
+      .like("email", `${marker}-%@example.invalid`)
+      .order("email")
+      .range(from, to);
+    fail("load marker write bookings", bookingsError);
+    return data;
+  });
   const identities = assignWriteBookings(rows.map(row => ({ email: row.email, user_id: row.user_id, business: { id: row.business_id } })), bookings);
   const credentials = await issueSessions(identities);
   await saveCredentials(credentials);

@@ -11,9 +11,24 @@ test("qualification defaults preserve the frozen BT500 phase contract", () => {
   assert.equal(config.seconds.recovery, 600);
   assert.equal(config.seconds.soak, 86400);
   assert.equal(phaseAt(config, config.phaseEnds.steady), "spike");
-  assert.deepEqual(k6Options(config).thresholds.bt500_read_duration, ["p(95)<=750", "p(99)<=1500"]);
-  assert.deepEqual(k6Options(config).thresholds.bt500_write_duration, ["p(95)<=1500", "p(99)<=3000"]);
-  assert.deepEqual(k6Options(config).thresholds.bt500_unexpected_failure, ["rate<0.001"]);
+  const thresholds = k6Options(config).thresholds;
+  assert.deepEqual(thresholds.bt500_read_action_duration, ["p(95)<=750", "p(99)<=1500"]);
+  assert.deepEqual(thresholds.bt500_write_action_duration, ["p(95)<=1500", "p(99)<=3000"]);
+  assert.deepEqual(thresholds.bt500_other_action_duration, ["p(95)<=750", "p(99)<=1500"]);
+  assert.deepEqual(thresholds.bt500_unexpected_failure, ["rate<0.001"]);
+  for (const phase of ["steady", "spike", "recovery", "soak"]) {
+    assert.deepEqual(thresholds[`bt500_read_action_duration{phase:${phase},journey:dashboard_bundle}`], ["p(95)<=750", "p(99)<=1500"]);
+    assert.deepEqual(thresholds[`bt500_write_action_duration{phase:${phase},journey:record_arrival}`], ["p(95)<=1500", "p(99)<=3000"]);
+    for (const journey of ["session", "report", "inbox"]) {
+      assert.deepEqual(thresholds[`bt500_other_action_duration{phase:${phase},journey:${journey}}`], ["p(95)<=750", "p(99)<=1500"]);
+    }
+    assert.deepEqual(thresholds[`bt500_unexpected_failure{phase:${phase},kind:write}`], ["rate<0.001"]);
+    for (const journey of ["identity", "business", "bookings", "slots", "arrival_state", "session", "report", "inbox"]) {
+      assert.deepEqual(thresholds[`bt500_read_request_duration{phase:${phase},journey:${journey}}`], ["p(95)<=750", "p(99)<=1500"]);
+      assert.deepEqual(thresholds[`bt500_journey_failure{phase:${phase},journey:${journey}}`], ["rate<0.001"]);
+    }
+    assert.deepEqual(thresholds[`bt500_journey_failure{phase:${phase},journey:record_arrival}`], ["rate<0.001"]);
+  }
 });
 
 test("qualification mode rejects shortened contract phases", () => {
@@ -37,6 +52,7 @@ test("smoke mode permits short phases and an omitted soak without changing targe
   });
   assert.deepEqual(config.stages.map(stage => stage.target), [100, 250, 500, 500, 500, 500, 0]);
   assert.equal(k6Options(config).thresholds["bt500_completed_actions{phase:steady}"], undefined);
+  assert.equal(k6Options(config).thresholds["bt500_write_action_duration{phase:steady,journey:record_arrival}"], undefined);
 });
 
 test("duration parsing fails closed", () => {
