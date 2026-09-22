@@ -81,7 +81,7 @@ export function phaseAt(config, elapsedSeconds) {
 
 export function k6Options(config) {
   const phases = config.mode === "qualification" ? ["steady", "spike", "recovery", "soak"] : [];
-  const readJourneys = ["identity", "business", "bookings", "slots", "arrival_state", "session", "report", "inbox"];
+  const readJourneys = ["dashboard_snapshot", "arrival_state", "session", "report", "inbox"];
   const readBudget = ["p(95)<=750", "p(99)<=1500"];
   const writeBudget = ["p(95)<=1500", "p(99)<=3000"];
   const thresholds = {

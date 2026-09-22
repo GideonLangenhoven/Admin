@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-22T06:30:05Z",
+  "updated_at_utc": "2026-09-22T09:15:55Z",
   "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "authorized": {
     "isolated_source_changes": true,
@@ -58,8 +58,8 @@
     "request": "Deploy the exact frozen candidates and use the current no-customer environment for approved ZAR 0 pre-launch qualification with replaceable marker data.",
     "section5_status": "Corrective implementation is deployed; browser and scheduler smoke pass, while remaining deployed role/provider acceptance is open.",
     "section6_status": "100-account local continuity passed; deployed role matrix and genuine provider sandbox gates remain.",
-    "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
-    "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; alert delivery and isolated restore rehearsal remain open.",
-    "section9_status": "Handoff verdict is FAILED_GATE with detailed deployed-smoke evidence."
+    "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Target-side queueing is confirmed; the local corrective candidate is not approved or deployed. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
+    "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; the capacity correction, alert delivery and isolated restore rehearsal remain open.",
+    "section9_status": "Handoff verdict is FAILED_GATE with deployed-smoke and follow-up capacity-attribution evidence."
   }
 }

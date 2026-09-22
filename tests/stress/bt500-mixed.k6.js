@@ -63,6 +63,7 @@ function restHeaders(session) {
     apikey: input.anon_key,
     Authorization: `Bearer ${session.access_token}`,
     "x-tenant-business-id": session.business_id,
+    "Content-Type": "application/json",
   };
 }
 
@@ -95,24 +96,33 @@ function tenantRows(rows, businessId, tags) {
 
 function readAction(session, tags) {
   const base = `${input.url}/rest/v1`;
-  const headers = restHeaders(session);
-  const journeys = ["identity", "business", "bookings", "slots"];
-  const responses = http.batch([
-    ["GET", `${base}/admin_users?select=id,role,business_id&user_id=eq.${session.user_id}`, null, { headers, tags: { ...tags, request: "identity" } }],
-    ["GET", `${base}/businesses?select=id,name,subscription_status&id=eq.${session.business_id}`, null, { headers, tags: { ...tags, request: "business" } }],
-    ["GET", `${base}/bookings?select=id,business_id,status,total_amount,created_at&business_id=eq.${session.business_id}&order=created_at.desc&limit=25`, null, { headers, tags: { ...tags, request: "bookings" } }],
-    ["GET", `${base}/slots?select=id,business_id,start_time,booked,held,capacity_total,status&business_id=eq.${session.business_id}&order=start_time.asc&limit=25`, null, { headers, tags: { ...tags, request: "slots" } }],
-  ]);
-  responses.forEach((response, index) => readRequestDuration.add(response.timings.duration, { ...tags, journey: journeys[index] }));
-  const bodies = responses.map(json);
-  const valid = [
-    responses[0].status === 200 && Array.isArray(bodies[0]) && bodies[0].length === 1 && bodies[0][0].business_id === session.business_id,
-    responses[1].status === 200 && Array.isArray(bodies[1]) && bodies[1].length === 1 && bodies[1][0].id === session.business_id,
-    responses[2].status === 200 && tenantRows(bodies[2], session.business_id, tags),
-    responses[3].status === 200 && tenantRows(bodies[3], session.business_id, tags),
-  ];
-  valid.forEach((ok, index) => journeyFailure.add(!ok, { ...tags, journey: journeys[index] }));
-  return valid.every(Boolean);
+  const now = new Date();
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const dayAfter = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const response = http.post(
+    `${base}/rpc/get_operator_dashboard`,
+    JSON.stringify({
+      p_business_id: session.business_id,
+      p_today_start: today.toISOString(),
+      p_tomorrow_start: tomorrow.toISOString(),
+      p_day_after: dayAfter.toISOString(),
+      p_week_ago: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      p_month_start: monthStart.toISOString(),
+      p_now: now.toISOString(),
+    }),
+    { headers: restHeaders(session), tags: { ...tags, request: "dashboard_snapshot" } },
+  );
+  const requestTags = { ...tags, journey: "dashboard_snapshot" };
+  readRequestDuration.add(response.timings.duration, requestTags);
+  const body = json(response);
+  const ok = response.status === 200
+    && body?.business_id === session.business_id
+    && tenantRows(body.today_manifest, session.business_id, tags)
+    && tenantRows(body.tomorrow_manifest, session.business_id, tags);
+  journeyFailure.add(!ok, requestTags);
+  return ok;
 }
 
 function writeAction(session, tags) {

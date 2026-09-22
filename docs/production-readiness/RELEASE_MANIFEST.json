@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "recorded_at_utc": "2026-09-22T09:15:55Z",
   "verdict": "FAILED_GATE",
   "admin_candidate": {
     "repository": "capekayak",
@@ -68,6 +68,16 @@
     "reached_vus": 500,
     "qualification_clock_started": false,
     "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "local_capacity_remediation": {
+    "status": "UNDEPLOYED_AWAITING_EXACT_REVIEW_AND_APPROVAL",
+    "commit": null,
+    "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
+    "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
+    "changes": "Collapse the Admin dashboard read fan-out into one tenant-scoped snapshot RPC, add five supporting indexes, coalesce Realtime bursts, and align the BT500 read journey.",
+    "validation": "188 disposable PostgreSQL checks, TypeScript, focused unit/contract tests and the 91-route Admin production build pass.",
+    "qualification_credit": false,
+    "evidence": "docs/production-readiness/evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json"
   },
   "active_sections": [
     5,

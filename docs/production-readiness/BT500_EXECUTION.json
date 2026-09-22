@@ -53,9 +53,16 @@
     "verdict": "FAIL_ABORTED_FOR_SAFETY",
     "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
   },
+  "capacity_diagnosis": {
+    "status": "TARGET_QUEUEING_CONFIRMED_LOCAL_REMEDIATION_NOT_DEPLOYED",
+    "finding": "Supabase edge telemetry recorded 2xx responses while direct-load origin p95 reached 11.975 seconds on base Micro compute, then recovered after abort. Generator contribution to cross-origin dial failures remains possible but does not explain the target-side delay.",
+    "local_remediation": "One tenant-scoped dashboard snapshot RPC, five supporting indexes, 250ms Realtime burst coalescing, and a matching BT500 read action await exact review and deployment approval.",
+    "evidence": "docs/production-readiness/evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json",
+    "qualification_credit": false
+  },
   "qualification_started": false,
   "qualification_blockers": [
-    "isolate target capacity from generator or egress saturation and pass the unchanged 500-user smoke thresholds",
+    "review, approve, deploy and progressively retest the local capacity correction with independent generator and remote-resource instrumentation; pass the unchanged 500-user smoke thresholds",
     "enable provider doubles and implement the public, webhook and background-work harnesses",
     "measure the product-required Realtime footprint from browsers",
     "establish representative-volume data and quota/headroom evidence",

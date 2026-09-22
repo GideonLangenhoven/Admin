@@ -23,7 +23,7 @@ test("qualification defaults preserve the frozen BT500 phase contract", () => {
       assert.deepEqual(thresholds[`bt500_other_action_duration{phase:${phase},journey:${journey}}`], ["p(95)<=750", "p(99)<=1500"]);
     }
     assert.deepEqual(thresholds[`bt500_unexpected_failure{phase:${phase},kind:write}`], ["rate<0.001"]);
-    for (const journey of ["identity", "business", "bookings", "slots", "arrival_state", "session", "report", "inbox"]) {
+    for (const journey of ["dashboard_snapshot", "arrival_state", "session", "report", "inbox"]) {
       assert.deepEqual(thresholds[`bt500_read_request_duration{phase:${phase},journey:${journey}}`], ["p(95)<=750", "p(99)<=1500"]);
       assert.deepEqual(thresholds[`bt500_journey_failure{phase:${phase},journey:${journey}}`], ["rate<0.001"]);
     }

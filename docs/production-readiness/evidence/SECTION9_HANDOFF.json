@@ -1,6 +1,6 @@
 {
   "profile_id": "BT-HANDOFF-6-7-8-9-2026-09-21",
-  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "recorded_at_utc": "2026-09-22T09:15:55Z",
   "handoff_validation": "PASS",
   "verdict": "FAILED_GATE",
   "candidate": {
@@ -41,7 +41,9 @@
     "independent_notification_and_runner_review": "ACCEPTED_71da036",
     "deployed_browser_smoke": "PASS_4_OF_4_BEFORE_AND_AFTER_LOAD",
     "deployed_bt500_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
-    "post_abort_integrity": "PASS"
+    "post_abort_integrity": "PASS",
+    "capacity_attribution": "TARGET_SIDE_QUEUEING_CONFIRMED_WITH_GENERATOR_CONTRIBUTION_NOT_EXCLUDED",
+    "local_capacity_correction": "188 database checks, TypeScript, focused tests and Admin production build pass; not reviewed, approved or deployed"
   },
   "section6": {
     "coverage_map": "PASS",
@@ -54,7 +56,7 @@
     "executed": false,
     "read_smoke": "PASS_500_AUTHENTICATED_USERS",
     "deployed_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
-    "remaining": "timeout attribution and passing rerun, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
+    "remaining": "exact corrective-candidate review/deploy and passing unchanged-threshold rerun, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
     "evidence": "../BT500_EXECUTION.json",
     "mixed_staff_runner": "OFFLINE_INSPECTION_PASS"
   },
@@ -84,7 +86,7 @@
     "evidence": "BT500_DEPLOYED_SMOKE_20260922.json"
   },
   "residual_risks": [
-    "The 500-VU deployed smoke failed with cross-origin dial-stage I/O timeouts; generator and target saturation are not yet separated.",
+    "The 500-VU deployed smoke failed with confirmed target-side queueing. The local capacity correction is undeployed and generator contribution to cross-origin dial failures remains possible.",
     "Complete deployed role/provider evidence, provider-double public/background traffic, Realtime and mixed-load qualification are absent.",
     "Representative-volume data, quota headroom, alert delivery, security-baseline reconciliation and isolated restore remain unproven."
   ],

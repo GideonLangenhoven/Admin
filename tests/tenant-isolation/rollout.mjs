@@ -661,6 +661,51 @@ try {
   for (const [n,status,date] of [[901,'PAID','2026-09-01'],[902,'PENDING','2026-09-01'],[903,'CANCELLED','2026-09-01'],[904,'PAID','2026-08-01']]) {
     await db.query("insert into bookings(id,business_id,tour_id,customer_name,email,qty,unit_price,total_amount,status,created_at) values ($1,$2,$3,'Unslotted guest','guest@fixture.invalid',1,100,100,$4,$5)",[id(n),id(1),id(801),status,date]);
   }
+  const dashboardBooking=(await db.query(`select b.id from bookings b join slots s on s.id=b.slot_id
+    where b.business_id=$1 and s.start_time>='2026-09-10T00:00:00+02:00' and s.start_time<'2026-09-11T00:00:00+02:00'
+    order by b.id limit 1`,[id(1)])).rows[0].id;
+  const dashboardSlots=(await db.query('select id from slots where business_id=$1 order by start_time limit 2',[id(1)])).rows.map(row=>row.id);
+  await db.query("update bookings set status='PAID',refund_status='REQUESTED',refund_amount=25,total_amount=100,created_at='2026-09-10T08:00:00+02:00' where id=$1",[dashboardBooking]);
+  await db.query('update slots set booked=1 where id=any($1::uuid[])',[dashboardSlots]);
+  await db.query("insert into add_ons(id,business_id,name,price) values($1,$2,'Snapshot extra',10)",[id(950),id(1)]);
+  await db.query('insert into booking_add_ons(booking_id,add_on_id,qty,unit_price) values($1,$2,2,10)',[dashboardBooking,id(950)]);
+  await db.query("insert into conversations(id,business_id,phone,status) values($1,$2,'fixture-1','HUMAN'),($3,$4,'fixture-2','HUMAN')",[id(951),id(1),id(952),id(2)]);
+  await db.query("insert into trip_photos(id,business_id,slot_id,uploaded_at) values($1,$2,$3,'2026-09-10T09:00:00+02:00')",[id(953),id(1),dashboardSlots[0]]);
+  const dashboardSql=`select get_operator_dashboard(
+    $1,'2026-09-10T00:00:00+02:00','2026-09-11T00:00:00+02:00','2026-09-12T00:00:00+02:00',
+    '2026-09-03T12:00:00+02:00','2026-09-01T00:00:00+02:00','2026-09-10T12:00:00+02:00'
+  ) snapshot`;
+  await check('dashboard snapshot preserves the complete owned view in one request',()=>as('authenticated',101,{},async()=>{
+    const snapshot=(await db.query(dashboardSql,[id(1)])).rows[0].snapshot;
+    assert.equal(snapshot.business_id,id(1));
+    assert(snapshot.today_manifest.length>=1201);
+    assert(snapshot.today_manifest.every(row=>row.business_id===id(1)));
+    assert.equal(snapshot.tomorrow_manifest.length,0);
+    assert.equal(snapshot.refund_count,1);
+    assert.equal(Number(snapshot.refund_total),25);
+    assert.equal(snapshot.inbox_count,1);
+    assert.equal(snapshot.photos_outstanding,1);
+    assert.equal(Number(snapshot.revenue.today),100);
+    assert.equal(Number(snapshot.revenue.week),100);
+    assert.equal(Number(snapshot.revenue.month),200);
+    assert.equal(snapshot.revenue.series.length,10);
+    assert.equal(snapshot.revenue.series.reduce((sum,value)=>sum+Number(value),0),200);
+    const booking=snapshot.today_manifest.find(row=>row.id===dashboardBooking);
+    assert.deepEqual(booking.add_ons,[{name:'Snapshot extra',qty:2}]);
+  }));
+  for (const [user,foreign] of [[101,2],[102,1],[104,1],[999,1]]) {
+    await check(`dashboard snapshot cannot widen caller ${user} using forged tenant headers`,()=>as('authenticated',user,{'x-tenant-business-id':id(foreign)},async()=>{
+      assert.equal((await db.query(dashboardSql,[id(foreign)])).rows[0].snapshot,null);
+    }));
+  }
+  await check('anonymous callers cannot use the dashboard snapshot',()=>as('anon',null,{'x-tenant-business-id':id(1)},async()=>{
+    await assert.rejects(db.query(dashboardSql,[id(1)]),{code:'42501'});
+  }));
+  await check('service workers retain an explicitly scoped dashboard snapshot',()=>as('service_role',null,{},async()=>{
+    const snapshot=(await db.query(dashboardSql,[id(2)])).rows[0].snapshot;
+    assert.equal(snapshot.business_id,id(2));
+    assert(snapshot.today_manifest.every(row=>row.business_id===id(2)));
+  }));
   const listBookings = 'select id,business_id from list_operator_bookings($1,\'2026-09-01\',\'2026-09-30\',$2,$3)';
   await check('R18 one global booking offset covers 1201 slots and interleaved unslotted bookings exactly once',()=>as('authenticated',101,{},async()=>{
     const expected=(await db.query("select id from bookings where business_id=$1 and id<>all($2::uuid[]) order by created_at,id",[id(1),[id(903),id(904)]])).rows.map(row=>row.id);

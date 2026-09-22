@@ -36,20 +36,28 @@ export default function () {
   const headers = {
     apikey: input.anon_key,
     Authorization: `Bearer ${credential.access_token}`,
-    "x-tenant-business-id": credential.business_id
+    "x-tenant-business-id": credential.business_id,
+    "Content-Type": "application/json"
   };
   const base = `${input.url}/rest/v1`;
   const started = Date.now();
-  const responses = http.batch([
-    ["GET", `${base}/admin_users?select=id,role,business_id&user_id=eq.${credential.user_id}`, null, { headers, tags: { journey: "identity" } }],
-    ["GET", `${base}/businesses?select=id,name,subscription_status&id=eq.${credential.business_id}`, null, { headers, tags: { journey: "business" } }],
-    ["GET", `${base}/bookings?select=id,status,total_amount,created_at&business_id=eq.${credential.business_id}&order=created_at.desc&limit=25`, null, { headers, tags: { journey: "bookings" } }],
-    ["GET", `${base}/slots?select=id,start_time,booked,held,capacity_total,status&business_id=eq.${credential.business_id}&order=start_time.asc&limit=25`, null, { headers, tags: { journey: "slots" } }]
-  ]);
-  check(responses, {
-    "all reads succeed": results => results.every(response => response.status === 200),
-    "identity visible": results => JSON.parse(results[0].body).length === 1,
-    "own business visible": results => JSON.parse(results[1].body).length === 1
+  const now = new Date();
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const dayAfter = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const response = http.post(`${base}/rpc/get_operator_dashboard`, JSON.stringify({
+    p_business_id: credential.business_id,
+    p_today_start: today.toISOString(),
+    p_tomorrow_start: tomorrow.toISOString(),
+    p_day_after: dayAfter.toISOString(),
+    p_week_ago: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    p_month_start: monthStart.toISOString(),
+    p_now: now.toISOString()
+  }), { headers, tags: { journey: "dashboard_snapshot" } });
+  check(response, {
+    "dashboard snapshot succeeds": result => result.status === 200,
+    "own business visible": result => JSON.parse(result.body).business_id === credential.business_id
   });
   actionDuration.add(Date.now() - started);
   completedActions.add(1);

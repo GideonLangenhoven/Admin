@@ -6,7 +6,7 @@ The read smoke reached500 distinct authenticated users across167 synthetic busin
 
 `AUTH-LOGIN-RATE-01` fixes the shared-server bottleneck in source: the server validates/migrates the account, then the browser mints its Supabase session using the user's network IP. A429 no longer counts as a bad password. Focused tests pass135/135 and TypeScript passes. The fix is deployed; distributed-origin login-load proof remains open.
 
-The guarded mixed-staff runner models 500 unique users across 167 tenants, deterministic 70/20/10 actions, 100/250/500 ramp, a 60-minute steady phase, double-rate spike, recovery and a 24-hour soak. Fresh independent Astra/xhigh review accepted its frozen source after offline probes. A shortened deployed smoke reached 500 VUs and failed with 35.19% unexpected action failures, 30.82% HTTP failures, read-action p95 30.004 seconds and write-action p95 61.486 seconds. It was stopped after approximately 144 seconds; post-abort invariants and browser recovery passed. Cross-origin dial-stage timeouts leave generator versus target saturation unresolved. See [BT500_DEPLOYED_SMOKE_20260922.json](evidence/BT500_DEPLOYED_SMOKE_20260922.json).
+The guarded mixed-staff runner models 500 unique users across 167 tenants, deterministic 70/20/10 actions, 100/250/500 ramp, a 60-minute steady phase, double-rate spike, recovery and a 24-hour soak. Fresh independent Astra/xhigh review accepted its frozen source after offline probes. A shortened deployed smoke reached 500 VUs and failed with 35.19% unexpected action failures, 30.82% HTTP failures, read-action p95 30.004 seconds and write-action p95 61.486 seconds. It was stopped after approximately 144 seconds; post-abort invariants and browser recovery passed. Follow-up Supabase edge telemetry records 2xx responses but approximately 12-second origin p95 during the failure minute, confirming target-side queueing on base Micro compute; generator contribution remains possible. See [BT500_DEPLOYED_SMOKE_20260922.json](evidence/BT500_DEPLOYED_SMOKE_20260922.json) and [BT500_CAPACITY_DIAGNOSIS_20260922.json](evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json).
 
 Section 5's corrective implementation is deployed and the integrated suite passes. Its remaining external Auth/provider, notification, CI and acceptance gates are listed in [SECTION5_CHECKPOINT.json](evidence/SECTION5_CHECKPOINT.json) and [ISSUES.json](ISSUES.json). Section 6 passed 100-account local synthetic continuity but still has external role/provider gates. Section 8 records exact deployment, migrations and recovery after the failed smoke; restore and alert drills remain open. Section 9's truthful `FAILED_GATE` handoff is complete under the user's scope override.
 
@@ -30,7 +30,7 @@ WORKLOAD.json freezes the action observation points, failure denominators, termi
 ## Inputs needed before execution
 
 - Observed infrastructure quotas with at least 30% headroom inside the ZAR 0 ceiling.
-- An instrumented independent generator and remote resource metrics that separate generator/egress limits from target capacity.
+- Review, approve, deploy and progressively retest the local dashboard snapshot correction with an instrumented independent generator and remote resource metrics; retain the original thresholds.
 - Provider-double public checkout/webhook/background traffic and runtime outbound-guard negative tests.
 - Exact-candidate browser measurement of the frozen 500-connection Realtime topology, plus the marketing rate and soak activity cycle.
 
