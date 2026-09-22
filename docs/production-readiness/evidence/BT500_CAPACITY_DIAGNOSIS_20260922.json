@@ -65,6 +65,7 @@
   "conclusion": "The deployed failure includes target-side queueing/saturation on base Micro compute. The dashboard and the original mixed runner multiplied each read action into parallel PostgREST requests; the live dashboard was heavier still. Generator contribution is not fully excluded, so an independent instrumented rerun remains required.",
   "local_remediation": {
     "deployed": false,
+    "source_commit": "4561c2014bc7f3fef053df93be9baac1d5aa1d15",
     "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
     "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
     "admin_source_sha256": "9805cf0b02d7efc5cfcda2b6451a6f56542744263de020f0d6d99ae83af88a42",

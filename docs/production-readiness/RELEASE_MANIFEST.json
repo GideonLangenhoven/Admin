@@ -71,7 +71,7 @@
   },
   "local_capacity_remediation": {
     "status": "UNDEPLOYED_AWAITING_EXACT_REVIEW_AND_APPROVAL",
-    "commit": null,
+    "source_commit": "4561c2014bc7f3fef053df93be9baac1d5aa1d15",
     "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
     "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
     "changes": "Collapse the Admin dashboard read fan-out into one tenant-scoped snapshot RPC, add five supporting indexes, coalesce Realtime bursts, and align the BT500 read journey.",
