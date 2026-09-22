@@ -1,7 +1,7 @@
 {
   "profile_id": "BT-RELEASE-RECOVERY-V1",
-  "recorded_at_utc": "2026-09-21T18:15:43Z",
-  "status": "READY_FOR_EXACT_DEPLOYMENT_APPROVAL",
+  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "status": "DEPLOYED_SMOKE_FAILED_RECOVERY_CONFIRMED",
   "candidates": {
     "admin": "71da0361db65dd63f90b5110648b96b2c4ff3567",
     "booking": "2ff1d82"
@@ -12,7 +12,7 @@
     "deployment_target": "current authorized pre-launch project and its linked Admin/storefront deployments",
     "window": "immediately after exact deployment for 24 elapsed hours",
     "cost_ceiling_zar": 0,
-    "approval_reference": "pending exact deployment approval"
+    "approval_reference": "user-session-2026-09-21-exact-rollout-approval at 2026-09-21T18:38:09Z"
   },
   "migration_order": [
     "20260920090000_enforce_standard_plan_pricing.sql",
@@ -45,9 +45,33 @@
   "executed": {
     "restore": false,
     "alert_drill": false,
-    "deployment": false,
-    "migration": false,
+    "deployment": true,
+    "migration": true,
     "canary": false
   },
-  "production_mutated": false
+  "deployments": {
+    "admin": {
+      "id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
+      "url": "https://caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+      "alias": "https://admin.bookingtours.co.za",
+      "status": "READY"
+    },
+    "booking": {
+      "id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
+      "url": "https://booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
+      "alias": "https://booking.bookingtours.co.za",
+      "status": "READY"
+    },
+    "edge_functions_active": 55,
+    "migration_ledger_exact": true
+  },
+  "deployed_smoke_result": {
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "reached_vus": 500,
+    "qualification_clock_started": false,
+    "post_abort_integrity": "PASS",
+    "post_abort_browser_recovery": "4/4 pass",
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "production_mutated": true
 }

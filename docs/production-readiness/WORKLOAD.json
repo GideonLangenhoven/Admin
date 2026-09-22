@@ -139,9 +139,9 @@
       "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
     }
   },
-  "updated_at_utc": "2026-09-21T18:15:43Z",
+  "updated_at_utc": "2026-09-22T06:30:05Z",
   "candidate_accepted_base": "71da0361db65dd63f90b5110648b96b2c4ff3567",
-  "candidate_status": "Exact local application source candidate committed, fully locally verified and independently accepted; deployment is pending.",
+  "candidate_status": "Exact application candidates and the controlled five-migration package are deployed; the bounded 500-VU staff smoke failed.",
   "active_sections": [
     6,
     7,
@@ -154,13 +154,13 @@
     "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
     "executed": false,
     "reason": [
-      "Exact Admin, storefront, Edge and five-migration candidate is not deployed",
+      "The deployed 500-VU staff smoke failed with unresolved cross-origin dial-stage I/O timeouts",
       "Provider-double public checkout/webhook/background harness and runtime outbound-guard proof remain open",
       "Production-equivalent quota denominators and at least 30% headroom are unverified at the ZAR 0 ceiling",
       "Realtime browser footprint has not been measured on the exact candidate"
     ],
-    "legacy_harness": "The 500-session authenticated read smoke passed. The mixed-staff runner is source-complete and independently reviewed but unexecuted.",
+    "legacy_harness": "The 500-session authenticated read smoke passed. The independently reviewed mixed-staff runner executed against the deployment and failed at 500 VUs; no qualification credit was taken.",
     "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json",
-    "mixed_staff_runner": "OFFLINE_INSPECTION_PASS; scripts/bt500-run-mixed.mjs"
+    "mixed_staff_runner": "DEPLOYED_SMOKE_FAIL; scripts/bt500-run-mixed.mjs; evidence/BT500_DEPLOYED_SMOKE_20260922.json"
   }
 }

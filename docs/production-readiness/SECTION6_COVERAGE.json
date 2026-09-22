@@ -214,7 +214,7 @@
   "provider_journeys": {
     "genuine_sandbox_completed": false,
     "status": "BLOCKED_EXTERNAL",
-    "reason": "Scoped recipients and Yoco test-mode use are approved, but the exact candidate is not deployed and the genuine provider journey has not run."
+    "reason": "The exact candidate is deployed and scoped recipients plus Yoco test-mode use are approved, but the genuine provider journey has not run."
   },
   "release_gate": "FAIL"
 }

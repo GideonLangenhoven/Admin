@@ -1,16 +1,16 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
-  "status": "BLOCKED_ON_EXACT_DEPLOYMENT_AND_FULL_HARNESS",
+  "status": "FAILED_DEPLOYED_SMOKE_AND_BLOCKED_ON_FULL_HARNESS",
   "candidate_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "candidate_tree": "6f4e3403ba6fab20767521529152a972907e1b81",
   "candidate_worktree_clean": true,
   "environment": {
     "classification": "user_authorized_prelaunch_no_customers",
     "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
-    "admin_url": null,
-    "booking_url": null,
-    "observed_current_admin_deployment": "https://caepweb-admin-l5wcz5var-jerrys-projects-f4e4eaf9.vercel.app",
-    "observed_current_booking_deployment": "https://booking-j3oyy0qs9-jerrys-projects-f4e4eaf9.vercel.app",
+    "admin_url": "https://admin.bookingtours.co.za",
+    "booking_url": "https://booking.bookingtours.co.za",
+    "observed_current_admin_deployment": "https://caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+    "observed_current_booking_deployment": "https://booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
     "generator_region": "operator workstation, Africa/Johannesburg",
     "application_region": "Admin iad1; storefront cdg1; Supabase eu-west-3"
   },
@@ -19,8 +19,9 @@
     "rule": "No paid scaling or live financial transaction; abort before incurring a new charge."
   },
   "window": {
-    "starts_at": "immediately_after_exact_deployment",
-    "ends_at": "24_elapsed_hours_after_start"
+    "starts_at": null,
+    "ends_at": null,
+    "not_started_reason": "The bounded 500-VU deployed smoke failed before qualification entry."
   },
   "approval": {
     "reference": "user-session-2026-09-21-prelaunch-qualification",
@@ -44,5 +45,20 @@
   "executed": false,
   "mixed_runner_complete": false,
   "smoke_executed": true,
-  "result": "evidence/BT500_READ_SMOKE_RESULT.json"
+  "result": "evidence/BT500_READ_SMOKE_RESULT.json",
+  "deployed_staff_smoke": {
+    "executed": true,
+    "qualification_credit": false,
+    "reached_vus": 500,
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "qualification_started": false,
+  "qualification_blockers": [
+    "isolate target capacity from generator or egress saturation and pass the unchanged 500-user smoke thresholds",
+    "enable provider doubles and implement the public, webhook and background-work harnesses",
+    "measure the product-required Realtime footprint from browsers",
+    "establish representative-volume data and quota/headroom evidence",
+    "complete genuine provider sandbox journeys, monitoring proof and restore rehearsal"
+  ]
 }

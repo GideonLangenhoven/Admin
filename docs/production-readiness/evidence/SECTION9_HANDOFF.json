@@ -1,14 +1,14 @@
 {
   "profile_id": "BT-HANDOFF-6-7-8-9-2026-09-21",
-  "recorded_at_utc": "2026-09-21T18:15:43Z",
+  "recorded_at_utc": "2026-09-22T06:30:05Z",
   "handoff_validation": "PASS",
-  "verdict": "IN_PROGRESS",
+  "verdict": "FAILED_GATE",
   "candidate": {
     "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
     "admin_tree": "6f4e3403ba6fab20767521529152a972907e1b81",
     "booking_commit": "2ff1d82",
-    "deployable_candidate_accepted": false,
-    "reason": "Local candidate is exact and verified; external release gates remain."
+    "deployable_candidate_accepted": true,
+    "reason": "The exact reviewed candidates and controlled five-migration package are deployed; release qualification failed at the bounded 500-VU smoke."
   },
   "routing": {
     "requested": "Astra/xhigh orchestration and review; Sol/max implementation",
@@ -38,7 +38,10 @@
     "builds": "pass",
     "npm_audit": "0 vulnerabilities",
     "independent_auth_review": "ACCEPTED_7d3e7b3",
-    "independent_notification_and_runner_review": "ACCEPTED_71da036"
+    "independent_notification_and_runner_review": "ACCEPTED_71da036",
+    "deployed_browser_smoke": "PASS_4_OF_4_BEFORE_AND_AFTER_LOAD",
+    "deployed_bt500_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
+    "post_abort_integrity": "PASS"
   },
   "section6": {
     "coverage_map": "PASS",
@@ -50,13 +53,14 @@
     "contract": "PASS",
     "executed": false,
     "read_smoke": "PASS_500_AUTHENTICATED_USERS",
-    "remaining": "exact deployment, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
+    "deployed_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
+    "remaining": "timeout attribution and passing rerun, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
     "evidence": "../BT500_EXECUTION.json",
     "mixed_staff_runner": "OFFLINE_INSPECTION_PASS"
   },
   "section8": {
-    "packet": "READY_FOR_EXTERNAL_INPUT_AND_APPROVAL",
-    "executed": false,
+    "packet": "DEPLOYED_SMOKE_FAILED_RECOVERY_CONFIRMED",
+    "executed": true,
     "evidence": "../SECTION8_EXECUTION.json"
   },
   "existing_customer_continuity": {
@@ -70,28 +74,30 @@
     "mfa_migration": "LOCAL_DB_PASSED",
     "genuine_provider_journeys": "NOT_RUN",
     "restore_rehearsal": "NOT_RUN",
-    "exact_five_migration_dry_run": "PASS"
+    "exact_five_migration_dry_run": "PASS",
+    "exact_five_migration_apply": "PASS"
   },
   "deployment_canary": {
-    "deployed": false,
+    "deployed": true,
     "canary_hours": 0,
-    "status": "NOT_RUN"
+    "status": "NOT_STARTED_AFTER_FAILED_BOUNDED_SMOKE",
+    "evidence": "BT500_DEPLOYED_SMOKE_20260922.json"
   },
   "residual_risks": [
-    "Real Auth/provider/deployed-role evidence is absent.",
-    "Candidate-specific CI, mixed-load qualification, restore, deployment and canary are unexecuted.",
-    "Production artifact, Edge, schema, scheduler and config equivalence are unproven."
+    "The 500-VU deployed smoke failed with cross-origin dial-stage I/O timeouts; generator and target saturation are not yet separated.",
+    "Complete deployed role/provider evidence, provider-double public/background traffic, Realtime and mixed-load qualification are absent.",
+    "Representative-volume data, quota headroom, alert delivery, security-baseline reconciliation and isolated restore remain unproven."
   ],
   "approvals": {
-    "production_mutation": false,
-    "deployment_or_push": false,
+    "production_mutation": true,
+    "deployment_or_push": true,
     "provider_transactions": false,
-    "full_qualification_execution": false
+    "full_qualification_execution": true
   },
   "scope_override": {
     "source": "User instruction: Section 9 may pass without having tested Section 7.",
     "section9_may_complete_without_section7": true,
     "does_not_waive_qualification": true,
-    "meaning": "Handoff completeness may pass while the release verdict remains IN_PROGRESS."
+    "meaning": "Handoff completeness passes while the release verdict remains FAILED_GATE."
   }
 }

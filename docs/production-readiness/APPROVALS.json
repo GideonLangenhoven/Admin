@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-21T18:15:43Z",
+  "updated_at_utc": "2026-09-22T06:30:05Z",
   "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "authorized": {
     "isolated_source_changes": true,
@@ -8,17 +8,18 @@
     "bt500_marker_only_synthetic_mutation": true,
     "current_prelaunch_project_synthetic_reset_and_testing": true,
     "current_prelaunch_project_bt500_qualification": true,
+    "bounded_deployed_marker_load": true,
     "immediate_24_hour_window_after_exact_deployment": true,
     "scoped_test_email_and_whatsapp_recipient": true,
     "monitoring_receiver_supplied": true,
     "yoco_test_mode_requests": true,
-    "production_mutation": false,
-    "deployment_or_push": false,
+    "production_mutation": true,
+    "deployment_or_push": true,
     "real_messages": false,
     "real_charges_or_refunds": false,
     "provider_account_changes": false,
     "paid_resource_changes": false,
-    "production_or_paid_load": false,
+    "production_or_paid_load": true,
     "destructive_existing_resource_operations": false
   },
   "resolved_product_decisions": [
@@ -48,17 +49,17 @@
     }
   ],
   "missing_external_approvals": [
-    "Exact candidate deployment and remote migration authorization",
-    "BT500 deployed URLs, observed capacity denominators and provider-double runtime proof",
     "Separate restore target",
-    "Exact production deployment, migration, rollback and canary authorization"
+    "Any paid scaling or cost above ZAR 0",
+    "Real charges, refunds, unrestricted outbound messaging or provider-account changes",
+    "Public launch switch"
   ],
   "latest_scope_steering": {
-    "request": "Use the current environment for pre-launch qualification because there are no real customers; its synthetic data may be overwritten without a separate staging environment.",
-    "section5_status": "Local corrective implementation, authoritative Auth, durable notifications and independent source review are complete; deployed acceptance remains.",
-    "section6_status": "100-account local continuity passed; deployed role and provider gates remain.",
-    "section7_status": "500-session read smoke passed and the mixed-staff runner passed offline review; deployed mixed load, provider doubles, Realtime, spike and soak remain.",
-    "section8_status": "The current environment and immediate post-deployment qualification window are authorized for pre-launch testing. A separate target is still required for the restore drill; live financial effects and public launch remain separately gated.",
-    "section9_status": "Handoff passes with an IN_PROGRESS verdict."
+    "request": "Deploy the exact frozen candidates and use the current no-customer environment for approved ZAR 0 pre-launch qualification with replaceable marker data.",
+    "section5_status": "Corrective implementation is deployed; browser and scheduler smoke pass, while remaining deployed role/provider acceptance is open.",
+    "section6_status": "100-account local continuity passed; deployed role matrix and genuine provider sandbox gates remain.",
+    "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
+    "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; alert delivery and isolated restore rehearsal remain open.",
+    "section9_status": "Handoff verdict is FAILED_GATE with detailed deployed-smoke evidence."
   }
 }

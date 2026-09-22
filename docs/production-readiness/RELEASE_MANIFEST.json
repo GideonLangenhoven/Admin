@@ -1,6 +1,6 @@
 {
-  "recorded_at_utc": "2026-09-21T18:15:43Z",
-  "verdict": "IN_PROGRESS",
+  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "verdict": "FAILED_GATE",
   "admin_candidate": {
     "repository": "capekayak",
     "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
@@ -28,7 +28,10 @@
     "npm_audit": "0 vulnerabilities",
     "independent_auth_review": "fresh-context Astra/xhigh accepted 7d3e7b3 after 49 focused tests and installed-SDK session isolation probe",
     "controlled_migration_dry_run": "exactly five pending migrations",
-    "independent_notification_and_bt500_review": "fresh-context Astra/xhigh accepted the frozen notification and mixed-staff runner source after 29 notification tests, 6 runner tests, offline action-timing probes and diff review"
+    "independent_notification_and_bt500_review": "fresh-context Astra/xhigh accepted the frozen notification and mixed-staff runner source after 29 notification tests, 6 runner tests, offline action-timing probes and diff review",
+    "deployed_browser_smoke": "4/4 pass before and after the bounded load",
+    "deployed_bt500_staff_smoke": "fail at 500 VUs; aborted after widespread dial-stage I/O timeouts",
+    "post_abort_integrity": "pass; zero marker invariant violations and exact baseline restored"
   },
   "database_changes": [
     "20260920090000_enforce_standard_plan_pricing.sql",
@@ -37,26 +40,34 @@
     "20260921130000_authoritative_auth_passwords.sql",
     "20260921140000_durable_notification_jobs.sql"
   ],
-  "production_equivalence_verified": false,
+  "production_equivalence_verified": true,
   "observed_hosted_state": {
-    "admin_commit": "6a630c0bb1cbfd583b30173bee9e602f219d8b9e",
-    "admin_deployment": "caepweb-admin-l5wcz5var-jerrys-projects-f4e4eaf9.vercel.app",
+    "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "admin_deployment": "caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+    "admin_deployment_id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
     "admin_function_region": "iad1",
-    "booking_commit": "99b71f093486b13f6f9bed38f48d184a93b23ba6",
-    "booking_deployment": "booking-j3oyy0qs9-jerrys-projects-f4e4eaf9.vercel.app",
+    "booking_commit": "2ff1d82",
+    "booking_deployment": "booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
+    "booking_deployment_id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
     "booking_function_region": "cdg1",
     "supabase_project": "ukdsrndqhsatjkmxijuj",
     "supabase_region": "eu-west-3",
-    "matches_candidate": false
+    "matches_candidate": true
   },
   "release_actions": {
     "pushed": false,
-    "deployed": false,
-    "migration_applied": false,
+    "deployed": true,
+    "migration_applied": true,
     "provider_called": false,
-    "production_mutated": false,
+    "production_mutated": true,
     "restore_run": false,
     "canary_started": false
+  },
+  "deployed_smoke": {
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "reached_vus": 500,
+    "qualification_clock_started": false,
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
   },
   "active_sections": [
     5,
