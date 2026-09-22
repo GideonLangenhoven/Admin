@@ -3,7 +3,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
+import { executionStatusAllows, mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const execution = JSON.parse(await readFile(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"), "utf8"));
@@ -18,7 +18,7 @@ if (contract.status !== 0) process.exit(contract.status || 1);
 const adminBase = String(process.env.BT500_ADMIN_BASE || "").replace(/\/$/, "");
 const runId = String(process.env.BT500_RUN_ID || "");
 const blockers = [];
-if (execution.status !== "APPROVED_FOR_QUALIFICATION") blockers.push("BT500_EXECUTION.status must be APPROVED_FOR_QUALIFICATION");
+if (!executionStatusAllows(config.mode, execution.status)) blockers.push(`BT500_EXECUTION.status does not approve ${config.mode} mode`);
 if (execution.candidate_worktree_clean !== true) blockers.push("candidate worktree must be recorded clean");
 if (!/^[0-9a-f]{40}$/.test(execution.candidate_commit || "") || !/^[0-9a-f]{40}$/.test(execution.candidate_tree || "")) blockers.push("exact candidate commit and tree are required");
 if (execution.environment?.classification !== "isolated_non_production"

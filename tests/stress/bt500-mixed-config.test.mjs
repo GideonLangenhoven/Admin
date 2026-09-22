@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { durationSeconds, k6Options, mixedConfig, phaseAt } from "./bt500-mixed-config.mjs";
+import { durationSeconds, executionStatusAllows, k6Options, mixedConfig, phaseAt } from "./bt500-mixed-config.mjs";
 
 test("qualification defaults preserve the frozen BT500 phase contract", () => {
   const config = mixedConfig({});
@@ -53,6 +53,8 @@ test("smoke mode permits short phases and an omitted soak without changing targe
   assert.deepEqual(config.stages.map(stage => stage.target), [100, 250, 500, 500, 500, 500, 0]);
   assert.equal(k6Options(config).thresholds["bt500_completed_actions{phase:steady}"], undefined);
   assert.equal(k6Options(config).thresholds["bt500_write_action_duration{phase:steady,journey:record_arrival}"], undefined);
+  assert.equal(executionStatusAllows("smoke", "APPROVED_FOR_BOUNDED_SMOKE"), true);
+  assert.equal(executionStatusAllows("qualification", "APPROVED_FOR_BOUNDED_SMOKE"), false);
 });
 
 test("duration parsing fails closed", () => {

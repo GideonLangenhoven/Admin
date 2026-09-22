@@ -71,6 +71,11 @@ export function mixedConfig(env = {}) {
   };
 }
 
+export function executionStatusAllows(mode, status) {
+  return status === "APPROVED_FOR_QUALIFICATION"
+    || (mode === "smoke" && status === "APPROVED_FOR_BOUNDED_SMOKE");
+}
+
 export function phaseAt(config, elapsedSeconds) {
   if (elapsedSeconds < config.phaseEnds.ramp) return "ramp";
   if (elapsedSeconds < config.phaseEnds.steady) return "steady";
