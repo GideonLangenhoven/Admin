@@ -94,11 +94,14 @@ describe("item 30 — operator-cancellation remediation", () => {
 
   it("the refund queue only shows customer-chosen refunds, never pending decisions", () => {
     // Same rule everywhere an operator sees a refund count: queue, nav badge, dashboard tile
-    for (const f of ["app/refunds/page.tsx", "components/RefundBadge.tsx", "app/page.tsx"]) {
+    for (const f of ["app/refunds/page.tsx", "components/RefundBadge.tsx"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).not.toContain('"ACTION_REQUIRED"');
       expect(src, f).toMatch(/\.(?:eq|in)\("refund_status", (?:\[)?"REQUESTED"/);
     }
+    const dashboard = readFileSync("supabase/migrations/20260922110000_operator_dashboard_snapshot.sql", "utf8");
+    expect(dashboard).not.toContain("ACTION_REQUIRED");
+    expect(dashboard).toContain("b.refund_status in ('REQUESTED', 'REFUND_PENDING', 'MANUAL_EFT_REQUIRED', 'FAILED')");
   });
 
   it("the slot cancel action doesn't promise a refund — the guest chooses", () => {
