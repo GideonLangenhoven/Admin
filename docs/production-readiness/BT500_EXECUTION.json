@@ -1,15 +1,15 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
   "status": "APPROVED_FOR_BOUNDED_SMOKE",
-  "candidate_commit": "d52ea1cccdfdb902ee3cf9328122812dbc298c0f",
-  "candidate_tree": "05c0ff588baaa13a53567f769054c700373f4e60",
+  "candidate_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d",
+  "candidate_tree": "b9848b532cb1c291ab9e257f05f5df45163e42f2",
   "candidate_worktree_clean": true,
   "environment": {
     "classification": "user_authorized_prelaunch_no_customers",
     "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
     "admin_url": "https://caepweb-admin.vercel.app",
     "booking_url": "https://booking.bookingtours.co.za",
-    "observed_current_admin_deployment": "https://caepweb-admin-1hwwfs7cv-jerrys-projects-f4e4eaf9.vercel.app",
+    "observed_current_admin_deployment": "https://caepweb-admin-ratqw30wq-jerrys-projects-f4e4eaf9.vercel.app",
     "observed_current_booking_deployment": "https://booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
     "generator_region": "operator workstation, Africa/Johannesburg",
     "application_region": "Admin iad1; storefront cdg1; Supabase eu-west-3"
@@ -19,8 +19,8 @@
     "rule": "No paid scaling or live financial transaction; abort before incurring a new charge."
   },
   "window": {
-    "starts_at": "2026-09-22T11:36:00Z",
-    "ends_at": "2026-09-22T13:00:00Z",
+    "starts_at": "2026-09-22T14:03:00Z",
+    "ends_at": "2026-09-22T16:00:00Z",
     "purpose": "Bounded corrective smoke only; this window does not start the 24-hour qualification clock."
   },
   "approval": {
@@ -34,6 +34,7 @@
   "bounded_smoke_authorization": {
     "reference": "user-session-2026-09-22-production-ready-continuation",
     "approved_at": "2026-09-22T11:36:00Z",
+    "continued_at": "2026-09-22T14:03:00Z",
     "qualification_credit": false
   },
   "outbound_controls": {
@@ -74,9 +75,19 @@
     "evidence": "docs/production-readiness/evidence/BT500_CORRECTIVE_SMOKE_20260922.json"
   },
   "second_capacity_correction": {
-    "status": "LOCAL_VALIDATION_IN_PROGRESS",
+    "status": "DEPLOYED_SMOKE_PENDING",
     "change": "Run the dashboard snapshot after one explicit tenant authorization and collapse arrival authorization plus mutation into one authenticated RPC.",
+    "commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d",
+    "migration": "supabase/migrations/20260922123000_operator_hot_path_admission.sql",
+    "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
+    "deployment_url": "https://caepweb-admin-ratqw30wq-jerrys-projects-f4e4eaf9.vercel.app",
+    "ci_run": "https://github.com/GideonLangenhoven/Admin/actions/runs/35728482325",
     "qualification_credit": false
+  },
+  "admission_corrective_staff_smoke": {
+    "executed": false,
+    "qualification_credit": false,
+    "status": "PENDING"
   },
   "qualification_started": false,
   "qualification_blockers": [
