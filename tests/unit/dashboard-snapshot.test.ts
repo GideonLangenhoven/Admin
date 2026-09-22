@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const page = readFileSync("app/page.tsx", "utf8");
 const migration = readFileSync("supabase/migrations/20260922110000_operator_dashboard_snapshot.sql", "utf8");
 const runner = readFileSync("tests/stress/bt500-mixed.k6.js", "utf8");
+const launcher = readFileSync("scripts/bt500-run-mixed.mjs", "utf8");
 
 describe("operator dashboard snapshot", () => {
   it("replaces the dashboard read fan-out and coalesces Realtime bursts", () => {
@@ -26,5 +27,7 @@ describe("operator dashboard snapshot", () => {
     expect(runner).toContain("/rpc/get_operator_dashboard");
     expect(runner).toContain('journey: "dashboard_snapshot"');
     expect(runner).not.toContain("http.batch([");
+    expect(launcher).toContain("SUPABASE_ACCESS_TOKEN");
+    expect(launcher).toContain(`/database/query`);
   });
 });

@@ -75,10 +75,11 @@ if (new URL(credentials.url).host !== `${projectRef}.supabase.co`) throw new Err
 if (credentials.credentials?.length !== 500) throw new Error("exactly 500 credentials are required");
 if ((await stat(credentialsFile)).mode & 0o077) throw new Error("credential file must not be readable by group or others");
 
-const databaseUrl = new URL(process.env.DATABASE_URL || "postgresql://missing");
-const directHost = databaseUrl.hostname === `db.${projectRef}.supabase.co`;
-const pooledUser = decodeURIComponent(databaseUrl.username).endsWith(`.${projectRef}`);
-if (!directHost && !pooledUser) throw new Error("DATABASE_URL does not match the execution project");
+const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;
+const directHost = databaseUrl?.hostname === `db.${projectRef}.supabase.co`;
+const pooledUser = databaseUrl && decodeURIComponent(databaseUrl.username).endsWith(`.${projectRef}`);
+if (databaseUrl && !directHost && !pooledUser) throw new Error("DATABASE_URL does not match the execution project");
+if (!databaseUrl && !process.env.SUPABASE_ACCESS_TOKEN) throw new Error("DATABASE_URL or SUPABASE_ACCESS_TOKEN is required for post-run invariants");
 
 const evidenceDir = path.resolve(process.env.BT500_EVIDENCE_DIR || `/private/tmp/bt500-mixed-${runId}`);
 await mkdir(evidenceDir, { recursive: true });
@@ -125,19 +126,33 @@ try {
   loadError = String(error?.message || error);
 }
 
-const psqlEnv = {
-  ...process.env,
-  PGHOST: databaseUrl.hostname,
-  PGPORT: databaseUrl.port || "5432",
-  PGUSER: decodeURIComponent(databaseUrl.username),
-  PGPASSWORD: decodeURIComponent(databaseUrl.password),
-  PGDATABASE: databaseUrl.pathname.slice(1) || "postgres",
-  PGSSLMODE: databaseUrl.searchParams.get("sslmode") || "require",
-};
 let invariantCode = 1;
 let invariantError = null;
 try {
-  invariantCode = await logged("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", "tests/stress/bt500-invariants.sql"], "invariants.log", psqlEnv);
+  if (databaseUrl) {
+    const psqlEnv = {
+      ...process.env,
+      PGHOST: databaseUrl.hostname,
+      PGPORT: databaseUrl.port || "5432",
+      PGUSER: decodeURIComponent(databaseUrl.username),
+      PGPASSWORD: decodeURIComponent(databaseUrl.password),
+      PGDATABASE: databaseUrl.pathname.slice(1) || "postgres",
+      PGSSLMODE: databaseUrl.searchParams.get("sslmode") || "require",
+    };
+    invariantCode = await logged("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", "tests/stress/bt500-invariants.sql"], "invariants.log", psqlEnv);
+  } else {
+    const sql = (await readFile(path.join(root, "tests/stress/bt500-invariants.sql"), "utf8")).replace(/^\\set.*$/gm, "");
+    const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sql }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const body = await response.text();
+    await writeFile(path.join(evidenceDir, "invariants.log"), body + "\n", { mode: 0o600 });
+    invariantCode = response.ok ? 0 : 1;
+    if (!response.ok) invariantError = `Supabase invariant query failed (${response.status})`;
+  }
 } catch (error) {
   invariantError = String(error?.message || error);
 }
