@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const page = readFileSync("app/page.tsx", "utf8");
 const migration = readFileSync("supabase/migrations/20260922110000_operator_dashboard_snapshot.sql", "utf8");
+const admissionMigration = readFileSync("supabase/migrations/20260922123000_operator_hot_path_admission.sql", "utf8");
+const arrivalServer = readFileSync("app/lib/booking-arrivals-server.ts", "utf8");
 const runner = readFileSync("tests/stress/bt500-mixed.k6.js", "utf8");
 const launcher = readFileSync("scripts/bt500-run-mixed.mjs", "utf8");
 
@@ -16,11 +18,21 @@ describe("operator dashboard snapshot", () => {
     expect(page).toContain("realtimeRefreshRef.current = setTimeout");
   });
 
-  it("keeps the RPC invoker-scoped and unavailable to anonymous callers", () => {
-    expect(migration).toContain("security invoker");
+  it("keeps the RPC tenant-scoped while avoiding repeated RLS admission", () => {
     expect(migration).toContain("public.current_business_ids()");
+    expect(admissionMigration).toMatch(/alter function public\.get_operator_dashboard\([\s\S]*?\) security definer;/);
     expect(migration).toMatch(/revoke all on function public\.get_operator_dashboard\([\s\S]*?from public, anon, authenticated;/);
     expect(migration).toMatch(/grant execute on function public\.get_operator_dashboard\([\s\S]*?to authenticated, service_role;/);
+  });
+
+  it("collapses authenticated arrival authorization and mutation into one RPC", () => {
+    expect(admissionMigration).toContain("a.user_id = auth.uid()");
+    expect(admissionMigration).toContain("not coalesce(a.suspended, false)");
+    expect(admissionMigration).toContain("not coalesce(a.read_only, false)");
+    expect(admissionMigration).toContain("public.record_booking_arrival(");
+    expect(admissionMigration).toMatch(/grant execute on function public\.record_authenticated_booking_arrival\([\s\S]*?to authenticated;/);
+    expect(arrivalServer).toContain('.rpc("record_authenticated_booking_arrival"');
+    expect(arrivalServer).not.toContain("getCallerAdmin");
   });
 
   it("measures the optimized product request without changing the action budget", () => {

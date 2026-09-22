@@ -1,18 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { getCallerAdmin } from "@/app/lib/api-auth";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function serviceClient() {
+function authenticatedClient(authorization: string) {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: { headers: { Authorization: authorization } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    },
   );
 }
 
 function statusForCode(code: string | undefined) {
+  if (code === "UNAUTHORIZED") return 401;
+  if (code === "SUBSCRIPTION_REQUIRED") return 403;
   if (code === "NOT_FOUND") return 404;
   if (code === "STALE" || code === "STALE_SLOT") return 409;
   if (code === "PAYMENT_REQUIRED" || code === "WAIVER_REQUIRED") return 422;
@@ -20,8 +24,14 @@ function statusForCode(code: string | undefined) {
 }
 
 export async function handleBookingArrivalRequest(req: Request, source: "simple-view" | "guide-pwa" | "dashboard" | "bookings") {
-  const caller = await getCallerAdmin(req);
-  if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  if (!/^Bearer\s+\S+$/i.test(authorization)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const businessId = req.headers.get("x-admin-business-id")?.trim() || "";
+  if (!UUID_RE.test(businessId)) {
+    return NextResponse.json({ error: "A valid business context is required" }, { status: 400 });
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -53,10 +63,9 @@ export async function handleBookingArrivalRequest(req: Request, source: "simple-
     return NextResponse.json({ error: "client_event_id is required and must be 160 characters or fewer" }, { status: 400 });
   }
 
-  const { data, error } = await serviceClient().rpc("record_booking_arrival", {
+  const { data, error } = await authenticatedClient(authorization).rpc("record_authenticated_booking_arrival", {
     p_booking_id: bookingId,
-    p_business_id: caller.business_id,
-    p_actor_admin_id: caller.id,
+    p_business_id: businessId,
     p_arrived_count: arrivedCount,
     p_expected_arrived_count: expectedCount,
     p_client_event_id: eventId,
@@ -69,11 +78,15 @@ export async function handleBookingArrivalRequest(req: Request, source: "simple-
     console.error(JSON.stringify({
       level: "error",
       code: "BOOKING_ARRIVAL_RPC_FAILED",
-      business_id: caller.business_id,
+      business_id: businessId,
       booking_id: bookingId,
       detail: error.message,
     }));
-    return NextResponse.json({ error: "Could not save the arrival count" }, { status: 500 });
+    const unauthorized = ["42501", "PGRST301", "PGRST302"].includes(error.code || "");
+    return NextResponse.json(
+      { error: unauthorized ? "Unauthorized" : "Could not save the arrival count" },
+      { status: unauthorized ? 401 : 500 },
+    );
   }
 
   const result = (data || {}) as Record<string, unknown>;

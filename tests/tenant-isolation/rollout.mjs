@@ -369,6 +369,8 @@ try {
   await db.query("insert into bookings(id,business_id,tour_id,slot_id,customer_name,email,qty,unit_price,total_amount,status,waiver_status) values ($1,$2,$3,$4,'Arrival fixture','arrival@fixture.invalid',6,100,600,'PAID','SIGNED'),($5,$2,$3,$4,'Concurrent fixture','concurrent@fixture.invalid',6,100,600,'PAID','SIGNED')", [id(731),id(1),id(701),id(711),id(732)]);
   const arrivalSql = "select record_booking_arrival($1,$2,$3,$4,$5,$6,$7,$8,$9) result";
   const arrivalArgs = (booking, target, expected, event, business=id(1), slot=id(711)) => [booking,business,id(11),target,expected,event,'rollout-test',null,slot];
+  const authenticatedArrivalSql = "select record_authenticated_booking_arrival($1,$2,$3,$4,$5,$6,$7,$8) result";
+  const authenticatedArrivalArgs = (booking, target, expected, event, business=id(1), slot=id(711)) => [booking,business,target,expected,event,'rollout-test',null,slot];
 
   await check('partial arrivals progress 0 to 4 with an atomic audit row',()=>as('service_role',null,{},async()=>{
     const result=(await db.query(arrivalSql,arrivalArgs(id(731),4,0,'arrival-1'))).rows[0].result;
@@ -414,6 +416,40 @@ try {
       await assert.rejects(db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-forged')),{code:'42501'});
     }));
   }
+  await check('authenticated arrival wrapper derives the owned actor and preserves the locked mutation',()=>as('authenticated',101,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-authenticated'))).rows[0].result;
+    assert.equal(result.ok,true); assert.equal(result.arrived_count,4);
+    assert.deepEqual((await db.query("select actor_admin_id,business_id from slot_check_ins where client_event_id='arrival-authenticated'")).rows,[{actor_admin_id:id(11),business_id:id(1)}]);
+  }));
+  await check('authenticated arrival wrapper rejects a forged tenant',()=>as('authenticated',101,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-foreign',id(2),id(721)))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'UNAUTHORIZED');
+  }));
+  await check('suspended administrators cannot use the authenticated arrival wrapper',()=>as('authenticated',104,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-suspended'))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'UNAUTHORIZED');
+  }));
+  await check('platform administrators retain explicitly targeted arrival support',()=>as('authenticated',103,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-platform',id(2),id(721)))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'NOT_FOUND');
+  }));
+  for (const role of ['anon','service_role']) {
+    await check(`${role} cannot invoke the authenticated arrival wrapper`,()=>as(role,null,{},async()=>{
+      await assert.rejects(db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-forged')),{code:'42501'});
+    }));
+  }
+  await db.query('update admin_users set read_only=true where id=$1',[id(11)]);
+  await check('read-only administrators cannot use the authenticated arrival wrapper',()=>as('authenticated',101,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-read-only'))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'UNAUTHORIZED');
+  }));
+  await db.query('update admin_users set read_only=false where id=$1',[id(11)]);
+  await db.query("update businesses set subscription_status='PAUSED' where id=$1",[id(1)]);
+  await check('inactive subscriptions cannot use the authenticated arrival wrapper',()=>as('authenticated',101,{},async()=>{
+    const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-paused'))).rows[0].result;
+    assert.equal(result.ok,false); assert.equal(result.code,'SUBSCRIPTION_REQUIRED');
+  }));
+  await db.query("update businesses set subscription_status='ACTIVE' where id=$1",[id(1)]);
   await check('authenticated clients cannot bypass conflict checks with a direct partial-count update',()=>as('authenticated',101,{},async()=>{
     await assert.rejects(db.query('update bookings set arrived_count=2 where id=$1',[id(731)]),{code:'42501'});
   }));
