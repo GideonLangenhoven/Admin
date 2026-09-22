@@ -66,14 +66,21 @@
     "qualification_credit": false
   },
   "corrective_staff_smoke": {
-    "executed": false,
+    "executed": true,
     "qualification_credit": false,
-    "status": "APPROVED_PENDING_EXECUTION",
-    "deployment_id": "dpl_GHnGko5mdT19AWn4kAjFY1QQCuXM"
+    "status": "FAIL_ABORTED_FOR_SAFETY",
+    "deployment_id": "dpl_GHnGko5mdT19AWn4kAjFY1QQCuXM",
+    "reached_vus": 500,
+    "evidence": "docs/production-readiness/evidence/BT500_CORRECTIVE_SMOKE_20260922.json"
+  },
+  "second_capacity_correction": {
+    "status": "LOCAL_VALIDATION_IN_PROGRESS",
+    "change": "Run the dashboard snapshot after one explicit tenant authorization and collapse arrival authorization plus mutation into one authenticated RPC.",
+    "qualification_credit": false
   },
   "qualification_started": false,
   "qualification_blockers": [
-    "pass the bounded corrective 500-user smoke with unchanged thresholds and independent generator/remote-resource instrumentation",
+    "pass a new bounded 500-user smoke with unchanged thresholds after the second hot-path admission correction",
     "enable provider doubles and implement the public, webhook and background-work harnesses",
     "measure the product-required Realtime footprint from browsers",
     "establish representative-volume data and quota/headroom evidence",
