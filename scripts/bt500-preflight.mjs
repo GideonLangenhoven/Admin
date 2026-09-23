@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
+import { executionWindow } from "./bt500-window.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const workloadPath = root + "docs/production-readiness/WORKLOAD.json";
@@ -75,12 +77,7 @@ function executionIssues(execution) {
   if (!(Number(execution.cost?.ceiling_zar) >= 0) || !String(execution.cost?.rule || "").trim()) {
     issues.push("a non-negative cost ceiling and abort rule are required");
   }
-  requiredText(execution.window?.starts_at, "window start");
-  requiredText(execution.window?.ends_at, "window end");
-  const start = Date.parse(execution.window?.starts_at || "");
-  const end = Date.parse(execution.window?.ends_at || "");
-  if (!Number.isFinite(start) || !Number.isFinite(end)) issues.push("window must use exact ISO timestamps after deployment");
-  if (Number.isFinite(start) && Number.isFinite(end) && end <= start) issues.push("window end must be after window start");
+  issues.push(...executionWindow(execution.window, mixedConfig(process.env)).issues);
   requiredText(execution.approval?.reference, "approval reference");
   requiredText(execution.approval?.approved_at, "approval timestamp");
   for (const field of ["workload_and_thresholds", "metric_definitions", "realtime_scope", "cost_environment_and_window"]) {
