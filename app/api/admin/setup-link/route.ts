@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
 import { setAdminAuthPassword } from "../../../lib/admin-password";
+import { limitAdminIngress } from "../../../../proxy";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -36,9 +37,14 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
+  const ingress = await limitAdminIngress(req);
+  if (ingress.blocked) {
+    ingress.blocked.headers.set("Connection", "close");
+    return ingress.blocked;
+  }
   let body: any;
   try {
-    body = await req.json();
+    body = JSON.parse(ingress.raw);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }

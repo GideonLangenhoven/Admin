@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { sourceExports } from "../helpers/source-handler";
+import { createRequire } from "node:module";
+import { PassThrough } from "node:stream";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
+
+const require = createRequire(import.meta.url);
 
 class NextResponse extends Response {
   static next() { return new NextResponse(null, { status: 200 }); }
   static redirect(url: URL) { return new NextResponse(null, { status: 307, headers: { Location: url.href } }); }
+  static json(body: unknown, init?: ResponseInit) { return Response.json(body, init); }
 }
 
 const production = {
@@ -23,7 +28,11 @@ function request(path: string, body: unknown, ip = "192.0.2.44", extraHeaders: R
 }
 
 function load(env: Record<string, string>, fetchImpl: typeof fetch = () => { throw new Error("Outbound network disabled"); }) {
-  return sourceExports("proxy.ts", { "next/server": { NextResponse } }, env, fetchImpl).proxy as (req: Request) => Promise<Response>;
+  const exported = sourceExports("proxy.ts", { "next/server": { NextResponse } }, env, fetchImpl);
+  const proxy = exported.proxy as (req: Request) => Promise<Response>;
+  const auth = exported.limitAdminIngress as (req: Request) => Promise<{ blocked: Response | null }>;
+  return (req: Request) => /^\/api\/admin\/(login|setup-link)$/.test(new URL(req.url).pathname)
+    ? auth(req).then(({ blocked }) => blocked || NextResponse.next()) : proxy(req);
 }
 
 function redis() {
@@ -44,6 +53,18 @@ function redis() {
 }
 
 describe("proxy ingress limits", () => {
+  it("excludes only auth routes from Next proxy and retains other API coverage", () => {
+    const config = sourceExports("proxy.ts", { "next/server": { NextResponse } }).config as { matcher: string[] };
+    const { getMiddlewareMatchers } = require("next/dist/build/analysis/get-page-static-info");
+    const [matcher] = getMiddlewareMatchers(config.matcher, {});
+    const matches = (path: string) => new RegExp(matcher.regexp).test(path);
+    expect(matches("/api/admin/login")).toBe(false);
+    expect(matches("/api/admin/setup-link")).toBe(false);
+    expect(matches("/api/admin/update")).toBe(true);
+    expect(matches("/api/check-ins")).toBe(true);
+    expect(matches("/settings")).toBe(true);
+  });
+
   it("rejects production bypass, missing Redis, and missing trusted IP", async () => {
     expect((await load({ ...production, E2E_BYPASS_RATE_LIMIT: "1" })(request("/api/admin/login", { email: "a@example.invalid" }))).status).toBe(503);
     expect((await load({ VERCEL_ENV: "production", VERCEL: "1" })(request("/api/admin/login", { email: "a@example.invalid" }))).status).toBe(503);
@@ -69,6 +90,50 @@ describe("proxy ingress limits", () => {
     expect(Number(denied.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect((await denied.json()).retry_after_ms).toBeGreaterThan(0);
   }, 20_000);
+
+  it("buckets coerced JSON-array email through the actual login handler", async () => {
+    const shared = redis();
+    const limitAdminIngress = sourceExports("proxy.ts", { "next/server": { NextResponse } }, production, shared.fetchImpl).limitAdminIngress;
+    const lookups: string[] = [];
+    const query: any = {
+      select: () => query,
+      eq: (_column: string, value: string) => { lookups.push(value); return query; },
+      maybeSingle: async () => ({ data: null, error: null }),
+    };
+    const login = sourceHandler("app/api/admin/login/route.ts", {
+      "next/server": { NextResponse },
+      "@supabase/supabase-js": { createClient: () => ({ from: () => query }) },
+      "../../../lib/admin-password": { setAdminAuthPassword: () => { throw new Error("Unexpected auth write"); } },
+      "../../../../proxy": { limitAdminIngress },
+    }, production);
+    for (let i = 0; i < 10; i++) {
+      expect((await login(request("/api/admin/login", { email: ["staff@example.invalid"], password: "synthetic-invalid" }))).status).toBe(401);
+    }
+    const denied = await login(request("/api/admin/login", { email: ["staff@example.invalid"], password: "synthetic-invalid" }));
+    expect(denied.status).toBe(429);
+    expect(denied.headers.get("Retry-After")).toBeTruthy();
+    expect(lookups).toEqual(Array(10).fill("staff@example.invalid"));
+    expect([...shared.counters.keys()].filter(key => key.includes("auth-input"))).toHaveLength(1);
+  });
+
+  it("closes blocked auth responses without changing their status, body, or retry header", async () => {
+    for (const route of ["login", "setup-link"] as const) {
+      for (const status of [408, 413, 429, 503]) {
+        const blocked = Response.json({ error: "synthetic denial" }, { status, headers: { "Retry-After": "7" } });
+        const handler = sourceHandler(`app/api/admin/${route}/route.ts`, {
+          "next/server": { NextResponse, after: () => { throw new Error("Unexpected background work"); } },
+          "@supabase/supabase-js": { createClient: () => { throw new Error("Unexpected database call"); } },
+          "../../../lib/api-auth": {}, "../../../lib/admin-password": {},
+          "../../../../proxy": { limitAdminIngress: async () => ({ blocked, raw: "" }) },
+        }, production);
+        const response = await handler(request(`/api/admin/${route}`, { email: "staff@example.invalid" }));
+        expect(response.status).toBe(status);
+        expect(response.headers.get("Connection")).toBe("close");
+        expect(response.headers.get("Retry-After")).toBe("7");
+        expect(await response.json()).toEqual({ error: "synthetic denial" });
+      }
+    }
+  });
 
   it("admits the BT500 shared-origin spike even when every Admin write retries", async () => {
     // 100 actions/s peak × 20% Admin writes × 2 check-in attempts × 60s.
@@ -111,8 +176,8 @@ describe("proxy ingress limits", () => {
   });
 
   it("stops waiting for a stalled classification body", async () => {
-    let controller: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
     const url = new URL("https://admin.example.invalid/api/admin/setup-link");
     const req = Object.assign(new Request(url, {
       method: "POST",
@@ -124,7 +189,37 @@ describe("proxy ingress limits", () => {
       load(production, redis().fetchImpl)(req),
       new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("body deadline missing")), 3_000)),
     ]);
-    controller!.close();
     expect(result.status).toBe(408);
+    expect(cancelled).toBe(true);
+  }, 5_000);
+
+  it("lets an actual Next Node route finish a stalled auth body at its deadline", async () => {
+    const { NodeNextRequest } = require("next/dist/server/base-http/node");
+    const { NextRequestAdapter } = require("next/dist/server/web/spec-extension/adapters/next-request");
+    const input = new PassThrough() as PassThrough & { method: string; url: string; headers: Record<string, string> };
+    input.method = "POST";
+    input.url = "https://admin.example.invalid/api/admin/setup-link";
+    input.headers = { "x-forwarded-for": "192.0.2.66", "content-type": "application/json" };
+    const req = NextRequestAdapter.fromNodeNextRequest(new NodeNextRequest(input), new AbortController().signal);
+    const limitAdminIngress = sourceExports("proxy.ts", { "next/server": { NextResponse } }, production, redis().fetchImpl).limitAdminIngress;
+    const setup = sourceHandler("app/api/admin/setup-link/route.ts", {
+      "next/server": { NextResponse, after: () => { throw new Error("Unexpected background work"); } },
+      "@supabase/supabase-js": { createClient: () => { throw new Error("Unexpected database call"); } },
+      "../../../lib/api-auth": {}, "../../../lib/admin-password": {},
+      "../../../../proxy": { limitAdminIngress },
+    }, production);
+    const started = Date.now();
+    try {
+      const response = await Promise.race([
+        setup(req),
+        new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("route deadline missing")), 3_000)),
+      ]);
+      expect(response.status).toBe(408);
+      expect(response.headers.get("Connection")).toBe("close");
+      expect(Date.now() - started).toBeLessThan(2_500);
+      expect(input.readableEnded).toBe(false);
+    } finally {
+      input.destroy();
+    }
   }, 5_000);
 });
