@@ -1,125 +1,230 @@
 {
-  "updated_at_utc": "2026-09-21T18:15:43Z",
-  "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
-  "issues": [
+  "updated_at_utc": "2026-09-23T07:37:00Z",
+  "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
+  "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+  "deployment_verdict": "FAILED_GATE",
+  "routing_verdict": "BLOCKED_ROUTING",
+  "parents": [
     {
-      "id": "REL-PROVENANCE",
-      "severity": "gate",
-      "status": "PARTIAL",
-      "evidence": "Admin and booking candidate commits are exact; deployed Admin, booking, onboarding, Edge and schema equivalence remain unproven.",
-      "next": "Build a redacted deployment manifest from the actual target before deployment."
+      "id": "C01",
+      "title": "Whole-product dependency and runtime security",
+      "status": "FAILED_GATE",
+      "owner": "gpt-6-sol/max companion writer",
+      "legacy_refs": ["SEC-DEV-DEPENDENCIES-01"],
+      "children": [
+        {
+          "id": "C01-STOREFRONT-AUDIT-20260923",
+          "severity": "critical",
+          "path": "capekayak-booking/package-lock.json",
+          "version": "current main 1cd8038 and historically deployed 2ff1d82",
+          "failure": "Fresh npm audit reports 17 findings: one critical and eight high; direct Next 16.1.6, Sharp 0.34.5, PostCSS 8.5.8 and DOMPurify 3.3.3 are affected by advisories requiring applicability triage.",
+          "impact": "Untriaged production dependency exposure blocks the security acceptance criterion.",
+          "verification": "Primary-advisory reachability dispositions, deterministic install, full and runtime audits, supported builds and relevant browser regressions."
+        },
+        {
+          "id": "C01-MOBILE-RECONCILIATION",
+          "severity": "gate",
+          "path": "capekayak-booking/app",
+          "failure": "Current companion main does not contain the seven-file mobile commit 2ff1d82 that was present in the previous deployment.",
+          "verification": "Account for each legitimate behavior while integrating current main, then run phone/tablet/desktop booking, cancellation, combo and chat journeys. The 34cc24c candidate restores mobile layout but independent review found additional behavior gaps."
+        },
+        {
+          "id": "C01-ONBOARDING-AUDIT-20260923",
+          "severity": "critical",
+          "path": "onboarding/package-lock.json",
+          "version": "current main 4ab0d699; deployed CLI artifact dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T has no Git fingerprint",
+          "failure": "Fresh npm audit reports 14 findings: one critical and nine high; direct Next 16.1.6 and PostCSS 8.5.8 require advisory applicability triage.",
+          "impact": "The separately enabled onboarding app cannot be omitted from release security and build acceptance.",
+          "verification": "Confirm deployed source, inspect primary advisories and reachability, patch exact lock, run deterministic install, production build and onboarding regressions."
+        },
+        {
+          "id": "C01-IMAGE-PROXY-20260923",
+          "severity": "high",
+          "path": "capekayak-booking/app/api/img/route.ts",
+          "version": "34cc24c candidate versus historically deployed 2ff1d82",
+          "failure": "Independent no-network repro shows the candidate follows an allowed-origin 302 to http://127.0.0.1:8080/private.png and returns a public immutable image response; it also accepts an evil-supabase.co suffix. The historical deployed route blocks both.",
+          "impact": "A public image proxy can reach private destinations and cache their responses.",
+          "verification": "Restore exact host/protocol, manual redirect, content-type and nosniff checks; prove forbidden redirects/suffixes fail and permitted images still work."
+        },
+        {
+          "id": "C01-CANCELLED-CHECKOUT-20260923",
+          "severity": "gate",
+          "path": "capekayak-booking/app/cancelled/page.tsx; checkout session persistence",
+          "version": "34cc24c candidate versus historically deployed 2ff1d82",
+          "failure": "The candidate's cancelled page only links Try Again to / and lacks the historical tenant-scoped unexpired HTTPS Yoco checkout resume and /my-bookings fallback.",
+          "impact": "A returning customer can lose the approved payment-recovery path.",
+          "verification": "Restore saved-session persistence and safe recovery, then test eligible, expired, foreign-tenant and absent sessions."
+        },
+        {
+          "id": "C01-COMBO-CHAT-20260923",
+          "severity": "gate",
+          "path": "capekayak-booking/app/combo; components/ChatWidget.tsx; next.config.ts",
+          "version": "34cc24c candidate versus historically deployed 2ff1d82",
+          "failure": "Source comparison shows the candidate retains only two-leg combo fields where deployed code supports combo_offer_items and date/per-leg selection; candidate chat omits tenant-scoped chat_session and live-agent polling, and its CSP omits deployed Paysafe SDK allowances. The local backend requires the missing chat capability and all combo legs.",
+          "impact": "Enabled combo, handoff and payment journeys would regress when replacing the deployed artifact.",
+          "verification": "Reconcile actual deployed capability and test authorized multi-leg combo, tenant-scoped live-agent reply, and enabled payment SDK behavior in a bounded candidate environment."
+        },
+        {
+          "id": "C01-BOOKING-CAPABILITY-20260923",
+          "severity": "high",
+          "path": "capekayak-booking/app/book/BookingFlow.tsx; supabase/functions/create-checkout/index.ts",
+          "version": "34cc24c candidate versus historically deployed 2ff1d82 and current backend contract",
+          "failure": "Candidate uses an unscoped anonymous insert/read and calls create-checkout without the booking_token required by the current backend; it also omits historically deployed server-priced add-ons, returned amount/expiry and safe retry handling.",
+          "impact": "Public booking or checkout can fail authorization, and preserving amount/retry truth is unverified.",
+          "verification": "Restore the deployed capability-based flow and test anonymous booking, authorized checkout, add-ons, expiry, lost response and retry against disposable backend fixtures."
+        }
+      ],
+      "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
+      "local_candidate": "34cc24c966436763e0acd6beb5db37cc860ef725",
+      "local_candidate_lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
+      "local_evidence": "npm ci, full and production-only audits with zero findings, TypeScript, Webpack production build and mocked WebP/AVIF image checks passed; existing lint reports 85 findings. Independent no-network proxy repro and source/backend contract comparison led fresh-context review dispatched as Astra xhigh to reject deployment for the recorded preservation/security regressions. Exact default Turbopack build remains unverified.",
+      "next": "Complete deployed-behavior reconciliation and bounded correction under Astra xhigh; re-review and verify before updating the Admin CI pin."
     },
     {
-      "id": "GUIDE-OFFLINE-01",
-      "severity": "high",
+      "id": "C02",
+      "title": "Public authentication and recovery behavior",
       "status": "LOCAL_VERIFIED",
-      "evidence": "109 focused tests, the broader suite, TypeScript and local browser probes pass.",
-      "next": "Verify with real Auth in isolated staging."
+      "owner": "gpt-6-sol/max Admin writer",
+      "base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+      "result": "b4439f7d1e6412e67d34222b1acd27bc0f817194",
+      "legacy_refs": ["AUTH-01"],
+      "children": [
+        {
+          "id": "C02-PUBLIC-CONTRACT-20260923",
+          "severity": "high",
+          "path": "app/api/admin/setup-link/route.ts; app/api/admin/login/route.ts; components/AuthGate.tsx; proxy.ts",
+          "failure": "Before the patch, reset response bodies and delivery failures exposed account state, recovery links trusted request origin, and login disclosed setup/suspension state before credential verification.",
+          "impact": "Account enumeration and hostile recovery-link origin could compromise recovery.",
+          "verification": "Independent review dispatched as Astra xhigh accepted the corrected two-commit patch after 202 focused tests, offline old/current AuthGate login execution, malformed reset isolation, actual installed Next after() lifecycle and diff checks. Deployed real-Auth/delivery and browser evidence remain."
+        }
+      ],
+      "review": "ACCEPTED by fresh-context Astra xhigh reviewer; effective runtime model/effort remains unobservable",
+      "next": "Under Astra-led routing, integrate the reviewed commits, check trusted ADMIN_RECOVERY_ORIGIN configuration without exposing its value, then verify deployed real-Auth/delivery/browser behavior with scoped approval."
     },
     {
-      "id": "AUTH-01",
-      "severity": "high",
-      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
-      "evidence": "Linked staff use verified Supabase Auth identity; legacy SHA-256 passwords migrate once and are cleared; self-change uses an isolated nonpersistent password session; setup-token issuance respects active claims; and a still-owned claim can finalize after expiry. Unit, production build, Edge and 181-check database rehearsal pass. A fresh Astra/xhigh reviewer accepted 7d3e7b3 after 49 focused tests and an installed-SDK session isolation probe.",
-      "next": "Deploy the exact candidate and run real Auth login, recovery, MFA and distributed-origin checks."
-    },
-    {
-      "id": "REFUND-01",
-      "severity": "high",
-      "status": "LOCAL_VERIFIED",
-      "evidence": "OPERATOR authority, tenant attribution and truthful single/bulk outcomes pass local coverage.",
-      "next": "Run one approved provider sandbox refund journey."
-    },
-    {
-      "id": "NOTIFY-01",
-      "severity": "high",
-      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
-      "evidence": "Durable tenant-fair notification jobs, transactional intent, stable provider idempotency, bounded retries/timeouts, crash recovery, stale-payload cancellation, legacy reminder suppression and atomic privileged retry audit pass 32 focused tests and the 181-check database rehearsal. Fresh Astra/xhigh review accepted the frozen source.",
-      "next": "Apply the exact migration and Edge candidate, verify the authenticated one-minute schedule, then run scoped genuine delivery and worker-failure probes."
-    },
-    {
-      "id": "ARRIVAL-01",
-      "severity": "high",
-      "status": "LOCAL_DB_PASSED",
-      "evidence": "Arrival compatibility, audit and direct privilege checks pass the 181-check disposable database run.",
-      "next": "Rehearse against an isolated target restored from the intended ledger."
-    },
-    {
-      "id": "PRICING-NEW-ONLY-01",
-      "severity": "high",
-      "status": "LOCAL_DB_PASSED",
-      "evidence": "Versioned pricing applies to future subscriptions and preserves existing plans, subscriptions and open lines.",
-      "next": "Rehearse against an isolated target restored from the intended ledger."
-    },
-    {
-      "id": "MFA-SENSITIVE-ACTIONS-01",
-      "severity": "high",
-      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
-      "evidence": "Bank, WhatsApp and Yoco changes require MFA; audited SUPER_ADMIN on-behalf recovery and changes are implemented.",
-      "next": "Validate real enrollment, challenge and recovery with Supabase Auth."
-    },
-    {
-      "id": "SEC-DEV-DEPENDENCIES-01",
-      "severity": "critical",
-      "status": "RESOLVED",
-      "evidence": "Vitest and Vite upgraded, vulnerable xlsx replaced, and npm audit reports zero vulnerabilities.",
-      "next": "Monitor new advisories in CI."
-    },
-    {
-      "id": "BOOKING-PRESERVED-MOBILE-01",
-      "severity": "high",
-      "status": "VERIFIED_COMMITTED",
-      "evidence": "Seven preserved mobile/accessibility changes were reconciled with embed action visibility and committed as 2ff1d82.",
-      "next": "Run deployed storefront browser smoke before release."
-    },
-    {
-      "id": "SECURITY-01",
-      "severity": "high",
-      "status": "PARTIAL",
-      "evidence": "Local regression, Edge checks and dependency audit pass; deployed CSP, quotas, TLS and privilege drift are not qualified.",
-      "next": "Run isolated staging and target-specific checks."
-    },
-    {
-      "id": "CI-01",
-      "severity": "gate",
+      "id": "C03",
+      "title": "Production-safe rate limits and bounded resource use",
       "status": "OPEN",
-      "evidence": "No candidate-specific remote workflow run exists.",
-      "next": "Run safe CI against exact Admin and booking commits."
+      "owner": "gpt-6-sol/max",
+      "legacy_refs": ["SECURITY-01"],
+      "children": [
+        {
+          "id": "C03-PROXY-20260923",
+          "severity": "high",
+          "path": "proxy.ts",
+          "failure": "Production E2E_BYPASS_RATE_LIMIT is not rejected, Redis fetch has no explicit timeout, and fallback is a per-process Map while direct Auth/Edge paths bypass this proxy.",
+          "impact": "Distributed abuse and unbounded limiter latency remain possible; a tiny shared IP allowance can deny legitimate staff.",
+          "verification": "Negative production bypass/config tests, bounded outage tests, shared-office allowance, distributed abuse, direct-path and expensive-operation behavioral tests."
+        }
+      ],
+      "next": "Trace every ingress and supported workload, then correct effective limits without disabling controls."
     },
     {
-      "id": "CONTINUITY-01",
-      "severity": "gate",
-      "status": "LOCAL_SYNTHETIC_PASSED",
-      "evidence": "100 of 100 same synthetic records survived the complete local migration ledger.",
-      "next": "Repeat on an isolated restore and complete the deployed role matrix."
+      "id": "C04",
+      "title": "Upload validation and partial-failure reconciliation",
+      "status": "OPEN",
+      "owner": "gpt-6-sol/max",
+      "children": [
+        {
+          "id": "C04-GUIDE-PHOTO-20260923",
+          "severity": "high",
+          "path": "app/api/guide/photo-upload/route.ts; app/photos/page.tsx",
+          "failure": "The guide route buffers an unbounded multipart file, trusts name/type, and leaves an operation-owned Drive object orphaned when the trip_photos insert fails; an alternate direct upload path also exists.",
+          "impact": "Resource exhaustion, unsafe content and unreconciled private objects can result.",
+          "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof."
+        }
+      ],
+      "next": "Inventory enabled Drive paths and implement bounded decoding and operation-owned reconciliation."
     },
     {
-      "id": "PROVIDER-01",
-      "severity": "gate",
+      "id": "C05",
+      "title": "Verified database TLS and effective permissions",
+      "status": "OPEN",
+      "owner": "gpt-6-sol/max",
+      "legacy_refs": ["SECURITY-01"],
+      "children": [
+        {
+          "id": "C05-TLS-20260923",
+          "severity": "high",
+          "path": "scripts/check-security-drift.mjs:136",
+          "failure": "The drift checker explicitly sets rejectUnauthorized: false and compares only selected table grants, RLS flags and policies.",
+          "impact": "Certificate spoofing can invalidate live drift evidence; effective grants and privileged functions may escape the baseline.",
+          "verification": "Trusted and untrusted certificate tests plus disposable low-privilege effective-grant/function/view/storage tests."
+        }
+      ],
+      "next": "Fix certificate/hostname validation and extend effective privilege coverage without rubber-stamping a new baseline."
+    },
+    {
+      "id": "C06",
+      "title": "Bulk acceptance and interruption recovery",
+      "status": "OPEN",
+      "owner": "gpt-6-sol/max",
+      "legacy_refs": ["REFUND-01"],
+      "children": [
+        {
+          "id": "C06-BATCH-REFUND-20260923",
+          "severity": "high",
+          "path": "supabase/functions/batch-refund/index.ts; app/bookings/page.tsx",
+          "failure": "The full-batch endpoint starts an audit with a total but does not persist the complete accepted target list before processing; the foreground UI's remaining selections vanish on tab close.",
+          "impact": "Interruption can leave accepted, completed, unknown and unsubmitted work hard to reconcile.",
+          "verification": "Disposable database and provider-fault tests for tab loss, timeout, failed audit writes, actor/tenant switch and stable money-operation IDs."
+        }
+      ],
+      "next": "Preserve the approved per-item foreground contract; make whole-batch acceptance and interrupted results authoritative."
+    },
+    {
+      "id": "V01",
+      "title": "Coordinated whole-product verification",
+      "status": "PARTIAL_LOCAL",
+      "owner": "gpt-6-astra/xhigh acceptance",
+      "legacy_refs": ["CONTINUITY-01", "GUIDE-OFFLINE-01", "ARRIVAL-01", "PRICING-NEW-ONLY-01", "MFA-SENSITIVE-ACTIONS-01", "BOOKING-PRESERVED-MOBILE-01", "NOTIFY-01"],
+      "evidence": "Dated synthetic 100-account continuity and focused regressions exist. Current inventory spans 49 Admin API files, 55 Edge Functions, five companion API files, and direct RPC/Storage paths; enabled capability and role-denial evidence is not yet complete.",
+      "next": "Map enabled paths, actual roles and positive/denied journeys to current candidate behavior; repeat same-record continuity on an isolated restore."
+    },
+    {
+      "id": "V02",
+      "title": "Genuine providers, financial faults, and twelve anomalies",
       "status": "BLOCKED_EXTERNAL",
-      "evidence": "Scoped test recipients and Yoco test-mode use are approved, but no genuine current payment-to-confirmation-to-message-to-refund journey exists.",
-      "next": "Deploy the exact candidate, validate provider credentials without exposing them, then run the scoped test-mode journey."
+      "owner": "gpt-6-astra/xhigh acceptance",
+      "legacy_refs": ["PROVIDER-01"],
+      "evidence": "No candidate-bound genuine Yoco payment-to-webhook-to-delivery/refund journey; 12 historical PAID records without provider IDs remain individually unreconciled.",
+      "next": "Obtain scoped sandbox/recipient access, run genuine journeys and fault invariants, classify all 12 against authoritative evidence before any historical mutation."
     },
     {
-      "id": "BT500-LAUNCH-V1",
-      "severity": "qualification",
-      "status": "STAFF_RUNNER_READY_EXECUTION_OPEN",
-      "evidence": "The 500-session read smoke passed. The guarded mixed-staff runner now enforces 70/20/10 actions, 100/250/500 ramp, 60-minute steady, 2x spike, recovery, 24-hour soak, zero dropped iterations, phase/journey latency and failure thresholds, marker isolation and post-run invariants. It has passed offline inspection but has not run against a deployed candidate.",
-      "next": "Deploy the exact candidate, complete provider-double/public/Realtime harnesses and quota proof, then execute the approved profile."
-    },
-    {
-      "id": "RESTORE-01",
-      "severity": "gate",
-      "status": "READY_FOR_EXTERNAL_APPROVAL",
-      "evidence": "A target-specific restore and alert packet is prepared in SECTION8_RELEASE_RECOVERY.md.",
-      "next": "Supply and approve a separate restore target and receiver."
-    },
-    {
-      "id": "DEPLOY-01",
-      "severity": "final_gate",
+      "id": "V03",
+      "title": "Complete harness, dataset, topology, and budget",
       "status": "BLOCKED_EXTERNAL",
-      "evidence": "Candidate is committed and locally verified but has not been pushed, deployed or canaried.",
-      "next": "Approve the exact target, order, rollback and canary after prior gates pass."
+      "owner": "gpt-6-astra/xhigh acceptance",
+      "legacy_refs": ["BT500-LAUNCH-V1"],
+      "evidence": "The 500-session profile and staff runner exist, but provider doubles, negative outbound guards, public/webhook/background harnesses, representative data, browser Realtime footprint and quota/headroom denominators are incomplete. Current target has 50 synthetic/demo bookings versus 250000 required; an existing isolated restore target and ZAR 0 ceiling were confirmed but its ID/capacity are unverified.",
+      "next": "Confirm data provenance, a separate safe target and budget; finish and verify controls before any qualifying clock."
+    },
+    {
+      "id": "V04",
+      "title": "Capacity, contention, and elapsed-time qualification",
+      "status": "FAILED_GATE",
+      "owner": "gpt-6-astra/xhigh acceptance",
+      "legacy_refs": ["BT500-LAUNCH-V1"],
+      "evidence": "First 500-VU mixed smoke and first corrective smoke failed; the second admission correction has no passing smoke. The 60-minute full mix, spike, recovery and 24-hour soak have not started.",
+      "next": "After V03 and a new exact approval window, run unchanged-threshold progressive smoke from an instrumented generator and continue only on pass."
+    },
+    {
+      "id": "V05",
+      "title": "Alerts, isolated restoration, and usable recovery",
+      "status": "BLOCKED_EXTERNAL",
+      "owner": "gpt-6-astra/xhigh acceptance",
+      "legacy_refs": ["RESTORE-01"],
+      "evidence": "No received alert drill or separate isolated usable restore with measured 15-minute data loss and 60-minute service recovery.",
+      "next": "Identify receiver/incident owner and isolated restore target; prove full database/Auth/object/config restoration and alert receipt."
+    },
+    {
+      "id": "V06",
+      "title": "Enforced release, deployment, and market handoff",
+      "status": "BLOCKED_EXTERNAL",
+      "owner": "gpt-6-astra/xhigh release decision",
+      "legacy_refs": ["REL-PROVENANCE", "CI-01", "DEPLOY-01"],
+      "evidence": "Admin source 52afaff differs from deployed ebb62b8; CI pins old companion 2ff1d82; current storefront candidate, exact provider checks, 24-hour production canary and final handoff are open.",
+      "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary."
     }
   ]
 }

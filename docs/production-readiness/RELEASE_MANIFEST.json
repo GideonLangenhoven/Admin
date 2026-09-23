@@ -1,96 +1,108 @@
 {
-  "recorded_at_utc": "2026-09-22T09:15:55Z",
+  "recorded_at_utc": "2026-09-23T07:37:00Z",
+  "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
-  "admin_candidate": {
-    "repository": "capekayak",
-    "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
-    "commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
-    "tree": "6f4e3403ba6fab20767521529152a972907e1b81",
-    "worktree": "/private/tmp/bookingtours-simple-view-1812677",
-    "package_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534"
+  "production_equivalence_verified": false,
+  "routing": {
+    "requested": {
+      "orchestration": "gpt-6-astra/xhigh",
+      "implementation": "gpt-6-sol/max",
+      "independent_review": "fresh-context gpt-6-astra/xhigh"
+    },
+    "dispatched": {
+      "implementation": "two explicit gpt-6-sol/max workers",
+      "review": "separate explicit gpt-6-astra/xhigh workers"
+    },
+    "observed_effective": "UNATTESTED_BY_HOST",
+    "next_action": "Switch embedded orchestration session to gpt-6-astra/xhigh after this checkpoint and verify effective host settings."
   },
-  "booking_candidate": {
-    "repository": "capekayak-booking",
-    "branch": "codex/bookingtours-mobile-readiness-2026-09-21",
-    "commit": "2ff1d82",
-    "base": "460e58d952ad570c9036bc13118eec66a2591918",
-    "worktree": "/private/tmp/bookingtours-booking-mobile-460e58d"
+  "admin": {
+    "repository": "GideonLangenhoven/Admin",
+    "release_branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
+    "branch_base_commit": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+    "branch_base_tree": "1f388e49894b024001c69d4620bfc384c11c7a69",
+    "branch_base_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534",
+    "isolated_c02_patch": {
+      "base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+      "commits": [
+        "45e07d80f1cde285505261261887ddc18f373281",
+        "b4439f7d1e6412e67d34222b1acd27bc0f817194"
+      ],
+      "tree": "2f71bdd947c1ce71284082cec74736e53a4c4055",
+      "review": "ACCEPTED_FRESH_CONTEXT",
+      "integration": "PENDING"
+    },
+    "deployed": {
+      "alias": "admin.bookingtours.co.za",
+      "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
+      "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
+    }
   },
-  "validation": {
-    "unit": "1355 pass, 1 skip",
-    "typescript": "pass",
-    "edge": "pass",
-    "database": "181 checks pass",
-    "simple_view_browser": "4/4 pass",
-    "admin_build": "pass, 91 routes",
-    "booking_build": "pass",
-    "booking_check_ways": "pass",
-    "npm_audit": "0 vulnerabilities",
-    "independent_auth_review": "fresh-context Astra/xhigh accepted 7d3e7b3 after 49 focused tests and installed-SDK session isolation probe",
-    "controlled_migration_dry_run": "exactly five pending migrations",
-    "independent_notification_and_bt500_review": "fresh-context Astra/xhigh accepted the frozen notification and mixed-staff runner source after 29 notification tests, 6 runner tests, offline action-timing probes and diff review",
-    "deployed_browser_smoke": "4/4 pass before and after the bounded load",
-    "deployed_bt500_staff_smoke": "fail at 500 VUs; aborted after widespread dial-stage I/O timeouts",
-    "post_abort_integrity": "pass; zero marker invariant violations and exact baseline restored"
+  "booking": {
+    "repository": "GideonLangenhoven/capekayak-booking",
+    "current_main_commit": "1cd80384884c5176f60607798b51fd54cf970fb2",
+    "current_main_tree": "eedc22e42cb50296e58ae00facc972cd2653eb78",
+    "isolated_c01_patch": {
+      "commit": "34cc24c966436763e0acd6beb5db37cc860ef725",
+      "tree": "882d6eb1f806795ac027a9c4d6f2f6a4c96d4543",
+      "lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
+      "review": "REJECTED_PRESERVATION_AND_IMAGE_PROXY_SECURITY",
+      "integration": "PENDING"
+    },
+    "historically_reviewed_mobile_commit": "2ff1d82046c73202c3146d11299cff9bc379ac54",
+    "deployed": {
+      "alias": "booking.bookingtours.co.za",
+      "deployment_id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
+      "git_commit": "UNVERIFIED"
+    }
   },
-  "database_changes": [
-    "20260920090000_enforce_standard_plan_pricing.sql",
-    "20260920100000_partial_booking_arrivals.sql",
-    "20260921120000_mfa_sensitive_business_columns.sql",
-    "20260921130000_authoritative_auth_passwords.sql",
-    "20260921140000_durable_notification_jobs.sql"
-  ],
-  "production_equivalence_verified": true,
-  "observed_hosted_state": {
-    "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
-    "admin_deployment": "caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
-    "admin_deployment_id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
-    "admin_function_region": "iad1",
-    "booking_commit": "2ff1d82",
-    "booking_deployment": "booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
-    "booking_deployment_id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
-    "booking_function_region": "cdg1",
+  "onboarding": {
+    "repository": "GideonLangenhoven/onboarding",
+    "current_main_commit": "4ab0d6993dc8c1f1d2fc1b82fc58e117a5f26616",
+    "current_main_tree": "7a44195fd310abc126419f89e0d181bcee76a185",
+    "current_main_lock_sha256": "430d95e5f46d4d2b2d8eadc94b9e3870f68caa135d00d792ab334f357cff22cf",
+    "audit_status": "14 findings; applicability and correction pending",
+    "deployed": {
+      "alias": "onboarding.bookingtours.co.za",
+      "deployment_id": "dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T",
+      "git_commit": "UNVERIFIED_CLI_DEPLOYMENT"
+    }
+  },
+  "cross_app_ci": {
+    "admin_companion_pin": "2ff1d82",
+    "accepted_new_pin": "PENDING_C01_ACCEPTANCE"
+  },
+  "local_evidence": {
+    "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
+    "booking_audit": "/private/tmp/bookingtours-booking-audit-20260923.json",
+    "onboarding_audit": "/private/tmp/bookingtours-onboarding-audit-20260923.json",
+    "c02": "202 focused tests pass; independent corrected-head review accepted; no deployed real-Auth/email/browser proof",
+    "c01": "npm ci, zero full/production-only audit findings, TypeScript and Webpack build pass; existing lint 85 findings; independent review rejected candidate"
+  },
+  "qualification": {
     "supabase_project": "ukdsrndqhsatjkmxijuj",
     "supabase_region": "eu-west-3",
-    "matches_candidate": true
+    "approved_profile": "BT500-LAUNCH-V1",
+    "last_mixed_500_smoke": "FAILED_ABORTED",
+    "first_corrective_smoke": "FAILED",
+    "second_corrective_smoke": "NOT_RUN",
+    "sixty_minute_mix": "NOT_RUN",
+    "two_x_spike": "NOT_RUN",
+    "twenty_four_hour_soak": "NOT_RUN",
+    "alert_restore": "NOT_RUN",
+    "production_canary": "NOT_RUN"
   },
-  "release_actions": {
+  "release_actions_this_checkpoint": {
     "pushed": false,
-    "deployed": true,
-    "migration_applied": true,
+    "deployed": false,
+    "remote_migration_applied": false,
     "provider_called": false,
-    "production_mutated": true,
-    "restore_run": false,
-    "canary_started": false
+    "hosted_data_mutated": false,
+    "load_run": false,
+    "restore_run": false
   },
-  "deployed_smoke": {
-    "verdict": "FAIL_ABORTED_FOR_SAFETY",
-    "reached_vus": 500,
-    "qualification_clock_started": false,
-    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
-  },
-  "local_capacity_remediation": {
-    "status": "UNDEPLOYED_AWAITING_EXACT_REVIEW_AND_APPROVAL",
-    "source_commit": "4561c2014bc7f3fef053df93be9baac1d5aa1d15",
-    "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
-    "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
-    "changes": "Collapse the Admin dashboard read fan-out into one tenant-scoped snapshot RPC, add five supporting indexes, coalesce Realtime bursts, and align the BT500 read journey.",
-    "validation": "188 disposable PostgreSQL checks, TypeScript, focused unit/contract tests and the 91-route Admin production build pass.",
-    "qualification_credit": false,
-    "evidence": "docs/production-readiness/evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json"
-  },
-  "active_sections": [
-    5,
-    6,
-    7,
-    8,
-    9
-  ],
-  "migration_sha256": {
-    "20260920090000_enforce_standard_plan_pricing.sql": "bff91f5b1a4fbaaa99c13db46c3d99e96f7dbe90c24252d1c4a7d7517d35bf7a",
-    "20260920100000_partial_booking_arrivals.sql": "b81fc4cb61061254d39a5448e4fedf889883c50d63665c7108f5be37bf21bee4",
-    "20260921120000_mfa_sensitive_business_columns.sql": "a7b45da389209e76d8a9b187946922474a2fe3d7ebc38dae26a5cf6caccc1691",
-    "20260921130000_authoritative_auth_passwords.sql": "434d0cb347ca8844c88a9c1a7cee5958b4436d0504378ccf81799df8bfbf7eb0",
-    "20260921140000_durable_notification_jobs.sql": "5c5f09b00c554c1c2135aa811d9fe9bcc0bacc5fed4993259ca029418bbf6827"
+  "historical_reference": {
+    "prior_manifest_in_commit": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+    "note": "Prior candidate/deployment claims remain in Git history; they are not the current release claim."
   }
 }
