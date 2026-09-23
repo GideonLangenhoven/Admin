@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T12:17:59Z",
+  "recorded_at_utc": "2026-09-23T12:23:22Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -276,6 +276,17 @@
       "integrated_log": "/private/tmp/bookingtours-integrated-evidence-20260923/edge-after-c05.log",
       "integrated_log_sha256": "b0896f819c90f77335a9b6b08d131748c1964ea2db16ab25c3a804deaa6b6857",
       "limit": "No actual CLI ESZip or deployed dependency graph verified; API upload omits lock and native Darwin runtime lacks libgcc. Local bundling is not deployed-runtime proof."
+    },
+    "production_limiter_env_names": {
+      "project": "caepweb-admin",
+      "environment": "production",
+      "evidence": "/private/tmp/bookingtours-vercel-env-readonly-evidence-20260923.json",
+      "sha256": "bb2fab75231477a4c171dbbfc13b7b8865b19a98992c3c9908e0deec87f82670",
+      "observed_at_utc": "2026-09-23T12:20:52.044Z",
+      "result": "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN not found among11 production project environment entries; E2E bypass also absent.",
+      "method": "Read-only Vercel CLI env ls production; only required name presence retained, no values or Redis request.",
+      "limit": "Not effective invocation evidence; VERCEL can be a system variable rather than a listed project variable.",
+      "minimum_next_action": "Before deploying fail-closed limiter, identify approved shared Redis service, verify available command/storage quotas within ZAR0, supply secrets through supported secret settings under exact deployment approval, and verify production/preview configuration and bounded failure behavior. No provisioning or hosted configuration change authorized by this record."
     }
   },
   "qualification": {

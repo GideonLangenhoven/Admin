@@ -24,6 +24,8 @@ Source Supabase project `ukdsrndqhsatjkmxijuj` is active in `eu-west-3`; the las
 
 The owner supplied this same source URL as the restore target and excluded the other visible project. A separate restore target is not identified; do not inspect or use other projects. Budget ceiling remains ZAR 0. Prior private recipients, Yoco test mode and monitoring receiver remain approved for planning only; no credentials or recipients were exposed.
 
+Read-only production environment-name inspection found neither required Upstash Redis setting among11 project entries. The corrected limiter must not be deployed before an approved, quota-verified shared service and effective runtime configuration are established. Values were not exposed; no Redis call or configuration change occurred.
+
 Before hosted execution, one exact approval packet must specify candidate/target, mutations/load or provider mode and recipients, window, budget/quota, abort and recovery. Required prerequisites include negative outbound guards, representative data and real Realtime topology, genuine provider sandbox access, alert receiver/incident owner and a separate restore target with Auth/files/protected configuration. Historical flags are not current authority. The last load window expired 22 September at 16:00 UTC; V03's integrated guard now rejects the expired record; it also handles insufficient duration, ordinary termination signals and forward clock adjustments. It grants no fresh permission.
 
 ## Remaining twelve-item gate
