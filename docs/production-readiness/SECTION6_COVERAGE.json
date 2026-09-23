@@ -214,12 +214,12 @@
   "provider_journeys": {
     "genuine_sandbox_completed": false,
     "status": "BLOCKED_EXTERNAL",
-    "reason": "The exact candidate is deployed and scoped recipients plus Yoco test-mode use are approved, but the genuine provider journey has not run."
+    "reason": "Current integrated local candidate is not deployed. Private recipients, Yoco test mode and monitoring destination are confirmed for planning only; no current genuine provider execution window or transaction/message authorization."
   },
   "release_gate": "FAIL",
   "current_verification": {
     "status": "IN_PROGRESS",
-    "admin_candidate": "739a3fe",
+    "admin_candidate": "94f84e6570636c5c54825a826866921facdc1af3",
     "meaning": "Existing statuses and tests refer to the historical candidate recorded above. They remain reusable only within unchanged code/configuration/fixture scope and do not certify the current integrated product.",
     "required_explicit_identities": [
       "anonymous",
@@ -242,6 +242,36 @@
       "privacy requests and owned exports",
       "logout/account/tenant switch and old-tab continuity"
     ],
-    "evidence_requirement": "Each enabled critical capability needs actual positive and denied behavioral run results tied to code, configuration, fixture and environment; filenames alone are not proof."
+    "evidence_requirement": "Each enabled critical capability needs actual positive and denied behavioral run results tied to code, configuration, fixture and environment; filenames alone are not proof.",
+    "updated_at_utc": "2026-09-23T11:53:09Z",
+    "accepted_scoped_evidence": [
+      {
+        "scope": "Public recovery/login response and token lifecycle; trusted recovery origin",
+        "parent": "C02",
+        "result": "202 focused review and46 affected integration checks pass",
+        "environment": "local handlers, synthetic providers and actual Next after lifecycle; no real Auth/email delivery"
+      },
+      {
+        "scope": "Exact staff helper/tenant/arrival/platform-settings authority and service-only demo RPC",
+        "parent": "C05",
+        "source": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+        "result": "112 focused unit,218 PostgreSQL rollout,47 independent PostgreSQL checks pass",
+        "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md",
+        "environment": "disposable PostgreSQL17; supported roles plus unknown/prefix/malformed/suspended/read-only denials; no hosted action proof"
+      },
+      {
+        "scope": "Guide photo decoding, durable same-content retry, interrupted persistence and Drive caller checks",
+        "parent": "C04",
+        "source": "15a56d3842fc11cc89e761246dc22dc92991c674",
+        "result": "107 focused tests and7 independent handler/PostgreSQL probes pass",
+        "environment": "real image bytes, disposable PostgreSQL17 and synthetic Drive; alternate upload and actual phone/browser proof open"
+      },
+      {
+        "scope": "Companion storefront and separate onboarding preserved application flows",
+        "parent": "C01",
+        "result": "Reviewed executable contracts, types/lint/configured builds and actual callback/provisioning probes pass",
+        "environment": "local source and synthetic providers; genuine payments, communications and deployed browser matrix open"
+      }
+    ]
   }
 }
