@@ -65,7 +65,7 @@ export function sourceFunction(file: string, name: string, bindings: Record<stri
   if (!node) throw new Error("Missing source function: " + name);
   const code = ts.transpileModule(node.getText(ast).replace(/^export\s+/, ""), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   return runInNewContext(code + "\n" + name, {
-    console, URL, setTimeout, clearTimeout, crypto: webcrypto,
+    console, URL, TextEncoder, setTimeout, clearTimeout, crypto: webcrypto,
     fetch: () => { throw new Error("Network disabled in source-function tests"); },
     ...bindings,
   }, { filename: file });

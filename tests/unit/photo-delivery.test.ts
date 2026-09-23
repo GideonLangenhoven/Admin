@@ -115,13 +115,15 @@ describe("guide photo callers", () => {
     const setUploadStatus = vi.fn();
     const upload = sourceFunction(file, "onPickPhotos", {
       getAuthHeaders, uploading: false, slotId: slot.id, FormData,
-      uploadOperations: { current: new Map<string, string>() },
+      businessId: "a", supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: "user-a" } } } }) } },
+      persistedOperationId: async () => ({ id: "22222222-2222-4222-8222-222222222222", key: "fixture" }),
+      clearOperation: () => {},
       setUploading: vi.fn(), setUploadStatus, setProgress: vi.fn(), reload: vi.fn(),
       fetch: async (_url: string, init: RequestInit) => {
         expect(init.headers).toEqual({ Authorization: "Bearer signed-in-guide" });
         expect((init.body as FormData).get("slot_id")).toBe(slot.id);
         expect((init.body as FormData).get("operation_id")).toMatch(/^[0-9a-f-]{36}$/);
-        return Response.json({ error: "Drive disconnected" }, { status: 400 });
+        return Response.json({ error: "Drive disconnected", retryable: true }, { status: 400 });
       },
     });
     await upload([new File(["photo"], "trip.jpg")]);
