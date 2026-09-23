@@ -53,20 +53,36 @@ try {
 
   const claim = `INSERT INTO public.guide_photo_uploads
     (operation_id,business_id,slot_id,actor_admin_id,content_sha256,state)
-    VALUES ('22222222-2222-4222-8222-222222222222','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    VALUES ($1,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     '11111111-1111-4111-8111-111111111111','33333333-3333-4333-8333-333333333333',
     repeat('a',64),'uploading')`;
   const first = await client();
   const second = await client();
   await Promise.all([first.query("SET ROLE service_role"), second.query("SET ROLE service_role")]);
-  const outcomes = await Promise.allSettled([first.query(claim), second.query(claim)]);
+  const original = "22222222-2222-4222-8222-222222222222";
+  const outcomes = await Promise.allSettled([first.query(claim, [original]), second.query(claim, [original])]);
   assert.equal(outcomes.filter(result => result.status === "fulfilled").length, 1);
   const denied = outcomes.find(result => result.status === "rejected");
   assert.equal(denied?.reason?.code, "23505");
   const rows = await admin.query("SELECT operation_id,state FROM public.guide_photo_uploads");
   assert.equal(rows.rowCount, 1);
   assert.equal(rows.rows[0].state, "uploading");
-  console.log("guide photo ledger: isolated PG17 grants and concurrent unique claim passed");
+  await admin.query("UPDATE public.guide_photo_uploads SET state='released' WHERE operation_id=$1", [original]);
+
+  const alternateA = "44444444-4444-4444-8444-444444444444";
+  const alternateB = "55555555-5555-4555-8555-555555555555";
+  const differentIds = await Promise.allSettled([first.query(claim, [alternateA]), second.query(claim, [alternateB])]);
+  assert.equal(differentIds.filter(result => result.status === "fulfilled").length, 1);
+  assert.equal(differentIds.find(result => result.status === "rejected")?.reason?.code, "23505");
+  const active = await admin.query("SELECT operation_id FROM public.guide_photo_uploads WHERE state='uploading'");
+  assert.equal(active.rowCount, 1);
+  const winner = active.rows[0].operation_id;
+  await admin.query("UPDATE public.guide_photo_uploads SET state='completed' WHERE operation_id=$1", [winner]);
+  await assert.rejects(admin.query(claim, ["66666666-6666-4666-8666-666666666666"]), { code: "23505" });
+  const released = await admin.query("UPDATE public.guide_photo_uploads SET state='released' WHERE operation_id=$1 AND state='completed' RETURNING operation_id", [winner]);
+  assert.equal(released.rowCount, 1);
+  await admin.query(claim, ["66666666-6666-4666-8666-666666666666"]);
+  console.log("guide photo ledger: PG17 low-role denial, concurrent same/different ID uniqueness, and confirmed release passed");
 } finally {
   await Promise.all(clients.map(connection => connection.end().catch(() => {})));
   if (started) run("pg_ctl", ["-D", data, "-m", "immediate", "stop"]);

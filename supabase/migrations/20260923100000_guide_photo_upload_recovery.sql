@@ -10,7 +10,7 @@ CREATE TABLE public.guide_photo_uploads (
   slot_id uuid NOT NULL,
   actor_admin_id uuid NOT NULL,
   content_sha256 text NOT NULL CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
-  state text NOT NULL CHECK (state IN ('uploading', 'uploaded', 'completed', 'rejected')),
+  state text NOT NULL CHECK (state IN ('uploading', 'uploaded', 'completed', 'rejected', 'released')),
   drive_file_id text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -18,6 +18,12 @@ CREATE TABLE public.guide_photo_uploads (
 CREATE INDEX guide_photo_uploads_reconcile_idx
   ON public.guide_photo_uploads (created_at)
   WHERE state IN ('uploading', 'uploaded');
+
+-- A new browser/device operation cannot create another Drive object while the
+-- same guide's same photo for the same slot is unresolved or still in the gallery.
+CREATE UNIQUE INDEX guide_photo_uploads_active_content_idx
+  ON public.guide_photo_uploads (business_id, slot_id, actor_admin_id, content_sha256)
+  WHERE state IN ('uploading', 'uploaded', 'completed');
 
 ALTER TABLE public.guide_photo_uploads ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.guide_photo_uploads FROM PUBLIC, anon, authenticated;

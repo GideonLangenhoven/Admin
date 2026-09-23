@@ -4,6 +4,7 @@ import { sourceExports, sourceFunction, sourceHandler } from "../helpers/source-
 
 const SLOT_ID = "11111111-1111-4111-8111-111111111111";
 const OPERATION_ID = "22222222-2222-4222-8222-222222222222";
+const OPERATION_B = "44444444-4444-4444-8444-444444444444";
 const BUSINESS_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const BUSINESS_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
@@ -92,8 +93,9 @@ function fixture(options: {
   const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
   const queriedTables: string[] = [];
   let tokenCalls = 0;
-  let ledger: Record<string, unknown> | null = null;
-  let savedPhoto: Record<string, unknown> | null = null;
+  let uploadCalls = 0;
+  const ledgers = new Map<string, Record<string, unknown>>();
+  const photos = new Map<string, Record<string, unknown>>();
 
   const db = {
     from(table: string) {
@@ -107,44 +109,60 @@ function fixture(options: {
         return query;
       }
       if (table === "trip_photos") {
+        const filters = new Map<string, unknown>();
         const query: any = {
           insert: async (row: Record<string, unknown>) => {
             inserts.push(row);
             if (options.insertThrows) throw new Error(options.insertError || "insert response lost");
             if (options.insertError) return { error: { message: options.insertError, code: options.insertErrorCode || "" } };
-            savedPhoto = row;
+            photos.set(String(row.id), row);
             return { error: null };
           },
           select: () => query,
-          eq: () => query,
+          eq: (column: string, value: unknown) => { filters.set(column, value); return query; },
           maybeSingle: async () => ({
-            data: options.reconciliationRow ? { id: OPERATION_ID, gdrive_file_id: "drive-file-a" } : savedPhoto,
+            data: options.reconciliationRow
+              ? { id: OPERATION_ID, gdrive_file_id: "drive-file-a" }
+              : [...photos.values()].find(row => [...filters].every(([column, value]) => row[column] === value)) ?? null,
             error: options.reconciliationError ? { message: options.reconciliationError, code: "" } : null,
           }),
         };
         return query;
       }
       if (table === "guide_photo_uploads") {
+        const filters = new Map<string, unknown>();
+        const included = new Map<string, unknown[]>();
+        const matches = (row: Record<string, unknown>) =>
+          [...filters].every(([column, value]) => row[column] === value) &&
+          [...included].every(([column, values]) => values.includes(row[column]));
         const query: any = {
           insert: async (row: Record<string, unknown>) => {
-            if (ledger) return { error: { code: "23505" } };
-            ledger = { ...row };
+            if (ledgers.has(String(row.operation_id)) || [...ledgers.values()].some(prior =>
+              ["uploading", "uploaded", "completed"].includes(String(prior.state)) &&
+              prior.business_id === row.business_id && prior.slot_id === row.slot_id &&
+              prior.actor_admin_id === row.actor_admin_id && prior.content_sha256 === row.content_sha256)) {
+              return { error: { code: "23505" } };
+            }
+            ledgers.set(String(row.operation_id), { ...row });
             return { error: null };
           },
           select: () => query,
-          eq: () => query,
-          maybeSingle: async () => ({ data: ledger, error: null }),
+          eq: (column: string, value: unknown) => { filters.set(column, value); return query; },
+          in: (column: string, values: unknown[]) => { included.set(column, values); return query; },
+          maybeSingle: async () => ({ data: [...ledgers.values()].find(matches) ?? null, error: null }),
           update: (patch: Record<string, unknown>) => {
+            const updateFilters = new Map<string, unknown>();
+            const applyUpdate = () => {
+              if (options.ledgerUpdateError && patch.state === "uploaded") return { data: null, error: { code: "08006" } };
+              const row = [...ledgers.values()].find(prior => [...updateFilters].every(([column, value]) => prior[column] === value));
+              if (row) Object.assign(row, patch);
+              return { data: row ?? null, error: null };
+            };
             const updateQuery: any = {
-              eq: () => updateQuery,
-              then: (resolve: (value: unknown) => void) => {
-                if (options.ledgerUpdateError && patch.state === "uploaded") {
-                  resolve({ error: { code: "08006" } });
-                  return;
-                }
-                if (ledger) Object.assign(ledger, patch);
-                resolve({ error: null });
-              },
+              eq: (column: string, value: unknown) => { updateFilters.set(column, value); return updateQuery; },
+              select: () => updateQuery,
+              maybeSingle: async () => applyUpdate(),
+              then: (resolve: (value: unknown) => void) => resolve(applyUpdate()),
             };
             return updateQuery;
           },
@@ -169,12 +187,14 @@ function fixture(options: {
         : new Response(null, { status: 204 });
     }
     if (href.startsWith("https://www.googleapis.com/upload/drive/")) {
+      uploadCalls++;
       if (options.uploadThrows) throw new Error("upload response lost SECRET_SENTINEL");
       if (options.malformedUploadResponse) return new Response("not-json SECRET_SENTINEL", { status: 200 });
       if (options.uploadStatus) {
         return Response.json({ error: { message: "upload denied SECRET_SENTINEL" } }, { status: options.uploadStatus });
       }
-      return Response.json({ id: "drive-file-a", webViewLink: "https://drive.invalid/a" });
+      const id = "drive-file-" + String.fromCharCode(96 + uploadCalls);
+      return Response.json({ id, webViewLink: "https://drive.invalid/" + id });
     }
     throw new Error("Unexpected fetch: " + href);
   });
@@ -185,7 +205,8 @@ function fixture(options: {
     sharp: { default: (input: Uint8Array, sharpOptions: Parameters<typeof sharp>[1]) => sharp(Buffer.from(input), sharpOptions) },
   }, {}, fetchImpl as typeof fetch);
 
-  return { handler, inserts, fetchCalls, fetchImpl, queriedTables, get ledger() { return ledger; }, get tokenCalls() { return tokenCalls; } };
+  return { handler, inserts, fetchCalls, fetchImpl, queriedTables, ledgers, photos,
+    get ledger() { return ledgers.get(OPERATION_ID) ?? null; }, get tokenCalls() { return tokenCalls; } };
 }
 
 async function body(response: Response) {
@@ -394,6 +415,68 @@ describe("guide photo upload boundary", () => {
     log.mockRestore();
   });
 
+  it("blocks a second device's new operation ID after an uncertain provider response", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const f = fixture({ uploadThrows: true });
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(503);
+    const second = await f.handler(requestFor(file, { operationId: OPERATION_B }));
+    expect(second.status).toBe(503);
+    expect(await body(second)).toMatchObject({ code: "UPLOAD_STATE_UNKNOWN", retryable: false });
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
+    expect(f.ledgers.size).toBe(1);
+    expect(f.tokenCalls).toBe(1);
+    log.mockRestore();
+  });
+
+  it("recovers a completed photo with a new operation ID without creating another Drive file", async () => {
+    const f = fixture();
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(200);
+    const second = await f.handler(requestFor(file, { operationId: OPERATION_B }));
+    expect(second.status).toBe(200);
+    expect(await body(second)).toMatchObject({ ok: true, recovered: true });
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
+    expect(f.ledgers.size).toBe(1);
+  });
+
+  it("releases a completed content claim only after confirming its gallery photo was removed", async () => {
+    const f = fixture();
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(200);
+    f.photos.delete(OPERATION_ID);
+    const second = await f.handler(requestFor(file, { operationId: OPERATION_B }));
+    expect(second.status).toBe(200);
+    expect(f.ledger?.state).toBe("released");
+    expect(f.ledgers.get(OPERATION_B)).toMatchObject({ state: "completed", drive_file_id: "drive-file-b" });
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(2);
+  });
+
+  it("keeps a completed claim when its gallery lookup fails", async () => {
+    const f = fixture({ reconciliationError: "gallery read unavailable" });
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(200);
+    f.photos.delete(OPERATION_ID);
+    const second = await f.handler(requestFor(file, { operationId: OPERATION_B }));
+    expect(second.status).toBe(503);
+    expect(f.ledger?.state).toBe("completed");
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
+  });
+
+  it("lets a confirmed rejected operation clear its ID and later retry safely", async () => {
+    const options: { uploadStatus?: number } = { uploadStatus: 400 };
+    const f = fixture(options);
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(502);
+    expect(f.ledger?.state).toBe("rejected");
+    const prior = await f.handler(requestFor(file));
+    expect(await body(prior)).toMatchObject({ retryable: true, new_operation_safe: true });
+    options.uploadStatus = undefined;
+    const next = await f.handler(requestFor(file, { operationId: OPERATION_B }));
+    expect(next.status).toBe(200);
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(2);
+  });
+
   it("checks an unresolved ledger claim before a later token failure", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const f = fixture({ uploadThrows: true, tokenFailsAfter: 1 });
@@ -595,6 +678,24 @@ describe("guide photo upload caller", () => {
     await callerFixture(fetchImpl as typeof fetch, saved).upload([photo]);
     expect(new Set(seen).size).toBe(1);
     expect(saved.rows.size).toBe(0);
+  });
+
+  it("blocks duplicate provider effects across two browsers with independent retry IDs", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const server = fixture({ uploadThrows: true });
+    const operationIds: string[] = [];
+    const send = async (url: string | URL | Request, init?: RequestInit) => {
+      operationIds.push(String((init?.body as FormData).get("operation_id")));
+      return server.handler(new Request(new URL(String(url), "https://fixture.invalid"), init));
+    };
+    const photo = imageFile(pngBytes, { name: "trip.png", type: "image/png" });
+    await callerFixture(send as typeof fetch, storage()).upload([photo]);
+    await callerFixture(send as typeof fetch, storage()).upload([photo]);
+    expect(operationIds).toHaveLength(2);
+    expect(operationIds[0]).not.toBe(operationIds[1]);
+    expect(server.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
+    expect(server.ledgers.size).toBe(1);
+    log.mockRestore();
   });
 
   it("blocks an account switch for an unresolved photo and scopes other operations by tenant, slot and bytes", async () => {

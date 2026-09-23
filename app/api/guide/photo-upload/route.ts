@@ -87,17 +87,69 @@ function unknownUploadResponse(operationId: string) {
   }, { status: 503 });
 }
 
+function newOperationResponse() {
+  return NextResponse.json({
+    error: "The previous upload ended without a gallery photo. Select the photo again to start a new upload.",
+    retryable: true,
+    new_operation_safe: true,
+  }, { status: 409 });
+}
+
+type UploadRecord = {
+  operation_id: string;
+  business_id: string;
+  slot_id: string;
+  actor_admin_id: string;
+  content_sha256: string;
+  state: string;
+  drive_file_id: string | null;
+};
+
+async function existingPhotoResponse(
+  db: ReturnType<typeof adminClient>, prior: UploadRecord, requestedOperationId: string,
+): Promise<Response | null> {
+  if (prior.state === "rejected" || prior.state === "released") return newOperationResponse();
+  if (!prior.drive_file_id) return unknownUploadResponse(prior.operation_id);
+
+  let photo: { gdrive_file_id: string } | null;
+  try {
+    const result = await db.from("trip_photos").select("gdrive_file_id")
+      .eq("id", prior.operation_id).eq("business_id", prior.business_id)
+      .eq("slot_id", prior.slot_id).maybeSingle();
+    if (result.error) return unknownUploadResponse(prior.operation_id);
+    photo = result.data;
+  } catch {
+    return unknownUploadResponse(prior.operation_id);
+  }
+  if (photo?.gdrive_file_id === prior.drive_file_id) {
+    return NextResponse.json({
+      ok: true, url: viewUrl(prior.drive_file_id),
+      thumbnail: thumbnailUrl(prior.drive_file_id), recovered: true,
+    });
+  }
+  if (photo || prior.state !== "completed") return unknownUploadResponse(prior.operation_id);
+
+  // Only a confirmed completed gallery photo that has since been removed may
+  // release the content claim. Pending provider/DB outcomes remain blocked.
+  try {
+    const released = await db.from("guide_photo_uploads").update({ state: "released" })
+      .eq("operation_id", prior.operation_id).eq("state", "completed")
+      .select("operation_id").maybeSingle();
+    if (released.error || !released.data) return unknownUploadResponse(prior.operation_id);
+  } catch {
+    return unknownUploadResponse(prior.operation_id);
+  }
+  return requestedOperationId === prior.operation_id ? newOperationResponse() : null;
+}
+
 async function recordedUploadResponse(
   db: ReturnType<typeof adminClient>, operationId: string, businessId: string,
   slotId: string, actorId: string, contentSha256: string,
 ): Promise<Response | null> {
-  let prior: {
-    business_id: string; slot_id: string; actor_admin_id: string;
-    content_sha256: string; drive_file_id: string | null;
-  } | null;
+  let prior: UploadRecord | null;
   try {
     const result = await db.from("guide_photo_uploads")
-      .select("business_id,slot_id,actor_admin_id,content_sha256,drive_file_id")
+      .select("operation_id,business_id,slot_id,actor_admin_id,content_sha256,state,drive_file_id")
       .eq("operation_id", operationId).maybeSingle();
     if (result.error) return unknownUploadResponse(operationId);
     prior = result.data;
@@ -109,16 +161,24 @@ async function recordedUploadResponse(
       prior.actor_admin_id !== actorId || prior.content_sha256 !== contentSha256) {
     return NextResponse.json({ error: "Upload operation belongs to a different request", code: "UPLOAD_OPERATION_MISMATCH", retryable: false }, { status: 409 });
   }
-  if (prior.drive_file_id) {
-    try {
-      const { data: photo } = await db.from("trip_photos").select("id,gdrive_file_id")
-        .eq("id", operationId).eq("business_id", businessId).eq("slot_id", slotId).maybeSingle();
-      if (photo?.gdrive_file_id === prior.drive_file_id) {
-        return NextResponse.json({ ok: true, url: viewUrl(prior.drive_file_id), thumbnail: thumbnailUrl(prior.drive_file_id), recovered: true });
-      }
-    } catch { /* The first request may still be committing. */ }
+  return existingPhotoResponse(db, prior, operationId);
+}
+
+async function matchingContentResponse(
+  db: ReturnType<typeof adminClient>, operationId: string, businessId: string,
+  slotId: string, actorId: string, contentSha256: string,
+): Promise<Response | null> {
+  try {
+    const result = await db.from("guide_photo_uploads")
+      .select("operation_id,business_id,slot_id,actor_admin_id,content_sha256,state,drive_file_id")
+      .eq("business_id", businessId).eq("slot_id", slotId)
+      .eq("actor_admin_id", actorId).eq("content_sha256", contentSha256)
+      .in("state", ["uploading", "uploaded", "completed"]).maybeSingle();
+    if (result.error) return unknownUploadResponse(operationId);
+    return result.data ? existingPhotoResponse(db, result.data, operationId) : null;
+  } catch {
+    return unknownUploadResponse(operationId);
   }
-  return unknownUploadResponse(operationId);
 }
 
 async function readBoundedFormData(req: NextRequest): Promise<
@@ -233,6 +293,8 @@ export async function POST(req: NextRequest) {
   const contentSha256 = createHash("sha256").update(fileBuf).digest("hex");
   const recorded = await recordedUploadResponse(db, operationId, caller.business_id, slotId, caller.id, contentSha256);
   if (recorded) return recorded;
+  const matching = await matchingContentResponse(db, operationId, caller.business_id, slotId, caller.id, contentSha256);
+  if (matching) return matching;
 
   let tokenRes: Response;
   try {
@@ -276,6 +338,7 @@ export async function POST(req: NextRequest) {
   if (reservationError) {
     if (errorCode(reservationError) !== "23505") return unknownUploadResponse(operationId);
     return await recordedUploadResponse(db, operationId, caller.business_id, slotId, caller.id, contentSha256)
+      ?? await matchingContentResponse(db, operationId, caller.business_id, slotId, caller.id, contentSha256)
       ?? unknownUploadResponse(operationId);
   }
 
@@ -334,9 +397,10 @@ export async function POST(req: NextRequest) {
       return unknownUploadResponse(operationId);
     }
     try {
-      await db.from("guide_photo_uploads").update({ state: "rejected" })
+      const marked = await db.from("guide_photo_uploads").update({ state: "rejected" })
         .eq("operation_id", operationId).eq("business_id", caller.business_id);
-    } catch { /* A confirmed provider rejection has no object to reconcile. */ }
+      if (marked.error) return unknownUploadResponse(operationId);
+    } catch { return unknownUploadResponse(operationId); }
     return NextResponse.json({ error: "Google Drive rejected the upload", retryable: true, new_operation_safe: true }, { status: 502 });
   }
   if (!driveFileId) {
@@ -441,9 +505,10 @@ export async function POST(req: NextRequest) {
       }, { status: 503 });
     }
     try {
-      await db.from("guide_photo_uploads").update({ state: "rejected" })
+      const marked = await db.from("guide_photo_uploads").update({ state: "rejected" })
         .eq("operation_id", operationId).eq("business_id", caller.business_id);
-    } catch { /* The confirmed Drive deletion makes a new operation safe. */ }
+      if (marked.error) return unknownUploadResponse(operationId);
+    } catch { return unknownUploadResponse(operationId); }
     return NextResponse.json({ error: "Photo record could not be saved", retryable: true, new_operation_safe: true }, { status: 500 });
   }
 
