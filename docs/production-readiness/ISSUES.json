@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T07:52:00Z",
+  "updated_at_utc": "2026-09-23T09:06:51Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -8,7 +8,7 @@
     {
       "id": "C01",
       "title": "Whole-product dependency and runtime security",
-      "status": "FAILED_GATE",
+      "status": "IN_PROGRESS",
       "owner": "gpt-6-sol/max companion writer",
       "legacy_refs": [
         "SEC-DEV-DEPENDENCIES-01"
@@ -21,14 +21,18 @@
           "version": "current main 1cd8038 and historically deployed 2ff1d82",
           "failure": "Fresh npm audit reports 17 findings: one critical and eight high; direct Next 16.1.6, Sharp 0.34.5, PostCSS 8.5.8 and DOMPurify 3.3.3 are affected by advisories requiring applicability triage.",
           "impact": "Untriaged production dependency exposure blocks the security acceptance criterion.",
-          "verification": "Primary-advisory reachability dispositions, deterministic install, full and runtime audits, supported builds and relevant browser regressions."
+          "verification": "Primary-advisory reachability dispositions, deterministic install, full and runtime audits, supported builds and relevant browser regressions.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
         },
         {
           "id": "C01-MOBILE-RECONCILIATION",
           "severity": "gate",
           "path": "capekayak-booking/app",
           "failure": "Current companion main does not contain the seven-file mobile commit 2ff1d82 that was present in the previous deployment.",
-          "verification": "Account for each legitimate behavior while integrating current main, then run phone/tablet/desktop booking, cancellation, combo and chat journeys. The 34cc24c candidate restores mobile layout but independent review found additional behavior gaps."
+          "verification": "Account for each legitimate behavior while integrating current main, then run phone/tablet/desktop booking, cancellation, combo and chat journeys. The 34cc24c candidate restores mobile layout but independent review found additional behavior gaps.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
         },
         {
           "id": "C01-ONBOARDING-AUDIT-20260923",
@@ -37,7 +41,9 @@
           "version": "current main 4ab0d699; deployed CLI artifact dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T has no Git fingerprint",
           "failure": "Fresh npm audit reports 14 findings: one critical and nine high; direct Next 16.1.6 and PostCSS 8.5.8 require advisory applicability triage.",
           "impact": "The separately enabled onboarding app cannot be omitted from release security and build acceptance.",
-          "verification": "Confirm deployed source, inspect primary advisories and reachability, patch exact lock, run deterministic install, production build and onboarding regressions."
+          "verification": "Confirm deployed source, inspect primary advisories and reachability, patch exact lock, run deterministic install, production build and onboarding regressions.",
+          "status": "LOCAL_VERIFIED",
+          "result": "2de7de49e86313e48f705f6845454c99d1556852"
         },
         {
           "id": "C01-IMAGE-PROXY-20260923",
@@ -46,7 +52,9 @@
           "version": "34cc24c candidate versus historically deployed 2ff1d82",
           "failure": "Independent no-network repro shows the candidate follows an allowed-origin 302 to http://127.0.0.1:8080/private.png and returns a public immutable image response; it also accepts an evil-supabase.co suffix. The historical deployed route blocks both.",
           "impact": "A public image proxy can reach private destinations and cache their responses.",
-          "verification": "Restore exact host/protocol, manual redirect, content-type and nosniff checks; prove forbidden redirects/suffixes fail and permitted images still work."
+          "verification": "Restore exact host/protocol, manual redirect, content-type and nosniff checks; prove forbidden redirects/suffixes fail and permitted images still work.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
         },
         {
           "id": "C01-CANCELLED-CHECKOUT-20260923",
@@ -55,7 +63,9 @@
           "version": "34cc24c candidate versus historically deployed 2ff1d82",
           "failure": "The candidate's cancelled page only links Try Again to / and lacks the historical tenant-scoped unexpired HTTPS Yoco checkout resume and /my-bookings fallback.",
           "impact": "A returning customer can lose the approved payment-recovery path.",
-          "verification": "Restore saved-session persistence and safe recovery, then test eligible, expired, foreign-tenant and absent sessions."
+          "verification": "Restore saved-session persistence and safe recovery, then test eligible, expired, foreign-tenant and absent sessions.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
         },
         {
           "id": "C01-COMBO-CHAT-20260923",
@@ -64,7 +74,9 @@
           "version": "34cc24c candidate versus historically deployed 2ff1d82",
           "failure": "Source comparison shows the candidate retains only two-leg combo fields where deployed code supports combo_offer_items and date/per-leg selection; candidate chat omits tenant-scoped chat_session and live-agent polling, and its CSP omits deployed Paysafe SDK allowances. The local backend requires the missing chat capability and all combo legs.",
           "impact": "Enabled combo, handoff and payment journeys would regress when replacing the deployed artifact.",
-          "verification": "Reconcile actual deployed capability and test authorized multi-leg combo, tenant-scoped live-agent reply, and enabled payment SDK behavior in a bounded candidate environment."
+          "verification": "Reconcile actual deployed capability and test authorized multi-leg combo, tenant-scoped live-agent reply, and enabled payment SDK behavior in a bounded candidate environment.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
         },
         {
           "id": "C01-BOOKING-CAPABILITY-20260923",
@@ -73,14 +85,32 @@
           "version": "34cc24c candidate versus historically deployed 2ff1d82 and current backend contract",
           "failure": "Candidate uses an unscoped anonymous insert/read and calls create-checkout without the booking_token required by the current backend; it also omits historically deployed server-priced add-ons, returned amount/expiry and safe retry handling.",
           "impact": "Public booking or checkout can fail authorization, and preserving amount/retry truth is unverified.",
-          "verification": "Restore the deployed capability-based flow and test anonymous booking, authorized checkout, add-ons, expiry, lost response and retry against disposable backend fixtures."
+          "verification": "Restore the deployed capability-based flow and test anonymous booking, authorized checkout, add-ons, expiry, lost response and retry against disposable backend fixtures.",
+          "status": "LOCAL_VERIFIED",
+          "result": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
+        },
+        {
+          "id": "C01-RUNTIME-CI-20260923",
+          "severity": "high",
+          "owner": "gpt-6-sol/max",
+          "version": "Local Node22.22.1; multiple Admin CI jobs still Node20; package engines allow >=20",
+          "path": "package.json and lock roots across Admin/booking/onboarding; .github/workflows; runtime selection",
+          "failure": "Node20 support ended 2026-04-30. Local22.22.1 predates official22.23.0 TLS identity and22.23.2 security fixes. Local tested runtime, configured CI and deployment runtime are not yet aligned.",
+          "impact": "Unsupported or unpatched runtime can invalidate security/build qualification.",
+          "violated_criterion": "C01 supported compatible runtime and V06 exact tested/deployed configuration",
+          "primary_sources": [
+            "https://github.com/nodejs/Release/blob/main/schedule.json",
+            "https://github.com/nodejs/node/blob/main/doc/changelogs/CHANGELOG_V22.md"
+          ],
+          "verification": "Use an official checksum-verified supported patch locally; align CI/engines and exact companion/onboarding pins, rerun affected runtime-sensitive checks and actual builds, then verify deployed runtime within approved deployment.",
+          "status": "IN_PROGRESS"
         }
       ],
       "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
-      "local_candidate": "34cc24c966436763e0acd6beb5db37cc860ef725",
+      "local_candidate": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
       "local_candidate_lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
-      "local_evidence": "npm ci, full and production-only audits with zero findings, TypeScript, Webpack production build and mocked WebP/AVIF image checks passed; existing lint reports 85 findings. Independent no-network proxy repro and source/backend contract comparison led fresh-context review dispatched as Astra xhigh to reject deployment for the recorded preservation/security regressions. Exact default Turbopack build remains unverified.",
-      "next": "Complete deployed-behavior reconciliation and bounded correction under Astra xhigh; re-review and verify before updating the Admin CI pin."
+      "local_evidence": "Storefront f11b1dd independently accepted: 9 executable contracts, type/ways checks, configured Webpack build, lint 0 errors/20 warnings, full/prod audits 0. Onboarding 2de7de49 independently accepted: 3 route contracts, type-enforced configured build, lint 0 errors/8 warnings, full/prod audits 0; reviewer additionally executed 88 form callbacks, provisioning cleanup/retry and actual submit behavior. Runtime/CI alignment remains open.",
+      "next": "Finish Node22.23.2 runtime/CI alignment and coordinated source pins through Sol, review configuration diff and repeat affected evidence under that runtime. Source-only acceptance does not close whole C01."
     },
     {
       "id": "C02",
@@ -152,7 +182,7 @@
     {
       "id": "C05",
       "title": "Verified database TLS and effective permissions",
-      "status": "OPEN",
+      "status": "SOURCE_IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "legacy_refs": [
         "SECURITY-01"
@@ -167,7 +197,8 @@
           "verification": "Trusted and untrusted certificate tests plus disposable low-privilege effective-grant/function/view/storage tests."
         }
       ],
-      "next": "Fix certificate/hostname validation and extend effective privilege coverage without rubber-stamping a new baseline."
+      "next": "Fix certificate/hostname validation and extend effective privilege coverage without rubber-stamping a new baseline.",
+      "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c"
     },
     {
       "id": "C06",
@@ -204,7 +235,23 @@
         "NOTIFY-01"
       ],
       "evidence": "Dated synthetic 100-account continuity and focused regressions exist. Current inventory spans 49 Admin API files, 55 Edge Functions, five companion API files, and direct RPC/Storage paths; enabled capability and role-denial evidence is not yet complete.",
-      "next": "Map enabled paths, actual roles and positive/denied journeys to current candidate behavior; repeat same-record continuity on an isolated restore."
+      "next": "Map enabled paths, actual roles and positive/denied journeys to current candidate behavior; repeat same-record continuity on an isolated restore.",
+      "children": [
+        {
+          "id": "V01-COMBO-NULL-GAP",
+          "severity": "high",
+          "owner": "gpt-6-sol/max",
+          "version": "Reproduced on2ff42479; corrected source428615726b3038a2fe7f8d1a5cfb08ab4cd48e00; integrated18f601e3",
+          "path": "supabase/functions/_shared/combo.ts; combo-rules.test.ts",
+          "failure": "Number(null) turned an optional absent maximum date gap into zero, rejecting otherwise valid different-day combos.",
+          "impact": "Existing null-valued combo offers could fail checkout or rescheduling.",
+          "violated_criterion": "Preserve enabled combo/date-rule behavior",
+          "verification": "Actual Deno regression failed before; 9 validator and11 parser tests independently pass after. Integrated tree exactly matches reviewed tree; explicit zero/positive bounds and other rules preserved.",
+          "status": "LOCAL_VERIFIED",
+          "result": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
+          "review": "ACCEPTED; local synthetic function/parser evidence only"
+        }
+      ]
     },
     {
       "id": "V02",
@@ -237,7 +284,8 @@
           "failure": "Runner validates a historical approval reference and status but does not enforce current time against the recorded execution window; preflight checks timestamp parsing/order only. The recorded window expired 2026-09-22T16:00:00Z.",
           "impact": "A stale approval record can authorize a later hosted run in source logic.",
           "violated_criterion": "V03 safe executable harness and explicit current action window",
-          "verification": "Offline negative tests for missing, not-yet-open, expired and insufficient-duration windows; an authorized in-window fixture passes without hosted calls."
+          "verification": "Offline negative tests for missing, not-yet-open, expired and insufficient-duration windows; an authorized in-window fixture passes without hosted calls.",
+          "status": "SOURCE_IN_PROGRESS"
         }
       ]
     },
@@ -273,7 +321,7 @@
         "CI-01",
         "DEPLOY-01"
       ],
-      "evidence": "Admin source 52afaff differs from deployed ebb62b8; CI pins old companion 2ff1d82; current storefront candidate, exact provider checks, 24-hour production canary and final handoff are open.",
+      "evidence": "Admin local code18f601e3 differs from deployedebb62b8; accepted local storefrontf11b1dd and onboarding2de7de49 await runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
       "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary.",
       "children": [
         {

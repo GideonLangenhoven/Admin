@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T07:52:00Z",
+  "recorded_at_utc": "2026-09-23T09:06:51Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,18 +38,27 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "739a3fe6f1706e8fb12ee86e654a5617a1cafdfb"
+    "integrated_commit": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
+    "integrated_tree": "bc17885c9f65f8ed99323f1d71061100996c8edf",
+    "additional_reviewed_correction": {
+      "id": "V01-COMBO-NULL-GAP",
+      "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
+      "integrated_commit": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
+      "review": "ACCEPTED",
+      "verification": "9 actual Deno validator and11 parser tests pass; exact integrated tree reused"
+    }
   },
   "booking": {
     "repository": "GideonLangenhoven/capekayak-booking",
     "current_main_commit": "1cd80384884c5176f60607798b51fd54cf970fb2",
     "current_main_tree": "eedc22e42cb50296e58ae00facc972cd2653eb78",
     "isolated_c01_patch": {
-      "commit": "34cc24c966436763e0acd6beb5db37cc860ef725",
-      "tree": "882d6eb1f806795ac027a9c4d6f2f6a4c96d4543",
+      "commit": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
+      "tree": "fe79f79b5361027c73eaa65e59bdaa61e1239941",
       "lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
-      "review": "REJECTED_PRESERVATION_AND_IMAGE_PROXY_SECURITY",
-      "integration": "PENDING"
+      "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
+      "integration": "LOCAL_CANDIDATE_RETAINED_CI_PIN_PENDING",
+      "historical_merge": "cb74f5f10605dc2ce4eac5158395e88ee6c62fd3"
     },
     "historically_reviewed_mobile_commit": "2ff1d82046c73202c3146d11299cff9bc379ac54",
     "deployed": {
@@ -63,23 +72,36 @@
     "current_main_commit": "4ab0d6993dc8c1f1d2fc1b82fc58e117a5f26616",
     "current_main_tree": "7a44195fd310abc126419f89e0d181bcee76a185",
     "current_main_lock_sha256": "430d95e5f46d4d2b2d8eadc94b9e3870f68caa135d00d792ab334f357cff22cf",
-    "audit_status": "14 findings; applicability and correction pending",
+    "audit_status": "Corrected candidate full and production audits zero; baseline14 retained as historical evidence",
     "deployed": {
       "alias": "onboarding.bookingtours.co.za",
       "deployment_id": "dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T",
       "git_commit": "UNVERIFIED_CLI_DEPLOYMENT"
+    },
+    "isolated_c01_patch": {
+      "commit": "2de7de49e86313e48f705f6845454c99d1556852",
+      "tree": "6963da4493cffefa234aa1eb10c59b70d7e6bcbc",
+      "lock_sha256": "0ec0dc6b33e09f2b4f0210c1892c2c3596398f4a04c782eef5641fcb678b0ab3",
+      "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
+      "integration": "LOCAL_CANDIDATE_RETAINED_CI_PIN_PENDING"
     }
   },
   "cross_app_ci": {
     "admin_companion_pin": "2ff1d82",
-    "accepted_new_pin": "PENDING_C01_ACCEPTANCE"
+    "accepted_new_pin": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
+    "onboarding_accepted_pin": "2de7de49e86313e48f705f6845454c99d1556852",
+    "pin_update": "PENDING"
   },
   "local_evidence": {
     "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
     "booking_audit": "/private/tmp/bookingtours-booking-audit-20260923.json",
     "onboarding_audit": "/private/tmp/bookingtours-onboarding-audit-20260923.json",
     "c02": "202 focused tests pass; independent corrected-head review accepted; no deployed real-Auth/email/browser proof; integrated application tree matches review; 46 affected tests pass on release branch",
-    "c01": "npm ci, zero full/production-only audit findings, TypeScript and Webpack build pass; existing lint 85 findings; independent review rejected candidate"
+    "c01": "Both source candidates independently accepted within reviewed scope; runtime/CI alignment prevents whole C01 closure. Storefront9 contracts, type/ways/build/lint pass; onboarding3 contracts, type-enforced build/lint pass plus independent actual form/provisioning/retry checks.",
+    "onboarding_typed_build": {
+      "path": "/private/tmp/bookingtours-onboarding-c01-evidence-20260923/build-typed-final.txt",
+      "sha256": "9751eb211e782fafcef7524f33cf0ae188cbce9da081fb10d93fc56be940b4ca"
+    }
   },
   "qualification": {
     "supabase_project": "ukdsrndqhsatjkmxijuj",
@@ -106,5 +128,18 @@
   "historical_reference": {
     "prior_manifest_in_commit": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
     "note": "Prior candidate/deployment claims remain in Git history; they are not the current release claim."
+  },
+  "runtime": {
+    "observed_local": "22.22.1",
+    "target_supported_patch": "22.23.2",
+    "status": "IN_PROGRESS",
+    "ci_findings": "Multiple jobs still select EOL20; one selects22",
+    "deployed_exact_runtime": "NOT_YET_VERIFIED",
+    "isolated_available": {
+      "version": "22.23.2",
+      "binary": "/private/tmp/bookingtours-node-v22.23.2-20260923/bin/node",
+      "binary_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572",
+      "archive_verification": "Official nodejs.org SHASUMS256 matched; no global runtime changed"
+    }
   }
 }
