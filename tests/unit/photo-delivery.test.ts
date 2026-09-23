@@ -115,15 +115,17 @@ describe("guide photo callers", () => {
     const setUploadStatus = vi.fn();
     const upload = sourceFunction(file, "onPickPhotos", {
       getAuthHeaders, uploading: false, slotId: slot.id, FormData,
+      uploadOperations: { current: new Map<string, string>() },
       setUploading: vi.fn(), setUploadStatus, setProgress: vi.fn(), reload: vi.fn(),
       fetch: async (_url: string, init: RequestInit) => {
         expect(init.headers).toEqual({ Authorization: "Bearer signed-in-guide" });
         expect((init.body as FormData).get("slot_id")).toBe(slot.id);
+        expect((init.body as FormData).get("operation_id")).toMatch(/^[0-9a-f-]{36}$/);
         return Response.json({ error: "Drive disconnected" }, { status: 400 });
       },
     });
     await upload([new File(["photo"], "trip.jpg")]);
-    expect(setUploadStatus).toHaveBeenLastCalledWith("0 of 1 photos uploaded. Please retry: trip.jpg");
+    expect(setUploadStatus).toHaveBeenLastCalledWith("0 of 1 photos uploaded. Please retry: trip.jpg.");
   });
 
   it("authenticates email sending and shows partial failures", async () => {
