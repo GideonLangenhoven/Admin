@@ -52,7 +52,7 @@ describe("mobile-first implementation contract", () => {
   });
 
   it("uses one customer booking bar without hiding My Bookings navigation", () => {
-    const booking = source("booking/app/book/page.tsx");
+    const booking = source("booking/app/book/BookingFlow.tsx");
     const combo = source("booking/app/combo/[id]/page.tsx");
     const nav = source("booking/app/components/BottomNav.tsx");
     expect(nav).toContain('pathname === "/book"');
@@ -80,7 +80,7 @@ describe("mobile-first implementation contract", () => {
   });
 
   it("fits seven minimum-size calendar targets and applies the all-operator hero rule", () => {
-    const booking = source("booking/app/book/page.tsx");
+    const booking = source("booking/app/book/BookingFlow.tsx");
     const home = source("booking/app/page.tsx");
     expect(booking).toContain("-mx-4 py-4");
     expect(booking).toContain("aspect-square min-h-11 min-w-11");

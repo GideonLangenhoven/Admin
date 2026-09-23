@@ -196,7 +196,7 @@ describe("R01 confirmation issuance must not bypass booking ownership", () => {
     expect(wa).toContain('"/functions/v1/create-checkout"');
     expect(wa).not.toMatch(/successUrl: withQuery\([^\n]+\{ ref:/);
     expect(wa).not.toContain('console.log("YOCO:" + JSON.stringify(yocoData))');
-    expect(readFileSync("booking/app/book/page.tsx", "utf8")).toContain("booking_token: booking.waiver_token");
+    expect(readFileSync("booking/app/lib/booking-checkout.ts", "utf8")).toContain("booking_token: input.bookingToken");
   });
 });
 
