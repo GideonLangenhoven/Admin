@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T11:50:32Z",
+  "updated_at_utc": "2026-09-23T12:01:57Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -122,20 +122,39 @@
           "impact": "Exact tested remote dependency/runtime resolutions are not reproducibly bound to the candidate.",
           "violated_criterion": "C01 reproducible remote dependency resolutions and V06 exact build/runtime manifest",
           "verification": "Record supported exact Edge toolchain and resolved dependencies through its supported locking interface; verify clean deterministic check/build and relevant regressions without blanket upgrades.",
-          "status": "SOURCE_FIXED",
+          "status": "LOCAL_VERIFIED",
           "source_commit": "bfebb152d6abc57c4f02ebbd6d41eb22bb7b5000",
-          "review": "FRESH_CONTEXT_REVIEW_IN_PROGRESS",
+          "review": "ACCEPTED_SCOPED_LOCAL_EDGE_RESOLUTION",
           "evidence": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/summary.md",
           "evidence_sha256": "fb3d49d069afda49b101aeffe4094fa872030ae285765024a53b81a9be7c3e24",
           "local_result": "55 frozen clean-cache Deno checks and bundles pass; hash tamper and floating-import negatives pass; isolated npm graph audit zero",
-          "remaining": "Actual CLI ESZip/deployed graph unverified: API upload omits lock and native bundler could not start with missing libgcc. No Docker startup or provisioning performed."
+          "remaining": "Actual CLI ESZip/deployed graph unverified: API upload omits lock and native bundler could not start with missing libgcc. No Docker startup or provisioning performed.",
+          "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
+          "review_artifact": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/independent-review.md"
         }
       ],
       "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
       "local_candidate": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
       "local_candidate_lock_sha256": "1ec6511d4909cad4efe126cfbf9610be0a504cb76403115594bc299ac862efc3",
       "local_evidence": "Storefront f11b1dd independently accepted: 9 executable contracts, type/ways checks, configured Webpack build, lint 0 errors/20 warnings, full/prod audits 0. Onboarding 2de7de49 independently accepted: 3 route contracts, type-enforced configured build, lint 0 errors/8 warnings, full/prod audits 0; reviewer additionally executed 88 form callbacks, provisioning cleanup/retry and actual submit behavior. Runtime/CI followup independently accepted and integrated at35ab96c. All three configured builds passed on Node22.23.2, full Admin1370pass/1existing conditional skip; independent affected79/79. Exact companions86588bcb/b93f053b are pinned in AdminCI. Edge graph remains open.",
-      "next": "Review and integrate bounded local Edge resolution patch; deployed transitive graph remains an explicit open gate. Preserve accepted app/runtime evidence."
+      "next": "Preserve accepted local Edge graph and combined-source checks; resolve actual CLI/deployed transitive graph before whole C01 closure.",
+      "accepted_edge_resolution": {
+        "source_commit": "bfebb152d6abc57c4f02ebbd6d41eb22bb7b5000",
+        "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
+        "review": "ACCEPTED_SCOPED_LOCAL_EDGE_RESOLUTION",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "review_artifact": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/independent-review.md",
+        "review_sha256": "7a6cbd65c5494278b9d0cc61f14fe021c3a5c6b269bfdf0fc869d35024735044",
+        "evidence": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/summary.md",
+        "evidence_sha256": "fb3d49d069afda49b101aeffe4094fa872030ae285765024a53b81a9be7c3e24",
+        "deno_version": "2.9.4",
+        "lock_sha256": "733f4b605e8939076ae238f7a044b693c85ad43453aec3d68fd99acb461b58c3",
+        "tests": "55 frozen clean-cache checks and55 bundles; two real Deno negative tests; seven independent checker probes pass; isolated npm audit zero",
+        "integrated_check": "All55 frozen Deno checks and bundles pass on combined C04/C05 source, exit0; lock unchanged",
+        "integrated_log": "/private/tmp/bookingtours-integrated-evidence-20260923/edge-after-c05.log",
+        "integrated_log_sha256": "b0896f819c90f77335a9b6b08d131748c1964ea2db16ab25c3a804deaa6b6857",
+        "limit": "No actual CLI ESZip or deployed dependency graph verified; API upload omits lock and native Darwin runtime lacks libgcc. Local bundling is not deployed-runtime proof."
+      }
     },
     {
       "id": "C02",
@@ -266,7 +285,7 @@
         "Alternate direct browser image/video and separate Storage paths need bounded behavioral coverage; do not presume all are defective.",
         "Native HEIC unsupported by corrected guide decoder; reconcile actual prior supported phone contract and safe compatibility before wholeC04 closure.",
         "Uncertain provider/database records need an operational manual reconciliation procedure; no automatic reconciler or universal deduplication claim.",
-        "Deno validation of latest Edge source awaits pinned dependency graph; deployed checks remain unrun."
+        "Integrated pinned-graph Deno check/bundle passes all55 functions; deployed checks remain unrun."
       ],
       "alternate_inventory": {
         "path": "/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md",

@@ -1,7 +1,7 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
-  "recorded_at_utc": "2026-09-21T12:54:38Z",
-  "status": "DISCOVERED_REGIONS_QUOTAS_OPEN",
+  "recorded_at_utc": "2026-09-23T12:01:57Z",
+  "status": "PARTIAL_PROJECT_LIMITS_OBSERVED_BUDGET_HEADROOM_OPEN",
   "regions": {
     "generator": "operator workstation, Africa/Johannesburg",
     "admin_functions": "iad1",
@@ -16,11 +16,34 @@
   "quotas": {
     "supabase_database_and_pool": null,
     "supabase_auth": null,
-    "supabase_realtime": null,
+    "supabase_realtime": {
+      "max_concurrent_users": 10000,
+      "max_events_per_second": 2500,
+      "max_bytes_per_second": 1000000,
+      "max_channels_per_client": 100,
+      "max_joins_per_second": 2500,
+      "max_presence_events_per_second": 1000,
+      "max_payload_size_in_kb": 3000,
+      "suspend": false,
+      "presence_enabled": false
+    },
     "supabase_edge": null,
     "vercel_functions": null,
     "message_workers": null
   },
   "approval": false,
-  "blocking_reason": "Plan limits and observed resource denominators are not available in the current read-only inventory. Headroom cannot be calculated from guesses."
+  "blocking_reason": "Realtime configured ceilings are observed. Compute/database/pool, Edge/Vercel/worker limits, actual usage, current billing allowance and spending controls remain unverified. ZAR0 and at least30% observed sustained headroom are unchanged; no qualifying execution authorized.",
+  "read_only_snapshot": {
+    "project": "ukdsrndqhsatjkmxijuj",
+    "observed_at_utc": "2026-09-23T12:00:36.083Z",
+    "evidence": "/private/tmp/bookingtours-quota-readonly-evidence-20260923.json",
+    "sha256": "068a39c9933c2ebd77e7b45d6a980990ea4ce9d9bd3ae85978f6f6ee63fc98fc",
+    "method": "Three GET requests; no changes, load or customer rows",
+    "remaining": "Addons returned no selected items; pooler returned PRIMARY/transaction but no numeric pool limits. Do not infer compute, paid plan, included remaining allowance or available headroom.",
+    "primary_references": [
+      "https://supabase.com/docs/reference/api/v1-list-project-addons",
+      "https://supabase.com/docs/reference/api/v1-get-realtime-config",
+      "https://supabase.com/docs/reference/api/v1-get-pooler-config"
+    ]
+  }
 }

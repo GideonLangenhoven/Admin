@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T11:50:32Z",
+  "recorded_at_utc": "2026-09-23T12:01:57Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
-    "integrated_tree": "33b50d4bd5b3d0320a6594ca6acef0ddb6b2c1af",
+    "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
+    "integrated_tree": "726fad8fdcfd284aec371317637ec3e790e0368d",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -91,6 +91,23 @@
       "tests": "112 focused unit, 218 disposable PostgreSQL rollout and 47 independent PostgreSQL checks pass",
       "integration": "git diff reviewed source vs integrated HEAD excluding readiness documents is empty; scoped evidence reused",
       "limits": "Source-only forward migration; broader Storage, function search paths, baseline and deployed low-role proof remain open"
+    },
+    "reviewed_edge_resolution": {
+      "source_commit": "bfebb152d6abc57c4f02ebbd6d41eb22bb7b5000",
+      "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
+      "review": "ACCEPTED_SCOPED_LOCAL_EDGE_RESOLUTION",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/independent-review.md",
+      "review_sha256": "7a6cbd65c5494278b9d0cc61f14fe021c3a5c6b269bfdf0fc869d35024735044",
+      "evidence": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/summary.md",
+      "evidence_sha256": "fb3d49d069afda49b101aeffe4094fa872030ae285765024a53b81a9be7c3e24",
+      "deno_version": "2.9.4",
+      "lock_sha256": "733f4b605e8939076ae238f7a044b693c85ad43453aec3d68fd99acb461b58c3",
+      "tests": "55 frozen clean-cache checks and55 bundles; two real Deno negative tests; seven independent checker probes pass; isolated npm audit zero",
+      "integrated_check": "All55 frozen Deno checks and bundles pass on combined C04/C05 source, exit0; lock unchanged",
+      "integrated_log": "/private/tmp/bookingtours-integrated-evidence-20260923/edge-after-c05.log",
+      "integrated_log_sha256": "b0896f819c90f77335a9b6b08d131748c1964ea2db16ab25c3a804deaa6b6857",
+      "limit": "No actual CLI ESZip or deployed dependency graph verified; API upload omits lock and native Darwin runtime lacks libgcc. Local bundling is not deployed-runtime proof."
     }
   },
   "booking": {
@@ -228,6 +245,23 @@
       "path": "/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md",
       "sha256": "e950f0a1780721e42dce9daba5518664a13351b14d481d64adb3d3a242f9faaa",
       "scope": "Source inventory only; alternate browser Drive and Storage paths require actual behavioral applicability checks. Guide picker advertises JPEG/PNG/WebP/AVIF/still GIF; native HEIC is unverified phone UX, not automatically a proven regression."
+    },
+    "edge_integrated": {
+      "source_commit": "bfebb152d6abc57c4f02ebbd6d41eb22bb7b5000",
+      "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
+      "review": "ACCEPTED_SCOPED_LOCAL_EDGE_RESOLUTION",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/independent-review.md",
+      "review_sha256": "7a6cbd65c5494278b9d0cc61f14fe021c3a5c6b269bfdf0fc869d35024735044",
+      "evidence": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/summary.md",
+      "evidence_sha256": "fb3d49d069afda49b101aeffe4094fa872030ae285765024a53b81a9be7c3e24",
+      "deno_version": "2.9.4",
+      "lock_sha256": "733f4b605e8939076ae238f7a044b693c85ad43453aec3d68fd99acb461b58c3",
+      "tests": "55 frozen clean-cache checks and55 bundles; two real Deno negative tests; seven independent checker probes pass; isolated npm audit zero",
+      "integrated_check": "All55 frozen Deno checks and bundles pass on combined C04/C05 source, exit0; lock unchanged",
+      "integrated_log": "/private/tmp/bookingtours-integrated-evidence-20260923/edge-after-c05.log",
+      "integrated_log_sha256": "b0896f819c90f77335a9b6b08d131748c1964ea2db16ab25c3a804deaa6b6857",
+      "limit": "No actual CLI ESZip or deployed dependency graph verified; API upload omits lock and native Darwin runtime lacks libgcc. Local bundling is not deployed-runtime proof."
     }
   },
   "qualification": {
