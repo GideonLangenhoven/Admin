@@ -26,7 +26,10 @@ function loadSource(
     require: (name: string) => {
       if (Object.hasOwn(mocks, name)) return mocks[name];
       if (name === "crypto") return require("node:crypto");
-      if (name === "next/server") return { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) } };
+      if (name === "next/server") return {
+        NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) },
+        after: (task: () => void | Promise<void>) => { void task(); },
+      };
       if (name.startsWith("jsr:") && name.endsWith(".d.ts")) return {};
       // Execute the real telemetry wrapper with delivery disabled unless the
       // test explicitly supplies a DSN and a network stub.

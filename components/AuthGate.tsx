@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
-import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import {
   activateGuideQueueAuthContext,
   clearGuideQueueAuthContext,
@@ -379,21 +378,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       });
       const data: any = await res.json().catch(() => ({}));
 
-      const linkedAuthRequired = !res.ok && data?.code === "AUTH_REQUIRED";
-      if (!res.ok && !linkedAuthRequired) {
-        // Special: account exists but needs password setup
-        if (data?.code === "MUST_SET_PASSWORD" && data?.admin_id) {
-          try {
-            await sendAdminSetupLink(
-              { id: data.admin_id, email: normalizedEmail, name: data.name },
-              "FIRST_LOGIN",
-              data.business_id || "",
-            );
-            setNotice("This admin account still needs a password. A secure setup link has been emailed.");
-          } catch (setupError) {
-            console.error("Failed to send admin setup link:", setupError);
-            setError("This account still needs a password, but the setup email could not be sent.");
-          }
+      const needsBrowserAuth = !res.ok && res.status === 401;
+      if (!res.ok && !needsBrowserAuth) {
+        // A setup state is returned only after a legacy password was verified.
+        if (data?.code === "MUST_SET_PASSWORD") {
+          const sent = await sendResetEmail(normalizedEmail);
+          if (sent) setNotice("This admin account still needs a password. A secure setup link has been requested.");
+          else setError("This account still needs a password. Use Set up or reset password to request a new link.");
           setLoading(false);
           return;
         }
@@ -414,7 +405,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       let adminInfo = data?.admin;
-      if (!linkedAuthRequired && (data?.auth_ready !== true || !adminInfo)) {
+      if (!needsBrowserAuth && (data?.auth_ready !== true || !adminInfo)) {
         setError("Login response was malformed");
         setLoading(false);
         return;
@@ -441,14 +432,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               || /rate limit|too many requests/i.test(signInRes.error?.message || "");
             throw new Error(rateLimited
               ? "Too many sign-in attempts from this network. Please wait a moment and try again."
-              : "Failed to start session: " + (signInRes.error?.message || "missing session"));
+              : "Invalid credentials");
           }
           establishedSession = signInRes.data.session;
 
           // Linked accounts are authorized by their verified Auth identity.
           // The unauthenticated request above intentionally never consults the
           // old password hash; resolve the staff row only after browser Auth.
-          if (linkedAuthRequired) {
+          if (needsBrowserAuth) {
             const verifiedResponse = await fetch("/api/admin/login", {
               method: "POST",
               headers: {
@@ -459,6 +450,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             });
             const verified = await verifiedResponse.json().catch(() => ({}));
             if (!verifiedResponse.ok || verified?.auth_ready !== true || !verified?.admin) {
+              if (verified?.code === "MUST_SET_PASSWORD") {
+                const sent = await sendResetEmail(normalizedEmail);
+                throw new Error(sent
+                  ? "Password setup required. A secure setup link has been requested."
+                  : "Password setup required. Use Set up or reset password to request a new link.");
+              }
               throw new Error(verified?.error || "This sign-in is not linked to an administrator account.");
             }
             adminInfo = verified.admin;
@@ -550,20 +547,18 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function sendResetEmail(targetEmail: string) {
-    const { data: admin } = await supabase
-      .from("admin_users")
-      .select("id, email, name")
-      .eq("email", targetEmail)
-      .maybeSingle();
-
-    if (!admin) return;
-
+  async function sendResetEmail(targetEmail: string): Promise<boolean> {
+    if (!targetEmail) return false;
     try {
-      await sendAdminSetupLink(admin, "RESET", "");
-    } catch { }
-
-    setResetSent(true);
+      const response = await fetch("/api/admin/setup-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send", email: targetEmail, reason: "RESET" }),
+      });
+      if (!response.ok) return false;
+      setResetSent(true);
+      return true;
+    } catch { return false; }
   }
 
   async function switchOperator(nextBusinessId: string) {
@@ -679,8 +674,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 <p className="text-xs leading-relaxed" style={{ color: "var(--ck-danger)" }}>
                   Too many failed attempts. Your account has been locked for 30 minutes.
                   {resetSent
-                    ? " A password setup email has been sent."
-                    : " If this is your account, a password setup email will be sent."}
+                    ? " If an admin account exists, a reset link will be emailed."
+                    : " Use the link below to request a reset email."}
                 </p>
               </div>
               <a href="/change-password" className="text-xs text-[var(--ck-text-muted)] hover:underline">

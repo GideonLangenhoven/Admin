@@ -98,8 +98,34 @@ describe("Supabase Auth is authoritative after legacy migration", () => {
     const f = loginFixture({ ...ADMIN, password_hash: hash("legacy-copy") });
     const response = await f.invoke({ email: ADMIN.email, password: "legacy-copy" });
     expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({ code: "AUTH_REQUIRED" });
+    expect(await response.json()).toEqual({ error: "Invalid credentials" });
     expect(f.authWrites).toEqual([]);
+  });
+
+  it("does not disclose account state before a password or Auth identity is verified", async () => {
+    for (const user of [
+      { ...ADMIN, email: "someone-else@example.invalid" },
+      { ...ADMIN, suspended: true, must_set_password: true },
+      { ...ADMIN, user_id: null, password_hash: hash("real-password"), suspended: true, must_set_password: true },
+    ]) {
+      const f = loginFixture(user);
+      const response = await f.invoke({ email: ADMIN.email, password: "wrong-password" });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "Invalid credentials" });
+      expect(f.authWrites).toEqual([]);
+    }
+  });
+
+  it("reveals setup and suspension state only after verified credentials", async () => {
+    const setup = loginFixture({ ...ADMIN, user_id: null, password_hash: hash("legacy-password"), must_set_password: true });
+    const setupResponse = await setup.invoke({ email: ADMIN.email, password: "legacy-password" });
+    expect(setupResponse.status).toBe(403);
+    expect(await setupResponse.json()).toMatchObject({ code: "MUST_SET_PASSWORD" });
+
+    const suspended = loginFixture({ ...ADMIN, suspended: true });
+    const suspendedResponse = await suspended.invoke({}, "linked-session");
+    expect(suspendedResponse.status).toBe(403);
+    expect(await suspendedResponse.json()).toEqual({ error: "Account is suspended. Contact support." });
   });
 
   it("uses a genuine legacy hash once, links Auth, and clears the duplicate hash", async () => {
@@ -111,13 +137,14 @@ describe("Supabase Auth is authoritative after legacy migration", () => {
   });
 });
 
-function setupFixture(options: { authFails?: boolean; completeFails?: boolean } = {}) {
+function setupFixture(options: { authFails?: boolean; completeFails?: boolean; claimStatus?: "INVALID" | "COMPLETED" } = {}) {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
   let claimed = false;
   const db = {
     rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
       calls.push({ name, args });
       if (name === "claim_admin_setup_token") {
+        if (options.claimStatus) return { data: { status: options.claimStatus, admin: { ...ADMIN } }, error: null };
         if (claimed) return { data: { status: "BUSY" }, error: null };
         claimed = true;
         return { data: { status: "CLAIMED", admin: { ...ADMIN } }, error: null };
@@ -153,6 +180,18 @@ function setupFixture(options: { authFails?: boolean; completeFails?: boolean } 
 }
 
 describe("password setup token claim", () => {
+  it("rejects expired claims and treats completed-token replay as idempotent", async () => {
+    const expired = setupFixture({ claimStatus: "INVALID" });
+    expect((await expired.invoke()).status).toBe(401);
+    expect(expired.setPassword).not.toHaveBeenCalled();
+
+    const replay = setupFixture({ claimStatus: "COMPLETED" });
+    const response = await replay.invoke();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, idempotent: true, id: ADMIN.id });
+    expect(replay.setPassword).not.toHaveBeenCalled();
+  });
+
   it("allows only one simultaneous completion to reach Auth", async () => {
     const f = setupFixture();
     const first = f.invoke();
