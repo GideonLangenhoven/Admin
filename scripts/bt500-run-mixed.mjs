@@ -4,6 +4,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { executionStatusAllows, mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
+import { executionWindow, stopAtWindowEnd } from "./bt500-window.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const execution = JSON.parse(await readFile(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"), "utf8"));
@@ -18,6 +19,7 @@ if (contract.status !== 0) process.exit(contract.status || 1);
 const adminBase = String(process.env.BT500_ADMIN_BASE || "").replace(/\/$/, "");
 const runId = String(process.env.BT500_RUN_ID || "");
 const blockers = [];
+blockers.push(...executionWindow(execution.window, config).issues);
 if (!executionStatusAllows(config.mode, execution.status)) blockers.push(`BT500_EXECUTION.status does not approve ${config.mode} mode`);
 if (execution.candidate_worktree_clean !== true) blockers.push("candidate worktree must be recorded clean");
 if (!/^[0-9a-f]{40}$/.test(execution.candidate_commit || "") || !/^[0-9a-f]{40}$/.test(execution.candidate_tree || "")) blockers.push("exact candidate commit and tree are required");
@@ -38,6 +40,7 @@ for (const field of ["workload_and_thresholds", "metric_definitions", "realtime_
 if (execution.outbound_controls?.live_messages_blocked !== true || execution.outbound_controls?.live_payments_blocked !== true) blockers.push("live messages and payments must be blocked");
 if (process.env.BT500_ALLOW_LOAD !== "YES") blockers.push("BT500_ALLOW_LOAD=YES is required");
 if (process.env.BT500_ALLOW_SHARED_PROJECT !== "YES") blockers.push("BT500_ALLOW_SHARED_PROJECT=YES is required");
+if (Object.keys(process.env).some(key => key.startsWith("K6_"))) blockers.push("K6_* option overrides are forbidden for the frozen runner");
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}$/.test(runId)) blockers.push("BT500_RUN_ID must be 1-48 safe characters");
 
 const plan = {
@@ -83,21 +86,40 @@ if (!databaseUrl && !process.env.SUPABASE_ACCESS_TOKEN) throw new Error("DATABAS
 
 const evidenceDir = path.resolve(process.env.BT500_EVIDENCE_DIR || `/private/tmp/bt500-mixed-${runId}`);
 await mkdir(evidenceDir, { recursive: true });
+const k6ConfigFile = path.join(evidenceDir, "k6-options.json");
+await writeFile(k6ConfigFile, "{}\n", { mode: 0o600 });
 
-async function logged(program, args, logName, env = process.env) {
+let windowExpired = false;
+let interruptedSignal = null;
+let activeLoadChild = null;
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    interruptedSignal ||= signal;
+    activeLoadChild?.kill("SIGKILL");
+  });
+}
+async function logged(program, args, logName, env = process.env, endsAtMs = null) {
+  if (endsAtMs !== null && interruptedSignal) throw new Error(`runner interrupted by ${interruptedSignal} before load`);
   const log = createWriteStream(path.join(evidenceDir, logName), { flags: "w", mode: 0o600 });
   const child = spawn(program, args, { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+  if (endsAtMs !== null) activeLoadChild = child;
+  const cancelWindowStop = endsAtMs === null ? () => {} : stopAtWindowEnd(child, endsAtMs, () => { windowExpired = true; });
   for (const stream of [child.stdout, child.stderr]) {
     stream.pipe(log, { end: false });
     stream.pipe(stream === child.stdout ? process.stdout : process.stderr);
   }
-  const code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
-  log.end();
-  return code;
+  try {
+    return await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
+  } finally {
+    cancelWindowStop();
+    if (activeLoadChild === child) activeLoadChild = null;
+    log.end();
+  }
 }
 
 const k6Args = [
   "run",
+  "--config", k6ConfigFile,
   "--summary-export", path.join(evidenceDir, "k6-summary.json"),
   "-e", `BT500_CREDENTIALS_FILE=${credentialsFile}`,
   "-e", `BT500_ADMIN_BASE=${adminBase}`,
@@ -118,12 +140,22 @@ const k6Args = [
   "tests/stress/bt500-mixed.k6.js",
 ];
 
+const launchWindow = executionWindow(execution.window, config);
+if (launchWindow.issues.length) throw new Error("BT500 mixed run blocked before load: " + launchWindow.issues.join("; "));
+
 let loadCode = 1;
 let loadError = null;
 try {
-  loadCode = await logged("k6", k6Args, "k6.log");
+  loadCode = await logged("k6", k6Args, "k6.log", process.env, launchWindow.endsAtMs);
 } catch (error) {
   loadError = String(error?.message || error);
+}
+if (windowExpired || interruptedSignal) {
+  loadCode = 1;
+  loadError = [
+    windowExpired && "execution window expired; load process terminated",
+    interruptedSignal && `runner interrupted by ${interruptedSignal}`,
+  ].filter(Boolean).join("; ");
 }
 
 let invariantCode = 1;
@@ -155,6 +187,12 @@ try {
   }
 } catch (error) {
   invariantError = String(error?.message || error);
+}
+
+if (interruptedSignal) {
+  loadCode = 1;
+  const reason = `runner interrupted by ${interruptedSignal}`;
+  if (!loadError?.includes(reason)) loadError = [loadError, reason].filter(Boolean).join("; ");
 }
 
 const result = {
