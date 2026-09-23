@@ -96,15 +96,20 @@ function batchFixture(options: {
   bookingError?: string;
   replies?: RefundReply[];
   failAuditAt?: number;
+  failRecordAt?: number;
 } = {}) {
   const authority = options.authority || { userId: "actor-a", businessId: "tenant-a", role: "OPERATOR", isServiceRole: false };
   const bookings = options.bookings || [{ id: "booking-a", business_id: "tenant-a" }];
   const replies = [...(options.replies || [])];
   const requests: Array<{ url: string; headers: Headers; body: any }> = [];
   const logWrites: any[] = [];
+  const batches = new Map<string, any>();
+  let recordCalls = 0;
+  const snapshot = (value: any) => JSON.parse(JSON.stringify(value));
   const from = vi.fn((table: string) => {
     let ids: string[] = [];
     let businessId: string | undefined;
+    let batchId: string | undefined;
     let write: any;
     const execute = async () => {
       if (table === "bookings") {
@@ -115,25 +120,52 @@ function batchFixture(options: {
         };
       }
       if (table === "logs") {
-        logWrites.push(write);
+        // A database stores the JSON snapshot sent at this point; later array
+        // mutations in the handler cannot retroactively fill accepted IDs.
+        logWrites.push(JSON.parse(JSON.stringify(write)));
         const failed = options.failAuditAt === logWrites.length;
         return { data: failed ? null : write, error: failed ? { message: "audit unavailable" } : null };
+      }
+      if (table === "refund_batches") {
+        if (write) {
+          if (batches.has(write.id)) return { data: null, error: { code: "23505" } };
+          batches.set(write.id, snapshot(write));
+          return { data: snapshot(write), error: null };
+        }
+        const row = batchId && batches.get(batchId);
+        return { data: row && row.business_id === businessId ? snapshot(row) : null, error: null };
       }
       throw new Error("Unexpected batch-refund table: " + table);
     };
     const q: any = {
       select: () => q,
       in: (_key: string, value: string[]) => { ids = value; return q; },
-      eq: (_key: string, value: string) => { businessId = value; return q; },
+      eq: (key: string, value: string) => { if (key === "id") batchId = value; else if (key === "business_id") businessId = value; return q; },
       insert: (value: any) => { write = value; return q; },
       upsert: (value: any) => { write = value; return q; },
+      single: execute,
+      maybeSingle: execute,
       then: (yes: any, no: any) => execute().then(yes, no),
     };
     return q;
   });
   const handler = sourceHandler("supabase/functions/batch-refund/index.ts", {
     "../_shared/tenant.ts": {
-      createServiceClient: () => ({ from }),
+      createServiceClient: () => ({ from, rpc: async (name: string, args: any) => {
+        const batch = batches.get(args.p_batch_id);
+        const item = batch?.results?.[args.p_booking_id];
+        if (!item) return { data: false, error: null };
+        if (name === "claim_refund_batch_item" && item.status === "unprocessed") {
+          batch.results[args.p_booking_id] = { booking_id: args.p_booking_id, status: "submitting", ok: false };
+          return { data: true, error: null };
+        }
+        if (name === "record_refund_batch_item" && item.status === "submitting") {
+          if (++recordCalls === options.failRecordAt) return { data: false, error: { message: "record unavailable" } };
+          batch.results[args.p_booking_id] = snapshot(args.p_result);
+          return { data: true, error: null };
+        }
+        return { data: false, error: null };
+      } }),
       getAdminAppOrigins: () => ["https://fixture.invalid"],
       isAllowedOrigin: () => true,
     },
@@ -152,9 +184,9 @@ function batchFixture(options: {
   const invoke = (bookingIds: string[], body: Record<string, unknown> = {}, headers: Record<string, string> = { authorization: "Bearer fixture-user-token" }) => handler(new Request("https://fixture.invalid/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify({ booking_ids: bookingIds, ...body }),
+    body: JSON.stringify({ batch_id: "00000000-0000-4000-8000-000000000201", booking_ids: bookingIds, ...body }),
   }));
-  return { invoke, from, requests, logWrites };
+  return { invoke, from, requests, logWrites, batches, authority, bookings };
 }
 
 describe("process-refund authority", () => {
@@ -212,9 +244,27 @@ describe("process-refund authority", () => {
 });
 
 describe("batch-refund authority and accounting", () => {
+  it("persists every accepted target and actor before contacting the refund handler", async () => {
+    const f = batchFixture({ bookings: [
+      { id: "booking-a", business_id: "tenant-a" },
+      { id: "booking-b", business_id: "tenant-a" },
+    ] });
+    await f.invoke(["booking-a", "booking-b"]);
+    expect(f.logWrites[0]).toMatchObject({
+      business_id: "tenant-a",
+      payload: {
+        actor_user_id: "actor-a",
+        results: [
+          { booking_id: "booking-a", status: "unprocessed" },
+          { booking_id: "booking-b", status: "unprocessed" },
+        ],
+      },
+    });
+    expect(f.requests).toHaveLength(2);
+  });
   it.each(["OPERATOR", "ADMIN", "MAIN_ADMIN"])("allows own-tenant %s and forwards the caller JWT", async role => {
     const f = batchFixture({ authority: { userId: "actor-a", businessId: "tenant-a", role, isServiceRole: false } });
-    const response = await f.invoke(["booking-a"], { business_id: "forged-tenant", actor_user_id: "forged-actor" });
+    const response = await f.invoke(["booking-a"], { actor_user_id: "forged-actor" });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ completed: 1, pending: 0, manual_action: 0, failed: 0, unknown: 0, unprocessed: 0 });
     expect(f.requests[0].headers.get("authorization")).toBe("Bearer fixture-user-token");
@@ -329,6 +379,53 @@ describe("batch-refund authority and accounting", () => {
     const response = await f.invoke(["booking-a"]);
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ ok: false, completed: 1, failed: 0, unknown: 0, unprocessed: 0 });
+    expect(f.requests).toHaveLength(1);
+  });
+
+  it("returns the accepted record after a lost response without submitting money again", async () => {
+    const f = batchFixture();
+    expect((await f.invoke(["booking-a"])).status).toBe(200);
+    expect((await f.invoke(["booking-a"])).status).toBe(200);
+    const status = await f.invoke([], { action: "status", business_id: "tenant-a" });
+    expect(await status.json()).toMatchObject({ completed: 1, unprocessed: 0 });
+    expect(f.requests).toHaveLength(1);
+    expect(f.batches.size).toBe(1);
+  });
+
+  it("resumes only unsubmitted items after an interrupted foreground batch", async () => {
+    const f = batchFixture({
+      bookings: ["booking-a", "booking-b"].map(id => ({ id, business_id: "tenant-a" })),
+      failAuditAt: 2,
+    });
+    expect((await f.invoke(["booking-a", "booking-b"])).status).toBe(503);
+    const status = await f.invoke([], { action: "status", business_id: "tenant-a" });
+    expect(await status.json()).toMatchObject({ completed: 1, unprocessed: 1 });
+    const resumed = await f.invoke([], { action: "resume", business_id: "tenant-a" });
+    expect(await resumed.json()).toMatchObject({ completed: 2, unprocessed: 0 });
+    expect(f.requests.map(request => request.body.booking_id)).toEqual(["booking-a", "booking-b"]);
+  });
+
+  it("keeps an uncertain item out of later resume and binds status to the original actor", async () => {
+    const f = batchFixture({ replies: [new Error("response lost")] });
+    expect((await f.invoke(["booking-a"])).status).toBe(200);
+    expect(await (await f.invoke([], { action: "resume", business_id: "tenant-a" })).json()).toMatchObject({ unknown: 1 });
+    expect(f.requests).toHaveLength(1);
+    f.authority.userId = "other-actor";
+    expect((await f.invoke([], { action: "status", business_id: "tenant-a" })).status).toBe(403);
+    f.authority.userId = "actor-a";
+    f.authority.businessId = "tenant-b";
+    expect((await f.invoke([], { action: "status", business_id: "tenant-a" })).status).toBe(403);
+  });
+
+  it("reconciles a persisted pending refund when the batch result write was lost", async () => {
+    const f = batchFixture({ failRecordAt: 1 });
+    expect((await f.invoke(["booking-a"])).status).toBe(503);
+    expect(f.requests).toHaveLength(1);
+    Object.assign(f.bookings[0], { refund_status: "REFUND_PENDING", refund_request_id: "existing-server-request" });
+    const recovered = await f.invoke([], { action: "status", business_id: "tenant-a" });
+    expect(await recovered.json()).toMatchObject({ pending: 1, unknown: 0, unprocessed: 0 });
+    expect(f.requests).toHaveLength(1);
+    expect((await (await f.invoke([], { action: "resume", business_id: "tenant-a" })).json()).pending).toBe(1);
     expect(f.requests).toHaveLength(1);
   });
 });

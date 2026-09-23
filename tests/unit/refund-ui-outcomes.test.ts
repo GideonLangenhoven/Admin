@@ -1,6 +1,16 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sourceExports, sourceFunction } from "../helpers/source-handler";
+import { readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal } from "../../app/lib/refund-bulk-journal";
+
+beforeEach(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
 
 type Reply = { status?: number; body?: any; malformed?: boolean; throws?: string };
 
@@ -57,6 +67,7 @@ function bulkHarness(options: {
   cancel?: (id: string, options: any) => Promise<any>;
   markPaid?: (id: string) => Promise<any>;
   checkIn?: (id: string, businessId: string, options: any) => Promise<any>;
+  serverStatuses?: Record<string, string>;
 } = {}) {
   const ids = options.ids || ["booking-a"];
   const bookingsById: Record<string, any> = {};
@@ -85,13 +96,20 @@ function bulkHarness(options: {
     confirm: () => true,
     prompt: () => "fixture reason",
     setBulkActionInFlight: (value: string | null) => { inFlight = value; },
+    setBulkProgressAction: () => undefined,
     setBulkProgress: (value: any) => { progress = typeof value === "function" ? value(progress) : value; },
     setBulkAuditError: (value: string | null) => { auditError = value; },
+    readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal,
+    lookupRefundStatuses: async (readIds: string[]) => ({ data: readIds.map(id => ({
+      id, refund_status: options.serverStatuses?.[id] || "REQUESTED", refund_request_id: options.serverStatuses?.[id] === "REFUND_PENDING" ? "server-request" : null,
+    })), error: null }),
+    notify: () => undefined,
     cancelBookingAction: cancel,
     refundBookingAction: refund,
     markPaidAction: markPaid,
     checkInAction: checkIn,
     supabase: {
+      auth: { getUser: async () => ({ data: { user: { id: "actor-a" } }, error: null }) },
       from: () => ({
         insert: async (value: any) => {
           audits.push(value);
@@ -120,7 +138,7 @@ function bulkHarness(options: {
 }
 
 function delayedCallerHarness(path: "bookings-bulk" | "executeAutoRefund" | "executeManualRefund" | "executeRefundAll") {
-  const session = deferred<{ data: { session: { access_token: string } } }>();
+  const session = deferred<{ data: { session: { access_token: string; user: { id: string } } } }>();
   const enteredSession = deferred<void>();
   const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({ ok: true, refund_status: "REFUNDED" }));
   const actions = sourceExports("app/lib/booking-actions.ts", {
@@ -162,10 +180,15 @@ function delayedCallerHarness(path: "bookings-bulk" | "executeAutoRefund" | "exe
       bookingsById: Object.fromEntries(refunds.map(refund => [refund.id, refund])),
       confirmAction: async () => true,
       setBulkActionInFlight: () => undefined,
+      setBulkProgressAction: () => undefined,
       setBulkProgress: (value: any) => { progress = typeof value === "function" ? value(progress) : value; },
       setBulkAuditError: () => undefined,
+      readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal,
+      lookupRefundStatuses: async (readIds: string[]) => ({ data: readIds.map(id => ({ id, refund_status: "REQUESTED", refund_request_id: null })), error: null }),
+      notify: () => undefined,
       refundBookingAction: actions.refundBookingAction,
-      supabase: { from: () => ({ insert: async (value: any) => { audits.push(value); return { error: null }; } }) },
+      supabase: { auth: { getUser: async () => ({ data: { user: { id: "actor-a" } }, error: null }) },
+        from: () => ({ insert: async (value: any) => { audits.push(value); return { error: null }; } }) },
       loadBookings: loads,
       setTimeout: (callback: () => void) => { callback(); return 0; },
     });
@@ -181,6 +204,10 @@ function delayedCallerHarness(path: "bookings-bulk" | "executeAutoRefund" | "exe
       getRefundAmount: (booking: any) => booking.refund_amount,
       setProcessing: () => undefined,
       setResults: (value: any) => { results = typeof value === "function" ? value(results) : value; },
+      setBulkHistory: () => undefined,
+      readRefundJournal, saveRefundJournal, unresolvedRefundJournal,
+      notify: () => undefined,
+      supabase: { auth: { getUser: async () => ({ data: { user: { id: "actor-a" } }, error: null }) } },
       load: loads,
       UNKNOWN_REFUND_RESULT: { ok: false, outcome: "unknown" },
       setTimeout: (callback: () => void) => { callback(); return 0; },
@@ -189,6 +216,31 @@ function delayedCallerHarness(path: "bookings-bulk" | "executeAutoRefund" | "exe
   }
 
   return { actions, audits, businessIdRef, enteredSession, fetchImpl, loads, mountedRef, refundRunRef, run, session };
+}
+
+function refundsAllHarness(ids: string[], processRefundAction: (input: any) => Promise<any>, serverStatuses: Record<string, string> = {}) {
+  const refundRunRef = { current: null as any };
+  const businessIdRef = { current: "tenant-a" };
+  const mountedRef = { current: true };
+  let history: any[] = [];
+  let results: Record<string, any> = {};
+  const run = sourceFunction("app/refunds/page.tsx", "executeRefundAll", {
+    businessId: "tenant-a", businessIdRef, mountedRef,
+    refunds: ids.map(id => ({ id, refund_status: "REQUESTED" })), refundRunRef,
+    processRefundAction, setProcessing: () => undefined,
+    setResults: (value: any) => { results = typeof value === "function" ? value(results) : value; },
+    setBulkHistory: (value: any) => { history = value; },
+    readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal,
+    lookupRefundStatuses: async (readIds: string[]) => ({ data: readIds.map(id => ({
+      id, refund_status: serverStatuses[id] || "REQUESTED", refund_request_id: serverStatuses[id] === "REFUND_PENDING" ? "server-request" : null,
+    })), error: null }),
+    notify: () => undefined,
+    supabase: { auth: { getUser: async () => ({ data: { user: { id: "actor-a" } }, error: null }) } },
+    load: async () => undefined,
+    UNKNOWN_REFUND_RESULT: { ok: false, outcome: "unknown" },
+    setTimeout: (callback: () => void) => { callback(); return 0; },
+  });
+  return { run, businessIdRef, mountedRef, get history() { return history; }, get results() { return results; } };
 }
 
 describe("refund action outcome contract", () => {
@@ -229,6 +281,28 @@ describe("refund action outcome contract", () => {
     expect(f.bodies).toEqual([{ booking_id: "booking-a" }, { booking_id: "booking-a" }]);
   });
 
+  it("does not dispatch a bulk item under a replacement signed-in actor", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({ ok: true, refund_status: "REFUNDED" }));
+    const actions = sourceExports("app/lib/booking-actions.ts", {
+      "./supabase": { supabase: { auth: { getSession: async () => ({
+        data: { session: { access_token: "fixture-token", user: { id: "other-actor" } } },
+      }) } } },
+    }, { NEXT_PUBLIC_SUPABASE_URL: "https://fixture.invalid" }, fetchImpl) as { processRefundAction: (input: any) => Promise<any> };
+    expect(await actions.processRefundAction({ bookingId: "booking-a", expectedActorId: "actor-a" }))
+      .toMatchObject({ outcome: "unprocessed" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("keeps an expired bulk session unsubmitted", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({ ok: true, refund_status: "REFUNDED" }));
+    const actions = sourceExports("app/lib/booking-actions.ts", {
+      "./supabase": { supabase: { auth: { getSession: async () => ({ data: { session: null } }) } } },
+    }, { NEXT_PUBLIC_SUPABASE_URL: "https://fixture.invalid" }, fetchImpl) as { processRefundAction: (input: any) => Promise<any> };
+    expect(await actions.processRefundAction({ bookingId: "booking-a", expectedActorId: "actor-a" }))
+      .toMatchObject({ outcome: "unprocessed" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.each([
     "Payment credentials for the original payment mode are missing",
     "Cash refunded; voucher credit still needs to be reissued. Please retry.",
@@ -255,6 +329,27 @@ describe("refund action outcome contract", () => {
   });
 });
 
+describe("authoritative foreground recovery", () => {
+  it("replaces browser success with server status and keeps untouched work distinct", async () => {
+    const journal = {
+      actorId: "actor-a", businessId: "tenant-a", surface: "bookings" as const,
+      items: [
+        { id: "booking-a", status: "completed" as const },
+        { id: "booking-b", status: "submitting" as const },
+        { id: "booking-c", status: "unprocessed" as const },
+      ],
+    };
+    const lookup = vi.fn(async () => ({ data: [
+      { id: "booking-a", refund_status: "REQUESTED", refund_request_id: null },
+      { id: "booking-b", refund_status: "REFUND_PENDING", refund_request_id: "server-reference" },
+    ], error: null }));
+    const recovered = await reconcileRefundJournal(journal, lookup);
+    expect(lookup).toHaveBeenCalledWith(["booking-a", "booking-b"], "tenant-a");
+    expect(recovered.items.map(item => item.status)).toEqual(["unknown", "pending", "unprocessed"]);
+    expect(journal.items.map(item => item.status)).toEqual(["completed", "submitting", "unprocessed"]);
+  });
+});
+
 describe("refund dispatch context", () => {
   it.each([
     ["bookings-bulk", "tenant change"],
@@ -273,7 +368,7 @@ describe("refund dispatch context", () => {
     if (interruption === "tenant change") f.businessIdRef.current = "tenant-b";
     else f.mountedRef.current = false;
     f.refundRunRef.current.cancelled = true;
-    f.session.resolve({ data: { session: { access_token: "fixture-user-token" } } });
+    f.session.resolve({ data: { session: { access_token: "fixture-user-token", user: { id: "actor-a" } } } });
     await running;
     expect(f.fetchImpl).not.toHaveBeenCalled();
     expect(f.loads).not.toHaveBeenCalled();
@@ -290,6 +385,51 @@ describe("refund dispatch context", () => {
 });
 
 describe("bookings bulk action runtime", () => {
+  it("keeps the selected, submitted and unsubmitted bookings across an interrupted tab", async () => {
+    const first = bulkHarness({ ids: ["booking-a", "booking-b"], refund: vi.fn(async () => {
+      first.businessIdRef.current = "tenant-b";
+      return { ok: true, outcome: "completed" };
+    }) });
+    await first.run("refund");
+    expect(readRefundJournal("bookings", "tenant-a", "actor-a")?.items).toEqual([
+      { id: "booking-a", status: "completed" }, { id: "booking-b", status: "unprocessed" },
+    ]);
+    const refund = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    const restored = bulkHarness({ ids: ["booking-a", "booking-b"], refund, serverStatuses: { "booking-a": "REFUNDED" } });
+    await restored.run("refund", true);
+    expect(refund).toHaveBeenCalledOnce();
+    expect(refund.mock.calls[0][0]).toBe("booking-b");
+    expect(restored.progress?.map(item => item.status)).toEqual(["completed", "completed"]);
+    expect(readRefundJournal("bookings", "tenant-b", "actor-a")).toBeNull();
+    expect(readRefundJournal("bookings", "tenant-a", "other-actor")).toBeNull();
+  });
+
+  it("stops before submission if durable browser progress cannot be stored", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => { throw new Error("quota"); } });
+    const refund = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    const f = bulkHarness({ refund });
+    await f.run("refund");
+    expect(refund).not.toHaveBeenCalled();
+  });
+
+  it("keeps a dispatched item uncertain when its response cannot be saved", async () => {
+    const values = new Map<string, string>();
+    let writes = 0;
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { if (++writes === 3) throw new Error("quota"); values.set(key, value); },
+    });
+    const refund = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    await bulkHarness({ refund }).run("refund");
+    expect(refund).toHaveBeenCalledOnce();
+    expect(readRefundJournal("bookings", "tenant-a", "actor-a")?.items[0].status).toBe("submitting");
+    const retry = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    const restored = bulkHarness({ refund: retry });
+    await restored.run("refund");
+    expect(retry).not.toHaveBeenCalled();
+    expect(restored.progress?.[0].status).toBe("unknown");
+  });
+
   it("uses its actual result list for mixed refund progress and audit", async () => {
     const outcomes = [
       { ok: true, outcome: "completed" },
@@ -386,6 +526,39 @@ describe("bookings bulk action runtime", () => {
     await checkInRun.run("checkin");
     expect(checkIn).toHaveBeenCalledWith("booking-a", "tenant-a", { expectedArrivedCount: 1, slotId: "slot-0" });
     expect(checkInRun.progress?.[0].status).toBe("completed");
+  });
+});
+
+describe("refund queue foreground recovery", () => {
+  it("resumes only the unsubmitted tail after interruption", async () => {
+    const first = refundsAllHarness(["booking-a", "booking-b"], vi.fn(async () => {
+      first.businessIdRef.current = "tenant-b";
+      return { ok: true, outcome: "completed" };
+    }));
+    await first.run();
+    expect(readRefundJournal("refunds", "tenant-a", "actor-a")?.items).toEqual([
+      { id: "booking-a", status: "completed" }, { id: "booking-b", status: "unprocessed" },
+    ]);
+    const process = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    const restored = refundsAllHarness(["booking-a", "booking-b"], process, { "booking-a": "REFUNDED" });
+    await restored.run(true);
+    expect(process).toHaveBeenCalledOnce();
+    expect(process.mock.calls[0][0]).toMatchObject({ bookingId: "booking-b", expectedActorId: "actor-a" });
+    expect(restored.history.map(item => item.status)).toEqual(["completed", "completed"]);
+  });
+
+  it("keeps a lost response unknown and does not replay it on a later visit", async () => {
+    const first = refundsAllHarness(["booking-a", "booking-b"], vi.fn(async input =>
+      input.bookingId === "booking-a"
+        ? { ok: false, outcome: "unknown" }
+        : { ok: true, outcome: "completed" }));
+    await first.run();
+    expect(readRefundJournal("refunds", "tenant-a", "actor-a")?.items.map(item => item.status))
+      .toEqual(["unknown", "completed"]);
+    const process = vi.fn(async () => ({ ok: true, outcome: "completed" }));
+    const restored = refundsAllHarness(["booking-a", "booking-b"], process, { "booking-b": "REFUNDED" });
+    await restored.run(true);
+    expect(process).not.toHaveBeenCalled();
   });
 });
 

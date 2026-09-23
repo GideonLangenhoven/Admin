@@ -32,16 +32,18 @@ export async function processRefundAction(input: {
   action?: "confirm_manual";
   resumeRefund?: boolean;
   canSubmit?: () => boolean;
+  expectedActorId?: string;
 }): Promise<ActionResult> {
   if (input.canSubmit && !input.canSubmit()) return UNSUBMITTED_REFUND;
   let accessToken: string;
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (input.canSubmit && !input.canSubmit()) return UNSUBMITTED_REFUND;
-    if (!session?.access_token) return { ok: false, outcome: "failed", error: "Session expired. Please sign in again." };
+    if (!session?.access_token) return { ok: false, outcome: input.expectedActorId ? "unprocessed" : "failed", error: "Session expired. Please sign in again." };
+    if (input.expectedActorId && session.user?.id !== input.expectedActorId) return UNSUBMITTED_REFUND;
     accessToken = session.access_token;
   } catch {
-    return { ok: false, outcome: "failed", error: "Your session could not be verified. Please sign in again." };
+    return { ok: false, outcome: input.expectedActorId ? "unprocessed" : "failed", error: "Your session could not be verified. Please sign in again." };
   }
 
   const body = {
@@ -85,8 +87,8 @@ export async function processRefundAction(input: {
   return { ok: false, outcome: "unknown", error: UNKNOWN_REFUND_MESSAGE, data };
 }
 
-export async function refundBookingAction(bookingId: string, options: { canSubmit?: () => boolean } = {}): Promise<ActionResult> {
-  return processRefundAction({ bookingId, canSubmit: options.canSubmit });
+export async function refundBookingAction(bookingId: string, options: { canSubmit?: () => boolean; expectedActorId?: string } = {}): Promise<ActionResult> {
+  return processRefundAction({ bookingId, canSubmit: options.canSubmit, expectedActorId: options.expectedActorId });
 }
 
 export type ManualPaymentMethod = "Cash" | "EFT" | "Card (terminal)" | "Other";
