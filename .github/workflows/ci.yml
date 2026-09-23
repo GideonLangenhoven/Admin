@@ -88,7 +88,7 @@ jobs:
           cache: npm
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.9.4
       - run: npm ci
       - run: npm ci --prefix booking
       - run: npm ci --prefix onboarding
@@ -98,6 +98,7 @@ jobs:
       - run: npm audit --omit=dev --prefix onboarding
       - run: npm run test:unit
       - run: npm run check:edge
+      - run: npm run test:edge-resolution
       - run: npm run lint --prefix booking
       - run: npx tsc --noEmit --incremental false --project booking/tsconfig.json
       - run: npm run check:ways --prefix booking
