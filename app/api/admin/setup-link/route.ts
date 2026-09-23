@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
@@ -10,6 +10,18 @@ function sha256(s: string): string {
 
 function hexToken(bytes = 24): string {
   return randomBytes(bytes).toString("hex");
+}
+
+const publicResetResponse = { ok: true, message: "If an admin account exists, a reset link will be emailed." };
+
+function recoveryOrigin(): string {
+  const configured = process.env.ADMIN_RECOVERY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) throw new Error("Administrator recovery origin is not configured");
+  const url = new URL(configured);
+  if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("Invalid administrator recovery origin");
+  }
+  return url.origin;
 }
 
 function adminClient() {
@@ -35,11 +47,17 @@ export async function POST(req: NextRequest) {
   if (!["send", "validate", "complete"].includes(action)) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
+  const isSelfReset = action === "send" && String(body.reason || "ADMIN_INVITE") === "RESET" &&
+    !!String(body.email || "").trim() && !body.admin_id;
 
   let admin;
   try {
     admin = adminClient();
   } catch (e: any) {
+    if (isSelfReset) {
+      console.error("ADMIN_RESET_CONFIG_ERR");
+      return NextResponse.json(publicResetResponse);
+    }
     return NextResponse.json({ error: e?.message || "Server misconfigured" }, { status: 500 });
   }
 
@@ -50,7 +68,6 @@ export async function POST(req: NextRequest) {
     const reason = String(body.reason || "ADMIN_INVITE");
     if (!adminId && !adminEmail) return NextResponse.json({ error: "admin_id or email is required" }, { status: 400 });
 
-    const isSelfReset = reason === "RESET" && !!adminEmail && !adminId;
     const caller = isSelfReset ? null : await getCallerAdmin(req);
 
     if (!isSelfReset) {
@@ -59,78 +76,107 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let lookupQuery = admin.from("admin_users").select("id, email, name, role, business_id");
-    if (adminId) {
-      lookupQuery = lookupQuery.eq("id", adminId);
-    } else {
-      lookupQuery = lookupQuery.eq("email", adminEmail);
-    }
-    const { data: user, error: lookupErr } = await lookupQuery.maybeSingle();
-    if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 });
-    if (!user) {
-      if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
-      return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-    }
-    if (!isSelfReset && (!caller || !canManageAdmin(caller, user))) {
-      return NextResponse.json({ error: "Cannot send setup links for this administrator" }, { status: 403 });
-    }
-
-    const rawToken = hexToken(24);
-    const tokenHash = sha256(rawToken);
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    const shouldForceSetup = reason !== "RESET";
-
-    const { data: issued, error: issueError } = await admin.rpc("issue_admin_setup_token", {
-      p_admin_id: user.id,
-      p_token_hash: tokenHash,
-      p_expires_at: expiresAt,
-      p_force_setup: shouldForceSetup,
-    });
-    if (issueError) return NextResponse.json({ error: "Password setup is temporarily unavailable" }, { status: 503 });
-    if (issued?.status === "BUSY") {
-      if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
-      return NextResponse.json({ error: "Password setup is already being completed. Try again shortly." }, { status: 409 });
-    }
-    if (issued?.status !== "ISSUED") {
-      return NextResponse.json({ error: "Password setup link could not be issued" }, { status: 409 });
-    }
-
-    const origin = req.nextUrl.origin || req.headers.get("origin") || "";
-    const setupUrl =
-      origin +
-      "/change-password?mode=setup&email=" +
-      encodeURIComponent(user.email as string) +
-      "&token=" +
-      encodeURIComponent(rawToken);
-
-    const { error: emailErr } = await admin.functions.invoke("send-email", {
-      body: {
-        type: "ADMIN_WELCOME",
-        data: {
-          email: user.email,
-          name: (user as any).name || "",
-          change_password_url: setupUrl,
-          expires_at: expiresAt,
-          reason,
-          ...(user.business_id ? { business_id: user.business_id } : {}),
-        },
-      },
-    });
-    if (emailErr) {
-      let humanMsg = "";
-      try {
-        const ctx: any = (emailErr as any).context;
-        if (ctx && typeof ctx.json === "function") {
-          const eb = await ctx.json();
-          humanMsg = eb?.providerResponse?.sandboxNote || eb?.error || "";
-        }
-      } catch {
-        /* swallow */
+    const send = async () => {
+      let origin: string;
+      try { origin = recoveryOrigin(); }
+      catch {
+        console.error("ADMIN_RECOVERY_ORIGIN_INVALID");
+        return NextResponse.json({ error: "Password setup links are temporarily unavailable" }, { status: 503 });
       }
-      return NextResponse.json({ error: humanMsg || (emailErr as any).message || "Email failed" }, { status: 500 });
-    }
 
-    return NextResponse.json({ ok: true, expires_at: expiresAt });
+      let lookupQuery = admin.from("admin_users").select("id, email, name, role, business_id");
+      if (adminId) {
+        lookupQuery = lookupQuery.eq("id", adminId);
+      } else {
+        lookupQuery = lookupQuery.eq("email", adminEmail);
+      }
+      const { data: user, error: lookupErr } = await lookupQuery.maybeSingle();
+      if (lookupErr) {
+        if (isSelfReset) console.error("ADMIN_RESET_LOOKUP_ERR");
+        return NextResponse.json({ error: lookupErr.message }, { status: 500 });
+      }
+      if (!user) {
+        if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
+        return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+      }
+      if (!isSelfReset && (!caller || !canManageAdmin(caller, user))) {
+        return NextResponse.json({ error: "Cannot send setup links for this administrator" }, { status: 403 });
+      }
+
+      const rawToken = hexToken(24);
+      const tokenHash = sha256(rawToken);
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      const shouldForceSetup = reason !== "RESET";
+
+      const { data: issued, error: issueError } = await admin.rpc("issue_admin_setup_token", {
+        p_admin_id: user.id,
+        p_token_hash: tokenHash,
+        p_expires_at: expiresAt,
+        p_force_setup: shouldForceSetup,
+      });
+      if (issueError) {
+        if (isSelfReset) console.error("ADMIN_RESET_ISSUE_ERR");
+        return NextResponse.json({ error: "Password setup is temporarily unavailable" }, { status: 503 });
+      }
+      if (issued?.status === "BUSY") {
+        if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
+        return NextResponse.json({ error: "Password setup is already being completed. Try again shortly." }, { status: 409 });
+      }
+      if (issued?.status !== "ISSUED") {
+        if (isSelfReset) console.error("ADMIN_RESET_ISSUE_STATUS");
+        return NextResponse.json({ error: "Password setup link could not be issued" }, { status: 409 });
+      }
+
+      const setupUrl =
+        origin +
+        "/change-password?mode=setup&email=" +
+        encodeURIComponent(user.email as string) +
+        "&token=" +
+        encodeURIComponent(rawToken);
+
+      const { error: emailErr } = await admin.functions.invoke("send-email", {
+        body: {
+          type: "ADMIN_WELCOME",
+          data: {
+            email: user.email,
+            name: (user as any).name || "",
+            change_password_url: setupUrl,
+            expires_at: expiresAt,
+            reason,
+            ...(user.business_id ? { business_id: user.business_id } : {}),
+          },
+        },
+      });
+      if (emailErr) {
+        if (isSelfReset) {
+          console.error("ADMIN_RESET_DELIVERY_ERR");
+          return NextResponse.json({ error: "Email failed" }, { status: 500 });
+        }
+        let humanMsg = "";
+        try {
+          const ctx: any = (emailErr as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const eb = await ctx.json();
+            humanMsg = eb?.providerResponse?.sandboxNote || eb?.error || "";
+          }
+        } catch {
+          /* swallow */
+        }
+        return NextResponse.json({ error: humanMsg || (emailErr as any).message || "Email failed" }, { status: 500 });
+      }
+
+      return NextResponse.json({ ok: true, expires_at: expiresAt });
+    };
+
+    if (isSelfReset) {
+      // Next waits for after() work without making lookup or delivery latency public.
+      after(async () => {
+        try { await send(); }
+        catch { console.error("ADMIN_RESET_SEND_ERR"); }
+      });
+      return NextResponse.json(publicResetResponse);
+    }
+    return send();
   }
 
   // -------- validate: confirm a setup token is current --------

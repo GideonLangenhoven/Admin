@@ -227,7 +227,7 @@ function ChangePasswordForm() {
               >
                 {loading ? "Sending..." : "Email New Reset Link"}
               </button>
-              {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">A password reset link has been sent.</p>}
+              {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">If an admin account exists, a reset link will be emailed.</p>}
             </div>
             <p className="text-center text-xs text-[var(--ck-text-muted)]">
               <a href="/" className="hover:underline">Back to sign in</a>
@@ -313,7 +313,7 @@ function ChangePasswordForm() {
                 >
                   {loading ? "Sending..." : "Email Reset Link"}
                 </button>
-                {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">A password reset link has been sent.</p>}
+                {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">If an admin account exists, a reset link will be emailed.</p>}
               </div>
             )}
 

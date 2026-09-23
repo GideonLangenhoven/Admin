@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     console.error("ADMIN_LOGIN_LOOKUP_ERR", lookupErr.message);
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
-  if (!user) {
+  if (!user || (!token && (user.user_id || !user.password_hash || user.password_hash !== sha256(password)))) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
   if (user.suspended) {
@@ -86,13 +86,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (!token) {
-    if (user.user_id) {
-      return NextResponse.json({ error: "Authenticate with Supabase Auth", code: "AUTH_REQUIRED" }, { status: 401 });
-    }
-    if (!user.password_hash || user.password_hash !== sha256(password)) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-    }
-
     try {
       authUserId = await setAdminAuthPassword(admin, user, password);
     } catch (error) {

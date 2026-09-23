@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { canManageAdmin, isPrivilegedRole } from "../../app/lib/role-utils";
 import { sourceHandler } from "../helpers/source-handler";
 import { setAdminAuthPassword } from "../../app/lib/admin-password";
@@ -90,7 +90,7 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
       "@supabase/supabase-js": { createClient: () => db },
       "../../../lib/api-auth": { getCallerAdmin: async () => caller, canManageAdmin, isPrivilegedRole },
       "../../../lib/admin-password": { setAdminAuthPassword },
-    });
+    }, { ADMIN_RECOVERY_ORIGIN: "https://trusted.example.invalid" });
     const req = Object.assign(new Request("https://admin.example.invalid/api/admin/" + route, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -146,6 +146,7 @@ describe("R02/R03 administrator boundaries", () => {
     const f = fixture("business-b", "MAIN_ADMIN", null);
     expect((await f.invoke("setup-link", { action: "send", reason: "RESET", email: "staff@example.invalid", business_id: "forged-brand" })).status).toBe(200);
     expect(f.target.must_set_password).toBeUndefined();
+    await vi.waitFor(() => expect(f.emails).toHaveLength(1));
     expect(f.emails[0].body.data.business_id).toBe("business-b");
   });
   it("does not rotate or email a setup token while its password completion owns the claim", async () => {
@@ -229,7 +230,7 @@ describe("password reset completion", () => {
     const response = await f.invoke("login", { email: f.target.email, password: "Previous-password" });
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body.code).toBe("AUTH_REQUIRED");
+    expect(body).toEqual({ error: "Invalid credentials" });
     expect(body.session).toBeUndefined();
   });
 });
