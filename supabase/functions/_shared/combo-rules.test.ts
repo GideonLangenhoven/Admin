@@ -35,6 +35,15 @@ Deno.test("max gap bounds the overall span", () => {
   assert(!validateComboDates(rules, [D(1), D(4), D(9)]).ok, "3-leg 8-day span fails");
 });
 
+Deno.test("omitted and null max gap allow cross-day legs; explicit zero and positive bounds remain enforceable", () => {
+  const dates = [D(1), D(3)];
+  assert(validateComboDates({}, dates).ok, "omitted max gap allows separate days");
+  assert(validateComboDates({ max_gap_days: null }, dates).ok, "null max gap allows separate days");
+  assert(!validateComboDates({ max_gap_days: 0 }, dates).ok, "zero max gap requires same day");
+  assert(validateComboDates({ max_gap_days: 2 }, dates).ok, "two-day bound allows two-day span");
+  assert(!validateComboDates({ max_gap_days: 1 }, dates).ok, "one-day bound rejects two-day span");
+});
+
 Deno.test("enforce_order requires non-decreasing dates", () => {
   const rules = { enforce_order: true };
   assert(validateComboDates(rules, [D(1), D(2)]).ok, "in order passes");
