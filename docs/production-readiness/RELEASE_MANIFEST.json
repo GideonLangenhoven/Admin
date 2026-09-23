@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T11:19:06Z",
+  "recorded_at_utc": "2026-09-23T11:50:32Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "0ae848defa74e500b4fe9c05941b3d7df860bc07",
-    "integrated_tree": "cb880e50e4e19352f7096607ca013dd333e091be",
+    "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+    "integrated_tree": "33b50d4bd5b3d0320a6594ca6acef0ddb6b2c1af",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -78,6 +78,19 @@
       "writer_verification_sha256": "e6c13b72d064d3b3cbd7eb02b89e34605a228a900355ac385930b397bee53f15",
       "proof": "107 focused tests; 7 independent actual-handler + disposablePG17 migration/concurrency/recovery probes; real image bytes and synthetic provider; no hosted effect.",
       "dedup_scope": "Identical raw photo bytes by same admin actor, business and slot, including independent browser IDs. Unknown provider/database outcomes require manual reconciliation."
+    },
+    "reviewed_exact_role_correction": {
+      "source_commit": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+      "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+      "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md",
+      "review_sha256": "27c25b8b0640889e0c976c2ce9afad8cf696a313930e279cac6b16c233f9625e",
+      "writer_evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-verification.md",
+      "writer_sha256": "107f6377518a14524950aecd9a74b5634bab895ce2f01ffe92c45c2bd9fd129e",
+      "tests": "112 focused unit, 218 disposable PostgreSQL rollout and 47 independent PostgreSQL checks pass",
+      "integration": "git diff reviewed source vs integrated HEAD excluding readiness documents is empty; scoped evidence reused",
+      "limits": "Source-only forward migration; broader Storage, function search paths, baseline and deployed low-role proof remain open"
     }
   },
   "booking": {
@@ -197,6 +210,24 @@
       "type_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "initial_type_fixture_failure": "First run included root-created onboarding test link after its dependencies were pruned, causing two missing-three imports. Removed only task-created links and standaloneAdmin typecheck passed; no application fix required. Initial log retained as type-after-c04.log.",
       "final_build_gate": "The earlier Admin build certifies pre-C04 runtime/app combination. Current Admin application build must run at final candidate freeze after remaining corrections; unchanged companion builds remain applicable."
+    },
+    "c05_exact_roles": {
+      "source_commit": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+      "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+      "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md",
+      "review_sha256": "27c25b8b0640889e0c976c2ce9afad8cf696a313930e279cac6b16c233f9625e",
+      "writer_evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-verification.md",
+      "writer_sha256": "107f6377518a14524950aecd9a74b5634bab895ce2f01ffe92c45c2bd9fd129e",
+      "tests": "112 focused unit, 218 disposable PostgreSQL rollout and 47 independent PostgreSQL checks pass",
+      "integration": "git diff reviewed source vs integrated HEAD excluding readiness documents is empty; scoped evidence reused",
+      "limits": "Source-only forward migration; broader Storage, function search paths, baseline and deployed low-role proof remain open"
+    },
+    "c04_alternate_inventory": {
+      "path": "/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md",
+      "sha256": "e950f0a1780721e42dce9daba5518664a13351b14d481d64adb3d3a242f9faaa",
+      "scope": "Source inventory only; alternate browser Drive and Storage paths require actual behavioral applicability checks. Guide picker advertises JPEG/PNG/WebP/AVIF/still GIF; native HEIC is unverified phone UX, not automatically a proven regression."
     }
   },
   "qualification": {
@@ -254,10 +285,13 @@
       "admin_BUILD_ID": "lamSU2kCEl-zydHDF8LFz",
       "admin_BUILD_ID_sha256": "2aa2b2880bccd5c354118626fc4c9bb2691cabcc35af81462dcee068b47eaf40",
       "tests": "Admin1370pass/1unchanged conditional skip; reviewer79/79; all3configured realfontbuilds/type/lint/contracts pass;6auditszero",
-      "integration_evidence_reuse": "All15 reviewed runtime/CI/test files exactly match source commit; release differences are previously reviewed C05/V03 scripts/tests and readiness records, with no app/runtime overlap."
+      "integration_evidence_reuse": "All15 reviewed runtime/CI/test files exactly match source commit; release differences are previously reviewed C05/V03 scripts/tests and readiness records, with no app/runtime overlap.",
+      "admin_build_output_retained": false,
+      "admin_build_cleanup": "Only this session's ignored /private/tmp/bookingtours-runtime-ci-20260923/.next removed after explicit tool approval and no open-file evidence. Build ID, hashes, logs, source and dependencies retained; current integrated Admin must be rebuilt before final freeze."
     }
   },
   "planned_unapplied_migrations": [
-    "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql"
+    "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql",
+    "supabase/migrations/20260923110000_exact_staff_roles_and_demo_rpc_acl.sql"
   ]
 }

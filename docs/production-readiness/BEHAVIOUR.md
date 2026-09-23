@@ -1,6 +1,6 @@
 # Behaviour baseline
 
-Candidate: `71da0361db65dd63f90b5110648b96b2c4ff3567`. This is a preservation contract and evidence map, not release certification.
+Historical baseline: `71da0361db65dd63f90b5110648b96b2c4ff3567`; current candidate and applicable evidence are recorded in RELEASE_MANIFEST.json. This is a preservation contract and evidence map, not release certification.
 
 | Capability | Behaviour to preserve | Current evidence or gap | Required release proof |
 |---|---|---|---|
@@ -13,9 +13,20 @@ Candidate: `71da0361db65dd63f90b5110648b96b2c4ff3567`. This is a preservation co
 | Guide offline check-in | Stable event ID; 401/409/429 are retained for correct recovery; no cross-user replay; terminal rejection visible | 109 focused tests, the broader suite and local browser probes pass | Authenticated isolated-staging verification |
 | Arrivals | Partial counts, locks, expected-count conflicts, payment/waiver policy, move detection and boolean compatibility remain coherent | Compatibility, audit and direct-write privilege checks pass the 181-check disposable database run | Repeat against an isolated restore of the intended ledger |
 | Notifications | Durable intent, stable dedupe, truthful accepted/delivered/failed state, bounded recovery and fairness | Transactional queue, tenant-fair claims, stable provider idempotency, stale-payload cancellation, crash recovery and audited retry pass local unit/database proof and independent review | Apply the exact migration/Edge candidate; verify scheduler, genuine scoped delivery and worker death against the deployed target |
-| Uploads and rendering | Byte/type/size/ownership validation and safe partial-failure handling without breaking supported media | Prior reviewed patch not integrated; CSP/dependency work open | Port/review, real storage/browser tests, CSP and advisory reachability |
+| Uploads and rendering | Byte/type/size/ownership validation and safe partial-failure handling without breaking supported media | Reviewed guide/Drive correction integrated; real-image, concurrency and partial-failure local proof accepted; alternate uploads/phone behavior still open | Actual alternate-path applicability, phone/browser, Storage and deployed provider proof |
 | New subscription pricing | Approved2000/month,one included seat,500 extra seat,zero setup applies only to new subscriptions; existing plans/subscriptions/open lines remain unchanged | Versioned future plan and old/new cohort preservation pass local database checks | Repeat against an isolated restore of the intended ledger |
 | Existing customers | Preserve all IDs, ownership, balances, consent, branding, valid links, provider references, history and pending work | 100/100 same synthetic staff records preserve identity and authorization fields through the full local ledger | Extend reconciliation to the isolated restored target and deployed journeys |
 | Full product | Simple/full dashboards, bookings, checkout, invoices, vouchers, waivers, reports, messages, settings and integrations remain available | Unit evidence is not end-to-end coverage | Role-based smoke map across Admin, booking and onboarding candidates |
 
 No mocked provider success, manually marked payment, saved credential, source-string assertion, build, or Vercel `READY` state alone satisfies a genuine provider, security, financial, migration, or customer-journey gate.
+
+## Guide upload manual recovery
+
+This source procedure covers an unresolved operation in `guide_photo_uploads`. It is not evidence of a rehearsed provider recovery or authorization for hosted changes. Any provider/database mutation requires an exact approved target, action and recovery window.
+
+1. Identify one operation UUID and verify its business, slot, actor, content SHA, state and recorded Drive ID against the original request and `trip_photos.id = operation_id`. Keep queries scoped to that tenant and slot.
+2. If the Drive ID is absent, inspect only that tenant’s connected Drive identity for `appProperties.guide_photo_operation`. Match the operation UUID, parent folder, generated slot prefix and exact file ID. Filename alone is insufficient. Conflicting gallery IDs or multiple matches require investigation. An empty search or timeout does not prove absence.
+3. If the proven object and matching gallery row exist, conditionally mark that operation completed. With a proven object but no gallery row, either link that exact object to the same tenant/slot/actor, or delete only that proven operation-owned object and confirm deletion before a conditional terminal state update. Failed reads, uncertain deletion or uncertain provider acceptance leave the claim locked.
+4. A confirmed completed gallery deletion permits the route’s controlled content-claim release. An `uploaded` or `uploading` operation without a gallery row stays locked for reconciliation. Do not restart an unknown upload with a fresh operation ID.
+
+Source inventory and limits: `/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md`, SHA256 `e950f0a1780721e42dce9daba5518664a13351b14d481d64adb3d3a242f9faaa`. No automated reconciler or hosted recovery is claimed.

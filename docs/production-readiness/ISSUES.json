@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T11:19:06Z",
+  "updated_at_utc": "2026-09-23T11:50:32Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -122,14 +122,20 @@
           "impact": "Exact tested remote dependency/runtime resolutions are not reproducibly bound to the candidate.",
           "violated_criterion": "C01 reproducible remote dependency resolutions and V06 exact build/runtime manifest",
           "verification": "Record supported exact Edge toolchain and resolved dependencies through its supported locking interface; verify clean deterministic check/build and relevant regressions without blanket upgrades.",
-          "status": "SOURCE_IN_PROGRESS"
+          "status": "SOURCE_FIXED",
+          "source_commit": "bfebb152d6abc57c4f02ebbd6d41eb22bb7b5000",
+          "review": "FRESH_CONTEXT_REVIEW_IN_PROGRESS",
+          "evidence": "/private/tmp/bookingtours-edge-resolution-evidence-20260923/summary.md",
+          "evidence_sha256": "fb3d49d069afda49b101aeffe4094fa872030ae285765024a53b81a9be7c3e24",
+          "local_result": "55 frozen clean-cache Deno checks and bundles pass; hash tamper and floating-import negatives pass; isolated npm graph audit zero",
+          "remaining": "Actual CLI ESZip/deployed graph unverified: API upload omits lock and native bundler could not start with missing libgcc. No Docker startup or provisioning performed."
         }
       ],
       "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
       "local_candidate": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
       "local_candidate_lock_sha256": "1ec6511d4909cad4efe126cfbf9610be0a504cb76403115594bc299ac862efc3",
       "local_evidence": "Storefront f11b1dd independently accepted: 9 executable contracts, type/ways checks, configured Webpack build, lint 0 errors/20 warnings, full/prod audits 0. Onboarding 2de7de49 independently accepted: 3 route contracts, type-enforced configured build, lint 0 errors/8 warnings, full/prod audits 0; reviewer additionally executed 88 form callbacks, provisioning cleanup/retry and actual submit behavior. Runtime/CI followup independently accepted and integrated at35ab96c. All three configured builds passed on Node22.23.2, full Admin1370pass/1existing conditional skip; independent affected79/79. Exact companions86588bcb/b93f053b are pinned in AdminCI. Edge graph remains open.",
-      "next": "Sol is implementing supported exact Edge dependency/toolchain resolutions in a separate worktree. Preserve accepted app/runtime evidence; review exact graph and deployment compatibility before C01 closure."
+      "next": "Review and integrate bounded local Edge resolution patch; deployed transitive graph remains an explicit open gate. Preserve accepted app/runtime evidence."
     },
     {
       "id": "C02",
@@ -164,7 +170,7 @@
     {
       "id": "C03",
       "title": "Production-safe rate limits and bounded resource use",
-      "status": "OPEN",
+      "status": "IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "legacy_refs": [
         "SECURITY-01"
@@ -176,10 +182,11 @@
           "path": "proxy.ts",
           "failure": "Production E2E_BYPASS_RATE_LIMIT is not rejected, Redis fetch has no explicit timeout, and fallback is a per-process Map while direct Auth/Edge paths bypass this proxy.",
           "impact": "Distributed abuse and unbounded limiter latency remain possible; a tiny shared IP allowance can deny legitimate staff.",
-          "verification": "Negative production bypass/config tests, bounded outage tests, shared-office allowance, distributed abuse, direct-path and expensive-operation behavioral tests."
+          "verification": "Negative production bypass/config tests, bounded outage tests, shared-office allowance, distributed abuse, direct-path and expensive-operation behavioral tests.",
+          "status": "SOURCE_IN_PROGRESS"
         }
       ],
-      "next": "Trace every ingress and supported workload, then correct effective limits without disabling controls.",
+      "next": "Sol is implementing bounded proxy controls with production bypass/outage, shared-office, trusted-IP, body-bound and distributed-abuse regressions; direct-path inventory remains open.",
       "native_auth_snapshot": {
         "project": "ukdsrndqhsatjkmxijuj",
         "observed_at_utc": "2026-09-23T10:43:41.701Z",
@@ -242,7 +249,7 @@
           "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af"
         }
       ],
-      "next": "Preserve accepted guide/Drive correction; complete alternate-path and phone-format coverage plus manual recovery procedure. C05 now owns serialized exact-role correction, including Drive bespoke caller lookup.",
+      "next": "Preserve accepted guide/Drive correction; verify alternate paths and actual phone-format contract. Conservative manual recovery is recorded in BEHAVIOUR.md; operational rehearsal remains required.",
       "accepted_correction": {
         "source_commit": "15a56d3842fc11cc89e761246dc22dc92991c674",
         "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af",
@@ -260,7 +267,12 @@
         "Native HEIC unsupported by corrected guide decoder; reconcile actual prior supported phone contract and safe compatibility before wholeC04 closure.",
         "Uncertain provider/database records need an operational manual reconciliation procedure; no automatic reconciler or universal deduplication claim.",
         "Deno validation of latest Edge source awaits pinned dependency graph; deployed checks remain unrun."
-      ]
+      ],
+      "alternate_inventory": {
+        "path": "/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md",
+        "sha256": "e950f0a1780721e42dce9daba5518664a13351b14d481d64adb3d3a242f9faaa",
+        "scope": "Source inventory only; alternate browser Drive and Storage paths require actual behavioral applicability checks. Guide picker advertises JPEG/PNG/WebP/AVIF/still GIF; native HEIC is unverified phone UX, not automatically a proven regression."
+      }
     },
     {
       "id": "C05",
@@ -288,7 +300,7 @@
           "id": "C05-EXACT-ROLE-AUTHORITY-20260923",
           "severity": "high",
           "owner": "gpt-6-sol/max",
-          "status": "SOURCE_IN_PROGRESS",
+          "status": "LOCAL_VERIFIED",
           "version": "Deployed catalog2026-09-23 / local source01491a1",
           "path": "supabase/migrations/20260724150000_operator_directory.sql:29; 20260907071000_operator_access_boundaries.sql:12; 20260922123000_operator_hot_path_admission.sql:25",
           "failure": "platform_public_settings ALL policy accepts SUPER% role prefixes. current_business_ids and authenticated arrival wrapper have no supported-role whitelist; optimized dashboard/bookings inherit that authority. Catalog proves these definitions, not existence or exploitation of an unknown-role account.",
@@ -296,22 +308,30 @@
           "violated_criterion": "ROLE_MATRIX exact SUPER_ADMIN/unknown-role denial; C05 effective permissions and V01 role matrix",
           "verification": "Reproduce unknown/prefixed role admission in disposable PG17 using actual policies and wrappers; implement reviewed additive correction; prove all supported own/foreign/suspended/read-only/service/customer cases and same identities.",
           "coverage_link": "V01",
-          "related_source_boundaries": "app/lib/api-auth.ts getCallerAdmin and supabase/functions/_shared/auth.ts requireAuth likewise admit an active admin row without a supported-role whitelist; verify actual handler regressions before extending shared correction."
+          "related_source_boundaries": "app/lib/api-auth.ts getCallerAdmin and supabase/functions/_shared/auth.ts requireAuth likewise admit an active admin row without a supported-role whitelist; verify actual handler regressions before extending shared correction.",
+          "source_commit": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+          "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+          "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
+          "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md"
         },
         {
           "id": "C05-DEMO-RPC-ACL-20260923",
           "severity": "gate",
           "owner": "gpt-6-sol/max",
-          "status": "SOURCE_IN_PROGRESS",
+          "status": "LOCAL_VERIFIED",
           "version": "Deployed function MD5 2f05b3d8c220ccac03016e9e7439bb99",
           "path": "public.refresh_claires_hiking_demo_dates(uuid,timestamptz); migrations20260915043000/20260916100000",
           "failure": "Direct anon/authenticated EXECUTE grants survive source revocation of PUBLIC despite intended service-only contract. Function is invoker and underlying RLS/ACL may block writes; no mutation was attempted or proven.",
           "impact": "Effective executable surface differs from intended service-only policy.",
           "violated_criterion": "C05 effective function grants and V01 named service authority",
-          "verification": "Forward explicit client-role revocation after local role tests; prove named service success and client denial without altering existing demo records."
+          "verification": "Forward explicit client-role revocation after local role tests; prove named service success and client denial without altering existing demo records.",
+          "source_commit": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+          "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+          "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
+          "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md"
         }
       ],
-      "next": "After C04 migration work stabilizes, serialize exact-role/ACL corrections with disposable regressions and independent review. Triage documented field/search-path/view dispositions, then review baseline updates against approved intended source.",
+      "next": "Sol is reproducing the separate Storage helper role gap with real disposable PostgreSQL, then making any evidence-supported forward correction. Complete targeted search-path and baseline dispositions; preserve accepted exact-role and demo-RPC proof.",
       "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
       "local_evidence": "Trusted CA/hostname/connection-string override tests; effective privilege/Storage/tenant drift fixtures and five independent probes pass on fresh PG17/Node22.23.2. Unchanged application rollout196/196 passes. Baseline unchanged. Integrated checker files exactly match accepted source; only readiness docs/V03 guard differ.",
       "result": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
@@ -337,12 +357,26 @@
         "24 definer functions use search_path=public with TEMP rights; review exact bodies/reachability and local temp-shadow cases before any targeted migration; no blanket exploit claim.",
         "Anon yoco_test_mode is a boolean, not credential disclosure by itself; reconcile intended public/staff contract before modifying grants or checker.",
         "operator_directory is an intentionally public marketing owner-rights view; preserve approved projection rather than treating label alone as defect.",
-        "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot."
+        "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot.",
+        "storage_admin_business_ids admits any unsuspended role in source; actual Storage permission reproduction is in progress before a separate correction. Public branding and approved read-only behavior must remain intact."
       ],
       "handler_failure_evidence": {
         "path": "/private/tmp/bookingtours-c05-evidence-20260923/unknown-role-handler-repro.mjs",
         "sha256": "ed877c2e4681d46d0b8512fa845c40a8f1b5b60c06e740e213950242e9e89ed8",
         "result": "Actual getCallerAdmin and shared Edge requireAuth admit FUTURE_STAFF; actual Drive handler admits FUTURE_STAFF/SUPER_PREFIX to two synthetic provider calls. No network/real provider."
+      },
+      "accepted_exact_role_correction": {
+        "source_commit": "48dce94b602cf1ad245a23b148af4b4ff5d0acb1",
+        "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
+        "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md",
+        "review_sha256": "27c25b8b0640889e0c976c2ce9afad8cf696a313930e279cac6b16c233f9625e",
+        "writer_evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-verification.md",
+        "writer_sha256": "107f6377518a14524950aecd9a74b5634bab895ce2f01ffe92c45c2bd9fd129e",
+        "tests": "112 focused unit, 218 disposable PostgreSQL rollout and 47 independent PostgreSQL checks pass",
+        "integration": "git diff reviewed source vs integrated HEAD excluding readiness documents is empty; scoped evidence reused",
+        "limits": "Source-only forward migration; broader Storage, function search paths, baseline and deployed low-role proof remain open"
       }
     },
     {
