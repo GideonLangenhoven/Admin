@@ -77,7 +77,7 @@ export function validateComboDates(
     }
   }
 
-  const maxGap = Number(rules.max_gap_days);
+  const maxGap = rules.max_gap_days == null ? NaN : Number(rules.max_gap_days);
   if (Number.isFinite(maxGap) && maxGap >= 0) {
     const span = (Math.max(...days) - Math.min(...days)) / DAY_MS;
     if (span > maxGap) {
