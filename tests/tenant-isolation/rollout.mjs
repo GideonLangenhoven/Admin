@@ -35,6 +35,11 @@ try {
   await db.query(readFileSync('tests/fixtures/rollout-marketing.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-cron.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-platform.sql', 'utf8'));
+  // Supabase-managed Storage grants and the last approved July Storage policy
+  // are fixture prerequisites for exercising the effective client write path.
+  await db.query(readFileSync('supabase/migrations/20260717100000_storage_upload_super_admin.sql', 'utf8'));
+  await db.query('grant usage on schema storage to authenticated');
+  await db.query('grant insert on storage.objects to authenticated');
   // The July public-settings policy exists in the deployed catalog but not in
   // the older schema snapshot; apply its real source before September changes.
   await db.query(readFileSync('supabase/migrations/20260724150000_operator_directory.sql', 'utf8'));
@@ -391,6 +396,34 @@ try {
   }
   await check('suspended staff has no tenant RLS authority',()=>as('authenticated',104,{},async()=>{
     assert.deepEqual((await db.query('select current_business_ids() ids')).rows[0].ids,[]);
+  }));
+  const insertStorage = (business, bucket='email-images') =>
+    db.query('insert into storage.objects(bucket_id,name) values($1,$2)',[bucket,id(business)+'/fixture.jpg']);
+  for (const user of [107,108]) {
+    await check(`unknown staff ${user} cannot upload to tenant Storage`,()=>as('authenticated',user,{},async()=>{
+      assert.deepEqual((await db.query('select storage_admin_business_ids() id')).rows,[]);
+      await assert.rejects(insertStorage(1),{code:'42501'});
+    }));
+  }
+  for (const user of [105,106,101]) {
+    await check(`exact own-tenant staff ${user} can upload scoped Storage`,()=>as('authenticated',user,{},async()=>{
+      await insertStorage(1);
+      await insertStorage(1,'marketing-assets');
+    }));
+    await check(`exact own-tenant staff ${user} cannot upload foreign Storage`,()=>as('authenticated',user,{},async()=>{
+      await assert.rejects(insertStorage(2),{code:'42501'});
+    }));
+  }
+  await check('exact SUPER_ADMIN can upload for supported target tenant',()=>as('authenticated',103,{},async()=>{
+    assert.equal((await db.query('select storage_is_super_admin() allowed')).rows[0].allowed,true);
+    await insertStorage(2);
+  }));
+  await check('read-only SUPER_ADMIN can browse but cannot upload Storage',()=>as('authenticated',109,{},async()=>{
+    assert.equal((await db.query('select storage_is_super_admin() allowed')).rows[0].allowed,true);
+    await assert.rejects(insertStorage(1),{code:'42501'});
+  }));
+  await check('suspended staff cannot upload Storage',()=>as('authenticated',104,{},async()=>{
+    await assert.rejects(insertStorage(1),{code:'42501'});
   }));
   await check('only exact active SUPER_ADMIN may update public platform settings',()=>as('authenticated',103,{},async()=>{
     assert.equal((await db.query("update platform_public_settings set value='{}'::jsonb where key='directory' returning key")).rowCount,1);
