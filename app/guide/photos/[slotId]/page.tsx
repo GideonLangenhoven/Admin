@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { getAuthHeaders } from "@/app/lib/admin-auth";
 import { useBusinessContext } from "@/components/BusinessContext";
@@ -16,6 +16,7 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
+  const uploadOperations = useRef(new Map<string, string>());
 
   useEffect(() => { reload(); }, [slotId, businessId]);
 
@@ -48,19 +49,30 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
       if (!headers.Authorization) throw new Error("Please sign in again before uploading photos.");
       delete headers["Content-Type"]; // The browser supplies the multipart boundary.
       const failed: string[] = [];
+      const needsReview: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const fileKey = [slotId, file.name, file.size, file.lastModified].join(":");
+        const operationId = uploadOperations.current.get(fileKey) || crypto.randomUUID();
+        uploadOperations.current.set(fileKey, operationId);
         const fd = new FormData();
         fd.append("file", file);
         fd.append("slot_id", slotId);
+        fd.append("operation_id", operationId);
         try {
           const r = await fetch("/api/guide/photo-upload", { method: "POST", headers, body: fd });
           const data = await r.json();
-          if (!r.ok || data.ok !== true) throw new Error(data.error || "Upload failed");
-        } catch { failed.push(file.name); }
+          if (!r.ok || data.ok !== true) {
+            if (data.retryable === false) needsReview.push(file.name);
+            else { failed.push(file.name); uploadOperations.current.delete(fileKey); }
+          } else uploadOperations.current.delete(fileKey);
+        } catch { needsReview.push(file.name); }
         setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
       }
-      setUploadStatus((files.length - failed.length) + " of " + files.length + " photos uploaded." + (failed.length ? " Please retry: " + failed.join(", ") : ""));
+      const confirmed = files.length - failed.length - needsReview.length;
+      setUploadStatus(confirmed + " of " + files.length + " photos uploaded."
+        + (failed.length ? " Please retry: " + failed.join(", ") + "." : "")
+        + (needsReview.length ? " Outcome unknown for " + needsReview.join(", ") + ". Check the gallery or ask an admin before uploading again." : ""));
       reload();
     } catch (e: any) {
       setUploadStatus(e?.message || "Upload failed");
@@ -112,10 +124,10 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
         ) : (
           <>
             <span className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Take or pick photos</span>
-            <span className="text-[12px] ui-text-muted">Saved to your Google Drive. Share this trip’s photo links in the thank-you email.</span>
+            <span className="text-[12px] ui-text-muted">JPEG, PNG, WebP, AVIF or still GIF up to 4 MB. Saved to your Google Drive.</span>
           </>
         )}
-        <input type="file" multiple accept="image/*" capture="environment" className="hidden"
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/gif" capture="environment" className="hidden"
           disabled={uploading} onChange={async e => { const input = e.currentTarget; await onPickPhotos(input.files); input.value = ""; }} />
       </label>
       {uploadStatus && <p role="status" className="mt-3 text-[13px] font-semibold">{uploadStatus}</p>}

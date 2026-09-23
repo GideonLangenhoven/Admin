@@ -20,12 +20,12 @@ function loadSource(
   }).outputText;
   runInNewContext(source, {
     module: sandboxModule, exports: sandboxModule.exports, console, Request, Response, Headers, URL, URLSearchParams, Date,
-    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, AbortSignal,
+    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, AbortSignal, File, Blob,
     process: { env: { NEXT_PUBLIC_SUPABASE_URL: "https://test.invalid", SUPABASE_SERVICE_ROLE_KEY: "fixture-".repeat(8), ...env } },
     Deno: { serve: (fn: typeof handler) => { handler = fn; }, env: { get: (key: string) => env[key] || "" } },
     require: (name: string) => {
       if (Object.hasOwn(mocks, name)) return mocks[name];
-      if (name === "crypto") return require("node:crypto");
+      if (name === "crypto" || name === "node:crypto") return require("node:crypto");
       if (name === "next/server") return {
         NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) },
         after: (task: () => void | Promise<void>) => { void task(); },
@@ -34,6 +34,7 @@ function loadSource(
       // Execute the real telemetry wrapper with delivery disabled unless the
       // test explicitly supplies a DSN and a network stub.
       if (name === "../_shared/sentry.ts") return loadSource("supabase/functions/_shared/sentry.ts", {}, env, fetchImpl).exports;
+      if (name === "../_shared/subscription.ts") return loadSource("supabase/functions/_shared/subscription.ts", {}, env, fetchImpl).exports;
       throw new Error("Unexpected handler import: " + name);
     },
     fetch: fetchImpl,
@@ -64,7 +65,7 @@ export function sourceFunction(file: string, name: string, bindings: Record<stri
   if (!node) throw new Error("Missing source function: " + name);
   const code = ts.transpileModule(node.getText(ast).replace(/^export\s+/, ""), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   return runInNewContext(code + "\n" + name, {
-    console, URL, setTimeout, clearTimeout,
+    console, URL, setTimeout, clearTimeout, crypto: webcrypto,
     fetch: () => { throw new Error("Network disabled in source-function tests"); },
     ...bindings,
   }, { filename: file });

@@ -2,6 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSubscriptionState } from "../_shared/subscription.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -152,9 +153,14 @@ Deno.serve(async (req: any) => {
     if (jwt && jwt !== SERVICE_ROLE_KEY) {
       const { data: { user: gUser }, error: gAuthErr } = await supabase.auth.getUser(jwt);
       if (gAuthErr || !gUser) return fail(req, "Unauthorized", 401);
-      const { data: gAdmin } = await supabase.from("admin_users").select("id, read_only").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
-      if (!gAdmin) return fail(req, "You are not an admin of this business", 403);
+      const { data: gAdmin, error: gAdminError } = await supabase.from("admin_users")
+        .select("id, role, read_only, suspended").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
+      if (gAdminError || !gAdmin || gAdmin.suspended) return fail(req, "You are not an active admin of this business", 403);
       if (gAdmin.read_only && action !== "status") return fail(req, "This demonstration account is read-only", 403);
+      if (action !== "status" && gAdmin.role !== "SUPER_ADMIN") {
+        const subscription = await getSubscriptionState(supabase, businessId);
+        if (!subscription.trading) return fail(req, "This operator is not active", 403);
+      }
     } else if (!jwt) {
       return fail(req, "Authorization required", 401);
     }
