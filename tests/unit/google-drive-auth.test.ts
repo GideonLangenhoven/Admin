@@ -76,6 +76,26 @@ describe("direct Google Drive authorization", () => {
     expect(f.fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it.each(["ADMIN", "MAIN_ADMIN"])("keeps exact legacy %s Drive token access", async role => {
+    const f = fixture({ admin: { id: "admin-a", role, read_only: false, suspended: false } });
+    expect((await f.handler(f.request)).status).toBe(200);
+    expect(f.fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it.each(["FUTURE_STAFF", "SUPER_PREFIX", "operator"])("denies unknown %s before Drive provider access", async role => {
+    const f = fixture({ admin: { id: "admin-a", role, read_only: false, suspended: false } });
+    expect((await f.handler(f.request)).status).toBe(403);
+    expect(f.fetchImpl).not.toHaveBeenCalled();
+    expect(f.rpc).not.toHaveBeenCalled();
+  });
+
+  it("denies an unknown role even for connection-status browsing", async () => {
+    const f = fixture({ action: "status", admin: { id: "admin-a", role: "FUTURE_STAFF", read_only: false, suspended: false } });
+    expect((await f.handler(f.request)).status).toBe(403);
+    expect(f.fetchImpl).not.toHaveBeenCalled();
+    expect(f.rpc).not.toHaveBeenCalled();
+  });
+
   it("preserves attributable service-role token operations", async () => {
     const f = fixture({ service: true });
     expect((await f.handler(f.request)).status).toBe(200);

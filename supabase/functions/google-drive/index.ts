@@ -155,7 +155,10 @@ Deno.serve(async (req: any) => {
       if (gAuthErr || !gUser) return fail(req, "Unauthorized", 401);
       const { data: gAdmin, error: gAdminError } = await supabase.from("admin_users")
         .select("id, role, read_only, suspended").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
-      if (gAdminError || !gAdmin || gAdmin.suspended) return fail(req, "You are not an active admin of this business", 403);
+      if (gAdminError || !gAdmin || gAdmin.suspended ||
+          !["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"].includes(gAdmin.role)) {
+        return fail(req, "You are not an active admin of this business", 403);
+      }
       if (gAdmin.read_only && action !== "status") return fail(req, "This demonstration account is read-only", 403);
       if (action !== "status" && gAdmin.role !== "SUPER_ADMIN") {
         const subscription = await getSubscriptionState(supabase, businessId);
