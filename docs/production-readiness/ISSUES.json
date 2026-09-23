@@ -319,7 +319,12 @@
       "alternate_inventory": {
         "path": "/private/tmp/bookingtours-c04-evidence-20260923/alternate-paths-and-recovery.md",
         "sha256": "e950f0a1780721e42dce9daba5518664a13351b14d481d64adb3d3a242f9faaa",
-        "scope": "Source inventory only; alternate browser Drive and Storage paths require actual behavioral applicability checks. Guide picker advertises JPEG/PNG/WebP/AVIF/still GIF; native HEIC is unverified phone UX, not automatically a proven regression."
+        "scope": "Source inventory only; alternate browser Drive and Storage paths require actual behavioral applicability checks. Guide picker advertises JPEG/PNG/WebP/AVIF/still GIF; native HEIC is unverified phone UX, not automatically a proven regression.",
+        "storage_followup": {
+          "path": "/private/tmp/bookingtours-c04-evidence-20260923/storage-bounds-followup.md",
+          "sha256": "edbb23abe5db9e5c49228285446648ac92192090b58045cfed289c0ec9282a14",
+          "result": "Captured bucket configuration already bounds email-images5MiB, marketing-assets10MiB and onboarding-assets5MiB with explicit MIME allowlists. Configuration is not actual upload/served-content or decoder proof; preserve supported SVG and existing links pending concrete criteria."
+        }
       }
     },
     {

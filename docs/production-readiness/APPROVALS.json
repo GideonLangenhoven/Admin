@@ -1,25 +1,25 @@
 {
-  "updated_at_utc": "2026-09-22T09:15:55Z",
-  "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "updated_at_utc": "2026-09-23T13:49:54Z",
+  "candidate": "PROVISIONAL_NOT_FROZEN",
   "authorized": {
     "isolated_source_changes": true,
     "local_tests_with_synthetic_data": true,
-    "bt500_shared_read_smoke": true,
-    "bt500_marker_only_synthetic_mutation": true,
-    "current_prelaunch_project_synthetic_reset_and_testing": true,
-    "current_prelaunch_project_bt500_qualification": true,
-    "bounded_deployed_marker_load": true,
-    "immediate_24_hour_window_after_exact_deployment": true,
-    "scoped_test_email_and_whatsapp_recipient": true,
-    "monitoring_receiver_supplied": true,
-    "yoco_test_mode_requests": true,
-    "production_mutation": true,
-    "deployment_or_push": true,
+    "bt500_shared_read_smoke": false,
+    "bt500_marker_only_synthetic_mutation": false,
+    "current_prelaunch_project_synthetic_reset_and_testing": false,
+    "current_prelaunch_project_bt500_qualification": false,
+    "bounded_deployed_marker_load": false,
+    "immediate_24_hour_window_after_exact_deployment": false,
+    "scoped_test_email_and_whatsapp_recipient": false,
+    "monitoring_receiver_supplied": false,
+    "yoco_test_mode_requests": false,
+    "production_mutation": false,
+    "deployment_or_push": false,
     "real_messages": false,
     "real_charges_or_refunds": false,
     "provider_account_changes": false,
     "paid_resource_changes": false,
-    "production_or_paid_load": true,
+    "production_or_paid_load": false,
     "destructive_existing_resource_operations": false
   },
   "resolved_product_decisions": [
@@ -41,25 +41,68 @@
     },
     {
       "id": "BT500_TARGET",
-      "decision": "Section 7 uses 500 authenticated sessions. Replaceable synthetic data is permitted; live messages, payments, refunds and provider changes remain blocked."
-    },
-    {
-      "id": "QUALIFICATION_WINDOW_AND_RECIPIENTS",
-      "decision": "Begin the 24-hour window immediately after the exact candidate is deployed. A single test email, WhatsApp recipient and monitoring receiver were supplied in-session and are intentionally not stored in Git. Yoco qualification remains test-mode-only."
+      "decision": "BT500-LAUNCH-V1 requires500 distinct staff accounts/concurrent active sessions across167 synthetic businesses, at most3 staff/business and2 in the final business. Scope and thresholds remain; the historical execution window expired. No current mutation/load authority is implied."
     }
   ],
   "missing_external_approvals": [
-    "Separate restore target",
-    "Any paid scaling or cost above ZAR 0",
-    "Real charges, refunds, unrestricted outbound messaging or provider-account changes",
-    "Public launch switch"
+    "Exact current publication/deployment and migration packet after required non-production gates pass; include automatic deployment paths, window, effects, cost and recovery.",
+    "Exact hosted test window and allowed synthetic records/recipients/modes, after outbound negative guards and candidate prerequisites pass.",
+    "Separate identified isolated restore target and allowed database/Auth/file/configuration restore effects; RPO15m and RTO60m remain required.",
+    "Existing shared Redis service identity, configuration and quota/remaining allowance at ZAR0 before fail-closed ingress deployment.",
+    "Capacity/data/Realtime/worker/generator quotas and remaining billable allowance for the complete BT500 workload; any paid capacity needs explicit owner decision.",
+    "Approved monitoring receiver, incident owner and delivered-alert test window.",
+    "Distinct24-hour limited production canary with real isolation boundary and adoption gates after exact deployed verification."
   ],
   "latest_scope_steering": {
-    "request": "Deploy the exact frozen candidates and use the current no-customer environment for approved ZAR 0 pre-launch qualification with replaceable marker data.",
-    "section5_status": "Corrective implementation is deployed; browser and scheduler smoke pass, while remaining deployed role/provider acceptance is open.",
-    "section6_status": "100-account local continuity passed; deployed role matrix and genuine provider sandbox gates remain.",
-    "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Target-side queueing is confirmed; the local corrective candidate is not approved or deployed. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
-    "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; the capacity correction, alert delivery and isolated restore rehearsal remain open.",
-    "section9_status": "Handoff verdict is FAILED_GATE with deployed-smoke and follow-up capacity-attribution evidence."
+    "request": "Continue all C01-C06 and V01-V06 requirements with authorized isolated source work and local synthetic tests. Complete concrete reviewable work before asking for an external action approval.",
+    "current_source": "Admin integrated e9bea358458ecd0d2d701731c4ca94f5ba9f589c; readiness-only commits are tracked separately. Source corrections remain active; no final candidate freeze.",
+    "deployment": "Local corrections are not deployed-equivalent; historical Admin alias reports ebb62b8. No push, remote migration, hosted load, provider effect or restore has been performed in the current closeout.",
+    "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet."
+  },
+  "historical_checkpoint": {
+    "updated_at_utc": "2026-09-22T09:15:55Z",
+    "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "authorized": {
+      "isolated_source_changes": true,
+      "local_tests_with_synthetic_data": true,
+      "bt500_shared_read_smoke": true,
+      "bt500_marker_only_synthetic_mutation": true,
+      "current_prelaunch_project_synthetic_reset_and_testing": true,
+      "current_prelaunch_project_bt500_qualification": true,
+      "bounded_deployed_marker_load": true,
+      "immediate_24_hour_window_after_exact_deployment": true,
+      "scoped_test_email_and_whatsapp_recipient": true,
+      "monitoring_receiver_supplied": true,
+      "yoco_test_mode_requests": true,
+      "production_mutation": true,
+      "deployment_or_push": true,
+      "real_messages": false,
+      "real_charges_or_refunds": false,
+      "provider_account_changes": false,
+      "paid_resource_changes": false,
+      "production_or_paid_load": true,
+      "destructive_existing_resource_operations": false
+    },
+    "latest_scope_steering": {
+      "request": "Deploy the exact frozen candidates and use the current no-customer environment for approved ZAR 0 pre-launch qualification with replaceable marker data.",
+      "section5_status": "Corrective implementation is deployed; browser and scheduler smoke pass, while remaining deployed role/provider acceptance is open.",
+      "section6_status": "100-account local continuity passed; deployed role matrix and genuine provider sandbox gates remain.",
+      "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Target-side queueing is confirmed; the local corrective candidate is not approved or deployed. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
+      "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; the capacity correction, alert delivery and isolated restore rehearsal remain open.",
+      "section9_status": "Handoff verdict is FAILED_GATE with deployed-smoke and follow-up capacity-attribution evidence."
+    },
+    "applicability": "Historical candidate/window only. Not current approval for this local candidate or any new hosted action. Retained for auditability.",
+    "superseded_window_decision": {
+      "id": "QUALIFICATION_WINDOW_AND_RECIPIENTS",
+      "decision": "Begin the 24-hour window immediately after the exact candidate is deployed. A single test email, WhatsApp recipient and monitoring receiver were supplied in-session and are intentionally not stored in Git. Yoco qualification remains test-mode-only."
+    }
+  },
+  "current_session_confirmations": {
+    "routing": "Astra xhigh orchestration/review and GPT-6 Sol max implementation; reduce tokens through compact tasks and evidence reuse.",
+    "source_project": "ukdsrndqhsatjkmxijuj",
+    "data": "Owner confirms current50 booking and50 customer rows synthetic/demo. No hosted mutation follows from that confirmation alone.",
+    "restore_target": "Supplied URL identifies source, so no separate isolated target is identified. Other projects are excluded from this assignment.",
+    "budget_ceiling_zar": 0,
+    "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window."
   }
 }
