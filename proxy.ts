@@ -321,9 +321,10 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
     }
   }
 
-  // The login and setup-link routes coerce these fields with String(...).
-  // Match that behavior so a one-element JSON array cannot evade its bucket.
-  const email = String(payload.email || "").trim().toLowerCase();
+  // Match the routes' String(...) coercion for array values, while leaving
+  // noncoercible JSON under the coarse IP bucket for route validation.
+  const bucketString = (value: unknown) => { try { return String(value || ""); } catch { return ""; } };
+  const email = bucketString(payload.email).trim().toLowerCase();
   const validEmail = email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : "";
   const secret = token || "local-only";
   const buckets: Array<[RateLimitConfig, string]> = [];
@@ -332,7 +333,7 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
     if (validEmail) buckets.push([AUTH_INPUT_LIMIT, `${ip}:${await inputKey(validEmail, secret)}`]);
   } else if (isSetupLink && (payload.action === "validate" || payload.action === "complete")) {
     buckets.push([TOKEN_IP_LIMIT, ip]);
-    const setupToken = String(payload.token || "");
+    const setupToken = bucketString(payload.token);
     const boundedToken = setupToken.length <= 256 ? setupToken : "";
     if (boundedToken) buckets.push([TOKEN_INPUT_LIMIT, `${ip}:${await inputKey(boundedToken, secret)}`]);
   } else if (isSetupLink) {
@@ -419,5 +420,5 @@ export async function limitAdminIngress(req: NextRequest): Promise<{ blocked: Ne
 }
 
 export const config = {
-  matcher: ["/((?!api/admin/(?:login|setup-link)(?:/|$)).*)"],
+  matcher: ["/((?!api/admin/(?:login|setup-link)/?$).*)"],
 };

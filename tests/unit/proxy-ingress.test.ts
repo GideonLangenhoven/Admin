@@ -59,7 +59,12 @@ describe("proxy ingress limits", () => {
     const [matcher] = getMiddlewareMatchers(config.matcher, {});
     const matches = (path: string) => new RegExp(matcher.regexp).test(path);
     expect(matches("/api/admin/login")).toBe(false);
+    expect(matches("/api/admin/login/")).toBe(false);
     expect(matches("/api/admin/setup-link")).toBe(false);
+    expect(matches("/api/admin/setup-link/")).toBe(false);
+    expect(matches("/api/admin/login/extra")).toBe(true);
+    expect(matches("/api/admin/setup-link/extra")).toBe(true);
+    expect(matches("/api/admin/login-extra")).toBe(true);
     expect(matches("/api/admin/update")).toBe(true);
     expect(matches("/api/check-ins")).toBe(true);
     expect(matches("/settings")).toBe(true);
@@ -114,6 +119,24 @@ describe("proxy ingress limits", () => {
     expect(denied.headers.get("Retry-After")).toBeTruthy();
     expect(lookups).toEqual(Array(10).fill("staff@example.invalid"));
     expect([...shared.counters.keys()].filter(key => key.includes("auth-input"))).toHaveLength(1);
+  });
+
+  it("keeps malformed setup-link email under the coarse IP bucket and route validation", async () => {
+    const shared = redis();
+    const limitAdminIngress = sourceExports("proxy.ts", { "next/server": { NextResponse } }, production, shared.fetchImpl).limitAdminIngress;
+    const setup = sourceHandler("app/api/admin/setup-link/route.ts", {
+      "next/server": { NextResponse },
+      "@supabase/supabase-js": { createClient: () => { throw new Error("Unexpected database call"); } },
+      "../../../lib/api-auth": {}, "../../../lib/admin-password": {},
+      "../../../../proxy": { limitAdminIngress },
+    }, production);
+    const response = await setup(request("/api/admin/setup-link", {
+      action: "send", reason: "RESET", email: { toString: null },
+    }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid setup-link request" });
+    expect([...shared.counters.keys()].filter(key => key.includes("setup-send-ip"))).toHaveLength(1);
+    expect([...shared.counters.keys()].filter(key => key.includes("setup-send-input"))).toHaveLength(0);
   });
 
   it("closes blocked auth responses without changing their status, body, or retry header", async () => {
