@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T09:06:51Z",
+  "recorded_at_utc": "2026-09-23T09:45:56Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,14 +38,24 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
-    "integrated_tree": "bc17885c9f65f8ed99323f1d71061100996c8edf",
+    "integrated_commit": "b29767b66359099291cd6aa5b34587e4b5a3fcf7",
+    "integrated_tree": "9edf12da5a78da06dbe03a1c6207322e5e464804",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
       "integrated_commit": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
       "review": "ACCEPTED",
       "verification": "9 actual Deno validator and11 parser tests pass; exact integrated tree reused"
+    },
+    "reviewed_execution_guard": {
+      "id": "V03-EXPIRED-WINDOW-20260923",
+      "source_commit": "323411740c1081d3a794d7e09e9fbdbd6335e29e",
+      "integrated_commit": "b29767b66359099291cd6aa5b34587e4b5a3fcf7",
+      "review": "ACCEPTED",
+      "integration": "LOCAL_VERIFIED",
+      "tests": "10/10 on patched Node22.23.2",
+      "evidence": "/private/tmp/bookingtours-v03-window-evidence-20260923/summary.md",
+      "evidence_sha256": "f8d2629c932a028269a1f504e8a80138ebb5852d6372efea53aad780a9c5d68e"
     }
   },
   "booking": {
@@ -101,6 +111,12 @@
     "onboarding_typed_build": {
       "path": "/private/tmp/bookingtours-onboarding-c01-evidence-20260923/build-typed-final.txt",
       "sha256": "9751eb211e782fafcef7524f33cf0ae188cbce9da081fb10d93fc56be940b4ca"
+    },
+    "v03_window": "Expired/future/insufficient window blocked; load stops on expiry/ordinary signal with failed result and post-stop invariant evidence. Only offline doubles; overall V03 incomplete.",
+    "c05_application_rollout": {
+      "path": "/private/tmp/bookingtours-c05-evidence-20260923/rollout-local-fresh.log",
+      "result": "196/196 real disposable database checks passed; checker review still pending",
+      "runtime": "Node22.23.2/PostgreSQL17"
     }
   },
   "qualification": {
@@ -140,6 +156,8 @@
       "binary": "/private/tmp/bookingtours-node-v22.23.2-20260923/bin/node",
       "binary_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572",
       "archive_verification": "Official nodejs.org SHASUMS256 matched; no global runtime changed"
-    }
+    },
+    "hosted_selection_limit": "Vercel selects major22 via engines and manages patches; exact deployed patch must be observed, not inferred from local pin.",
+    "primary_vercel_source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions"
   }
 }

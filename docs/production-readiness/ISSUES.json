@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T09:06:51Z",
+  "updated_at_utc": "2026-09-23T09:45:56Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -9,7 +9,7 @@
       "id": "C01",
       "title": "Whole-product dependency and runtime security",
       "status": "IN_PROGRESS",
-      "owner": "gpt-6-sol/max companion writer",
+      "owner": "gpt-6-sol/max runtime and CI writer",
       "legacy_refs": [
         "SEC-DEV-DEPENDENCIES-01"
       ],
@@ -104,6 +104,18 @@
           ],
           "verification": "Use an official checksum-verified supported patch locally; align CI/engines and exact companion/onboarding pins, rerun affected runtime-sensitive checks and actual builds, then verify deployed runtime within approved deployment.",
           "status": "IN_PROGRESS"
+        },
+        {
+          "id": "C01-EDGE-RESOLUTION-20260923",
+          "severity": "gate",
+          "owner": "gpt-6-sol/max",
+          "version": "b29767b66359099291cd6aa5b34587e4b5a3fcf7",
+          "path": "supabase/functions/deno.json; Edge remote imports; .github/workflows/ci.yml",
+          "failure": "Deno lock is explicitly disabled; remote imports include floating supabase-js@2 and CI selects deno v2.x.",
+          "impact": "Exact tested remote dependency/runtime resolutions are not reproducibly bound to the candidate.",
+          "violated_criterion": "C01 reproducible remote dependency resolutions and V06 exact build/runtime manifest",
+          "verification": "Record supported exact Edge toolchain and resolved dependencies through its supported locking interface; verify clean deterministic check/build and relevant regressions without blanket upgrades.",
+          "status": "OPEN"
         }
       ],
       "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
@@ -198,7 +210,8 @@
         }
       ],
       "next": "Fix certificate/hostname validation and extend effective privilege coverage without rubber-stamping a new baseline.",
-      "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c"
+      "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
+      "local_evidence": "Unchanged application rollout196/196 passed on fresh disposable PG17/Node22.23.2. Earlier failed run was traced to cluster-shared fixture service_role without BYPASSRLS; fresh fixture preserved all assertions. Checker source remains under independent review for exact Storage policy semantics and safe empty search_path; no baseline or hosted policy changed."
     },
     {
       "id": "C06",
@@ -284,8 +297,15 @@
           "failure": "Runner validates a historical approval reference and status but does not enforce current time against the recorded execution window; preflight checks timestamp parsing/order only. The recorded window expired 2026-09-22T16:00:00Z.",
           "impact": "A stale approval record can authorize a later hosted run in source logic.",
           "violated_criterion": "V03 safe executable harness and explicit current action window",
-          "verification": "Offline negative tests for missing, not-yet-open, expired and insufficient-duration windows; an authorized in-window fixture passes without hosted calls.",
-          "status": "SOURCE_IN_PROGRESS"
+          "verification": "Node22.23.2: 10/10 writer and integration tests, independent affected2/2; contract/self-test pass; actual expired record denied before credentials/load. Integration command node --test tests/stress/bt500-window.test.mjs tests/stress/bt500-mixed-config.test.mjs, tool session43592 exit0. Only readiness docs differ from reviewed source.",
+          "status": "LOCAL_VERIFIED",
+          "source_commit": "323411740c1081d3a794d7e09e9fbdbd6335e29e",
+          "integrated_commit": "b29767b66359099291cd6aa5b34587e4b5a3fcf7",
+          "reviewer": "fresh-context gpt-6-astra/xhigh /root/v03_window_review",
+          "review": "ACCEPTED after signal-interruption and clock-adjustment corrections",
+          "evidence": "/private/tmp/bookingtours-v03-window-evidence-20260923/summary.md",
+          "evidence_sha256": "f8d2629c932a028269a1f504e8a80138ebb5852d6372efea53aad780a9c5d68e",
+          "limits": "Synthetic local k6/psql doubles, no hosted workload. Hard SIGKILL, host loss or a stalled runner require external supervision before qualification."
         }
       ]
     },
@@ -321,7 +341,7 @@
         "CI-01",
         "DEPLOY-01"
       ],
-      "evidence": "Admin local code18f601e3 differs from deployedebb62b8; accepted local storefrontf11b1dd and onboarding2de7de49 await runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
+      "evidence": "Admin integrated source/harness b29767b66359099291cd6aa5b34587e4b5a3fcf7 differs from deployed ebb62b8. Accepted storefront f11b1dd and onboarding2de7de49 await active runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
       "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary.",
       "children": [
         {
