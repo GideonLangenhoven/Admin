@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T10:49:49Z",
+  "updated_at_utc": "2026-09-23T11:19:06Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -212,7 +212,7 @@
     {
       "id": "C04",
       "title": "Upload validation and partial-failure reconciliation",
-      "status": "SOURCE_IN_PROGRESS",
+      "status": "IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "children": [
         {
@@ -222,33 +222,45 @@
           "failure": "The guide route buffers an unbounded multipart file, trusts name/type, and leaves an operation-owned Drive object orphaned when the trip_photos insert fails; an alternate direct upload path also exists.",
           "impact": "Resource exhaustion, unsafe content and unreconciled private objects can result.",
           "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof.",
-          "status": "SOURCE_FIXED_PENDING_CORRECTION_REVIEW"
+          "status": "LOCAL_VERIFIED_SCOPED",
+          "source_commit": "15a56d3842fc11cc89e761246dc22dc92991c674",
+          "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af"
         },
         {
           "id": "C04-DRIVE-AUTH-20260923",
           "severity": "high",
           "owner": "gpt-6-sol/max upload writer",
-          "status": "SOURCE_FIXED_PENDING_CORRECTION_REVIEW",
+          "status": "LOCAL_VERIFIED_SCOPED",
           "version": "Admin b29767b / actual handler synthetic test",
           "path": "supabase/functions/google-drive/index.ts:165",
           "failure": "Actual handler with synthetic suspended own-tenant admin returns200 for action token and calls trapped OAuth refresh; current select only id/read_only and no subscription-state boundary.",
           "impact": "Revoked staff can attempt continued provider access through a direct enabled path. No genuine Google call or credential exposure was performed.",
           "violated_criterion": "C04 ownership/demo/permission preservation; V01 suspended identity and direct Edge denial",
           "verification": "Use current shared auth/subscription semantics where compatible; prove active staff/service positive flows and suspended/inactive/read-only token denial with zero forbidden provider calls. Preserve read-only status and valid photo/video/OAuth workflows.",
-          "evidence": "/private/tmp/bookingtours-c04-evidence-20260923/google-drive-auth-repro.test.ts"
+          "evidence": "/private/tmp/bookingtours-c04-evidence-20260923/google-drive-auth-repro.test.ts",
+          "source_commit": "15a56d3842fc11cc89e761246dc22dc92991c674",
+          "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af"
         }
       ],
-      "next": "Sol corrects confirmed duplicate retry/reload paths, then same independent Astra reviewer verifies fixed hash. Alternate-path and deployed evidence remain incomplete.",
-      "pending_review": {
-        "commit": "5bd1486a95b18a8b2ca960f39bcc36fa4599dd7d",
-        "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
-        "worktree": "/private/tmp/bookingtours-c04-20260923",
-        "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
-        "reviewer": "fresh-context gpt-6-astra/xhigh",
-        "status": "CHANGES_REQUESTED",
-        "findings": "Independent actual route/picker probes reproduced two provider objects after token failure clears retry ID and after component remount loses memory-only ID. Sol is correcting durable identity/ledger ordering.",
-        "probe_sha256": "bdda0b8ae1c818c138f0d736deb9524af97cf54b0210a4734cab3fda9305f7a6"
-      }
+      "next": "Preserve accepted guide/Drive correction; complete alternate-path and phone-format coverage plus manual recovery procedure. C05 now owns serialized exact-role correction, including Drive bespoke caller lookup.",
+      "accepted_correction": {
+        "source_commit": "15a56d3842fc11cc89e761246dc22dc92991c674",
+        "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af",
+        "fixture_source_commit": "b89a57d2d0e7db6f4822ce1ca18ac48eb538c2f4",
+        "fixture_integrated_commit": "0ae848defa74e500b4fe9c05941b3d7df860bc07",
+        "review": "ACCEPTED_SCOPED_C04",
+        "review_artifact": "/private/tmp/bookingtours-c04-evidence-20260923/independent-c04-acceptance.md",
+        "review_sha256": "d20ba1f2ef4b2cdf6fa4f7e1d19ba24b2d11d06a4728523c1080c35ab70720b1",
+        "writer_verification_sha256": "e6c13b72d064d3b3cbd7eb02b89e34605a228a900355ac385930b397bee53f15",
+        "proof": "107 focused tests; 7 independent actual-handler + disposablePG17 migration/concurrency/recovery probes; real image bytes and synthetic provider; no hosted effect.",
+        "dedup_scope": "Identical raw photo bytes by same admin actor, business and slot, including independent browser IDs. Unknown provider/database outcomes require manual reconciliation."
+      },
+      "remaining": [
+        "Alternate direct browser image/video and separate Storage paths need bounded behavioral coverage; do not presume all are defective.",
+        "Native HEIC unsupported by corrected guide decoder; reconcile actual prior supported phone contract and safe compatibility before wholeC04 closure.",
+        "Uncertain provider/database records need an operational manual reconciliation procedure; no automatic reconciler or universal deduplication claim.",
+        "Deno validation of latest Edge source awaits pinned dependency graph; deployed checks remain unrun."
+      ]
     },
     {
       "id": "C05",
@@ -276,7 +288,7 @@
           "id": "C05-EXACT-ROLE-AUTHORITY-20260923",
           "severity": "high",
           "owner": "gpt-6-sol/max",
-          "status": "OPEN",
+          "status": "SOURCE_IN_PROGRESS",
           "version": "Deployed catalog2026-09-23 / local source01491a1",
           "path": "supabase/migrations/20260724150000_operator_directory.sql:29; 20260907071000_operator_access_boundaries.sql:12; 20260922123000_operator_hot_path_admission.sql:25",
           "failure": "platform_public_settings ALL policy accepts SUPER% role prefixes. current_business_ids and authenticated arrival wrapper have no supported-role whitelist; optimized dashboard/bookings inherit that authority. Catalog proves these definitions, not existence or exploitation of an unknown-role account.",
@@ -290,7 +302,7 @@
           "id": "C05-DEMO-RPC-ACL-20260923",
           "severity": "gate",
           "owner": "gpt-6-sol/max",
-          "status": "OPEN",
+          "status": "SOURCE_IN_PROGRESS",
           "version": "Deployed function MD5 2f05b3d8c220ccac03016e9e7439bb99",
           "path": "public.refresh_claires_hiking_demo_dates(uuid,timestamptz); migrations20260915043000/20260916100000",
           "failure": "Direct anon/authenticated EXECUTE grants survive source revocation of PUBLIC despite intended service-only contract. Function is invoker and underlying RLS/ACL may block writes; no mutation was attempted or proven.",
@@ -326,7 +338,12 @@
         "Anon yoco_test_mode is a boolean, not credential disclosure by itself; reconcile intended public/staff contract before modifying grants or checker.",
         "operator_directory is an intentionally public marketing owner-rights view; preserve approved projection rather than treating label alone as defect.",
         "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot."
-      ]
+      ],
+      "handler_failure_evidence": {
+        "path": "/private/tmp/bookingtours-c05-evidence-20260923/unknown-role-handler-repro.mjs",
+        "sha256": "ed877c2e4681d46d0b8512fa845c40a8f1b5b60c06e740e213950242e9e89ed8",
+        "result": "Actual getCallerAdmin and shared Edge requireAuth admit FUTURE_STAFF; actual Drive handler admits FUTURE_STAFF/SUPER_PREFIX to two synthetic provider calls. No network/real provider."
+      }
     },
     {
       "id": "C06",

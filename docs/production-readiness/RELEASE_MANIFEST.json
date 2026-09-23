@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T10:49:49Z",
+  "recorded_at_utc": "2026-09-23T11:19:06Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "35ab96c241dfa4e7b670b230d9973b1e3321c95a",
-    "integrated_tree": "24da8de5afd1a7f5b7cd96fcb0d60fbccd2c3bf4",
+    "integrated_commit": "0ae848defa74e500b4fe9c05941b3d7df860bc07",
+    "integrated_tree": "cb880e50e4e19352f7096607ca013dd333e091be",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -66,17 +66,19 @@
       "independent_log_sha256": "c23fcb6e7800eaa5f7ba39d926fbd86618bf2ad2d95cdf5c55418c370b22e72a",
       "rollout_log_sha256": "3bff56e7fff6d46fefe5e1d90648487b98e276739cfe9e2938f01cdd776b6a69"
     },
-    "pending_upload_review": {
-      "commit": "5bd1486a95b18a8b2ca960f39bcc36fa4599dd7d",
-      "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
-      "worktree": "/private/tmp/bookingtours-c04-20260923",
-      "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
-      "reviewer": "fresh-context gpt-6-astra/xhigh",
-      "status": "CHANGES_REQUESTED",
-      "findings": "Independent actual route/picker probes reproduced two provider objects after token failure clears retry ID and after component remount loses memory-only ID. Sol is correcting durable identity/ledger ordering.",
-      "probe_sha256": "bdda0b8ae1c818c138f0d736deb9524af97cf54b0210a4734cab3fda9305f7a6"
-    },
-    "integrated_lock_sha256": "e6f465440dd65b937f39e58581d4daf5fb63379860d077853995ce2a5a603b70"
+    "integrated_lock_sha256": "e6f465440dd65b937f39e58581d4daf5fb63379860d077853995ce2a5a603b70",
+    "reviewed_upload_correction": {
+      "source_commit": "15a56d3842fc11cc89e761246dc22dc92991c674",
+      "integrated_commit": "5289389220a38db233bf4892d93007e46c1831af",
+      "fixture_source_commit": "b89a57d2d0e7db6f4822ce1ca18ac48eb538c2f4",
+      "fixture_integrated_commit": "0ae848defa74e500b4fe9c05941b3d7df860bc07",
+      "review": "ACCEPTED_SCOPED_C04",
+      "review_artifact": "/private/tmp/bookingtours-c04-evidence-20260923/independent-c04-acceptance.md",
+      "review_sha256": "d20ba1f2ef4b2cdf6fa4f7e1d19ba24b2d11d06a4728523c1080c35ab70720b1",
+      "writer_verification_sha256": "e6c13b72d064d3b3cbd7eb02b89e34605a228a900355ac385930b397bee53f15",
+      "proof": "107 focused tests; 7 independent actual-handler + disposablePG17 migration/concurrency/recovery probes; real image bytes and synthetic provider; no hosted effect.",
+      "dedup_scope": "Identical raw photo bytes by same admin actor, business and slot, including independent browser IDs. Unknown provider/database outcomes require manual reconciliation."
+    }
   },
   "booking": {
     "repository": "GideonLangenhoven/capekayak-booking",
@@ -179,6 +181,22 @@
       "removed": "Only unused Gitignored generated historical build cache after explicit tool approval to recover disk; no source/dependencies/logs deleted.",
       "historical_BUILD_ID": "wSXxL5fxaV6Jb44rTkpJE",
       "historical_BUILD_ID_sha256": "e767958c756cd415e7607306d7119da65b71a8281dcb5ac55ffea443ee11b4aa"
+    },
+    "c04_integration": {
+      "candidate_before_fixture": "5289389220a38db233bf4892d93007e46c1831af",
+      "candidate_after_fixture": "0ae848defa74e500b4fe9c05941b3d7df860bc07",
+      "unit_command": "sanitized env, officialNode22.23.2 node node_modules/vitest/vitest.mjs run; exact accepted companion source links for this test only",
+      "full_unit_result": "1440pass/1skip/1fail; sole failure was missing new ledger table in schema fixture",
+      "full_unit_log": "/private/tmp/bookingtours-integrated-evidence-20260923/unit-after-c04.log",
+      "full_unit_sha256": "27aeda8621a45751a47bb4a13d35ae516d61f83b0b7bfb74996d73ec8752bce1",
+      "corrective_verification": "Fixture now matches accepted migration; all3 schema-reference checks pass with exact booking source; prior other unit passes remain applicable. No claim of a new full-suite run.",
+      "focused_log": "/private/tmp/bookingtours-integrated-evidence-20260923/schema-fixture-after-c04.log",
+      "focused_sha256": "c8b2179f7d5c31700205c0f6760018f7f741488db01d5b70f444418935d36bce",
+      "typecheck": "PASS: node node_modules/typescript/bin/tsc --noEmit --incremental false, no nested companion fixture links, matching standaloneAdminCI type job",
+      "type_log": "/private/tmp/bookingtours-integrated-evidence-20260923/type-after-c04-clean.log",
+      "type_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "initial_type_fixture_failure": "First run included root-created onboarding test link after its dependencies were pruned, causing two missing-three imports. Removed only task-created links and standaloneAdmin typecheck passed; no application fix required. Initial log retained as type-after-c04.log.",
+      "final_build_gate": "The earlier Admin build certifies pre-C04 runtime/app combination. Current Admin application build must run at final candidate freeze after remaining corrections; unchanged companion builds remain applicable."
     }
   },
   "qualification": {
@@ -238,5 +256,8 @@
       "tests": "Admin1370pass/1unchanged conditional skip; reviewer79/79; all3configured realfontbuilds/type/lint/contracts pass;6auditszero",
       "integration_evidence_reuse": "All15 reviewed runtime/CI/test files exactly match source commit; release differences are previously reviewed C05/V03 scripts/tests and readiness records, with no app/runtime overlap."
     }
-  }
+  },
+  "planned_unapplied_migrations": [
+    "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql"
+  ]
 }
