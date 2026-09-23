@@ -1,16 +1,18 @@
 {
-  "updated_at_utc": "2026-09-23T07:37:00Z",
+  "updated_at_utc": "2026-09-23T07:52:00Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
-  "routing_verdict": "BLOCKED_ROUTING",
+  "routing_verdict": "IN_PROGRESS",
   "parents": [
     {
       "id": "C01",
       "title": "Whole-product dependency and runtime security",
       "status": "FAILED_GATE",
       "owner": "gpt-6-sol/max companion writer",
-      "legacy_refs": ["SEC-DEV-DEPENDENCIES-01"],
+      "legacy_refs": [
+        "SEC-DEV-DEPENDENCIES-01"
+      ],
       "children": [
         {
           "id": "C01-STOREFRONT-AUDIT-20260923",
@@ -87,7 +89,9 @@
       "owner": "gpt-6-sol/max Admin writer",
       "base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
       "result": "b4439f7d1e6412e67d34222b1acd27bc0f817194",
-      "legacy_refs": ["AUTH-01"],
+      "legacy_refs": [
+        "AUTH-01"
+      ],
       "children": [
         {
           "id": "C02-PUBLIC-CONTRACT-20260923",
@@ -99,14 +103,23 @@
         }
       ],
       "review": "ACCEPTED by fresh-context Astra xhigh reviewer; effective runtime model/effort remains unobservable",
-      "next": "Under Astra-led routing, integrate the reviewed commits, check trusted ADMIN_RECOVERY_ORIGIN configuration without exposing its value, then verify deployed real-Auth/delivery/browser behavior with scoped approval."
+      "next": "Verify trusted recovery origin and deployed Auth/delivery/browser behavior during an approved candidate window.",
+      "integrated_result": "739a3fe6f1706e8fb12ee86e654a5617a1cafdfb",
+      "integration_verification": {
+        "command": "npm run test:unit -- tests/unit/admin-account-boundaries.test.ts tests/unit/admin-reset-rate-limit.test.ts tests/unit/admin-reset-recovery.test.ts tests/unit/auth-password-authority.test.ts",
+        "result": "4 files / 46 tests passed",
+        "run_session_id": 70284,
+        "code_comparison": "Only readiness documents differ from reviewed b4439f7"
+      }
     },
     {
       "id": "C03",
       "title": "Production-safe rate limits and bounded resource use",
       "status": "OPEN",
       "owner": "gpt-6-sol/max",
-      "legacy_refs": ["SECURITY-01"],
+      "legacy_refs": [
+        "SECURITY-01"
+      ],
       "children": [
         {
           "id": "C03-PROXY-20260923",
@@ -141,7 +154,9 @@
       "title": "Verified database TLS and effective permissions",
       "status": "OPEN",
       "owner": "gpt-6-sol/max",
-      "legacy_refs": ["SECURITY-01"],
+      "legacy_refs": [
+        "SECURITY-01"
+      ],
       "children": [
         {
           "id": "C05-TLS-20260923",
@@ -159,7 +174,9 @@
       "title": "Bulk acceptance and interruption recovery",
       "status": "OPEN",
       "owner": "gpt-6-sol/max",
-      "legacy_refs": ["REFUND-01"],
+      "legacy_refs": [
+        "REFUND-01"
+      ],
       "children": [
         {
           "id": "C06-BATCH-REFUND-20260923",
@@ -177,7 +194,15 @@
       "title": "Coordinated whole-product verification",
       "status": "PARTIAL_LOCAL",
       "owner": "gpt-6-astra/xhigh acceptance",
-      "legacy_refs": ["CONTINUITY-01", "GUIDE-OFFLINE-01", "ARRIVAL-01", "PRICING-NEW-ONLY-01", "MFA-SENSITIVE-ACTIONS-01", "BOOKING-PRESERVED-MOBILE-01", "NOTIFY-01"],
+      "legacy_refs": [
+        "CONTINUITY-01",
+        "GUIDE-OFFLINE-01",
+        "ARRIVAL-01",
+        "PRICING-NEW-ONLY-01",
+        "MFA-SENSITIVE-ACTIONS-01",
+        "BOOKING-PRESERVED-MOBILE-01",
+        "NOTIFY-01"
+      ],
       "evidence": "Dated synthetic 100-account continuity and focused regressions exist. Current inventory spans 49 Admin API files, 55 Edge Functions, five companion API files, and direct RPC/Storage paths; enabled capability and role-denial evidence is not yet complete.",
       "next": "Map enabled paths, actual roles and positive/denied journeys to current candidate behavior; repeat same-record continuity on an isolated restore."
     },
@@ -186,7 +211,9 @@
       "title": "Genuine providers, financial faults, and twelve anomalies",
       "status": "BLOCKED_EXTERNAL",
       "owner": "gpt-6-astra/xhigh acceptance",
-      "legacy_refs": ["PROVIDER-01"],
+      "legacy_refs": [
+        "PROVIDER-01"
+      ],
       "evidence": "No candidate-bound genuine Yoco payment-to-webhook-to-delivery/refund journey; 12 historical PAID records without provider IDs remain individually unreconciled.",
       "next": "Obtain scoped sandbox/recipient access, run genuine journeys and fault invariants, classify all 12 against authoritative evidence before any historical mutation."
     },
@@ -195,16 +222,33 @@
       "title": "Complete harness, dataset, topology, and budget",
       "status": "BLOCKED_EXTERNAL",
       "owner": "gpt-6-astra/xhigh acceptance",
-      "legacy_refs": ["BT500-LAUNCH-V1"],
-      "evidence": "The 500-session profile and staff runner exist, but provider doubles, negative outbound guards, public/webhook/background harnesses, representative data, browser Realtime footprint and quota/headroom denominators are incomplete. Current target has 50 synthetic/demo bookings versus 250000 required; an existing isolated restore target and ZAR 0 ceiling were confirmed but its ID/capacity are unverified.",
-      "next": "Confirm data provenance, a separate safe target and budget; finish and verify controls before any qualifying clock."
+      "legacy_refs": [
+        "BT500-LAUNCH-V1"
+      ],
+      "evidence": "The 500-session profile and staff runner exist, but provider doubles, negative outbound guards, public/webhook/background harnesses, representative data, browser Realtime footprint and quota/headroom denominators are incomplete. Current target has 50 synthetic/demo bookings versus 250000 required; the owner supplied the source project as the intended restore target and excluded the other visible project; a separate target is not identified and the ceiling remains ZAR 0.",
+      "next": "Confirm data provenance, a separate safe target and budget; finish and verify controls before any qualifying clock.",
+      "children": [
+        {
+          "id": "V03-EXPIRED-WINDOW-20260923",
+          "severity": "gate",
+          "owner": "gpt-6-sol/max",
+          "version": "Admin 739a3fe",
+          "path": "scripts/bt500-run-mixed.mjs; scripts/bt500-preflight.mjs; docs/production-readiness/BT500_EXECUTION.json",
+          "failure": "Runner validates a historical approval reference and status but does not enforce current time against the recorded execution window; preflight checks timestamp parsing/order only. The recorded window expired 2026-09-22T16:00:00Z.",
+          "impact": "A stale approval record can authorize a later hosted run in source logic.",
+          "violated_criterion": "V03 safe executable harness and explicit current action window",
+          "verification": "Offline negative tests for missing, not-yet-open, expired and insufficient-duration windows; an authorized in-window fixture passes without hosted calls."
+        }
+      ]
     },
     {
       "id": "V04",
       "title": "Capacity, contention, and elapsed-time qualification",
       "status": "FAILED_GATE",
       "owner": "gpt-6-astra/xhigh acceptance",
-      "legacy_refs": ["BT500-LAUNCH-V1"],
+      "legacy_refs": [
+        "BT500-LAUNCH-V1"
+      ],
       "evidence": "First 500-VU mixed smoke and first corrective smoke failed; the second admission correction has no passing smoke. The 60-minute full mix, spike, recovery and 24-hour soak have not started.",
       "next": "After V03 and a new exact approval window, run unchanged-threshold progressive smoke from an instrumented generator and continue only on pass."
     },
@@ -213,18 +257,37 @@
       "title": "Alerts, isolated restoration, and usable recovery",
       "status": "BLOCKED_EXTERNAL",
       "owner": "gpt-6-astra/xhigh acceptance",
-      "legacy_refs": ["RESTORE-01"],
+      "legacy_refs": [
+        "RESTORE-01"
+      ],
       "evidence": "No received alert drill or separate isolated usable restore with measured 15-minute data loss and 60-minute service recovery.",
-      "next": "Identify receiver/incident owner and isolated restore target; prove full database/Auth/object/config restoration and alert receipt."
+      "next": "A separate isolated restore target remains unidentified; the owner excludes the other visible project. Continue local recovery preparation at ZAR 0 and obtain an exact allowed target before any restore."
     },
     {
       "id": "V06",
       "title": "Enforced release, deployment, and market handoff",
       "status": "BLOCKED_EXTERNAL",
       "owner": "gpt-6-astra/xhigh release decision",
-      "legacy_refs": ["REL-PROVENANCE", "CI-01", "DEPLOY-01"],
+      "legacy_refs": [
+        "REL-PROVENANCE",
+        "CI-01",
+        "DEPLOY-01"
+      ],
       "evidence": "Admin source 52afaff differs from deployed ebb62b8; CI pins old companion 2ff1d82; current storefront candidate, exact provider checks, 24-hour production canary and final handoff are open.",
-      "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary."
+      "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary.",
+      "children": [
+        {
+          "id": "V06-EVIDENCE-ENFORCEMENT-20260923",
+          "severity": "gate",
+          "owner": "gpt-6-sol/max",
+          "version": "Admin 739a3fe",
+          "path": "scripts/release-evidence-check.mjs",
+          "failure": "The map guard verifies test-file existence; the release guard adds mutable status/count/boolean checks without binding actual run evidence to candidate/configuration hashes.",
+          "impact": "The final release path can accept declarations without current behavioral proof.",
+          "violated_criterion": "V01 behavioral coverage and V06 candidate-bound enforced evidence",
+          "verification": "Use actual retained run manifests; offline stale-candidate, missing-result, failed-result and tampered-artifact cases fail while a complete matching fixture passes. Do not require unrelated development branches to run qualification."
+        }
+      ]
     }
   ]
 }

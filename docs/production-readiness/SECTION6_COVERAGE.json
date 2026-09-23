@@ -216,5 +216,32 @@
     "status": "BLOCKED_EXTERNAL",
     "reason": "The exact candidate is deployed and scoped recipients plus Yoco test-mode use are approved, but the genuine provider journey has not run."
   },
-  "release_gate": "FAIL"
+  "release_gate": "FAIL",
+  "current_verification": {
+    "status": "IN_PROGRESS",
+    "admin_candidate": "739a3fe",
+    "meaning": "Existing statuses and tests refer to the historical candidate recorded above. They remain reusable only within unchanged code/configuration/fixture scope and do not certify the current integrated product.",
+    "required_explicit_identities": [
+      "anonymous",
+      "verified_customer",
+      "OPERATOR",
+      "legacy_ADMIN",
+      "MAIN_ADMIN",
+      "exact_SUPER_ADMIN",
+      "read_only_demo",
+      "suspended_staff",
+      "foreign_tenant_staff",
+      "named_service_operations",
+      "guide_identity_without_new_database_role"
+    ],
+    "additional_capability_scope": [
+      "separate enabled onboarding application",
+      "directory and embedded booking",
+      "multi-leg combos and enabled payment modes",
+      "tenant-scoped chat and live-agent handoff",
+      "privacy requests and owned exports",
+      "logout/account/tenant switch and old-tab continuity"
+    ],
+    "evidence_requirement": "Each enabled critical capability needs actual positive and denied behavioral run results tied to code, configuration, fixture and environment; filenames alone are not proof."
+  }
 }

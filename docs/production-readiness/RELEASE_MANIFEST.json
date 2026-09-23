@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T07:37:00Z",
+  "recorded_at_utc": "2026-09-23T07:52:00Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -14,7 +14,8 @@
       "review": "separate explicit gpt-6-astra/xhigh workers"
     },
     "observed_effective": "UNATTESTED_BY_HOST",
-    "next_action": "Switch embedded orchestration session to gpt-6-astra/xhigh after this checkpoint and verify effective host settings."
+    "next_action": "Continue Astra orchestration and explicitly dispatched gpt-6-sol/max implementation; retain unexposed effective telemetry as a limitation.",
+    "host_model_switch_received": true
   },
   "admin": {
     "repository": "GideonLangenhoven/Admin",
@@ -30,13 +31,14 @@
       ],
       "tree": "2f71bdd947c1ce71284082cec74736e53a4c4055",
       "review": "ACCEPTED_FRESH_CONTEXT",
-      "integration": "PENDING"
+      "integration": "INTEGRATED_LOCAL_VERIFIED"
     },
     "deployed": {
       "alias": "admin.bookingtours.co.za",
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
-    }
+    },
+    "integrated_commit": "739a3fe6f1706e8fb12ee86e654a5617a1cafdfb"
   },
   "booking": {
     "repository": "GideonLangenhoven/capekayak-booking",
@@ -76,7 +78,7 @@
     "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
     "booking_audit": "/private/tmp/bookingtours-booking-audit-20260923.json",
     "onboarding_audit": "/private/tmp/bookingtours-onboarding-audit-20260923.json",
-    "c02": "202 focused tests pass; independent corrected-head review accepted; no deployed real-Auth/email/browser proof",
+    "c02": "202 focused tests pass; independent corrected-head review accepted; no deployed real-Auth/email/browser proof; integrated application tree matches review; 46 affected tests pass on release branch",
     "c01": "npm ci, zero full/production-only audit findings, TypeScript and Webpack build pass; existing lint 85 findings; independent review rejected candidate"
   },
   "qualification": {
