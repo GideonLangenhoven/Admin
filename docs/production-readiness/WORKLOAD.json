@@ -1,13 +1,14 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
   "version": "1.0",
-  "status": "APPROVED_SCOPE_BLOCKED_ON_DEPLOYMENT_AND_TOPOLOGY",
+  "status": "APPROVED_SCOPE_BLOCKED_ON_CURRENT_GATES",
   "approval": {
     "workload_and_thresholds": true,
     "cost_and_environment": true,
     "approval_reference": "user-session-2026-09-21-prelaunch-qualification",
     "metric_definitions": true,
-    "realtime_topology_and_scope": true
+    "realtime_topology_and_scope": true,
+    "execution_authority": "Historical scope/threshold decisions remain; prior hosted execution window expired 2026-09-22T16:00:00Z. No new hosted action or cost is authorized."
   },
   "scope": {
     "distinct_authenticated_staff_accounts": 500,
@@ -139,9 +140,9 @@
       "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
     }
   },
-  "updated_at_utc": "2026-09-22T09:15:55Z",
+  "updated_at_utc": "2026-09-23T10:22:59Z",
   "candidate_accepted_base": "71da0361db65dd63f90b5110648b96b2c4ff3567",
-  "candidate_status": "Exact application candidates and the controlled five-migration package are deployed; the bounded 500-VU staff smoke failed. A local corrective candidate is not deployed or approved.",
+  "candidate_status": "Historical dashboard snapshot and second hot-path admission correction are deployed at Admin ebb62b8/dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL. Initial and first corrective mixed staff smokes failed; the second correction has no passing smoke. Current local release corrections are not deployed.",
   "active_sections": [
     6,
     7,
@@ -154,13 +155,13 @@
     "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
     "executed": false,
     "reason": [
-      "The deployed 500-VU staff smoke failed with confirmed target-side queueing; the local dashboard snapshot correction awaits exact review, approval, deployment and an unchanged-threshold progressive rerun",
+      "Initial and first corrective 500-VU staff smokes failed. The second hot-path admission correction is deployed but its unchanged-threshold progressive smoke remains unrun; a fresh exact execution approval is required after prerequisites pass.",
       "Provider-double public checkout/webhook/background harness and runtime outbound-guard proof remain open",
       "Production-equivalent quota denominators and at least 30% headroom are unverified at the ZAR 0 ceiling",
       "Realtime browser footprint has not been measured on the exact candidate"
     ],
     "legacy_harness": "The 500-session authenticated read smoke passed. The independently reviewed mixed-staff runner executed against the deployment and failed at 500 VUs; no qualification credit was taken.",
     "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json",
-    "mixed_staff_runner": "DEPLOYED_SMOKE_FAIL; the local runner now maps dashboard reads to the undeployed snapshot RPC; scripts/bt500-run-mixed.mjs; evidence/BT500_DEPLOYED_SMOKE_20260922.json; evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json"
+    "mixed_staff_runner": "HISTORICAL_SMOKES_FAILED; dashboard snapshot and authenticated arrival RPC are deployed; second corrective smoke NOT_RUN. Reviewed local runner rejects the expired window; no qualifying execution has begun."
   }
 }

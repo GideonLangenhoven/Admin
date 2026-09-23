@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T10:11:12Z",
+  "recorded_at_utc": "2026-09-23T10:22:59Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -65,6 +65,13 @@
       "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/independent-review-final.md",
       "independent_log_sha256": "c23fcb6e7800eaa5f7ba39d926fbd86618bf2ad2d95cdf5c55418c370b22e72a",
       "rollout_log_sha256": "3bff56e7fff6d46fefe5e1d90648487b98e276739cfe9e2938f01cdd776b6a69"
+    },
+    "pending_upload_review": {
+      "commit": "5bd1486a95b18a8b2ca960f39bcc36fa4599dd7d",
+      "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
+      "worktree": "/private/tmp/bookingtours-c04-20260923",
+      "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
+      "reviewer": "fresh-context gpt-6-astra/xhigh"
     }
   },
   "booking": {
@@ -180,10 +187,10 @@
     "hosted_selection_limit": "Vercel selects major22 via engines and manages patches; exact deployed patch must be observed, not inferred from local pin.",
     "primary_vercel_source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions",
     "pending_review": {
-      "booking_commit": "cf9a15c7285fb9135cf560384855de7c71c03370",
-      "onboarding_commit": "197dc6ff2f07286bd362780e2a7cbf4c94a7ee21",
-      "status": "CHANGES_REQUESTED",
-      "remaining": "Encode least-privilege CI; separate automatic hosted Lighthouse/source checks; wire booking contracts; update obsolete Admin checkout source paths and run complete cross-app suite. Admin final commit pending.",
+      "booking_commit": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+      "onboarding_commit": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
+      "status": "CORRECTED_COMPANIONS_PENDING_COMBINED_ADMIN_REVIEW",
+      "remaining": "Companion least-privilege/source-check corrections committed; Admin pin/test/workflow changes and combined suite are in progress. Existing accepted app hashes remain authoritative until final review.",
       "evidence_directory": "/private/tmp/bookingtours-runtime-ci-evidence-20260923",
       "tested_runtime": "Node22.23.2/npm10.9.8",
       "companion_checks": "Both clean installs, full/prod audits0, type/lint/contracts and exact configured production builds pass; CI-only followups pending."

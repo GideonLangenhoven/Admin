@@ -1,6 +1,6 @@
 {
   "profile_id": "BT500-LAUNCH-V1",
-  "status": "APPROVED_FOR_BOUNDED_SMOKE",
+  "status": "HISTORICAL_WINDOW_EXPIRED_NO_CURRENT_EXECUTION_AUTHORITY",
   "candidate_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d",
   "candidate_tree": "b9848b532cb1c291ab9e257f05f5df45163e42f2",
   "candidate_worktree_clean": true,
@@ -29,7 +29,8 @@
     "workload_and_thresholds": true,
     "metric_definitions": true,
     "realtime_scope": true,
-    "cost_environment_and_window": true
+    "cost_environment_and_window": true,
+    "current_applicability": "Historical record only for the stated expired bounded-smoke window; not authorization for the current candidate, qualification, provider calls, restore or deployment."
   },
   "bounded_smoke_authorization": {
     "reference": "user-session-2026-09-22-production-ready-continuation",
@@ -91,10 +92,12 @@
   },
   "qualification_started": false,
   "qualification_blockers": [
+    "complete current candidate source/security gates and obtain an exact fresh execution window after prerequisites pass",
     "pass a new bounded 500-user smoke with unchanged thresholds after the second hot-path admission correction",
     "enable provider doubles and implement the public, webhook and background-work harnesses",
     "measure the product-required Realtime footprint from browsers",
     "establish representative-volume data and quota/headroom evidence",
     "complete genuine provider sandbox journeys, monitoring proof and restore rehearsal"
-  ]
+  ],
+  "checkpoint_recorded_at_utc": "2026-09-23T10:22:59Z"
 }

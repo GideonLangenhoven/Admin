@@ -177,7 +177,7 @@
     {
       "id": "C04",
       "title": "Upload validation and partial-failure reconciliation",
-      "status": "SOURCE_IN_PROGRESS",
+      "status": "SOURCE_FIXED_PENDING_REVIEW",
       "owner": "gpt-6-sol/max",
       "children": [
         {
@@ -186,13 +186,14 @@
           "path": "app/api/guide/photo-upload/route.ts; app/photos/page.tsx",
           "failure": "The guide route buffers an unbounded multipart file, trusts name/type, and leaves an operation-owned Drive object orphaned when the trip_photos insert fails; an alternate direct upload path also exists.",
           "impact": "Resource exhaustion, unsafe content and unreconciled private objects can result.",
-          "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof."
+          "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof.",
+          "status": "SOURCE_FIXED_PENDING_REVIEW"
         },
         {
           "id": "C04-DRIVE-AUTH-20260923",
           "severity": "high",
           "owner": "gpt-6-sol/max upload writer",
-          "status": "SOURCE_IN_PROGRESS",
+          "status": "SOURCE_FIXED_PENDING_REVIEW",
           "version": "Admin b29767b / actual handler synthetic test",
           "path": "supabase/functions/google-drive/index.ts:165",
           "failure": "Actual handler with synthetic suspended own-tenant admin returns200 for action token and calls trapped OAuth refresh; current select only id/read_only and no subscription-state boundary.",
@@ -202,7 +203,14 @@
           "evidence": "/private/tmp/bookingtours-c04-evidence-20260923/google-drive-auth-repro.test.ts"
         }
       ],
-      "next": "Sol is reusing historical guide upload patch a390797, closing verified bounds/reconciliation gaps and inventorying alternate paths in a separate worktree."
+      "next": "Fresh-context Astra review of 5bd1486 is active; integrate only after acceptance, retaining alternate-path and deployed limitations.",
+      "pending_review": {
+        "commit": "5bd1486a95b18a8b2ca960f39bcc36fa4599dd7d",
+        "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
+        "worktree": "/private/tmp/bookingtours-c04-20260923",
+        "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
+        "reviewer": "fresh-context gpt-6-astra/xhigh"
+      }
     },
     {
       "id": "C05",
