@@ -219,7 +219,7 @@
   "release_gate": "FAIL",
   "current_verification": {
     "status": "IN_PROGRESS",
-    "admin_candidate": "94f84e6570636c5c54825a826866921facdc1af3",
+    "admin_candidate": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
     "meaning": "Existing statuses and tests refer to the historical candidate recorded above. They remain reusable only within unchanged code/configuration/fixture scope and do not certify the current integrated product.",
     "required_explicit_identities": [
       "anonymous",
@@ -243,7 +243,7 @@
       "logout/account/tenant switch and old-tab continuity"
     ],
     "evidence_requirement": "Each enabled critical capability needs actual positive and denied behavioral run results tied to code, configuration, fixture and environment; filenames alone are not proof.",
-    "updated_at_utc": "2026-09-23T11:53:09Z",
+    "updated_at_utc": "2026-09-23T13:17:03Z",
     "accepted_scoped_evidence": [
       {
         "scope": "Public recovery/login response and token lifecycle; trusted recovery origin",
@@ -271,6 +271,15 @@
         "parent": "C01",
         "result": "Reviewed executable contracts, types/lint/configured builds and actual callback/provisioning probes pass",
         "environment": "local source and synthetic providers; genuine payments, communications and deployed browser matrix open"
+      },
+      {
+        "scope": "Storage helpers preserve exact permitted staff and denial boundaries",
+        "parent": "C05",
+        "source": "d05ede11ff1b86032ecfbde478f8d45e51ab6155",
+        "integrated": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+        "result": "229 exact-source PostgreSQL rollout checks pass; independently reviewed",
+        "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-independent-review.md",
+        "environment": "disposable PostgreSQL17 and captured source review; no hosted Storage operations"
       }
     ]
   }

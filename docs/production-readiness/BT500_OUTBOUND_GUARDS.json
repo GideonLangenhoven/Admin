@@ -5,15 +5,15 @@
   "target": "ukdsrndqhsatjkmxijuj",
   "guards": {
     "synthetic_marker": "bt500-20260921",
-    "customer_data": "The owner states there are no customers and authorizes replacement of synthetic data.",
+    "customer_data": "The owner confirms the source project's 50 booking and 50 customer rows are synthetic/demo. This confirmation does not authorize mutation; other existing rows still require provenance checks and an exact approved action window.",
     "high_volume_messages": "blocked",
     "high_volume_payments_and_refunds": "blocked",
     "provider_doubles": "required but not configured",
-    "genuine_email": "one supplied recipient only; held outside Git",
-    "genuine_whatsapp": "one supplied recipient only; held outside Git",
-    "yoco": "test mode only; no live charge or refund",
+    "genuine_email": "supplied private recipient confirmed for planning only; no sending window authorized",
+    "genuine_whatsapp": "supplied private recipient confirmed for planning only; no sending window authorized",
+    "yoco": "test mode confirmed for planning only; no charge or refund execution authorized",
     "paid_scaling": "blocked; cost ceiling ZAR 0",
-    "teardown": "delete marker-labelled rows and Auth users only, then reconcile pre/post counts"
+    "teardown": "Requires exact approval and a pre-run inventory proving operation-owned rows and Auth users; a marker alone is insufficient. Preserve pre-existing identities, relationships and pending operations, and reconcile after approved cleanup."
   },
   "negative_tests_required": [
     "reject a non-marker tenant during volume mutation",
@@ -23,5 +23,6 @@
     "reject teardown when pre-run inventory is missing"
   ],
   "approval": false,
-  "blocking_reason": "The mixed-staff runner enforces marker-scoped identities and invariant checks. Provider doubles and runtime recipient/live-mode rejection still require deployed negative proof."
+  "blocking_reason": "The mixed-staff runner enforces marker-scoped identities and invariant checks. Provider doubles and runtime recipient/live-mode rejection still require deployed negative proof.",
+  "updated_at_utc": "2026-09-23T13:17:03Z"
 }

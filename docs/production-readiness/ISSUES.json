@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T12:33:32Z",
+  "updated_at_utc": "2026-09-23T13:17:03Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -243,7 +243,14 @@
           "Array-email coercion differs between proxy partition and unchanged login route",
           "Actual installed Next Node proxy finalization waits original body end despite handler408; hosted Vercel behavior unverified"
         ],
-        "next": "Sol corrects normalization and proves supported route-level request lifecycle; existing Redis deadline evidence remains valid within unchanged scope."
+        "next": "Sol corrects normalization and proves supported route-level request lifecycle; existing Redis deadline evidence remains valid within unchanged scope.",
+        "design_followup": {
+          "artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/lifecycle-design-review.md",
+          "sha256": "9cd88cf4b702bbbf568916a3ff0c4e83ccfd2e151e8ce1c97f1685ef57428d45",
+          "decision": "Retain consume-once guard and exact login/setup matcher exclusions; Sol adds standard Connection: close on blocked auth responses, then freezes exact-source regression evidence for fresh review.",
+          "observed": "One actual localhost Next/Node unfinished request received complete408 and server socket closed before client EOF. Guard1509ms; cold response4.69s includes compilation. Original object-flag assertion failed and is preserved, not counted as a passing test.",
+          "remaining": "Other proxy-route clone/finalize and hosted Vercel ingress/invocation bounds remain unverified. No total-heap or immediate-GC bound claimed."
+        }
       },
       "production_configuration_prerequisite": {
         "project": "caepweb-admin",
@@ -602,7 +609,7 @@
         "CI-01",
         "DEPLOY-01"
       ],
-      "evidence": "Admin integrated source/harness 01491a10bf5bfc28872a8fc58db034226d346347 differs from deployed ebb62b8. Accepted storefront f11b1dd and onboarding2de7de49 await active runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
+      "evidence": "Admin integrated source e9bea358458ecd0d2d701731c4ca94f5ba9f589c differs from deployed ebb62b8. Accepted storefront86588bcb and onboardingb93f053b include reviewed runtime/CI alignment. Current CI/deployed provenance, genuine providers, qualification, restoration and production canary remain open.",
       "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary.",
       "children": [
         {

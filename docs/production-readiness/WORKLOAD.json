@@ -140,17 +140,24 @@
       "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
     }
   },
-  "updated_at_utc": "2026-09-23T10:22:59Z",
+  "updated_at_utc": "2026-09-23T13:17:03Z",
   "candidate_accepted_base": "71da0361db65dd63f90b5110648b96b2c4ff3567",
   "candidate_status": "Historical dashboard snapshot and second hot-path admission correction are deployed at Admin ebb62b8/dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL. Initial and first corrective mixed staff smokes failed; the second correction has no passing smoke. Current local release corrections are not deployed.",
-  "active_sections": [
-    6,
-    7,
-    9
+  "active_work_items": [
+    "C01",
+    "C02",
+    "C03",
+    "C04",
+    "C05",
+    "C06",
+    "V01",
+    "V02",
+    "V03",
+    "V04",
+    "V05",
+    "V06"
   ],
-  "deferred_sections": {
-    "8": "Deployment, recovery, and release gate"
-  },
+  "scope_reconciliation": "The current master assignment includes recovery, deployment and canary. The older section8 deferral is superseded; this does not authorize any hosted action or waive elapsed-time gates.",
   "execution_readiness": {
     "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
     "executed": false,
