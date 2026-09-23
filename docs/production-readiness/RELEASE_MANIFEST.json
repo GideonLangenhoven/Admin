@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T10:22:59Z",
+  "recorded_at_utc": "2026-09-23T10:49:49Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "01491a10bf5bfc28872a8fc58db034226d346347",
-    "integrated_tree": "029df5b70808c51f862e42025f1180f539bce648",
+    "integrated_commit": "35ab96c241dfa4e7b670b230d9973b1e3321c95a",
+    "integrated_tree": "24da8de5afd1a7f5b7cd96fcb0d60fbccd2c3bf4",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -71,20 +71,25 @@
       "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
       "worktree": "/private/tmp/bookingtours-c04-20260923",
       "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
-      "reviewer": "fresh-context gpt-6-astra/xhigh"
-    }
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "status": "CHANGES_REQUESTED",
+      "findings": "Independent actual route/picker probes reproduced two provider objects after token failure clears retry ID and after component remount loses memory-only ID. Sol is correcting durable identity/ledger ordering.",
+      "probe_sha256": "bdda0b8ae1c818c138f0d736deb9524af97cf54b0210a4734cab3fda9305f7a6"
+    },
+    "integrated_lock_sha256": "e6f465440dd65b937f39e58581d4daf5fb63379860d077853995ce2a5a603b70"
   },
   "booking": {
     "repository": "GideonLangenhoven/capekayak-booking",
     "current_main_commit": "1cd80384884c5176f60607798b51fd54cf970fb2",
     "current_main_tree": "eedc22e42cb50296e58ae00facc972cd2653eb78",
     "isolated_c01_patch": {
-      "commit": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
-      "tree": "fe79f79b5361027c73eaa65e59bdaa61e1239941",
-      "lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
+      "commit": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+      "tree": "4bbcfecdede214497eb986cddf5eb2c4ba9ea5d3",
+      "lock_sha256": "1ec6511d4909cad4efe126cfbf9610be0a504cb76403115594bc299ac862efc3",
       "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
-      "integration": "LOCAL_CANDIDATE_RETAINED_CI_PIN_PENDING",
-      "historical_merge": "cb74f5f10605dc2ce4eac5158395e88ee6c62fd3"
+      "integration": "LOCAL_ACCEPTED_CANDIDATE_PINNED_IN_ADMIN_CI_NOT_PUBLISHED",
+      "historical_merge": "cb74f5f10605dc2ce4eac5158395e88ee6c62fd3",
+      "accepted_app_behavior_base": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
     },
     "historically_reviewed_mobile_commit": "2ff1d82046c73202c3146d11299cff9bc379ac54",
     "deployed": {
@@ -105,25 +110,26 @@
       "git_commit": "UNVERIFIED_CLI_DEPLOYMENT"
     },
     "isolated_c01_patch": {
-      "commit": "2de7de49e86313e48f705f6845454c99d1556852",
-      "tree": "6963da4493cffefa234aa1eb10c59b70d7e6bcbc",
-      "lock_sha256": "0ec0dc6b33e09f2b4f0210c1892c2c3596398f4a04c782eef5641fcb678b0ab3",
+      "commit": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
+      "tree": "a7f1ff19ec38b92ba450c143a30c7c6df23a8788",
+      "lock_sha256": "a07a031d0faaeb23f90dfbd6f624a25d3da6485a955d10b5f38f77b58b9a076b",
       "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
-      "integration": "LOCAL_CANDIDATE_RETAINED_CI_PIN_PENDING"
+      "integration": "LOCAL_ACCEPTED_CANDIDATE_PINNED_IN_ADMIN_CI_NOT_PUBLISHED",
+      "accepted_app_behavior_base": "2de7de49e86313e48f705f6845454c99d1556852"
     }
   },
   "cross_app_ci": {
-    "admin_companion_pin": "2ff1d82",
-    "accepted_new_pin": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
-    "onboarding_accepted_pin": "2de7de49e86313e48f705f6845454c99d1556852",
-    "pin_update": "PENDING"
+    "admin_companion_pin": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+    "accepted_new_pin": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+    "onboarding_accepted_pin": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
+    "pin_update": "INTEGRATED_LOCAL; companion publication/cross-repo access and actualCI run pending"
   },
   "local_evidence": {
     "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
     "booking_audit": "/private/tmp/bookingtours-booking-audit-20260923.json",
     "onboarding_audit": "/private/tmp/bookingtours-onboarding-audit-20260923.json",
     "c02": "202 focused tests pass; independent corrected-head review accepted; no deployed real-Auth/email/browser proof; integrated application tree matches review; 46 affected tests pass on release branch",
-    "c01": "Both source candidates independently accepted within reviewed scope; runtime/CI alignment prevents whole C01 closure. Storefront9 contracts, type/ways/build/lint pass; onboarding3 contracts, type-enforced build/lint pass plus independent actual form/provisioning/retry checks.",
+    "c01": "Accepted companion app and runtime/CI scope; all3 configuredbuilds pass22.23.2, fullAdmin1370+1baseline skip, sixauditszero. Edge graph remains open; no deployed or hostedCI claim.",
     "onboarding_typed_build": {
       "path": "/private/tmp/bookingtours-onboarding-c01-evidence-20260923/build-typed-final.txt",
       "sha256": "9751eb211e782fafcef7524f33cf0ae188cbce9da081fb10d93fc56be940b4ca"
@@ -144,6 +150,35 @@
       "ledger": "215 total IDs; all34 local September version/name pairs match, latest20260922123000; no claim of body identity",
       "source_rows_read": false,
       "hosted_mutation": false
+    },
+    "native_auth_config": {
+      "project": "ukdsrndqhsatjkmxijuj",
+      "observed_at_utc": "2026-09-23T10:43:41.701Z",
+      "evidence": "/private/tmp/bookingtours-auth-config-evidence-20260923.json",
+      "sha256": "dd9db14af9878dc3d8de9968a9dbba6644f2271d82347b05886e893958e2b025",
+      "limits": {
+        "rate_limit_anonymous_users": 30,
+        "rate_limit_email_sent": 30,
+        "rate_limit_sms_sent": 30,
+        "rate_limit_token_refresh": 150,
+        "rate_limit_verify": 30,
+        "rate_limit_otp": 30,
+        "rate_limit_web3": 30
+      },
+      "flags": {
+        "security_sb_forwarded_for_enabled": false,
+        "security_captcha_enabled": false,
+        "external_anonymous_users_enabled": false
+      },
+      "limitation": "Read-only configuration snapshot; no Auth requests or enforcement proof. Native direct-path controls exist, although these paths do not pass through Admin proxy. No changes made.",
+      "primary_reference": "https://supabase.com/docs/guides/auth/rate-limits"
+    },
+    "historical_cache_cleanup": {
+      "path": "/private/tmp/bookingtours-readiness-76d00f3/.next",
+      "source_retained": "b586f48d5fdbef50a0ef1e805d0da1dde11a62b0",
+      "removed": "Only unused Gitignored generated historical build cache after explicit tool approval to recover disk; no source/dependencies/logs deleted.",
+      "historical_BUILD_ID": "wSXxL5fxaV6Jb44rTkpJE",
+      "historical_BUILD_ID_sha256": "e767958c756cd415e7607306d7119da65b71a8281dcb5ac55ffea443ee11b4aa"
     }
   },
   "qualification": {
@@ -175,8 +210,8 @@
   "runtime": {
     "observed_local": "22.22.1",
     "target_supported_patch": "22.23.2",
-    "status": "IN_PROGRESS",
-    "ci_findings": "Multiple jobs still select EOL20; one selects22",
+    "status": "LOCAL_VERIFIED_EDGE_SCOPE_SEPARATE",
+    "ci_findings": "Reviewed source CI pins22.23.2 and npm10.9.8 across all3apps; engines >=22.23.2 <23; leastprivilege source checks and manually authorized hosted paths.",
     "deployed_exact_runtime": "NOT_YET_VERIFIED",
     "isolated_available": {
       "version": "22.23.2",
@@ -186,14 +221,22 @@
     },
     "hosted_selection_limit": "Vercel selects major22 via engines and manages patches; exact deployed patch must be observed, not inferred from local pin.",
     "primary_vercel_source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions",
-    "pending_review": {
+    "accepted_patch": {
+      "admin_source_commit": "2688b4cf10bbf1723f29df3c4887da2cff08ff67",
+      "admin_integrated_commit": "35ab96c241dfa4e7b670b230d9973b1e3321c95a",
       "booking_commit": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
       "onboarding_commit": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
-      "status": "CORRECTED_COMPANIONS_PENDING_COMBINED_ADMIN_REVIEW",
-      "remaining": "Companion least-privilege/source-check corrections committed; Admin pin/test/workflow changes and combined suite are in progress. Existing accepted app hashes remain authoritative until final review.",
-      "evidence_directory": "/private/tmp/bookingtours-runtime-ci-evidence-20260923",
-      "tested_runtime": "Node22.23.2/npm10.9.8",
-      "companion_checks": "Both clean installs, full/prod audits0, type/lint/contracts and exact configured production builds pass; CI-only followups pending."
+      "review": "ACCEPTED_SCOPED_RUNTIME_CI",
+      "evidence": "/private/tmp/bookingtours-runtime-ci-evidence-20260923/summary.md",
+      "evidence_sha256": "202af9f0c2c61dd69fe30532723a279b61be7a8dbc9a7ec8ee8c1141e69deb2f",
+      "checksums_sha256": "a6a9b5a16649b9ad3a0e8416238ef5436defa9132d04896c48d1b150a4be75ad",
+      "independent_acceptance": "/private/tmp/bookingtours-runtime-ci-evidence-20260923/independent-runtime-acceptance.md",
+      "independent_acceptance_sha256": "baebcf8fc1730fe7934a22b938235823d830e748f156d64749a80d0b529d1f39",
+      "admin_build_log_sha256": "28d106370b4950ecb38615a1c910a58e32f6f7f59feba5d7524e2dacea1242a0",
+      "admin_BUILD_ID": "lamSU2kCEl-zydHDF8LFz",
+      "admin_BUILD_ID_sha256": "2aa2b2880bccd5c354118626fc4c9bb2691cabcc35af81462dcee068b47eaf40",
+      "tests": "Admin1370pass/1unchanged conditional skip; reviewer79/79; all3configured realfontbuilds/type/lint/contracts pass;6auditszero",
+      "integration_evidence_reuse": "All15 reviewed runtime/CI/test files exactly match source commit; release differences are previously reviewed C05/V03 scripts/tests and readiness records, with no app/runtime overlap."
     }
   }
 }

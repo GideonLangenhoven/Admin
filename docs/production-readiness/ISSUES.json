@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T10:11:12Z",
+  "updated_at_utc": "2026-09-23T10:49:49Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -103,7 +103,14 @@
             "https://github.com/nodejs/node/blob/main/doc/changelogs/CHANGELOG_V22.md"
           ],
           "verification": "Use an official checksum-verified supported patch locally; align CI/engines and exact companion/onboarding pins, rerun affected runtime-sensitive checks and actual builds, then verify deployed runtime within approved deployment.",
-          "status": "IN_PROGRESS"
+          "status": "LOCAL_VERIFIED",
+          "source_commit": "2688b4cf10bbf1723f29df3c4887da2cff08ff67",
+          "integrated_commit": "35ab96c241dfa4e7b670b230d9973b1e3321c95a",
+          "booking_commit": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+          "onboarding_commit": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
+          "review": "ACCEPTED scoped runtime/CI, independent gpt-6-astra/xhigh",
+          "evidence": "/private/tmp/bookingtours-runtime-ci-evidence-20260923/independent-runtime-acceptance.md",
+          "remaining": "Actual CI execution/cross-repo access/branch rules and deployed patch require approved publication/deployment; Edge graph is separate child."
         },
         {
           "id": "C01-EDGE-RESOLUTION-20260923",
@@ -115,14 +122,14 @@
           "impact": "Exact tested remote dependency/runtime resolutions are not reproducibly bound to the candidate.",
           "violated_criterion": "C01 reproducible remote dependency resolutions and V06 exact build/runtime manifest",
           "verification": "Record supported exact Edge toolchain and resolved dependencies through its supported locking interface; verify clean deterministic check/build and relevant regressions without blanket upgrades.",
-          "status": "OPEN"
+          "status": "SOURCE_IN_PROGRESS"
         }
       ],
       "base": "1cd80384884c5176f60607798b51fd54cf970fb2",
-      "local_candidate": "f11b1dd94b662d8570f06e64088da8e832fbaaeb",
-      "local_candidate_lock_sha256": "3fbb44a38b39a047c58bc7ef8c7667e54358d25f88ca169918e825d5dbd6c411",
-      "local_evidence": "Storefront f11b1dd independently accepted: 9 executable contracts, type/ways checks, configured Webpack build, lint 0 errors/20 warnings, full/prod audits 0. Onboarding 2de7de49 independently accepted: 3 route contracts, type-enforced configured build, lint 0 errors/8 warnings, full/prod audits 0; reviewer additionally executed 88 form callbacks, provisioning cleanup/retry and actual submit behavior. Runtime/CI alignment remains open.",
-      "next": "Finish Node22.23.2 runtime/CI alignment and coordinated source pins through Sol, review configuration diff and repeat affected evidence under that runtime. Source-only acceptance does not close whole C01."
+      "local_candidate": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+      "local_candidate_lock_sha256": "1ec6511d4909cad4efe126cfbf9610be0a504cb76403115594bc299ac862efc3",
+      "local_evidence": "Storefront f11b1dd independently accepted: 9 executable contracts, type/ways checks, configured Webpack build, lint 0 errors/20 warnings, full/prod audits 0. Onboarding 2de7de49 independently accepted: 3 route contracts, type-enforced configured build, lint 0 errors/8 warnings, full/prod audits 0; reviewer additionally executed 88 form callbacks, provisioning cleanup/retry and actual submit behavior. Runtime/CI followup independently accepted and integrated at35ab96c. All three configured builds passed on Node22.23.2, full Admin1370pass/1existing conditional skip; independent affected79/79. Exact companions86588bcb/b93f053b are pinned in AdminCI. Edge graph remains open.",
+      "next": "Sol is implementing supported exact Edge dependency/toolchain resolutions in a separate worktree. Preserve accepted app/runtime evidence; review exact graph and deployment compatibility before C01 closure."
     },
     {
       "id": "C02",
@@ -172,12 +179,40 @@
           "verification": "Negative production bypass/config tests, bounded outage tests, shared-office allowance, distributed abuse, direct-path and expensive-operation behavioral tests."
         }
       ],
-      "next": "Trace every ingress and supported workload, then correct effective limits without disabling controls."
+      "next": "Trace every ingress and supported workload, then correct effective limits without disabling controls.",
+      "native_auth_snapshot": {
+        "project": "ukdsrndqhsatjkmxijuj",
+        "observed_at_utc": "2026-09-23T10:43:41.701Z",
+        "evidence": "/private/tmp/bookingtours-auth-config-evidence-20260923.json",
+        "sha256": "dd9db14af9878dc3d8de9968a9dbba6644f2271d82347b05886e893958e2b025",
+        "limits": {
+          "rate_limit_anonymous_users": 30,
+          "rate_limit_email_sent": 30,
+          "rate_limit_sms_sent": 30,
+          "rate_limit_token_refresh": 150,
+          "rate_limit_verify": 30,
+          "rate_limit_otp": 30,
+          "rate_limit_web3": 30
+        },
+        "flags": {
+          "security_sb_forwarded_for_enabled": false,
+          "security_captcha_enabled": false,
+          "external_anonymous_users_enabled": false
+        },
+        "limitation": "Read-only configuration snapshot; no Auth requests or enforcement proof. Native direct-path controls exist, although these paths do not pass through Admin proxy. No changes made.",
+        "primary_reference": "https://supabase.com/docs/guides/auth/rate-limits"
+      },
+      "source_inventory_not_behavioral_proof": [
+        "proxy.ts: production bypass, unbounded Redis fetch/body clone, per-process fallback and shared-IP buckets need correction; trusted Vercel header contract: https://vercel.com/docs/headers/request-headers",
+        "web-chat/index.ts: per-instance20/minute Map and req.json; onboarding-wizard/index.ts: shared check_rate_limit RPC but errors/missingIP allow through; inspect supported workload before limits",
+        "_shared/otp-attempts.ts: existing email/IP/attempt tracking; reuse valid evidence and test concurrency/direct ingress. Native Auth settings need no blind alteration.",
+        "batch-refund/index.ts already bounds100 unique IDs; retain financial invariants while C06 fixes interruption. Upload route belongs to C04."
+      ]
     },
     {
       "id": "C04",
       "title": "Upload validation and partial-failure reconciliation",
-      "status": "SOURCE_FIXED_PENDING_REVIEW",
+      "status": "SOURCE_IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "children": [
         {
@@ -187,13 +222,13 @@
           "failure": "The guide route buffers an unbounded multipart file, trusts name/type, and leaves an operation-owned Drive object orphaned when the trip_photos insert fails; an alternate direct upload path also exists.",
           "impact": "Resource exhaustion, unsafe content and unreconciled private objects can result.",
           "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof.",
-          "status": "SOURCE_FIXED_PENDING_REVIEW"
+          "status": "SOURCE_FIXED_PENDING_CORRECTION_REVIEW"
         },
         {
           "id": "C04-DRIVE-AUTH-20260923",
           "severity": "high",
           "owner": "gpt-6-sol/max upload writer",
-          "status": "SOURCE_FIXED_PENDING_REVIEW",
+          "status": "SOURCE_FIXED_PENDING_CORRECTION_REVIEW",
           "version": "Admin b29767b / actual handler synthetic test",
           "path": "supabase/functions/google-drive/index.ts:165",
           "failure": "Actual handler with synthetic suspended own-tenant admin returns200 for action token and calls trapped OAuth refresh; current select only id/read_only and no subscription-state boundary.",
@@ -203,13 +238,16 @@
           "evidence": "/private/tmp/bookingtours-c04-evidence-20260923/google-drive-auth-repro.test.ts"
         }
       ],
-      "next": "Fresh-context Astra review of 5bd1486 is active; integrate only after acceptance, retaining alternate-path and deployed limitations.",
+      "next": "Sol corrects confirmed duplicate retry/reload paths, then same independent Astra reviewer verifies fixed hash. Alternate-path and deployed evidence remain incomplete.",
       "pending_review": {
         "commit": "5bd1486a95b18a8b2ca960f39bcc36fa4599dd7d",
         "tree": "6a6b5c8158843ec741097e4b1fb89af2964622f7",
         "worktree": "/private/tmp/bookingtours-c04-20260923",
         "reported_verification": "94/94 focused tests; real disposable PG17 service-only ledger grants and concurrent claim; type/lint zero errors. Independent review pending; no hosted/provider call.",
-        "reviewer": "fresh-context gpt-6-astra/xhigh"
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "status": "CHANGES_REQUESTED",
+        "findings": "Independent actual route/picker probes reproduced two provider objects after token failure clears retry ID and after component remount loses memory-only ID. Sol is correcting durable identity/ledger ordering.",
+        "probe_sha256": "bdda0b8ae1c818c138f0d736deb9524af97cf54b0210a4734cab3fda9305f7a6"
       }
     },
     {
