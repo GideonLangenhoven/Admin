@@ -582,6 +582,16 @@
     "retry_count",
     "source"
   ],
+  "guide_photo_uploads": [
+    "actor_admin_id",
+    "business_id",
+    "content_sha256",
+    "created_at",
+    "drive_file_id",
+    "operation_id",
+    "slot_id",
+    "state"
+  ],
   "holds": [
     "booking_id",
     "checkout_request",
