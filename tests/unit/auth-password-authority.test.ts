@@ -53,6 +53,7 @@ function loginFixture(user: Record<string, unknown>) {
     rpc: vi.fn(async () => ({ data: null, error: null })),
   };
   const handler = sourceHandler("app/api/admin/login/route.ts", {
+    "../../../../proxy": { limitAdminIngress: async (req: Request) => ({ blocked: null, raw: await req.text() }) },
     "@supabase/supabase-js": { createClient: () => db },
     "../../../lib/admin-password": {
       setAdminAuthPassword: async () => { authWrites.push("migrate"); return "auth-new"; },
@@ -173,6 +174,7 @@ function setupFixture(options: { authFails?: boolean; completeFails?: boolean; c
     return "auth-a";
   });
   const handler = sourceHandler("app/api/admin/setup-link/route.ts", {
+    "../../../../proxy": { limitAdminIngress: async (req: Request) => ({ blocked: null, raw: await req.text() }) },
     "@supabase/supabase-js": { createClient: () => db },
     "../../../lib/api-auth": {},
     "../../../lib/admin-password": { setAdminAuthPassword: setPassword },

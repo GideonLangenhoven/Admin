@@ -87,6 +87,7 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
   };
   const invoke = async (route: "update" | "setup-link" | "login", body: object, token?: string) => {
     const handler = sourceHandler(`app/api/admin/${route}/route.ts`, {
+      "../../../../proxy": { limitAdminIngress: async (req: Request) => ({ blocked: null, raw: await req.text() }) },
       "@supabase/supabase-js": { createClient: () => db },
       "../../../lib/api-auth": { getCallerAdmin: async () => caller, canManageAdmin, isPrivilegedRole },
       "../../../lib/admin-password": { setAdminAuthPassword },

@@ -58,6 +58,7 @@ function resetFixture(options: {
     },
   };
   const handler = sourceHandler("app/api/admin/setup-link/route.ts", {
+    "../../../../proxy": { limitAdminIngress: async (req: Request) => ({ blocked: null, raw: await req.text() }) },
     "@supabase/supabase-js": { createClient: () => db },
     "../../../lib/api-auth": {
       getCallerAdmin: async () => options.privileged ? { id: "owner", role: "MAIN_ADMIN", business_id: TARGET.business_id } : null,

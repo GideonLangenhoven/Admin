@@ -270,7 +270,7 @@ function checkPageRoleGate(req: NextRequest): NextResponse | null {
   return NextResponse.redirect(url);
 }
 
-export async function proxy(req: NextRequest) {
+async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknown>) {
   const mvpHidden = checkMvpHidden(req);
   if (mvpHidden) return mvpHidden;
 
@@ -301,8 +301,8 @@ export async function proxy(req: NextRequest) {
 
   const isLogin = req.nextUrl.pathname === "/api/admin/login";
   const isSetupLink = req.nextUrl.pathname === "/api/admin/setup-link";
-  let payload: Record<string, unknown> = {};
-  if ((isLogin || isSetupLink) && req.method === "POST") {
+  let payload: Record<string, unknown> = parsedBody || {};
+  if (parsedBody === undefined && (isLogin || isSetupLink) && req.method === "POST") {
     if (Number(req.headers.get("content-length")) > BODY_BYTES) {
       return new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } });
     }
@@ -321,7 +321,9 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+  // The login and setup-link routes coerce these fields with String(...).
+  // Match that behavior so a one-element JSON array cannot evade its bucket.
+  const email = String(payload.email || "").trim().toLowerCase();
   const validEmail = email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : "";
   const secret = token || "local-only";
   const buckets: Array<[RateLimitConfig, string]> = [];
@@ -330,8 +332,9 @@ export async function proxy(req: NextRequest) {
     if (validEmail) buckets.push([AUTH_INPUT_LIMIT, `${ip}:${await inputKey(validEmail, secret)}`]);
   } else if (isSetupLink && (payload.action === "validate" || payload.action === "complete")) {
     buckets.push([TOKEN_IP_LIMIT, ip]);
-    const setupToken = typeof payload.token === "string" && payload.token.length <= 256 ? payload.token : "";
-    if (setupToken) buckets.push([TOKEN_INPUT_LIMIT, `${ip}:${await inputKey(setupToken, secret)}`]);
+    const setupToken = String(payload.token || "");
+    const boundedToken = setupToken.length <= 256 ? setupToken : "";
+    if (boundedToken) buckets.push([TOKEN_INPUT_LIMIT, `${ip}:${await inputKey(boundedToken, secret)}`]);
   } else if (isSetupLink) {
     buckets.push([SEND_IP_LIMIT, ip]);
     const adminId = typeof payload.admin_id === "string" && payload.admin_id.length <= 128 ? payload.admin_id : "";
@@ -383,3 +386,38 @@ export async function proxy(req: NextRequest) {
   res.headers.set("X-RateLimit-Remaining", String(result.remaining));
   return res;
 }
+
+export async function proxy(req: NextRequest) {
+  return checkRequest(req);
+}
+
+// Next's Node proxy adapter waits for the original POST body to end during
+// finalize(), even after this guard returns 408. These two routes call the
+// same guard inside their route handler, where the response can finish at the
+// body deadline. The matcher keeps every other path under proxy coverage.
+export async function limitAdminIngress(req: NextRequest): Promise<{ blocked: NextResponse | null; raw: string }> {
+  if (Number(req.headers.get("content-length")) > BODY_BYTES) {
+    void req.body?.cancel().catch(() => {});
+    return { blocked: new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } }), raw: "" };
+  }
+  let raw = "";
+  try {
+    raw = await readBounded(req.body, BODY_BYTES, AbortSignal.timeout(LIMITER_DEADLINE_MS));
+  } catch (error) {
+    if (error instanceof Error && error.message === "body_too_large") {
+      return { blocked: new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } }), raw: "" };
+    }
+    return { blocked: new NextResponse(JSON.stringify({ error: "Request body timed out" }), { status: 408, headers: { "Content-Type": "application/json" } }), raw: "" };
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    const body = JSON.parse(raw);
+    if (body && typeof body === "object" && !Array.isArray(body)) parsed = body;
+  } catch { /* malformed JSON still consumes the route's IP bucket */ }
+  const decision = await checkRequest(req, parsed);
+  return { blocked: decision.status === 200 ? null : decision, raw };
+}
+
+export const config = {
+  matcher: ["/((?!api/admin/(?:login|setup-link)(?:/|$)).*)"],
+};

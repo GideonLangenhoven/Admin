@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { setAdminAuthPassword } from "../../../lib/admin-password";
+import { limitAdminIngress } from "../../../../proxy";
 
 // Legacy SHA-256 hash check — matches what the browser admin-auth.ts produces.
 // Used only to verify pre-migration passwords; new passwords are stored by Supabase Auth (bcrypt internally).
@@ -25,9 +26,14 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
+  const ingress = await limitAdminIngress(req);
+  if (ingress.blocked) {
+    ingress.blocked.headers.set("Connection", "close");
+    return ingress.blocked;
+  }
   let body: { email?: string; password?: string };
   try {
-    body = await req.json();
+    body = JSON.parse(ingress.raw);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
