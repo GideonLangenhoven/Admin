@@ -574,6 +574,18 @@
           "evidence": "/private/tmp/bookingtours-v03-window-evidence-20260923/summary.md",
           "evidence_sha256": "f8d2629c932a028269a1f504e8a80138ebb5852d6372efea53aad780a9c5d68e",
           "limits": "Synthetic local k6/psql doubles, no hosted workload. Hard SIGKILL, host loss or a stalled runner require external supervision before qualification."
+        },
+        {
+          "id": "V03-SEED-OWNERSHIP-20260923",
+          "severity": "gate",
+          "owner": "gpt-6-sol/max",
+          "status": "OPEN_VERIFICATION_GAP",
+          "version": "Admin e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+          "path": "scripts/bt500-seed.mjs:81-114,135",
+          "failure": "Source teardown selects/deletes by the historical marker, without a pre-run inventory proving operation ownership; --seed invokes teardown first. Its entry guard uses a target hostname and flag rather than a current action window. No seed, teardown or hosted reproduction was run.",
+          "impact": "The existing harness cannot yet demonstrate preservation of pre-existing marker-labelled rows, Auth identities, relationships or pending operations.",
+          "violated_criterion": "V03 safe executable harness; section4 marker alone is not isolation or mutation authority; preserve existing identities and operations.",
+          "verification": "Before hosted use, Sol reproduces with trapped synthetic client operations and adds narrow ownership/current-window guards; absent, stale, mismatched or tampered inventory must cause zero mutations. Approved exact operation-owned cleanup and interrupted retry must preserve pre-existing records. Reuse the accepted window parser and keep volume/provider prerequisites separate."
         }
       ]
     },
