@@ -1,12 +1,12 @@
 # BookingTours production-readiness checkpoint
 
-Updated: 2026-09-23T09:45:56Z. Release verdict: **FAILED_GATE**. Implementation acceptance and go-to-market readiness have not been reached.
+Updated: 2026-09-23T09:52:43Z. Release verdict: **FAILED_GATE**. Implementation acceptance and go-to-market readiness have not been reached.
 
 ## Routing and active work
 
 The host signalled a model switch and the owner instructed continuation with Astra orchestration/review and GPT-6 Sol Max implementation to control token cost. All implementation workers explicitly request `gpt-6-sol`/`max`; independent reviewers explicitly request `gpt-6-astra`/`xhigh`. Effective model/effort telemetry is not exposed; no stronger observation is claimed. At most two Sol writers operate on disjoint files and isolated fixtures, with compact handoffs and reused valid evidence. Astra does not implement application code.
 
-Sol C05 owns database TLS/effective permission checks and is correcting independent review findings. The other Sol writer now owns C01 runtime/CI alignment across all three apps and coordinated source pins. V03's reviewed approval-window guard is integrated at b29767b66359099291cd6aa5b34587e4b5a3fcf7; it passed 10/10 integration tests on Node 22.23.2. Hard parent termination/host loss still requires external runner supervision.
+C05 checker source 6c2df66 is independently accepted and integrated at 01491a1; baseline unchanged. Its writer now owns C04 upload correction in a separate worktree. A separate read-only Sol task collects known-source catalog metadata and maps remaining C05 evidence; it does not edit source or mutate hosted data. The other Sol writer now owns C01 runtime/CI alignment across all three apps and coordinated source pins. V03's reviewed approval-window guard is integrated at b29767b66359099291cd6aa5b34587e4b5a3fcf7; it passed 10/10 integration tests on Node 22.23.2. Hard parent termination/host loss still requires external runner supervision.
 
 ## Current source and acceptance
 
@@ -28,6 +28,6 @@ Before hosted execution, one exact approval packet must specify candidate/target
 
 ## Remaining twelve-item gate
 
-C01 runtime/CI work remains; C02 is locally verified; C03/C04/C06 remain open; C05 is in progress; its unchanged application rollout passed 196/196 on a fresh disposable PG17 fixture while the expanded checker remains under review. V01 remains partial beyond the accepted narrow fixes. V02 genuine providers and twelve anomalies are unresolved. V03 harness/data/topology/budget prerequisites remain incomplete. V04 failed mixed and corrective smokes; no qualifying 60-minute mix, spike, continuous 24-hour soak or canary has passed. V05 alert delivery/isolated restore are unproven. V06 requires enforced candidate evidence, exact coordinated release and approved deployment/canary.
+C01 runtime/CI work remains; C02 is locally verified; C03/C06 remain open; C04 source work is active; C05 is in progress; its unchanged application rollout passed 196/196 on a fresh disposable PG17 fixture and the expanded checker has scoped independent acceptance. Actual deployed policy/RPC/Storage evidence remains incomplete. V01 remains partial beyond the accepted narrow fixes. V02 genuine providers and twelve anomalies are unresolved. V03 harness/data/topology/budget prerequisites remain incomplete. V04 failed mixed and corrective smokes; no qualifying 60-minute mix, spike, continuous 24-hour soak or canary has passed. V05 alert delivery/isolated restore are unproven. V06 requires enforced candidate evidence, exact coordinated release and approved deployment/canary.
 
 See [ISSUES.json](ISSUES.json) for the same twelve parents and concrete children, and [RELEASE_MANIFEST.json](RELEASE_MANIFEST.json) for exact sources/hashes. Existing dated evidence remains valid only for unchanged relevant source, dependencies, configuration, fixtures and scope. Source inspection, local tests and synthetic doubles do not certify genuine providers, hosted capacity or customer continuity.

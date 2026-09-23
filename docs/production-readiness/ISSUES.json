@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T09:45:56Z",
+  "updated_at_utc": "2026-09-23T09:52:43Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -177,7 +177,7 @@
     {
       "id": "C04",
       "title": "Upload validation and partial-failure reconciliation",
-      "status": "OPEN",
+      "status": "SOURCE_IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "children": [
         {
@@ -189,12 +189,12 @@
           "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof."
         }
       ],
-      "next": "Inventory enabled Drive paths and implement bounded decoding and operation-owned reconciliation."
+      "next": "Sol is reusing historical guide upload patch a390797, closing verified bounds/reconciliation gaps and inventorying alternate paths in a separate worktree."
     },
     {
       "id": "C05",
       "title": "Verified database TLS and effective permissions",
-      "status": "SOURCE_IN_PROGRESS",
+      "status": "IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "legacy_refs": [
         "SECURITY-01"
@@ -206,12 +206,25 @@
           "path": "scripts/check-security-drift.mjs:136",
           "failure": "The drift checker explicitly sets rejectUnauthorized: false and compares only selected table grants, RLS flags and policies.",
           "impact": "Certificate spoofing can invalidate live drift evidence; effective grants and privileged functions may escape the baseline.",
-          "verification": "Trusted and untrusted certificate tests plus disposable low-privilege effective-grant/function/view/storage tests."
+          "verification": "Trusted and untrusted certificate tests plus disposable low-privilege effective-grant/function/view/storage tests.",
+          "status": "LOCAL_VERIFIED",
+          "source_commit": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
+          "integrated_commit": "01491a10bf5bfc28872a8fc58db034226d346347",
+          "review": "SCOPED ACCEPTANCE, independent gpt-6-astra/xhigh reviewer",
+          "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/independent-review-final.md"
         }
       ],
-      "next": "Fix certificate/hostname validation and extend effective privilege coverage without rubber-stamping a new baseline.",
+      "next": "Collect restricted read-only catalog facts from known source project only; reconcile applied ledger and intended policy, then finish actual RPC/Storage role tests in disposable fixtures. No deployed verification or full baseline acceptance yet.",
       "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
-      "local_evidence": "Unchanged application rollout196/196 passed on fresh disposable PG17/Node22.23.2. Earlier failed run was traced to cluster-shared fixture service_role without BYPASSRLS; fresh fixture preserved all assertions. Checker source remains under independent review for exact Storage policy semantics and safe empty search_path; no baseline or hosted policy changed."
+      "local_evidence": "Trusted CA/hostname/connection-string override tests; effective privilege/Storage/tenant drift fixtures and five independent probes pass on fresh PG17/Node22.23.2. Unchanged application rollout196/196 passes. Baseline unchanged. Integrated checker files exactly match accepted source; only readiness docs/V03 guard differ.",
+      "result": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
+      "integrated_result": "01491a10bf5bfc28872a8fc58db034226d346347",
+      "remaining_limits": [
+        "No deployed catalog yet; read-only collection dispatched",
+        "Complete RPC/helper/body authorization evidence incomplete",
+        "Complete Storage reads/grants/inherited-policy coverage incomplete",
+        "Existing baseline requires intended-policy review; no regeneration accepted"
+      ]
     },
     {
       "id": "C06",
@@ -341,7 +354,7 @@
         "CI-01",
         "DEPLOY-01"
       ],
-      "evidence": "Admin integrated source/harness b29767b66359099291cd6aa5b34587e4b5a3fcf7 differs from deployed ebb62b8. Accepted storefront f11b1dd and onboarding2de7de49 await active runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
+      "evidence": "Admin integrated source/harness 01491a10bf5bfc28872a8fc58db034226d346347 differs from deployed ebb62b8. Accepted storefront f11b1dd and onboarding2de7de49 await active runtime/CI alignment and coordinated pins. Genuine providers, qualification, restoration and production canary remain open.",
       "next": "Integrate reviewed source and companion CI pin, pass all non-production gates, then present exact deployment approval packet and perform approved candidate-bound canary.",
       "children": [
         {

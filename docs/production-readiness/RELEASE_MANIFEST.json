@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T09:45:56Z",
+  "recorded_at_utc": "2026-09-23T09:52:43Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "b29767b66359099291cd6aa5b34587e4b5a3fcf7",
-    "integrated_tree": "9edf12da5a78da06dbe03a1c6207322e5e464804",
+    "integrated_commit": "01491a10bf5bfc28872a8fc58db034226d346347",
+    "integrated_tree": "029df5b70808c51f862e42025f1180f539bce648",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -56,6 +56,15 @@
       "tests": "10/10 on patched Node22.23.2",
       "evidence": "/private/tmp/bookingtours-v03-window-evidence-20260923/summary.md",
       "evidence_sha256": "f8d2629c932a028269a1f504e8a80138ebb5852d6372efea53aad780a9c5d68e"
+    },
+    "reviewed_database_checker": {
+      "source_commit": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
+      "integrated_commit": "01491a10bf5bfc28872a8fc58db034226d346347",
+      "review": "SCOPED_ACCEPTANCE",
+      "baseline_changed": false,
+      "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/independent-review-final.md",
+      "independent_log_sha256": "c23fcb6e7800eaa5f7ba39d926fbd86618bf2ad2d95cdf5c55418c370b22e72a",
+      "rollout_log_sha256": "3bff56e7fff6d46fefe5e1d90648487b98e276739cfe9e2938f01cdd776b6a69"
     }
   },
   "booking": {
@@ -115,7 +124,7 @@
     "v03_window": "Expired/future/insufficient window blocked; load stops on expiry/ordinary signal with failed result and post-stop invariant evidence. Only offline doubles; overall V03 incomplete.",
     "c05_application_rollout": {
       "path": "/private/tmp/bookingtours-c05-evidence-20260923/rollout-local-fresh.log",
-      "result": "196/196 real disposable database checks passed; checker review still pending",
+      "result": "196/196 real disposable database checks passed; independent checker scope accepted, whole policy/deployed C05 remains open",
       "runtime": "Node22.23.2/PostgreSQL17"
     }
   },
