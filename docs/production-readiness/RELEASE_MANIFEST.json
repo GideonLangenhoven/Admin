@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T12:01:57Z",
+  "recorded_at_utc": "2026-09-23T12:17:59Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "e6bcc7a23031bf476ada5c100891867d0b7e9263",
-    "integrated_tree": "726fad8fdcfd284aec371317637ec3e790e0368d",
+    "integrated_commit": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+    "integrated_tree": "d6b9d8130b03514367ace85a3d351daa811f06ee",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -108,6 +108,20 @@
       "integrated_log": "/private/tmp/bookingtours-integrated-evidence-20260923/edge-after-c05.log",
       "integrated_log_sha256": "b0896f819c90f77335a9b6b08d131748c1964ea2db16ab25c3a804deaa6b6857",
       "limit": "No actual CLI ESZip or deployed dependency graph verified; API upload omits lock and native Darwin runtime lacks libgcc. Local bundling is not deployed-runtime proof."
+    },
+    "reviewed_storage_helpers": {
+      "source_commit": "d05ede11ff1b86032ecfbde478f8d45e51ab6155",
+      "integrated_commit": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+      "review": "ACCEPTED_SCOPED_STORAGE_HELPERS",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-independent-review.md",
+      "review_sha256": "1dca8aa740acae2b36e84f6bb49341208632d4f55128d8b3f2f179315d77904d",
+      "writer_evidence": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-verification.md",
+      "writer_sha256": "b93ea0fa5e6e76d1ea2aac92161eb66cf0ccac074e2a6128920c95c6c94a147e",
+      "tests": "Exact committed source229/229 disposablePG17 rollout; independent hash/source/catalog review, syntax and diff checks pass",
+      "test_log_sha256": "bd070bb6e8696fdb00aad15fd9a963edbdf958658d004ae077b9a66d44f2ca3f",
+      "integration": "All three integrated files equal reviewed source; existing tests reused",
+      "limitations": "No hosted Storage/SQL proof. Earlier extra-probe230 result differs from committed229 scope; neither certifies hosted PostgREST reachability."
     }
   },
   "booking": {
@@ -326,6 +340,7 @@
   },
   "planned_unapplied_migrations": [
     "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql",
-    "supabase/migrations/20260923110000_exact_staff_roles_and_demo_rpc_acl.sql"
+    "supabase/migrations/20260923110000_exact_staff_roles_and_demo_rpc_acl.sql",
+    "supabase/migrations/20260923120000_storage_exact_staff_roles.sql"
   ]
 }

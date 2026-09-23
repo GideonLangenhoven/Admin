@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T12:01:57Z",
+  "updated_at_utc": "2026-09-23T12:17:59Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -233,7 +233,18 @@
         "web-chat/index.ts: per-instance20/minute Map and req.json; onboarding-wizard/index.ts: shared check_rate_limit RPC but errors/missingIP allow through; inspect supported workload before limits",
         "_shared/otp-attempts.ts: existing email/IP/attempt tracking; reuse valid evidence and test concurrency/direct ingress. Native Auth settings need no blind alteration.",
         "batch-refund/index.ts already bounds100 unique IDs; retain financial invariants while C06 fixes interruption. Upload route belongs to C04."
-      ]
+      ],
+      "proxy_review": {
+        "source_commit": "00cef2205e8d753f8ebbe9834bbe97043fa7b73a",
+        "status": "CHANGES_REQUIRED_NOT_INTEGRATED",
+        "artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/review.md",
+        "sha256": "c478afd52ab9b6cfa5259df53e590892f0374ac207341b9becb8e9f168075d36",
+        "findings": [
+          "Array-email coercion differs between proxy partition and unchanged login route",
+          "Actual installed Next Node proxy finalization waits original body end despite handler408; hosted Vercel behavior unverified"
+        ],
+        "next": "Sol corrects normalization and proves supported route-level request lifecycle; existing Redis deadline evidence remains valid within unchanged scope."
+      }
     },
     {
       "id": "C04",
@@ -348,9 +359,25 @@
           "integrated_commit": "94f84e6570636c5c54825a826866921facdc1af3",
           "review": "ACCEPTED_SCOPED_C05_EXACT_ROLES_AND_DEMO_ACL",
           "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/exact-role-independent-review.md"
+        },
+        {
+          "id": "C05-STORAGE-HELPERS-20260923",
+          "severity": "high",
+          "owner": "gpt-6-sol/max",
+          "status": "LOCAL_VERIFIED",
+          "version": "Source48dce94 and actual July Storage migration in disposablePG17",
+          "path": "public.storage_admin_business_ids(); public.storage_is_super_admin(); supabase/migrations/20260923120000_storage_exact_staff_roles.sql",
+          "failure": "Unknown persisted staff roles inserted into own-tenant email-images and marketing-assets in ordinary authenticated-role fixtures. Prior helper table references were unqualified under search_path=public.",
+          "impact": "Storage authority can differ from exact approved staff-role policy; helper authority lookup needs explicit schema binding.",
+          "violated_criterion": "C05 effective permissions and V01 exact-role denial",
+          "verification": "Actual policies and forward migration; allowed own-tenant and exactSUPER support, foreign/unknown/suspended/read-only denial, preserved ACLs and public browsing. Exact commit229 checks pass.",
+          "source_commit": "d05ede11ff1b86032ecfbde478f8d45e51ab6155",
+          "integrated_commit": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+          "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-independent-review.md",
+          "limitations": "No hosted Storage/SQL proof. Earlier extra-probe230 result differs from committed229 scope; neither certifies hosted PostgREST reachability."
         }
       ],
-      "next": "Sol is reproducing the separate Storage helper role gap with real disposable PostgreSQL, then making any evidence-supported forward correction. Complete targeted search-path and baseline dispositions; preserve accepted exact-role and demo-RPC proof.",
+      "next": "Read-only independent review of known remaining function/search-path, public-field/view and baseline deltas. Exact-role, Storage helper and checker corrections are accepted locally; no deployed closure.",
       "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
       "local_evidence": "Trusted CA/hostname/connection-string override tests; effective privilege/Storage/tenant drift fixtures and five independent probes pass on fresh PG17/Node22.23.2. Unchanged application rollout196/196 passes. Baseline unchanged. Integrated checker files exactly match accepted source; only readiness docs/V03 guard differ.",
       "result": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
@@ -376,8 +403,7 @@
         "24 definer functions use search_path=public with TEMP rights; review exact bodies/reachability and local temp-shadow cases before any targeted migration; no blanket exploit claim.",
         "Anon yoco_test_mode is a boolean, not credential disclosure by itself; reconcile intended public/staff contract before modifying grants or checker.",
         "operator_directory is an intentionally public marketing owner-rights view; preserve approved projection rather than treating label alone as defect.",
-        "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot.",
-        "storage_admin_business_ids admits any unsuspended role in source; actual Storage permission reproduction is in progress before a separate correction. Public branding and approved read-only behavior must remain intact."
+        "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot."
       ],
       "handler_failure_evidence": {
         "path": "/private/tmp/bookingtours-c05-evidence-20260923/unknown-role-handler-repro.mjs",
@@ -396,12 +422,26 @@
         "tests": "112 focused unit, 218 disposable PostgreSQL rollout and 47 independent PostgreSQL checks pass",
         "integration": "git diff reviewed source vs integrated HEAD excluding readiness documents is empty; scoped evidence reused",
         "limits": "Source-only forward migration; broader Storage, function search paths, baseline and deployed low-role proof remain open"
+      },
+      "accepted_storage_correction": {
+        "source_commit": "d05ede11ff1b86032ecfbde478f8d45e51ab6155",
+        "integrated_commit": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+        "review": "ACCEPTED_SCOPED_STORAGE_HELPERS",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "review_artifact": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-independent-review.md",
+        "review_sha256": "1dca8aa740acae2b36e84f6bb49341208632d4f55128d8b3f2f179315d77904d",
+        "writer_evidence": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-verification.md",
+        "writer_sha256": "b93ea0fa5e6e76d1ea2aac92161eb66cf0ccac074e2a6128920c95c6c94a147e",
+        "tests": "Exact committed source229/229 disposablePG17 rollout; independent hash/source/catalog review, syntax and diff checks pass",
+        "test_log_sha256": "bd070bb6e8696fdb00aad15fd9a963edbdf958658d004ae077b9a66d44f2ca3f",
+        "integration": "All three integrated files equal reviewed source; existing tests reused",
+        "limitations": "No hosted Storage/SQL proof. Earlier extra-probe230 result differs from committed229 scope; neither certifies hosted PostgREST reachability."
       }
     },
     {
       "id": "C06",
       "title": "Bulk acceptance and interruption recovery",
-      "status": "OPEN",
+      "status": "IN_PROGRESS",
       "owner": "gpt-6-sol/max",
       "legacy_refs": [
         "REFUND-01"
@@ -416,7 +456,7 @@
           "verification": "Disposable database and provider-fault tests for tab loss, timeout, failed audit writes, actor/tenant switch and stable money-operation IDs."
         }
       ],
-      "next": "Preserve the approved per-item foreground contract; make whole-batch acceptance and interrupted results authoritative."
+      "next": "Sol is implementing interruption recovery under the approved foreground per-item contract, reusing existing refund operation IDs; enabled batch endpoint needs durable accepted target list and item progress. No genuine provider effects."
     },
     {
       "id": "V01",
