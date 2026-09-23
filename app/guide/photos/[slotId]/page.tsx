@@ -1,11 +1,51 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { getAuthHeaders } from "@/app/lib/admin-auth";
 import { useBusinessContext } from "@/components/BusinessContext";
 
 type Photo = { id: string; photo_url: string; gdrive_view_url: string | null; uploaded_at: string };
+
+async function persistedOperationId(file: File, businessId: string, userId: string, slotId: string) {
+  if (!businessId || !userId || file.size > 4 * 1024 * 1024) {
+    throw new Error("Select a photo under 4 MB while signed in to an operator.");
+  }
+  const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+  const fileHash = hex(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()));
+  const scopeHash = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(
+    [businessId, slotId, fileHash].join(":"),
+  )));
+  const actorHash = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(userId)));
+  const prefix = "guide-photo-upload:v1:";
+  const key = prefix + scopeHash;
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      const [owner, id, extra] = existing.split(":");
+      if (extra || !/^[0-9a-f]{64}$/.test(owner) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+        throw new Error("A saved photo retry record is damaged. Ask an admin to reconcile it before uploading again.");
+      }
+      if (owner !== actorHash) throw new Error("This photo has an unresolved upload under another sign-in. Ask an admin before uploading it again.");
+      return { key, id };
+    }
+    let pending = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith(prefix)) pending++;
+    }
+    if (pending >= 100) throw new Error("Too many unresolved photo uploads. Ask an admin to reconcile them before adding more.");
+    const id = crypto.randomUUID();
+    localStorage.setItem(key, actorHash + ":" + id);
+    return { key, id };
+  } catch (error) {
+    if (error instanceof Error && (error.message.startsWith("A saved photo") || error.message.startsWith("This photo has") || error.message.startsWith("Too many unresolved"))) throw error;
+    throw new Error("This browser cannot safely remember photo retries. Enable storage before uploading.");
+  }
+}
+
+function clearOperation(key: string) {
+  try { localStorage.removeItem(key); } catch { /* Keeping the ID is safer than losing it. */ }
+}
 
 export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: string }> }) {
   const { slotId } = use(params);
@@ -16,7 +56,6 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
-  const uploadOperations = useRef(new Map<string, string>());
 
   useEffect(() => { reload(); }, [slotId, businessId]);
 
@@ -47,25 +86,26 @@ export default function GuidePhotosPage({ params }: { params: Promise<{ slotId: 
     try {
       const headers = await getAuthHeaders();
       if (!headers.Authorization) throw new Error("Please sign in again before uploading photos.");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) throw new Error("Please sign in again before uploading photos.");
       delete headers["Content-Type"]; // The browser supplies the multipart boundary.
       const failed: string[] = [];
       const needsReview: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileKey = [slotId, file.name, file.size, file.lastModified].join(":");
-        const operationId = uploadOperations.current.get(fileKey) || crypto.randomUUID();
-        uploadOperations.current.set(fileKey, operationId);
+        const operation = await persistedOperationId(file, businessId, session.user.id, slotId);
         const fd = new FormData();
         fd.append("file", file);
         fd.append("slot_id", slotId);
-        fd.append("operation_id", operationId);
+        fd.append("operation_id", operation.id);
         try {
           const r = await fetch("/api/guide/photo-upload", { method: "POST", headers, body: fd });
           const data = await r.json();
           if (!r.ok || data.ok !== true) {
-            if (data.retryable === false) needsReview.push(file.name);
-            else { failed.push(file.name); uploadOperations.current.delete(fileKey); }
-          } else uploadOperations.current.delete(fileKey);
+            if (data.new_operation_safe === true) clearOperation(operation.key);
+            if (data.retryable === true) failed.push(file.name);
+            else needsReview.push(file.name);
+          } else clearOperation(operation.key);
         } catch { needsReview.push(file.name); }
         setProgress(prev => prev ? { ...prev, done: i + 1 } : null);
       }

@@ -73,6 +73,7 @@ function fixture(options: {
   caller?: { id: string; business_id: string; role: string } | null;
   slotBusinessId?: string;
   tokenThrows?: boolean;
+  tokenFailsAfter?: number;
   uploadThrows?: boolean;
   uploadStatus?: number;
   malformedUploadResponse?: boolean;
@@ -90,6 +91,7 @@ function fixture(options: {
   const inserts: Record<string, unknown>[] = [];
   const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
   const queriedTables: string[] = [];
+  let tokenCalls = 0;
   let ledger: Record<string, unknown> | null = null;
   let savedPhoto: Record<string, unknown> | null = null;
 
@@ -157,7 +159,8 @@ function fixture(options: {
     const href = String(url);
     fetchCalls.push({ url: href, init });
     if (href.endsWith("/functions/v1/google-drive")) {
-      if (options.tokenThrows) throw new Error("token response lost");
+      tokenCalls++;
+      if (options.tokenThrows || (options.tokenFailsAfter && tokenCalls > options.tokenFailsAfter)) throw new Error("token response lost");
       return Response.json({ access_token: "drive-token-a", folder_id: "folder-a" });
     }
     if (init.method === "DELETE") {
@@ -182,7 +185,7 @@ function fixture(options: {
     sharp: { default: (input: Uint8Array, sharpOptions: Parameters<typeof sharp>[1]) => sharp(Buffer.from(input), sharpOptions) },
   }, {}, fetchImpl as typeof fetch);
 
-  return { handler, inserts, fetchCalls, fetchImpl, queriedTables, get ledger() { return ledger; } };
+  return { handler, inserts, fetchCalls, fetchImpl, queriedTables, get ledger() { return ledger; }, get tokenCalls() { return tokenCalls; } };
 }
 
 async function body(response: Response) {
@@ -367,13 +370,14 @@ describe("guide photo upload boundary", () => {
   });
 
   it("returns the first saved photo on a stable retry without another Drive upload", async () => {
-    const f = fixture();
+    const f = fixture({ tokenFailsAfter: 1 });
     const file = imageFile(pngBytes, { type: "image/png" });
     expect((await f.handler(requestFor(file))).status).toBe(200);
     const retry = await f.handler(requestFor(file));
     expect(retry.status).toBe(200);
     expect(await body(retry)).toMatchObject({ ok: true, recovered: true });
     expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
+    expect(f.tokenCalls).toBe(1);
     expect(f.inserts).toHaveLength(1);
   });
 
@@ -387,6 +391,17 @@ describe("guide photo upload boundary", () => {
     expect(await body(retry)).toMatchObject({ code: "UPLOAD_STATE_UNKNOWN", retryable: false });
     expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
     expect(f.ledger).toMatchObject({ operation_id: OPERATION_ID, state: "uploading" });
+    log.mockRestore();
+  });
+
+  it("checks an unresolved ledger claim before a later token failure", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const f = fixture({ uploadThrows: true, tokenFailsAfter: 1 });
+    const file = imageFile(pngBytes, { type: "image/png" });
+    expect((await f.handler(requestFor(file))).status).toBe(503);
+    expect((await f.handler(requestFor(file))).status).toBe(503);
+    expect(f.tokenCalls).toBe(1);
+    expect(f.fetchCalls.filter(call => call.url.includes("/upload/drive/"))).toHaveLength(1);
     log.mockRestore();
   });
 
@@ -491,14 +506,30 @@ describe("guide photo upload boundary", () => {
 });
 
 describe("guide photo upload caller", () => {
-  function callerFixture(fetchImpl: typeof fetch) {
+  function storage() {
+    const rows = new Map<string, string>();
+    return {
+      rows,
+      getItem: (key: string) => rows.get(key) ?? null,
+      setItem: (key: string, value: string) => { rows.set(key, value); },
+      removeItem: (key: string) => { rows.delete(key); },
+      key: (index: number) => [...rows.keys()][index] ?? null,
+      get length() { return rows.size; },
+    };
+  }
+  function callerFixture(fetchImpl: typeof fetch, saved = storage(), userId = "user-a", businessId = BUSINESS_A) {
     const setUploadStatus = vi.fn();
-    const uploadOperations = { current: new Map<string, string>() };
+    const file = "app/guide/photos/[slotId]/page.tsx";
+    const persistedOperationId = sourceFunction(file, "persistedOperationId", { localStorage: saved });
+    const clearOperation = sourceFunction(file, "clearOperation", { localStorage: saved });
     const upload = sourceFunction("app/guide/photos/[slotId]/page.tsx", "onPickPhotos", {
       getAuthHeaders: async () => ({ Authorization: "Bearer signed-in-guide", "Content-Type": "application/json" }),
       uploading: false,
       slotId: SLOT_ID,
-      uploadOperations,
+      businessId,
+      supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) } },
+      persistedOperationId,
+      clearOperation,
       FormData,
       setUploading: vi.fn(),
       setUploadStatus,
@@ -506,7 +537,7 @@ describe("guide photo upload caller", () => {
       reload: vi.fn(),
       fetch: fetchImpl,
     });
-    return { upload, setUploadStatus, uploadOperations };
+    return { upload, setUploadStatus, saved };
   }
 
   it("does not invite a blind retry when the server cannot reconcile persistence", async () => {
@@ -543,7 +574,76 @@ describe("guide photo upload caller", () => {
     await f.upload([file]);
     expect(seen).toHaveLength(2);
     expect(seen[0]).toBe(seen[1]);
-    expect(f.uploadOperations.current.size).toBe(1);
+    expect(f.saved.rows.size).toBe(1);
+  });
+
+  it("survives a page remount and a transient token error with the same operation ID", async () => {
+    const saved = storage();
+    const seen: string[] = [];
+    let attempt = 0;
+    const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) => {
+      seen.push(String((init?.body as FormData).get("operation_id")));
+      attempt++;
+      if (attempt === 1) return Response.json({ code: "UPLOAD_STATE_UNKNOWN", retryable: false }, { status: 503 });
+      if (attempt === 2) return Response.json({ error: "temporary token failure", retryable: true }, { status: 502 });
+      return Response.json({ ok: true });
+    };
+    const photo = imageFile(pngBytes, { name: "trip.png", type: "image/png" });
+    await callerFixture(fetchImpl as typeof fetch, saved).upload([photo]);
+    await callerFixture(fetchImpl as typeof fetch, saved).upload([photo]);
+    expect(saved.rows.size).toBe(1);
+    await callerFixture(fetchImpl as typeof fetch, saved).upload([photo]);
+    expect(new Set(seen).size).toBe(1);
+    expect(saved.rows.size).toBe(0);
+  });
+
+  it("blocks an account switch for an unresolved photo and scopes other operations by tenant, slot and bytes", async () => {
+    const saved = storage();
+    const persisted = sourceFunction("app/guide/photos/[slotId]/page.tsx", "persistedOperationId", { localStorage: saved });
+    const photo = imageFile(pngBytes, { name: "trip.png", type: "image/png" });
+    const other = imageFile(avifBytes, { name: "trip.png", type: "image/avif" });
+    const first = await persisted(photo, BUSINESS_A, "user-a", SLOT_ID);
+    expect((await persisted(photo, BUSINESS_A, "user-a", SLOT_ID)).id).toBe(first.id);
+    await expect(persisted(photo, BUSINESS_A, "user-b", SLOT_ID)).rejects.toThrow("under another sign-in");
+    expect((await persisted(photo, BUSINESS_B, "user-a", SLOT_ID)).id).not.toBe(first.id);
+    expect((await persisted(photo, BUSINESS_A, "user-a", "44444444-4444-4444-8444-444444444444")).id).not.toBe(first.id);
+    expect((await persisted(other, BUSINESS_A, "user-a", SLOT_ID)).id).not.toBe(first.id);
+    expect([...saved.rows.keys()].join(" ")).not.toMatch(/user-a|user-b|aaaaaaaa|bbbbbbbb|trip.png/);
+    expect([...saved.rows.values()].join(" ")).not.toMatch(/user-a|user-b|aaaaaaaa|bbbbbbbb|trip.png/);
+  });
+
+  it("does not contact the provider after an account switch on an unresolved photo", async () => {
+    const saved = storage();
+    const photo = imageFile(pngBytes, { type: "image/png" });
+    const first = callerFixture(async () => Response.json({ code: "UPLOAD_STATE_UNKNOWN", retryable: false }, { status: 503 }), saved, "user-a");
+    await first.upload([photo]);
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true }));
+    const switched = callerFixture(fetchImpl as typeof fetch, saved, "user-b");
+    await switched.upload([photo]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(switched.setUploadStatus).toHaveBeenLastCalledWith("This photo has an unresolved upload under another sign-in. Ask an admin before uploading it again.");
+  });
+
+  it.each(["read denied", "write full"])("stops before upload when durable browser storage is %s", async mode => {
+    const saved = storage();
+    if (mode === "read denied") saved.getItem = () => { throw new Error("disabled"); };
+    else saved.setItem = () => { throw new Error("quota"); };
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true }));
+    const f = callerFixture(fetchImpl as typeof fetch, saved);
+    await f.upload([imageFile(pngBytes, { type: "image/png" })]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(f.setUploadStatus).toHaveBeenLastCalledWith("This browser cannot safely remember photo retries. Enable storage before uploading.");
+  });
+
+  it("keeps unresolved identities and stops adding new ones at the storage bound", async () => {
+    const saved = storage();
+    for (let i = 0; i < 100; i++) saved.rows.set("guide-photo-upload:v1:" + i, crypto.randomUUID());
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true }));
+    const f = callerFixture(fetchImpl as typeof fetch, saved);
+    await f.upload([imageFile(pngBytes, { type: "image/png" })]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(saved.rows.size).toBe(100);
+    expect(f.setUploadStatus).toHaveBeenLastCalledWith("Too many unresolved photo uploads. Ask an admin to reconcile them before adding more.");
   });
 });
 
