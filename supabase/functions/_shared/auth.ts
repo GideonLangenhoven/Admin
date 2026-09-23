@@ -45,7 +45,9 @@ export async function requireAuth(req: Request, options: { allowReadOnly?: boole
     .eq("user_id", data.user.id)
     .maybeSingle();
 
-  if (!admin || admin.suspended || (!admin.business_id && admin.role !== "SUPER_ADMIN")) {
+  if (!admin || admin.suspended ||
+      !["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"].includes(admin.role) ||
+      (!admin.business_id && admin.role !== "SUPER_ADMIN")) {
     throw new Error("Not an active admin user");
   }
   // Edge functions run with the service role and can send messages or move

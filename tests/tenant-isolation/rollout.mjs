@@ -35,6 +35,11 @@ try {
   await db.query(readFileSync('tests/fixtures/rollout-marketing.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-cron.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-platform.sql', 'utf8'));
+  // The July public-settings policy exists in the deployed catalog but not in
+  // the older schema snapshot; apply its real source before September changes.
+  await db.query(readFileSync('supabase/migrations/20260724150000_operator_directory.sql', 'utf8'));
+  await db.query('grant select on public.platform_public_settings to anon');
+  await db.query('grant select,insert,update,delete on public.platform_public_settings to authenticated');
   await db.query("create function public.ck_current_period_key() returns date language sql stable as 'select current_date'");
   await db.query(readFileSync('supabase/migrations/20260302123000_subscription_line_items.sql', 'utf8'));
   const platformInvoiceSchema = readFileSync('supabase/migrations/20260714172241_platform_invoices.sql', 'utf8');
@@ -361,6 +366,55 @@ try {
     ($7,$8,$3,'platform@example.invalid','fixture','SUPER_ADMIN',false),
     ($9,$10,$3,'suspended@example.invalid','fixture','SUPER_ADMIN',true)`,
   [id(11),id(101),id(1),id(12),id(102),id(2),id(13),id(103),id(14),id(104)]);
+  await db.query(`insert into admin_users(id,user_id,business_id,email,password_hash,role,suspended,read_only) values
+    ($1,$2,$3,'operator-a@example.invalid','fixture','OPERATOR',false,false),
+    ($4,$5,$3,'legacy-a@example.invalid','fixture','ADMIN',false,false),
+    ($6,$7,$3,'unknown-a@example.invalid','fixture','FUTURE_STAFF',false,false),
+    ($8,$9,$3,'super-prefix@example.invalid','fixture','SUPER_PREFIX',false,false),
+    ($10,$11,$3,'demo-platform@example.invalid','fixture','SUPER_ADMIN',false,true)`,
+  [id(15),id(105),id(1),id(16),id(106),id(17),id(107),id(18),id(108),id(19),id(109)]);
+  for (const user of [107,108]) {
+    await check(`unknown staff ${user} has no tenant RLS authority`,()=>as('authenticated',user,{},async()=>{
+      assert.deepEqual((await db.query('select current_business_ids() ids')).rows[0].ids,[]);
+    }));
+  }
+  for (const user of [105,106,101]) {
+    await check(`exact own-tenant staff ${user} keeps tenant RLS authority`,()=>as('authenticated',user,{},async()=>{
+      assert.deepEqual((await db.query('select current_business_ids() ids')).rows[0].ids,[id(1)]);
+    }));
+  }
+  for (const user of [103,109]) {
+    await check(`exact platform staff ${user} retains browsing`,()=>as('authenticated',user,{},async()=>{
+      const ids=(await db.query('select current_business_ids() ids')).rows[0].ids;
+      assert(ids.includes(id(1)) && ids.includes(id(2)));
+    }));
+  }
+  await check('suspended staff has no tenant RLS authority',()=>as('authenticated',104,{},async()=>{
+    assert.deepEqual((await db.query('select current_business_ids() ids')).rows[0].ids,[]);
+  }));
+  await check('only exact active SUPER_ADMIN may update public platform settings',()=>as('authenticated',103,{},async()=>{
+    assert.equal((await db.query("update platform_public_settings set value='{}'::jsonb where key='directory' returning key")).rowCount,1);
+  }));
+  for (const user of [107,108,104]) {
+    await check(`staff ${user} cannot mutate public platform settings`,()=>as('authenticated',user,{},async()=>{
+      assert.equal((await db.query("update platform_public_settings set value='{}'::jsonb where key='directory' returning key")).rowCount,0);
+    }));
+  }
+  await check('read-only platform demo can browse settings but cannot mutate',()=>as('authenticated',109,{},async()=>{
+    assert.equal((await db.query("select key from platform_public_settings where key='directory'")).rowCount,1);
+    assert.equal((await db.query("update platform_public_settings set value='{\"blocked\":true}'::jsonb where key='directory' returning key")).rowCount,0);
+  }));
+  await check('demo date refresh has service-only EXECUTE, including explicit client grants',async()=>{
+    for (const role of ['anon','authenticated']) {
+      assert.equal((await db.query("select has_function_privilege($1,'public.refresh_claires_hiking_demo_dates(uuid,timestamptz)','EXECUTE') allowed",[role])).rows[0].allowed,false);
+      await as(role,role==='authenticated'?101:null,{},async()=>{
+        await assert.rejects(db.query('select refresh_claires_hiking_demo_dates($1)',[id(1)]),{code:'42501'});
+      });
+    }
+    await as('service_role',null,{},async()=>{
+      assert.equal((await db.query('select refresh_claires_hiking_demo_dates($1) result',[id(1)])).rows[0].result,null);
+    });
+  });
 
   // Shared partial-arrival contract: one conflict-checked absolute count, one
   // audit row, and compatibility for old boolean writers and booking moves.
@@ -433,6 +487,20 @@ try {
     const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-platform',id(2),id(721)))).rows[0].result;
     assert.equal(result.ok,false); assert.equal(result.code,'NOT_FOUND');
   }));
+  for (const [user,actor] of [[105,15],[106,16]]) {
+    await check(`exact legacy staff ${user} retains attributable own-tenant arrival`,()=>as('authenticated',user,{},async()=>{
+      const event='arrival-exact-'+user;
+      const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),5,6,event))).rows[0].result;
+      assert.equal(result.ok,true);
+      assert.equal((await db.query('select actor_admin_id from slot_check_ins where client_event_id=$1',[event])).rows[0].actor_admin_id,id(actor));
+    }));
+  }
+  for (const user of [107,108]) {
+    await check(`unknown staff ${user} cannot invoke the authenticated arrival wrapper`,()=>as('authenticated',user,{},async()=>{
+      const result=(await db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),5,6,'arrival-unknown-'+user))).rows[0].result;
+      assert.equal(result.code,'UNAUTHORIZED');
+    }));
+  }
   for (const role of ['anon','service_role']) {
     await check(`${role} cannot invoke the authenticated arrival wrapper`,()=>as(role,null,{},async()=>{
       await assert.rejects(db.query(authenticatedArrivalSql,authenticatedArrivalArgs(id(731),4,6,'arrival-auth-forged')),{code:'42501'});
@@ -742,6 +810,12 @@ try {
     assert.equal(snapshot.business_id,id(2));
     assert(snapshot.today_manifest.every(row=>row.business_id===id(2)));
   }));
+  for (const user of [107,108]) {
+    await check(`unknown staff ${user} cannot read direct or dashboard booking data`,()=>as('authenticated',user,{},async()=>{
+      assert.equal((await db.query('select id from bookings where id=$1',[dashboardBooking])).rowCount,0);
+      assert.equal((await db.query(dashboardSql,[id(1)])).rows[0].snapshot,null);
+    }));
+  }
   const listBookings = 'select id,business_id from list_operator_bookings($1,\'2026-09-01\',\'2026-09-30\',$2,$3)';
   await check('R18 one global booking offset covers 1201 slots and interleaved unslotted bookings exactly once',()=>as('authenticated',101,{},async()=>{
     const expected=(await db.query("select id from bookings where business_id=$1 and id<>all($2::uuid[]) order by created_at,id",[id(1),[id(903),id(904)]])).rows.map(row=>row.id);
@@ -773,6 +847,11 @@ try {
       assert.equal(rows.length,1000);
       assert(rows.every(row=>row.business_id===id(2)));
       assert.equal((await db.query(listBookings,[id(2),50,5000])).rowCount,0);
+    }));
+  }
+  for (const user of [107,108]) {
+    await check(`unknown staff ${user} cannot page operator bookings`,()=>as('authenticated',user,{},async()=>{
+      assert.equal((await db.query(listBookings,[id(1),50,0])).rowCount,0);
     }));
   }
   for (const method of ['GET','POST','PATCH']) {

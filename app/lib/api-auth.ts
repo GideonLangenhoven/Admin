@@ -32,7 +32,8 @@ export async function getCallerAdmin(
     .eq("user_id", data.user.id)
     .maybeSingle();
 
-  if (!adminRow || adminRow.suspended) return null;
+  if (!adminRow || adminRow.suspended ||
+      !["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"].includes(adminRow.role)) return null;
   // Shared demo credentials may browse GET-backed dashboard data, but can
   // never use a service-role API route to mutate data or contact customers.
   if (adminRow.read_only && req.method !== "GET") return null;
