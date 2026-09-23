@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Per-IP rate limiting at the platform edge (Next.js 16 proxy.ts).
+ * API rate limiting at the platform edge (Next.js 16 proxy.ts).
  *
  * The rate-limit logic is inlined here because Next 16's bundler
  * compiles proxy.ts in an isolated context that cannot resolve imports
  * out of the `app/` directory. Keeping the implementation small and
  * self-contained avoids any cross-bundle resolution issues.
  *
- * Note: the store is in-memory per Node.js process. On a single-instance
- * Vercel deployment that's fine; if we ever scale to multiple regions/
- * instances the limit is per-instance. For multi-instance enforcement,
- * swap the in-memory Map for Redis/Upstash.
- *
- * Limits:
- *   - /api/admin/login                        : 5 attempts / 15 minutes
- *   - setup-link validate/complete            : 5 attempts / 15 minutes, separate bucket
- *   - setup-link send or malformed requests   : 5 attempts / 15 minutes, separate bucket
- *   - all other /api/*                         : 100 requests / minute
+ * The in-memory store is for local development only. Deployed requests
+ * require Redis, and an unavailable limiter rejects API traffic.
  *
  * Webhook endpoints live at supabase/functions/* (different runtime)
  * and rely on signature verification + idempotency keys, not this.
@@ -59,6 +51,53 @@ interface RateLimitResult {
   retryAfterMs: number;
 }
 
+const BODY_BYTES = 8 * 1024;
+const REDIS_BYTES = 4 * 1024;
+const LIMITER_DEADLINE_MS = 1_500;
+let lastLimiterError = "";
+
+function unavailable(reason: string): NextResponse {
+  if (lastLimiterError !== reason) console.error("RATE_LIMIT_UNAVAILABLE:", reason);
+  lastLimiterError = reason;
+  return new NextResponse(JSON.stringify({ error: "Rate limiting temporarily unavailable" }), {
+    status: 503,
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": "2" },
+  });
+}
+
+async function beforeDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw new Error("deadline");
+  let onAbort = () => {};
+  const timedOut = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new Error("deadline"));
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([work, timedOut]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
+async function readBounded(body: ReadableStream<Uint8Array> | null, maxBytes: number, signal: AbortSignal): Promise<string> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await beforeDeadline(reader.read(), signal);
+      if (done) return text + decoder.decode();
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw new Error("body_too_large");
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    if (bytes > maxBytes || signal.aborted) void reader.cancel().catch(() => {});
+  }
+}
+
 function rateLimit(config: RateLimitConfig, key: string): RateLimitResult {
   const store = getStore(config.name);
   const now = Date.now();
@@ -90,13 +129,10 @@ function rateLimit(config: RateLimitConfig, key: string): RateLimitResult {
   };
 }
 
-async function distributedRateLimit(config: RateLimitConfig, key: string): Promise<RateLimitResult | null> {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-
+async function distributedRateLimit(config: RateLimitConfig, key: string, url: string, token: string): Promise<RateLimitResult> {
   const redisKey = `ck:rl:${config.name}:${key}`;
-  const res = await fetch(`${url}/multi-exec`, {
+  const signal = AbortSignal.timeout(LIMITER_DEADLINE_MS);
+  const res = await beforeDeadline(fetch(`${url}/multi-exec`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -108,13 +144,19 @@ async function distributedRateLimit(config: RateLimitConfig, key: string): Promi
       ["PTTL", redisKey],
     ]),
     cache: "no-store",
-  });
+    signal,
+  }), signal);
 
   if (!res.ok) throw new Error(`Redis rate limit failed: ${res.status}`);
-  const results = await res.json();
-  const count = Number(results?.[1]?.result || 0);
-  const ttl = Number(results?.[2]?.result || config.windowMs);
-  if (!Number.isFinite(count) || count <= 0) throw new Error("Redis rate limit returned invalid count");
+  const results = JSON.parse(await readBounded(res.body, REDIS_BYTES, signal));
+  const rawCount = results?.[1]?.result;
+  const rawTtl = results?.[2]?.result;
+  const count = Number(rawCount);
+  const ttl = Number(rawTtl);
+  if (!Array.isArray(results) || results.length !== 3 || !Number.isSafeInteger(count) || count <= 0 ||
+      rawTtl == null || !Number.isSafeInteger(ttl) || ttl < 0 || ttl > config.windowMs) {
+    throw new Error("Redis rate limit returned invalid result");
+  }
 
   return {
     allowed: count <= config.limit,
@@ -124,12 +166,11 @@ async function distributedRateLimit(config: RateLimitConfig, key: string): Promi
   };
 }
 
-function getClientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "127.0.0.1";
+function getClientIp(req: NextRequest, deployed: boolean): string | null {
+  if (deployed && process.env.VERCEL !== "1") return null;
+  const ip = (req.headers.get("x-vercel-forwarded-for") || req.headers.get("x-forwarded-for") || "").trim();
+  if (!ip || ip.length > 45 || !/^[0-9a-fA-F:.]+$/.test(ip)) return deployed ? null : "local";
+  return ip;
 }
 
 let lastCleanup = 0;
@@ -146,10 +187,19 @@ function cleanupStores(maxWindowMs: number) {
   });
 }
 
-const API_LIMIT: RateLimitConfig = { name: "api", limit: 100, windowMs: 60_000 };
-const AUTH_LIMIT: RateLimitConfig = { name: "auth", limit: 5, windowMs: 15 * 60_000 };
-const TOKEN_LIMIT: RateLimitConfig = { name: "setup-token", limit: 5, windowMs: 15 * 60_000 };
-const SEND_LIMIT: RateLimitConfig = { name: "setup-send", limit: 5, windowMs: 15 * 60_000 };
+const API_LIMIT: RateLimitConfig = { name: "api-ip", limit: 4_000, windowMs: 60_000 };
+const AUTH_IP_LIMIT: RateLimitConfig = { name: "auth-ip", limit: 1_200, windowMs: 15 * 60_000 };
+const AUTH_INPUT_LIMIT: RateLimitConfig = { name: "auth-input", limit: 10, windowMs: 15 * 60_000 };
+const TOKEN_IP_LIMIT: RateLimitConfig = { name: "setup-token-ip", limit: 1_200, windowMs: 15 * 60_000 };
+const TOKEN_INPUT_LIMIT: RateLimitConfig = { name: "setup-token-input", limit: 10, windowMs: 15 * 60_000 };
+const SEND_IP_LIMIT: RateLimitConfig = { name: "setup-send-ip", limit: 300, windowMs: 15 * 60_000 };
+const SEND_INPUT_LIMIT: RateLimitConfig = { name: "setup-send-input", limit: 5, windowMs: 15 * 60_000 };
+
+async function inputKey(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
+  return Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 /**
  * Page-level role gating (advisory UX, NOT a security boundary).
@@ -228,40 +278,99 @@ export async function proxy(req: NextRequest) {
   if (pageGate) return pageGate;
 
   if (!req.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
-  if (process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
-
-  const ip = getClientIp(req);
-  const isLogin = req.nextUrl.pathname.startsWith("/api/admin/login");
-  const isSetupLink = req.nextUrl.pathname.startsWith("/api/admin/setup-link");
-  let isTokenAction = false;
-  if (isSetupLink && req.method === "POST") {
-    try {
-      const body = await req.clone().json();
-      isTokenAction = body?.action === "validate" || body?.action === "complete";
-    } catch { /* malformed requests use the setup-send bucket */ }
+  const deployed = process.env.VERCEL === "1" || process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
+  if (deployed && process.env.E2E_BYPASS_RATE_LIMIT && process.env.E2E_BYPASS_RATE_LIMIT !== "0") {
+    return unavailable("production rate-limit bypass configured");
   }
-  const config = isSetupLink ? (isTokenAction ? TOKEN_LIMIT : SEND_LIMIT) : isLogin ? AUTH_LIMIT : API_LIMIT;
+  if (!deployed && process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
 
-  let result: RateLimitResult;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
+  let redisUrl = "";
   try {
-    result = (await distributedRateLimit(config, ip)) || rateLimit(config, ip);
-  } catch (error) {
-    console.error("RATE_LIMIT_DISTRIBUTED_FALLBACK:", error);
-    result = rateLimit(config, ip);
+    const url = new URL(process.env.UPSTASH_REDIS_REST_URL || "");
+    if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("invalid Redis URL");
+    }
+    redisUrl = url.origin;
+  } catch { /* missing or invalid configuration is handled below */ }
+  if (deployed && (!redisUrl || !token)) return unavailable("valid HTTPS Redis URL and token required");
+
+  const ip = getClientIp(req, deployed);
+  if (!ip) return unavailable("trusted Vercel client IP required");
+
+  const isLogin = req.nextUrl.pathname === "/api/admin/login";
+  const isSetupLink = req.nextUrl.pathname === "/api/admin/setup-link";
+  let payload: Record<string, unknown> = {};
+  if ((isLogin || isSetupLink) && req.method === "POST") {
+    if (Number(req.headers.get("content-length")) > BODY_BYTES) {
+      return new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } });
+    }
+    try {
+      const raw = await readBounded(req.clone().body, BODY_BYTES, AbortSignal.timeout(LIMITER_DEADLINE_MS));
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) payload = parsed;
+    } catch (error) {
+      if (error instanceof Error && error.message === "body_too_large") {
+        return new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } });
+      }
+      if (error instanceof Error && error.message === "deadline") {
+        return new NextResponse(JSON.stringify({ error: "Request body timed out" }), { status: 408, headers: { "Content-Type": "application/json" } });
+      }
+      // Malformed JSON still consumes the route's IP bucket.
+    }
   }
-  cleanupStores(Math.max(API_LIMIT.windowMs, AUTH_LIMIT.windowMs));
+
+  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+  const validEmail = email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : "";
+  const secret = token || "local-only";
+  const buckets: Array<[RateLimitConfig, string]> = [];
+  if (isLogin) {
+    buckets.push([AUTH_IP_LIMIT, ip]);
+    if (validEmail) buckets.push([AUTH_INPUT_LIMIT, `${ip}:${await inputKey(validEmail, secret)}`]);
+  } else if (isSetupLink && (payload.action === "validate" || payload.action === "complete")) {
+    buckets.push([TOKEN_IP_LIMIT, ip]);
+    const setupToken = typeof payload.token === "string" && payload.token.length <= 256 ? payload.token : "";
+    if (setupToken) buckets.push([TOKEN_INPUT_LIMIT, `${ip}:${await inputKey(setupToken, secret)}`]);
+  } else if (isSetupLink) {
+    buckets.push([SEND_IP_LIMIT, ip]);
+    const adminId = typeof payload.admin_id === "string" && payload.admin_id.length <= 128 ? payload.admin_id : "";
+    const target = validEmail || adminId;
+    if (target) buckets.push([SEND_INPUT_LIMIT, `${ip}:${await inputKey(target, secret)}`]);
+  } else {
+    buckets.push([API_LIMIT, ip]);
+  }
+
+  let results: RateLimitResult[];
+  try {
+    if (redisUrl && token) {
+      results = await Promise.all(buckets.map(([config, key]) => distributedRateLimit(config, key, redisUrl, token)));
+    } else {
+      results = buckets.map(([config, key]) => rateLimit(config, key));
+    }
+  } catch {
+    if (deployed) return unavailable("Redis request failed, timed out, or returned an invalid result");
+    results = buckets.map(([config, key]) => rateLimit(config, key));
+  }
+  if (!deployed) cleanupStores(Math.max(API_LIMIT.windowMs, AUTH_IP_LIMIT.windowMs));
+
+  const denied = results.filter((candidate) => !candidate.allowed);
+  const result = denied.length
+    ? denied.reduce((a, b) => a.retryAfterMs >= b.retryAfterMs ? a : b)
+    : results.reduce((a, b) => a.remaining <= b.remaining ? a : b);
 
   if (!result.allowed) {
     return new NextResponse(
       JSON.stringify({
         error: "Too many requests",
-        retry_after_ms: result.retryAfterMs,
+        retry_after_ms: Math.max(1, result.retryAfterMs),
       }),
       {
         status: 429,
         headers: {
           "Content-Type": "application/json",
-          "Retry-After": String(Math.ceil(result.retryAfterMs / 1000)),
+          "Retry-After": String(Math.max(1, Math.ceil(result.retryAfterMs / 1000))),
+          "Cache-Control": "no-store",
           "X-RateLimit-Limit": String(result.limit),
           "X-RateLimit-Remaining": "0",
         },
