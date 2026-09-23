@@ -43,12 +43,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const action = String(body.action || "");
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const action = body.action;
   if (!["send", "validate", "complete"].includes(action)) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
-  const isSelfReset = action === "send" && String(body.reason || "ADMIN_INVITE") === "RESET" &&
-    !!String(body.email || "").trim() && !body.admin_id;
+  if (action === "send" && ["reason", "email", "admin_id"].some(key => body[key] != null && typeof body[key] !== "string")) {
+    return NextResponse.json({ error: "Invalid setup-link request" }, { status: 400 });
+  }
+  const isSelfReset = action === "send" && body.reason === "RESET" && !!body.email?.trim() && !body.admin_id;
 
   let admin;
   try {

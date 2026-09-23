@@ -8,9 +8,9 @@ describe("public reset rate limiting", () => {
       static redirect(url: URL) { return new NextResponse(null, { status: 307, headers: { Location: url.href } }); }
     }
     const proxy = sourceExports("proxy.ts", { "next/server": { NextResponse } }).proxy as (req: Request) => Promise<Response>;
-    const request = (path: string, body: object) => Object.assign(new Request("https://admin.example.invalid" + path, {
+    const request = (path: string, body: object, ip = "192.0.2.154") => Object.assign(new Request("https://admin.example.invalid" + path, {
       method: "POST",
-      headers: { "x-forwarded-for": "192.0.2.154" },
+      headers: { "x-forwarded-for": ip },
       body: JSON.stringify(body),
     }), { nextUrl: new URL("https://admin.example.invalid" + path) });
 
@@ -20,5 +20,16 @@ describe("public reset rate limiting", () => {
     expect((await proxy(request("/api/admin/setup-link", { action: "send", reason: "RESET", email: "staff@example.invalid" }))).status).toBe(429);
     expect((await proxy(request("/api/admin/login", { email: "staff@example.invalid", password: "fixture" }))).status).toBe(200);
     expect((await proxy(request("/api/admin/setup-link", { action: "complete", email: "staff@example.invalid", token: "fixture" }))).status).toBe(200);
+
+    const malformed = [
+      { action: "send", reason: ["RESET"], email: "staff@example.invalid" },
+      { action: ["send"], reason: "RESET", email: "staff@example.invalid" },
+    ];
+    for (let i = 0; i < 5; i++) {
+      expect((await proxy(request("/api/admin/setup-link", malformed[i % malformed.length], "192.0.2.155"))).status).toBe(200);
+    }
+    expect((await proxy(request("/api/admin/setup-link", malformed[0], "192.0.2.155"))).status).toBe(429);
+    expect((await proxy(request("/api/admin/login", { email: "staff@example.invalid", password: "fixture" }, "192.0.2.155"))).status).toBe(200);
+    expect((await proxy(request("/api/admin/setup-link", { action: "complete", email: "staff@example.invalid", token: "fixture" }, "192.0.2.155"))).status).toBe(200);
   });
 });

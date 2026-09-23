@@ -9,6 +9,10 @@ function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+function invalidCredentials() {
+  return NextResponse.json({ error: "Invalid credentials", code: "AUTH_REQUIRED" }, { status: 401 });
+}
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
   let authUserId = "";
   if (token) {
     const { data, error } = await admin.auth.getUser(token);
-    if (error || !data.user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    if (error || !data.user) return invalidCredentials();
     authUserId = data.user.id;
   }
 
@@ -64,7 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
   if (!user || (!token && (user.user_id || !user.password_hash || user.password_hash !== sha256(password)))) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    return invalidCredentials();
   }
   if (user.suspended) {
     return NextResponse.json(

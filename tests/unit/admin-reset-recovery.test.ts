@@ -73,17 +73,29 @@ function resetFixture(options: {
     ...(options.origin === null ? {} : { ADMIN_RECOVERY_ORIGIN: options.origin || "https://trusted.example.invalid" }),
     ...(options.serviceConfigured === false ? { SUPABASE_SERVICE_ROLE_KEY: "missing" } : {}),
   });
-  const invoke = () => handler(Object.assign(new Request("https://attacker.example.invalid/api/admin/setup-link", {
+  const invoke = (payload?: unknown) => handler(Object.assign(new Request("https://attacker.example.invalid/api/admin/setup-link", {
     method: "POST",
     headers: { Host: "attacker.example.invalid", Origin: "https://evil.example.invalid" },
-    body: JSON.stringify(options.privileged
+    body: JSON.stringify(payload ?? (options.privileged
       ? { action: "send", reason: "ADMIN_INVITE", admin_id: TARGET.id }
-      : { action: "send", reason: "RESET", email: TARGET.email }),
+      : { action: "send", reason: "RESET", email: TARGET.email })),
   }), { nextUrl: new URL("https://attacker.example.invalid/api/admin/setup-link") }));
   return { invoke, jobs, calls, emails, db, flush: async () => { for (const job of jobs) await job(); } };
 }
 
 describe("public administrator recovery", () => {
+  it("rejects coerced action and reason values before scheduling recovery", async () => {
+    for (const payload of [
+      { action: ["send"], reason: "RESET", email: TARGET.email },
+      { action: "send", reason: ["RESET"], email: TARGET.email },
+    ]) {
+      const f = resetFixture();
+      expect((await f.invoke(payload)).status).toBe(400);
+      expect(f.jobs).toEqual([]);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
   it("returns one immediate contract across known, missing, busy, and provider failures", async () => {
     let body: unknown;
     const logs: string[] = [];

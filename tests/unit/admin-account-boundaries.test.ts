@@ -230,7 +230,7 @@ describe("password reset completion", () => {
     const response = await f.invoke("login", { email: f.target.email, password: "Previous-password" });
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: "Invalid credentials" });
+    expect(body).toEqual({ error: "Invalid credentials", code: "AUTH_REQUIRED" });
     expect(body.session).toBeUndefined();
   });
 });

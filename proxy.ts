@@ -14,8 +14,9 @@ import { NextRequest, NextResponse } from "next/server";
  * swap the in-memory Map for Redis/Upstash.
  *
  * Limits:
- *   - /api/admin/login + protected setup-link actions : 5 attempts / 15 minutes
- *   - public email-only password recovery             : 5 attempts / 15 minutes, separate bucket
+ *   - /api/admin/login                        : 5 attempts / 15 minutes
+ *   - setup-link validate/complete            : 5 attempts / 15 minutes, separate bucket
+ *   - setup-link send or malformed requests   : 5 attempts / 15 minutes, separate bucket
  *   - all other /api/*                         : 100 requests / minute
  *
  * Webhook endpoints live at supabase/functions/* (different runtime)
@@ -147,7 +148,8 @@ function cleanupStores(maxWindowMs: number) {
 
 const API_LIMIT: RateLimitConfig = { name: "api", limit: 100, windowMs: 60_000 };
 const AUTH_LIMIT: RateLimitConfig = { name: "auth", limit: 5, windowMs: 15 * 60_000 };
-const RESET_LIMIT: RateLimitConfig = { name: "public-reset", limit: 5, windowMs: 15 * 60_000 };
+const TOKEN_LIMIT: RateLimitConfig = { name: "setup-token", limit: 5, windowMs: 15 * 60_000 };
+const SEND_LIMIT: RateLimitConfig = { name: "setup-send", limit: 5, windowMs: 15 * 60_000 };
 
 /**
  * Page-level role gating (advisory UX, NOT a security boundary).
@@ -229,18 +231,16 @@ export async function proxy(req: NextRequest) {
   if (process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
 
   const ip = getClientIp(req);
-  const isAuth =
-    req.nextUrl.pathname.startsWith("/api/admin/login") ||
-    req.nextUrl.pathname.startsWith("/api/admin/setup-link");
-  let isPublicReset = false;
-  if (req.nextUrl.pathname.startsWith("/api/admin/setup-link") && req.method === "POST") {
+  const isLogin = req.nextUrl.pathname.startsWith("/api/admin/login");
+  const isSetupLink = req.nextUrl.pathname.startsWith("/api/admin/setup-link");
+  let isTokenAction = false;
+  if (isSetupLink && req.method === "POST") {
     try {
       const body = await req.clone().json();
-      isPublicReset = body.action === "send" && body.reason === "RESET" &&
-        !!String(body.email || "").trim() && !body.admin_id;
-    } catch { /* malformed requests use the normal auth bucket */ }
+      isTokenAction = body?.action === "validate" || body?.action === "complete";
+    } catch { /* malformed requests use the setup-send bucket */ }
   }
-  const config = isPublicReset ? RESET_LIMIT : isAuth ? AUTH_LIMIT : API_LIMIT;
+  const config = isSetupLink ? (isTokenAction ? TOKEN_LIMIT : SEND_LIMIT) : isLogin ? AUTH_LIMIT : API_LIMIT;
 
   let result: RateLimitResult;
   try {

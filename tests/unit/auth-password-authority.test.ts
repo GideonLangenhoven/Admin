@@ -98,7 +98,10 @@ describe("Supabase Auth is authoritative after legacy migration", () => {
     const f = loginFixture({ ...ADMIN, password_hash: hash("legacy-copy") });
     const response = await f.invoke({ email: ADMIN.email, password: "legacy-copy" });
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Invalid credentials" });
+    const body = await response.json();
+    expect(body).toEqual({ error: "Invalid credentials", code: "AUTH_REQUIRED" });
+    // Open tabs from the previous client version only try browser Auth on this code.
+    expect(!response.ok && body.code === "AUTH_REQUIRED").toBe(true);
     expect(f.authWrites).toEqual([]);
   });
 
@@ -111,7 +114,9 @@ describe("Supabase Auth is authoritative after legacy migration", () => {
       const f = loginFixture(user);
       const response = await f.invoke({ email: ADMIN.email, password: "wrong-password" });
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({ error: "Invalid credentials" });
+      const body = await response.json();
+      expect(body).toEqual({ error: "Invalid credentials", code: "AUTH_REQUIRED" });
+      expect(!response.ok && body.code === "AUTH_REQUIRED").toBe(true);
       expect(f.authWrites).toEqual([]);
     }
   });
