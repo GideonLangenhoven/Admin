@@ -32,6 +32,11 @@ verify_jwt = false
 [functions.process-refund]
 verify_jwt = false
 
+# The handler verifies active staff or a named service credential with
+# requireAuth and preserves original caller authority downstream.
+[functions.batch-refund]
+verify_jwt = false
+
 # These validate active administrator sessions inside the handler (ES256 safe).
 [functions.cancel-booking]
 verify_jwt = false

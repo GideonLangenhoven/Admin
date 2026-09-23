@@ -1416,6 +1416,16 @@
     "created_at",
     "updated_at"
   ],
+  "refund_batches": [
+    "id",
+    "business_id",
+    "actor_user_id",
+    "actor_role",
+    "booking_ids",
+    "results",
+    "created_at",
+    "updated_at"
+  ],
   "voucher_reservations": [
     "id",
     "voucher_id",

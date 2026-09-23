@@ -16,6 +16,7 @@ import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
+import { readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal, type RefundJournal } from "../lib/refund-bulk-journal";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
@@ -241,10 +242,13 @@ export default function Bookings() {
   type ProgressStatus = "submitting" | "completed" | "pending" | "manual_action" | "failed" | "unknown" | "unprocessed";
   type ProgressEvent = { id: string; name: string; status: ProgressStatus; error?: string };
   const [bulkProgress, setBulkProgress] = useState<ProgressEvent[] | null>(null);
+  const [bulkProgressAction, setBulkProgressAction] = useState<BulkAction | null>(null);
   const [bulkActionInFlight, setBulkActionInFlight] = useState<BulkAction | null>(null);
   const [bulkAuditError, setBulkAuditError] = useState<string | null>(null);
+  const [authVersion, setAuthVersion] = useState(0);
   const bulkRunRef = useRef<{ businessId: string; cancelled: boolean } | null>(null);
   const businessIdRef = useRef(businessId);
+  const activeActorRef = useRef<string | null>(null);
   const mountedRef = useRef(false);
   businessIdRef.current = businessId;
 
@@ -257,15 +261,59 @@ export default function Bookings() {
   }, []);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      const actorId = session?.user?.id || null;
+      if (activeActorRef.current === actorId) return;
+      activeActorRef.current = actorId;
+      if (bulkRunRef.current) bulkRunRef.current.cancelled = true;
+      setAuthVersion(value => value + 1);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const run = bulkRunRef.current;
-    if (run && run.businessId !== businessId) {
+    if (run && (run.cancelled || run.businessId !== businessId)) {
       run.cancelled = true;
       bulkRunRef.current = null;
     }
     setBulkProgress(null);
+    setSelected(new Set());
+    setBulkProgressAction(null);
     setBulkActionInFlight(null);
     setBulkAuditError(null);
-  }, [businessId]);
+    if (!businessId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user || cancelled || !mountedRef.current || businessIdRef.current !== businessId) return;
+        activeActorRef.current = user.id;
+        const saved = readRefundJournal("bookings", businessId, user.id);
+        if (saved) {
+          let recovered: RefundJournal;
+          try {
+            recovered = await reconcileRefundJournal(saved, lookupRefundStatuses);
+            saveRefundJournal(recovered);
+          } catch {
+            recovered = uncertainRefundJournal(saved);
+            setBulkAuditError("Refund status could not be reconciled. Do not retry unknown items.");
+          }
+          if (cancelled || !mountedRef.current || businessIdRef.current !== businessId) return;
+          setBulkProgressAction("refund");
+          setBulkProgress(recovered.items.map(item => ({
+            id: item.id, name: item.id.slice(0, 8),
+            status: item.status === "submitting" ? "unknown" : item.status,
+            error: item.status === "submitting" ? "Submission may have started. Reconcile this booking before retrying." : undefined,
+          })));
+        }
+      } catch {
+        if (!cancelled) notify({ title: "Saved refund progress unavailable", message: "Reconcile the prior batch before submitting another.", tone: "error" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [businessId, authVersion]);
 
   function toggleSelect(id: string) {
     setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -281,14 +329,49 @@ export default function Bookings() {
     return map;
   }, [bookings]);
 
-  async function runBulk(action: BulkAction) {
-    const ids = Array.from(selected);
-    if (ids.length === 0 || bulkRunRef.current) return;
+  async function lookupRefundStatuses(ids: string[], targetBusinessId: string) {
+    const { data, error } = await supabase.from("bookings")
+      .select("id,refund_status,refund_request_id").eq("business_id", targetBusinessId).in("id", ids);
+    return { data, error };
+  }
+
+  async function runBulk(action: BulkAction, resume = false) {
+    let ids = Array.from(selected);
+    if ((!resume && ids.length === 0) || bulkRunRef.current) return;
     const run = { businessId, cancelled: false };
     bulkRunRef.current = run;
     const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
 
     try {
+      let journal: RefundJournal | null = null;
+      if (action === "refund") {
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error || !user || !isCurrent()) return;
+          const stored = readRefundJournal("bookings", run.businessId, user.id);
+          const previous = stored ? await reconcileRefundJournal(stored, lookupRefundStatuses) : null;
+          if (previous) saveRefundJournal(previous);
+          if (resume) {
+            if (!previous?.items.some(item => item.status === "unprocessed")) return;
+            journal = previous;
+            ids = journal.items.map(item => item.id);
+          } else if (previous && unresolvedRefundJournal(previous)) {
+            setBulkProgressAction("refund");
+            setBulkProgress(previous.items.map(item => ({
+              id: item.id, name: bookingsById[item.id]?.customer_name || item.id.slice(0, 8),
+              status: item.status === "submitting" ? "unknown" : item.status,
+              error: item.status === "submitting" ? "Submission may have started. Reconcile this booking before retrying." : undefined,
+            })));
+            return;
+          } else {
+            journal = { actorId: user.id, businessId: run.businessId, surface: "bookings",
+              items: ids.map(id => ({ id, status: "unprocessed" })) };
+          }
+        } catch {
+          notify({ title: "Refund progress unavailable", message: "Saved progress and server refund status must be available before submitting another batch.", tone: "error" });
+          return;
+        }
+      }
       const confirmText: Record<BulkAction, string> = {
         cancel: "Cancel " + ids.length + " booking(s)? Each paid customer gets an email to choose reschedule, voucher, or refund. Bookings within 24h of the trip are forfeited instead.",
         refund: "Submit " + ids.length + " refund(s)? Card refunds may remain pending and bank transfers still require confirmation. Keep this page open while each item is submitted.",
@@ -296,6 +379,13 @@ export default function Bookings() {
         checkin: "Check in " + ids.length + " guest(s)?",
       };
       if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" }) || !isCurrent()) return;
+      if (journal) {
+        try { saveRefundJournal(journal); }
+        catch {
+          notify({ title: "Refund progress unavailable", message: "The batch was not submitted because its progress could not be saved.", tone: "error" });
+          return;
+        }
+      }
 
       let reason = "operator-cancel";
       let weather = false;
@@ -306,25 +396,40 @@ export default function Bookings() {
       }
 
       setBulkActionInFlight(action);
+      setBulkProgressAction(action);
       setBulkAuditError(null);
       const final: ProgressEvent[] = ids.map(id => ({
         id,
         name: bookingsById[id]?.customer_name || id.slice(0, 8),
-        status: "unprocessed",
-        error: "Not submitted yet. Keep this page open.",
+        status: journal?.items.find(item => item.id === id)?.status === "submitting" ? "unknown"
+          : journal?.items.find(item => item.id === id)?.status || "unprocessed",
+        error: journal?.items.find(item => item.id === id)?.status === "unprocessed" || !journal
+          ? "Not submitted yet. Keep this page open." : undefined,
       }));
       setBulkProgress(final.map(item => ({ ...item })));
 
       for (let i = 0; i < ids.length; i++) {
         if (!isCurrent()) return;
+        if (journal && journal.items[i].status !== "unprocessed") continue;
         const id = ids[i];
+        if (journal) {
+          try {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error || user?.id !== journal.actorId || !isCurrent()) return;
+            journal.items[i].status = "submitting";
+            saveRefundJournal(journal);
+          } catch {
+            setBulkAuditError("Refund progress could not be saved. Remaining items were not submitted.");
+            return;
+          }
+        }
         final[i] = { ...final[i], status: "submitting", error: undefined };
         setBulkProgress(final.map(item => ({ ...item })));
         let result: ActionResult;
         try {
           switch (action) {
             case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
-            case "refund":   result = await refundBookingAction(id, { canSubmit: isCurrent }); break;
+            case "refund":   result = await refundBookingAction(id, { canSubmit: isCurrent, expectedActorId: journal?.actorId }); break;
             case "markpaid": result = await markPaidAction(id); break;
             case "checkin":  result = await checkInAction(id, run.businessId, {
               expectedArrivedCount: bookingsById[id]?.arrived_count ?? null,
@@ -340,7 +445,17 @@ export default function Bookings() {
           ? result.outcome || (result.ok ? "completed" : "failed")
           : result.ok ? "completed" : "failed";
         final[i] = { ...final[i], status, error: result.error || result.message };
+        if (journal) {
+          try {
+            journal.items[i].status = status;
+            saveRefundJournal(journal);
+          } catch {
+            if (isCurrent()) setBulkAuditError("Refund outcome needs reconciliation. Remaining items were not submitted.");
+            return;
+          }
+        }
         if (isCurrent()) setBulkProgress(final.map(item => ({ ...item })));
+        if (status === "unprocessed") return;
         if (i < ids.length - 1) await new Promise(resolve => setTimeout(resolve, 120));
       }
 
@@ -1951,6 +2066,13 @@ export default function Bookings() {
             })()}
             {bulkAuditError && <p role="alert" className="mt-3 rounded-lg p-3 text-xs" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }}>{bulkAuditError}</p>}
             <div className="mt-4 flex gap-2 justify-end">
+              {!bulkActionInFlight && (
+                bulkProgressAction === "refund" && bulkProgress.some(item => item.status === "unprocessed") && (
+                  <button onClick={() => void runBulk("refund", true)} className="ui-btn ui-btn-danger">
+                    Submit remaining items
+                  </button>
+                )
+              )}
               {!bulkActionInFlight && (
                 <button onClick={() => { setBulkProgress(null); clearSelection(); }}
                   className="ui-btn ui-btn-primary">

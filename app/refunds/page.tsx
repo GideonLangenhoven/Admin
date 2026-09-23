@@ -6,6 +6,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { processRefundAction, type ActionResult, type RefundOutcome } from "../lib/booking-actions";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { CaretDown, CaretRight } from "@phosphor-icons/react";
+import { readRefundJournal, saveRefundJournal, unresolvedRefundJournal, reconcileRefundJournal, uncertainRefundJournal, type RefundJournal } from "../lib/refund-bulk-journal";
 
 type RefundUiOutcome = RefundOutcome | "unprocessed";
 type RefundUiResult = Omit<ActionResult, "outcome"> & { outcome: RefundUiOutcome };
@@ -27,6 +28,8 @@ export default function Refunds() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, RefundUiResult>>({});
+  const [bulkHistory, setBulkHistory] = useState<RefundJournal["items"]>([]);
+  const [authVersion, setAuthVersion] = useState(0);
   const [showProcessed, setShowProcessed] = useState(false);
   const [editedAmounts, setEditedAmounts] = useState<Record<string, string>>({});
   const [confirmState, setConfirmState] = useState<null | {
@@ -37,9 +40,16 @@ export default function Refunds() {
   }>(null);
   const mountedRef = useRef(false);
   const businessIdRef = useRef(businessId);
+  const activeActorRef = useRef<string | null>(null);
   const loadRequestRef = useRef(0);
   const refundRunRef = useRef<{ businessId: string; cancelled: boolean } | null>(null);
   businessIdRef.current = businessId;
+
+  async function lookupRefundStatuses(ids: string[], targetBusinessId: string) {
+    const { data, error } = await supabase.from("bookings")
+      .select("id,refund_status,refund_request_id").eq("business_id", targetBusinessId).in("id", ids);
+    return { data, error };
+  }
 
   const load = useCallback(async (expectedBusinessId = businessId) => {
     const requestId = ++loadRequestRef.current;
@@ -86,8 +96,20 @@ export default function Refunds() {
   }, []);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      const actorId = session?.user?.id || null;
+      if (activeActorRef.current === actorId) return;
+      activeActorRef.current = actorId;
+      if (refundRunRef.current) refundRunRef.current.cancelled = true;
+      setAuthVersion(value => value + 1);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const run = refundRunRef.current;
-    if (run && run.businessId !== businessId) {
+    if (run && (run.cancelled || run.businessId !== businessId)) {
       run.cancelled = true;
       refundRunRef.current = null;
     }
@@ -95,11 +117,41 @@ export default function Refunds() {
     setRefunds([]);
     setProcessed([]);
     setResults({});
+    setBulkHistory([]);
     setEditedAmounts({});
     setConfirmState(null);
     setLoading(true);
     void load(businessId);
-  }, [businessId, load]);
+    if (!businessId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user || cancelled || !mountedRef.current || businessIdRef.current !== businessId) return;
+        activeActorRef.current = user.id;
+        const saved = readRefundJournal("refunds", businessId, user.id);
+        if (!saved) return;
+        let recovered: RefundJournal;
+        try {
+          recovered = await reconcileRefundJournal(saved, lookupRefundStatuses);
+          saveRefundJournal(recovered);
+        } catch {
+          recovered = uncertainRefundJournal(saved);
+          notify({ title: "Refund status unavailable", message: "Reconcile unknown items before retrying them.", tone: "warning" });
+        }
+        if (cancelled || !mountedRef.current || businessIdRef.current !== businessId) return;
+        setBulkHistory(recovered.items);
+        setResults(Object.fromEntries(recovered.items.map(item => [item.id, {
+          ok: item.status === "completed",
+          outcome: item.status === "submitting" ? "unknown" : item.status,
+          message: item.status === "submitting" ? "Submission may have started. Reconcile before retrying." : undefined,
+        }])));
+      } catch {
+        if (!cancelled) notify({ title: "Saved refund progress unavailable", message: "Reconcile the prior batch before submitting another.", tone: "error" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [businessId, load, authVersion]);
 
   function getRefundAmount(b: any): number {
     const edited = editedAmounts[b.id];
@@ -164,33 +216,73 @@ export default function Refunds() {
     }
   }
 
-  async function executeRefundAll() {
-    if (refundRunRef.current || refunds.length === 0) return;
-    const queued = [...refunds];
+  async function executeRefundAll(resume = false) {
+    if (refundRunRef.current || (!resume && refunds.length === 0)) return;
     const run = { businessId, cancelled: false };
     refundRunRef.current = run;
     const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
-    if (isCurrent()) {
-      setResults(prev => {
-        const next = { ...prev };
-        for (const refund of queued) next[refund.id] = { ok: false, outcome: "unprocessed", message: "Not submitted yet. Keep this page open." };
-        return next;
-      });
-    }
     try {
-      for (let index = 0; index < queued.length; index++) {
+      let journal: RefundJournal;
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user || !isCurrent()) return;
+        const stored = readRefundJournal("refunds", run.businessId, user.id);
+        const previous = stored ? await reconcileRefundJournal(stored, lookupRefundStatuses) : null;
+        if (previous) saveRefundJournal(previous);
+        if (resume) {
+          if (!previous?.items.some(item => item.status === "unprocessed")) return;
+          journal = previous;
+        } else if (previous && unresolvedRefundJournal(previous)) {
+          setBulkHistory(previous.items);
+          notify({ title: "Earlier refund batch needs review", message: "Submit only its remaining items or reconcile unknown outcomes first.", tone: "warning" });
+          return;
+        } else {
+          journal = { actorId: user.id, businessId: run.businessId, surface: "refunds",
+            items: refunds.map(refund => ({ id: refund.id, status: "unprocessed" })) };
+        }
+        saveRefundJournal(journal);
+      } catch {
+        notify({ title: "Refund progress unavailable", message: "Saved progress and server refund status must be available before submitting another batch.", tone: "error" });
+        return;
+      }
+      setBulkHistory([...journal.items]);
+      setResults(prev => ({ ...prev, ...Object.fromEntries(journal.items.map(item => [item.id, {
+        ok: item.status === "completed", outcome: item.status === "submitting" ? "unknown" : item.status,
+        message: item.status === "unprocessed" ? "Not submitted yet. Keep this page open." : undefined,
+      }])) }));
+      for (let index = 0; index < journal.items.length; index++) {
         if (!isCurrent()) return;
-        const refund = queued[index];
-        setProcessing(refund.id);
+        const item = journal.items[index];
+        if (item.status !== "unprocessed") continue;
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error || user?.id !== journal.actorId || !isCurrent()) return;
+          item.status = "submitting";
+          saveRefundJournal(journal);
+          setBulkHistory([...journal.items]);
+        } catch {
+          notify({ title: "Refund progress unavailable", message: "Remaining items were not submitted.", tone: "error" });
+          return;
+        }
+        setProcessing(item.id);
         let result: RefundUiResult;
         try {
-          result = await processRefundAction({ bookingId: refund.id, canSubmit: isCurrent }) as RefundUiResult;
+          result = await processRefundAction({ bookingId: item.id, canSubmit: isCurrent, expectedActorId: journal.actorId }) as RefundUiResult;
         } catch {
           result = UNKNOWN_REFUND_RESULT;
         }
+        try {
+          item.status = result.outcome;
+          saveRefundJournal(journal);
+          setBulkHistory([...journal.items]);
+        } catch {
+          notify({ title: "Refund outcome needs reconciliation", message: "Remaining items were not submitted.", tone: "error" });
+          return;
+        }
         if (!isCurrent()) return;
-        setResults(prev => ({ ...prev, [refund.id]: result }));
-        if (index < queued.length - 1) await new Promise(resolve => setTimeout(resolve, 500));
+        setResults(prev => ({ ...prev, [item.id]: result }));
+        if (result.outcome === "unprocessed") return;
+        if (index < journal.items.length - 1) await new Promise(resolve => setTimeout(resolve, 500));
       }
       if (isCurrent()) await load(run.businessId);
     } finally {
@@ -308,6 +400,33 @@ export default function Refunds() {
           </button>
         )}
       </div>
+
+      {bulkHistory.length > 0 && (
+        <div className="ui-card p-4" role="status">
+          <p className="text-sm font-semibold">Saved foreground refund progress</p>
+          <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+            These items were selected for a previous run. Only items marked not submitted can be continued; reconcile unknown outcomes against the refund queue first.
+          </p>
+          <div className="mt-3 space-y-1 text-xs">
+            {bulkHistory.map(item => (
+              <div key={item.id} className="flex justify-between gap-3">
+                <span className="font-mono">{item.id.slice(0, 8)}</span>
+                <span>{item.status === "submitting" ? "Outcome unknown" : item.status === "unprocessed" ? "Not submitted" : item.status.replaceAll("_", " ")}</span>
+              </div>
+            ))}
+          </div>
+          {bulkHistory.some(item => item.status === "unprocessed") && (
+            <button className="ui-btn ui-btn-danger mt-3" disabled={!!processing} onClick={() => setConfirmState({
+              title: "Submit remaining refunds",
+              message: "Only items recorded as not submitted will be sent. Pending and uncertain items need separate reconciliation.",
+              tone: "danger",
+              onConfirm: async () => { setConfirmState(null); await executeRefundAll(true); },
+            })}>
+              Submit remaining items
+            </button>
+          )}
+        </div>
+      )}
 
       {refunds.length > 0 && (
         <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 sm:max-w-md">
