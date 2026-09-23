@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T09:52:43Z",
+  "updated_at_utc": "2026-09-23T10:11:12Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -187,6 +187,19 @@
           "failure": "The guide route buffers an unbounded multipart file, trusts name/type, and leaves an operation-owned Drive object orphaned when the trip_photos insert fails; an alternate direct upload path also exists.",
           "impact": "Resource exhaustion, unsafe content and unreconciled private objects can result.",
           "verification": "Image-byte/size/dimension and ownership/demo tests, valid phone-photo behavior, provider-success/database-failure and interrupted retry proof."
+        },
+        {
+          "id": "C04-DRIVE-AUTH-20260923",
+          "severity": "high",
+          "owner": "gpt-6-sol/max upload writer",
+          "status": "SOURCE_IN_PROGRESS",
+          "version": "Admin b29767b / actual handler synthetic test",
+          "path": "supabase/functions/google-drive/index.ts:165",
+          "failure": "Actual handler with synthetic suspended own-tenant admin returns200 for action token and calls trapped OAuth refresh; current select only id/read_only and no subscription-state boundary.",
+          "impact": "Revoked staff can attempt continued provider access through a direct enabled path. No genuine Google call or credential exposure was performed.",
+          "violated_criterion": "C04 ownership/demo/permission preservation; V01 suspended identity and direct Edge denial",
+          "verification": "Use current shared auth/subscription semantics where compatible; prove active staff/service positive flows and suspended/inactive/read-only token denial with zero forbidden provider calls. Preserve read-only status and valid photo/video/OAuth workflows.",
+          "evidence": "/private/tmp/bookingtours-c04-evidence-20260923/google-drive-auth-repro.test.ts"
         }
       ],
       "next": "Sol is reusing historical guide upload patch a390797, closing verified bounds/reconciliation gaps and inventorying alternate paths in a separate worktree."
@@ -212,18 +225,61 @@
           "integrated_commit": "01491a10bf5bfc28872a8fc58db034226d346347",
           "review": "SCOPED ACCEPTANCE, independent gpt-6-astra/xhigh reviewer",
           "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/independent-review-final.md"
+        },
+        {
+          "id": "C05-EXACT-ROLE-AUTHORITY-20260923",
+          "severity": "high",
+          "owner": "gpt-6-sol/max",
+          "status": "OPEN",
+          "version": "Deployed catalog2026-09-23 / local source01491a1",
+          "path": "supabase/migrations/20260724150000_operator_directory.sql:29; 20260907071000_operator_access_boundaries.sql:12; 20260922123000_operator_hot_path_admission.sql:25",
+          "failure": "platform_public_settings ALL policy accepts SUPER% role prefixes. current_business_ids and authenticated arrival wrapper have no supported-role whitelist; optimized dashboard/bookings inherit that authority. Catalog proves these definitions, not existence or exploitation of an unknown-role account.",
+          "impact": "A synthetic unsupported staff role can potentially acquire tenant or platform authority contrary to the agreed exact-role contract. Suspended/read-only protections elsewhere must be preserved and tested.",
+          "violated_criterion": "ROLE_MATRIX exact SUPER_ADMIN/unknown-role denial; C05 effective permissions and V01 role matrix",
+          "verification": "Reproduce unknown/prefixed role admission in disposable PG17 using actual policies and wrappers; implement reviewed additive correction; prove all supported own/foreign/suspended/read-only/service/customer cases and same identities.",
+          "coverage_link": "V01",
+          "related_source_boundaries": "app/lib/api-auth.ts getCallerAdmin and supabase/functions/_shared/auth.ts requireAuth likewise admit an active admin row without a supported-role whitelist; verify actual handler regressions before extending shared correction."
+        },
+        {
+          "id": "C05-DEMO-RPC-ACL-20260923",
+          "severity": "gate",
+          "owner": "gpt-6-sol/max",
+          "status": "OPEN",
+          "version": "Deployed function MD5 2f05b3d8c220ccac03016e9e7439bb99",
+          "path": "public.refresh_claires_hiking_demo_dates(uuid,timestamptz); migrations20260915043000/20260916100000",
+          "failure": "Direct anon/authenticated EXECUTE grants survive source revocation of PUBLIC despite intended service-only contract. Function is invoker and underlying RLS/ACL may block writes; no mutation was attempted or proven.",
+          "impact": "Effective executable surface differs from intended service-only policy.",
+          "violated_criterion": "C05 effective function grants and V01 named service authority",
+          "verification": "Forward explicit client-role revocation after local role tests; prove named service success and client denial without altering existing demo records."
         }
       ],
-      "next": "Collect restricted read-only catalog facts from known source project only; reconcile applied ledger and intended policy, then finish actual RPC/Storage role tests in disposable fixtures. No deployed verification or full baseline acceptance yet.",
+      "next": "After C04 migration work stabilizes, serialize exact-role/ACL corrections with disposable regressions and independent review. Triage documented field/search-path/view dispositions, then review baseline updates against approved intended source.",
       "base": "18f601e3e9b861f4b1d2a4616518dab2ddfa6b4c",
       "local_evidence": "Trusted CA/hostname/connection-string override tests; effective privilege/Storage/tenant drift fixtures and five independent probes pass on fresh PG17/Node22.23.2. Unchanged application rollout196/196 passes. Baseline unchanged. Integrated checker files exactly match accepted source; only readiness docs/V03 guard differ.",
       "result": "6c2df6619c20badad8f6e5a7f1eecc7c4f3e9a78",
       "integrated_result": "01491a10bf5bfc28872a8fc58db034226d346347",
       "remaining_limits": [
-        "No deployed catalog yet; read-only collection dispatched",
-        "Complete RPC/helper/body authorization evidence incomplete",
+        "Catalog metadata only; no deployed low-role action tests or direct DB TLS attestation",
+        "Complete RPC/helper/body authorization evidence incomplete, now with targeted exact-role gaps",
         "Complete Storage reads/grants/inherited-policy coverage incomplete",
         "Existing baseline requires intended-policy review; no regeneration accepted"
+      ],
+      "catalog_evidence": {
+        "report": "/private/tmp/bookingtours-c05-catalog-evidence-20260923/reconciliation.md",
+        "sha256": "a708e840b84251b9f3ad2dca91a175648a9c501160e792b74bf2cb3661ea2aad",
+        "manifest_sha256": "3b3e490288e3e672e5e7a807afb638c39de605a8c1a1005947fae444b4b45294",
+        "transport": "HTTPS Management API read-only endpoint; supabase_read_only_user; transaction_read_only=on; not direct DB TLS",
+        "project": "ukdsrndqhsatjkmxijuj",
+        "server_time_utc": "2026-09-23T09:55:52Z",
+        "ledger": "215 total IDs; all34 local September version/name pairs match, latest20260922123000; no claim of body identity",
+        "source_rows_read": false,
+        "hosted_mutation": false
+      },
+      "pending_dispositions": [
+        "24 definer functions use search_path=public with TEMP rights; review exact bodies/reachability and local temp-shadow cases before any targeted migration; no blanket exploit claim.",
+        "Anon yoco_test_mode is a boolean, not credential disclosure by itself; reconcile intended public/staff contract before modifying grants or checker.",
+        "operator_directory is an intentionally public marketing owner-rights view; preserve approved projection rather than treating label alone as defect.",
+        "Baseline delta maps to3 approved applied migrations:14 added service grants,7 removed authenticated grants,2 RLS tables and1 changed policy. Review intended changes; do not rubber-stamp snapshot."
       ]
     },
     {

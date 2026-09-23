@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T09:52:43Z",
+  "recorded_at_utc": "2026-09-23T10:11:12Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -126,6 +126,17 @@
       "path": "/private/tmp/bookingtours-c05-evidence-20260923/rollout-local-fresh.log",
       "result": "196/196 real disposable database checks passed; independent checker scope accepted, whole policy/deployed C05 remains open",
       "runtime": "Node22.23.2/PostgreSQL17"
+    },
+    "deployed_catalog_metadata": {
+      "report": "/private/tmp/bookingtours-c05-catalog-evidence-20260923/reconciliation.md",
+      "sha256": "a708e840b84251b9f3ad2dca91a175648a9c501160e792b74bf2cb3661ea2aad",
+      "manifest_sha256": "3b3e490288e3e672e5e7a807afb638c39de605a8c1a1005947fae444b4b45294",
+      "transport": "HTTPS Management API read-only endpoint; supabase_read_only_user; transaction_read_only=on; not direct DB TLS",
+      "project": "ukdsrndqhsatjkmxijuj",
+      "server_time_utc": "2026-09-23T09:55:52Z",
+      "ledger": "215 total IDs; all34 local September version/name pairs match, latest20260922123000; no claim of body identity",
+      "source_rows_read": false,
+      "hosted_mutation": false
     }
   },
   "qualification": {
@@ -167,6 +178,15 @@
       "archive_verification": "Official nodejs.org SHASUMS256 matched; no global runtime changed"
     },
     "hosted_selection_limit": "Vercel selects major22 via engines and manages patches; exact deployed patch must be observed, not inferred from local pin.",
-    "primary_vercel_source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions"
+    "primary_vercel_source": "https://vercel.com/docs/functions/runtimes/node-js/node-js-versions",
+    "pending_review": {
+      "booking_commit": "cf9a15c7285fb9135cf560384855de7c71c03370",
+      "onboarding_commit": "197dc6ff2f07286bd362780e2a7cbf4c94a7ee21",
+      "status": "CHANGES_REQUESTED",
+      "remaining": "Encode least-privilege CI; separate automatic hosted Lighthouse/source checks; wire booking contracts; update obsolete Admin checkout source paths and run complete cross-app suite. Admin final commit pending.",
+      "evidence_directory": "/private/tmp/bookingtours-runtime-ci-evidence-20260923",
+      "tested_runtime": "Node22.23.2/npm10.9.8",
+      "companion_checks": "Both clean installs, full/prod audits0, type/lint/contracts and exact configured production builds pass; CI-only followups pending."
+    }
   }
 }
