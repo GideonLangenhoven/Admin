@@ -249,7 +249,9 @@ describe("web chat booking ownership and guest changes", () => {
 it("the widget sends its active operator and separate chat/customer capabilities", async () => {
   const calls: any[] = [];
   const invoke = sourceFunction("booking/app/components/ChatWidget.tsx", "invokeChat", {
-    businessId: "a", chatSession: "signed-chat-a", localStorage: { getItem: () => "verified-customer-a" },
+    businessId: "a", chatSession: "signed-chat-a",
+    browserChatStorage: { getItem: () => "verified-customer-a" },
+    invokeAuthenticatedChat: sourceFunction("booking/app/lib/web-chat-client.ts", "invokeAuthenticatedChat", {}),
     supabase: { functions: { invoke: async (...args: any[]) => { calls.push(args); return { data: {}, error: null }; } } },
   });
   await invoke({ action: "poll", business_id: "forged-b", chat_session: "forged" });

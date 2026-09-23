@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 // amount actually applied (not the promo-inflated original_total delta).
 describe("partial gift-voucher checkout (B1)", () => {
   it("booking payload includes voucher_amount_paid for create-checkout", () => {
-    const bookPage = readFileSync("booking/app/book/page.tsx", "utf8");
+    const bookPage = readFileSync("booking/app/book/BookingFlow.tsx", "utf8");
     expect(bookPage).toContain("voucher_amount_paid: effectiveVoucherCredit");
   });
 

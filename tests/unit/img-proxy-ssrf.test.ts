@@ -42,13 +42,14 @@ describe("route refuses to become an SSRF or XSS vector", () => {
   it("rejects non-http(s) protocols before fetching", () => {
     // ftp://supabase.co/x sets hostname, so the host check alone lets it pass.
     expect(new URL("ftp://supabase.co/x").hostname).toBe("supabase.co");
-    expect(SRC).toContain('parsed.protocol !== "https:" && parsed.protocol !== "http:"');
+    expect(SRC).toContain('url.protocol !== "https:" || url.port || url.username || url.password');
   });
 
   it("only echoes image content types, with sniffing disabled", () => {
-    expect(SRC).toContain('upstreamType.startsWith("image/")');
+    expect(SRC).toContain('ALLOWED_TYPES.test(upstream.headers.get("content-type") || "")');
     expect(SRC).toContain('"X-Content-Type-Options": "nosniff"');
-    // The passthrough must reuse the validated type, not re-read the header.
+    expect(SRC).toContain('"Content-Type": `image/${format}`');
+    // The transformed response must not echo an untrusted upstream type.
     expect(SRC).not.toContain('"Content-Type": upstream.headers.get("content-type") || "image/jpeg"');
   });
 });

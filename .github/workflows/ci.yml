@@ -7,31 +7,52 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   lint-and-typecheck:
-    name: Lint + Typecheck
+    name: Admin source, dependencies and build
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.2
           cache: npm
+      - run: node --version
       - run: npm ci
+      - run: npm audit
+      - run: npm audit --omit=dev
       - name: Lint
         run: npm run lint
       - name: TypeScript typecheck
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --incremental false
+      - name: Production build with synthetic provider config
+        env:
+          VERCEL_ENV: preview
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: https://synthetic.invalid
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-anon-key
+        run: npm run build
 
   release-regressions:
-    name: Payments, tenant isolation and edge functions
+    name: Companion sources, payments, isolation and edge functions
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      VERCEL_ENV: preview
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://synthetic.invalid
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-anon-key
+      NEXT_PUBLIC_BUSINESS_ID: 00000000-0000-4000-8000-000000000001
     services:
       postgres:
         image: postgres:17
@@ -46,25 +67,59 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      # The storefront is a separate public repository; unit checks cover both apps.
+        with:
+          persist-credentials: false
+      # Companion commits must be published before this Admin commit reaches CI.
       - uses: actions/checkout@v4
         with:
           repository: GideonLangenhoven/capekayak-booking
-          # Update this pin alongside the next storefront release.
-          ref: 2ff1d82046c73202c3146d11299cff9bc379ac54
+          ref: 86588bcb2cbad7da202e21cc9662e012dd291ddc
           path: booking
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GideonLangenhoven/onboarding
+          ref: b93f053b324ad2db67e6481af6f4c9ba5f8b6544
+          path: onboarding
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - run: npm ci
       - run: npm ci --prefix booking
+      - run: npm ci --prefix onboarding
+      - run: npm audit --prefix booking
+      - run: npm audit --omit=dev --prefix booking
+      - run: npm audit --prefix onboarding
+      - run: npm audit --omit=dev --prefix onboarding
       - run: npm run test:unit
       - run: npm run check:edge
+      - run: npm run lint --prefix booking
       - run: npx tsc --noEmit --incremental false --project booking/tsconfig.json
+      - run: npm run check:ways --prefix booking
+      - run: node --test booking/tests/c01-contracts.test.mjs
+      - run: npm run lint --prefix onboarding
+      - run: npx tsc --noEmit --incremental false --project onboarding/tsconfig.json
+      - run: npm run test:contract --prefix onboarding
+      - name: Build pinned storefront
+        env:
+          VERCEL_ENV: preview
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: https://synthetic.invalid
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-anon-key
+          NEXT_PUBLIC_BUSINESS_ID: 00000000-0000-4000-8000-000000000001
+        run: npm run build --prefix booking
+      - name: Build pinned onboarding
+        env:
+          VERCEL_ENV: preview
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: https://synthetic.invalid
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-anon-key
+        run: npm run build --prefix onboarding
       - name: Real PostgreSQL isolation and payment transactions
         env:
           ROLLOUT_TEST_USER: postgres
@@ -72,15 +127,18 @@ jobs:
         run: npm run test:isolation:local
 
   smoke-e2e:
-    name: Smoke E2E (production booking site)
+    name: Deployed smoke E2E (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [lint-and-typecheck, release-regressions]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.2
           cache: npm
       - run: npm ci
       - uses: actions/cache@v4
