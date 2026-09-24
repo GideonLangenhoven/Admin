@@ -240,7 +240,7 @@ function refundsAllHarness(ids: string[], processRefundAction: (input: any) => P
     UNKNOWN_REFUND_RESULT: { ok: false, outcome: "unknown" },
     setTimeout: (callback: () => void) => { callback(); return 0; },
   });
-  return { run, businessIdRef, mountedRef, get history() { return history; }, get results() { return results; } };
+  return { run, businessIdRef, mountedRef, refundRunRef, clearHistory: () => { history = []; }, get history() { return history; }, get results() { return results; } };
 }
 
 describe("refund action outcome contract", () => {
@@ -404,6 +404,18 @@ describe("bookings bulk action runtime", () => {
     expect(readRefundJournal("bookings", "tenant-a", "other-actor")).toBeNull();
   });
 
+  it("restores a valid 101-item foreground selection after interruption", async () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `booking-${index}`);
+    const first = bulkHarness({ ids, refund: vi.fn(async () => {
+      first.mountedRef.current = false;
+      return { ok: true, outcome: "completed" };
+    }) });
+    await first.run("refund");
+    const saved = readRefundJournal("bookings", "tenant-a", "actor-a");
+    expect(saved?.items).toHaveLength(101);
+    expect(saved?.items.map(item => item.status)).toEqual(["completed", ...Array(100).fill("unprocessed")]);
+  });
+
   it("stops before submission if durable browser progress cannot be stored", async () => {
     vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => { throw new Error("quota"); } });
     const refund = vi.fn(async () => ({ ok: true, outcome: "completed" }));
@@ -530,6 +542,21 @@ describe("bookings bulk action runtime", () => {
 });
 
 describe("refund queue foreground recovery", () => {
+  it.each(["tenant switch", "account switch"])("does not publish an old response after %s", async interruption => {
+    const first = refundsAllHarness(["old-booking-a", "old-booking-b"], vi.fn(async () => {
+      if (interruption === "tenant switch") first.businessIdRef.current = "tenant-b";
+      else first.refundRunRef.current.cancelled = true;
+      first.clearHistory();
+      return { ok: true, outcome: "completed" };
+    }));
+    await first.run();
+    expect(first.history).toEqual([]);
+    expect(readRefundJournal("refunds", "tenant-a", "actor-a")?.items).toEqual([
+      { id: "old-booking-a", status: "completed" }, { id: "old-booking-b", status: "unprocessed" },
+    ]);
+    expect(readRefundJournal("refunds", "tenant-b", "actor-a")).toBeNull();
+  });
+
   it("resumes only the unsubmitted tail after interruption", async () => {
     const first = refundsAllHarness(["booking-a", "booking-b"], vi.fn(async () => {
       first.businessIdRef.current = "tenant-b";

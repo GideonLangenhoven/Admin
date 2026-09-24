@@ -229,6 +229,7 @@ export default function Refunds() {
         const stored = readRefundJournal("refunds", run.businessId, user.id);
         const previous = stored ? await reconcileRefundJournal(stored, lookupRefundStatuses) : null;
         if (previous) saveRefundJournal(previous);
+        if (!isCurrent()) return;
         if (resume) {
           if (!previous?.items.some(item => item.status === "unprocessed")) return;
           journal = previous;
@@ -242,9 +243,10 @@ export default function Refunds() {
         }
         saveRefundJournal(journal);
       } catch {
-        notify({ title: "Refund progress unavailable", message: "Saved progress and server refund status must be available before submitting another batch.", tone: "error" });
+        if (isCurrent()) notify({ title: "Refund progress unavailable", message: "Saved progress and server refund status must be available before submitting another batch.", tone: "error" });
         return;
       }
+      if (!isCurrent()) return;
       setBulkHistory([...journal.items]);
       setResults(prev => ({ ...prev, ...Object.fromEntries(journal.items.map(item => [item.id, {
         ok: item.status === "completed", outcome: item.status === "submitting" ? "unknown" : item.status,
@@ -261,7 +263,7 @@ export default function Refunds() {
           saveRefundJournal(journal);
           setBulkHistory([...journal.items]);
         } catch {
-          notify({ title: "Refund progress unavailable", message: "Remaining items were not submitted.", tone: "error" });
+          if (isCurrent()) notify({ title: "Refund progress unavailable", message: "Remaining items were not submitted.", tone: "error" });
           return;
         }
         setProcessing(item.id);
@@ -274,12 +276,12 @@ export default function Refunds() {
         try {
           item.status = result.outcome;
           saveRefundJournal(journal);
-          setBulkHistory([...journal.items]);
         } catch {
-          notify({ title: "Refund outcome needs reconciliation", message: "Remaining items were not submitted.", tone: "error" });
+          if (isCurrent()) notify({ title: "Refund outcome needs reconciliation", message: "Remaining items were not submitted.", tone: "error" });
           return;
         }
         if (!isCurrent()) return;
+        setBulkHistory([...journal.items]);
         setResults(prev => ({ ...prev, [item.id]: result }));
         if (result.outcome === "unprocessed") return;
         if (index < journal.items.length - 1) await new Promise(resolve => setTimeout(resolve, 500));

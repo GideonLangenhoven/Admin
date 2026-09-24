@@ -17,7 +17,7 @@ export function readRefundJournal(surface: RefundJournal["surface"], businessId:
   if (!raw) return null;
   const journal = JSON.parse(raw) as RefundJournal;
   if (journal.surface !== surface || journal.businessId !== businessId || journal.actorId !== actorId ||
-      !Array.isArray(journal.items) || journal.items.length < 1 || journal.items.length > 100 ||
+      !Array.isArray(journal.items) || journal.items.length < 1 ||
       journal.items.some(item => typeof item.id !== "string" || !item.id ||
         !["unprocessed", "submitting", "completed", "pending", "manual_action", "failed", "unknown"].includes(item.status))) {
     throw new Error("Saved refund progress could not be read. Please reconcile the prior batch before submitting another.");
