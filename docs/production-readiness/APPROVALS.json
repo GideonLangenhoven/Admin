@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-24T04:28:03Z",
+  "updated_at_utc": "2026-09-24T04:52:00Z",
   "candidate": "PROVISIONAL_NOT_FROZEN",
   "authorized": {
     "isolated_source_changes": true,
@@ -103,6 +103,7 @@
     "data": "Owner confirms current50 booking and50 customer rows synthetic/demo. No hosted mutation follows from that confirmation alone.",
     "restore_target": "Supplied URL identifies source, so no separate isolated target is identified. Other projects are excluded from this assignment.",
     "budget_ceiling_zar": 0,
-    "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window."
+    "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window.",
+    "redis": "Owner selected existing service and will name it. Identity, quota and configuration remain unverified; planning only."
   }
 }

@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-24T04:28:03Z",
+  "updated_at_utc": "2026-09-24T04:52:00Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -511,7 +511,7 @@
     {
       "id": "C06",
       "title": "Bulk acceptance and interruption recovery",
-      "status": "IN_PROGRESS",
+      "status": "LOCAL_VERIFIED",
       "owner": "gpt-6-sol/max",
       "legacy_refs": [
         "REFUND-01"
@@ -523,11 +523,13 @@
           "path": "supabase/functions/batch-refund/index.ts; app/bookings/page.tsx",
           "failure": "The full-batch endpoint starts an audit with a total but does not persist the complete accepted target list before processing; the foreground UI's remaining selections vanish on tab close.",
           "impact": "Interruption can leave accepted, completed, unknown and unsubmitted work hard to reconcile.",
-          "verification": "Disposable database and provider-fault tests for tab loss, timeout, failed audit writes, actor/tenant switch and stable money-operation IDs."
+          "verification": "Disposable database and provider-fault tests for tab loss, timeout, failed audit writes, actor/tenant switch and stable money-operation IDs.",
+          "status": "LOCAL_VERIFIED",
+          "resolution_commit": "3e3d224ef8a86864d9a53978cd2efef43bb14c2b"
         }
       ],
-      "next": "Sol corrects these together under preserved per-item UI and separate100-item whole-batch contracts; parked C05 work remains isolated.",
-      "review": {
+      "next": "Carry accepted source through candidate-bound browser, full migration ledger, provider fault and deployed verification in V01/V02/V06.",
+      "previous_review": {
         "source_commit": "8923a5461621a9b41c743e2616b83ddd7f5e5a33",
         "status": "CHANGES_REQUIRED_NOT_INTEGRATED",
         "artifact": "/private/tmp/bookingtours-c06-evidence-20260923/independent-review.md",
@@ -539,7 +541,32 @@
           "Valid101-item foreground selection is persisted/dispatched but recovery validator rejects it.",
           "Old tenant/account response repopulates the new context history panel."
         ],
-        "next": "Sol corrects these together under preserved per-item UI and separate100-item whole-batch contracts; parked C05 work remains isolated."
+        "next": "Sol corrects these together under preserved per-item UI and separate100-item whole-batch contracts; parked C05 work remains isolated.",
+        "disposition": "All four findings resolved by 7cd03c4; retained as historical evidence."
+      },
+      "review": {
+        "source_commit": "7cd03c488980c1a09bab6a7dcf866b243f2c6624",
+        "source_tree": "ee4b6f53b0268f4e198257fd13a04aefe5cb84ca",
+        "integrated_commits": [
+          "557eb93",
+          "3e3d224ef8a86864d9a53978cd2efef43bb14c2b"
+        ],
+        "review": "ACCEPTED_SCOPED",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "review_artifact": "/private/tmp/bookingtours-c06-evidence-20260923/independent-followup-review.md",
+        "review_sha256": "9c8195cf860ac4927a605841b9c011d5264028bd8fc0c14a417c108828be2d24",
+        "writer_artifact": "/private/tmp/bookingtours-c06-evidence-20260923/followup-verification.md",
+        "writer_sha256": "fcc4549ea3f30120f242e668d508cc4095ffb3fefca873408a8576524974ea25",
+        "proof": "Regression-first five failures corrected; 79/79 focused tests, types, affected frozen Deno check/bundle, lint, six disposable PostgreSQL17 checks and six independent actual-source probes pass. All four initial review findings resolved.",
+        "integration": "All 11 changed paths byte-identical to accepted source; integrated focused suite 79/79 passes, exit0.",
+        "integration_command": "env -i PATH=/private/tmp/bookingtours-node-v22.23.2-20260923/bin:/opt/homebrew/bin:/usr/bin:/bin TMPDIR=/private/tmp /private/tmp/bookingtours-node-v22.23.2-20260923/bin/node node_modules/vitest/vitest.mjs run tests/unit/refund-ui-outcomes.test.ts tests/unit/refund-authority-runtime.test.ts tests/unit/db-column-refs.test.ts --no-cache",
+        "integration_log": "/private/tmp/bookingtours-integrated-evidence-20260923/refund-recovery-after-integration.log",
+        "integration_log_sha256": "6eee1e598df7ec2f6446d58b8a6a44037b2607a80f9279fd9899d8e1fef91efd",
+        "migration": "supabase/migrations/20260923130000_refund_batch_acceptance.sql",
+        "migration_sha256": "9e1c20d036b7fa9adc4819dd145920aec3090e8c59a24e62d3b3c572a5f810aa",
+        "migration_status": "UNAPPLIED",
+        "contract": "Existing bookings/refunds UI retains foreground per-item processing and browser-scoped recovery; separate whole-batch endpoint persists accepted targets under stable caller UUID. Audit IDs are database-owned, 401/403 stops the unsubmitted tail, 101-item UI recovery remains valid, and stale tenant/account responses do not populate the new context.",
+        "limits": "Same-browser storage must survive to recover the UI selected list; separate endpoint callers must retain batch UUID. Unknown submitted results need reconciliation, never blind replay. Synthetic minimal PostgreSQL schema is not full hosted-ledger proof; no real provider, deployed browser, or migration rollout claim."
       }
     },
     {

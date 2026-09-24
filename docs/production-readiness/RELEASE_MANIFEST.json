@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-24T04:28:03Z",
+  "recorded_at_utc": "2026-09-24T04:52:00Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "307d6cb94e375c17f50997c12102d56188b9f487",
-    "integrated_tree": "3d4d66915727110832f2afb1d958ea5a7f3d440f",
+    "integrated_commit": "3e3d224ef8a86864d9a53978cd2efef43bb14c2b",
+    "integrated_tree": "ab093641d854040fe5b14f371113fdc61d139c0a",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -148,6 +148,30 @@
       "observed_at_utc": "2026-09-24T04:28:03Z",
       "method": "git ls-remote origin refs/heads/codex/bookingtours-simple-view-readiness-2026-09-20",
       "result": "unchanged remote base; no push"
+    },
+    "reviewed_refund_recovery": {
+      "source_commit": "7cd03c488980c1a09bab6a7dcf866b243f2c6624",
+      "source_tree": "ee4b6f53b0268f4e198257fd13a04aefe5cb84ca",
+      "integrated_commits": [
+        "557eb93",
+        "3e3d224ef8a86864d9a53978cd2efef43bb14c2b"
+      ],
+      "review": "ACCEPTED_SCOPED",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-c06-evidence-20260923/independent-followup-review.md",
+      "review_sha256": "9c8195cf860ac4927a605841b9c011d5264028bd8fc0c14a417c108828be2d24",
+      "writer_artifact": "/private/tmp/bookingtours-c06-evidence-20260923/followup-verification.md",
+      "writer_sha256": "fcc4549ea3f30120f242e668d508cc4095ffb3fefca873408a8576524974ea25",
+      "proof": "Regression-first five failures corrected; 79/79 focused tests, types, affected frozen Deno check/bundle, lint, six disposable PostgreSQL17 checks and six independent actual-source probes pass. All four initial review findings resolved.",
+      "integration": "All 11 changed paths byte-identical to accepted source; integrated focused suite 79/79 passes, exit0.",
+      "integration_command": "env -i PATH=/private/tmp/bookingtours-node-v22.23.2-20260923/bin:/opt/homebrew/bin:/usr/bin:/bin TMPDIR=/private/tmp /private/tmp/bookingtours-node-v22.23.2-20260923/bin/node node_modules/vitest/vitest.mjs run tests/unit/refund-ui-outcomes.test.ts tests/unit/refund-authority-runtime.test.ts tests/unit/db-column-refs.test.ts --no-cache",
+      "integration_log": "/private/tmp/bookingtours-integrated-evidence-20260923/refund-recovery-after-integration.log",
+      "integration_log_sha256": "6eee1e598df7ec2f6446d58b8a6a44037b2607a80f9279fd9899d8e1fef91efd",
+      "migration": "supabase/migrations/20260923130000_refund_batch_acceptance.sql",
+      "migration_sha256": "9e1c20d036b7fa9adc4819dd145920aec3090e8c59a24e62d3b3c572a5f810aa",
+      "migration_status": "UNAPPLIED",
+      "contract": "Existing bookings/refunds UI retains foreground per-item processing and browser-scoped recovery; separate whole-batch endpoint persists accepted targets under stable caller UUID. Audit IDs are database-owned, 401/403 stops the unsubmitted tail, 101-item UI recovery remains valid, and stale tenant/account responses do not populate the new context.",
+      "limits": "Same-browser storage must survive to recover the UI selected list; separate endpoint callers must retain batch UUID. Unknown submitted results need reconciliation, never blind replay. Synthetic minimal PostgreSQL schema is not full hosted-ledger proof; no real provider, deployed browser, or migration rollout claim."
     }
   },
   "booking": {
@@ -312,7 +336,14 @@
       "result": "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN not found among11 production project environment entries; E2E bypass also absent.",
       "method": "Read-only Vercel CLI env ls production; only required name presence retained, no values or Redis request.",
       "limit": "Not effective invocation evidence; VERCEL can be a system variable rather than a listed project variable.",
-      "minimum_next_action": "Before deploying fail-closed limiter, identify approved shared Redis service, verify available command/storage quotas within ZAR0, supply secrets through supported secret settings under exact deployment approval, and verify production/preview configuration and bounded failure behavior. No provisioning or hosted configuration change authorized by this record."
+      "minimum_next_action": "Before deploying fail-closed limiter, identify approved shared Redis service, verify available command/storage quotas within ZAR0, supply secrets through supported secret settings under exact deployment approval, and verify production/preview configuration and bounded failure behavior. No provisioning or hosted configuration change authorized by this record.",
+      "alias_recheck": {
+        "observed_at_utc": "2026-09-24T04:34:51.014Z",
+        "evidence": "/private/tmp/bookingtours-vercel-env-alias-evidence-20260924.json",
+        "sha256": "db3f28d9fc2cf26b4684eb620847870a32038ccb15a03d90f254143b8d5eb327",
+        "result": "Required Upstash names and KV_REST_API_URL/TOKEN, REDIS_URL and E2E_BYPASS_RATE_LIMIT absent among 11 production entries; values not retained. No Redis requests or mutations."
+      },
+      "owner_response": "Existing service available; owner will provide its name. Name, access and quota verification remain pending; no provisioning or configuration authority."
     }
   },
   "qualification": {
@@ -387,6 +418,7 @@
   "planned_unapplied_migrations": [
     "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql",
     "supabase/migrations/20260923110000_exact_staff_roles_and_demo_rpc_acl.sql",
-    "supabase/migrations/20260923120000_storage_exact_staff_roles.sql"
+    "supabase/migrations/20260923120000_storage_exact_staff_roles.sql",
+    "supabase/migrations/20260923130000_refund_batch_acceptance.sql"
   ]
 }
