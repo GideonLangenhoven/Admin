@@ -41,7 +41,10 @@ function fixture() {
       };
       return q;
     },
-    rpc: async () => ({ data: 10, error: null }),
+    rpc: (name: string) => {
+      const result = Promise.resolve({ data: name === "check_rate_limit" ? true : 10, error: null });
+      return Object.assign(result, { abortSignal: () => result });
+    },
     functions: { invoke: async (name: string, options: any) => {
       invocations.push({ name, ...options });
       return { data: changeResult, error: null };
