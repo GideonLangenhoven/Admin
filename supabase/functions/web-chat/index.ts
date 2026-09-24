@@ -337,35 +337,103 @@ async function adjustSlotBooked(businessId: string, slotId: string, delta: numbe
   if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR slot=" + slotId + " err=" + rpcRes.error.message);
 }
 
-// Basic per-client rate limit for this open endpoint (per-instance, sliding
-// window). Keeps abuse from spamming bookings/Gemini; legit chats never hit it.
-const RATE_LIMIT_MAX = 20;
-const RATE_WINDOW_MS = 60_000;
-const rateBuckets = new Map<string, number[]>();
-function rateLimited(clientKey: string): boolean {
-  const nowMs = Date.now();
-  const hits = (rateBuckets.get(clientKey) || []).filter((t) => t > nowMs - RATE_WINDOW_MS);
-  if (hits.length >= RATE_LIMIT_MAX) { rateBuckets.set(clientKey, hits); return true; }
-  hits.push(nowMs);
-  if (rateBuckets.size > 5000) rateBuckets.clear();
-  rateBuckets.set(clientKey, hits);
-  return false;
+const MAX_BODY_BYTES = 64 * 1024;
+const MAX_MESSAGE_CHARS = 4096;
+const BODY_DEADLINE_MS = 3000;
+const LIMITER_DEADLINE_MS = 1500;
+// Each widget polls every four seconds. These per-minute budgets permit 500
+// simultaneous visitors at that cadence, including one large tenant.
+const CHAT_LIMITS = {
+  context: { global: 12000, tenant: 0, visitor: 0 },
+  session: { global: 1800, tenant: 600, visitor: 0 },
+  poll: { global: 12000, tenant: 9000, visitor: 30 },
+  message: { global: 1800, tenant: 600, visitor: 20 },
+} as const;
+
+class ChatRequestError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+async function readChatBody(req: Request) {
+  if (Number(req.headers.get("content-length")) > MAX_BODY_BYTES) {
+    void req.body?.cancel().catch(() => {});
+    throw new ChatRequestError(413, "Chat request too large");
+  }
+  const reader = req.body?.getReader();
+  if (!reader) throw new ChatRequestError(400, "Invalid JSON body");
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let raw = "";
+  let bytes = 0;
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new ChatRequestError(408, "Chat request timed out")), BODY_DEADLINE_MS);
+  });
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_BODY_BYTES) throw new ChatRequestError(413, "Chat request too large");
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    const body = JSON.parse(raw);
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new ChatRequestError(400, "Invalid JSON body");
+    if (body.message != null && (typeof body.message !== "string" || body.message.length > MAX_MESSAGE_CHARS)) {
+      throw new ChatRequestError(413, "Chat message too large");
+    }
+    if (body.messages != null && (!Array.isArray(body.messages) || body.messages.length > 11 ||
+      body.messages.some((item) => !item || typeof item !== "object" || typeof item.text !== "string" || item.text.length > MAX_MESSAGE_CHARS))) {
+      throw new ChatRequestError(413, "Chat history too large");
+    }
+    if (body.chat_session != null && (typeof body.chat_session !== "string" || body.chat_session.length > 512)) {
+      throw new ChatRequestError(400, "Invalid chat session");
+    }
+    return body;
+  } catch (error) {
+    void reader.cancel().catch(() => {});
+    if (error instanceof ChatRequestError) throw error;
+    throw new ChatRequestError(400, "Invalid JSON body");
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+async function chatLimit(req: Request, lane: keyof typeof CHAT_LIMITS, scope: "global" | "tenant" | "visitor", key: string): Promise<Response | null> {
+  const max = CHAT_LIMITS[lane][scope];
+  if (!max) return null;
+  let timer: ReturnType<typeof setTimeout>;
+  try {
+    const query = db.rpc("check_rate_limit", { p_ip: key, p_endpoint: `web-chat:${lane}:${scope}`, p_max: max })
+      .abortSignal(AbortSignal.timeout(LIMITER_DEADLINE_MS));
+    const { data, error } = await Promise.race([query, new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("limiter_timeout")), LIMITER_DEADLINE_MS);
+    })]);
+    if (error || typeof data !== "boolean") throw new Error("limiter_unavailable");
+    if (data) return null;
+    return new Response(JSON.stringify({ reply: "You’re sending messages a little fast. Give me a few seconds and try again." }), {
+      status: 429, headers: { ...gCors(req), "Retry-After": String(60 - new Date().getUTCSeconds()), "Cache-Control": "no-store" },
+    });
+  } catch {
+    return new Response(JSON.stringify({ reply: "Chat is temporarily unavailable. Please try again shortly." }), {
+      status: 503, headers: { ...gCors(req), "Retry-After": "1", "Cache-Control": "no-store" },
+    });
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 Deno.serve(withSentry("web-chat", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (rateLimited(clientIp)) {
-    return new Response(JSON.stringify({ reply: "You\u2019re sending messages a little fast. Give me a few seconds and try again." }), { status: 429, headers: gCors(req) });
-  }
   const url = new URL(req.url);
   if (url.searchParams.get("__sentry_test") === "1") {
     throw new Error("Sentry test error from web-chat (intentional)");
   }
   try {
-    const body = await req.json(); const hist = body.messages || []; const msg = body.message || ""; const state = body.state || { step: "IDLE" };
+    const body = await readChatBody(req); const hist = body.messages || []; const msg = body.message || ""; const state = body.state || { step: "IDLE" };
     const now = new Date(); let ns = { ...state }; let pay = null; let reply = ""; let buttons = null; let calendar = null;
     let requestedBusinessId = body.business_id || body.businessId || state.bid || "";
+    if (typeof requestedBusinessId !== "string" || requestedBusinessId.length > 128) throw new ChatRequestError(400, "Invalid business context");
     const requestOrigin = req?.headers?.get("origin") || "";
     // L10: Reset timezone at start of each request
     _requestTimezone = "UTC";
@@ -376,6 +444,10 @@ Deno.serve(withSentry("web-chat", async (req) => {
     // We now resolve the business from the Origin's subdomain as a fallback, and refuse
     // the request if it still can't be determined.
     if (!requestedBusinessId && requestOrigin) {
+      // Legacy clients may omit business_id; cap their indexed subdomain lookup
+      // before touching the tenant table, even when the origin is forged.
+      const contextLimit = await chatLimit(req, "context", "global", "global");
+      if (contextLimit) return contextLimit;
       try {
         const hostname = new URL(requestOrigin).hostname;
         const bookingMatch = hostname.match(/^([^.]+)\.booking\.bookingtours\.co\.za$/i);
@@ -397,6 +469,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
       );
     }
 
+    const chatToken = typeof body.chat_session === "string" ? body.chat_session : "";
+    const visitorId = requestedBusinessId ? await verifyWebChatSession(chatToken, requestedBusinessId) : null;
+    const lane = visitorId && (body.action === "poll" || body.action === "session") ? "poll" : body.action === "session" ? "session" : "message";
+    const globalLimit = await chatLimit(req, lane, "global", "global");
+    if (globalLimit) return globalLimit;
+
     const requestTenant = await getTenantByBusinessId(db, requestedBusinessId).catch(function () { return null; });
     if (!requestTenant) {
       return new Response(JSON.stringify({ error: "Business unavailable. Please reopen chat from the booking site." }), { status: 404, headers: gCors(req) });
@@ -409,8 +487,12 @@ Deno.serve(withSentry("web-chat", async (req) => {
       }
     }
 
-    const chatToken = typeof body.chat_session === "string" ? body.chat_session : "";
-    const visitorId = await verifyWebChatSession(chatToken, requestedBusinessId);
+    const tenantLimit = await chatLimit(req, lane, "tenant", requestedBusinessId);
+    if (tenantLimit) return tenantLimit;
+    if (visitorId) {
+      const visitorLimit = await chatLimit(req, lane, "visitor", visitorId);
+      if (visitorLimit) return visitorLimit;
+    }
     if (body.action === "session") {
       const session = visitorId ? { token: chatToken } : await issueWebChatSession(requestedBusinessId);
       return new Response(JSON.stringify({ chat_session: session.token }), { status: 200, headers: gCors(req) });
@@ -1640,5 +1722,9 @@ Deno.serve(withSentry("web-chat", async (req) => {
     reply = gem2 || "Hey! Need help booking or got a question?";
     ns = { step: "IDLE" };
     return new Response(JSON.stringify({ reply: reply, state: ns, intent: classification.intent }), { status: 200, headers: gCors(req) });
-  } catch (err) { console.error("ERR:", err); return new Response(JSON.stringify({ reply: "Ah sorry, try that again?", state: { step: "IDLE" } }), { status: 500, headers: gCors(req) }); }
+  } catch (err) {
+    if (err instanceof ChatRequestError) return new Response(JSON.stringify({ error: err.message }), { status: err.status, headers: gCors(req) });
+    console.error("ERR:", err);
+    return new Response(JSON.stringify({ reply: "Ah sorry, try that again?", state: { step: "IDLE" } }), { status: 500, headers: gCors(req) });
+  }
 }));
