@@ -262,6 +262,18 @@ describe("batch-refund authority and accounting", () => {
     });
     expect(f.requests).toHaveLength(2);
   });
+
+  it("appends tenant-scoped audit events without using the caller's batch ID as a log key", async () => {
+    const f = batchFixture();
+    const chosenBatchId = "00000000-0000-4000-8000-000000000987";
+    expect((await f.invoke(["booking-a"], { batch_id: chosenBatchId })).status).toBe(200);
+    expect(f.logWrites).toHaveLength(3);
+    expect(f.logWrites.every(log => !Object.hasOwn(log, "id"))).toBe(true);
+    expect(f.logWrites.every(log => log.business_id === "tenant-a" && log.payload.batch_id === chosenBatchId)).toBe(true);
+    expect(f.logWrites.map(log => log.event)).toEqual([
+      "batch_refund_started", "batch_refund_progress", "batch_refund_complete",
+    ]);
+  });
   it.each(["OPERATOR", "ADMIN", "MAIN_ADMIN"])("allows own-tenant %s and forwards the caller JWT", async role => {
     const f = batchFixture({ authority: { userId: "actor-a", businessId: "tenant-a", role, isServiceRole: false } });
     const response = await f.invoke(["booking-a"], { actor_user_id: "forged-actor" });
@@ -352,6 +364,27 @@ describe("batch-refund authority and accounting", () => {
       "completed", "pending", "manual_action", "failed", "unknown", "unknown", "pending",
     ]);
     expect(f.from.mock.calls.filter(call => call[0] === "bookings")).toHaveLength(1);
+  });
+
+  it.each([401, 403])("leaves the untouched tail unprocessed after downstream %i", async status => {
+    const f = batchFixture({
+      bookings: ["booking-a", "booking-b", "booking-c"].map(id => ({ id, business_id: "tenant-a" })),
+      replies: [
+        Response.json({ ok: true, refund_status: "REFUNDED" }),
+        Response.json({ error: "Admin session required" }, { status }),
+      ],
+    });
+    const first = await f.invoke(["booking-a", "booking-b", "booking-c"]);
+    expect(first.status).toBe(status);
+    expect(await first.json()).toMatchObject({ completed: 1, failed: 1, unprocessed: 1 });
+    expect(f.requests.map(request => request.body.booking_id)).toEqual(["booking-a", "booking-b"]);
+    expect(f.logWrites.map(log => log.event)).toEqual([
+      "batch_refund_started", "batch_refund_progress", "batch_refund_progress",
+    ]);
+    expect((await (await f.invoke([], { action: "status", business_id: "tenant-a" })).json()).unprocessed).toBe(1);
+    const resumed = await f.invoke([], { action: "resume", business_id: "tenant-a" });
+    expect(await resumed.json()).toMatchObject({ completed: 2, failed: 1, unprocessed: 0 });
+    expect(f.requests.map(request => request.body.booking_id)).toEqual(["booking-a", "booking-b", "booking-c"]);
   });
 
   it("stops before submission when the initial audit cannot be persisted", async () => {

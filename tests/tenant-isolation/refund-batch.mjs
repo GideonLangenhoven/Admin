@@ -36,6 +36,7 @@ try {
     if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role nologin bypassrls; end if;
   end $$`);
   await db.query('create table public.businesses(id uuid primary key)');
+  await db.query('create table public.logs(id uuid primary key default gen_random_uuid(), business_id uuid, event text, payload jsonb)');
   await db.query('insert into public.businesses values($1),($2)', [id(1), id(2)]);
   await db.query(readFileSync('supabase/migrations/20260923130000_refund_batch_acceptance.sql', 'utf8'));
   const batch = id(10), actor = id(11), first = id(20), second = id(21);
@@ -50,6 +51,18 @@ try {
     assert.equal(saved.rows.length, 1);
     assert.deepEqual(saved.rows[0].booking_ids, [first, second]);
     assert.deepEqual(saved.rows[0].results, accepted.results);
+  });
+  await check('batch audit append keeps an unrelated existing log with the caller batch UUID', async () => {
+    await db.query('insert into public.logs(id,business_id,event,payload) values($1,$2,$3,$4)',
+      [batch, id(2), 'existing_payment_event', { preserve: true }]);
+    await db.query('insert into public.logs(business_id,event,payload) values($1,$2,$3)',
+      [id(1), 'batch_refund_started', { batch_id: batch, actor_user_id: actor }]);
+    const rows = (await db.query('select id,business_id,event,payload from public.logs order by event')).rows;
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows.find(row => row.id === batch), {
+      id: batch, business_id: id(2), event: 'existing_payment_event', payload: { preserve: true },
+    });
+    assert.equal(rows.find(row => row.event === 'batch_refund_started').payload.batch_id, batch);
   });
   await check('client roles cannot read, write, claim or record refund batches', async () => {
     await denied('select * from public.refund_batches');

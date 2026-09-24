@@ -181,10 +181,10 @@ Deno.serve(async (req: any) => {
       batch = inserted.data as BatchRecord;
     }
 
-    const audit = async (event: string) => (await supabase.from("logs").upsert({
-      id: batchId, business_id: businessId, event,
+    const audit = async (event: string) => (await supabase.from("logs").insert({
+      business_id: businessId, event,
       payload: { actor_user_id: auth.userId, ...batchSummary(batch) },
-    }, { onConflict: "id" })).error;
+    })).error;
     if (await audit(action === "start" ? "batch_refund_started" : "batch_refund_resumed")) {
       return respond({ ...batchSummary(batch), ok: false, audit_error: "Could not persist batch refund audit" }, 503);
     }
@@ -204,6 +204,7 @@ Deno.serve(async (req: any) => {
       }
       batch.results[bookingId] = { booking_id: bookingId, status: "submitting", ok: false };
       let result: BatchResult;
+      let authorityStatus = 0;
       try {
         const refundRes = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
           method: "POST",
@@ -211,14 +212,18 @@ Deno.serve(async (req: any) => {
           body: JSON.stringify({ booking_id: bookingId }),
           signal: AbortSignal.timeout(10000),
         });
-        result = await classifyRefundResponse(bookingId, refundRes);
-      } catch (err: any) {
+        authorityStatus = refundRes.status === 401 || refundRes.status === 403 ? refundRes.status : 0;
+        result = authorityStatus
+          ? { booking_id: bookingId, status: "failed", ok: false, error: "Refund authorization was rejected" }
+          : await classifyRefundResponse(bookingId, refundRes);
+      } catch {
         result = { booking_id: bookingId, status: "unknown", ok: false, error: "Refund outcome could not be confirmed" };
       }
       const recorded = await supabase.rpc("record_refund_batch_item", { p_batch_id: batchId, p_booking_id: bookingId, p_result: result });
       if (recorded.error || !recorded.data) return respond({ ...batchSummary(batch), ok: false, audit_error: "Refund result could not be persisted; reconcile before retrying" }, 503);
       batch.results[bookingId] = result;
       if (await audit("batch_refund_progress")) return respond({ ...batchSummary(batch), ok: false, audit_error: "Could not persist batch refund audit" }, 503);
+      if (authorityStatus) return respond({ ...batchSummary(batch), error: "Refund authorization was rejected; remaining items were not submitted" }, authorityStatus);
     }
 
     const finalAuditError = await audit("batch_refund_complete");
