@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-23T12:23:22Z",
+  "recorded_at_utc": "2026-09-24T04:28:03Z",
   "kind": "PROVISIONAL_CHECKPOINT_NOT_A_RELEASE",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -38,8 +38,8 @@
       "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
       "git_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d"
     },
-    "integrated_commit": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
-    "integrated_tree": "d6b9d8130b03514367ace85a3d351daa811f06ee",
+    "integrated_commit": "307d6cb94e375c17f50997c12102d56188b9f487",
+    "integrated_tree": "3d4d66915727110832f2afb1d958ea5a7f3d440f",
     "additional_reviewed_correction": {
       "id": "V01-COMBO-NULL-GAP",
       "source_commit": "428615726b3038a2fe7f8d1a5cfb08ab4cd48e00",
@@ -122,6 +122,32 @@
       "test_log_sha256": "bd070bb6e8696fdb00aad15fd9a963edbdf958658d004ae077b9a66d44f2ca3f",
       "integration": "All three integrated files equal reviewed source; existing tests reused",
       "limitations": "No hosted Storage/SQL proof. Earlier extra-probe230 result differs from committed229 scope; neither certifies hosted PostgREST reachability."
+    },
+    "reviewed_ingress_correction": {
+      "source_commit": "38576f20f0907b0090574e903d584813492b0a5e",
+      "source_tree": "4743118b7ef17494cf256bab7cb0b7c9bc89557d",
+      "integrated_commit": "307d6cb94e375c17f50997c12102d56188b9f487",
+      "review": "ACCEPTED_SCOPED",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "review_artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/final-review-accepted.md",
+      "review_sha256": "0307f01b28ddbe049df5a979b6d8ba3e504fb606463ae057b5d8629649bed46d",
+      "writer_artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/reviewer-delta.md",
+      "writer_sha256": "c857e9d8287a67b46f0204b08c1bd5e77302d43ad2a180fa750abddf4b2e0fbd",
+      "proof": "Writer58/58 focused, types/lint; independent malformed-input/coarse accounting,11 actual Next matcher cases, array normalization and one body consumption;17 artifact hashes. Prior three actual localhost Next/Node HTTP socket-close and bounded Redis evidence reused for unchanged functions.",
+      "integration": "All8 changed source/test files equal accepted source. First focused integration57/58 failed a3s stalled-body watchdog. Exact clean-environment isolated, worker-suite and integrated-suite rechecks pass; integrated58/58 with actual NextNode case1525ms. No source/deadline change; scheduling delay is an inference, not proven cause.",
+      "integration_log": "/private/tmp/bookingtours-integrated-evidence-20260923/auth-ingress-after-integration.log",
+      "integration_log_sha256": "7374a91ded2c257e9ab90fa6e955ae6a8011523338f5aa6d9ee2d0ca1ba948ab",
+      "limits": "Hosted ingress/invocation and generic proxy lifecycle unverified; required Redis settings absent from production project-name inventory; input+IP partition is not verified identity/global distributed-account enforcement. Direct paths and expensive operations remain C03 scope.",
+      "integration_recheck_log": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/integrated-suite-recheck.log",
+      "integration_recheck_sha256": "689d99bae9dc2939b3e2f33b7e2c4d0a8c8ad9e3d8772bfbfbaf14404f1b4269",
+      "integration_diagnosis": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/integration-timeout-diagnosis.md",
+      "integration_diagnosis_sha256": "2a77cfcc9a008c8808c0d113c9b2764cf90ae2b0c6779d7b0b5403cbc0413d8b"
+    },
+    "remote_branch_recheck": {
+      "commit": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
+      "observed_at_utc": "2026-09-24T04:28:03Z",
+      "method": "git ls-remote origin refs/heads/codex/bookingtours-simple-view-readiness-2026-09-20",
+      "result": "unchanged remote base; no push"
     }
   },
   "booking": {
@@ -300,7 +326,16 @@
     "two_x_spike": "NOT_RUN",
     "twenty_four_hour_soak": "NOT_RUN",
     "alert_restore": "NOT_RUN",
-    "production_canary": "NOT_RUN"
+    "production_canary": "NOT_RUN",
+    "financial_snapshot": {
+      "disposition": "/private/tmp/bookingtours-v02-anomaly-evidence-20260924/v02-disposition.md",
+      "disposition_sha256": "8051a1fe26ca554947700109dc76e0db62735f52ab80da72467eb86f971e6618",
+      "supplement": "/private/tmp/bookingtours-v02-anomaly-evidence-20260924/v02-branch-supplement.md",
+      "supplement_sha256": "329edf9c6852123e49d1c92aaa332dfce5e8a346ddb07f47f71a073469cedf87",
+      "reviewer": "fresh-context gpt-6-astra/xhigh",
+      "result": "11 current owner-classified synthetic/demo records have per-record private facts/hash labels;11/11 supplemental identity correspondence verified. Observed fields imply ordinary refund requests enter manual handling without provider call. No refund was invoked; source inference only.",
+      "limits": "Historical12-record identity mapping remains open. Recorded PAID/captured values are not settlement proof and may appear in application report totals; they must not substantiate genuine revenue claims. No mutation, replay or invented capture."
+    }
   },
   "release_actions_this_checkpoint": {
     "pushed": false,

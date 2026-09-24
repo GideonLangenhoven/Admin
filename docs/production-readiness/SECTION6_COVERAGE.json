@@ -219,7 +219,7 @@
   "release_gate": "FAIL",
   "current_verification": {
     "status": "IN_PROGRESS",
-    "admin_candidate": "e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
+    "admin_candidate": "307d6cb94e375c17f50997c12102d56188b9f487",
     "meaning": "Existing statuses and tests refer to the historical candidate recorded above. They remain reusable only within unchanged code/configuration/fixture scope and do not certify the current integrated product.",
     "required_explicit_identities": [
       "anonymous",
@@ -243,7 +243,7 @@
       "logout/account/tenant switch and old-tab continuity"
     ],
     "evidence_requirement": "Each enabled critical capability needs actual positive and denied behavioral run results tied to code, configuration, fixture and environment; filenames alone are not proof.",
-    "updated_at_utc": "2026-09-23T13:17:03Z",
+    "updated_at_utc": "2026-09-24T04:28:03Z",
     "accepted_scoped_evidence": [
       {
         "scope": "Public recovery/login response and token lifecycle; trusted recovery origin",
@@ -280,6 +280,14 @@
         "result": "229 exact-source PostgreSQL rollout checks pass; independently reviewed",
         "evidence": "/private/tmp/bookingtours-c05-evidence-20260923/storage-role-independent-review.md",
         "environment": "disposable PostgreSQL17 and captured source review; no hosted Storage operations"
+      },
+      {
+        "scope": "Bounded auth ingress and exact matcher, malformed-input accounting and real local Next/Node unfinished-body closure",
+        "parent": "C03",
+        "source": "38576f20f0907b0090574e903d584813492b0a5e",
+        "integrated": "307d6cb94e375c17f50997c12102d56188b9f487",
+        "result": "58/58 writer and exact-environment integrated recheck; independent matcher/accounting/normalization and source/artifact verification; first integration timing failure retained",
+        "environment": "synthetic Redis/Auth plus actual localhost HTTP transport; hosted and generic proxy/direct paths not certified"
       }
     ]
   }

@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T13:17:03Z",
+  "updated_at_utc": "2026-09-24T04:28:03Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
@@ -202,10 +202,12 @@
           "failure": "Production E2E_BYPASS_RATE_LIMIT is not rejected, Redis fetch has no explicit timeout, and fallback is a per-process Map while direct Auth/Edge paths bypass this proxy.",
           "impact": "Distributed abuse and unbounded limiter latency remain possible; a tiny shared IP allowance can deny legitimate staff.",
           "verification": "Negative production bypass/config tests, bounded outage tests, shared-office allowance, distributed abuse, direct-path and expensive-operation behavioral tests.",
-          "status": "SOURCE_IN_PROGRESS"
+          "status": "LOCAL_VERIFIED_SCOPED",
+          "source_commit": "38576f20f0907b0090574e903d584813492b0a5e",
+          "integrated_commit": "307d6cb94e375c17f50997c12102d56188b9f487"
         }
       ],
-      "next": "Sol is implementing bounded proxy controls with production bypass/outage, shared-office, trusted-IP, body-bound and distributed-abuse regressions; direct-path inventory remains open.",
+      "next": "Finish disjoint web-chat/direct-path and expensive-operation controls. Preserve accepted auth correction and first failed timing log; exact-environment rechecks pass with no source/deadline change. Hosted configuration and lifecycle boundaries remain open.",
       "native_auth_snapshot": {
         "project": "ukdsrndqhsatjkmxijuj",
         "observed_at_utc": "2026-09-23T10:43:41.701Z",
@@ -236,7 +238,7 @@
       ],
       "proxy_review": {
         "source_commit": "00cef2205e8d753f8ebbe9834bbe97043fa7b73a",
-        "status": "CHANGES_REQUIRED_NOT_INTEGRATED",
+        "status": "HISTORICAL_FINDINGS_CORRECTED_BY_38576F2",
         "artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/review.md",
         "sha256": "c478afd52ab9b6cfa5259df53e590892f0374ac207341b9becb8e9f168075d36",
         "findings": [
@@ -262,6 +264,26 @@
         "method": "Read-only Vercel CLI env ls production; only required name presence retained, no values or Redis request.",
         "limit": "Not effective invocation evidence; VERCEL can be a system variable rather than a listed project variable.",
         "minimum_next_action": "Before deploying fail-closed limiter, identify approved shared Redis service, verify available command/storage quotas within ZAR0, supply secrets through supported secret settings under exact deployment approval, and verify production/preview configuration and bounded failure behavior. No provisioning or hosted configuration change authorized by this record."
+      },
+      "accepted_proxy_correction": {
+        "source_commit": "38576f20f0907b0090574e903d584813492b0a5e",
+        "source_tree": "4743118b7ef17494cf256bab7cb0b7c9bc89557d",
+        "integrated_commit": "307d6cb94e375c17f50997c12102d56188b9f487",
+        "review": "ACCEPTED_SCOPED",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "review_artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/final-review-accepted.md",
+        "review_sha256": "0307f01b28ddbe049df5a979b6d8ba3e504fb606463ae057b5d8629649bed46d",
+        "writer_artifact": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/reviewer-delta.md",
+        "writer_sha256": "c857e9d8287a67b46f0204b08c1bd5e77302d43ad2a180fa750abddf4b2e0fbd",
+        "proof": "Writer58/58 focused, types/lint; independent malformed-input/coarse accounting,11 actual Next matcher cases, array normalization and one body consumption;17 artifact hashes. Prior three actual localhost Next/Node HTTP socket-close and bounded Redis evidence reused for unchanged functions.",
+        "integration": "All8 changed source/test files equal accepted source. First focused integration57/58 failed a3s stalled-body watchdog. Exact clean-environment isolated, worker-suite and integrated-suite rechecks pass; integrated58/58 with actual NextNode case1525ms. No source/deadline change; scheduling delay is an inference, not proven cause.",
+        "integration_log": "/private/tmp/bookingtours-integrated-evidence-20260923/auth-ingress-after-integration.log",
+        "integration_log_sha256": "7374a91ded2c257e9ab90fa6e955ae6a8011523338f5aa6d9ee2d0ca1ba948ab",
+        "limits": "Hosted ingress/invocation and generic proxy lifecycle unverified; required Redis settings absent from production project-name inventory; input+IP partition is not verified identity/global distributed-account enforcement. Direct paths and expensive operations remain C03 scope.",
+        "integration_recheck_log": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/integrated-suite-recheck.log",
+        "integration_recheck_sha256": "689d99bae9dc2939b3e2f33b7e2c4d0a8c8ad9e3d8772bfbfbaf14404f1b4269",
+        "integration_diagnosis": "/private/tmp/bookingtours-c03-proxy-evidence-20260923/integration-timeout-diagnosis.md",
+        "integration_diagnosis_sha256": "2a77cfcc9a008c8808c0d113c9b2764cf90ae2b0c6779d7b0b5403cbc0413d8b"
       }
     },
     {
@@ -504,7 +526,21 @@
           "verification": "Disposable database and provider-fault tests for tab loss, timeout, failed audit writes, actor/tenant switch and stable money-operation IDs."
         }
       ],
-      "next": "Sol is implementing interruption recovery under the approved foreground per-item contract, reusing existing refund operation IDs; enabled batch endpoint needs durable accepted target list and item progress. No genuine provider effects."
+      "next": "Sol corrects these together under preserved per-item UI and separate100-item whole-batch contracts; parked C05 work remains isolated.",
+      "review": {
+        "source_commit": "8923a5461621a9b41c743e2616b83ddd7f5e5a33",
+        "status": "CHANGES_REQUIRED_NOT_INTEGRATED",
+        "artifact": "/private/tmp/bookingtours-c06-evidence-20260923/independent-review.md",
+        "sha256": "addd457431a3297869bd97815ebc1ee9d790d2a54d4d6291642a6e4ca0fba5ac",
+        "writer_evidence": "73 focused tests,5 minimal-schema local PostgreSQL checks,types,affected Edge check/bundle passed before independent findings; not acceptance.",
+        "confirmed_findings": [
+          "Caller-selected batch UUID can overwrite unrelated global audit row through logs.id upsert; actual handler and disposable PostgreSQL confirmed.",
+          "Downstream401/403 does not stop dispatch; untouched tail becomes failed instead of remaining unsubmitted.",
+          "Valid101-item foreground selection is persisted/dispatched but recovery validator rejects it.",
+          "Old tenant/account response repopulates the new context history panel."
+        ],
+        "next": "Sol corrects these together under preserved per-item UI and separate100-item whole-batch contracts; parked C05 work remains isolated."
+      }
     },
     {
       "id": "V01",
@@ -548,7 +584,26 @@
         "PROVIDER-01"
       ],
       "evidence": "No candidate-bound genuine Yoco payment-to-webhook-to-delivery/refund journey; 12 historical PAID records without provider IDs remain individually unreconciled.",
-      "next": "Obtain scoped sandbox/recipient access, run genuine journeys and fault invariants, classify all 12 against authoritative evidence before any historical mutation."
+      "next": "Obtain scoped sandbox/recipient access, run genuine journeys and fault invariants, classify all 12 against authoritative evidence before any historical mutation.",
+      "current_readonly_snapshot": {
+        "project": "ukdsrndqhsatjkmxijuj",
+        "observed_at_utc": "2026-09-24T04:19:50.600Z",
+        "manifest": "/private/tmp/bookingtours-v02-anomaly-evidence-20260924/manifest.json",
+        "manifest_sha256": "887d0ef71565127f86e7a2e854ebc1aae2d61007bc5af71233493f79126fe532",
+        "result": "50 bookings remain;11 current PAID rows lack both Yoco IDs. All11 declareYOCO, modeNULL, positivecapture, zero refunds/voucher funding, no Payfast reference, no booking logs/refund operations.",
+        "privacy": "Restricted0600 artifacts contain stable record IDs and limited financial fields; no customer contacts, tokens, payment URLs, raw provider references or free-text audit payloads selected.",
+        "limitation": "Historical12 count did not identify records.11 current matches neither reconciles all12 nor proves missing record corrected. Owner synthetic/demo classification is retained; no captures/provider verification or mutations invented.",
+        "next": "Independent read-only finance disposition is examining current facts and existing effect guards; historical per-record mapping remains unresolved."
+      },
+      "independent_current_disposition": {
+        "disposition": "/private/tmp/bookingtours-v02-anomaly-evidence-20260924/v02-disposition.md",
+        "disposition_sha256": "8051a1fe26ca554947700109dc76e0db62735f52ab80da72467eb86f971e6618",
+        "supplement": "/private/tmp/bookingtours-v02-anomaly-evidence-20260924/v02-branch-supplement.md",
+        "supplement_sha256": "329edf9c6852123e49d1c92aaa332dfce5e8a346ddb07f47f71a073469cedf87",
+        "reviewer": "fresh-context gpt-6-astra/xhigh",
+        "result": "11 current owner-classified synthetic/demo records have per-record private facts/hash labels;11/11 supplemental identity correspondence verified. Observed fields imply ordinary refund requests enter manual handling without provider call. No refund was invoked; source inference only.",
+        "limits": "Historical12-record identity mapping remains open. Recorded PAID/captured values are not settlement proof and may appear in application report totals; they must not substantiate genuine revenue claims. No mutation, replay or invented capture."
+      }
     },
     {
       "id": "V03",

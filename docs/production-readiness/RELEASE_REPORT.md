@@ -2,7 +2,7 @@
 
 Verdict: **FAILED_GATE**. Astra handles orchestration/review and explicitly dispatched GPT-6 Sol Max workers implement. Effective runtime model/effort telemetry is unavailable. No implementation-qualification or go-to-market verdict is claimed.
 
-Admin integrated source is `e9bea35`: C02's reviewed authentication/recovery changes are integrated and 46 affected integration tests pass. The separate combo-null-gap correction is accepted, with nine actual validator and eleven parser tests passing and an identical integrated tree.
+Admin integrated source is `307d6cb`: C02's reviewed authentication/recovery changes are integrated and 46 affected integration tests pass. The separate combo-null-gap correction is accepted, with nine actual validator and eleven parser tests passing and an identical integrated tree.
 
 Storefront `f11b1dd` and onboarding `2de7de49` are independently accepted for their reviewed source scopes. Storefront restores the full prior descendant behavior and corrects ownership, chat, combo response, cancellation and image-proxy regressions. Onboarding patches dependencies, fixes reproduced type/lint errors and removes the type-check bypass. Both configured Webpack production builds, type checks, focused contracts and lint pass; warnings remain 20 and 8 respectively. Full/production dependency audits are zero. Onboarding's real-font typed build log is retained with SHA-256 in the manifest.
 
@@ -13,3 +13,5 @@ Admin deployment still identifies `ebb62b8`; booking/onboarding deployment Git f
 The owner confirmed synthetic/demo booking/customer data, ZAR 0 and private provider destinations for planning. The supplied restore URL is the source; other projects are excluded and a separate target is unresolved. No hosted execution is authorized by this report.
 
 Use [STATE.md](STATE.md), [ISSUES.json](ISSUES.json) and [RELEASE_MANIFEST.json](RELEASE_MANIFEST.json) to resume. Preserve existing evidence where applicable; complete source work and actual gates before deployment approval or launch claims.
+
+Latest ingress checkpoint: independently accepted38576f2 is integrated307d6cb with identical changed source. Writer58/58 and independent malformed-input/matcher/HTTP evidence pass. The first integration57/58 timing failure is retained; exact clean-environment rechecks now pass58/58 without source/deadline changes. C06 frozen8923a54 has four independently reproduced issues under correction and is not integrated.

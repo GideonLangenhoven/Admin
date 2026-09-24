@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-23T13:49:54Z",
+  "updated_at_utc": "2026-09-24T04:28:03Z",
   "candidate": "PROVISIONAL_NOT_FROZEN",
   "authorized": {
     "isolated_source_changes": true,
@@ -55,7 +55,7 @@
   ],
   "latest_scope_steering": {
     "request": "Continue all C01-C06 and V01-V06 requirements with authorized isolated source work and local synthetic tests. Complete concrete reviewable work before asking for an external action approval.",
-    "current_source": "Admin integrated e9bea358458ecd0d2d701731c4ca94f5ba9f589c; readiness-only commits are tracked separately. Source corrections remain active; no final candidate freeze.",
+    "current_source": "Admin integrated307d6cb94e375c17f50997c12102d56188b9f487; readiness-only commits tracked separately. Source corrections remain active; no final candidate freeze.",
     "deployment": "Local corrections are not deployed-equivalent; historical Admin alias reports ebb62b8. No push, remote migration, hosted load, provider effect or restore has been performed in the current closeout.",
     "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet."
   },
