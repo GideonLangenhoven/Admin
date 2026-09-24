@@ -8,8 +8,8 @@
 // half-finished wizard cannot take money.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getClientIp, sha256Hex } from "../_shared/otp-attempts.ts";
-import { generateSlots } from "../_shared/slot-generation.ts";
+import { sha256Hex } from "../_shared/otp-attempts.ts";
+import { buildSlotRows, generateSlots } from "../_shared/slot-generation.ts";
 import {
   isPrivateAddress,
   normaliseRefundTiers,
@@ -44,13 +44,12 @@ const corsHeaders = {
   "Content-Type": "application/json",
 };
 
-function respond(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
+function respond(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, ...headers } });
 }
 
-// Per-minute cap per IP per action. Reads are chatty (autosave polling, the
-// finish-screen booking poll); anything that reaches a third party or writes
-// credentials is kept tight.
+// Per-minute tenant caps. A shared admission bucket also covers bad/missing
+// invite tokens without relying on an unverified forwarded IP header.
 const RATE_LIMITS: Record<string, number> = {
   validate: 30,
   "get-state": 30,
@@ -62,6 +61,56 @@ const RATE_LIMITS: Record<string, number> = {
   "go-live": 5,
   complete: 5,
 };
+const MAX_BODY_BYTES = 256_000;
+const MAX_TOURS = 50;
+const MAX_BATCH_SLOTS = 5000;
+
+class BoundedInputError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
+
+async function withDeadline<T>(work: PromiseLike<T>, ms: number, onTimeout: () => void = () => {}): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      onTimeout();
+      reject(new Error("Deadline exceeded"));
+    }, Math.max(1, ms));
+    Promise.resolve(work).then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+async function readText(body: ReadableStream<Uint8Array> | null, maxBytes: number, timeoutMs: number): Promise<string> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  const deadline = Date.now() + timeoutMs;
+  let bytes = 0;
+  let complete = false;
+  try {
+    for (;;) {
+      if (Date.now() >= deadline) throw new BoundedInputError(408, "Request body timed out");
+      const { done, value } = await withDeadline(reader.read(), deadline - Date.now(), () => { void reader.cancel().catch(() => {}); })
+        .catch(() => { throw new BoundedInputError(408, "Request body timed out"); });
+      if (done) { complete = true; break; }
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw new BoundedInputError(413, "Request body is too large");
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join("");
+  } finally {
+    if (!complete) void reader.cancel().catch(() => {});
+  }
+}
+
+function limitedResponse() {
+  const seconds = Math.max(1, 60 - Math.floor(Date.now() / 1000) % 60);
+  return respond(429, { success: false, error: "Too many requests. Give it a minute and try again." }, { "Retry-After": String(seconds) });
+}
 
 // STEP_COLUMNS (the per-step write whitelist), pickColumns, normaliseRefundTiers
 // and the SSRF helpers live in ../_shared/onboarding-guards.ts so they can be
@@ -104,19 +153,19 @@ async function resolveInvite(token: string): Promise<Invite | null> {
   return data as Invite;
 }
 
-async function withinRateLimit(req: Request, action: string): Promise<boolean> {
-  const ip = getClientIp(req);
-  if (!ip) return true; // no usable IP: don't lock out a legitimate client
-  const { data, error } = await supabase.rpc("check_rate_limit", {
-    p_ip: ip,
-    p_endpoint: "onboarding-wizard:" + action,
-    p_max: RATE_LIMITS[action] ?? 30,
-  });
-  if (error) {
-    console.error("rate_limit_check_failed", error);
-    return true; // the bucket is a guard rail, not the auth boundary
+async function rateDecision(action: string, key: string, scope: string, limit: number): Promise<"allowed" | "limited" | "unavailable"> {
+  try {
+    const { data, error } = await withDeadline(supabase.rpc("check_rate_limit", {
+      p_ip: key,
+      p_endpoint: `onboarding-wizard:${action}:${scope}`,
+      p_max: limit,
+    }).abortSignal(AbortSignal.timeout(1500)), 1600);
+    if (error) return "unavailable";
+    if (data === true) return "allowed";
+    return data === false ? "limited" : "unavailable";
+  } catch {
+    return "unavailable";
   }
-  return data !== false;
 }
 
 async function loadState(invite: Invite) {
@@ -182,7 +231,7 @@ async function assertPublicUrl(raw: string): Promise<URL> {
       ...await Deno.resolveDns(host, "A").catch(() => [] as string[]),
       ...await Deno.resolveDns(host, "AAAA").catch(() => [] as string[]),
     ];
-    if (records.length && records.every((r) => isPrivateAddress(String(r)))) {
+    if (records.some((r) => isPrivateAddress(String(r)))) {
       throw new Error("That host is not reachable.");
     }
   } catch (err) {
@@ -220,8 +269,9 @@ async function scrapeSite(rawUrl: string) {
     while (total < 200_000) {
       const { done, value } = await reader.read();
       if (done) break;
-      total += value.byteLength;
-      html += decoder.decode(value, { stream: true });
+      const chunk = value.subarray(0, 200_000 - total);
+      total += chunk.byteLength;
+      html += decoder.decode(chunk, { stream: true });
       if (/<\/head>/i.test(html)) break;
     }
     await reader.cancel().catch(() => {});
@@ -248,16 +298,23 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return respond(405, { success: false, error: "Method not allowed" });
 
   try {
-    const body = await req.json();
-    const action = String(body.action || "").trim();
-    const token = String(body.token || "").trim();
+    let body: Record<string, any>;
+    try {
+      body = JSON.parse(await readText(req.body, MAX_BODY_BYTES, 3000));
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid JSON object");
+    } catch (error) {
+      if (error instanceof BoundedInputError) return respond(error.status, { success: false, error: error.message });
+      return respond(400, { success: false, error: "Invalid JSON request" });
+    }
+    const action = typeof body.action === "string" ? body.action.trim() : "";
+    const token = typeof body.token === "string" ? body.token.trim() : "";
 
     if (!action) return respond(400, { success: false, error: "action is required" });
-    if (!(action in RATE_LIMITS)) return respond(400, { success: false, error: `Unknown action: ${action}` });
+    if (!Object.hasOwn(RATE_LIMITS, action)) return respond(400, { success: false, error: `Unknown action: ${action}` });
 
-    if (!await withinRateLimit(req, action)) {
-      return respond(429, { success: false, error: "Too many requests. Give it a minute and try again." });
-    }
+    const sharedRate = await rateDecision(action, "public", "shared", RATE_LIMITS[action] * 200);
+    if (sharedRate === "unavailable") return respond(503, { success: false, error: "Please try again in a moment." });
+    if (sharedRate === "limited") return limitedResponse();
 
     const invite = await resolveInvite(token);
     if (!invite) {
@@ -267,6 +324,9 @@ Deno.serve(async (req) => {
       });
     }
     const businessId = invite.business_id;
+    const tenantRate = await rateDecision(action, businessId, "tenant", RATE_LIMITS[action]);
+    if (tenantRate === "unavailable") return respond(503, { success: false, error: "Please try again in a moment." });
+    if (tenantRate === "limited") return limitedResponse();
 
     // ── validate ──
     if (action === "validate") {
@@ -300,18 +360,37 @@ Deno.serve(async (req) => {
 
       if (step === "tours") {
         const tours = Array.isArray(body.data?.tours) ? body.data.tours : [];
+        if (tours.length > MAX_TOURS) return respond(413, { success: false, error: "Too many tours in one save." });
+        // Validate the whole batch and its slot work before the first write.
+        const { data: biz } = await supabase
+          .from("businesses").select("timezone").eq("id", businessId).maybeSingle();
+        const timezone = biz?.timezone || "Africa/Johannesburg";
+        let slotWork = 0;
+        let rangeWork = 0;
+        for (const t of tours) {
+          const name = String(t?.name || "").trim();
+          if (!name || !(Number(t?.base_price_per_person) > 0) || !(Number(t?.duration_minutes) > 0)) {
+            return respond(400, { success: false, error: `Every tour needs a name, a price above 0, and a duration above 0. Check "${name || "unnamed tour"}".` });
+          }
+          const ranges = Array.isArray(t?.ranges) ? t.ranges : [];
+          rangeWork += ranges.length;
+          if (rangeWork > 100 || ranges.some((range: any) =>
+            !Array.isArray(range?.times) || range.times.length > 24 ||
+            !Array.isArray(range?.days_of_week) || range.days_of_week.length > 7)) {
+            return respond(413, { success: false, error: "Too many departure ranges or times in one tour." });
+          }
+          if (ranges.length) {
+            slotWork += buildSlotRows({
+              business_id: businessId, tour_id: "preflight", capacity: 1, timezone, ranges,
+            }).length;
+            if (slotWork > MAX_BATCH_SLOTS) return respond(413, { success: false, error: "Too many slots in one save." });
+          }
+        }
         const results = [];
         for (const t of tours) {
           const name = String(t?.name || "").trim();
           const price = Number(t?.base_price_per_person);
           const duration = Number(t?.duration_minutes);
-          if (!name || !(price > 0) || !(duration > 0)) {
-            return respond(400, {
-              success: false,
-              error: `Every tour needs a name, a price above 0, and a duration above 0. Check "${name || "unnamed tour"}".`,
-            });
-          }
-
           const payload = {
             business_id: businessId,
             name,
@@ -338,13 +417,11 @@ Deno.serve(async (req) => {
           const ranges = Array.isArray(t?.ranges) ? t.ranges : [];
           let slots = { slots_created: 0, slots_skipped: 0 };
           if (ranges.length) {
-            const { data: biz } = await supabase
-              .from("businesses").select("timezone").eq("id", businessId).maybeSingle();
             const gen = await generateSlots(supabase, {
               business_id: businessId,
               tour_id: tourId,
               capacity: payload.default_capacity,
-              timezone: biz?.timezone || "Africa/Johannesburg",
+              timezone,
               ranges,
             });
             if (gen.errors.length) throw new Error(gen.errors[0].message);
@@ -385,32 +462,38 @@ Deno.serve(async (req) => {
       }
       const query = String(body.query || "").trim();
       if (!query) return respond(400, { success: false, error: "query is required" });
+      if (query.length > 256) return respond(413, { success: false, error: "Place search is too long." });
 
-      const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-          "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber," +
-            "places.websiteUri,places.googleMapsUri,places.regularOpeningHours.weekdayDescriptions",
-        },
-        body: JSON.stringify({ textQuery: query, maxResultCount: 5 }),
-      });
-      if (!res.ok) {
+      try {
+        const deadline = Date.now() + 5000;
+        const res = await withDeadline(fetch("https://places.googleapis.com/v1/places:searchText", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+            "X-Goog-FieldMask":
+              "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber," +
+              "places.websiteUri,places.googleMapsUri,places.regularOpeningHours.weekdayDescriptions",
+          },
+          body: JSON.stringify({ textQuery: query, maxResultCount: 5 }),
+          signal: AbortSignal.timeout(5000),
+        }), 5000);
+        if (!res.ok) throw new Error("Place lookup failed");
+        const json = JSON.parse(await readText(res.body, 64_000, Math.max(1, deadline - Date.now())));
+        if (!Array.isArray(json.places)) throw new Error("Invalid Places response");
+        const candidates = json.places.slice(0, 5).map((p: any) => ({
+          place_id: p.id,
+          name: p.displayName?.text || "",
+          address: p.formattedAddress || "",
+          phone: p.nationalPhoneNumber || "",
+          website: p.websiteUri || "",
+          maps_uri: p.googleMapsUri || "",
+          hours: p.regularOpeningHours?.weekdayDescriptions || [],
+        }));
+        return respond(200, { success: true, candidates });
+      } catch {
         return respond(502, { success: false, error: "Place lookup failed. Enter the details by hand." });
       }
-      const json = await res.json();
-      const candidates = (json.places || []).map((p: any) => ({
-        place_id: p.id,
-        name: p.displayName?.text || "",
-        address: p.formattedAddress || "",
-        phone: p.nationalPhoneNumber || "",
-        website: p.websiteUri || "",
-        maps_uri: p.googleMapsUri || "",
-        hours: p.regularOpeningHours?.weekdayDescriptions || [],
-      }));
-      return respond(200, { success: true, candidates });
     }
 
     // ── prefill-website ──

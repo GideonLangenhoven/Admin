@@ -20,8 +20,8 @@ it.each([
   expect(rpc).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
 });
 
-it("blocks anonymous onboarding credential linking before provider or database effects", async () => {
-  const rpc = vi.fn();
+it("blocks anonymous onboarding credential linking before provider or credential effects", async () => {
+  const rpc = vi.fn(() => ({ abortSignal: async () => ({ data: true, error: null }) }));
   const gateway = { validateYocoKey: vi.fn(), registerYocoWebhook: vi.fn() };
   const query: any = { select: () => query, eq: () => query, is: () => query, gt: () => query, maybeSingle: async () => ({ data: { id: "invite", business_id: "a" }, error: null }) };
   const handler = sourceHandler("supabase/functions/onboarding-wizard/index.ts", {
@@ -35,5 +35,6 @@ it("blocks anonymous onboarding credential linking before provider or database e
   expect(await response.json()).toMatchObject({ success: false, code: "MFA_REQUIRED" });
   expect(gateway.validateYocoKey).not.toHaveBeenCalled();
   expect(gateway.registerYocoWebhook).not.toHaveBeenCalled();
-  expect(rpc).not.toHaveBeenCalled();
+  expect(rpc).toHaveBeenCalledTimes(2);
+  expect(rpc).toHaveBeenCalledWith("check_rate_limit", expect.any(Object));
 });
