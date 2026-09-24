@@ -18,7 +18,7 @@ const secretBusinessColumns = new Set([
   "wa_token_encrypted", "wa_phone_id_encrypted", "wa_phone_id_lookup",
   "yoco_secret_key_encrypted", "yoco_webhook_secret_encrypted",
   "yoco_test_secret_key_encrypted", "yoco_test_webhook_secret_encrypted",
-  "yoco_test_mode", "yoco_webhook_status", "paysafe_api_key_encrypted",
+  "yoco_webhook_status", "paysafe_api_key_encrypted",
   "paysafe_api_secret_encrypted", "google_drive_refresh_token_encrypted",
   "bank_account_owner_encrypted", "bank_account_number_encrypted",
   "bank_account_type_encrypted", "bank_name_encrypted", "bank_branch_code_encrypted",
@@ -58,6 +58,31 @@ const serviceOnlyFunctions = new Set([
   "cancel_booking_notification_jobs", "enqueue_replacement_booking_notification_job",
   "refresh_claires_hiking_demo_dates", "sync_booking_arrival_state", "audit_direct_booking_arrival",
 ]);
+// Captured on 2026-09-23 and reviewed against their source/ACL boundary.
+// Only these exact signatures, bodies and grants may retain search_path=public;
+// any changed function must be reviewed again. Three client-originating paths
+// are corrected by the 20260923140000 forward migration instead.
+const reviewedPublicPathFunctions = new Map([
+  ["public.apply_last_minute_deals()", "77c22eaf4d3d134d7d0598477b25feb0", "service_role"],
+  ["public.assert_sensitive_settings_actor(p_actor_id uuid, p_business_id uuid)", "7b3f1f212f3cf4f1365550dda2aabe8d", "service_role"],
+  ["public.complete_my_admin_onboarding()", "eebe3370033bb01795191d81da8cf236", "authenticated,service_role"],
+  ["public.finish_mfa_recovery(p_operation_id uuid, p_actor_id uuid, p_admin_id uuid, p_business_id uuid, p_completed boolean, p_deleted_count integer, p_failed_count integer, p_remaining_count integer)", "dc92d405416a31e6a69d32ad30e2ea69", "service_role"],
+  ["public.get_my_admin_onboarding()", "7415339ca0204127313d66d9dca063c6", "authenticated,service_role"],
+  ["public.platform_assert_actor(p_actor_id uuid, p_business_id uuid, p_super_only boolean)", "568631fcbe393f607e3504ebedfaa19a", "service_role"],
+  ["public.platform_change_business_status(p_business_id uuid, p_actor_id uuid, p_status text, p_expected_status text, p_reason text)", "3e6bce6bd51dc48ae5446286ee90200f", "service_role"],
+  ["public.platform_change_seats(p_business_id uuid, p_actor_id uuid, p_delta integer)", "447b2ba162b244076e64e27d38ba29ec", "service_role"],
+  ["public.platform_complete_business_setup(p_business_id uuid, p_actor_id uuid)", "506fed5382ace03172a7a140bb2c11ad", "service_role"],
+  ["public.platform_generate_invoice(p_actor_id uuid, p_snapshot jsonb)", "43449fd21e60e96ea9969f1a5f2c967a", "service_role"],
+  ["public.platform_onboard_business(p_actor_id uuid, p_request_id uuid, p_business jsonb, p_admin jsonb, p_credentials jsonb, p_key text)", "5f52fd1e89f0b3377c2a59359801b97c", ""],
+  ["public.platform_onboard_business_audited(p_actor_id uuid, p_request_id uuid, p_business jsonb, p_admin jsonb, p_credentials jsonb, p_key text)", "79588af81274a9b45894cea973e4ff74", "service_role"],
+  ["public.platform_operations_snapshot(p_actor_id uuid)", "583f47e926a2a59ca344375a9523c4c4", "service_role"],
+  ["public.platform_record_invoice_payment(p_invoice_id uuid, p_actor_id uuid, p_method text, p_notes text, p_payment_id text, p_checkout_id text, p_amount_cents bigint, p_currency text)", "ffd0d5308614ae24550178f7d8220557", "service_role"],
+  ["public.platform_record_release_check(p_actor_id uuid, p_business_id uuid, p_check text, p_complete boolean)", "c70b7a3b72fc691cd8d39f1553ddaf13", "service_role"],
+  ["public.platform_reserve_invoice_checkout(p_invoice_id uuid)", "9b5fd8779caeeb59d9772145a74fe51f", "service_role"],
+  ["public.platform_suspend_admin(p_admin_id uuid, p_actor_id uuid, p_suspended boolean)", "d49e43c0ae57f8dd06881e2e43eeacd0", "service_role"],
+  ["public.platform_void_invoice(p_invoice_id uuid, p_actor_id uuid, p_reason text)", "5a05c6f86b3f5637e7fe1317a6de4ca5", "service_role"],
+  ["public.set_my_help_chat_hidden(p_hidden boolean)", "5178f305b1a827352fb304fdacb575ad", "authenticated,service_role"],
+].map(([signature, definitionMd5, clientGrants]) => [signature, { definitionMd5, clientGrants }]));
 // pg_policies' rendered expressions for the reviewed Storage write migrations.
 // Normalization below ignores formatting and an optional public. qualification,
 // but retains every operator and term (including any added OR true).
@@ -119,17 +144,28 @@ const publicTableSql = `
 const functionSql = `
   select p.proname name, pg_get_function_identity_arguments(p.oid) args,
     owner.rolname owner, p.prosecdef definer, p.proconfig settings,
+    md5(pg_get_functiondef(p.oid)) definition_md5,
     pg_has_role('anon',owner.oid,'MEMBER') or pg_has_role('authenticated',owner.oid,'MEMBER') client_owner,
     has_function_privilege('anon',p.oid,'EXECUTE') anon_execute,
-    has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute
+    has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute,
+    has_function_privilege('service_role',p.oid,'EXECUTE') service_execute,
+    array(select case when acl.grantee=0 then 'PUBLIC' else grantee.rolname end
+      from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+      left join pg_roles grantee on grantee.oid=acl.grantee
+      where acl.privilege_type='EXECUTE' and
+        (acl.grantee=0 or grantee.rolname in ('anon','authenticated','service_role'))
+      order by 1) client_grants
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   join pg_roles owner on owner.oid=p.proowner
   where n.nspname='public' and p.prokind='f'`;
 const viewSql = `
-  select c.relname name, c.reloptions,
+  select c.relname name, c.reloptions, owner.rolname owner,
     has_table_privilege('anon',c.oid,'SELECT') anon_select,
-    has_table_privilege('authenticated',c.oid,'SELECT') authenticated_select
+    has_table_privilege('authenticated',c.oid,'SELECT') authenticated_select,
+    has_table_privilege('service_role',c.oid,'SELECT') service_select,
+    md5(pg_get_viewdef(c.oid,true)) view_md5
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  join pg_roles owner on owner.oid=c.relowner
   where n.nspname='public' and c.relkind in ('v','m')`;
 const linkSql = `
   select child.relname child, parent.relname parent, con.convalidated valid,
@@ -195,16 +231,29 @@ export async function auditAdditionalSecurity(client, baseline) {
     const configuredPath = row.settings?.find(setting => setting.startsWith('search_path='))?.slice('search_path='.length);
     const path = configuredPath === '""' ? '' : configuredPath;
     const parts = path === '' ? [] : path?.split(',').map(x => x.trim().replace(/^"|"$/g, '')) ?? [];
-    if (path === undefined || parts.some(x => !['pg_catalog','public','auth','storage','extensions','pg_temp'].includes(x)) ||
+    const unsafePath = path === undefined || parts.some(x => !['pg_catalog','public','auth','storage','extensions','pg_temp'].includes(x)) ||
         (path !== '' && (temporary.rows[0].anon_temp || temporary.rows[0].authenticated_temp) && !parts.includes('pg_temp')) ||
         (parts.includes('pg_temp') && parts.at(-1) !== 'pg_temp') ||
-        parts.some(x => writableSchemas.has(x))) {
-      findings.push(`Unconstrained search_path on SECURITY DEFINER ${signature}`);
+        parts.some(x => writableSchemas.has(x));
+    if (unsafePath) {
+      const reviewed = reviewedPublicPathFunctions.get(signature);
+      const expectedGrants = reviewed?.clientGrants ? reviewed.clientGrants.split(',') : [];
+      const exactReviewedBody = path === 'public' && !writableSchemas.has('public') &&
+        row.owner === 'postgres' && row.settings?.length === 1 &&
+        row.definition_md5 === reviewed?.definitionMd5 &&
+        JSON.stringify(row.client_grants) === JSON.stringify(expectedGrants) &&
+        row.anon_execute === false &&
+        row.authenticated_execute === expectedGrants.includes('authenticated') &&
+        row.service_execute === expectedGrants.includes('service_role');
+      if (!exactReviewedBody) findings.push(`Unconstrained search_path on SECURITY DEFINER ${signature}`);
     }
   }
   for (const row of views.rows) {
+    const reviewedDirectory = row.name === 'operator_directory' && row.owner === 'postgres' &&
+      row.reloptions === null && row.anon_select && row.authenticated_select && row.service_select &&
+      row.view_md5 === '1af5943aea01646e9ae6e8922b661f72';
     if ((row.anon_select || row.authenticated_select) &&
-        !row.reloptions?.includes('security_invoker=true')) {
+        !row.reloptions?.includes('security_invoker=true') && !reviewedDirectory) {
       findings.push(`Client-readable owner-rights view public.${row.name}`);
     }
   }
