@@ -1,6 +1,16 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
 
+const env = {
+  SUPABASE_URL: "https://fixture.invalid",
+  SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key",
+  CUSTOMER_SESSION_SECRET: "fixture-session-secret",
+};
+const customerSessions = sourceExports("supabase/functions/_shared/customer-session.ts", {}, env);
+const chatSessions = sourceExports("supabase/functions/_shared/web-chat-session.ts", {
+  "./customer-session.ts": customerSessions,
+}, env);
 const wa = readFileSync("supabase/functions/wa-webhook/index.ts", "utf8");
 const web = readFileSync("supabase/functions/web-chat/index.ts", "utf8");
 
@@ -64,9 +74,41 @@ describe("guest-removal refund parity (P1)", () => {
 });
 
 // P2: the open web-chat endpoint needs rate limiting.
+// P2: the per-process `rateLimited` helper is gone by design — web-chat now
+// enforces shared global/tenant/signed-visitor limits (full contract in
+// web-chat-limits.test.ts). This asserts the approved behavioral replacement:
+// a denied shared limiter yields 429 with Retry-After, an allowed request passes.
 describe("web-chat rate limiting (P2)", () => {
-  it("throttles per client and returns 429", () => {
-    expect(web).toContain("429");
-    expect(web).toContain("rateLimited");
+  it("throttles a caller and returns 429 with Retry-After when the shared limiter denies", async () => {
+    const result = Promise.resolve({ data: false, error: null });
+    const query: any = {
+      select: () => query, eq: () => query, gt: () => query, order: () => query,
+      limit: async () => ({ data: [], error: null }),
+      maybeSingle: async () => ({ data: null, error: null }),
+    };
+    const db = {
+      rpc: () => Object.assign(result, { abortSignal: () => result }),
+      from: () => query,
+    };
+    const handler = sourceHandler("supabase/functions/web-chat/index.ts", {
+      "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db },
+      "../_shared/sentry.ts": { withSentry: (_name: string, fn: unknown) => fn },
+      "../_shared/duration.ts": {},
+      "../_shared/tenant.ts": { getTenantByBusinessId: async () => ({ business: { id: "a", timezone: "UTC" } }) },
+      "../_shared/bot-guards.ts": {}, "../_shared/intent.ts": {},
+      "../_shared/subscription.ts": { getSubscriptionState: async () => ({ trading: false }) },
+      "../_shared/chat-booking-pricing.ts": {}, "../_shared/platform-invariants.ts": {},
+      "../_shared/llm.ts": { llmText: () => { throw new Error("Unexpected LLM call"); } },
+      "../_shared/kb.ts": {},
+      "../_shared/customer-session.ts": customerSessions,
+      "../_shared/web-chat-session.ts": chatSessions,
+    }, env);
+    const response = await handler(new Request("https://fixture.invalid/web-chat", {
+      method: "POST",
+      headers: { "x-forwarded-for": "192.0.2.44", "content-type": "application/json" },
+      body: JSON.stringify({ business_id: "a", action: "session" }),
+    }));
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
   });
 });
