@@ -99,13 +99,42 @@ The disposable cluster was destroyed after the run.
 
 ## Limitations of this review
 
-- The 20 frozen `definitionMd5` values were captured from a reviewed database; this
+- ~~The 20 frozen `definitionMd5` values were captured from a reviewed database; this
   review verified the freeze mechanism and source-level bodies but could not
-  independently re-derive the hashes (needs the full migrated catalog).
+  independently re-derive the hashes.~~ **Closed 2026-09-25: see MD5 re-derivation below.**
 - No live/hosted database was touched; `npm run check-security-drift` against a deployed
   target was not run (requires DATABASE_URL and is out of scope for this pass).
 - Effective permissions were exercised on PostgreSQL 17.11 locally via the test
   fixtures, not against the deployed Supabase project.
+
+## MD5 re-derivation (2026-09-25, limitation closed)
+
+Every frozen hash was re-derived from migration source in a disposable PostgreSQL 17.11
+catalog (fixture tables + each function's definition extracted from the migration
+folder; `pg_get_functiondef`/`pg_get_viewdef` normalization makes source formatting
+irrelevant): **19/19 function hashes and the `operator_directory` view hash
+(`1af5943a…`) match the frozen values exactly.** The freeze is faithful to source.
+
+Two extraction notes for anyone repeating this:
+
+1. `get_my_admin_onboarding` has four definition sites; the final one is
+   `CREATE FUNCTION` (no OR REPLACE, after a DROP) in `20260712090000_help_chat_hidden_pref.sql`
+   and its return type grew a column (`help_chat_hidden`). Matching the frozen
+   `7415339c…` requires that final variant rendered verbatim (SQL-language bodies
+   render as stored source when created without validation; the capture environment
+   rendered the same way — confirmed because `set_my_help_chat_hidden`, also
+   `LANGUAGE sql`, matches under the same conditions).
+2. `apply_last_minute_deals`: the frozen `77c22eaf…` equals the
+   `20260804134933` definition. The lexically-later
+   `20260804160000_last_minute_deals_follow_config.sql` re-defines it with
+   **comments only** (zero functional delta), so a strict full-folder replay ends
+   with hash `3d4ad428…` and the checker would flag it. One reconciliation needed
+   before the checker runs against the real target: query
+   `md5(pg_get_functiondef(oid))` for `apply_last_minute_deals` on the deployed DB
+   and align the freeze to the deployed state (if `77c22eaf`, the deployed DB never
+   applied the 160000 re-issue and that duplicate-migration question belongs to
+   V06's ledger review; if `3d4ad428`, re-freeze). Comments only either way: no
+   security delta.
 
 ## Reproduction commands
 
