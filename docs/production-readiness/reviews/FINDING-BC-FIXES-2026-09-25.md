@@ -51,9 +51,16 @@ contracts exist in no surviving booking commit). They remain **blocked**, not pa
 
 1. Companion sources (recovery of `86588bcb`/`b93f053b`/`f11b1dd9`/`2de7de49`, or
    deliberate repinning with equivalence evidence) then rerun the 7 unchanged checks.
-2. Supported-runtime run (Node >=22.23.2 per `engines` + `engine-strict`) — runs so
-   far used Node 22.22.1 with the floor overridden for install only.
-3. Deployment prerequisites (unchanged): shared Redis service for the fail-closed
-   proxy limiter (503 when absent), `ADMIN_RECOVERY_ORIGIN`, and the migration set
-   including this one and the C06 forward migration.
+2. ~~Supported-runtime run (Node >=22.23.2 per `engines` + `engine-strict`).~~
+   **Done 2026-09-25:** local Node upgraded 22.22.1 -> **22.23.3** (npm 10.9.9);
+   strict `npm ci` passes with the engine floor enforced and no override; the
+   sweep reproduces exactly **1499 passed / 7 failed / 1 skipped (1507)** on the
+   supported runtime. The 7 are the unchanged companion-source set.
+3. Deployment prerequisites — **verified still missing as of 2026-09-25** (Vercel
+   production env-name inspection, read-only): the 11 names are unchanged and there
+   is **no shared Redis/Upstash setting, no `ADMIN_RECOVERY_ORIGIN`, and no
+   `NEXT_PUBLIC_APP_URL`**. Deploying the corrected proxy as-is fails closed (503)
+   on its gated traffic, and the recovery route has no trusted origin configured.
+   These are owner-side configuration actions, not code defects. The migration set
+   (this one + the unapplied C06 forward migration) is also a deploy prerequisite.
 4. `apply_last_minute_deals` deployed-definition reconciliation (one query).
