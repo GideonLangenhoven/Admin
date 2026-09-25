@@ -9,7 +9,7 @@ describe("mobile-first implementation contract", () => {
   it("keeps exactly four primary admin routes plus the More trigger", () => {
     const shell = source("components/AppShell.tsx");
     const drawer = source("components/MobileMenuDrawer.tsx");
-    expect(shell).toContain('const mobilePrimaryHrefs = ["/", "/simple", "/new-booking", "/inbox"]');
+    expect(shell).toContain('const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"]');
     expect(shell).toContain('<MobileMenuDrawer nav={visibleNav} active={mobileMoreActive} />');
     expect(shell).not.toContain("overflow-x-auto no-scrollbar");
     expect(drawer).toContain("const drawer = open ?");
