@@ -1,0 +1,23 @@
+{
+  "id": "PRICING-NEW-ONLY-01",
+  "status": "READY_AFTER_SCHEMA_WRITER",
+  "user_policy": "New subscriptions only. Preserve existing subscriptions, open billing lines and their referenced commercial terms.",
+  "source_findings": [
+    "20260920090000_enforce_standard_plan_pricing.sql is unapplied in prior linked ledger snapshot; it currently changes shared standard plan and existing subscriptions/line items. Must revalidate target ledger before any deployment.",
+    "platform_complete_business_setup in20260913100000_platform_admin_controls.sql creates missing subscription with hardcoded standard; existing subscription branch is already no-op.",
+    "ck_after_subscription_write trigger inserts new recurring/setup rows using referenced plan prices.",
+    "app/api/billing/subscription reads referenced plan for existing customers; active-plan switcher must not involuntarily reprice old subscriptions.",
+    "app/lib/platform-invoice-preview and platform_change_admin_seats use referenced plan; preserve old values.",
+    "Historical applied July migrations previously repriced all subscriptions; do not modify applied migration history.",
+    "app/super-admin/page.tsx monthlyCostZar hardcodes2000/1/500 for existing business rows; cohort work must trace this display and keep existing-customer commercial summaries truthful. MFA currently owns this page, so all financial changes wait until its freeze/acceptance."
+  ],
+  "acceptance": [
+    "New immutable/versioned pricing cohort for future subscription creation, with every creation path traced.",
+    "No update/delete of existing plans, subscriptions, open/paid billing lines, balances or ownership.",
+    "Migration retry/idempotence does not mutate existing commercial data.",
+    "Actual PostgreSQL snapshots across mixed old plans/statuses/open lines remain equal before/after; new ACTIVE/TRIAL/setup/repair creation paths get approved2000/0/1/500 terms.",
+    "Explicit plan switching remains deliberate and tested; no automatic enrollment of old customers.",
+    "Fresh independent Astra/xhigh review before local acceptance."
+  ],
+  "coordination": "Sol/max implementation after MFA migration/schema writer frozen. No production DB/provider access."
+}

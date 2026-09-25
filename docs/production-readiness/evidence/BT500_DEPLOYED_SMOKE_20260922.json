@@ -1,0 +1,116 @@
+{
+  "evidence_id": "BT500-DEPLOYED-SMOKE-20260922",
+  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "verdict": "FAIL_ABORTED_FOR_SAFETY",
+  "qualification_credit": false,
+  "approval": {
+    "reference": "user-session-2026-09-21-exact-rollout-approval",
+    "approved_at_utc": "2026-09-21T18:38:09Z",
+    "cost_ceiling_zar": 0,
+    "live_messages": false,
+    "live_payments_or_refunds": false
+  },
+  "target": {
+    "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
+    "admin_candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "admin_deployment_id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
+    "admin_deployment_url": "https://caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+    "load_alias": "https://caepweb-admin.vercel.app",
+    "alias_verified_same_deployment": true,
+    "generator": "operator workstation, Africa/Johannesburg"
+  },
+  "preflight": {
+    "direct_deployment_protection_status": 401,
+    "direct_deployment_protection_result": "The immutable deployment URL was Vercel-auth protected, so the first setup guard stopped before load.",
+    "public_alias_foreign_read_rows": 0,
+    "public_alias_foreign_write_status": 404,
+    "public_alias_foreign_write_code": "NOT_FOUND",
+    "auth_rate_limit_verify_restored": 30,
+    "marker": "bt500-20260921",
+    "businesses": 167,
+    "users": 500,
+    "slots": 668,
+    "bookings": 5010,
+    "credentials_mode": "0600"
+  },
+  "workload": {
+    "source": "tests/stress/bt500-mixed.k6.js",
+    "mode": "smoke",
+    "run_id": "deploysmoke-20260922b",
+    "mix": "70% reads, 20% legitimate arrival writes, 10% session/report/inbox",
+    "stages": [
+      {"duration": "30s", "target_vus": 100},
+      {"duration": "30s", "target_vus": 250},
+      {"duration": "30s", "target_vus": 500},
+      {"duration": "2m", "target_vus": 500},
+      {"duration": "1m", "target_vus": 500, "label": "spike"},
+      {"duration": "1m", "target_vus": 500, "label": "recovery"},
+      {"duration": "1m", "target_vus": 500, "label": "soak"},
+      {"duration": "30s", "target_vus": 0}
+    ],
+    "reached_vus": 500,
+    "actual_elapsed_seconds_approx": 144,
+    "stopped_early": true,
+    "stop_reason": "Widespread dial-stage I/O timeouts made the smoke a decisive threshold failure; the operator interrupted it to limit impact."
+  },
+  "results": {
+    "offered_actions": 2153,
+    "completed_actions": 1103,
+    "iterations": 1653,
+    "http_requests": 5933,
+    "unexpected_failure_rate": 0.3519388954171563,
+    "journey_failure_rate": 0.2973621103117506,
+    "http_failure_rate": 0.3082757458284173,
+    "read_action_p95_ms": 30004,
+    "write_action_p95_ms": 61486.5,
+    "http_request_p95_ms": 10797.4226,
+    "dropped_iterations": 0,
+    "k6_invariant_violations": 0,
+    "thresholds_passed": false,
+    "failure_mode": "dial: i/o timeout across Supabase REST/Auth and Vercel check-in origins",
+    "attribution": "unresolved; target capacity and local generator/egress saturation have not been separated"
+  },
+  "post_run": {
+    "database_invariants": {
+      "slot_capacity": 0,
+      "refund_capture": 0,
+      "duplicate_idempotency": 0,
+      "expired_holds": 0,
+      "held_mismatch": 0,
+      "marker_tenant": 0,
+      "marker_arrival_audit": 0,
+      "marker_paid_without_provider_id": 0,
+      "preexisting_non_marker_paid_without_provider_id": 12
+    },
+    "scheduled_http_timeouts_during_window": 1,
+    "next_minute_scheduled_requests_succeeded": true,
+    "browser_recovery_smoke": "4/4 pass",
+    "teardown": {
+      "auth_users_deleted": 500,
+      "businesses_deleted": 167,
+      "credentials_deleted": true
+    },
+    "baseline_counts_restored": {
+      "businesses": 2,
+      "admin_users": 2,
+      "tours": 5,
+      "bookings": 50,
+      "slots": 34,
+      "customers": 50,
+      "wa_messages": 0
+    }
+  },
+  "private_raw_artifacts": [
+    {
+      "path": "/private/tmp/bookingtours-simple-view-evidence-1812677/deployed-smoke-20260922/k6-summary.json",
+      "sha256": "01cb3a47730a91a256f6f57945944aa58a3dcf2c53643e89dcf27e8672c5cbdd",
+      "description": "Protected immutable-URL setup-guard failure; no VU phase ran."
+    },
+    {
+      "path": "/private/tmp/bookingtours-simple-view-evidence-1812677/deployed-smoke-20260922/k6-summary-b.json",
+      "sha256": "caf4c3bd06578271a2e6845b39dc91866060f77e3057d2f6772b5f95a2ec30bd",
+      "description": "Public same-deployment alias run, interrupted after decisive failure."
+    }
+  ],
+  "remaining_gate": "Repeat progressively from an instrumented independent generator, capture generator and remote resource saturation, resolve the timeout source, and pass the unchanged thresholds before steady/spike/recovery/soak qualification."
+}

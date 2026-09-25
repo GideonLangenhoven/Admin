@@ -1,0 +1,105 @@
+{
+  "profile_id": "BT-HANDOFF-6-7-8-9-2026-09-21",
+  "recorded_at_utc": "2026-09-22T09:15:55Z",
+  "handoff_validation": "PASS",
+  "verdict": "FAILED_GATE",
+  "candidate": {
+    "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "admin_tree": "6f4e3403ba6fab20767521529152a972907e1b81",
+    "booking_commit": "2ff1d82",
+    "deployable_candidate_accepted": true,
+    "reason": "The exact reviewed candidates and controlled five-migration package are deployed; release qualification failed at the bounded 500-VU smoke."
+  },
+  "routing": {
+    "requested": "Astra/xhigh orchestration and review; Sol/max implementation",
+    "attestation": "Historical local turn metadata only."
+  },
+  "accepted_fixes": [
+    "SIMPLE-DAY-01",
+    "GUIDE-OFFLINE-01",
+    "AUTH-LOGIN-RATE-01",
+    "REFUND-AUTHORITY-01",
+    "REFUND-UI-OUTCOMES-01",
+    "MFA-SENSITIVE-ACTIONS-01",
+    "PRICING-NEW-ONLY-01",
+    "ARRIVAL-01",
+    "SEC-DEV-DEPENDENCIES-01",
+    "BOOKING-PRESERVED-MOBILE-01",
+    "AUTH-AUTHORITATIVE-01",
+    "NOTIFY-01",
+    "PERF-BT500-RUNNER"
+  ],
+  "test_results": {
+    "unit": "1355 pass, 0 fail, 1 skip",
+    "typescript": "pass",
+    "edge": "pass",
+    "database": "181 checks pass",
+    "browser": "4/4 pass",
+    "builds": "pass",
+    "npm_audit": "0 vulnerabilities",
+    "independent_auth_review": "ACCEPTED_7d3e7b3",
+    "independent_notification_and_runner_review": "ACCEPTED_71da036",
+    "deployed_browser_smoke": "PASS_4_OF_4_BEFORE_AND_AFTER_LOAD",
+    "deployed_bt500_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
+    "post_abort_integrity": "PASS",
+    "capacity_attribution": "TARGET_SIDE_QUEUEING_CONFIRMED_WITH_GENERATOR_CONTRIBUTION_NOT_EXCLUDED",
+    "local_capacity_correction": "188 database checks, TypeScript, focused tests and Admin production build pass; not reviewed, approved or deployed"
+  },
+  "section6": {
+    "coverage_map": "PASS",
+    "local_continuity": "PASS_100_OF_100",
+    "release_gate": "FAIL_EXTERNAL_GATES",
+    "evidence": "../SECTION6_COVERAGE.json"
+  },
+  "section7": {
+    "contract": "PASS",
+    "executed": false,
+    "read_smoke": "PASS_500_AUTHENTICATED_USERS",
+    "deployed_staff_smoke": "FAIL_ABORTED_FOR_SAFETY_AT_500_VUS",
+    "remaining": "exact corrective-candidate review/deploy and passing unchanged-threshold rerun, provider-double/public/background harness, Realtime measurement, steady target, spike, recovery and soak",
+    "evidence": "../BT500_EXECUTION.json",
+    "mixed_staff_runner": "OFFLINE_INSPECTION_PASS"
+  },
+  "section8": {
+    "packet": "DEPLOYED_SMOKE_FAILED_RECOVERY_CONFIRMED",
+    "executed": true,
+    "evidence": "../SECTION8_EXECUTION.json"
+  },
+  "existing_customer_continuity": {
+    "required_accounts": 100,
+    "completed_accounts": 100,
+    "status": "LOCAL_SYNTHETIC_PASSED"
+  },
+  "migration_provider_restore": {
+    "pricing_new_subscriptions_only": "LOCAL_DB_PASSED",
+    "arrival_audit": "LOCAL_DB_PASSED",
+    "mfa_migration": "LOCAL_DB_PASSED",
+    "genuine_provider_journeys": "NOT_RUN",
+    "restore_rehearsal": "NOT_RUN",
+    "exact_five_migration_dry_run": "PASS",
+    "exact_five_migration_apply": "PASS"
+  },
+  "deployment_canary": {
+    "deployed": true,
+    "canary_hours": 0,
+    "status": "NOT_STARTED_AFTER_FAILED_BOUNDED_SMOKE",
+    "evidence": "BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "residual_risks": [
+    "The 500-VU deployed smoke failed with confirmed target-side queueing. The local capacity correction is undeployed and generator contribution to cross-origin dial failures remains possible.",
+    "Complete deployed role/provider evidence, provider-double public/background traffic, Realtime and mixed-load qualification are absent.",
+    "Representative-volume data, quota headroom, alert delivery, security-baseline reconciliation and isolated restore remain unproven."
+  ],
+  "approvals": {
+    "production_mutation": true,
+    "deployment_or_push": true,
+    "provider_transactions": false,
+    "full_qualification_execution": true
+  },
+  "scope_override": {
+    "source": "User instruction: Section 9 may pass without having tested Section 7.",
+    "section9_may_complete_without_section7": true,
+    "does_not_waive_qualification": true,
+    "meaning": "Handoff completeness passes while the release verdict remains FAILED_GATE."
+  }
+}

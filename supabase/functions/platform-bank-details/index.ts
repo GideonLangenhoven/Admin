@@ -55,8 +55,10 @@ Deno.serve(withSentry("platform-bank-details", async (req) => {
   }
 
   if (action === "set") {
-    const { account_owner, account_number, account_type, bank_name, branch_code } = body;
-    const { error: setErr } = await db.rpc("set_platform_bank_details", {
+    const { actor_id, account_owner, account_number, account_type, bank_name, branch_code } = body;
+    if (!actor_id) return fail("Actor required", 400);
+    const { error: setErr } = await db.rpc("set_platform_bank_details_audited", {
+      p_actor_id: actor_id,
       p_key: SETTINGS_ENCRYPTION_KEY,
       p_account_owner: account_owner ?? null,
       p_account_number: account_number ?? null,

@@ -14,6 +14,8 @@ import { notify } from "../lib/app-notify";
 type OutboxRow = {
   id: string;
   phone: string;
+  destination?: string;
+  channel?: "WHATSAPP" | "EMAIL";
   message_type: string;
   message_body: string | null;
   status: string;
@@ -58,7 +60,9 @@ export default function NotificationsPage() {
     const data = await r.json();
     setRetrying(null);
     if (r.ok) {
-      if (data.outcome === "queued_window_closed") {
+      if (data.outcome === "queued") {
+        notify({ title: "Queued", message: "The email is queued for the next notification worker run.", tone: "success" });
+      } else if (data.outcome === "queued_window_closed") {
         notify({ title: "Queued", message: "WhatsApp window is closed — it will send when the customer next messages you.", tone: "success" });
       } else {
         notify({ title: "Sent", message: "Delivered via your WhatsApp number.", tone: "success" });
@@ -90,8 +94,8 @@ export default function NotificationsPage() {
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-        WhatsApp messages in the outbox queue. Failed rows have exhausted their 2-attempt retry budget;
-        Retry sends immediately from your WhatsApp number (or queues until the customer next replies if the 24h window is closed).
+        WhatsApp outbox messages and transactional email jobs. Failed rows exhausted their automatic retry budget.
+        Retry sends WhatsApp immediately and queues email for the next worker run.
       </p>
 
       <div className="ui-seg anim-fade-up anim-d1">
@@ -128,13 +132,14 @@ export default function NotificationsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.phone}</span>
+                    <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.destination || r.phone}</span>
+                    <span className="ui-pill ui-pill-neutral">{r.channel || "WHATSAPP"}</span>
                     <span className="ui-pill ui-pill-neutral">{r.message_type}</span>
                     <span className={`ui-status ${
                       r.status === "FAILED" ? "ui-pill-danger"
-                        : r.status === "EXPIRED" ? "ui-pill-warning"
-                        : r.status === "WAITING_WINDOW" ? "ui-pill-ocean"
-                        : r.status === "SENT" ? "ui-pill-success"
+                        : r.status === "EXPIRED" || r.status === "CANCELLED" ? "ui-pill-warning"
+                        : r.status === "WAITING_WINDOW" || r.status === "QUEUED" || r.status === "PROCESSING" ? "ui-pill-ocean"
+                        : r.status === "SENT" || r.status === "ACCEPTED" ? "ui-pill-success"
                         : "ui-pill-neutral"
                     }`}>{r.status}</span>
                     <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>

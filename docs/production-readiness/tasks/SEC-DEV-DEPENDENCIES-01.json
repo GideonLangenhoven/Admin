@@ -1,0 +1,31 @@
+{
+  "id": "SEC-DEV-DEPENDENCIES-01",
+  "status": "READY_AFTER_WRITER_SLOT",
+  "scope": "Narrow isolated Vitest/Vite dependency remediation; keep integration runtime and active writers untouched until reviewed.",
+  "sources": [
+    "https://github.com/vitest-dev/vitest/security/advisories/GHSA-5xrq-8626-4rwp",
+    "https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9",
+    "https://vitest.dev/guide/migration/"
+  ],
+  "findings": [
+    "Installed Vitest2.1.9 is flagged critical by current audit. CI unit command is vitest run, watch script vitest; checked config uses node environment and no explicit API/UI network exposure. Do not conflate audit presence with proven deployed exploit.",
+    "Maintainer mocker advisory fixes4.1.11 and5; older2/3 majors do not receive patch. Evaluate maintained4.x compatibility before unnecessary5.x migration.",
+    "Maintainer UI advisory describes network-exposed UI or Windows UI/Browser conditions. Current audit floor differs from advisory displayed patched3.2.5; target should satisfy complete current dependency closure, not one advisory.",
+    "Full baseline with dependency patch and booking460 snapshot is1112pass6fail1skip; preserve assertions and classify changes separately from these known failures."
+  ],
+  "acceptance": [
+    "Isolated worktree with no real provider credentials. Record before/after lock closure and primary-source advisory triage.",
+    "No uncoordinated package install in integration while agents run tests.",
+    "Actual full unit runner comparison on identical source/booking fixture plus TS/lint and necessary build validation.",
+    "No weakened tests, forced audit-fix or speculative major upgrades.",
+    "Fresh Astra/xhigh review of frozen hashes before cherry-pick."
+  ],
+  "registry_verification": {
+    "version": "4.1.11",
+    "latest_in_major_4": true,
+    "engines": "^20.0.0 || ^22.0.0 || >=24.0.0",
+    "vite_dependency": "^6.0.0 || ^7.0.0 || ^8.0.0",
+    "command": "npm view vitest@4.1.11 engines dependencies peerDependencies --json; npm view vitest@4 version --json",
+    "observed_date": "2026-09-21"
+  }
+}

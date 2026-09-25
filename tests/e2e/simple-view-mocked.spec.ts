@@ -146,7 +146,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200, extraHeade
 
 async function installMockBackend(page: Page, state: "populated" | "empty" | "error" = "populated", staffName: string | null = "Taylor Operator") {
   const session = fakeSession();
-  const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ukdsrndqhsatjkmxijuj.supabase.co").hostname.split(".")[0];
+  const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fixture.supabase.co").hostname.split(".")[0];
 
   await page.context().addCookies([
     { name: "ck_session_hint", value: "1", url: "http://127.0.0.1:3000" },

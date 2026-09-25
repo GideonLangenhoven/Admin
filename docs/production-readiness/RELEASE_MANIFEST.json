@@ -1,0 +1,96 @@
+{
+  "recorded_at_utc": "2026-09-22T09:15:55Z",
+  "verdict": "FAILED_GATE",
+  "admin_candidate": {
+    "repository": "capekayak",
+    "branch": "codex/bookingtours-simple-view-readiness-2026-09-20",
+    "commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "tree": "6f4e3403ba6fab20767521529152a972907e1b81",
+    "worktree": "/private/tmp/bookingtours-simple-view-1812677",
+    "package_lock_sha256": "932b03d227b35f42c604bd5ee4b0c9ada30a1805f9bc9e3962b206d656723534"
+  },
+  "booking_candidate": {
+    "repository": "capekayak-booking",
+    "branch": "codex/bookingtours-mobile-readiness-2026-09-21",
+    "commit": "2ff1d82",
+    "base": "460e58d952ad570c9036bc13118eec66a2591918",
+    "worktree": "/private/tmp/bookingtours-booking-mobile-460e58d"
+  },
+  "validation": {
+    "unit": "1355 pass, 1 skip",
+    "typescript": "pass",
+    "edge": "pass",
+    "database": "181 checks pass",
+    "simple_view_browser": "4/4 pass",
+    "admin_build": "pass, 91 routes",
+    "booking_build": "pass",
+    "booking_check_ways": "pass",
+    "npm_audit": "0 vulnerabilities",
+    "independent_auth_review": "fresh-context Astra/xhigh accepted 7d3e7b3 after 49 focused tests and installed-SDK session isolation probe",
+    "controlled_migration_dry_run": "exactly five pending migrations",
+    "independent_notification_and_bt500_review": "fresh-context Astra/xhigh accepted the frozen notification and mixed-staff runner source after 29 notification tests, 6 runner tests, offline action-timing probes and diff review",
+    "deployed_browser_smoke": "4/4 pass before and after the bounded load",
+    "deployed_bt500_staff_smoke": "fail at 500 VUs; aborted after widespread dial-stage I/O timeouts",
+    "post_abort_integrity": "pass; zero marker invariant violations and exact baseline restored"
+  },
+  "database_changes": [
+    "20260920090000_enforce_standard_plan_pricing.sql",
+    "20260920100000_partial_booking_arrivals.sql",
+    "20260921120000_mfa_sensitive_business_columns.sql",
+    "20260921130000_authoritative_auth_passwords.sql",
+    "20260921140000_durable_notification_jobs.sql"
+  ],
+  "production_equivalence_verified": true,
+  "observed_hosted_state": {
+    "admin_commit": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "admin_deployment": "caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+    "admin_deployment_id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
+    "admin_function_region": "iad1",
+    "booking_commit": "2ff1d82",
+    "booking_deployment": "booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
+    "booking_deployment_id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
+    "booking_function_region": "cdg1",
+    "supabase_project": "ukdsrndqhsatjkmxijuj",
+    "supabase_region": "eu-west-3",
+    "matches_candidate": true
+  },
+  "release_actions": {
+    "pushed": false,
+    "deployed": true,
+    "migration_applied": true,
+    "provider_called": false,
+    "production_mutated": true,
+    "restore_run": false,
+    "canary_started": false
+  },
+  "deployed_smoke": {
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "reached_vus": 500,
+    "qualification_clock_started": false,
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "local_capacity_remediation": {
+    "status": "UNDEPLOYED_AWAITING_EXACT_REVIEW_AND_APPROVAL",
+    "source_commit": "4561c2014bc7f3fef053df93be9baac1d5aa1d15",
+    "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
+    "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
+    "changes": "Collapse the Admin dashboard read fan-out into one tenant-scoped snapshot RPC, add five supporting indexes, coalesce Realtime bursts, and align the BT500 read journey.",
+    "validation": "188 disposable PostgreSQL checks, TypeScript, focused unit/contract tests and the 91-route Admin production build pass.",
+    "qualification_credit": false,
+    "evidence": "docs/production-readiness/evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json"
+  },
+  "active_sections": [
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "migration_sha256": {
+    "20260920090000_enforce_standard_plan_pricing.sql": "bff91f5b1a4fbaaa99c13db46c3d99e96f7dbe90c24252d1c4a7d7517d35bf7a",
+    "20260920100000_partial_booking_arrivals.sql": "b81fc4cb61061254d39a5448e4fedf889883c50d63665c7108f5be37bf21bee4",
+    "20260921120000_mfa_sensitive_business_columns.sql": "a7b45da389209e76d8a9b187946922474a2fe3d7ebc38dae26a5cf6caccc1691",
+    "20260921130000_authoritative_auth_passwords.sql": "434d0cb347ca8844c88a9c1a7cee5958b4436d0504378ccf81799df8bfbf7eb0",
+    "20260921140000_durable_notification_jobs.sql": "5c5f09b00c554c1c2135aa811d9fe9bcc0bacc5fed4993259ca029418bbf6827"
+  }
+}

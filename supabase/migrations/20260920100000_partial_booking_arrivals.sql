@@ -62,10 +62,28 @@ CREATE POLICY check_ins_admin ON public.slot_check_ins FOR ALL TO authenticated
 DROP POLICY IF EXISTS check_ins_service ON public.slot_check_ins;
 CREATE POLICY check_ins_service ON public.slot_check_ins FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-REVOKE ALL ON public.slot_check_ins FROM anon;
-REVOKE INSERT, UPDATE, DELETE ON public.slot_check_ins FROM authenticated;
+REVOKE ALL ON public.slot_check_ins FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.slot_check_ins TO authenticated;
 GRANT ALL ON public.slot_check_ins TO service_role;
+
+-- Remove both table and column grants inherited through any role that can act
+-- as an API principal. This also closes grants left by an older deployment.
+DO $$
+DECLARE inherited_role name;
+BEGIN
+  FOR inherited_role IN
+    SELECT rolname FROM pg_roles
+    WHERE rolname NOT IN ('postgres', 'service_role')
+      AND (
+        rolname IN ('anon', 'authenticated')
+        OR pg_has_role('anon', oid, 'MEMBER')
+        OR pg_has_role('authenticated', oid, 'MEMBER')
+      )
+  LOOP
+    EXECUTE format('REVOKE ALL ON TABLE public.slot_check_ins FROM %I', inherited_role);
+  END LOOP;
+END $$;
+GRANT SELECT ON public.slot_check_ins TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.sync_booking_arrival_state()
 RETURNS trigger
@@ -78,6 +96,11 @@ DECLARE
   old_count integer := 0;
 BEGIN
   IF TG_OP = 'INSERT' THEN
+    IF current_user = 'authenticated'
+        AND (COALESCE(NEW.arrived_count, 0) <> 0 OR COALESCE(NEW.checked_in, false)) THEN
+      RAISE EXCEPTION 'Create the booking before recording arrivals'
+        USING ERRCODE = '42501';
+    END IF;
     NEW.arrived_count := CASE
       WHEN COALESCE(NEW.checked_in, false) THEN NEW.qty
       ELSE COALESCE(NEW.arrived_count, 0)
@@ -163,8 +186,7 @@ DECLARE
   actor_id uuid;
   event_source text;
 BEGIN
-  IF NEW.arrived_count IS NOT DISTINCT FROM OLD.arrived_count
-      OR COALESCE(current_setting('bookingtours.arrival_rpc', true), '') = '1' THEN
+  IF NEW.arrived_count IS NOT DISTINCT FROM OLD.arrived_count THEN
     RETURN NEW;
   END IF;
 
@@ -223,6 +245,7 @@ DECLARE
   target_count integer;
   previous_count integer;
   existing_event public.slot_check_ins%ROWTYPE;
+  claimed_events integer;
 BEGIN
   SELECT * INTO b
   FROM public.bookings
@@ -295,23 +318,44 @@ BEGIN
     );
   END IF;
 
-  PERFORM set_config('bookingtours.arrival_rpc', '1', true);
   UPDATE public.bookings
   SET arrived_count = target_count
   WHERE id = b.id
   RETURNING * INTO b;
-  PERFORM set_config('bookingtours.arrival_rpc', '0', true);
 
-  INSERT INTO public.slot_check_ins (
-    business_id, booking_id, slot_id, actor_admin_id, checked_in_at,
-    client_event_id, source, notes, arrived_count_before, arrived_count_after
-  ) VALUES (
-    b.business_id, b.id, b.slot_id, p_actor_admin_id, now(),
-    NULLIF(left(COALESCE(p_client_event_id, ''), 160), ''),
-    left(COALESCE(NULLIF(p_source, ''), 'admin'), 80),
-    NULLIF(left(COALESCE(p_notes, ''), 500), ''),
-    previous_count, target_count
-  );
+  IF target_count IS DISTINCT FROM previous_count THEN
+    -- The trigger wrote the immutable audit row in this transaction. The
+    -- booking row lock serializes writers, so the exact before/after pair is
+    -- unambiguous and can be enriched with the RPC's actor and replay id.
+    UPDATE public.slot_check_ins SET
+      actor_admin_id = p_actor_admin_id,
+      client_event_id = NULLIF(left(COALESCE(p_client_event_id, ''), 160), ''),
+      source = left(COALESCE(NULLIF(p_source, ''), 'admin'), 80),
+      notes = NULLIF(left(COALESCE(p_notes, ''), 500), '')
+    WHERE id = (
+      SELECT id FROM public.slot_check_ins
+      WHERE booking_id = b.id
+        AND arrived_count_before = previous_count
+        AND arrived_count_after = target_count
+        AND client_event_id IS NULL
+      ORDER BY checked_in_at DESC, id DESC
+      LIMIT 1
+      FOR UPDATE
+    );
+    GET DIAGNOSTICS claimed_events = ROW_COUNT;
+    IF claimed_events <> 1 THEN RAISE EXCEPTION 'Arrival audit could not be attributed'; END IF;
+  ELSE
+    INSERT INTO public.slot_check_ins (
+      business_id, booking_id, slot_id, actor_admin_id, checked_in_at,
+      client_event_id, source, notes, arrived_count_before, arrived_count_after
+    ) VALUES (
+      b.business_id, b.id, b.slot_id, p_actor_admin_id, now(),
+      NULLIF(left(COALESCE(p_client_event_id, ''), 160), ''),
+      left(COALESCE(NULLIF(p_source, ''), 'admin'), 80),
+      NULLIF(left(COALESCE(p_notes, ''), 500), ''),
+      previous_count, target_count
+    );
+  END IF;
 
   RETURN jsonb_build_object(
     'ok', true, 'replay', false,

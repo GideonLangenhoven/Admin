@@ -64,6 +64,16 @@ create table public.booking_add_ons (
   created_at timestamp with time zone default now() not null
 );
 
+create table public.conversations (
+  id uuid default gen_random_uuid() not null,
+  business_id uuid not null,
+  phone text not null,
+  status text default 'BOT'::text not null,
+  customer_name text,
+  last_activity_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null
+);
+
 create table public.bookings (
   id uuid default gen_random_uuid() not null,
   business_id uuid not null,
@@ -547,6 +557,14 @@ create table public.tours (
   last_minute_end_hours integer
 );
 
+create table public.trip_photos (
+  id uuid default gen_random_uuid() not null,
+  business_id uuid,
+  slot_id uuid,
+  uploaded_at timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
 create table public.usage_counters (
   business_id uuid not null,
   period_key date not null,
@@ -590,6 +608,7 @@ alter table public.add_ons add constraint "add_ons_pkey" PRIMARY KEY (id);
 alter table public.admin_users add constraint "admin_users_email_key" UNIQUE (email);
 alter table public.admin_users add constraint "admin_users_pkey" PRIMARY KEY (id);
 alter table public.booking_add_ons add constraint "booking_add_ons_pkey" PRIMARY KEY (id);
+alter table public.conversations add constraint "conversations_pkey" PRIMARY KEY (id);
 alter table public.bookings add constraint "bookings_payfast_m_payment_id_key" UNIQUE (payfast_m_payment_id);
 alter table public.bookings add constraint "bookings_pkey" PRIMARY KEY (id);
 alter table public.bookings add constraint "bookings_refund_ceiling" CHECK (((total_captured IS NULL) OR (COALESCE(total_refunded, (0)::numeric) <= total_captured)));
@@ -639,6 +658,7 @@ alter table public.slots add constraint "slots_business_id_tour_id_start_time_ke
 alter table public.slots add constraint "slots_pkey" PRIMARY KEY (id);
 alter table public.tours add constraint "tours_last_minute_window_chk" CHECK (((last_minute_end_hours IS NULL) OR ((last_minute_hours IS NOT NULL) AND (last_minute_end_hours >= 0) AND (last_minute_end_hours < last_minute_hours))));
 alter table public.tours add constraint "tours_pkey" PRIMARY KEY (id);
+alter table public.trip_photos add constraint "trip_photos_pkey" PRIMARY KEY (id);
 alter table public.usage_counters add constraint "usage_counters_pkey" PRIMARY KEY (business_id, period_key);
 alter table public.vouchers add constraint "vouchers_code_key" UNIQUE (code);
 alter table public.vouchers add constraint "vouchers_pkey" PRIMARY KEY (id);

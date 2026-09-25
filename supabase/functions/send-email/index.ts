@@ -13,6 +13,9 @@ import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-ht
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+// Leave the outer cron worker one second to receive and persist Resend's
+// timeout result before its own send-email deadline expires.
+const RESEND_TIMEOUT_MS = 7_000;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
@@ -59,7 +62,7 @@ function isValidEmail(email: string): boolean {
 // See: https://resend.com/docs/dashboard/webhooks/introduction
 // This lets you mark bad emails in the database and stop future sends to them.
 
-async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
+async function sendResend(to: string, fromEmail: string, subject: string, html: string, bcc?: string, attachments?: Array<{ filename: string; content: string }>, replyTo?: string, unsubscribeUrl?: string, idempotencyKey?: string): Promise<{ ok: boolean; id?: string; status?: number; error?: string; message?: string }> {
   // Validate email format before attempting to send
   if (!to || !isValidEmail(to)) {
     console.warn("RESEND_SKIP invalid email format: to=" + to + " subject=" + subject);
@@ -87,11 +90,22 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
   }
   let res: Response;
   try {
-    res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const requestHeaders: Record<string, string> = { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" };
+    if (idempotencyKey) requestHeaders["Idempotency-Key"] = idempotencyKey;
+    const resendSignal = AbortSignal.timeout(RESEND_TIMEOUT_MS);
+    res = await Promise.race([
+      fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(payload),
+        signal: resendSignal,
+      }),
+      new Promise<Response>((_resolve, reject) => {
+        const rejectOnAbort = () => reject(resendSignal.reason || new Error("Resend request timed out"));
+        if (resendSignal.aborted) rejectOnAbort();
+        else resendSignal.addEventListener("abort", rejectOnAbort, { once: true });
+      }),
+    ]);
   } catch (netErr) {
     console.error("RESEND_NETWORK_ERR to=" + to + ":", netErr);
     return { ok: false, error: "network_error", message: String(netErr) };
@@ -112,8 +126,20 @@ async function sendResend(to: string, fromEmail: string, subject: string, html: 
       message: (data as any)?.message || ("HTTP " + res.status),
     };
   }
-  console.log("RESEND_OK id=" + (data as any)?.id + " to=" + to + " subject=" + subject);
-  return { ok: true, id: (data as any)?.id };
+  const providerId = typeof (data as any)?.id === "string" ? (data as any).id.trim() : "";
+  if (!providerId) {
+    // A 2xx without Resend's durable message ID cannot prove acceptance. Keep
+    // the stable idempotency key retry path open instead of reporting success.
+    console.error("RESEND_INVALID_RESPONSE status=" + res.status + " to=" + to + " subject=" + subject);
+    return {
+      ok: false,
+      status: 502,
+      error: "invalid_provider_response",
+      message: "Email provider returned success without a message ID",
+    };
+  }
+  console.log("RESEND_OK id=" + providerId + " to=" + to + " subject=" + subject);
+  return { ok: true, id: providerId };
 }
 
 // Default email images — empty means no image shown unless business uploads one via Settings
@@ -2540,6 +2566,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     // present we verify the standard-webhooks signature and convert to the
     // internal { type, data } shape that the switch below already knows.
     const isAuthHook = parsedBody && typeof parsedBody === "object" && (parsedBody as Record<string, unknown>).user && (parsedBody as Record<string, unknown>).email_data && !(parsedBody as Record<string, unknown>).type;
+    let serviceCaller = false;
     if (isAuthHook) {
       if (!SEND_EMAIL_HOOK_SECRET) {
         console.error("SEND_EMAIL_AUTH_HOOK: SEND_EMAIL_HOOK_SECRET not configured — rejecting to avoid arbitrary magic-link sends");
@@ -2592,6 +2619,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       let auth;
       try { auth = await requireAuth(req); }
       catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: getCors(req) }); }
+      serviceCaller = auth.isServiceRole;
       if (!auth.isServiceRole) {
         // Identity, privacy and platform billing messages are issued only by
         // their verified server workflows, never as arbitrary admin payloads.
@@ -2610,6 +2638,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         d.business_id = businessId;
       }
     }
+    const deliveryIdempotencyKey = serviceCaller && typeof d.delivery_idempotency_key === "string"
+      ? String(d.delivery_idempotency_key).slice(0, 256)
+      : undefined;
+    delete d.delivery_idempotency_key;
 
     // Escape user-controlled fields to prevent HTML injection in email templates
     const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email", "business_name", "plan_name"];
@@ -2910,7 +2942,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     const unsubForHeader = isMarketingClass && typeof d.unsubscribe_url === "string" && d.unsubscribe_url
       ? String(d.unsubscribe_url)
       : undefined;
-    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail, unsubForHeader);
+    const result = await sendResend(d.email as string, branding.fromEmail, branded.subject, branded.html, bcc, attachments, branding.replyToEmail, unsubForHeader, deliveryIdempotencyKey);
     if (!result.ok) {
       // Surface the upstream failure to the caller as a non-2xx so that
       // supabase.functions.invoke sets `.error` and callers can't mistake a

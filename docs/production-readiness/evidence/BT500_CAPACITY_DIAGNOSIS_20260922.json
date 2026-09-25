@@ -1,0 +1,102 @@
+{
+  "recorded_at_utc": "2026-09-22T09:15:55Z",
+  "status": "TARGET_QUEUEING_CONFIRMED_LOCAL_REMEDIATION_NOT_DEPLOYED",
+  "supersedes_attribution_only": "BT500_DEPLOYED_SMOKE_20260922.json",
+  "deployed_candidate_diagnosed": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "load_window_utc": {
+    "from": "2026-09-22T06:20:00Z",
+    "to": "2026-09-22T06:24:00Z"
+  },
+  "observations": {
+    "supabase_edge_requests": 8701,
+    "supabase_status_failures_in_aggregate": 0,
+    "direct_load_origin_timing_by_minute": [
+      {
+        "minute": "06:20",
+        "requests": 847,
+        "average_ms": 182.8,
+        "p95_ms": 221,
+        "max_ms": 525
+      },
+      {
+        "minute": "06:21",
+        "requests": 2391,
+        "average_ms": 2350.6,
+        "p95_ms": 11975,
+        "max_ms": 14189
+      },
+      {
+        "minute": "06:22",
+        "requests": 738,
+        "average_ms": 167.6,
+        "p95_ms": 179,
+        "max_ms": 208
+      }
+    ],
+    "slowest_path_p95_ms": {
+      "admin_users": 11406,
+      "slots": 11393,
+      "bookings": 9327,
+      "auth_user": 2229,
+      "businesses": 1975,
+      "record_booking_arrival": 1947
+    },
+    "database": {
+      "plan": "Pro",
+      "compute_addons": [],
+      "inferred_compute": "Micro base compute",
+      "max_connections": 60,
+      "shared_buffers_mb": 224,
+      "work_mem_kb": 2184,
+      "effective_cache_size_mb": 384,
+      "statement_finding": "The public read statements showed no comparable multi-second execution hotspot. The delay accumulated at or ahead of API/database admission rather than in one slow table scan."
+    },
+    "generator": {
+      "open_file_limit": 1048575,
+      "dropped_iterations": 0,
+      "remaining_uncertainty": "Local networking may have contributed to the cross-origin dial failures, but cannot explain Supabase's recorded approximately 12-second origin p95."
+    },
+    "scheduled_work": {
+      "cron_enqueue_max_seconds_in_window": 0.181,
+      "all_cron_enqueue_statuses": "succeeded",
+      "finding": "Scheduled database enqueue work was not the primary bottleneck. One downstream scheduled HTTP request still timed out during the load and recovered afterward."
+    }
+  },
+  "conclusion": "The deployed failure includes target-side queueing/saturation on base Micro compute. The dashboard and the original mixed runner multiplied each read action into parallel PostgREST requests; the live dashboard was heavier still. Generator contribution is not fully excluded, so an independent instrumented rerun remains required.",
+  "local_remediation": {
+    "deployed": false,
+    "source_commit": "4561c2014bc7f3fef053df93be9baac1d5aa1d15",
+    "migration": "supabase/migrations/20260922110000_operator_dashboard_snapshot.sql",
+    "migration_sha256": "b2c17b125be9d94bd8f9f7b14b601c70d2997e6c645cf484a6fb27df403eb515",
+    "admin_source_sha256": "9805cf0b02d7efc5cfcda2b6451a6f56542744263de020f0d6d99ae83af88a42",
+    "runner_sha256": "6d73e2501a0a3eb61d6586c293551d43b10dd27f10d6902d8f0e32d17884f53a",
+    "changes": [
+      "replace the dashboard's approximately eleven concurrent Supabase reads with one SECURITY INVOKER tenant-scoped snapshot RPC",
+      "add five indexes used by the snapshot's tenant/time/status predicates",
+      "coalesce booking Realtime bursts for 250ms",
+      "make the BT500 dashboard read action exercise the same snapshot RPC while preserving the approved mix and latency/error thresholds"
+    ],
+    "local_validation": [
+      "188 disposable PostgreSQL checks pass, including own/foreign/anonymous/service-role snapshot behavior and a 1201-slot tenant",
+      "TypeScript passes",
+      "Next.js production build passes with 91 routes",
+      "dashboard snapshot unit tests pass",
+      "BT500 configuration contract tests pass",
+      "ESLint reports no errors in touched TypeScript/JavaScript files"
+    ],
+    "qualification_credit": false,
+    "next_gate": "Review and approve an exact new candidate, rehearse/apply the single migration, deploy, then repeat a bounded progressive smoke with unchanged thresholds and independent generator/resource instrumentation."
+  },
+  "sources": {
+    "supabase_compute": "https://supabase.com/docs/guides/platform/compute-and-disk",
+    "supabase_log_fields": "https://supabase.com/docs/guides/observability/log-field-reference",
+    "supabase_log_filtering": "https://supabase.com/docs/guides/observability/advanced-log-filtering"
+  },
+  "raw_local_artifacts": [
+    "/private/tmp/bookingtours_supabase_load_window.mjs",
+    "/private/tmp/bookingtours_pg_stats.mjs",
+    "/private/tmp/bookingtours_cron_window.mjs",
+    "/private/tmp/bookingtours_capacity_db.mjs",
+    "/private/tmp/bookingtours_supabase_capacity.mjs"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "recorded_at_utc": "2026-09-21T12:54:38Z",
+  "status": "SOURCE_SCOPE_APPROVED_BROWSER_MEASUREMENT_OPEN",
+  "client_model": {
+    "authenticated_browser_sessions": 500,
+    "supabase_realtime_websockets": 500,
+    "reason": "One shared Supabase browser client multiplexes page channels over one WebSocket per active browser session. This must be measured in a deployed browser run."
+  },
+  "always_mounted_shell_bindings_per_session": [
+    {
+      "component": "NotificationBadge",
+      "table": "conversations",
+      "event": "*",
+      "channel": "inbox-badge"
+    },
+    {
+      "component": "RefundBadge",
+      "table": "bookings",
+      "event": "*",
+      "channel": "refund-badge-{business_id}"
+    }
+  ],
+  "route_binding_maximums": {
+    "dashboard": 1,
+    "bookings": 1,
+    "simple_day": 2,
+    "selected_inbox_conversation": 1
+  },
+  "qualification_footprint": {
+    "connections": 500,
+    "minimum_shell_bindings": 1000,
+    "route_bindings": "Record from the approved route mix; do not replace with idle sockets.",
+    "required_measurements": [
+      "connected and subscribed timestamps",
+      "reconnects and unrecovered disconnects",
+      "delivered update latency p95",
+      "actual sockets and bindings",
+      "database Realtime authorization and resource use"
+    ]
+  },
+  "approval": true,
+  "blocking_reason": "The source-derived scope is frozen. An exact-candidate browser measurement of that scope and its route mix is still required for qualification."
+}

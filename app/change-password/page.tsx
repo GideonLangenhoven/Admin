@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   completeAdminPasswordSetup,
+  reauthenticateAdminPassword,
   validateAdminSetupToken,
 } from "../lib/admin-auth";
 import { BrandMark } from "../../components/BrandLogo";
@@ -134,13 +135,19 @@ function ChangePasswordForm() {
     setLoading(true);
 
     try {
+      const accessToken = await reauthenticateAdminPassword(email, currentPass);
+      if (!accessToken) {
+        setLoading(false);
+        return setError("Incorrect email or current password.");
+      }
       const res = await fetch("/api/admin/update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + accessToken,
+        },
         body: JSON.stringify({
           action: "change_password",
-          email: email.trim().toLowerCase(),
-          current_password: currentPass,
           new_password: newPass,
         }),
       });

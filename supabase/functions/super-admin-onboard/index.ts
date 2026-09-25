@@ -22,10 +22,35 @@ function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function sha256Hex(input: string) {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+async function requireCredentialMfa(req: Request, adminId: string, userId: string) {
+  const token = (req.headers.get("authorization") || "").match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (!token) return { error: "Sign in again before linking credentials", status: 401 } as const;
+  let userResult;
+  try { userResult = await supabase.auth.getUser(token); }
+  catch { return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const; }
+  const user = userResult.data.user;
+  if (userResult.error || !user || user.id !== userId) return { error: "Sign in again before linking credentials", status: 401 } as const;
+
+  let assurance;
+  try { assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel(token); }
+  catch { return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const; }
+  if (assurance.error || !assurance.data) return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const;
+  const factors = (user.factors || []).filter((factor: any) => factor.status === "verified" && factor.factor_type === "totp");
+  const { data: recovery, error: recoveryError } = await supabase.from("mfa_recovery_state")
+    .select("status, completed_at").eq("admin_id", adminId).maybeSingle();
+  if (recoveryError) return { error: "Recovery status could not be verified. Nothing was changed.", status: 503 } as const;
+  if (recovery && recovery.status !== "COMPLETED") return { error: "MFA recovery must finish before credentials can be linked", status: 423 } as const;
+  if (recovery?.status === "COMPLETED") {
+    const completedAt = Date.parse(recovery.completed_at || "");
+    const freshFactor = factors.some((factor: any) => Date.parse(factor.updated_at || factor.created_at || "") > completedAt);
+    const freshChallenge = (assurance.data.currentAuthenticationMethods || []).some((method: any) =>
+      typeof method !== "string" && String(method.method).includes("totp") && Number(method.timestamp) * 1000 > completedAt
+    );
+    if (!freshFactor || !freshChallenge) return { error: "Enroll and verify a new authenticator after recovery", status: 403 } as const;
+  }
+  if (!factors.length) return { error: "Set up an authenticator before linking credentials", status: 403 } as const;
+  if (assurance.data.currentLevel !== "aal2") return { error: "Enter a current authenticator code before linking credentials", status: 403 } as const;
+  return { ok: true } as const;
 }
 
 // Removed: two-step encryption context pattern was replaced with key-as-parameter RPCs.
@@ -43,8 +68,6 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
   try {
     const body = await req.json();
     const idempotencyKey = String(body.idempotency_key || "").trim();
-    const requesterEmail = String(body.requester_email || "").trim().toLowerCase();
-    const requesterPassword = String(body.requester_password || "");
     const businessName = String(body.business_name || "").trim();
     const businessTagline = String(body.business_tagline || "").trim();
     const adminName = String(body.admin_name || "").trim();
@@ -58,28 +81,22 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
     const yocoWebhookSecret = String(body.yoco_webhook_secret || "").trim() || null;
     const customDomain = String(body.custom_domain || "").trim() || null;
 
-    if (!requesterEmail || !requesterPassword || !businessName || !adminName || !adminEmail) {
-      return respond(400, { success: false, error: "requester_email, requester_password, business_name, admin_name, and admin_email are required" });
+    if (!businessName || !adminName || !adminEmail) {
+      return respond(400, { success: false, error: "business_name, admin_name, and admin_email are required" });
     }
 
     const { data: requester, error: requesterError } = await supabase
       .from("admin_users")
-      .select("id, role, password_hash, suspended")
-      .eq("email", requesterEmail)
+      .select("id, role, suspended")
       .eq("user_id", auth.userId)
       .maybeSingle();
     if (requesterError) throw requesterError;
-    if (!requester || !/super/i.test(String(requester.role || ""))) {
+    if (!requester || requester.role !== "SUPER_ADMIN") {
       return respond(403, { success: false, error: "Only super admins can create new tenants" });
     }
     if (requester.suspended) {
       return respond(403, { success: false, error: "Account is suspended" });
     }
-    const requesterHash = await sha256Hex(requesterPassword);
-    if (!requester.password_hash || requester.password_hash !== requesterHash) {
-      return respond(403, { success: false, error: "Super admin password verification failed" });
-    }
-
     const subdomain = String(body.subdomain || "").trim().toLowerCase();
     if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain)) return respond(400, { success: false, error: "A valid booking subdomain is required" });
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idempotencyKey)) return respond(400, { success: false, error: "A valid onboarding request ID is required" });
@@ -91,11 +108,18 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
     const credentials = Object.fromEntries(Object.entries({
       wa_token: waToken, wa_phone_id: waPhoneId, yoco_secret_key: yocoSecretKey, yoco_webhook_secret: yocoWebhookSecret,
     }).filter(([, value]) => value));
+    if (Boolean(waToken) !== Boolean(waPhoneId) || Boolean(yocoSecretKey) !== Boolean(yocoWebhookSecret)) {
+      return respond(400, { success: false, error: "Supply both values for each credential pair, or leave both blank and connect it later in Settings." });
+    }
     if (Object.keys(credentials).length && SETTINGS_ENCRYPTION_KEY.length < 32) throw new Error("Credential encryption is not configured");
     if (yocoSecretKey && !yocoSecretKey.startsWith("sk_live_")) return respond(400, { success: false, error: "This field is for the live Yoco key. Configure test keys separately in Settings." });
+    if (Object.keys(credentials).length) {
+      const mfa = await requireCredentialMfa(req, requester.id, auth.userId);
+      if ("error" in mfa) return respond(mfa.status, { success: false, code: "MFA_REQUIRED", error: mfa.error });
+    }
     // Saving a key is not a payment verification. No surprise checkout is
     // created, and the readiness checklist keeps the provider test outstanding.
-    const { data, error } = await supabase.rpc("platform_onboard_business", {
+    const { data, error } = await supabase.rpc("platform_onboard_business_audited", {
       p_actor_id: requester.id, p_request_id: idempotencyKey,
       p_business: { business_name: businessName, business_tagline: businessTagline, timezone, currency, logo_url: logoUrl, subdomain },
       p_admin: { name: adminName, email: adminEmail }, p_credentials: credentials, p_key: SETTINGS_ENCRYPTION_KEY,

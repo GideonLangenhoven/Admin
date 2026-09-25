@@ -1,0 +1,114 @@
+{
+  "evidence_id": "BT500-CORRECTIVE-SMOKE-20260922",
+  "recorded_at_utc": "2026-09-22T12:18:00Z",
+  "verdict": "FAIL_ABORTED_FOR_SAFETY",
+  "qualification_credit": false,
+  "target": {
+    "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
+    "admin_candidate": "d52ea1cccdfdb902ee3cf9328122812dbc298c0f",
+    "admin_tree": "05c0ff588baaa13a53567f769054c700373f4e60",
+    "admin_deployment_id": "dpl_GHnGko5mdT19AWn4kAjFY1QQCuXM",
+    "admin_deployment_url": "https://caepweb-admin-1hwwfs7cv-jerrys-projects-f4e4eaf9.vercel.app",
+    "load_alias": "https://caepweb-admin.vercel.app",
+    "migration": "20260922110000_operator_dashboard_snapshot.sql",
+    "generator": "operator workstation, Africa/Johannesburg"
+  },
+  "window": {
+    "started_at_utc": "2026-09-22T11:57:30Z",
+    "stopped_at_utc": "2026-09-22T12:02:37Z",
+    "elapsed_seconds": 305.6,
+    "stopped_early": true,
+    "stop_reason": "Sustained target-side origin queueing made the unchanged thresholds impossible; the run was interrupted to avoid needless additional pressure."
+  },
+  "workload": {
+    "source": "tests/stress/bt500-mixed.k6.js",
+    "run_id": "corrective-20260922a",
+    "mode": "smoke",
+    "mix": "70% reads, 20% legitimate arrival writes, 10% session/report/inbox",
+    "reached_vus": 500,
+    "completed_iterations": 3337,
+    "dropped_iterations_observed_before_abort": 0,
+    "request_timeout_warnings": 801,
+    "timeouts_by_client_path": {
+      "admin_check_ins": 419,
+      "dashboard_snapshot": 256,
+      "bookings": 112,
+      "conversations": 10,
+      "auth_user": 4
+    },
+    "summary_export_available": false,
+    "summary_note": "The safety interrupt ended k6 before its summary export; the raw log and remote telemetry are retained."
+  },
+  "remote_telemetry": {
+    "k6_direct_requests": 3071,
+    "minute_origin_p95_ms": [232, 2628, 55929, 48031, 57814],
+    "minute_origin_max_ms": 59404,
+    "path_origin_p95_ms": {
+      "conversations": 57235,
+      "bookings": 56885,
+      "get_operator_dashboard": 51225,
+      "auth_user": 14463
+    },
+    "database_statement_observations": {
+      "get_operator_dashboard_calls": 2577,
+      "get_operator_dashboard_mean_exec_ms": 170.43,
+      "get_operator_dashboard_max_exec_ms": 7483.04,
+      "record_booking_arrival_calls": 949,
+      "record_booking_arrival_mean_exec_ms": 206.73,
+      "record_booking_arrival_max_exec_ms": 5573.2
+    },
+    "finding": "The first correction removed dashboard request fan-out, but the base Micro target still saturated. PostgreSQL execution was far shorter than the 51-58 second origin p95, proving admission/pool queueing remained dominant."
+  },
+  "integrity": {
+    "marker_booking_wrong_business": 0,
+    "marker_check_in_invalid": 0,
+    "oversold_slots": 0,
+    "over_refunded_bookings": 0,
+    "duplicate_idempotency_keys": 0,
+    "stale_active_holds": 0,
+    "slot_held_below_active_holds": 0,
+    "marker_paid_without_provider_ids": 0,
+    "preexisting_non_marker_paid_without_provider_ids": 12,
+    "global_invariant_exit": "FAIL_DUE_TO_PREEXISTING_NON_MARKER_BASELINE"
+  },
+  "marker_activity": {
+    "businesses": 167,
+    "admin_users": 500,
+    "bookings": 5010,
+    "slots": 668,
+    "check_ins": 569,
+    "unique_check_in_events": 569,
+    "businesses_with_check_ins": 152,
+    "actors_with_check_ins": 384,
+    "bookings_with_arrivals": 223,
+    "total_arrived": 223
+  },
+  "recovery": {
+    "scheduled_jobs": "All observed cron runs succeeded during and after the load window.",
+    "browser_smoke": "PASS_4_OF_4",
+    "teardown": {
+      "auth_users_deleted": 500,
+      "businesses_deleted": 167,
+      "credentials_deleted": true
+    },
+    "baseline_counts_restored": {
+      "businesses": 2,
+      "admin_users": 2,
+      "tours": 5,
+      "bookings": 50,
+      "slots": 34,
+      "customers": 50,
+      "wa_messages": 0
+    }
+  },
+  "private_raw_artifacts": [
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/k6.log", "sha256": "5c42f3a113bbfbe4cf2ad3f7ac019fc78c112f9110aac7d4f1875b4fc185107e"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/supabase-telemetry.json", "sha256": "ad0c1f5d53b66101e32f25e37189450aa902055a61c04a90156d3d3599f849da"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/invariants.log", "sha256": "15a75c33fe5875b7f125f3364262043916312250d849295508c15a633f4ab29d"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/invariant-diagnosis.json", "sha256": "e61e25e8c954eded6c06b6428a1c0835a81adb0691cd76adaf256d66f40941bc"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/marker-state-before-teardown.json", "sha256": "71d797d5377621960cd1369a6d39a641c7e2072febd0bd8135264ba0f12d7196"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/cron-window.json", "sha256": "e0a648f2095d08e4c40abe03c7ad58ad7ae3818a9aa9c6a2e4ff4bc276281bea"},
+    {"path": "/private/tmp/bookingtours-simple-view-evidence-1812677/corrective-smoke-20260922/pg-stat-statements.json", "sha256": "af6add2557990af17759beffa27813c4ac864d3252ec2c44465ea661fae74cd9"}
+  ],
+  "next_action": "Deploy only after review: retain the one-call dashboard contract but execute its internal reads after one explicit tenant authorization, and collapse arrival authorization plus mutation into one authenticated RPC. Retest progressively with unchanged thresholds."
+}

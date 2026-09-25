@@ -1,8 +1,26 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import {
+  clearGuideQueueAuthContext,
+  createGuideQueueItem,
+  currentGuideQueueAuthority,
+  currentGuideQueueAuthGeneration,
+  GUIDE_QUEUE_UPDATE_EVENT,
+  guideQueueAuthContext,
+  guideQueueRetryAt,
+  isCurrentGuideQueueAuthClear,
+  isCurrentGuideQueueAuthContext,
+  postGuideQueueAuthContext,
+  queueGuideCheckIn,
+  rejectGuideQueueCredential,
+  registerGuideCheckInSync,
+  requestGuideQueueStatus,
+  type GuideCheckInPayload,
+  type GuideQueueUpdate,
+} from "@/app/lib/guide-offline";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
 import { Check } from "@phosphor-icons/react";
@@ -20,14 +38,69 @@ type Booking = {
   add_ons: Array<{ name: string; qty: number }>;
 };
 
+function canonicalArrival(data: any, booking: Booking, expectedSlotId?: string) {
+  if (data?.ok !== true || typeof data.replay !== "boolean") return null;
+  if (typeof data.slot_id !== "string" || (expectedSlotId && data.slot_id !== expectedSlotId)) return null;
+  const qty = Number(data.qty);
+  if (!Number.isInteger(qty) || qty < 0) return null;
+  const arrivedCount = Number(data?.arrived_count);
+  if (!Number.isInteger(arrivedCount) || arrivedCount < 0 || arrivedCount > qty) return null;
+  const checkedIn = typeof data.checked_in === "boolean" ? data.checked_in : qty > 0 && arrivedCount === qty;
+  if (typeof data.checked_in !== "boolean") return null;
+  if (data.checked_in_at !== null && typeof data.checked_in_at !== "string") return null;
+  return {
+    qty,
+    arrived_count: arrivedCount,
+    checked_in: checkedIn,
+    checked_in_at: checkedIn && typeof data.checked_in_at === "string" ? data.checked_in_at : null,
+  };
+}
+
+function reconcileGuideBooking(bookings: Booking[], update: GuideQueueUpdate) {
+  if (update.kind !== "canonical" || !update.canonical) return bookings;
+  return bookings.map(booking => {
+    if (booking.id !== update.bookingId) return booking;
+    const canonical = canonicalArrival(update.canonical, booking, update.slotId);
+    return canonical ? { ...booking, ...canonical } : booking;
+  });
+}
+
 export default function GuideSlotPage({ params }: { params: Promise<{ slotId: string }> }) {
   const { slotId } = use(params);
-  const { businessId } = useBusinessContext();
+  const { businessId, readOnly } = useBusinessContext();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [slotInfo, setSlotInfo] = useState<{ tour_name: string; start_time: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => { reload(); }, [slotId, businessId]);
+
+  useEffect(() => {
+    const onQueueUpdate = (event: Event) => {
+      const update = (event as CustomEvent<GuideQueueUpdate>).detail;
+      const authority = currentGuideQueueAuthority();
+      if (!update || update.slotId !== slotId || !authority
+          || authority.userId !== update.userId || authority.businessId !== update.businessId
+          || authority.businessId !== businessId) return;
+      if (update.kind === "canonical") {
+        setBookings(current => reconcileGuideBooking(current, update));
+        return;
+      }
+      notify({
+        tone: "warning",
+        message: update.reason === "STALE" || update.reason === "STALE_SLOT"
+          ? "An offline check-in conflicted with newer trip data. Review the current count before retrying."
+          : "An offline check-in was rejected. Review the current booking before trying again.",
+      });
+    };
+    window.addEventListener(GUIDE_QUEUE_UPDATE_EVENT, onQueueUpdate);
+    return () => window.removeEventListener(GUIDE_QUEUE_UPDATE_EVENT, onQueueUpdate);
+  }, [slotId, businessId]);
 
   async function reload() {
     if (!businessId) return;
@@ -63,7 +136,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       }
     }
 
-    setBookings((data || []).map((b: any) => ({
+    const nextBookings = (data || []).map((b: any) => ({
       id: b.id,
       customer_name: b.customer_name || "Guest",
       phone: b.phone || "",
@@ -74,17 +147,23 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       waiver_status: b.waiver_status || null,
       dietary: b.custom_fields?.dietary || null,
       add_ons: addOnsByBooking[b.id] || [],
-    })));
+    }));
+    setBookings(nextBookings);
     setLoading(false);
   }
 
   async function checkIn(bookingId: string) {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return;
+    if (readOnly) {
+      notify({ tone: "warning", message: "This demo account is read-only." });
+      return;
+    }
+    const authGeneration = currentGuideQueueAuthGeneration();
+    const actionAuthority = currentGuideQueueAuthority();
     const clientEventId = crypto.randomUUID();
-    const payload = {
+    const payload: GuideCheckInPayload = {
       booking_id: bookingId,
-      business_id: businessId,
       slot_id: slotId,
       arrived_count: null,
       expected_arrived_count: booking.arrived_count,
@@ -93,48 +172,140 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
 
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, arrived_count: b.qty, checked_in: true, checked_in_at: new Date().toISOString() } : b));
 
-    const revert = () => setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, arrived_count: booking.arrived_count, checked_in: booking.checked_in, checked_in_at: booking.checked_in_at } : b));
+    const restoreOptimisticState = () => {
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, arrived_count: booking.arrived_count, checked_in: booking.checked_in, checked_in_at: booking.checked_in_at } : b));
+    };
+    const actionIsCurrent = () => mountedRef.current && currentGuideQueueAuthGeneration() === authGeneration;
+    const revert = () => {
+      if (!actionIsCurrent()) return;
+      restoreOptimisticState();
+    };
 
-    if (!navigator.onLine) {
-      const { data: { session } } = await supabase.auth.getSession();
-      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime(), token: session?.access_token || null });
-      if ("serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        try { await (reg as any).sync?.register("sync-check-ins"); } catch (_) {}
+    const { data: { session } } = await supabase.auth.getSession();
+    const auth = guideQueueAuthContext(session, businessId);
+    if (!auth) {
+      const clearedGeneration = await clearGuideQueueAuthContext(authGeneration);
+      const currentAuthority = currentGuideQueueAuthority();
+      const stillOwnsResult = mountedRef.current && (
+        (clearedGeneration !== null && isCurrentGuideQueueAuthClear(clearedGeneration))
+        || (!!actionAuthority && !!currentAuthority
+          && currentAuthority.generation === actionAuthority.generation
+          && currentAuthority.authorityId === actionAuthority.authorityId
+          && currentAuthority.userId === actionAuthority.userId
+          && currentAuthority.businessId === actionAuthority.businessId)
+      );
+      if (stillOwnsResult) {
+        restoreOptimisticState();
+        notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
       }
       return;
     }
+    const ownerIsCurrent = () => isCurrentGuideQueueAuthContext(auth, authGeneration);
+    const canUpdate = () => mountedRef.current && ownerIsCurrent();
+    if (!ownerIsCurrent()) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || null;
-    if (!token) {
-      revert();
-      notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
+    const persistForResolution = async (
+      status: "pending" | "needs_reauth" | "failed",
+      lastError?: string,
+      serverError?: string,
+      committed = false,
+      retryAfter: string | null = null,
+    ) => {
+      if (!committed && !ownerIsCurrent()) return false;
+      try {
+        const item = createGuideQueueItem(payload, auth);
+        await queueGuideCheckIn(status === "pending"
+          ? committed ? {
+              ...item,
+              attempts: 1,
+              lastError,
+              nextAttemptAt: guideQueueRetryAt(retryAfter),
+              updatedAt: Date.now(),
+            } : item
+          : {
+              ...item,
+              status,
+              attempts: 1,
+              lastError,
+              serverError: serverError?.slice(0, 160) || null,
+              updatedAt: Date.now(),
+            });
+      } catch {
+        if (canUpdate()) {
+          revert();
+          notify({ tone: "error", message: "Check-in could not be saved offline. Please reconnect and try again." });
+        }
+        return false;
+      }
+      if (!canUpdate()) return true;
+      if (status !== "pending") {
+        await requestGuideQueueStatus().catch(() => {});
+        return true;
+      }
+      const published = await postGuideQueueAuthContext(auth, authGeneration, canUpdate).catch(() => false);
+      if (!canUpdate()) return true;
+      if (published) {
+        if (committed) await requestGuideQueueStatus().catch(() => {});
+        else await registerGuideCheckInSync().catch(() => {});
+      }
+      return true;
+    };
+    const queueForRetry = (committed = false, retryAfter: string | null = null) =>
+      persistForResolution("pending", undefined, undefined, committed, retryAfter);
+
+    if (!navigator.onLine) {
+      await queueForRetry();
       return;
     }
 
     try {
+      if (!ownerIsCurrent()) return;
       const r = await fetch("/api/guide/check-in", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "x-admin-business-id": businessId,
+          Authorization: `Bearer ${auth.accessToken}`,
+          "x-admin-business-id": auth.businessId,
         },
         body: JSON.stringify(payload),
       });
-      if (!r.ok) {
-        // Auth/validation failures are not retryable — revert and surface, never queue.
-        if (r.status >= 400 && r.status < 500) {
-          revert();
-          notify({ tone: "error", message: r.status === 401 || r.status === 403 ? "Not authorized to check in. Please sign in again." : "Check-in was rejected. Please refresh and try again." });
+      let result: any = null;
+      try { result = await r.json(); } catch { /* uncertain 2xx is queued below */ }
+      if (r.ok) {
+        const canonical = canonicalArrival(result, booking, slotId);
+        if (result?.ok === true && canonical) {
+          if (canUpdate()) setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, ...canonical } : b));
           return;
         }
-        throw new Error("server_error");
+        await queueForRetry(true);
+        return;
       }
-    } catch (_) {
-      // True network/offline or server (5xx) failure — queue for background sync.
-      await queueLocally({ id: clientEventId, payload, queuedAt: new Date().getTime(), token });
+      if ([408, 425, 429].includes(r.status) || r.status >= 500) {
+        await queueForRetry(true, r.headers.get("Retry-After"));
+        return;
+      }
+      if (r.status < 400 || r.status >= 500) {
+        await queueForRetry(true);
+        return;
+      }
+
+      revert();
+      if (r.status === 401) {
+        const retained = await persistForResolution("needs_reauth", "unauthorized", result?.error, true);
+        await rejectGuideQueueCredential(auth, authGeneration).catch(() => false);
+        if (!retained) return;
+      } else {
+        const reason = typeof result?.code === "string" ? result.code : `http_${r.status}`;
+        if (!await persistForResolution("failed", reason, result?.error, true)) return;
+      }
+      if (canUpdate()) notify({
+        tone: "error",
+        message: r.status === 401
+          ? "Not authorized to check in. Please sign in again."
+          : result?.error || "Check-in was rejected. Please refresh and try again.",
+      });
+    } catch {
+      await queueForRetry(true);
     }
   }
 
@@ -242,18 +413,4 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       )}
     </div>
   );
-}
-
-async function queueLocally(item: { id: string; payload: any; queuedAt: number; token?: string | null }) {
-  return new Promise<void>((resolve, reject) => {
-    const req = indexedDB.open("guide-queue", 1);
-    req.onupgradeneeded = () => req.result.createObjectStore("check-ins", { keyPath: "id" });
-    req.onsuccess = () => {
-      const tx = req.result.transaction("check-ins", "readwrite");
-      tx.objectStore("check-ins").put(item);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e);
-    };
-    req.onerror = (e) => reject(e);
-  });
 }

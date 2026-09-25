@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { MagnifyingGlass, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
-import * as XLSX from "xlsx";
+import { readSheet } from "read-excel-file/browser";
 
 interface Contact {
   id: string;
@@ -334,44 +334,33 @@ export default function ContactsPage() {
     return map;
   }
 
-  function handleCsvFile(file: File | null) {
+  async function handleCsvFile(file: File | null) {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const isExcel = ["xlsx", "xls", "xlsb", "xlsm"].includes(ext);
+    const isExcel = ext === "xlsx";
 
     if (isExcel) {
-      // Read Excel with SheetJS
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          // Convert to array of arrays, then to CSV-like structure
-          const jsonRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-          if (jsonRows.length === 0) {
-            notify({ message: "Excel file is empty.", tone: "warning" });
-            return;
-          }
-          const headers = Object.keys(jsonRows[0]).map((h) => String(h).trim());
-          const rows = jsonRows.map((row) => {
-            const mapped: Record<string, string> = {};
-            headers.forEach((h) => { mapped[h] = String(row[h] ?? "").trim(); });
-            return mapped;
-          }).filter((r) => Object.values(r).some((v) => v));
-
-          setCsvHeaders(headers);
-          const autoMap = autoMapHeaders(headers);
-          setCsvMapping(autoMap);
-          setCsvRows(rows.map((r) => ({ data: r, errors: [] })));
-          setCsvStep("map");
-          notify({ message: `Loaded ${rows.length} rows from "${sheetName}" sheet.`, tone: "success" });
-        } catch (err: any) {
-          notify({ message: "Failed to read Excel file: " + (err.message || "Unknown error"), tone: "error" });
+      try {
+        const sheetRows = await readSheet(file);
+        if (sheetRows.length < 2) {
+          notify({ message: "Excel file is empty.", tone: "warning" });
+          return;
         }
-      };
-      reader.readAsArrayBuffer(file);
+        const headers = sheetRows[0].map((value, index) => String(value ?? "").trim() || `Column ${index + 1}`);
+        const rows = sheetRows.slice(1).map((values) => {
+          const mapped: Record<string, string> = {};
+          headers.forEach((header, index) => { mapped[header] = String(values[index] ?? "").trim(); });
+          return mapped;
+        }).filter((row) => Object.values(row).some(Boolean));
+
+        setCsvHeaders(headers);
+        setCsvMapping(autoMapHeaders(headers));
+        setCsvRows(rows.map((row) => ({ data: row, errors: [] })));
+        setCsvStep("map");
+        notify({ message: `Loaded ${rows.length} rows from the first sheet.`, tone: "success" });
+      } catch (err: any) {
+        notify({ message: "Failed to read Excel file: " + (err.message || "Unknown error"), tone: "error" });
+      }
     } else {
       // Read as text (CSV, TSV, TXT)
       const reader = new FileReader();
@@ -924,7 +913,7 @@ export default function ContactsPage() {
                 <div className="space-y-4">
                   <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-strong)" }}>
                     <p className="mb-2 text-sm font-medium" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
-                    <input type="file" accept=".csv,.txt,.tsv,.xls,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
+                    <input type="file" accept=".csv,.txt,.tsv,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
                     <p className="mt-2 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
                       Any columns are accepted. You&apos;ll map them in the next step, and gaps in data are fine.
                     </p>

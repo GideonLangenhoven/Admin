@@ -1,0 +1,77 @@
+{
+  "profile_id": "BT-RELEASE-RECOVERY-V1",
+  "recorded_at_utc": "2026-09-22T06:30:05Z",
+  "status": "DEPLOYED_SMOKE_FAILED_RECOVERY_CONFIRMED",
+  "candidates": {
+    "admin": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "booking": "2ff1d82"
+  },
+  "required_inputs": {
+    "restore_target": null,
+    "monitoring_receiver": "supplied_outside_repository",
+    "deployment_target": "current authorized pre-launch project and its linked Admin/storefront deployments",
+    "window": "immediately after exact deployment for 24 elapsed hours",
+    "cost_ceiling_zar": 0,
+    "approval_reference": "user-session-2026-09-21-exact-rollout-approval at 2026-09-21T18:38:09Z"
+  },
+  "migration_order": [
+    "20260920090000_enforce_standard_plan_pricing.sql",
+    "20260920100000_partial_booking_arrivals.sql",
+    "20260921120000_mfa_sensitive_business_columns.sql",
+    "20260921130000_authoritative_auth_passwords.sql",
+    "20260921140000_durable_notification_jobs.sql"
+  ],
+  "migration_dry_run": {
+    "status": "PASS_EXACT_FIVE_ONLY",
+    "evidence": "docs/production-readiness/evidence/MIGRATION_DRY_RUN.json",
+    "blanket_include_all_prohibited": true
+  },
+  "deployment_order": [
+    "reconfirm remote migration ledger and pre-deployment inventory",
+    "apply the controlled five-migration package",
+    "deploy candidate Edge Functions without pruning unrelated functions",
+    "deploy Admin commit 71da0361db65dd63f90b5110648b96b2c4ff3567",
+    "deploy booking commit 2ff1d82",
+    "run Auth, role, MFA, refund, booking, notification-scheduler and outbound-guard smoke checks",
+    "record exact URLs and start the qualification clock"
+  ],
+  "canary_steps": [
+    5,
+    25,
+    100,
+    250,
+    500
+  ],
+  "executed": {
+    "restore": false,
+    "alert_drill": false,
+    "deployment": true,
+    "migration": true,
+    "canary": false
+  },
+  "deployments": {
+    "admin": {
+      "id": "dpl_6XfJvbbYuWDTvR8KCgbCgbJs14K6",
+      "url": "https://caepweb-admin-2kebairaa-jerrys-projects-f4e4eaf9.vercel.app",
+      "alias": "https://admin.bookingtours.co.za",
+      "status": "READY"
+    },
+    "booking": {
+      "id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
+      "url": "https://booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
+      "alias": "https://booking.bookingtours.co.za",
+      "status": "READY"
+    },
+    "edge_functions_active": 55,
+    "migration_ledger_exact": true
+  },
+  "deployed_smoke_result": {
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "reached_vus": 500,
+    "qualification_clock_started": false,
+    "post_abort_integrity": "PASS",
+    "post_abort_browser_recovery": "4/4 pass",
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "production_mutated": true
+}

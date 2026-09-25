@@ -1,0 +1,100 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "status": "APPROVED_FOR_BOUNDED_SMOKE",
+  "candidate_commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d",
+  "candidate_tree": "b9848b532cb1c291ab9e257f05f5df45163e42f2",
+  "candidate_worktree_clean": true,
+  "environment": {
+    "classification": "user_authorized_prelaunch_no_customers",
+    "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
+    "admin_url": "https://caepweb-admin.vercel.app",
+    "booking_url": "https://booking.bookingtours.co.za",
+    "observed_current_admin_deployment": "https://caepweb-admin-ratqw30wq-jerrys-projects-f4e4eaf9.vercel.app",
+    "observed_current_booking_deployment": "https://booking-lt4akbigx-jerrys-projects-f4e4eaf9.vercel.app",
+    "generator_region": "operator workstation, Africa/Johannesburg",
+    "application_region": "Admin iad1; storefront cdg1; Supabase eu-west-3"
+  },
+  "cost": {
+    "ceiling_zar": 0,
+    "rule": "No paid scaling or live financial transaction; abort before incurring a new charge."
+  },
+  "window": {
+    "starts_at": "2026-09-22T14:03:00Z",
+    "ends_at": "2026-09-22T16:00:00Z",
+    "purpose": "Bounded corrective smoke only; this window does not start the 24-hour qualification clock."
+  },
+  "approval": {
+    "reference": "user-session-2026-09-21-prelaunch-qualification",
+    "approved_at": "2026-09-21T12:54:38Z",
+    "workload_and_thresholds": true,
+    "metric_definitions": true,
+    "realtime_scope": true,
+    "cost_environment_and_window": true
+  },
+  "bounded_smoke_authorization": {
+    "reference": "user-session-2026-09-22-production-ready-continuation",
+    "approved_at": "2026-09-22T11:36:00Z",
+    "continued_at": "2026-09-22T14:03:00Z",
+    "qualification_credit": false
+  },
+  "outbound_controls": {
+    "live_messages_blocked": true,
+    "live_payments_blocked": true,
+    "provider_doubles_enabled": false
+  },
+  "required_artifacts": {
+    "action_mapping": "docs/production-readiness/BT500_ACTION_MAPPING.json",
+    "realtime_topology": "docs/production-readiness/BT500_REALTIME_TOPOLOGY.json",
+    "quota_budget": "docs/production-readiness/BT500_QUOTA_BUDGET.json",
+    "outbound_guard_evidence": "docs/production-readiness/BT500_OUTBOUND_GUARDS.json"
+  },
+  "executed": false,
+  "mixed_runner_complete": false,
+  "smoke_executed": true,
+  "result": "evidence/BT500_READ_SMOKE_RESULT.json",
+  "deployed_staff_smoke": {
+    "executed": true,
+    "qualification_credit": false,
+    "reached_vus": 500,
+    "verdict": "FAIL_ABORTED_FOR_SAFETY",
+    "evidence": "docs/production-readiness/evidence/BT500_DEPLOYED_SMOKE_20260922.json"
+  },
+  "capacity_diagnosis": {
+    "status": "TARGET_QUEUEING_CONFIRMED_REMEDIATION_DEPLOYED_SMOKE_PENDING",
+    "finding": "Supabase edge telemetry recorded 2xx responses while direct-load origin p95 reached 11.975 seconds on base Micro compute, then recovered after abort. Generator contribution to cross-origin dial failures remains possible but does not explain the target-side delay.",
+    "local_remediation": "One tenant-scoped dashboard snapshot RPC, five supporting indexes, 250ms Realtime burst coalescing, and a matching BT500 read action are deployed in Admin deployment dpl_GHnGko5mdT19AWn4kAjFY1QQCuXM.",
+    "evidence": "docs/production-readiness/evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json",
+    "qualification_credit": false
+  },
+  "corrective_staff_smoke": {
+    "executed": true,
+    "qualification_credit": false,
+    "status": "FAIL_ABORTED_FOR_SAFETY",
+    "deployment_id": "dpl_GHnGko5mdT19AWn4kAjFY1QQCuXM",
+    "reached_vus": 500,
+    "evidence": "docs/production-readiness/evidence/BT500_CORRECTIVE_SMOKE_20260922.json"
+  },
+  "second_capacity_correction": {
+    "status": "DEPLOYED_SMOKE_PENDING",
+    "change": "Run the dashboard snapshot after one explicit tenant authorization and collapse arrival authorization plus mutation into one authenticated RPC.",
+    "commit": "ebb62b8f318d7039efcbf1b66d3f5bce9f02996d",
+    "migration": "supabase/migrations/20260922123000_operator_hot_path_admission.sql",
+    "deployment_id": "dpl_9e1NYwdPEsrXBeVQ3XX6DpQ6m6qL",
+    "deployment_url": "https://caepweb-admin-ratqw30wq-jerrys-projects-f4e4eaf9.vercel.app",
+    "ci_run": "https://github.com/GideonLangenhoven/Admin/actions/runs/35728482325",
+    "qualification_credit": false
+  },
+  "admission_corrective_staff_smoke": {
+    "executed": false,
+    "qualification_credit": false,
+    "status": "PENDING"
+  },
+  "qualification_started": false,
+  "qualification_blockers": [
+    "pass a new bounded 500-user smoke with unchanged thresholds after the second hot-path admission correction",
+    "enable provider doubles and implement the public, webhook and background-work harnesses",
+    "measure the product-required Realtime footprint from browsers",
+    "establish representative-volume data and quota/headroom evidence",
+    "complete genuine provider sandbox journeys, monitoring proof and restore rehearsal"
+  ]
+}

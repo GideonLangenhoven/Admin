@@ -9,6 +9,12 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createServiceClient();
 const CRON_BATCH_SIZE = 500;
+// The dedicated minute schedule can start at least 50 healthy deliveries per
+// minute. Calls are still bounded so a slow provider cannot exhaust the Edge
+// worker or stop another tenant's jobs from progressing.
+const NOTIFICATION_JOB_LIMIT = 50;
+const NOTIFICATION_CONCURRENCY = 10;
+const SEND_EMAIL_TIMEOUT_MS = 8_000;
 
 function headers() {
   return { "Content-Type": "application/json" };
@@ -22,16 +28,14 @@ async function cleanupExpiredHolds() {
   // cron releases spots seconds before Yoco’s webhook arrives with a payment.
   const graceMs = 5 * 60 * 1000;
   const cutoffIso = new Date(Date.now() - graceMs).toISOString();
-  const { data: expiredHolds } = await supabase
+  const { data: expiredHolds, error: expiredHoldsError } = await supabase
     .from("holds")
-    // holds has neither a business_id column nor an FK to tours, so this select
-    // failed outright (PGRST200 + 42703) and expired holds never reached the
-    // payment-link notification path. Tour name comes via the booking.
-    .select("id, booking_id, slot_id, hold_type, bookings(phone, email, customer_name, qty, status, yoco_payment_id, total_amount, payment_url, allow_unpaid, business_id, tours(name)), slots(start_time)")
+    .select("id")
     .eq("status", "ACTIVE")
     .lt("expires_at", cutoffIso)
     .order("expires_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
+  if (expiredHoldsError) throw expiredHoldsError;
 
   for (const hold of expiredHolds || []) {
     // R16: single authoritative expiry — expire_single_hold claims the row
@@ -44,59 +48,20 @@ async function cleanupExpiredHolds() {
       continue;
     }
     if (exRes.converted) {
-      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id + " booking=" + hold.booking_id);
+      console.log("HOLD_EXPIRY_SKIP_PAID hold=" + hold.id);
       results.skipped_paid += 1;
       continue;
     }
     if (exRes.already) continue;
 
-    if (["RESCHEDULE", "ADD_GUESTS"].includes(String(hold.hold_type))) {
+    if (["RESCHEDULE", "ADD_GUESTS"].includes(String(exRes.hold_type))) {
       results.reschedule_hold_cleanup += 1;
       results.hold_cleanup += 1;
       continue;
     }
 
-    // ── Regular booking hold expiry ──
-    // Capacity was already released tenant-checked by expire_single_hold.
-    const holdBooking = Array.isArray(hold.bookings) ? hold.bookings[0] : hold.bookings as { phone?: string; email?: string; customer_name?: string; qty?: number; status?: string; total_amount?: number; payment_url?: string; business_id?: string; tours?: unknown } | null;
-    const holdSlot = Array.isArray(hold.slots) ? hold.slots[0] : hold.slots as { start_time?: string } | null;
-    // Tour name now arrives nested under the booking (holds has no FK to tours).
-    const holdTourRaw = (holdBooking as any)?.tours;
-    const holdTour = (Array.isArray(holdTourRaw) ? holdTourRaw[0] : holdTourRaw) as { name?: string } | null;
-    // Abandoned-checkout follow-up: email the ORIGINAL payment link once the
-    // 15-min hold lapses unpaid (this sweep runs at expiry + 5-min grace, so a
-    // payment already in flight lands first and the paid-check above skips it).
-    // Email only — no WhatsApp, per operator request. A late payment is safe:
-    // yoco-webhook re-checks capacity and auto-refunds if the slot filled.
-    const stillUnpaid = holdBooking?.status === "HELD" || holdBooking?.status === "PENDING";
-    if (stillUnpaid && holdBooking?.email && holdBooking?.payment_url && (holdBooking as any)?.business_id) {
-      try {
-        const tenant = await getTenantByBusinessId(supabase, (holdBooking as any).business_id);
-        const slotLabel = holdSlot?.start_time ? formatTenantDateTime(tenant.business, holdSlot.start_time) : "";
-        await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-          body: JSON.stringify({
-            type: "PAYMENT_LINK",
-            data: {
-              business_id: (holdBooking as any).business_id,
-              email: holdBooking.email,
-              booking_id: hold.booking_id,
-              customer_name: holdBooking.customer_name || "there",
-              ref: String(hold.booking_id || "").slice(0, 8).toUpperCase(),
-              tour_name: holdTour?.name || "your tour",
-              tour_date: slotLabel,
-              qty: Number(holdBooking.qty || 1),
-              total_amount: Number(holdBooking.total_amount || 0).toFixed(2),
-              payment_url: holdBooking.payment_url,
-            },
-          }),
-        });
-        console.log("HOLD_EXPIRY_PAYLINK_SENT hold=" + hold.id + " booking=" + hold.booking_id);
-      } catch (error) {
-        console.error("HOLD_EXPIRY_PAYLINK_EMAIL_ERR", hold.id, error);
-      }
-    }
+    // Regular unpaid reminders are inserted transactionally by
+    // expire_single_hold and delivered by processNotificationJobs below.
     results.hold_cleanup += 1;
   }
 
@@ -190,69 +155,148 @@ async function cleanupExpiredOtpAttempts() {
   return { otp_attempts_cleaned: count || 0 };
 }
 
-async function cleanupAbandonedVouchers() {
-  const results = { vouchers_cleaned: 0, voucher_reminders_sent: 0 };
-
+async function enqueueVoucherPaymentReminders() {
   // Payment-link reminder: a voucher still PENDING 15 min after checkout means
   // the buyer didn't pay (or payment failed). Email the stored payment_url once.
   // This replaces the old eager email at checkout creation — mirrors the booking
   // hold-expiry sweep. The 24h delete below sweeps anything still unpaid after.
-  const reminderCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const { data: unpaidVouchers } = await supabase
-    .from("vouchers")
-    .select("id, business_id, buyer_name, buyer_email, recipient_name, tour_name, value, purchase_amount, payment_url")
-    .eq("status", "PENDING")
-    .is("payment_reminder_sent_at", null)
-    .not("payment_url", "is", null)
-    .lt("created_at", reminderCutoff)
-    .order("created_at", { ascending: true })
-    .limit(CRON_BATCH_SIZE);
+  const queued = await supabase.rpc("enqueue_voucher_payment_reminders", { p_limit: 100, p_per_business: 5 });
+  if (queued.error) throw queued.error;
+  return Number(queued.data || 0);
+}
 
-  for (const v of unpaidVouchers || []) {
-    const voucherEmail = String((v as any).buyer_email || "").trim().toLowerCase();
-    if (!voucherEmail.includes("@") || !(v as any).business_id) continue;
-    try {
-      await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
-        body: JSON.stringify({
-          type: "VOUCHER_PAYMENT_LINK",
-          data: {
-            email: voucherEmail,
-            business_id: (v as any).business_id,
-            buyer_name: (v as any).buyer_name || "there",
-            recipient_name: (v as any).recipient_name || "your recipient",
-            tour_name: (v as any).tour_name || "Gift Voucher",
-            total_amount: Number((v as any).value || (v as any).purchase_amount || 0).toFixed(2),
-            payment_url: (v as any).payment_url,
-          },
-        }),
-      });
-      await supabase.from("vouchers").update({ payment_reminder_sent_at: new Date().toISOString() }).eq("id", (v as any).id);
-      results.voucher_reminders_sent += 1;
-      console.log("VOUCHER_PAYMENT_REMINDER_SENT voucher=" + (v as any).id);
-    } catch (remErr) {
-      console.error("VOUCHER_PAYMENT_REMINDER_ERR", (v as any).id, remErr);
-    }
-  }
+async function cleanupAbandonedVouchers() {
+  const results = { vouchers_cleaned: 0, voucher_reminders_queued: await enqueueVoucherPaymentReminders() };
 
   // Delete PENDING vouchers older than 24 hours (abandoned checkout flows)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: abandoned } = await supabase
+  const { data: abandoned, error: abandonedError } = await supabase
     .from("vouchers")
     .select("id")
     .eq("status", "PENDING")
     .lt("created_at", cutoff)
     .order("created_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
+  if (abandonedError) throw abandonedError;
 
-  if (abandoned && abandoned.length > 0) {
-    const ids = abandoned.map((v: any) => v.id);
-    await supabase.from("vouchers").delete().in("id", ids);
-    results.vouchers_cleaned = ids.length;
-    console.log("VOUCHER_CLEANUP: deleted " + ids.length + " abandoned PENDING vouchers");
+  for (const voucher of abandoned || []) {
+    const cleaned = await supabase.rpc("cleanup_abandoned_voucher", { p_voucher_id: (voucher as any).id });
+    if (cleaned.error) throw cleaned.error;
+    if (cleaned.data === true) results.vouchers_cleaned += 1;
   }
 
+  return results;
+}
+
+async function processNotificationJobs() {
+  const claimId = crypto.randomUUID();
+  const { data: jobs, error: claimError } = await supabase.rpc("claim_notification_jobs", {
+    p_claim_id: claimId,
+    p_limit: NOTIFICATION_JOB_LIMIT,
+    p_per_business: 2,
+  });
+  if (claimError) throw claimError;
+  const results = { claimed: (jobs || []).length, accepted: 0, retrying: 0, failed: 0, cancelled: 0 };
+
+  async function processJob(job: any) {
+    const eligibility = await supabase.rpc("validate_notification_job", {
+      p_job_id: job.id,
+      p_claim_id: claimId,
+    });
+    if (eligibility.error || eligibility.data === "STALE_CLAIM") {
+      throw eligibility.error || new Error("Notification claim was lost");
+    }
+    if (eligibility.data === "CANCELLED") {
+      return "CANCELLED";
+    }
+    if (eligibility.data !== "ELIGIBLE") throw new Error("Notification eligibility could not be confirmed");
+
+    // Resend retains idempotency keys for 24 hours. If a provider acceptance
+    // stayed uncertain beyond that window, never risk a duplicate automatic
+    // send; surface it as a terminal failure for operator review instead.
+    if (Number(job.attempts) > 1 && Date.now() - Date.parse(String(job.first_attempt_at || "")) >= 23 * 60 * 60 * 1000) {
+      const expired = await supabase.rpc("finish_notification_job", {
+        p_job_id: job.id,
+        p_claim_id: claimId,
+        p_accepted: false,
+        p_provider_message_id: null,
+        p_error: "Provider acceptance remained uncertain beyond the idempotency window; manual review required",
+        p_retryable: false,
+        p_acceptance_uncertain: true,
+      });
+      if (expired.error || expired.data === "STALE_CLAIM") throw expired.error || new Error("Notification claim was lost");
+      return "FAILED";
+    }
+    let accepted = false;
+    let retryable = true;
+    let acceptanceUncertain = true;
+    let providerId: string | null = null;
+    let failure = "Notification delivery failed";
+    try {
+      const payload = { ...(job.payload || {}) } as Record<string, unknown>;
+      if (payload.tour_date_raw) {
+        const tenant = await getTenantByBusinessId(supabase, job.business_id);
+        payload.tour_date = formatTenantDateTime(tenant.business, String(payload.tour_date_raw));
+        delete payload.tour_date_raw;
+      }
+      const sendSignal = AbortSignal.timeout(SEND_EMAIL_TIMEOUT_MS);
+      const response = await Promise.race([
+        fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({
+          type: job.template_type,
+          data: { ...payload, email: job.recipient, delivery_idempotency_key: job.dedupe_key },
+        }),
+          signal: sendSignal,
+        }),
+        new Promise<Response>((_resolve, reject) => {
+          const rejectOnAbort = () => reject(sendSignal.reason || new Error("send-email request timed out"));
+          if (sendSignal.aborted) rejectOnAbort();
+          else sendSignal.addEventListener("abort", rejectOnAbort, { once: true });
+        }),
+      ]);
+      const body = await response.json().catch(() => ({}));
+      const responseProviderId = typeof body?.id === "string" ? body.id.trim() : "";
+      accepted = response.ok && body?.ok === true && responseProviderId.length > 0;
+      providerId = accepted ? responseProviderId : null;
+      const malformedSuccess = response.ok && body?.ok !== false && !accepted;
+      failure = malformedSuccess
+        ? "Email provider response did not include a message ID"
+        : String(body?.message || body?.error || `Email provider returned ${response.status}`);
+      const providerStatus = typeof body?.status === "number" ? body.status : response.status;
+      retryable = malformedSuccess || providerStatus === 408 || providerStatus === 429 || providerStatus >= 500;
+      acceptanceUncertain = malformedSuccess || providerStatus === 408 || providerStatus >= 500;
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+
+    const finished = await supabase.rpc("finish_notification_job", {
+      p_job_id: job.id,
+      p_claim_id: claimId,
+      p_accepted: accepted,
+      p_provider_message_id: providerId,
+      p_error: accepted ? null : failure,
+      p_retryable: retryable,
+      p_acceptance_uncertain: !accepted && acceptanceUncertain,
+    });
+    if (finished.error || finished.data === "STALE_CLAIM") throw finished.error || new Error("Notification claim was lost");
+    return String(finished.data);
+  }
+
+  const errors: unknown[] = [];
+  for (let start = 0; start < (jobs || []).length; start += NOTIFICATION_CONCURRENCY) {
+    const settled = await Promise.allSettled((jobs || []).slice(start, start + NOTIFICATION_CONCURRENCY).map(processJob));
+    for (const outcome of settled) {
+      if (outcome.status === "rejected") {
+        errors.push(outcome.reason);
+      } else if (outcome.value === "ACCEPTED") results.accepted += 1;
+      else if (outcome.value === "QUEUED") results.retrying += 1;
+      else if (outcome.value === "CANCELLED") results.cancelled += 1;
+      else results.failed += 1;
+    }
+  }
+  if (errors.length) throw errors[0];
   return results;
 }
 
@@ -565,9 +609,22 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
   catch { return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: headers() }); }
   // This sweep performs platform-wide cleanup; there is no operator UI caller.
   if (!auth.isServiceRole) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: headers() });
+  const body = await req.json().catch(() => ({}));
   // Check-ins begin only AFTER service authentication, never from a public ping.
   const checkInId = await captureCheckIn("cron-tasks", "in_progress");
-  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
+  if (body?.action === "notification_jobs") {
+    try {
+      const voucher_reminders_queued = await enqueueVoucherPaymentReminders();
+      const notification_jobs = await processNotificationJobs();
+      await captureCheckIn("cron-tasks", "ok", checkInId);
+      return new Response(JSON.stringify({ voucher_reminders_queued, notification_jobs }), { headers: headers() });
+    } catch (error) {
+      console.error("NOTIFICATION_JOB_ERR", error);
+      await captureCheckIn("cron-tasks", "error", checkInId);
+      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { headers: headers(), status: 500 });
+    }
+  }
+  const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, notification_jobs: null, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
 
   // Capacity-releasing cleanups run BEFORE auto-messages: its auto-expire
   // cancels past-deadline PENDING bookings without releasing slot capacity,
@@ -606,6 +663,13 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    results.notification_jobs = await processNotificationJobs();
+  } catch (error) {
+    console.error("NOTIFICATION_JOB_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

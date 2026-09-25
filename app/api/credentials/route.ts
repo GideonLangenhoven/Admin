@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
+import { requireSensitiveMfa } from "../../lib/mfa-sensitive";
 
 function serviceClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -52,23 +53,51 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
     }
 
-    const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
-    if (!encryptionKey || encryptionKey.length < 32) {
-        return NextResponse.json({
-            error: "SETTINGS_ENCRYPTION_KEY is not configured on the server.",
-        }, { status: 500 });
-    }
     let body: any;
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
     const { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
     if (!section) return NextResponse.json({ error: "section is required ('wa', 'yoco', or 'yoco_test')" }, { status: 400 });
 
-    if (caller.role !== "SUPER_ADMIN" && caller.business_id !== business_id) {
+    const selectedTarget = req.headers.get("x-admin-business-id")?.trim() || "";
+    if (caller.role === "SUPER_ADMIN") {
+        if (!selectedTarget || selectedTarget !== business_id || caller.business_id !== business_id) {
+            return NextResponse.json({ error: "Select the target business again before changing protected credentials" }, { status: 403 });
+        }
+    } else if (caller.business_id !== business_id) {
         return NextResponse.json({ error: "You can only update credentials for your own business" }, { status: 403 });
     }
 
     const supabase = serviceClient();
+    const { data: target, error: targetError } = await supabase.from("businesses")
+        .select("id, subscription_status").eq("id", business_id).maybeSingle();
+    if (targetError) return NextResponse.json({ error: "Target business could not be verified" }, { status: 503 });
+    if (!target || !["ACTIVE", "TRIAL", "PAST_DUE"].includes(String(target.subscription_status || "").toUpperCase())) {
+        return NextResponse.json({ error: "Protected credentials can only be changed for an active business" }, { status: 403 });
+    }
+
+    const mfa = await requireSensitiveMfa(req, {
+        allowedRoles: ["MAIN_ADMIN", "SUPER_ADMIN"],
+        expectedActorId: caller.id,
+    });
+    if (!mfa.ok) return NextResponse.json({ error: mfa.message, code: mfa.code }, { status: mfa.status });
+
+    const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
+    if (!encryptionKey || encryptionKey.length < 32) {
+        return NextResponse.json({
+            error: "SETTINGS_ENCRYPTION_KEY is not configured on the server.",
+        }, { status: 500 });
+    }
+
+    const save = (first: string | null, second: string | null, testMode: boolean | null = null) => supabase.rpc("set_sensitive_credentials_audited", {
+        p_business_id: business_id,
+        p_actor_id: caller.id,
+        p_key: encryptionKey,
+        p_section: section,
+        p_first_value: first,
+        p_second_value: second,
+        p_test_mode: testMode,
+    });
     if (section === "wa") {
         if (!wa_token?.trim() || !wa_phone_id?.trim()) {
             return NextResponse.json({ error: "Both WhatsApp Access Token and Phone Number ID are required." }, { status: 400 });
@@ -93,9 +122,7 @@ export async function POST(req: NextRequest) {
             // Meta unreachable (network blip) — don't block the save on our outage.
             console.warn("WA_CRED_VALIDATE_SKIPPED: Meta Graph unreachable");
         }
-        const { error: waErr } = await supabase.rpc("set_wa_credentials", {
-            p_business_id: business_id, p_key: encryptionKey, p_wa_token: wa_token.trim(), p_wa_phone_id: wa_phone_id.trim(),
-        });
+        const { error: waErr } = await save(wa_token.trim(), wa_phone_id.trim());
         if (waErr) return NextResponse.json({ error: "Failed to save WhatsApp credentials: " + waErr.message }, { status: 500 });
     } else if (section === "yoco") {
         if (!yoco_secret_key?.trim() || !yoco_webhook_secret?.trim()) {
@@ -104,9 +131,7 @@ export async function POST(req: NextRequest) {
         if (!yoco_secret_key.trim().startsWith("sk_live_")) {
             return NextResponse.json({ error: "Live credentials require a Yoco live key (sk_live_...). Save test keys under Yoco Test Credentials and enable Test Mode." }, { status: 400 });
         }
-        const { error: yocoErr } = await supabase.rpc("set_yoco_credentials", {
-            p_business_id: business_id, p_key: encryptionKey, p_yoco_secret_key: yoco_secret_key.trim(), p_yoco_webhook_secret: yoco_webhook_secret.trim(),
-        });
+        const { error: yocoErr } = await save(yoco_secret_key.trim(), yoco_webhook_secret.trim());
         if (yocoErr) return NextResponse.json({ error: "Failed to save Yoco credentials: " + yocoErr.message }, { status: 500 });
     } else if (section === "yoco_test") {
         if (!yoco_test_secret_key?.trim() || !yoco_test_webhook_secret?.trim()) {
@@ -115,15 +140,10 @@ export async function POST(req: NextRequest) {
         if (!yoco_test_secret_key.trim().startsWith("sk_test_")) {
             return NextResponse.json({ error: "Test credentials require a Yoco test key (sk_test_...). Save live keys under Yoco Credentials." }, { status: 400 });
         }
-        const { error: testErr } = await supabase.rpc("set_yoco_test_credentials", {
-            p_business_id: business_id, p_key: encryptionKey, p_test_secret_key: yoco_test_secret_key.trim(), p_test_webhook_secret: yoco_test_webhook_secret.trim(),
-        });
+        const { error: testErr } = await save(yoco_test_secret_key.trim(), yoco_test_webhook_secret.trim());
         if (testErr) return NextResponse.json({ error: "Failed to save Yoco test credentials: " + testErr.message }, { status: 500 });
     } else if (section === "yoco_test_mode") {
-        const { error: modeErr } = await supabase
-            .from("businesses")
-            .update({ yoco_test_mode: yoco_test_mode === true })
-            .eq("id", business_id);
+        const { error: modeErr } = await save(null, null, yoco_test_mode === true);
         if (modeErr) return NextResponse.json({ error: "Failed to update test mode: " + modeErr.message }, { status: 500 });
     } else {
         return NextResponse.json({ error: "Invalid section value." }, { status: 400 });

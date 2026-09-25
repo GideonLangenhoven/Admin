@@ -24,21 +24,25 @@ describe("support business targeting",()=>{
   });
 });
 describe("business detail response race",()=>{
+  it("calculates an existing customer's cost from its referenced plan",()=>{
+    const monthlyCost=sourceFunction("app/super-admin/page.tsx","monthlyCostZar",{});
+    expect(monthlyCost(3,{monthly_price_zar:1400,seat_limit:2,extra_seat_price_zar:250})).toBe(1650);
+  });
   it("discards a slower response for the previous client",async()=>{
     const pending: Record<string,()=>void>={};
-    const q=(table:string)=>{let id="";const obj:any={select:()=>obj,eq:(_:string,value:string)=>{id=value;return obj;},order:()=>obj,single:()=>obj,
-      then:(resolve:any)=>{pending[table+id]=()=>resolve({data:table==="businesses"?{id,business_name:id,faq_json:{}}:[],error:null});}};
+    const q=(table:string)=>{let id="";const obj:any={select:()=>obj,eq:(_:string,value:string)=>{id=value;return obj;},order:()=>obj,single:()=>obj,maybeSingle:()=>obj,
+      then:(resolve:any)=>{pending[table+id]=()=>resolve({data:table==="businesses"?{id,business_name:id,faq_json:{}}:table==="subscriptions"?null:[],error:null});}};
       return obj;};
     const setBizDetail=vi.fn(),setBizDetailLoading=vi.fn();
     const load=sourceFunction("app/super-admin/page.tsx","loadBizDetail",{
       detailRequest:{current:0},expandedBiz:null,setExpandedBiz:vi.fn(),setBizDetail,setBizDetailLoading,setBizTours:vi.fn(),setBizAdmins:vi.fn(),setBizFaqs:vi.fn(),notify:vi.fn(),HIDDEN_SUPERADMIN_EMAILS:[],supabase:{from:q},
     });
     const first=load(A),second=load(B);await Promise.resolve();
-    for(const table of ["businesses","tours","admin_users"]) pending[table+B]();
+    for(const table of ["businesses","tours","admin_users","subscriptions"]) pending[table+B]();
     await second;
-    for(const table of ["businesses","tours","admin_users"]) pending[table+A]();
+    for(const table of ["businesses","tours","admin_users","subscriptions"]) pending[table+A]();
     await first;
-    expect(setBizDetail.mock.calls.filter(c=>c[0]!==null)).toEqual([[{id:B,business_name:B,faq_json:{}}]]);
+    expect(setBizDetail.mock.calls.filter(c=>c[0]!==null)).toEqual([[{id:B,business_name:B,faq_json:{},billing_plan:null}]]);
     expect(setBizDetailLoading.mock.calls.filter(c=>c[0]===false)).toHaveLength(1);
   });
   it("refuses to save a mismatched detail record",async()=>{

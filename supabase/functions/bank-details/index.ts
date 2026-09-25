@@ -13,7 +13,7 @@ function getCors(req: Request) {
   const origin = req.headers.get("origin") || "";
   return {
     "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-business-id, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
@@ -27,27 +27,66 @@ function fail(req: Request, msg: string, status = 400) {
   return new Response(JSON.stringify({ error: msg }), { status, headers: getCors(req) });
 }
 
-async function verifyAdmin(req: Request, businessId: string) {
-  const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!jwt) return null;
-  const { data: { user }, error } = await db.auth.getUser(jwt);
-  if (error || !user) return null;
-  const { data: row } = await db
+async function verifyAdmin(req: Request, businessId: string, action: string) {
+  const jwt = (req.headers.get("authorization") || "").match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (!jwt) return { error: "Unauthorized", status: 401 } as const;
+  let userResult;
+  try { userResult = await db.auth.getUser(jwt); }
+  catch { return { error: "Authentication service unavailable", status: 503 } as const; }
+  const user = userResult.data.user;
+  if (userResult.error || !user) return { error: "Unauthorized", status: 401 } as const;
+  const { data: row, error: rowError } = await db
     .from("admin_users")
-    .select("id, read_only")
+    .select("id, user_id, role, business_id, suspended, read_only")
     .eq("user_id", user.id)
-    .eq("business_id", businessId)
     .maybeSingle();
-  return row ? { user, readOnly: row.read_only === true } : null;
+  if (rowError) return { error: "Account verification unavailable", status: 503 } as const;
+  if (!row || row.suspended || !["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"].includes(row.role)) {
+    return { error: "Unauthorized", status: 403 } as const;
+  }
+  if (row.role === "SUPER_ADMIN" && req.headers.get("x-admin-business-id")?.trim() !== businessId) {
+    return { error: "Select the target business again", status: 403 } as const;
+  }
+  if (row.role !== "SUPER_ADMIN" && row.business_id !== businessId) return { error: "Wrong business", status: 403 } as const;
+  if (action !== "set") return { user, actor: row, jwt } as const;
+  if (row.read_only) return { error: "This demonstration account is read-only", status: 403 } as const;
+  if (row.role !== "MAIN_ADMIN" && row.role !== "SUPER_ADMIN") return { error: "MAIN_ADMIN or SUPER_ADMIN required", status: 403 } as const;
+
+  const { data: business, error: businessError } = await db.from("businesses")
+    .select("id, subscription_status").eq("id", businessId).maybeSingle();
+  if (businessError) return { error: "Target business verification unavailable", status: 503 } as const;
+  if (!business || !["ACTIVE", "TRIAL", "PAST_DUE"].includes(String(business.subscription_status || "").toUpperCase())) {
+    return { error: "Protected settings require an active business", status: 403 } as const;
+  }
+
+  let assurance;
+  try { assurance = await db.auth.mfa.getAuthenticatorAssuranceLevel(jwt); }
+  catch { return { error: "MFA verification unavailable", status: 503 } as const; }
+  if (assurance.error || !assurance.data) return { error: "MFA verification unavailable", status: 503 } as const;
+  const factors = (user.factors || []).filter((factor: any) => factor.status === "verified" && factor.factor_type === "totp");
+
+  const { data: recovery, error: recoveryError } = await db.from("mfa_recovery_state")
+    .select("status, completed_at")
+    .eq("admin_id", row.id)
+    .maybeSingle();
+  if (recoveryError) return { error: "Recovery status unavailable", status: 503 } as const;
+  if (recovery && recovery.status !== "COMPLETED") return { error: "MFA recovery is still in progress", status: 423 } as const;
+  if (recovery?.status === "COMPLETED") {
+    const completedAt = Date.parse(recovery.completed_at || "");
+    const freshFactor = factors.some((factor: any) => Date.parse(factor.updated_at || factor.created_at || "") > completedAt);
+    const freshChallenge = (assurance.data.currentAuthenticationMethods || []).some((method: any) =>
+      typeof method !== "string" && String(method.method).includes("totp") && Number(method.timestamp) * 1000 > completedAt
+    );
+    if (!freshFactor || !freshChallenge) return { error: "Enroll and verify a new authenticator after recovery", status: 403 } as const;
+  }
+  if (!factors.length) return { error: "Set up an authenticator before changing bank details", status: 403 } as const;
+  if (assurance.data.currentLevel !== "aal2") return { error: "Enter a current authenticator code before changing bank details", status: 403 } as const;
+  return { user, actor: row, jwt } as const;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCors(req) });
-  }
-
-  if (!SETTINGS_ENCRYPTION_KEY) {
-    return fail(req, "Encryption key not configured", 503);
   }
 
   let body: any;
@@ -60,9 +99,12 @@ Deno.serve(async (req) => {
   const { action, business_id } = body;
   if (!business_id) return fail(req, "business_id required");
 
-  const admin = await verifyAdmin(req, business_id);
-  if (!admin) return fail(req, "Unauthorized", 401);
-  if (admin.readOnly && action !== "get") return fail(req, "This demonstration account is read-only", 403);
+  const admin = await verifyAdmin(req, business_id, action);
+  if ("error" in admin) return fail(req, admin.error, admin.status);
+
+  if (!SETTINGS_ENCRYPTION_KEY) {
+    return fail(req, "Encryption key not configured", 503);
+  }
 
   if (action === "get") {
     const { data, error } = await db.rpc("get_business_bank_details", {
@@ -82,8 +124,9 @@ Deno.serve(async (req) => {
 
   if (action === "set") {
     const { account_owner, account_number, account_type, bank_name, branch_code } = body;
-    const { error: setErr } = await db.rpc("set_business_bank_details", {
+    const { error: setErr } = await db.rpc("set_business_bank_details_audited", {
       p_business_id: business_id,
+      p_actor_id: admin.actor.id,
       p_key: SETTINGS_ENCRYPTION_KEY,
       p_account_owner: account_owner ?? null,
       p_account_number: account_number ?? null,
@@ -91,7 +134,17 @@ Deno.serve(async (req) => {
       p_bank_name: bank_name ?? null,
       p_branch_code: branch_code ?? null,
     });
-    if (setErr) return fail(req, setErr.message, 500);
+    if (setErr) {
+      await db.from("audit_logs").insert({
+        actor_id: admin.actor.id,
+        business_id,
+        action_type: "BANK_DETAILS_CHANGE_FAILED",
+        target_entity: "businesses",
+        target_id: business_id,
+        after_state: { outcome: "failed" },
+      });
+      return fail(req, setErr.message, 500);
+    }
     return ok(req, { success: true });
   }
 

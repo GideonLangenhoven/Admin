@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { getCallerAdmin, isPrivilegedRole, canManageAdmin } from "../../../lib/api-auth";
 import { setAdminAuthPassword } from "../../../lib/admin-password";
 
@@ -80,15 +80,20 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     const shouldForceSetup = reason !== "RESET";
 
-    const updatePayload: Record<string, any> = {
-      setup_token_hash: tokenHash,
-      setup_token_expires_at: expiresAt,
-      invite_sent_at: new Date().toISOString(),
-    };
-    if (shouldForceSetup) updatePayload.must_set_password = true;
-
-    const { error: updErr } = await admin.from("admin_users").update(updatePayload).eq("id", user.id);
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    const { data: issued, error: issueError } = await admin.rpc("issue_admin_setup_token", {
+      p_admin_id: user.id,
+      p_token_hash: tokenHash,
+      p_expires_at: expiresAt,
+      p_force_setup: shouldForceSetup,
+    });
+    if (issueError) return NextResponse.json({ error: "Password setup is temporarily unavailable" }, { status: 503 });
+    if (issued?.status === "BUSY") {
+      if (isSelfReset) return NextResponse.json({ ok: true, expires_at: null });
+      return NextResponse.json({ error: "Password setup is already being completed. Try again shortly." }, { status: 409 });
+    }
+    if (issued?.status !== "ISSUED") {
+      return NextResponse.json({ error: "Password setup link could not be issued" }, { status: 409 });
+    }
 
     const origin = req.nextUrl.origin || req.headers.get("origin") || "";
     const setupUrl =
@@ -169,71 +174,45 @@ export async function POST(req: NextRequest) {
 
     const tokenHash = sha256(token);
 
-    let user: any;
-    {
-      const { data } = await admin
-        .from("admin_users")
-        .select("id, email, name, setup_token_expires_at, password_set_at, user_id")
-        .eq("email", email)
-        .eq("setup_token_hash", tokenHash)
-        .maybeSingle();
-      user = data || null;
+    const claimId = randomUUID();
+    const { data: claim, error: claimError } = await admin.rpc("claim_admin_setup_token", {
+      p_email: email,
+      p_token_hash: tokenHash,
+      p_claim_id: claimId,
+    });
+    if (claimError) return NextResponse.json({ error: "Password setup is temporarily unavailable" }, { status: 503 });
+    if (claim?.status === "COMPLETED") {
+      return NextResponse.json({ ok: true, idempotent: true, ...claim.admin });
     }
-
-    if (!user) {
-      // Idempotency: a legitimate double-submit (e.g. the client retries after
-      // the first response was lost) replays the SAME token that already
-      // succeeded. setup_token_hash_used preserves that token's hash across
-      // the primary path's null-out specifically so this can be verified —
-      // matching only on email + a time window (the old check) let ANY
-      // submitted token, including a wrong/forged one, get ok:true back.
-      const { data: recent } = await admin
-        .from("admin_users")
-        .select("id, email, name, password_set_at, setup_token_hash_used")
-        .eq("email", email)
-        .maybeSingle();
-      if ((recent as any)?.password_set_at && (recent as any)?.setup_token_hash_used === tokenHash) {
-        const setAgo = Date.now() - new Date((recent as any).password_set_at).getTime();
-        if (setAgo < 5 * 60 * 1000) {
-          return NextResponse.json({
-            ok: true,
-            idempotent: true,
-            id: (recent as any).id,
-            email: (recent as any).email,
-            name: (recent as any).name,
-          });
-        }
-      }
+    if (claim?.status === "BUSY") {
+      return NextResponse.json({ error: "This password link is already being completed. Please wait and try again." }, { status: 409 });
+    }
+    if (claim?.status !== "CLAIMED" || !claim.admin?.id) {
       return NextResponse.json({ error: "Invalid or expired link" }, { status: 401 });
     }
+    const user = claim.admin;
 
-    if (
-      !(user as any).setup_token_expires_at ||
-      new Date((user as any).setup_token_expires_at).getTime() < Date.now()
-    ) {
-      return NextResponse.json({ error: "Link has expired" }, { status: 401 });
-    }
+    const releaseClaim = async () => {
+      await admin.rpc("release_admin_setup_token_claim", { p_admin_id: user.id, p_claim_id: claimId });
+    };
 
     let authUserId: string;
     try { authUserId = await setAdminAuthPassword(admin, user, newPassword); }
     catch (error) {
+      await releaseClaim();
       return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update the sign-in password. Please try again." }, { status: 502 });
     }
-    const newHash = sha256(newPassword);
 
-    const { error: updErr } = await admin
-      .from("admin_users")
-      .update({
-        user_id: authUserId,
-        password_hash: newHash,
-        password_set_at: new Date().toISOString(),
-        must_set_password: false,
-        setup_token_hash: null,
-        setup_token_hash_used: tokenHash,
-        setup_token_expires_at: null,
-      })
-      .eq("id", user.id);
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    const { data: completed, error: completeError } = await admin.rpc("complete_admin_setup_token", {
+      p_admin_id: user.id,
+      p_token_hash: tokenHash,
+      p_claim_id: claimId,
+      p_user_id: authUserId,
+    });
+    if (completeError || completed !== true) {
+      await releaseClaim();
+      return NextResponse.json({ error: "The password changed, but setup could not be finalized. Submit the same link again." }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, id: user.id, email: user.email, name: user.name });
   }

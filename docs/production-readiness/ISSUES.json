@@ -1,0 +1,125 @@
+{
+  "updated_at_utc": "2026-09-21T18:15:43Z",
+  "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "issues": [
+    {
+      "id": "REL-PROVENANCE",
+      "severity": "gate",
+      "status": "PARTIAL",
+      "evidence": "Admin and booking candidate commits are exact; deployed Admin, booking, onboarding, Edge and schema equivalence remain unproven.",
+      "next": "Build a redacted deployment manifest from the actual target before deployment."
+    },
+    {
+      "id": "GUIDE-OFFLINE-01",
+      "severity": "high",
+      "status": "LOCAL_VERIFIED",
+      "evidence": "109 focused tests, the broader suite, TypeScript and local browser probes pass.",
+      "next": "Verify with real Auth in isolated staging."
+    },
+    {
+      "id": "AUTH-01",
+      "severity": "high",
+      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
+      "evidence": "Linked staff use verified Supabase Auth identity; legacy SHA-256 passwords migrate once and are cleared; self-change uses an isolated nonpersistent password session; setup-token issuance respects active claims; and a still-owned claim can finalize after expiry. Unit, production build, Edge and 181-check database rehearsal pass. A fresh Astra/xhigh reviewer accepted 7d3e7b3 after 49 focused tests and an installed-SDK session isolation probe.",
+      "next": "Deploy the exact candidate and run real Auth login, recovery, MFA and distributed-origin checks."
+    },
+    {
+      "id": "REFUND-01",
+      "severity": "high",
+      "status": "LOCAL_VERIFIED",
+      "evidence": "OPERATOR authority, tenant attribution and truthful single/bulk outcomes pass local coverage.",
+      "next": "Run one approved provider sandbox refund journey."
+    },
+    {
+      "id": "NOTIFY-01",
+      "severity": "high",
+      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
+      "evidence": "Durable tenant-fair notification jobs, transactional intent, stable provider idempotency, bounded retries/timeouts, crash recovery, stale-payload cancellation, legacy reminder suppression and atomic privileged retry audit pass 32 focused tests and the 181-check database rehearsal. Fresh Astra/xhigh review accepted the frozen source.",
+      "next": "Apply the exact migration and Edge candidate, verify the authenticated one-minute schedule, then run scoped genuine delivery and worker-failure probes."
+    },
+    {
+      "id": "ARRIVAL-01",
+      "severity": "high",
+      "status": "LOCAL_DB_PASSED",
+      "evidence": "Arrival compatibility, audit and direct privilege checks pass the 181-check disposable database run.",
+      "next": "Rehearse against an isolated target restored from the intended ledger."
+    },
+    {
+      "id": "PRICING-NEW-ONLY-01",
+      "severity": "high",
+      "status": "LOCAL_DB_PASSED",
+      "evidence": "Versioned pricing applies to future subscriptions and preserves existing plans, subscriptions and open lines.",
+      "next": "Rehearse against an isolated target restored from the intended ledger."
+    },
+    {
+      "id": "MFA-SENSITIVE-ACTIONS-01",
+      "severity": "high",
+      "status": "LOCAL_VERIFIED_EXTERNAL_OPEN",
+      "evidence": "Bank, WhatsApp and Yoco changes require MFA; audited SUPER_ADMIN on-behalf recovery and changes are implemented.",
+      "next": "Validate real enrollment, challenge and recovery with Supabase Auth."
+    },
+    {
+      "id": "SEC-DEV-DEPENDENCIES-01",
+      "severity": "critical",
+      "status": "RESOLVED",
+      "evidence": "Vitest and Vite upgraded, vulnerable xlsx replaced, and npm audit reports zero vulnerabilities.",
+      "next": "Monitor new advisories in CI."
+    },
+    {
+      "id": "BOOKING-PRESERVED-MOBILE-01",
+      "severity": "high",
+      "status": "VERIFIED_COMMITTED",
+      "evidence": "Seven preserved mobile/accessibility changes were reconciled with embed action visibility and committed as 2ff1d82.",
+      "next": "Run deployed storefront browser smoke before release."
+    },
+    {
+      "id": "SECURITY-01",
+      "severity": "high",
+      "status": "PARTIAL",
+      "evidence": "Local regression, Edge checks and dependency audit pass; deployed CSP, quotas, TLS and privilege drift are not qualified.",
+      "next": "Run isolated staging and target-specific checks."
+    },
+    {
+      "id": "CI-01",
+      "severity": "gate",
+      "status": "OPEN",
+      "evidence": "No candidate-specific remote workflow run exists.",
+      "next": "Run safe CI against exact Admin and booking commits."
+    },
+    {
+      "id": "CONTINUITY-01",
+      "severity": "gate",
+      "status": "LOCAL_SYNTHETIC_PASSED",
+      "evidence": "100 of 100 same synthetic records survived the complete local migration ledger.",
+      "next": "Repeat on an isolated restore and complete the deployed role matrix."
+    },
+    {
+      "id": "PROVIDER-01",
+      "severity": "gate",
+      "status": "BLOCKED_EXTERNAL",
+      "evidence": "Scoped test recipients and Yoco test-mode use are approved, but no genuine current payment-to-confirmation-to-message-to-refund journey exists.",
+      "next": "Deploy the exact candidate, validate provider credentials without exposing them, then run the scoped test-mode journey."
+    },
+    {
+      "id": "BT500-LAUNCH-V1",
+      "severity": "qualification",
+      "status": "STAFF_RUNNER_READY_EXECUTION_OPEN",
+      "evidence": "The 500-session read smoke passed. The guarded mixed-staff runner now enforces 70/20/10 actions, 100/250/500 ramp, 60-minute steady, 2x spike, recovery, 24-hour soak, zero dropped iterations, phase/journey latency and failure thresholds, marker isolation and post-run invariants. It has passed offline inspection but has not run against a deployed candidate.",
+      "next": "Deploy the exact candidate, complete provider-double/public/Realtime harnesses and quota proof, then execute the approved profile."
+    },
+    {
+      "id": "RESTORE-01",
+      "severity": "gate",
+      "status": "READY_FOR_EXTERNAL_APPROVAL",
+      "evidence": "A target-specific restore and alert packet is prepared in SECTION8_RELEASE_RECOVERY.md.",
+      "next": "Supply and approve a separate restore target and receiver."
+    },
+    {
+      "id": "DEPLOY-01",
+      "severity": "final_gate",
+      "status": "BLOCKED_EXTERNAL",
+      "evidence": "Candidate is committed and locally verified but has not been pushed, deployed or canaried.",
+      "next": "Approve the exact target, order, rollback and canary after prior gates pass."
+    }
+  ]
+}

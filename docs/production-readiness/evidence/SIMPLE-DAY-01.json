@@ -1,0 +1,21 @@
+{
+  "recorded_at_utc":"2026-09-20T14:29:11Z","base":"181267717e2fc116599df04e8444e9e94fb3c0b6","candidate":"75b0b05d97741b012a7fcdfedcd6cf146cbbe9fa",
+  "artifacts": {
+    "directory":"/private/tmp/bookingtours-simple-view-evidence-1812677",
+    "hook_sha256":"84d59ce72b5579e8d6ebe4dfe00a0005b812e623d53a020c566a747f14bfcf9b",
+    "test_sha256":"174a6a4ddcafa25cbc58b984353a863a7c48c7a9a035a81b3a955eeb5ce56013",
+    "before_log_sha256":"deb15f3df01e9b80df492d6db2d1f94f0cabb92ff3117386715686855021f1f3",
+    "after_log_sha256":"d445493146ea0c3811034bda99e9ec3da5477f968765e37a69cdcaa796c7fa7d"
+  },
+  "failing_before":{"command":"npm run test:unit -- --run tests/unit/simple-day-request-order.test.ts","exit_code":1,"tests_failed":7,"tests_passed":0,"source":"writer artifact; parent and reviewer read but did not rerun baseline"},
+  "passing_after":[
+    {"command":"npm run test:unit -- --run tests/unit/simple-day-request-order.test.ts","exit_code":0,"tests_passed":7,"independently_rerun_by":["integration owner","fresh reviewer"]},
+    {"command":"npm run test:unit -- --run tests/unit/simple-view.test.ts tests/unit/bookings-realtime.test.ts tests/unit/rollout-pagination.test.ts","exit_code":0,"tests_passed":22,"independently_rerun_by":["integration owner","fresh reviewer"]},
+    {"command":"npx eslint app/simple/use-simple-day.ts tests/unit/simple-day-request-order.test.ts","exit_code":0,"independently_rerun_by":["integration owner","fresh reviewer"]},
+    {"command":"npx tsc --noEmit","exit_code":0,"independently_rerun_by":["integration owner"]},
+    {"command":"npx tsc --noEmit --incremental false","exit_code":0,"independently_rerun_by":["fresh reviewer"]},
+    {"command":"git diff --check","exit_code":0,"independently_rerun_by":["integration owner","fresh reviewer"]}
+  ],
+  "not_run":["real browser/React Strict Mode","authenticated staging","database","provider","deployment","production"],
+  "customer_effect":"Stale same-tenant responses can no longer replace the selected day, surface obsolete errors, or end the active load early. No tenant-switch leak was reproduced."
+}

@@ -1,0 +1,19 @@
+{
+  "task": "REFUND-AUTHORITY-01",
+  "status": "APPROVE_TASK",
+  "commit": "718dee28df58df0cab527eb3f4aea7f8ae513389",
+  "validation": {
+    "affected": 76,
+    "independent_actual_chain": 44,
+    "edge_check": 0,
+    "eslint": 0,
+    "diff_check": 0
+  },
+  "evidence": "/private/tmp/bookingtours-simple-view-evidence-1812677/refund-authority-01",
+  "limits": [
+    "Synthetic provider/database evidence only",
+    "Batch gateway configuration not deployment-verified",
+    "Browser-close durable batch not implemented",
+    "UI outcomes follow-up active"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "recorded_at_utc": "2026-09-21T18:15:43Z",
+  "status": "POLICY_FROZEN_RUNTIME_PROOF_OPEN",
+  "target": "ukdsrndqhsatjkmxijuj",
+  "guards": {
+    "synthetic_marker": "bt500-20260921",
+    "customer_data": "The owner states there are no customers and authorizes replacement of synthetic data.",
+    "high_volume_messages": "blocked",
+    "high_volume_payments_and_refunds": "blocked",
+    "provider_doubles": "required but not configured",
+    "genuine_email": "one supplied recipient only; held outside Git",
+    "genuine_whatsapp": "one supplied recipient only; held outside Git",
+    "yoco": "test mode only; no live charge or refund",
+    "paid_scaling": "blocked; cost ceiling ZAR 0",
+    "teardown": "delete marker-labelled rows and Auth users only, then reconcile pre/post counts"
+  },
+  "negative_tests_required": [
+    "reject a non-marker tenant during volume mutation",
+    "reject a recipient outside the supplied allowlist",
+    "reject live Yoco mode",
+    "reject a missing provider-double flag",
+    "reject teardown when pre-run inventory is missing"
+  ],
+  "approval": false,
+  "blocking_reason": "The mixed-staff runner enforces marker-scoped identities and invariant checks. Provider doubles and runtime recipient/live-mode rejection still require deployed negative proof."
+}

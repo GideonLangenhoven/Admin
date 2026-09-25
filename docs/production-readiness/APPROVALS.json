@@ -1,0 +1,65 @@
+{
+  "updated_at_utc": "2026-09-22T09:15:55Z",
+  "candidate": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "authorized": {
+    "isolated_source_changes": true,
+    "local_tests_with_synthetic_data": true,
+    "bt500_shared_read_smoke": true,
+    "bt500_marker_only_synthetic_mutation": true,
+    "current_prelaunch_project_synthetic_reset_and_testing": true,
+    "current_prelaunch_project_bt500_qualification": true,
+    "bounded_deployed_marker_load": true,
+    "immediate_24_hour_window_after_exact_deployment": true,
+    "scoped_test_email_and_whatsapp_recipient": true,
+    "monitoring_receiver_supplied": true,
+    "yoco_test_mode_requests": true,
+    "production_mutation": true,
+    "deployment_or_push": true,
+    "real_messages": false,
+    "real_charges_or_refunds": false,
+    "provider_account_changes": false,
+    "paid_resource_changes": false,
+    "production_or_paid_load": true,
+    "destructive_existing_resource_operations": false
+  },
+  "resolved_product_decisions": [
+    {
+      "id": "REFUND_OPERATOR_POLICY",
+      "decision": "Active authorized OPERATOR staff retain own-tenant refund initiation and completion. Legacy ADMIN, MAIN_ADMIN and exact SUPER_ADMIN support remain."
+    },
+    {
+      "id": "SENSITIVE_ACTION_MFA_SCOPE",
+      "decision": "MFA is required for invoice bank-account changes and WhatsApp or Yoco linking. Ordinary booking work remains available while recovery is pending."
+    },
+    {
+      "id": "MFA_RECOVERY",
+      "decision": "Verified SUPER_ADMIN-assisted recovery. SUPER_ADMIN may change protected details on behalf of an operator using the SUPER_ADMIN own MFA, an explicit target business and durable attribution."
+    },
+    {
+      "id": "STANDARD_PLAN_EXISTING_CUSTOMERS",
+      "decision": "Pricing changes apply to new subscriptions only; preserve existing subscriptions and open billing lines."
+    },
+    {
+      "id": "BT500_TARGET",
+      "decision": "Section 7 uses 500 authenticated sessions. Replaceable synthetic data is permitted; live messages, payments, refunds and provider changes remain blocked."
+    },
+    {
+      "id": "QUALIFICATION_WINDOW_AND_RECIPIENTS",
+      "decision": "Begin the 24-hour window immediately after the exact candidate is deployed. A single test email, WhatsApp recipient and monitoring receiver were supplied in-session and are intentionally not stored in Git. Yoco qualification remains test-mode-only."
+    }
+  ],
+  "missing_external_approvals": [
+    "Separate restore target",
+    "Any paid scaling or cost above ZAR 0",
+    "Real charges, refunds, unrestricted outbound messaging or provider-account changes",
+    "Public launch switch"
+  ],
+  "latest_scope_steering": {
+    "request": "Deploy the exact frozen candidates and use the current no-customer environment for approved ZAR 0 pre-launch qualification with replaceable marker data.",
+    "section5_status": "Corrective implementation is deployed; browser and scheduler smoke pass, while remaining deployed role/provider acceptance is open.",
+    "section6_status": "100-account local continuity passed; deployed role matrix and genuine provider sandbox gates remain.",
+    "section7_status": "The bounded 500-VU deployed staff smoke failed and was aborted safely. Target-side queueing is confirmed; the local corrective candidate is not approved or deployed. Full provider-double, public/background, Realtime, steady, spike, recovery and soak qualification remains blocked.",
+    "section8_status": "The exact candidates and five migrations are deployed. Recovery after the failed smoke is confirmed; the capacity correction, alert delivery and isolated restore rehearsal remain open.",
+    "section9_status": "Handoff verdict is FAILED_GATE with deployed-smoke and follow-up capacity-attribution evidence."
+  }
+}

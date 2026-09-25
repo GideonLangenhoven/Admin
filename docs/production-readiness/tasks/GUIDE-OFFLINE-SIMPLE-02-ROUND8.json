@@ -1,0 +1,18 @@
+{
+  "id": "GUIDE-OFFLINE-SIMPLE-02-ROUND8",
+  "status": "READY_FOR_SOL",
+  "scope": [
+    "components/AuthGate.tsx",
+    "tests/unit/guide-offline-queue.test.ts"
+  ],
+  "frozen_context": "All7 offline implementation files remain unaccepted. Round7 reviewer report in reviews/GUIDE-OFFLINE-SIMPLE-02-ROUND7.md.",
+  "finding": "clearSession ignores signOut returned error and swallows rejection, returns true; SignOutButton then navigates while SDK credentials persist. Durable worker revocation is correct and must remain.",
+  "acceptance": [
+    "Connected actual AuthGate/SignOutButton handler-chain regression for returned SDK error and thrown SDK call, followed by successful retry.",
+    "Preserve durable worker tombstone and retry authority refs; no successful UI logout/reload until actual SDK logout success.",
+    "Do not reopen/replay old worker authority after failed logout.",
+    "106 focused plus new cases, affected tests, syntax/lint/TypeScript relevant to scope; qualify active unrelated MFA TS failure.",
+    "Frozen hashes of complete offline patch and fresh independent Astra/xhigh review."
+  ],
+  "coordination": "Sol/max, only after a source writer freezes. No production/provider access; original dirty checkout untouched."
+}

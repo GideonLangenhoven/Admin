@@ -1,0 +1,166 @@
+{
+  "profile_id": "BT500-LAUNCH-V1",
+  "version": "1.0",
+  "status": "APPROVED_SCOPE_BLOCKED_ON_DEPLOYMENT_AND_TOPOLOGY",
+  "approval": {
+    "workload_and_thresholds": true,
+    "cost_and_environment": true,
+    "approval_reference": "user-session-2026-09-21-prelaunch-qualification",
+    "metric_definitions": true,
+    "realtime_topology_and_scope": true
+  },
+  "scope": {
+    "distinct_authenticated_staff_accounts": 500,
+    "concurrent_active_staff_sessions": 500,
+    "synthetic_businesses": 167,
+    "accounts_per_business_max": 3,
+    "final_business_accounts": 2,
+    "certifies_500_operator_businesses": false,
+    "public_traffic_included_only_as_specified": true
+  },
+  "staff_actions": {
+    "steady_actions_per_second": 50,
+    "approximate_seconds_between_actions_per_session": 10,
+    "mix": {
+      "reads": 0.7,
+      "legitimate_writes": 0.2,
+      "other_authenticated_workflows": 0.1
+    },
+    "backend_request_rate": "Measure endpoint fan-out from actual browser journeys, not static assets.",
+    "shared_demo_credentials_allowed_for_load": false,
+    "authorization_and_limits_enabled": true,
+    "realtime_connections_if_one_per_active_session": 500,
+    "realtime_topology": {
+      "observed_product_topology": "one multiplexed Supabase Realtime WebSocket per active browser session",
+      "required_connections": 500,
+      "required_channels": "at least 1000 shell bindings plus route bindings from the approved route mix",
+      "rule": "Measure the source-derived footprint in an exact-candidate browser run; do not replace it with idle sockets."
+    }
+  },
+  "concurrent_extra_traffic": {
+    "public_browse_availability_actions_per_second": 5,
+    "checkout_creations_per_second": 0.5,
+    "controlled_webhook_deliveries_per_second": 1.25,
+    "transactional_jobs_burst": 500,
+    "transactional_jobs_burst_seconds": 600,
+    "background_marketing_active": true,
+    "marketing_rate": "Approve and fix provider-aware offered rate before qualification."
+  },
+  "dataset_minimum": {
+    "bookings": 250000,
+    "slots": 62500,
+    "customer_relationships": 25000,
+    "message_and_audit_records": 500000,
+    "busy_tenant_bookings": 25000,
+    "requires_representative_history_statuses_and_skew": true,
+    "existing_accounts_for_upgrade_regression": 100
+  },
+  "execution": {
+    "ramp_session_levels": [
+      100,
+      250,
+      500
+    ],
+    "steady_full_load_seconds": 3600,
+    "spike_action_rate_multiplier": 2,
+    "spike_seconds": 300,
+    "recovery_max_seconds": 600,
+    "soak_elapsed_seconds": 86400,
+    "soak_activity_cycle": "Document an approved realistic activity cycle before testing; full-target steady qualification remains separately required.",
+    "qualification_dropped_iterations": 0,
+    "soak_active_staff_sessions": 500,
+    "soak_realtime_footprint": "Retain the approved staff_actions.realtime_topology footprint continuously for the soak."
+  },
+  "thresholds": {
+    "common_authenticated_read_p95_ms": 750,
+    "common_authenticated_read_p99_ms": 1500,
+    "application_write_p95_ms": 1500,
+    "application_write_p99_ms": 3000,
+    "unexpected_valid_traffic_failure_rate_lt": 0.001,
+    "security_financial_invariant_violations": 0,
+    "verified_webhook_ack_p95_ms": 1000,
+    "accepted_payment_event_apply_p95_ms": 10000,
+    "realtime_ui_update_p95_ms": 2000,
+    "transactional_queue_start_p95_seconds": 60,
+    "oldest_eligible_steady_job_max_seconds": 120,
+    "burst_drain_max_seconds": 600,
+    "sustained_resource_and_quota_headroom_min_fraction": 0.3
+  },
+  "separate_required_gates": {
+    "genuine_provider_journey": true,
+    "cross_version_continuity": true,
+    "backup_restore": true,
+    "recovery_point_objective_max_minutes": 15,
+    "recovery_time_objective_max_minutes": 60,
+    "approved_deployed_canary_hours": 24,
+    "all_enabled_schedulers_exercised": true
+  },
+  "safety": {
+    "production_load_authorized": false,
+    "test_tenant_in_production_is_staging": false,
+    "block_live_messages_and_payments": true,
+    "high_volume_provider_doubles_required": true,
+    "genuine_provider_tests_separately_approved": true,
+    "no_silent_threshold_reduction": true,
+    "no_unapproved_paid_resource_change": true
+  },
+  "metrics_required": [
+    "offered/completed meaningful actions",
+    "request rates by endpoint",
+    "distinct active identities",
+    "actual realtime sockets/channels",
+    "actual elapsed time",
+    "generator utilization and dropped iterations",
+    "status breakdown including unplanned 429/401/403/409",
+    "p95/p99 by critical journey",
+    "DB/worker/provider/queue metrics",
+    "during-and-after financial and isolation invariants"
+  ],
+  "notes": [
+    "Targets are inherited/concretized proposed acceptance criteria, not benchmark results or vendor guarantees.",
+    "Preserve existing stronger approved budgets; change a profile only with dated approval before a new qualifying run.",
+    "Check actual staging/production quotas and paid capacity before provisioning."
+  ],
+  "measurement_definitions": {
+    "webhook_ack_timer": "Request arrival at ingress through signature verification and durable acceptance to acknowledgement.",
+    "burst_drain_timer": "All tagged burst jobs reach approved terminal outcomes within 600 seconds of the last scheduled enqueue. Record scheduled and actual admission; delayed admission cannot extend the deadline.",
+    "terminal_outcomes": "For provider doubles, successful terminal means the business effect and labelled acknowledgement are durable. Failed, discarded, unsubmitted and unresolved items do not count as drained.",
+    "action_endpoint_mapping": "Frozen in BT500_ACTION_MAPPING.json; the mixed-staff runner tags each request and critical journey.",
+    "latency_observation_points": "Client/generator action start through required parsed/durable result, including token refresh, request fan-out and retries; request latency is also reported separately.",
+    "error_denominators_and_rolling_failure_windows": "Unexpected failures divided by scheduled valid actions, split by phase, kind and journey; report steady aggregate and 60-second windows. Label negative/contention cases separately.",
+    "provisioned_bottlenecks_and_headroom_calculations": null,
+    "note": "Freeze and approve all definitions before qualification. Failures, discarded work and simulated delivery cannot be relabelled as successful completion.",
+    "proposed_for_approval": {
+      "action_latency": "Measure from client action initiation to required visible result; retain retries and backend fan-out in separate request metrics. Report each critical journey independently.",
+      "valid_traffic_errors": "Unexpected status, transport failure, timeout, invalid response or unmet normal-work outcome divided by all scheduled valid actions; report steady aggregate and60-second rolling windows. Expected negative/contention actions have separate tags and denominator.",
+      "terminal_outcomes": "For volume provider doubles, successful terminal means the business effect is committed and the explicitly labelled double acknowledgement is recorded. Failed, discarded, unsubmitted and unresolved items do not drain the successful burst. Genuine delivery is separate and unexecuted.",
+      "headroom": "Record each provisioned CPU/memory/connection/worker/provider quota and observed usage; require at least30% unused capacity at steady target. No guessed denominators.",
+      "spike_scope": "Twice the approved action rates for300 seconds while maintaining500 distinct active staff sessions; preserve the documented account scope.",
+      "soak": "Actual86400 seconds at approved activity cycle and required authenticated/Realtime connection footprint; elapsed time cannot be simulated."
+    }
+  },
+  "updated_at_utc": "2026-09-22T09:15:55Z",
+  "candidate_accepted_base": "71da0361db65dd63f90b5110648b96b2c4ff3567",
+  "candidate_status": "Exact application candidates and the controlled five-migration package are deployed; the bounded 500-VU staff smoke failed. A local corrective candidate is not deployed or approved.",
+  "active_sections": [
+    6,
+    7,
+    9
+  ],
+  "deferred_sections": {
+    "8": "Deployment, recovery, and release gate"
+  },
+  "execution_readiness": {
+    "status": "BLOCKED_BEFORE_QUALIFYING_RUN",
+    "executed": false,
+    "reason": [
+      "The deployed 500-VU staff smoke failed with confirmed target-side queueing; the local dashboard snapshot correction awaits exact review, approval, deployment and an unchanged-threshold progressive rerun",
+      "Provider-double public checkout/webhook/background harness and runtime outbound-guard proof remain open",
+      "Production-equivalent quota denominators and at least 30% headroom are unverified at the ZAR 0 ceiling",
+      "Realtime browser footprint has not been measured on the exact candidate"
+    ],
+    "legacy_harness": "The 500-session authenticated read smoke passed. The independently reviewed mixed-staff runner executed against the deployment and failed at 500 VUs; no qualification credit was taken.",
+    "read_smoke": "PASS; evidence/BT500_READ_SMOKE_RESULT.json",
+    "mixed_staff_runner": "DEPLOYED_SMOKE_FAIL; the local runner now maps dashboard reads to the undeployed snapshot RPC; scripts/bt500-run-mixed.mjs; evidence/BT500_DEPLOYED_SMOKE_20260922.json; evidence/BT500_CAPACITY_DIAGNOSIS_20260922.json"
+  }
+}

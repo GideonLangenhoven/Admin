@@ -21,12 +21,6 @@ function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function sha256Hex(input: string) {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 const BOOKING_DOMAIN = Deno.env.get("BOOKING_DOMAIN") || "booking.bookingtours.co.za";
 const DEFAULT_TIMEZONE = "Africa/Johannesburg";
 const DEFAULT_CURRENCY = "ZAR";
@@ -64,32 +58,18 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
     const body = await req.json();
     const action = String(body.action || "generate");
 
-    // Authenticate the super admin
-    const requesterEmail = String(body.requester_email || "").trim().toLowerCase();
-    const requesterPassword = String(body.requester_password || "");
-
-    if (!requesterEmail || !requesterPassword) {
-      return respond(400, { success: false, error: "requester_email and requester_password are required" });
-    }
-
     const { data: requester, error: requesterError } = await supabase
       .from("admin_users")
-      .select("id, role, password_hash, suspended")
-      .eq("email", requesterEmail)
+      .select("id, role, suspended")
       .eq("user_id", auth.userId)
       .maybeSingle();
 
     if (requesterError) throw requesterError;
-    if (!requester || !/super/i.test(String(requester.role || ""))) {
+    if (!requester || requester.role !== "SUPER_ADMIN") {
       return respond(403, { success: false, error: "Only super admins can manage invite tokens" });
     }
     if (requester.suspended) {
       return respond(403, { success: false, error: "Account is suspended" });
-    }
-
-    const requesterHash = await sha256Hex(requesterPassword);
-    if (!requester.password_hash || requester.password_hash !== requesterHash) {
-      return respond(403, { success: false, error: "Super admin password verification failed" });
     }
 
     if (action === "generate") {

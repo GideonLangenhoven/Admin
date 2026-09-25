@@ -1,5 +1,7 @@
 # Independent acceptance review — Astra/high
 
+> Current-session override (21 September 2026): start with [00_START_HERE.md](00_START_HERE.md) and [STATE.md](STATE.md). Their source, routing, resolved policy and evidence supersede historical values below. Customer-protection and release-qualification gates remain in force.
+
 Paste this into a fresh `gpt-6-astra` / `high` session, or send it with a bounded review packet to that explicitly configured reviewer. Fill the packet from actual evidence, not assumptions.
 
 ```text

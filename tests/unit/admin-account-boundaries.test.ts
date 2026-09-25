@@ -24,7 +24,57 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
       return q;
     },
     functions: { invoke: async (_name: string, body: unknown) => { emails.push(body); return { error: null }; } },
+    rpc: async (name: string, args: Record<string, any>) => {
+      if (name === "issue_admin_setup_token") {
+        const claimedAt = Date.parse(String(target.setup_token_claimed_at || ""));
+        if (target.setup_token_claim_id && Number.isFinite(claimedAt) && claimedAt > Date.now() - 5 * 60 * 1000) {
+          return { data: { status: "BUSY" }, error: null };
+        }
+        Object.assign(target, {
+          setup_token_hash: args.p_token_hash,
+          setup_token_expires_at: args.p_expires_at,
+          setup_token_claim_id: null,
+          setup_token_claimed_at: null,
+          ...(args.p_force_setup ? { must_set_password: true } : {}),
+        });
+        return { data: { status: "ISSUED" }, error: null };
+      }
+      if (name === "claim_admin_setup_token") {
+        if (target.setup_token_hash !== args.p_token_hash) return { data: { status: "INVALID" }, error: null };
+        if (target.setup_token_claim_id && target.setup_token_claim_id !== args.p_claim_id) {
+          return { data: { status: "BUSY" }, error: null };
+        }
+        target.setup_token_claim_id = args.p_claim_id;
+        target.setup_token_claimed_at = new Date().toISOString();
+        return { data: { status: "CLAIMED", admin: { ...target } }, error: null };
+      }
+      if (name === "complete_admin_setup_token") {
+        if (target.setup_token_claim_id !== args.p_claim_id || target.setup_token_hash !== args.p_token_hash) {
+          return { data: false, error: null };
+        }
+        Object.assign(target, {
+          user_id: args.p_user_id,
+          password_hash: null,
+          must_set_password: false,
+          setup_token_hash_used: args.p_token_hash,
+          setup_token_hash: null,
+          setup_token_expires_at: null,
+          setup_token_claim_id: null,
+          setup_token_claimed_at: null,
+        });
+        return { data: true, error: null };
+      }
+      if (name === "release_admin_setup_token_claim") {
+        if (target.setup_token_claim_id === args.p_claim_id) {
+          target.setup_token_claim_id = null;
+          target.setup_token_claimed_at = null;
+        }
+        return { data: true, error: null };
+      }
+      return { data: null, error: null };
+    },
     auth: {
+      getUser: async () => ({ data: { user: { id: target.user_id } }, error: null }),
       admin: { updateUserById: async (...args: any[]) => {
         passwords.push(args);
         if (!authFails) authPassword = args[1].password;
@@ -35,16 +85,20 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
         : { data: null, error: { message: "Wrong sign-in password" } },
     },
   };
-  const invoke = async (route: "update" | "setup-link" | "login", body: object) => {
+  const invoke = async (route: "update" | "setup-link" | "login", body: object, token?: string) => {
     const handler = sourceHandler(`app/api/admin/${route}/route.ts`, {
       "@supabase/supabase-js": { createClient: () => db },
       "../../../lib/api-auth": { getCallerAdmin: async () => caller, canManageAdmin, isPrivilegedRole },
       "../../../lib/admin-password": { setAdminAuthPassword },
     });
-    const req = Object.assign(new Request("https://admin.example.invalid/api/admin/" + route, { method: "POST", body: JSON.stringify(body) }), { nextUrl: new URL("https://admin.example.invalid") });
+    const req = Object.assign(new Request("https://admin.example.invalid/api/admin/" + route, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: JSON.stringify(body),
+    }), { nextUrl: new URL("https://admin.example.invalid") });
     return handler(req);
   };
-  return { target, updates, emails, passwords, invoke };
+  return { target, updates, emails, passwords, invoke, authPassword: () => authPassword };
 }
 
 describe("R02/R03 administrator boundaries", () => {
@@ -94,6 +148,18 @@ describe("R02/R03 administrator boundaries", () => {
     expect(f.target.must_set_password).toBeUndefined();
     expect(f.emails[0].body.data.business_id).toBe("business-b");
   });
+  it("does not rotate or email a setup token while its password completion owns the claim", async () => {
+    const f = fixture();
+    Object.assign(f.target, {
+      setup_token_hash: "active-token",
+      setup_token_claim_id: "11111111-1111-4111-8111-111111111111",
+      setup_token_claimed_at: new Date().toISOString(),
+    });
+    const response = await f.invoke("setup-link", { action: "send", admin_id: "target" });
+    expect(response.status).toBe(409);
+    expect(f.target.setup_token_hash).toBe("active-token");
+    expect(f.emails).toEqual([]);
+  });
 });
 
 describe("password reset completion", () => {
@@ -101,7 +167,7 @@ describe("password reset completion", () => {
   for (const role of ["ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"]) {
     for (const route of ["setup-link", "update"] as const) {
       for (const fails of [false, true]) {
-        it(`${role} ${route} ${fails ? "keeps its previous password and link on Auth failure" : "updates both password stores"}`, async () => {
+        it(`${role} ${route} ${fails ? "keeps recovery retryable on Auth failure" : "uses Auth and clears the legacy password hash"}`, async () => {
           const f = fixture("business-a", role, { ...main, role: "SUPER_ADMIN" }, fails);
           Object.assign(f.target, { password_hash: hash("Previous-password"), setup_token_hash: hash("fixture-token"), setup_token_expires_at: new Date(Date.now() + 60000).toISOString() });
           const before = { ...f.target };
@@ -110,19 +176,36 @@ describe("password reset completion", () => {
             : { action: "reset_password", admin_id: f.target.id, password: "Replacement-password" });
           expect(res.status).toBe(fails ? 502 : 200);
           expect(f.passwords).toHaveLength(1);
-          if (fails) { expect(f.target).toEqual(before); expect(f.updates).toEqual([]); }
-          else expect(f.target.password_hash).toBe(hash("Replacement-password"));
-          const login = await f.invoke("login", { email: f.target.email, password: fails ? "Previous-password" : "Replacement-password" });
+          if (fails) {
+            expect(f.target.password_hash).toBe(before.password_hash);
+            expect(f.target.setup_token_hash).toBe(before.setup_token_hash);
+            expect(f.authPassword()).toBe("Previous-password");
+          } else {
+            expect(f.target.password_hash).toBeNull();
+            expect(f.authPassword()).toBe("Replacement-password");
+          }
+          const login = await f.invoke("login", {}, "verified-auth-session");
           expect(login.status).toBe(200);
         });
       }
     }
   }
   it("keeps self-service password changes retryable when Auth fails", async () => {
-    const f = fixture("business-a", "ADMIN", null, true);
+    const f = fixture("business-a", "ADMIN", { id: "target", role: "ADMIN", business_id: "business-a" }, true);
     f.target.password_hash = hash("Previous-password");
-    const res = await f.invoke("update", { action: "change_password", email: f.target.email, current_password: "Previous-password", new_password: "Replacement-password" });
+    const payload = Buffer.from(JSON.stringify({
+      amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+    })).toString("base64url");
+    const res = await f.invoke("update", { action: "change_password", new_password: "Replacement-password" }, `header.${payload}.signature`);
     expect(res.status).toBe(502);
+    expect(f.updates).toEqual([]);
+  });
+  it("does not treat an ordinary refreshed session as password reconfirmation", async () => {
+    const f = fixture("business-a", "ADMIN", { id: "target", role: "ADMIN", business_id: "business-a" });
+    const payload = Buffer.from(JSON.stringify({ iat: Math.floor(Date.now() / 1000), amr: [] })).toString("base64url");
+    const res = await f.invoke("update", { action: "change_password", new_password: "Replacement-password" }, `header.${payload}.signature`);
+    expect(res.status).toBe(401);
+    expect(f.passwords).toEqual([]);
     expect(f.updates).toEqual([]);
   });
   it("links an existing Auth account beyond the first page", async () => {
@@ -139,5 +222,14 @@ describe("password reset completion", () => {
     expect(await setAdminAuthPassword(db as any, { id: "target", email: "staff@example.invalid" }, "Replacement-password")).toBe("found");
     expect(pages).toEqual([1, 2]);
     expect(passwords).toEqual(["found"]);
+  });
+  it("requires linked accounts to authenticate in the browser", async () => {
+    const f = fixture();
+    f.target.password_hash = createHash("sha256").update("Previous-password").digest("hex");
+    const response = await f.invoke("login", { email: f.target.email, password: "Previous-password" });
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.code).toBe("AUTH_REQUIRED");
+    expect(body.session).toBeUndefined();
   });
 });

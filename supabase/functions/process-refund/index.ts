@@ -8,7 +8,10 @@ import { getComboLegPolicy } from "../_shared/combo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SERVICE_KEYS = new Set([SUPABASE_KEY, ...Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))]
+  .filter((key): key is string => typeof key === "string" && key.length > 0));
 const supabase = createServiceClient();
+const REFUND_ADMIN_ROLES = new Set(["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"]);
 
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
@@ -26,19 +29,21 @@ function getCors(req?: any) {
 async function authorizeRefund(req: any, booking: any): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (token && token === SUPABASE_KEY) return { ok: true };
+  const apiKey = (req.headers.get("apikey") || "").trim();
+  if (SERVICE_KEYS.has(token) || SERVICE_KEYS.has(apiKey)) return { ok: true };
   if (!token) return { ok: false, status: 401, message: "Admin session required" };
   try {
     const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !userRes?.user) return { ok: false, status: 401, message: "Admin session required" };
-    const { data: admin } = await supabase
+    const { data: admin, error: adminErr } = await supabase
       .from("admin_users")
       .select("business_id, role, suspended, read_only")
       .eq("user_id", userRes.user.id)
       .maybeSingle();
+    if (adminErr) return { ok: false, status: 503, message: "Admin access could not be verified" };
     if (!admin || admin.suspended) return { ok: false, status: 403, message: "Admin access required" };
     if (admin.read_only) return { ok: false, status: 403, message: "This demonstration account is read-only." };
-    if (/super/i.test(admin.role || "") || admin.business_id === booking.business_id) return { ok: true };
+    if (REFUND_ADMIN_ROLES.has(admin.role) && (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id)) return { ok: true };
     return { ok: false, status: 403, message: "You can only refund bookings for your own business" };
   } catch {
     return { ok: false, status: 401, message: "Admin session required" };
@@ -51,7 +56,7 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
   try {
     const body = await req.json();
     if (!body.booking_id) return respond({ error: "booking_id required" }, 400);
-    if (!req.headers.get("authorization")) return respond({ error: "Admin session required" }, 401);
+    if (!req.headers.get("authorization") && !req.headers.get("apikey")) return respond({ error: "Admin session required" }, 401);
     const loaded = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).single();
     const booking = loaded.data;
     if (loaded.error || !booking) return respond({ error: "Booking not found" }, 404);

@@ -51,7 +51,7 @@ jobs:
         with:
           repository: GideonLangenhoven/capekayak-booking
           # Update this pin alongside the next storefront release.
-          ref: 460e58d952ad570c9036bc13118eec66a2591918
+          ref: 2ff1d82046c73202c3146d11299cff9bc379ac54
           path: booking
       - uses: actions/setup-node@v4
         with:

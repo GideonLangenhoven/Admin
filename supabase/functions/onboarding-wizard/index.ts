@@ -10,7 +10,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getClientIp, sha256Hex } from "../_shared/otp-attempts.ts";
 import { generateSlots } from "../_shared/slot-generation.ts";
-import { registerYocoWebhook, validateYocoKey } from "../_shared/yoco.ts";
 import {
   isPrivateAddress,
   normaliseRefundTiers,
@@ -427,43 +426,10 @@ Deno.serve(async (req) => {
 
     // ── save-credentials ──
     if (action === "save-credentials") {
-      const yocoSecretKey = String(body.yoco_secret_key || "").trim();
-      if (!yocoSecretKey) return respond(400, { success: false, error: "yoco_secret_key is required" });
-      if (!yocoSecretKey.startsWith("sk_live_")) return respond(400, { success: false, error: "Enter a live Yoco key (sk_live_...). Add test keys in Settings → Yoco Test Credentials and enable Test Mode." });
-      if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
-        throw new Error("SETTINGS_ENCRYPTION_KEY must be 32+ characters to store credentials.");
-      }
-
-      const valid = await validateYocoKey(yocoSecretKey);
-      if (!valid.ok) return respond(400, { success: false, error: valid.error });
-
-      // Fail-soft by design: a Yoco API hiccup must not stall a live onboarding
-      // call. The validated key is stored either way and CS finishes webhook
-      // registration afterwards from the flag.
-      const webhookUrl = `${SUPABASE_URL}/functions/v1/yoco-webhook`;
-      const registration = await registerYocoWebhook(yocoSecretKey, webhookUrl, "bookingtours");
-
-      const { error: credError } = await supabase.rpc("set_yoco_credentials", {
-        p_business_id: businessId,
-        p_key: SETTINGS_ENCRYPTION_KEY,
-        p_yoco_secret_key: yocoSecretKey,
-        p_yoco_webhook_secret: registration.ok ? registration.secret : null,
-      });
-      if (credError) throw credError;
-
-      const status = registration.ok ? "REGISTERED" : "PENDING_REGISTRATION";
-      await supabase.from("businesses").update({ yoco_webhook_status: status }).eq("id", businessId);
-      await supabase.from("invite_tokens").update({ wizard_step: "yoco" }).eq("id", invite.id);
-
-      if (!registration.ok) {
-        console.warn(`YOCO_WEBHOOK_PENDING business=${businessId}: ${registration.error}`);
-      }
-      return respond(200, {
-        success: true,
-        webhook: registration.ok ? "registered" : "pending",
-        note: registration.ok
-          ? null
-          : "Your key is saved. We'll finish connecting payment notifications for you shortly.",
+      return respond(403, {
+        success: false,
+        code: "MFA_REQUIRED",
+        error: "Finish onboarding without payment credentials. Then sign in to the admin dashboard and connect Yoco under Settings after authenticator verification.",
       });
     }
 
@@ -522,7 +488,7 @@ Deno.serve(async (req) => {
             name: invite.client_name || business.business_name,
             email: clientEmail,
             role: "MAIN_ADMIN",
-            password_hash: "",
+            password_hash: null,
             must_set_password: true,
           }).select("id").single();
           if (error) throw error;
@@ -532,16 +498,18 @@ Deno.serve(async (req) => {
         const rawToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
           .map((b) => b.toString(16).padStart(2, "0")).join("");
         const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const { error: tokErr } = await supabase.from("admin_users").update({
-          setup_token_hash: await sha256Hex(rawToken),
-          setup_token_expires_at: expiresAt,
-          invite_sent_at: new Date().toISOString(),
-          must_set_password: true,
-        }).eq("id", adminId);
+        const { data: issued, error: tokErr } = await supabase.rpc("issue_admin_setup_token", {
+          p_admin_id: adminId,
+          p_token_hash: await sha256Hex(rawToken),
+          p_expires_at: expiresAt,
+          p_force_setup: true,
+        });
         if (tokErr) throw tokErr;
+        const tokenIssued = issued?.status === "ISSUED";
+        if (!tokenIssued && issued?.status !== "BUSY") throw new Error("Password setup link could not be issued");
 
         const adminOrigin = adminOriginFor(business.subdomain);
-        if (adminOrigin) {
+        if (adminOrigin && tokenIssued) {
           const setupUrl = `${adminOrigin}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
           const { error: mailErr } = await supabase.functions.invoke("send-email", {
             body: {

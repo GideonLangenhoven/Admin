@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { confirmAction, notify } from "./lib/app-notify";
 import { getAdminTimezone } from "./lib/admin-timezone";
@@ -22,10 +22,6 @@ function fmtTime(iso: string) {
         hour: "2-digit", minute: "2-digit", hour12: false,
         timeZone: getAdminTimezone(),
     });
-}
-
-function localDayKey(d: Date) {
-    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 type WeatherLocation = { id: string; name: string; lat: number; lon: number; wgSpot?: number; isDefault?: boolean; province?: string; };
@@ -161,6 +157,18 @@ interface SlotSummary {
     bookings: ManifestBooking[];
 }
 
+interface DashboardSnapshot {
+    business_id: string;
+    weather_widget_locations: unknown;
+    today_manifest: ManifestBooking[];
+    tomorrow_manifest: ManifestBooking[];
+    refund_count: number;
+    refund_total: number;
+    inbox_count: number;
+    photos_outstanding: number;
+    revenue: { today: number; week: number; month: number; series: number[] };
+}
+
 /* ── decorative: topographic contour lines for the hero card ── */
 function TopoLines({ className = "" }: { className?: string }) {
     return (
@@ -226,6 +234,8 @@ function Sparkline({ data }: { data: number[] }) {
 /* ── main component ── */
 export default function Dashboard() {
     const { businessId, role } = useBusinessContext();
+    const activeBusinessRef = useRef(businessId);
+    activeBusinessRef.current = businessId;
     // Main Admin can hide the revenue panel from operator-level admins.
     const [hideRevenue, setHideRevenue] = useState(false);
     useEffect(() => {
@@ -250,6 +260,7 @@ export default function Dashboard() {
     const [revMonth, setRevMonth] = useState(0);
     const [revSeries, setRevSeries] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
+    const realtimeRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Roll call state
     const [activeSlotIdx, setActiveSlotIdx] = useState(0);
@@ -272,37 +283,9 @@ export default function Dashboard() {
     const [geocoding, setGeocoding] = useState(false);
 
     useEffect(() => {
-        if (!businessId) return;
-        loadWeatherLocations();
-    }, [businessId]);
-
-    useEffect(() => {
         const iv = setInterval(() => setNow(Date.now()), 60_000);
         return () => clearInterval(iv);
     }, []);
-
-    async function loadWeatherLocations() {
-        try {
-            const { data, error } = await supabase
-                .from("businesses")
-                .select("weather_widget_locations")
-                .eq("id", businessId)
-                .maybeSingle();
-            if (error) throw error;
-
-            const stored = Array.isArray(data?.weather_widget_locations) && data.weather_widget_locations.length > 0
-                ? data.weather_widget_locations as WeatherLocation[]
-                : DEFAULT_LOCATIONS;
-
-            setLocations(stored);
-            setLocation((current) => stored.find((loc) => loc.id === current?.id) || stored.find((loc) => loc.isDefault) || stored[0] || null);
-        } catch (e) {
-            console.error("Failed to load weather locations:", e);
-            setLocations(DEFAULT_LOCATIONS);
-            setLocation(DEFAULT_LOCATIONS.find(l => l.isDefault) || DEFAULT_LOCATIONS[0] || null);
-            notify({ title: "Weather locations unavailable", message: "Falling back to the default location list for this dashboard.", tone: "warning" });
-        }
-    }
 
     const saveLocations = async (locs: WeatherLocation[]) => {
         setSavingLocations(true);
@@ -455,15 +438,25 @@ export default function Dashboard() {
         return () => clearInterval(timer);
     }, [slotGroups, manualSlotNav]);
 
-    useEffect(() => { if (businessId) load(); }, [businessId]);
+    useEffect(() => { if (businessId) void load(); }, [businessId]);
 
     // Realtime: refresh dashboard when bookings change (refund processed, new booking, etc.)
     useEffect(() => {
         if (!businessId) return;
         const ch = supabase.channel("dash-bookings-" + businessId)
-            .on("postgres_changes" as any, { event: "*", schema: "public", table: "bookings", filter: bookingRealtimeFilter(businessId) }, () => load())
+            .on("postgres_changes" as any, { event: "*", schema: "public", table: "bookings", filter: bookingRealtimeFilter(businessId) }, () => {
+                if (realtimeRefreshRef.current) clearTimeout(realtimeRefreshRef.current);
+                realtimeRefreshRef.current = setTimeout(() => {
+                    realtimeRefreshRef.current = null;
+                    void load();
+                }, 250);
+            })
             .subscribe();
-        return () => { supabase.removeChannel(ch); };
+        return () => {
+            if (realtimeRefreshRef.current) clearTimeout(realtimeRefreshRef.current);
+            realtimeRefreshRef.current = null;
+            supabase.removeChannel(ch);
+        };
     }, [businessId]);
 
     async function load() {
@@ -471,75 +464,26 @@ export default function Dashboard() {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
         const dayAfter = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const nowISO = new Date().toISOString();
-
-        // Helper to fetch bookings for a date range's slots (two-step: slots → bookings)
-        async function fetchManifest(from: Date, to: Date): Promise<ManifestBooking[]> {
-            const { data: slots } = await supabase.from("slots").select("id")
-                .eq("business_id", businessId).gte("start_time", from.toISOString()).lt("start_time", to.toISOString());
-            const slotIds = (slots || []).map((s: any) => s.id);
-            if (slotIds.length === 0) return [];
-            // Only count real bookings towards pax / Roll Call. EXPIRED holds
-            // (slot reservations that never got paid for) and CANCELLED bookings
-            // were inflating "Today's Pax" by ~50% on busy days.
-            const { data: bks } = await supabase.from("bookings")
-                .select("id, customer_name, phone, qty, total_amount, status, slot_id, arrived_count, checked_in, custom_fields, slots(start_time), tours(name)")
-                .eq("business_id", businessId)
-                .in("status", ["PAID", "CONFIRMED", "COMPLETED", "PENDING"])
-                .in("slot_id", slotIds)
-                .order("created_at", { ascending: true });
-            const bookingIds = (bks || []).map((b: any) => b.id);
-            const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
-            if (bookingIds.length > 0) {
-                const { data: addOnRows } = await supabase.from("booking_add_ons")
-                    .select("booking_id, qty, add_ons(name)")
-                    .in("booking_id", bookingIds);
-                for (const row of (addOnRows || []) as any[]) {
-                    const ao = Array.isArray(row.add_ons) ? row.add_ons[0] : row.add_ons;
-                    if (!ao?.name) continue;
-                    (addOnsByBooking[row.booking_id] ||= []).push({ name: ao.name, qty: row.qty || 1 });
-                }
-            }
-            return (bks || []).map((b: any) => ({
-                ...b,
-                arrived_count: Math.min(b.qty || 0, Math.max(0, Number(b.arrived_count ?? (b.checked_in ? b.qty : 0)))),
-                tours: Array.isArray(b.tours) ? b.tours[0] : b.tours,
-                slots: Array.isArray(b.slots) ? b.slots[0] : b.slots,
-                add_ons: addOnsByBooking[b.id] || [],
-            })).filter((b: any) => b.slots?.start_time);
-        }
-
-        // Revenue window: pull all paid/confirmed bookings created since the
-        // earlier of month start / 7 days ago, then bucket today / past 7d /
-        // this month by payment (booking) date — money received, not trip date.
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        async function fetchMonthRevenueRows() {
-            const since = new Date(Math.min(monthStart.getTime(), Date.now() - 7 * 24 * 60 * 60 * 1000));
-            const { data: bks } = await supabase.from("bookings")
-                .select("total_amount, created_at")
-                .eq("business_id", businessId)
-                .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
-                .gte("created_at", since.toISOString());
-            return (bks || []).map((b: any) => ({
-                total_amount: Number(b.total_amount || 0),
-                created_at: b.created_at as string,
-            }));
+        const nowDate = new Date();
+        const { data, error } = await supabase.rpc("get_operator_dashboard", {
+            p_business_id: businessId,
+            p_today_start: today.toISOString(),
+            p_tomorrow_start: tomorrow.toISOString(),
+            p_day_after: dayAfter.toISOString(),
+            p_week_ago: new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            p_month_start: monthStart.toISOString(),
+            p_now: nowDate.toISOString(),
+        });
+        if (activeBusinessRef.current !== businessId) return;
+        if (error || !data || data.business_id !== businessId) {
+            console.error("Failed to load dashboard snapshot:", error || "tenant mismatch");
+            setLoading(false);
+            return;
         }
-
-        // Run ALL independent queries in parallel
-        const [todayManifest, tomorrowData, refundsData, inboxData, photosData, revRows] = await Promise.all([
-            fetchManifest(today, tomorrow),
-            fetchManifest(tomorrow, dayAfter),
-            // ACTION_REQUIRED excluded — those await the customer's remediation choice, not operator action
-            supabase.from("bookings").select("id, refund_amount").eq("business_id", businessId).in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"]),
-            supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("status", "HUMAN"),
-            Promise.all([
-                supabase.from("slots").select("id, start_time, booked").eq("business_id", businessId).lt("start_time", nowISO).gt("start_time", weekAgo).gt("booked", 0),
-                supabase.from("trip_photos").select("slot_id").eq("business_id", businessId).gt("uploaded_at", weekAgo),
-            ]),
-            fetchMonthRevenueRows(),
-        ]);
+        const snapshot = data as DashboardSnapshot;
+        const todayManifest = snapshot.today_manifest || [];
+        const tomorrowData = snapshot.tomorrow_manifest || [];
 
         // Today
         setManifest(todayManifest);
@@ -551,48 +495,25 @@ export default function Dashboard() {
         setTomorrowPax(tomorrowData.reduce((s, b) => s + b.qty, 0));
 
         // Refunds
-        const refunds = refundsData.data || [];
-        setRefundCount(refunds.length);
-        setRefundTotal(refunds.reduce((s: number, b: any) => s + Number(b.refund_amount || 0), 0));
+        setRefundCount(Number(snapshot.refund_count || 0));
+        setRefundTotal(Number(snapshot.refund_total || 0));
 
         // Inbox
-        setInboxCount(inboxData.count || 0);
+        setInboxCount(Number(snapshot.inbox_count || 0));
 
         // Photos outstanding
-        const [completedSlotsRes, sentPhotosRes] = photosData;
-        const sentSlotIds = new Set((sentPhotosRes.data || []).map((p: any) => p.slot_id));
-        const outstanding = (completedSlotsRes.data || []).filter((s: any) => !sentSlotIds.has(s.id));
-        setPhotosOutstanding(outstanding.length);
+        setPhotosOutstanding(Number(snapshot.photos_outstanding || 0));
 
-        // Revenue buckets — by payment (booking) date.
-        const todayMs = today.getTime();
-        const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const monthStartMs = monthStart.getTime();
-        let revT = 0, revW = 0, revM = 0;
-        const daily = new Map<string, number>();
-        for (const row of revRows) {
-            const t = new Date(row.created_at).getTime();
-            if (!Number.isFinite(t)) continue;
-            if (t >= todayMs) revT += row.total_amount;
-            if (t >= weekAgoMs) revW += row.total_amount;
-            if (t >= monthStartMs) {
-                revM += row.total_amount;
-                const key = localDayKey(new Date(row.created_at));
-                daily.set(key, (daily.get(key) || 0) + row.total_amount);
-            }
-        }
-        setRevToday(revT);
-        setRevWeek(revW);
-        setRevMonth(revM);
+        setRevToday(Number(snapshot.revenue?.today || 0));
+        setRevWeek(Number(snapshot.revenue?.week || 0));
+        setRevMonth(Number(snapshot.revenue?.month || 0));
+        setRevSeries((snapshot.revenue?.series || []).map(Number));
 
-        // Sparkline series: month start → today, one bucket per local day
-        const series: number[] = [];
-        const cursor = new Date(monthStart);
-        while (cursor <= today && series.length < 62) {
-            series.push(daily.get(localDayKey(cursor)) || 0);
-            cursor.setDate(cursor.getDate() + 1);
-        }
-        setRevSeries(series);
+        const stored = Array.isArray(snapshot.weather_widget_locations) && snapshot.weather_widget_locations.length > 0
+            ? snapshot.weather_widget_locations as WeatherLocation[]
+            : DEFAULT_LOCATIONS;
+        setLocations(stored);
+        setLocation((current) => stored.find((loc) => loc.id === current?.id) || stored.find((loc) => loc.isDefault) || stored[0] || null);
 
         setLoading(false);
     }

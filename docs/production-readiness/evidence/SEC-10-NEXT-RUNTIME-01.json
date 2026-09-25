@@ -1,0 +1,25 @@
+{
+  "task": "SEC-10-NEXT-RUNTIME-01",
+  "status": "APPROVE_TASK",
+  "candidate_commit": "c61e9dbeef8bf32e9e01b7b5875bbcb543183e24",
+  "source_commit": "62e9e6e",
+  "evidence_root": "/private/tmp/bookingtours-simple-view-evidence-1812677/dependencies/sec-10-next-runtime-01",
+  "source_hashes": {
+    "package.json": "5fc561ebc725f4345347c77fcd2952fa9934332149329bd757a5f12a4701743a",
+    "package-lock.json": "eaf575182b432b6e7ca74b118b7d2ed453077b6c70f70a9563d7988c0c1101f2",
+    "tests/unit/runtime-dependency-floors.test.ts": "c68b00f7216cb2200ec285c80b759dfd6d63390141add6301aaf412d409bf74c"
+  },
+  "integration_install": {
+    "command": "npm ci --ignore-scripts",
+    "exit": 0,
+    "packages": 827,
+    "output": "tool captured"
+  },
+  "integration_focused": {
+    "command": "./node_modules/.bin/vitest run tests/unit/runtime-dependency-floors.test.ts tests/unit/simple-day-request-order.test.ts",
+    "exit": 0,
+    "pass": 10,
+    "log": "/private/tmp/bookingtours-simple-view-evidence-1812677/resume-20260921/integrated-deps-and-simple-day.log"
+  },
+  "limitations": "No release qualification. Production-only audit6high, all-dependency audit1critical/7high. Full1112pass6fail1skip is pre-MFA/refund/offline integration evidence only."
+}
