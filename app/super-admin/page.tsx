@@ -624,7 +624,7 @@ export default function SuperAdminPage() {
       <OnboardingInvitesPanel />
 
       {/* ── Business Management ── */}
-      <div className="ui-card anim-fade-up anim-d2 p-6">
+      <div className="ui-card anim-fade-up anim-d2 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Management</h2>
@@ -645,77 +645,81 @@ export default function SuperAdminPage() {
           <div className="space-y-3">
             {businesses.map((b) => (
               <div key={b.id} className="ui-card p-4">
-                <div className="flex items-start justify-between gap-4">
-                  {/* Left: Name + ID */}
-                  <div>
-                    <div className="font-semibold text-[var(--ck-text-strong)]">{b.business_name}</div>
-                    <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5">{b.id}</div>
-                  </div>
-                  {/* Right: Status + Seat controls */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    {/* Subscription status */}
-                    <button
-                      onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
-                      disabled={togglingStatusId === b.id}
-                      title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
-                      className={"ui-status cursor-pointer transition-opacity hover:opacity-80 " +
-                        (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : "ui-pill-success")}
-                    >
-                      {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
-                    </button>
-                    {/* Seat controls */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
-                      <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">−</button>
-                      <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
-                      <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
-                        className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30">+</button>
-                      <span className={"ml-1 ui-status " +
-                        ((b.admin_count || 0) >= b.max_admin_seats ? "ui-pill-danger" : "ui-pill-success")}>
-                        {b.admin_count || 0}/{b.max_admin_seats}
-                      </span>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  {/* Left: Name + ID + Status */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-[var(--ck-text-strong)] text-base">{b.business_name}</span>
+                      {/* Subscription status */}
+                      <button
+                        onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
+                        disabled={togglingStatusId === b.id}
+                        title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
+                        className={"ui-status cursor-pointer transition-opacity hover:opacity-80 " +
+                          (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : "ui-pill-success")}
+                      >
+                        {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
+                      </button>
                     </div>
+                    <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5 break-all">{b.id}</div>
+                  </div>
+                  {/* Right: Seat controls */}
+                  <div className="flex items-center gap-1.5 flex-wrap sm:shrink-0">
+                    <span className="text-xs text-[var(--ck-text-muted)] mr-1">Seats:</span>
+                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats - 1)} disabled={b.max_admin_seats <= 1 || savingSeatId === b.id}
+                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30 flex items-center justify-center">−</button>
+                    <span className="w-6 text-center font-semibold text-[var(--ck-text-strong)] text-sm">{b.max_admin_seats}</span>
+                    <button onClick={() => updateSeatLimit(b.id, b.max_admin_seats + 1)} disabled={savingSeatId === b.id}
+                      className="h-7 w-7 rounded-lg border border-[var(--ck-border-subtle)] text-sm font-bold hover:bg-[var(--ck-surface-sunken)] disabled:opacity-30 flex items-center justify-center">+</button>
+                    <span className={"ml-1 ui-status " +
+                      ((b.admin_count || 0) >= b.max_admin_seats ? "ui-pill-danger" : "ui-pill-success")}>
+                      {b.admin_count || 0}/{b.max_admin_seats}
+                    </span>
                   </div>
                 </div>
 
                 {/* Subdomain row */}
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs font-medium text-[var(--ck-text-muted)] w-20 shrink-0">Subdomain:</span>
+                <div className="mt-3 pt-3 border-t border-[var(--ck-border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   {editingSubdomain?.id === b.id ? (
-                    <div className="flex items-center gap-0 flex-1">
-                      <input
-                        value={editingSubdomain.value}
-                        onChange={(e) => setEditingSubdomain({ id: b.id, value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
-                        className="ui-control rounded-r-none py-1 px-2 text-xs flex-1"
-                        placeholder="my-business"
-                        autoFocus
-                      />
-                      <span className="inline-flex items-center border border-l-0 rounded-r-lg px-2 py-1 text-[10px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
-                      <button onClick={() => saveSubdomain(b.id, editingSubdomain.value)} disabled={savingSubdomain}
-                        className="ui-btn ui-btn-primary ml-2 !h-7 !px-3 !text-xs">
-                        {savingSubdomain ? "..." : "Save"}
-                      </button>
-                      <button onClick={() => setEditingSubdomain(null)} className="ml-1 text-xs text-[var(--ck-text-muted)]">Cancel</button>
+                    <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                      <span className="text-xs font-medium text-[var(--ck-text-muted)] shrink-0">Subdomain:</span>
+                      <div className="flex items-center gap-0 flex-1 min-w-[200px]">
+                        <input
+                          value={editingSubdomain.value}
+                          onChange={(e) => setEditingSubdomain({ id: b.id, value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                          className="ui-control rounded-r-none py-1 px-2 text-xs flex-1"
+                          placeholder="my-business"
+                          autoFocus
+                        />
+                        <span className="inline-flex items-center border border-l-0 rounded-r-lg px-2 py-1 text-[10px]" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-bg)", color: "var(--ck-text-muted)" }}>.{BOOKING_DOMAIN}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 sm:mt-0">
+                        <button onClick={() => saveSubdomain(b.id, editingSubdomain.value)} disabled={savingSubdomain}
+                          className="ui-btn ui-btn-primary !h-7 !px-3 !text-xs">
+                          {savingSubdomain ? "..." : "Save"}
+                        </button>
+                        <button onClick={() => setEditingSubdomain(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline px-1">Cancel</button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <span className="text-xs font-medium text-[var(--ck-text-muted)] shrink-0">Subdomain:</span>
                       {b.subdomain ? (
                         <a href={`https://${b.subdomain}.${BOOKING_DOMAIN}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs font-mono font-medium" style={{ color: "var(--ck-accent)" }}>
+                          className="text-xs font-mono font-medium break-all hover:underline" style={{ color: "var(--ck-accent)" }}>
                           {b.subdomain}.{BOOKING_DOMAIN}
                         </a>
                       ) : (
                         <span className="text-xs italic text-[var(--ck-text-muted)]">Not configured</span>
                       )}
                       <button onClick={() => setEditingSubdomain({ id: b.id, value: b.subdomain || "" })}
-                        className="text-[10px] font-medium text-[var(--ck-accent)] hover:underline">
+                        className="text-[11px] font-medium text-[var(--ck-accent)] hover:underline shrink-0">
                         {b.subdomain ? "Change" : "Set up"}
                       </button>
                     </div>
                   )}
                   {/* View/Edit Details toggle */}
-                  <button onClick={() => loadBizDetail(b.id)} className="mt-2 text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
+                  <button onClick={() => loadBizDetail(b.id)} className="text-xs font-medium hover:underline shrink-0 self-start sm:self-auto" style={{ color: "var(--ck-accent)" }}>
                     {expandedBiz === b.id ? "▲ Hide Details" : "▼ View / Edit Details"}
                   </button>
                 </div>
@@ -753,7 +757,7 @@ export default function SuperAdminPage() {
                         {/* ── Business Info ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Business Info</legend>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                               ["business_name", "Business Name"],
                               ["business_tagline", "Tagline"],
@@ -775,7 +779,7 @@ export default function SuperAdminPage() {
                         {/* ── Branding ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Branding & Colors</legend>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {[
                               ["hero_eyebrow", "Hero Eyebrow"],
                               ["hero_title", "Hero Title"],
@@ -788,7 +792,7 @@ export default function SuperAdminPage() {
                               </label>
                             ))}
                           </div>
-                          <div className="grid grid-cols-6 gap-2 mt-2">
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-2">
                             {[
                               ["color_main", "Main"],
                               ["color_secondary", "Secondary"],
@@ -832,7 +836,7 @@ export default function SuperAdminPage() {
                         {/* ── Navigation & Footer Labels ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Booking Page Labels</legend>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {[
                               ["nav_gift_voucher_label", "Gift Voucher Label"],
                               ["nav_my_bookings_label", "My Bookings Label"],
@@ -881,7 +885,7 @@ export default function SuperAdminPage() {
                         {/* ── Social Links ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Social Links (email footers + site footer)</legend>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                               ["social_facebook", "Facebook"],
                               ["social_instagram", "Instagram"],
@@ -904,7 +908,7 @@ export default function SuperAdminPage() {
                         {/* ── Terminology / Messaging ── */}
                         <fieldset>
                           <legend className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ck-text-muted)" }}>Terminology & Messaging</legend>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {[
                               ["activity_noun", "Activity noun (e.g. 'tour', 'dive', 'flight')"],
                               ["activity_verb_past", "Activity verb in the past tense (e.g. 'kayaked')"],
@@ -959,7 +963,7 @@ export default function SuperAdminPage() {
                           <div className="space-y-2">
                             {bizFaqs.map((faq, i) => (
                               <div key={i} className="flex gap-2 items-start">
-                                <div className="flex-1 grid grid-cols-2 gap-2">
+                                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   <input value={faq.q} onChange={(e) => { const next = [...bizFaqs]; next[i].q = e.target.value; setBizFaqs(next); }}
                                     className="ui-control rounded-lg px-2 py-1.5 text-xs" placeholder="Question" />
                                   <input value={faq.a} onChange={(e) => { const next = [...bizFaqs]; next[i].a = e.target.value; setBizFaqs(next); }}
@@ -1030,7 +1034,7 @@ export default function SuperAdminPage() {
                                 const permsExpanded = expandedPermsAdmin === admin.id;
                                 return (
                                 <div key={admin.id} className="rounded-lg border p-2.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div className="min-w-0">
                                       <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">
                                         {admin.name || admin.email}
@@ -1040,7 +1044,7 @@ export default function SuperAdminPage() {
                                         {admin.email} · {admin.role}
                                       </div>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2 ml-3">
+                                    <div className="flex flex-wrap items-center gap-2">
                                       {admin.role !== "SUPER_ADMIN" && <button onClick={() => setAdminSuspended(admin)} disabled={changingRoleId === admin.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">{admin.suspended ? "Reactivate" : "Suspend"}</button>}
                                       {admin.role !== "SUPER_ADMIN" && (
                                         <button
@@ -1069,7 +1073,7 @@ export default function SuperAdminPage() {
                                     </div>
                                   </div>
                                   {permsExpanded && admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
-                                    <div className="mt-2 pt-2 border-t grid grid-cols-2 gap-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                    <div className="mt-2 pt-2 border-t grid grid-cols-1 sm:grid-cols-2 gap-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
                                       {SETTINGS_SECTIONS.map(section => (
                                         <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded px-2 py-1 hover:bg-[var(--ck-surface-sunken)]">
                                           <input
@@ -1280,7 +1284,7 @@ function OnboardingInvitesPanel() {
   };
 
   return (
-    <div className="ui-card anim-fade-up anim-d2 p-6">
+    <div className="ui-card anim-fade-up anim-d2 p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Onboarding Invites</h2>
@@ -1364,7 +1368,7 @@ function OnboardingInvitesPanel() {
           <div className="space-y-2">
             {rows.map((row) => (
               <div key={row.id} className="rounded-lg border p-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-[var(--ck-text-strong)] truncate">
@@ -1386,7 +1390,7 @@ function OnboardingInvitesPanel() {
                       <div className="text-[10px] font-medium mt-0.5" style={{ color: "var(--ck-warning)" }}>Yoco webhook needs manual registration</div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {row.status === "active" && (
                       <button onClick={() => copyLink(row.invite_link, row.token)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs whitespace-nowrap">Copy link</button>
                     )}
@@ -1655,14 +1659,14 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
   }
 
   return (
-    <div className="ui-card anim-fade-up anim-d3 p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Landing Pages</h2>
         <p className="text-xs text-[var(--ck-text-muted)] mt-1">Generate polished landing pages for each business. Choose a template, preview, and deploy to Firebase.</p>
       </div>
 
       {/* Step 1: Select business */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <div>
           <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">Business</label>
           <select value={selectedBiz} onChange={(e) => setSelectedBiz(e.target.value)}
@@ -1681,7 +1685,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       </div>
 
       {/* Template previews */}
-      <div className="grid grid-cols-5 md:grid-cols-10 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2 mb-4">
         {TEMPLATES.map((t) => (
           <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
             className={"rounded-xl border p-2.5 text-center transition-all cursor-pointer " + (selectedTemplate === t.id ? "ring-2 shadow-sm" : "opacity-50 hover:opacity-80")}
@@ -1698,7 +1702,6 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
         {generating ? "Generating..." : "Generate Landing Page"}
       </button>
 
-      {/* Preview + Actions */}
       {showPreview && generatedHtml && (
         <div className="mt-4 space-y-3">
           {/* Preview iframe */}
@@ -1713,7 +1716,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button onClick={downloadHtml} className="ui-btn ui-btn-ghost !text-xs">
               Download HTML
             </button>
@@ -1870,8 +1873,8 @@ function EmailUsageBilling() {
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
 
   return (
-    <div className="ui-card anim-fade-up anim-d3 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Email Usage & Billing</h2>
           <p className="text-xs text-[var(--ck-text-muted)] mt-1">Track usage and pricing. Email overages are included once in the monthly Platform Invoice below.</p>
@@ -1890,7 +1893,7 @@ function EmailUsageBilling() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
         <div className="ui-card p-4">
           <div className="flex items-center gap-2">            <span className="ui-mono-label">Emails Sent</span>
           </div>
@@ -1912,89 +1915,91 @@ function EmailUsageBilling() {
       </div>
 
       {rows.length > 0 && (
-        <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
-          {/* Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
-            <div className="col-span-3">Business</div>
-            <div className="col-span-2 text-center">Emails Sent</div>
-            <div className="col-span-1 text-center">Included</div>
-            <div className="col-span-1 text-center">Overage</div>
-            <div className="col-span-2 text-center">Rate (R/email)</div>
-            <div className="col-span-1 text-center">Owed</div>
-            <div className="col-span-2 text-center">Invoice</div>
-          </div>
-
-          {rows.map((r) => (
-            <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
-              {/* Business name */}
-              <div className="col-span-3">
-                <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
-              </div>
-
-              {/* Emails sent */}
-              <div className="col-span-2 text-center">
-                <span className="font-semibold text-[var(--ck-text-strong)]">{r.emails_sent.toLocaleString()}</span>
-              </div>
-
-              {/* Included */}
-              <div className="col-span-1 text-center text-[var(--ck-text-muted)]">{r.included}</div>
-
-              {/* Overage */}
-              <div className="col-span-1 text-center">
-                {r.overage > 0 ? (
-                  <span className="text-[var(--ck-amber)] font-semibold">{r.overage}</span>
-                ) : (
-                  <span className="text-[var(--ck-success)]">0</span>
-                )}
-              </div>
-
-              {/* Rate */}
-              <div className="col-span-2 flex items-center justify-center gap-1">
-                {editingRate?.id === r.business_id ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs">R</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editingRate.value}
-                      onChange={(e) => setEditingRate({ id: r.business_id, value: e.target.value })}
-                      className="w-16 ui-control !px-1.5 !py-0.5 !text-xs text-center"
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => saveRate(r.business_id, Number(editingRate.value))}
-                      disabled={savingRate}
-                      className="text-xs text-[var(--ck-accent)] font-semibold hover:underline"
-                    >Save</button>
-                    <button onClick={() => setEditingRate(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline">Cancel</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setEditingRate({ id: r.business_id, value: r.rate_zar.toFixed(2) })}
-                    className="text-xs font-medium hover:underline"
-                    title="Click to edit rate"
-                  >
-                    R{r.rate_zar.toFixed(2)}
-                  </button>
-                )}
-              </div>
-
-              {/* Owed */}
-              <div className="col-span-1 text-center">
-                {r.overage_cost > 0 ? (
-                  <span className="font-bold text-[var(--ck-amber)]">R{r.overage_cost.toFixed(2)}</span>
-                ) : (
-                  <span className="text-[var(--ck-success)] text-xs">R0</span>
-                )}
-              </div>
-
-              {/* Invoice button */}
-              <div className="col-span-2 text-center">
-                <a href="#platform-invoices" className="text-xs text-[var(--ck-accent)] underline">Monthly invoice</a>
-              </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px] divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
+              <div className="col-span-3">Business</div>
+              <div className="col-span-2 text-center">Emails Sent</div>
+              <div className="col-span-1 text-center">Included</div>
+              <div className="col-span-1 text-center">Overage</div>
+              <div className="col-span-2 text-center">Rate (R/email)</div>
+              <div className="col-span-1 text-center">Owed</div>
+              <div className="col-span-2 text-center">Invoice</div>
             </div>
-          ))}
+
+            {rows.map((r) => (
+              <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+                {/* Business name */}
+                <div className="col-span-3">
+                  <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
+                </div>
+
+                {/* Emails sent */}
+                <div className="col-span-2 text-center">
+                  <span className="font-semibold text-[var(--ck-text-strong)]">{r.emails_sent.toLocaleString()}</span>
+                </div>
+
+                {/* Included */}
+                <div className="col-span-1 text-center text-[var(--ck-text-muted)]">{r.included}</div>
+
+                {/* Overage */}
+                <div className="col-span-1 text-center">
+                  {r.overage > 0 ? (
+                    <span className="text-[var(--ck-amber)] font-semibold">{r.overage}</span>
+                  ) : (
+                    <span className="text-[var(--ck-success)]">0</span>
+                  )}
+                </div>
+
+                {/* Rate */}
+                <div className="col-span-2 flex items-center justify-center gap-1">
+                  {editingRate?.id === r.business_id ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs">R</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingRate.value}
+                        onChange={(e) => setEditingRate({ id: r.business_id, value: e.target.value })}
+                        className="w-16 ui-control !px-1.5 !py-0.5 !text-xs text-center"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => saveRate(r.business_id, Number(editingRate.value))}
+                        disabled={savingRate}
+                        className="text-xs text-[var(--ck-accent)] font-semibold hover:underline"
+                      >Save</button>
+                      <button onClick={() => setEditingRate(null)} className="text-xs text-[var(--ck-text-muted)] hover:underline">Cancel</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEditingRate({ id: r.business_id, value: r.rate_zar.toFixed(2) })}
+                      className="text-xs font-medium hover:underline"
+                      title="Click to edit rate"
+                    >
+                      R{r.rate_zar.toFixed(2)}
+                    </button>
+                  )}
+                </div>
+
+                {/* Owed */}
+                <div className="col-span-1 text-center">
+                  {r.overage_cost > 0 ? (
+                    <span className="font-bold text-[var(--ck-amber)]">R{r.overage_cost.toFixed(2)}</span>
+                  ) : (
+                    <span className="text-[var(--ck-success)] text-xs">R0</span>
+                  )}
+                </div>
+
+                {/* Invoice button */}
+                <div className="col-span-2 text-center">
+                  <a href="#platform-invoices" className="text-xs text-[var(--ck-accent)] underline">Monthly invoice</a>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -2149,8 +2154,8 @@ function PlatformInvoicesBilling() {
   const periodLabel = new Date(period + "-01").toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
 
   return (
-    <div className="ui-card anim-fade-up anim-d3 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Invoices</h2>
           <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours -&gt; operator monthly subscription invoices, pro-rated for pauses.</p>
@@ -2164,56 +2169,58 @@ function PlatformInvoicesBilling() {
       </div>
 
       {rows.length > 0 && (
-        <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
-            <div className="col-span-3">Business</div>
-            <div className="col-span-2">Plan</div>
-            <div className="col-span-2 text-center">Active Days</div>
-            <div className="col-span-1 text-center">Amount</div>
-            <div className="col-span-1 text-center">Status</div>
-            <div className="col-span-3 text-center">Actions</div>
-          </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[680px] divide-y divide-[var(--ck-border-subtle)] rounded-xl border border-[var(--ck-border-subtle)] overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-[var(--ck-surface-sunken)] font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--ck-text-muted)]">
+              <div className="col-span-3">Business</div>
+              <div className="col-span-2">Plan</div>
+              <div className="col-span-2 text-center">Active Days</div>
+              <div className="col-span-1 text-center">Amount</div>
+              <div className="col-span-1 text-center">Status</div>
+              <div className="col-span-3 text-center">Actions</div>
+            </div>
 
-          {rows.filter(r => r.has_subscription).map((r) => {
-            const invoice = r.existing_invoice;
-            const busy = busyId === r.business_id;
-            return (
-              <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
-                <div className="col-span-3">
-                  <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
-                  {r.pro_rated && r.pause_note && <div className="text-[10px] text-[var(--ck-amber)] mt-0.5">{r.pause_note}</div>}
-                </div>
-                <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} (R{r.monthly_price_zar})</div>
-                <div className="col-span-2 text-center">
-                  <span className={r.pro_rated ? "text-[var(--ck-amber)] font-semibold" : "text-[var(--ck-success)]"}>{r.active_days}</span>
-                  <span className="text-[var(--ck-text-muted)]"> / {r.total_days}</span>
-                </div>
-                <div className="col-span-1 text-center font-bold">R{Number(invoice?.amount_zar ?? r.amount_zar ?? 0).toFixed(2)}</div>
-                <div className="col-span-1 text-center text-[10px] font-mono uppercase">{invoice?.status || "—"}</div>
-                <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
-                  {!invoice && (
-                    <button onClick={() => generate(r)} disabled={busy} className="ui-btn ui-btn-primary !h-7 !px-2.5 !text-xs disabled:opacity-30">
-                      {busy ? "..." : "Generate"}
-                    </button>
-                  )}
-                  {invoice && invoice.status !== "PAID" && invoice.status !== "PAID_MANUALLY" && (
-                    <>
-                      <button onClick={() => createPaymentLink(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">
-                        {invoice.yoco_payment_link_url ? "Recover Link" : "Payment Link"}
+            {rows.filter(r => r.has_subscription).map((r) => {
+              const invoice = r.existing_invoice;
+              const busy = busyId === r.business_id;
+              return (
+                <div key={r.business_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm">
+                  <div className="col-span-3">
+                    <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
+                    {r.pro_rated && r.pause_note && <div className="text-[10px] text-[var(--ck-amber)] mt-0.5">{r.pause_note}</div>}
+                  </div>
+                  <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} (R{r.monthly_price_zar})</div>
+                  <div className="col-span-2 text-center">
+                    <span className={r.pro_rated ? "text-[var(--ck-amber)] font-semibold" : "text-[var(--ck-success)]"}>{r.active_days}</span>
+                    <span className="text-[var(--ck-text-muted)]"> / {r.total_days}</span>
+                  </div>
+                  <div className="col-span-1 text-center font-bold">R{Number(invoice?.amount_zar ?? r.amount_zar ?? 0).toFixed(2)}</div>
+                  <div className="col-span-1 text-center text-[10px] font-mono uppercase">{invoice?.status || "—"}</div>
+                  <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
+                    {!invoice && (
+                      <button onClick={() => generate(r)} disabled={busy} className="ui-btn ui-btn-primary !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                        {busy ? "..." : "Generate"}
                       </button>
-                      <button onClick={() => markPaidManually(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Mark Paid</button>
-                      <button onClick={() => sendEmail(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Send</button>
-                      <button onClick={() => voidInvoice(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Void draft</button>
-                    </>
-                  )}
-                  {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
-                    <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
-                  )}
-                  {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · R{Number(old.amount_zar).toFixed(2)} · {old.void_reason}</p>)}</details>}
+                    )}
+                    {invoice && invoice.status !== "PAID" && invoice.status !== "PAID_MANUALLY" && (
+                      <>
+                        <button onClick={() => createPaymentLink(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">
+                          {invoice.yoco_payment_link_url ? "Recover Link" : "Payment Link"}
+                        </button>
+                        <button onClick={() => markPaidManually(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Mark Paid</button>
+                        <button onClick={() => sendEmail(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Send</button>
+                        <button onClick={() => voidInvoice(r)} disabled={busy} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs disabled:opacity-30">Void draft</button>
+                      </>
+                    )}
+                    {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
+                      <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
+                    )}
+                    {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · R{Number(old.amount_zar).toFixed(2)} · {old.void_reason}</p>)}</details>}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
       {!loading && rows.filter(r => r.has_subscription).length === 0 && (
@@ -2280,7 +2287,7 @@ function PlatformSettingsPanel() {
   }
 
   return (
-    <div className="ui-card anim-fade-up anim-d3 p-6">
+    <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Settings</h2>
         <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours' own logo and banking details, shown on platform invoices.</p>
@@ -2305,7 +2312,7 @@ function PlatformSettingsPanel() {
             <input value={bank.account_owner} onChange={(e) => setBank({ ...bank, account_owner: e.target.value })} placeholder="Account owner" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             <input value={bank.bank_name} onChange={(e) => setBank({ ...bank, bank_name: e.target.value })} placeholder="Bank name" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             <input value={bank.account_number} onChange={(e) => setBank({ ...bank, account_number: e.target.value })} placeholder="Account number" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input value={bank.account_type} onChange={(e) => setBank({ ...bank, account_type: e.target.value })} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
               <input value={bank.branch_code} onChange={(e) => setBank({ ...bank, branch_code: e.target.value })} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             </div>
@@ -2423,7 +2430,7 @@ function ChatbotAvatarManager() {
   }
 
   return (
-    <section className="ui-card anim-fade-up anim-d3 p-6 space-y-4">
+    <section className="ui-card anim-fade-up anim-d3 p-4 sm:p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Avatars</h2>
         <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Global catalog. Every tenant sees the active avatars in their booking-site settings. Only super admins can add, edit, or remove entries.</p>
@@ -2545,7 +2552,7 @@ function DirectoryPanel() {
   ];
 
   return (
-    <div className="ui-card">
+    <div className="ui-card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Operator Directory</h2>
         <a href="https://booking.bookingtours.co.za" target="_blank" rel="noreferrer" className="text-xs font-medium text-[var(--ck-accent)] hover:underline">View live page</a>
@@ -2594,15 +2601,15 @@ function DirectoryPanel() {
             <p className="text-[12px] font-semibold text-[var(--ck-text-strong)] mb-2">Listed operators</p>
             <div className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
               {operators.map((b) => (
-                <div key={b.id} className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="text-[13px] font-medium text-[var(--ck-text-strong)]">{b.business_name || b.name}</p>
-                    <p className="text-[11px] text-[var(--ck-text-muted)]">{b.subdomain ? b.subdomain + ".booking.bookingtours.co.za" : "No subdomain — never listed"}</p>
+                <div key={b.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-[var(--ck-text-strong)] truncate">{b.business_name || b.name}</p>
+                    <p className="text-[11px] text-[var(--ck-text-muted)] truncate">{b.subdomain ? b.subdomain + ".booking.bookingtours.co.za" : "No subdomain — never listed"}</p>
                   </div>
                   <button
                     onClick={() => toggleVisible(b)}
                     disabled={busyBiz === b.id || !b.subdomain}
-                    className={"ui-status " + (b.directory_visible && b.subdomain ? "ui-pill-success" : "ui-pill-neutral")}
+                    className={"ui-status shrink-0 " + (b.directory_visible && b.subdomain ? "ui-pill-success" : "ui-pill-neutral")}
                     title={b.subdomain ? "Toggle directory listing" : "Operator needs a subdomain first"}
                   >
                     {b.directory_visible && b.subdomain ? "Listed" : "Hidden"}

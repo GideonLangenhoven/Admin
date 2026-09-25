@@ -894,7 +894,7 @@ function Slots() {
             </div>
 
             {/* Save time/capacity/price changes — never affects status/bookings */}
-            <div className="mt-6 grid grid-cols-2 gap-2">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button onClick={() => setSelectedSlot(null)} className="ui-btn ui-btn-ghost">Close window</button>
               <button data-demo-action="slot.save" onClick={saveSlotEdit} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
                 {saving ? "Saving..." : "Save Changes"}

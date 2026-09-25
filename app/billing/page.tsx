@@ -239,7 +239,7 @@ export default function BillingPage() {
         {(sub.status === "ACTIVE" || sub.status === "TRIAL") && plansAvailable.length > 1 && (
           <div className="mt-4">
             <div className="ui-mono-label !text-[10px] mb-2">Change plan</div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {plansAvailable.map((p) => (
                 <button data-demo-action="billing.plan"
                   key={p.id}
@@ -260,7 +260,7 @@ export default function BillingPage() {
           </div>
         )}
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
             <div className="ui-mono-label !text-[10px]">Seats purchased</div>
             <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{sub.seats_purchased}</div>
@@ -269,7 +269,7 @@ export default function BillingPage() {
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
             <div className="ui-mono-label !text-[10px]">This month</div>
             <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{monthly.toLocaleString()}</div>
-            <div className="text-xs mt-1.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
+            <div className="text-xs mt-1.5 tabular-nums break-words" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
           </div>
         </div>
 
@@ -292,7 +292,7 @@ export default function BillingPage() {
             <button data-demo-action="billing.pause"
               onClick={pauseSubscription}
               disabled={actionLoading}
-              className="ui-btn ui-btn-ghost ml-auto disabled:opacity-50"
+              className="ui-btn ui-btn-ghost sm:ml-auto disabled:opacity-50"
             >
               Pause for off-season
             </button>
@@ -300,7 +300,7 @@ export default function BillingPage() {
         )}
 
         {sub.status === "PAUSED" && (
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <span className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Subscription paused{sub.paused_at ? ` since ${new Date(sub.paused_at).toLocaleDateString("en-ZA")}` : ""}.
               No billing while paused.
@@ -308,7 +308,7 @@ export default function BillingPage() {
             <button data-demo-action="billing.resume"
               onClick={resumeSubscription}
               disabled={actionLoading}
-              className="ui-btn ui-btn-primary ml-auto disabled:opacity-50"
+              className="ui-btn ui-btn-primary sm:ml-auto disabled:opacity-50"
             >
               Resume now
             </button>
@@ -325,7 +325,7 @@ export default function BillingPage() {
             <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Marketing email usage</h2>
             <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>this billing period</span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
               <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Sent / Included</div>
               <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>

@@ -258,7 +258,7 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-gray-100 last:border-b-0">
       <span className="text-xs font-medium shrink-0" style={{ color: "var(--ck-text-muted)" }}>{label}</span>
-      <span className={`text-sm text-right tabular-nums ${mono ? "font-mono text-xs" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{value || "—"}</span>
+      <span className={`text-sm text-right tabular-nums min-w-0 break-words ${mono ? "font-mono text-xs break-all" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{value || "—"}</span>
     </div>
   );
 }
@@ -741,7 +741,7 @@ export default function BookingDetailPage() {
           <Badge className="ui-pill-neutral">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>
         {isPending && Number(booking.total_amount) > 0 && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setMarkPaidOpen((v) => !v)}
               disabled={markPaidLoading}
@@ -818,7 +818,7 @@ export default function BookingDetailPage() {
 
       {/* Booking ID + Created */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-        <span>ID: <span className="font-mono">{booking.id}</span></span>
+        <span>ID: <span className="font-mono break-all">{booking.id}</span></span>
         <span>Created: {fmtDateTime(booking.created_at)}</span>
         {booking.cancelled_at && <span className="text-red-600">Cancelled: {fmtDateTime(booking.cancelled_at)}</span>}
       </div>

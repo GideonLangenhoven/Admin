@@ -61,7 +61,7 @@ export default function ReviewsPage() {
     }
 
     return (
-        <div className="p-6 max-w-5xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
             <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="ui-mono-label mb-2">Customers · Reviews</p>
@@ -89,8 +89,8 @@ export default function ReviewsPage() {
             ) : (
                 <div className="anim-fade-up anim-d1 space-y-4">
                     {reviews.map(r => (
-                        <div key={r.id} className="ui-card p-5">
-                            <div className="flex items-start justify-between gap-4">
+                        <div key={r.id} className="ui-card p-4 sm:p-5">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-2">
                                         {r.reviewer_avatar_url && (
@@ -107,12 +107,12 @@ export default function ReviewsPage() {
                                         )) : <span className="text-sm" style={{ color: "var(--ck-text-muted)" }}>—</span>}
                                     </div>
                                     {r.comment && <p className="text-sm leading-relaxed" style={{ color: "var(--ck-text)" }}>{r.comment}</p>}
-                                    <div className="mt-2 flex items-center gap-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                                    <div className="mt-2 flex items-center gap-3 text-xs flex-wrap" style={{ color: "var(--ck-text-muted)" }}>
                                         {r.tours?.name && <span>Tour: {r.tours.name}</span>}
                                         {r.submitted_at && <span>{new Date(r.submitted_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</span>}
                                     </div>
                                 </div>
-                                <div className="flex gap-2 shrink-0">
+                                <div className="flex gap-2 shrink-0 self-start sm:self-auto flex-wrap">
                                     {filter !== "APPROVED" && (
                                         <button onClick={() => updateStatus(r.id, "APPROVED")} disabled={updating === r.id}
                                             className="ui-btn h-8 px-3 text-xs disabled:opacity-40" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>

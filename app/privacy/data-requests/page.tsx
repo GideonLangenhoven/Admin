@@ -212,16 +212,16 @@ export default function DataRequestsPage() {
               : null;
             return (
               <div key={r.id} className="ui-card p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.email}</span>
+                      <span className="text-sm font-medium break-all" style={{ color: "var(--ck-text-strong)" }}>{r.email}</span>
                       {statusBadge(r.status)}
                       <span className={`ui-status ${r.request_type === "DELETION" ? "ui-pill-danger" : "ui-pill-ocean"}`}>
                         {r.request_type}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    <div className="mt-1 flex items-center gap-3 text-xs flex-wrap" style={{ color: "var(--ck-text-muted)" }}>
                       <span>Requested {new Date(r.created_at).toLocaleDateString("en-ZA")}</span>
                       {r.customers && (
                         <span>{r.customers.total_bookings} bookings · R{r.customers.total_spent}</span>
@@ -237,7 +237,7 @@ export default function DataRequestsPage() {
                   </div>
 
                   {isPrivileged && ["CONFIRMED", "IN_REVIEW"].includes(r.status) && (
-                    <div className="flex gap-1.5 shrink-0">
+                    <div className="flex gap-1.5 shrink-0 self-start sm:self-auto flex-wrap">
                       {r.request_type === "ACCESS" && (
                         <button data-demo-action="privacy.export"
                           onClick={() => handleExport(r.id)}

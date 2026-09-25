@@ -108,6 +108,18 @@ try {
       await assert.rejects(db.query(arrivalSql,arrivalArgs(id(731),6,4,'arrival-forged')),{code:'42501'});
     }));
   }
+  await check('authenticated clients cannot bypass conflict checks with a direct partial-count update',()=>as('authenticated',101,{},async()=>{
+    await assert.rejects(db.query('update bookings set arrived_count=2 where id=$1',[id(731)]),{code:'42501'});
+  }));
+  await check('legacy authenticated whole-group toggles remain coherent and audited',()=>as('authenticated',101,{},async()=>{
+    const row=(await db.query('update bookings set checked_in=false where id=$1 returning arrived_count,checked_in',[id(731)])).rows[0];
+    assert.deepEqual(row,{arrived_count:0,checked_in:false});
+    const audit=(await db.query("select source,arrived_count_before,arrived_count_after from slot_check_ins where booking_id=$1 and source='legacy-admin'",[id(731)])).rows;
+    assert.deepEqual(audit,[{source:'legacy-admin',arrived_count_before:6,arrived_count_after:0}]);
+  }));
+  await check('authenticated clients cannot forge arrival audit rows',()=>as('authenticated',101,{},async()=>{
+    await assert.rejects(db.query("insert into slot_check_ins(business_id,booking_id,slot_id,source) values($1,$2,$3,'forged')",[id(1),id(731),id(711)]),{code:'42501'});
+  }));
   await check('concurrent absolute arrival updates cannot silently overwrite each other',async()=>{
     const clients=[new pg.Client({...connection,database}),new pg.Client({...connection,database})];
     try {

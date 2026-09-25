@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import { BusinessProvider } from "./BusinessContext";
@@ -26,6 +26,7 @@ interface OperatorOption {
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -43,6 +44,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [businessId, setBusinessId] = useState("");
   const contextRequestRef = useRef(0);
   const [businessName, setBusinessName] = useState("");
+  const [staffName, setStaffName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [role, setRole] = useState("");
@@ -168,6 +170,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (data && data.business_id) {
       const context = await loadBusinessContext(data.role, data.business_id);
       setRole(data.role);
+      setStaffName(data.name || "");
       setBusinessId(context.businessId);
       setBusinessName(context.businessName);
       setLogoUrl(context.logoUrl);
@@ -189,6 +192,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (data) {
       // Admin exists but no business_id — legacy admin, still allow access
       setRole(data.role);
+      setStaffName(data.name || "");
       setReadOnly(data.read_only === true);
       setTimezone("UTC");
       setOperators([]);
@@ -223,6 +227,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setAuthed(false);
     setBusinessId("");
     setBusinessName("");
+    setStaffName("");
     setLogoUrl("");
     setTimezone("UTC");
     setRole("");
@@ -316,6 +321,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
 
       setRole(adminInfo.role);
+      setStaffName(adminInfo.name || "");
       setReadOnly(adminInfo.read_only === true);
       // Set ck_admin_role cookie immediately so proxy.ts page-gating works on the
       // very next navigation (without waiting for validateSession to run on next mount).
@@ -345,7 +351,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         // Simple view is entered deliberately from the full app. A restored
         // authenticated session may keep a deep link, but a fresh sign-in
         // always starts on the full dashboard.
-        window.location.replace("/");
+        router.replace("/");
       }
     } catch (err: any) {
       console.error("LOGIN_ERR", err);
@@ -584,7 +590,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BusinessProvider value={{ businessId, businessName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>
+    <BusinessProvider value={{ businessId, businessName, staffName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>
       {children}
     </BusinessProvider>
   );

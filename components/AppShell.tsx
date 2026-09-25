@@ -436,7 +436,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             </a>
           </div>
         )}
-        <main className="flex-1 overflow-auto px-4 py-6 pb-8 md:px-10 md:py-8">
+        <main className="flex-1 overflow-auto px-4 py-6 pb-28 md:px-10 md:py-8 md:pb-8">
           {readOnly && !isDemoPathVisible(pathname) ? (
             <div className="ui-card mx-auto max-w-md p-8 text-center">
               <h2 className="text-lg font-semibold">This section is not part of the demo</h2>

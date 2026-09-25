@@ -100,6 +100,7 @@
   ],
   "bookings": [
     "allow_unpaid",
+    "arrived_count",
     "business_id",
     "cancellation_reason",
     "cancelled_at",

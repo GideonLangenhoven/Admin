@@ -1731,7 +1731,7 @@ export default function SettingsPage() {
                                         {isExpanded && a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
                                             <div className="px-4 pb-4 pt-1 bg-[var(--ck-surface-sunken)] border-t border-[var(--ck-border-subtle)]">
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mb-3">Settings page access for {a.name || a.email}</p>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     {SETTINGS_SECTIONS.map(section => (
                                                         <label key={section.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-[var(--ck-surface)] transition-colors">
                                                             <input data-demo-action={perms[section.key] ? "admin.revoke" : "admin.grant"} data-demo-subject={section.label}
@@ -1752,7 +1752,7 @@ export default function SettingsPage() {
                                                 </div>
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mt-5 mb-1">Dashboard sections visible to {a.name || a.email}</p>
                                                 <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide a section from this admin. Billing, Chat FAQ and Data Requests are always Main-Admin only.</p>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     {OPERATOR_HIDEABLE_SECTIONS.filter(section => !readOnly || !section.key.startsWith("/") || isDemoPathVisible(section.key)).map(section => {
                                                         const hideKey = `hide:${section.key}`;
                                                         const visible = perms[hideKey] !== true;
@@ -1974,7 +1974,7 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price per Person (R)</label>
                                     <input type="number" required min="1" step="1" value={tourForm.price}
@@ -1997,7 +1997,7 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Default Capacity</label>
                                     <input type="number" min="1" step="1" value={tourForm.default_capacity}
@@ -2019,7 +2019,7 @@ export default function SettingsPage() {
                                 <DemoFeatureLink feature="tour.last-minute" />
                                 <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">Last-minute deal (optional)</label>
                                 <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats drop to the deal price between the start and the cut-off, then go back to the normal price. Leave blank to switch it off.</p>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Starts (hours before departure)</label>
                                         <input type="number" min="1" max="720" step="1" value={tourForm.lastMinuteHours}
@@ -2047,7 +2047,7 @@ export default function SettingsPage() {
                                     {editingTour ? "Generate Slots" : "Auto-generate Slots (optional)"}
                                 </label>
                                 <p className="text-xs text-[var(--ck-text-muted)] mb-3">Creates one slot per selected day in the date range.</p>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Date</label>
                                         <DatePicker
@@ -2312,7 +2312,7 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price (R)</label>
                                     <input type="number" required min="0" step="0.01" value={addOnForm.price}
@@ -3045,7 +3045,7 @@ export default function SettingsPage() {
                     <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">VIP Tag</h3>
                         <p className="text-xs text-[var(--ck-text-muted)]">Assigned when a customer makes a certain number of paid bookings within a time window. Expires after a set period unless they rebook.</p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bookings required</span>
                                 <input type="number" min={1} max={50} value={autoTagConfig.vip_bookings} onChange={e => setAutoTagConfig({ ...autoTagConfig, vip_bookings: parseInt(e.target.value) || 3 })}

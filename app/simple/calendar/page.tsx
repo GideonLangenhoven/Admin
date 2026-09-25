@@ -31,16 +31,16 @@ export default function SimpleCalendarPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <header>
-        <p className="ui-mono-label">View and book</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Calendar</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Choose a day to see departures, availability, and guest lists.</p>
+    <div className="sv-page">
+      <header className="sv-intro sv-intro--calendar">
+        <p className="sv-eyebrow"><CalendarBlank size={16} /> View and book</p>
+        <h1 className="sv-title">Calendar</h1>
+        <p className="sv-intro-copy">Find a departure. Make room for the next adventure.</p>
       </header>
 
-      <section className="ui-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Choose date">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="flex h-11 w-11 items-center justify-center rounded-xl border hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Previous day">
+      <section className="ui-card sv-filters flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Choose date">
+        <div className="sv-date-filter">
+          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="sv-day-picker-button" aria-label="Previous day">
             <CaretLeft size={20} />
           </button>
           <label className="relative min-w-0 flex-1 sm:w-52 sm:flex-none">
@@ -48,16 +48,16 @@ export default function SimpleCalendarPage() {
             <CalendarBlank size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
             <input type="date" value={date} onChange={event => selectDate(event.target.value)} className="ui-control h-11 w-full rounded-xl pl-10 pr-3 text-sm font-semibold" />
           </label>
-          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="flex h-11 w-11 items-center justify-center rounded-xl border hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Next day">
+          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="sv-day-picker-button" aria-label="Next day">
             <CaretRight size={20} />
           </button>
         </div>
         {date !== today && <button type="button" onClick={() => selectDate(today)} className="ui-btn ui-btn-soft !h-11 !rounded-xl">Today</button>}
       </section>
 
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-xl font-semibold" style={{ color: "var(--ck-text-strong)" }}>{longDate(date)}</h2>
-        {!loading && !error && <span className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{data?.departures.length || 0} departures</span>}
+      <div className="sv-section-heading">
+        <h2>{longDate(date)}</h2>
+        {!loading && !error && <span>{data?.departures.length || 0} departures</span>}
       </div>
 
       {loading && <div className="space-y-3">{[0, 1, 2].map(item => <div key={item} className="ui-skeleton h-36 rounded-2xl" />)}</div>}
@@ -78,7 +78,7 @@ export default function SimpleCalendarPage() {
       )}
 
       {!loading && !error && data && (
-        <div className="space-y-3">
+        <div className="sv-departure-list">
           {data.departures.map(departure => (
             <DepartureCard
               key={departure.id}

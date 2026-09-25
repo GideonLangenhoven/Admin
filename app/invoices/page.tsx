@@ -614,10 +614,10 @@ export default function Invoices() {
                   return (
                     <div key={inv.id} className="ui-card p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-mono text-sm font-bold" style={{ color: "var(--ck-accent)" }}>{invoiceNumber(inv)}</p>
                           <p className="mt-1 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{asText(inv.customer_name, "-")}</p>
-                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.customer_email, "")}</p>
+                          <p className="text-xs break-all" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.customer_email, "")}</p>
                           <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.tour_name, "-")}</p>
                         </div>
                         <div className="text-right">

@@ -98,30 +98,30 @@ function BookingCheckIn({
   }
 
   return (
-    <li className="ui-card overflow-hidden">
-      <div className="p-4 sm:p-5">
+    <li className="sv-check-in">
+      <div className="sv-check-in-body">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{booking.customer_name || "Guest"}</h3>
+            <h3 className="sv-customer-name">{booking.customer_name || "Guest"}</h3>
             <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               {booking.qty} guest{booking.qty === 1 ? "" : "s"}
               {booking.phone ? ` · ${booking.phone}` : ""}
             </p>
           </div>
-          <span className={`ui-status self-start ${booking.checked_in ? "ui-pill-success" : booking.arrived_count > 0 ? "ui-pill-amber" : "ui-pill-neutral"}`}>
+          <span className={`ui-status shrink-0 self-start sv-arrival-pill ${booking.checked_in ? "sv-arrival-pill--full" : booking.arrived_count === 0 ? "sv-arrival-pill--empty" : ""}`}>
             {booking.arrived_count} of {booking.qty} arrived
           </span>
         </div>
 
-        <div className="mt-4 grid gap-3 rounded-xl border p-3 sm:grid-cols-2" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
+        <div className="sv-readiness">
           <div>
-            <p className="ui-mono-label !text-[9px]">Payment</p>
+            <p className="sv-field-label">Payment</p>
             <p className="mt-1 text-sm font-semibold" style={{ color: paymentNeeded ? "var(--ck-warning)" : "var(--ck-success)" }}>
               {paymentNeeded ? `${money(due, currency)} due` : `Paid${derivePaymentMethod(booking) ? ` · ${derivePaymentMethod(booking)}` : ""}`}
             </p>
           </div>
           <div>
-            <p className="ui-mono-label !text-[9px]">Waiver</p>
+            <p className="sv-field-label">Waiver</p>
             <p className="mt-1 text-sm font-semibold" style={{ color: waiverReady ? "var(--ck-success)" : "var(--ck-danger)" }}>
               {waiverReady ? "Signed" : "Signature required"}
             </p>
@@ -129,15 +129,15 @@ function BookingCheckIn({
         </div>
 
         {paymentNeeded && (
-          <div className="mt-4 rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--ck-warning) 30%, transparent)", background: "var(--ck-warning-soft)" }}>
+          <div className="sv-payment-panel">
             <div className="flex items-start gap-2">
-              <WarningCircle size={19} className="mt-0.5 shrink-0" style={{ color: "var(--ck-warning)" }} />
+              <WarningCircle size={19} className="mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Confirm payment received</p>
-                <p className="mt-0.5 text-xs" style={{ color: "var(--ck-text-muted)" }}>This records the full outstanding balance of {money(due, currency)}. Card (terminal) means it was already taken on the external terminal.</p>
+                <p className="text-sm font-semibold">Confirm payment received</p>
+                <p className="mt-1 text-xs leading-relaxed">Record the full balance of {money(due, currency)}. Card (terminal) records a payment already taken on your terminal.</p>
               </div>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:items-end">
+            <div className="sv-payment-fields">
               <label className="text-xs font-semibold">
                 Method
                 <select value={method} onChange={event => setMethod(event.target.value as ManualPaymentMethod)} className="ui-control mt-1 h-11 w-full rounded-xl px-3 text-sm" disabled={busy !== null}>
@@ -145,10 +145,10 @@ function BookingCheckIn({
                 </select>
               </label>
               <label className="text-xs font-semibold">
-                Note <span className="font-normal" style={{ color: "var(--ck-text-muted)" }}>(optional)</span>
+                Note <span className="font-normal">(optional)</span>
                 <input value={paymentNote} onChange={event => setPaymentNote(event.target.value)} maxLength={240} className="ui-control mt-1 h-11 w-full rounded-xl px-3 text-sm" placeholder="Receipt or reference" disabled={busy !== null} />
               </label>
-              <button type="button" onClick={recordPayment} disabled={busy !== null} className="ui-btn ui-btn-primary !h-11 !rounded-xl whitespace-nowrap disabled:opacity-50">
+              <button type="button" onClick={recordPayment} disabled={busy !== null} className="ui-btn ui-btn-primary disabled:opacity-50">
                 {busy === "payment" ? "Confirming…" : `Confirm ${money(due, currency)} received`}
               </button>
             </div>
@@ -161,17 +161,17 @@ function BookingCheckIn({
           </p>
         )}
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="sv-arrival-editor">
           <div>
             <label className="text-sm font-semibold" htmlFor={`arrived-${booking.id}`}>Guests arrived</label>
-            <div className="mt-1.5 flex items-center gap-2">
-              <button type="button" onClick={() => changeDraft(draft - 1)} disabled={draft <= 0 || busy !== null} className="flex h-11 w-11 items-center justify-center rounded-xl border disabled:opacity-30" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Decrease arrived guests"><Minus size={18} /></button>
-              <input id={`arrived-${booking.id}`} type="number" inputMode="numeric" min={0} max={booking.qty} step={1} value={draft} onChange={event => changeDraft(Number(event.target.value || 0))} disabled={busy !== null} className="ui-control h-11 w-20 rounded-xl px-2 text-center text-base font-bold tabular-nums" />
+            <div className="sv-count-control">
+              <button type="button" onClick={() => changeDraft(draft - 1)} disabled={draft <= 0 || busy !== null} className="sv-count-button" aria-label="Decrease arrived guests"><Minus size={18} /></button>
+              <input id={`arrived-${booking.id}`} type="number" inputMode="numeric" min={0} max={booking.qty} step={1} value={draft} onChange={event => changeDraft(Number(event.target.value || 0))} disabled={busy !== null} className="ui-control tabular-nums" />
               <span className="text-sm font-semibold" style={{ color: "var(--ck-text-muted)" }}>of {booking.qty}</span>
-              <button type="button" onClick={() => changeDraft(draft + 1)} disabled={draft >= booking.qty || busy !== null} className="flex h-11 w-11 items-center justify-center rounded-xl border disabled:opacity-30" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Increase arrived guests"><Plus size={18} /></button>
+              <button type="button" onClick={() => changeDraft(draft + 1)} disabled={draft >= booking.qty || busy !== null} className="sv-count-button" aria-label="Increase arrived guests"><Plus size={18} /></button>
             </div>
           </div>
-          <button type="button" onClick={saveArrival} disabled={!canSave || busy !== null} className="ui-btn ui-btn-primary !h-11 !rounded-xl disabled:opacity-40 sm:min-w-32">
+          <button type="button" onClick={saveArrival} disabled={!canSave || busy !== null} className="ui-btn ui-btn-primary disabled:opacity-40 sm:min-w-32">
             {busy === "arrival" ? "Saving…" : draft < booking.arrived_count ? "Save correction" : "Save arrivals"}
           </button>
         </div>
@@ -224,21 +224,21 @@ export default function SimpleCheckInsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <header>
-        <p className="ui-mono-label">Arrivals and desk payments</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Check-ins</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Record the number of guests who have arrived. Payment must be confirmed and waivers signed first.</p>
+    <div className="sv-page">
+      <header className="sv-intro sv-intro--arrivals">
+        <p className="sv-eyebrow"><CheckCircle size={16} /> Arrivals and desk payments</p>
+        <h1 className="sv-title">Check-ins</h1>
+        <p className="sv-intro-copy">Welcome your guests. Confirm payment and waivers, then record arrivals.</p>
       </header>
 
-      <section className="ui-card grid gap-3 p-3 sm:grid-cols-[auto_minmax(12rem,1fr)] sm:items-end" aria-label="Check-in filters">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="flex h-11 w-11 items-center justify-center rounded-xl border" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Previous day"><CaretLeft size={20} /></button>
+      <section className="ui-card sv-filters grid gap-4 md:grid-cols-[auto_minmax(12rem,1fr)] md:items-end" aria-label="Check-in filters">
+        <div className="sv-date-filter">
+          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="sv-day-picker-button" aria-label="Previous day"><CaretLeft size={20} /></button>
           <label>
             <span className="sr-only">Selected date</span>
-            <input type="date" value={date} onChange={event => selectDate(event.target.value)} className="ui-control h-11 min-w-0 rounded-xl px-3 text-sm font-semibold" />
+            <input type="date" value={date} onChange={event => selectDate(event.target.value)} className="ui-control w-full h-11 min-w-0 px-3 font-semibold" />
           </label>
-          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="flex h-11 w-11 items-center justify-center rounded-xl border" style={{ borderColor: "var(--ck-border-strong)" }} aria-label="Next day"><CaretRight size={20} /></button>
+          <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="sv-day-picker-button" aria-label="Next day"><CaretRight size={20} /></button>
         </div>
         <label className="text-xs font-semibold">
           Departure
@@ -249,9 +249,9 @@ export default function SimpleCheckInsPage() {
         </label>
       </section>
 
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <h2 className="font-display text-xl font-semibold" style={{ color: "var(--ck-text-strong)" }}>{longDate(date)}</h2>
-        {!loading && !error && <span className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{bookingCount} booking{bookingCount === 1 ? "" : "s"}</span>}
+      <div className="sv-section-heading">
+        <h2>{longDate(date)}</h2>
+        {!loading && !error && <span>{bookingCount} booking{bookingCount === 1 ? "" : "s"}</span>}
       </div>
 
       {loading && <div className="space-y-3">{[0, 1, 2].map(item => <div key={item} className="ui-skeleton h-64 rounded-2xl" />)}</div>}
@@ -275,11 +275,11 @@ export default function SimpleCheckInsPage() {
         <div className="space-y-6">
           {departures.filter(departure => departure.bookings.length > 0).map(departure => (
             <section key={departure.id} aria-labelledby={`departure-${departure.id}`}>
-              <div className="mb-2 flex items-center justify-between gap-3 px-1">
-                <h2 id={`departure-${departure.id}`} className="min-w-0 truncate font-display text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+              <div className="sv-group-heading">
+                <h2 id={`departure-${departure.id}`}>
                   <span className="tabular-nums">{timeLabel(departure.start_time, timezone)}</span> · {departure.tour_name}
                 </h2>
-                <span className="shrink-0 text-xs font-semibold" style={{ color: "var(--ck-text-muted)" }}>{departure.arrived_guests}/{departure.booked_guests} arrived</span>
+                <span>{departure.arrived_guests}/{departure.booked_guests} arrived</span>
               </div>
               <ul className="space-y-3">
                 {departure.bookings.map(booking => (

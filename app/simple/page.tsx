@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarBlank, Plus } from "@phosphor-icons/react";
+import { ArrowUpRight, CalendarBlank, Plus } from "@phosphor-icons/react";
 import { useBusinessContext } from "@/components/BusinessContext";
 import DepartureCard from "@/components/simple/DepartureCard";
 import { businessDateKey, walkInUrl } from "@/app/lib/simple-view";
@@ -12,28 +12,32 @@ function longDate(date: string) {
 }
 
 export default function SimpleTodayPage() {
-  const { businessId, timezone } = useBusinessContext();
+  const { businessId, staffName, timezone } = useBusinessContext();
+  const welcomeName = staffName?.trim();
   const date = businessDateKey(timezone);
   const { data, loading, error, reload } = useSimpleDay(businessId, date, timezone);
   const booked = data?.departures.reduce((sum, departure) => sum + departure.booked_guests, 0) || 0;
   const arrived = data?.departures.reduce((sum, departure) => sum + departure.arrived_guests, 0) || 0;
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="ui-mono-label">{longDate(date)}</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Today</h1>
+    <div className="sv-page">
+      <header className="sv-intro">
+        <p className="sv-eyebrow"><CalendarBlank size={16} /> Today · {longDate(date)}</p>
+        <h1 className="sv-title sv-welcome">Welcome{welcomeName && <>,<br /><span>{welcomeName}</span></>}</h1>
+        <p className="sv-intro-copy">Your departures. Your guests. All in one place.</p>
+        <div className="sv-intro-footer">
           {!loading && !error && (
-            <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              {data?.departures.length || 0} departure{data?.departures.length === 1 ? "" : "s"} · {booked} booked · {arrived} arrived
-            </p>
+            <div className="sv-day-summary" aria-label="Today's overview">
+              <span><strong>{data?.departures.length || 0}</strong> departure{data?.departures.length === 1 ? "" : "s"}</span>
+              <span><strong>{booked}</strong> booked</span>
+              <span><strong>{arrived}</strong> arrived</span>
+            </div>
           )}
+          <Link href="/simple/calendar" className="sv-text-link">Browse calendar <ArrowUpRight size={18} /></Link>
         </div>
-        <Link href="/simple/calendar" className="ui-btn ui-btn-soft !h-11 !rounded-xl self-start text-sm font-semibold sm:self-auto">
-          <CalendarBlank size={18} /> Browse calendar
-        </Link>
       </header>
+
+      <div className="sv-section-heading"><h2>Departures</h2><span>In time order</span></div>
 
       {loading && (
         <div className="space-y-3" aria-label="Loading today’s departures">
@@ -62,7 +66,7 @@ export default function SimpleTodayPage() {
       )}
 
       {!loading && !error && data && data.departures.length > 0 && (
-        <div className="space-y-3">
+        <div className="sv-departure-list">
           {data.departures.map(departure => (
             <DepartureCard
               key={departure.id}

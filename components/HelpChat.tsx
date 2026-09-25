@@ -272,11 +272,11 @@ export default function HelpChat() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label={readOnly ? "Open AI bot" : "Open AI help"}
-          className="fixed bottom-20 right-4 z-40 flex h-12 items-center justify-center gap-2 rounded-full px-4 transition-transform hover:scale-105 md:bottom-6 md:right-6"
+          className="fixed bottom-20 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 md:bottom-6 md:right-6 md:h-12 md:w-auto md:gap-2 md:px-4"
           style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
         >
-          <ChatCircleDots size={24} weight="fill" />
-          <span className="text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
+          <ChatCircleDots size={22} weight="fill" />
+          <span className="hidden md:inline text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
         </button>
       )}
 
