@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-09-27T13:11:06Z",
+  "recorded_at_utc": "2026-09-27T16:46:30Z",
   "kind": "CURRENT_SOURCE_REVIEW_WITH_OPEN_RELEASE_GATES",
   "verdict": "FAILED_GATE",
   "production_equivalence_verified": false,
@@ -51,7 +51,8 @@
       "candidate_source_verified": false
     },
     "supabase_latest_observed_migration": "20260922123000",
-    "source": "27 September read-only inspection; no current source/configuration equivalence claim"
+    "source": "27 September read-only inspection; no current source/configuration equivalence claim",
+    "historical_database_observation_at_utc": "2026-09-27T12:46:05.949Z"
   },
   "routing": {
     "requested": {
@@ -447,11 +448,12 @@
   "release_actions_this_checkpoint": {
     "pushed": false,
     "deployed": false,
-    "remote_migration_applied": false,
+    "remote_migration_applied": true,
     "provider_called": false,
-    "hosted_data_mutated": false,
+    "hosted_data_mutated": true,
     "load_run": false,
-    "restore_run": false
+    "restore_run": false,
+    "hosted_data_mutation_scope": "Seven reviewed schema/ledger migrations plus one cleaned-up synthetic ingress fixture under renewed bounded approval; no provider/customer mutation."
   },
   "historical_reference": {
     "prior_manifest_in_commit": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
@@ -506,5 +508,18 @@
     "conclusion": "SUCCESS",
     "url": "https://github.com/GideonLangenhoven/Admin/actions/runs/36305604444",
     "scope": "Admin source/build and companion/regression jobs passed on exact source: 1517 unit passes and one skip; 13 release/seed guards, six storefront guards, 55 Deno bundles, three Edge-resolution guards, three onboarding contracts, 230 PostgreSQL checks, three builds and zero audit vulnerabilities; deployed smoke skipped"
-  }
+  },
+  "current_hosted_database_state": {
+    "observed_at_utc": "2026-09-27T16:42:07.149Z",
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "migration_ledger_count": 222,
+    "latest_migration": "20260927100000",
+    "exact_seven_candidate_versions_installed": true,
+    "catalog_and_service_low_role_postflight": "PASS",
+    "synthetic_ingress_rows_after_cleanup": 0,
+    "evidence": "evidence/PHASE1_HOSTED_2026-09-27.json",
+    "limit": "Application Preview configuration, Edge deployment and deployed journeys remain unqualified."
+  },
+  "planned_unapplied_migrations_snapshot_at_utc": "2026-09-27T12:46:05.949Z",
+  "planned_unapplied_migrations_current_disposition": "All seven listed versions were applied under the renewed 16:11:30Z\u201318:11:30Z scoped owner window; retained list is the pre-apply planned set for source and SQL identity checks."
 }

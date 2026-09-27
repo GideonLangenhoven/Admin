@@ -1,7 +1,7 @@
 {
-  "updated_at_utc": "2026-09-27T06:02:18Z",
+  "updated_at_utc": "2026-09-27T16:53:34Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
-  "current_closeout": "docs/production-readiness/CLOSEOUT_PACKET.json; frozen Admin 72e0d59 plus storefront5658610 and onboarding293d4e4 passed hosted source CI36321231309 with deployed smoke skipped. Previous CI36304613607 failed in storefront test lint after Admin source/build passed; the test-only error was corrected. Production aliases are non-equivalent/unverified, six previously reviewed migrations plus the new shared-ingress migration are unapplied, and previous 500-VU mixed/corrective smokes failed. The hosted rollback rehearsal covers the original six only.",
+  "current_closeout": "docs/production-readiness/CLOSEOUT_PACKET.json; frozen Admin72e0d59 plus storefront5658610 and onboarding293d4e4 passed hosted source CI36321231309 with deployed smoke skipped. Seven hosted database migrations applied in two exact rehearsed stages; ledger222/latest20260927100000 and bounded catalog/ingress postflight passed with zero synthetic rows after cleanup. Production aliases remain non-equivalent/unverified and unchanged; Preview configuration/rebuild is held for commercial hosting eligibility. Previous 500-VU mixed/corrective smokes failed, and provider/alert/full restore/canary gates remain open.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
   "routing_verdict": "IN_PROGRESS",
@@ -565,9 +565,9 @@
         "integration_log_sha256": "6eee1e598df7ec2f6446d58b8a6a44037b2607a80f9279fd9899d8e1fef91efd",
         "migration": "supabase/migrations/20260923130000_refund_batch_acceptance.sql",
         "migration_sha256": "9e1c20d036b7fa9adc4819dd145920aec3090e8c59a24e62d3b3c572a5f810aa",
-        "migration_status": "UNAPPLIED",
+        "migration_status": "APPLIED_HOSTED_2026_09_27",
         "contract": "Existing bookings/refunds UI retains foreground per-item processing and browser-scoped recovery; separate whole-batch endpoint persists accepted targets under stable caller UUID. Audit IDs are database-owned, 401/403 stops the unsubmitted tail, 101-item UI recovery remains valid, and stale tenant/account responses do not populate the new context.",
-        "limits": "Same-browser storage must survive to recover the UI selected list; separate endpoint callers must retain batch UUID. Unknown submitted results need reconciliation, never blind replay. Synthetic minimal PostgreSQL schema is not full hosted-ledger proof; no real provider, deployed browser, or migration rollout claim."
+        "limits": "Same-browser storage must survive to recover the UI selected list; separate endpoint callers must retain batch UUID. Unknown submitted results need reconciliation, never blind replay. The exact hosted migration is installed in ledger222; no real provider or deployed browser journey claim."
       }
     },
     {

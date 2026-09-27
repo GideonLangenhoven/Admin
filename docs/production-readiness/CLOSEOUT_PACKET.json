@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at_utc": "2026-09-27T15:56:03Z",
+  "recorded_at_utc": "2026-09-27T16:46:30Z",
   "verdict": "FAILED_GATE",
   "candidate": {
     "admin_commit": "72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5",
@@ -31,7 +31,8 @@
     "booking_git_dirty": true,
     "onboarding_git_commit": null,
     "candidate_equivalence": "NOT_MATCHING_ADMIN_OR_BOOKING; ONBOARDING_UNVERIFIED",
-    "supabase_latest_migration": "20260922123000"
+    "supabase_latest_migration": "20260927100000",
+    "supabase_migration_ledger_count": 222
   },
   "deployment_ids": null,
   "config_fingerprint": null,
@@ -53,14 +54,22 @@
       "private_receipt": "/private/tmp/capekayak-release-dsQ4QB/rehearsal.json",
       "limit": "No migration applied; seventh shared-ingress migration was outside this rehearsal."
     },
-    "local_scoped_restore": "evidence/LOCAL_RESTORE_2026-09-27.json; scoped database rows, two object hashes and local existing-user Auth/API authorization matched; new archive decode/schema parity passed, but file serving/platform recovery and RPO/RTO remain open",
+    "local_scoped_restore": "evidence/LOCAL_RESTORE_2026-09-27.json; scoped database rows, existing-user Auth/API authorization and two public Storage API HTTP byte hashes matched; full protected platform configuration, private-object authorization and RPO/RTO remain open",
     "local_edge_lock_runtime": {
       "status": "LOCAL_26_OF_26_BUNDLE_PASS_NOT_DEPLOYED",
       "private_receipt": "/private/tmp/bookingtours-edge-v4-probe-20260927/EDGE_LOCK_RUNTIME_QUALIFICATION.json",
       "receipt_sha256": "a68b2fd55043e694480f4a63d0e9c9e4b937b327702c775959c8e14fff818b39",
       "limit": "Pinned runtime local warm-cache and tamper checks only; no hosted function deployment or invocation."
     },
-    "storage_api_serving": "NOT_RUN_EXECUTION_CAP_EXPIRED; two restored file hashes and public bucket flags known, but no Storage HTTP response; see evidence/LOCAL_RESTORE_2026-09-27.json"
+    "storage_api_serving": "PASS_TWO_PUBLIC_OBJECTS_LOCAL_ONLY; both HTTP 200, bytes and SHA-256 match retained manifest; synthetic local xattrs; see evidence/LOCAL_RESTORE_2026-09-27.json",
+    "hosted_phase1_database": {
+      "status": "SEVEN_MIGRATIONS_APPLIED_POSTFLIGHT_PASS_PREVIEWS_HELD",
+      "evidence": "evidence/PHASE1_HOSTED_2026-09-27.json",
+      "ledger_before": 215,
+      "ledger_after": 222,
+      "latest_version": "20260927100000",
+      "limit": "Shared database update passed catalog and bounded synthetic ingress checks. No Preview environment/rebuild, Edge function, production alias promotion, provider journey, load or release qualification."
+    }
   },
   "proofs": {
     "source_security": null,
@@ -87,21 +96,28 @@
     "current_project_owner_classification": "no real user data at present; authorized for bounded synthetic testing",
     "budget_ceiling_zar": 0,
     "exact_current_mutation_load_provider_deployment_or_restore_window": null,
-    "separate_restore_target": "isolated local Docker bt-restore-20260927-a81c (scoped database/object and existing-user Auth/API verified; operational file-serving/platform recovery and RPO/RTO unproven)",
+    "separate_restore_target": "isolated local Docker bt-restore-20260927-a81c (scoped database rows, existing-user Auth/API and two public object-serving byte hashes verified; protected platform recovery and RPO/RTO unproven)",
     "provider_destinations": "private planning inputs only",
     "qualification_window_required_seconds_at_least": 92280,
-    "production_canary_required_seconds": 86400
+    "production_canary_required_seconds": 86400,
+    "renewed_phase1_window": {
+      "start_utc": "2026-09-27T16:11:30Z",
+      "end_utc": "2026-09-27T18:11:30Z",
+      "scope": "Seven exact shared-database migrations plus scoped branch Preview configuration/rebuild and bounded no-provider checks; database complete, Previews held.",
+      "status_as_of_utc": "2026-09-27T16:46:30Z"
+    }
   },
   "blockers": [
-    "Six reviewed forward migrations after 20260922123000 plus the new shared-ingress limiter migration are unapplied. The hosted rollback rehearsal proves the original six only; the seven-stage package still needs exact review, rehearsal, ledger and reconciliation evidence.",
+    "Seven exact hosted migrations are applied and ledger 222/catalog postflight passed. Candidate Admin/storefront/Edge runtime configuration and full journeys remain unqualified; Preview configuration/rebuild is held.",
     "Current aliases do not prove the three candidate sources, Edge versions, migration ledger or effective runtime configuration.",
     "The Supabase-backed shared ingress limiter and trusted recovery origin require effective hosted configuration, failure-behavior and capacity proof within ZAR 0.",
     "Candidate-bound role, 100-account continuity, genuine provider, financial-fault and negative outbound journeys remain open.",
     "Representative dataset, independent generator, provider doubles, public/webhook/background traffic, browser Realtime footprint and measured quota headroom remain open.",
     "The September 22 deployed 500-VU staff and corrective smokes failed; no passing unchanged-threshold 60-minute mix, 2x spike, recovery or 24-hour soak exists.",
-    "Alert delivery and a usable isolated restore with RPO at most 15 minutes and RTO at most 60 minutes are unproven; a network-disabled local database/object and scoped Auth/API restore passed, but file-serving/platform recovery and RPO/RTO are incomplete.",
-    "The September 22 window expired; a new exact candidate/action/target/window/abort/recovery approval packet is required before consequential execution.",
-    "A distinct approved 24-hour limited production canary and final release review have not occurred."
+    "Alert delivery and a usable isolated restore with RPO at most 15 minutes and RTO at most 60 minutes are unproven; network-disabled local database, existing-user Auth/API and two public Storage HTTP byte-hash checks passed, but full protected platform recovery and private-object authorization are incomplete.",
+    "The first phase-1 window expired without changes. A renewed exact window authorized and completed seven database migrations, while Preview changes are held. Separate exact seed/load/provider/Edge/production action windows and recovery approvals remain required.",
+    "A distinct approved 24-hour limited production canary and final release review have not occurred.",
+    "The observed Vercel Hobby plan is limited to personal non-commercial use; no durable eligible ZAR 0 commercial hosting route for BookingTours is verified. The owner keeps the current sites until all release gates pass."
   ],
   "prior_successful_source_ci": {
     "admin_commit": "c7e15f91ceca76acbec75688f9768704628f5a9e",

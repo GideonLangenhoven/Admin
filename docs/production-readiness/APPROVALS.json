@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-09-27T15:56:03Z",
+  "updated_at_utc": "2026-09-27T16:46:30Z",
   "candidate": "FROZEN_REVIEW_SOURCE_CI_PASSED_RELEASE_GATES_OPEN",
   "authorized": {
     "isolated_source_changes": true,
@@ -64,19 +64,21 @@
     }
   ],
   "missing_external_approvals": [
-    "Exact current publication/deployment and migration packet after required non-production gates pass; include automatic deployment paths, window, effects, cost and recovery.",
+    "Any future SQL stage, Edge deployment or production application publication/promotion requires a separate exact reviewed action/window packet after its own required gates; the seven database migrations were already applied under the renewed bounded phase-1 authority.",
     "Exact seed, mass-load, provider and outbound test window with allowed synthetic records/recipients/modes, after outbound negative guards and candidate prerequisites pass.",
-    "Operational isolated restore on the identified local recovery environment or an equivalent approved isolated environment, covering database, Auth sign-in/API, object serving and protected configuration with RPO15m and RTO60m measurements.",
+    "Operational isolated restore on the identified local recovery environment or an equivalent approved isolated environment, covering complete protected configuration and platform services with RPO15m and RTO60m measurements; scoped database, existing-user Auth/API and two public object-serving checks have passed locally.",
     "Supabase-backed shared admission limiter effective configuration, failure behavior and capacity verified within ZAR 0 before ingress deployment; no separate Redis service is required by the candidate.",
     "Capacity/data/Realtime/worker/generator quotas and remaining billable allowance for the complete BT500 workload; any paid capacity needs explicit owner decision.",
     "Approved monitoring receiver, incident owner and delivered-alert test window.",
-    "Distinct24-hour limited production canary with real isolation boundary and adoption gates after exact deployed verification."
+    "Distinct24-hour limited production canary with real isolation boundary and adoption gates after exact deployed verification.",
+    "A durable commercially eligible ZAR 0 hosting path for the three application sites, or an explicit paid-hosting decision; Vercel Hobby is restricted to personal non-commercial use and its trial path is temporary/unverified."
   ],
   "latest_scope_steering": {
     "request": "Continue all C01-C06 and V01-V06 requirements with authorized isolated source work and local synthetic tests. Complete concrete reviewable work before asking for an external action approval.",
-    "current_source": "Current review source is frozen at Admin 72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5, storefront 565861037fd4f12a747254705b0c74e6ab4161ae and onboarding 293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb. Hosted source CI 36321231309 passed both jobs with deployed smoke skipped. Prior CI 36304613607 failed in companion lint on storefront b29bc5; the test-only correction is in storefront5658610. The expired phase-1 approval remains bound to the earlier Admin c7e15f9 source and did not authorize this later source.",
-    "deployment": "27 September read-only aliases report Admin7be561b, dirty storefront8c0b4bf and onboarding without Git SHA; none proves current candidate equivalence. No forward migration was applied and no current candidate was deployed to production or promoted; exact review-branch Previews are READY but do not prove runtime qualification. A rollback-only hosted rehearsal of the original six migration bodies and a scoped local isolated database/file restore preparation completed; neither is a full release or operational restore gate pass. No hosted mass load, real message/payment or provider effect occurred.",
-    "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet."
+    "current_source": "Current review source is frozen at Admin 72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5, storefront 565861037fd4f12a747254705b0c74e6ab4161ae and onboarding 293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb. Hosted source CI 36321231309 passed both jobs with deployed smoke skipped. Prior CI 36304613607 failed in companion lint on storefront b29bc5; the test-only correction is in storefront5658610. The first expired phase-1 approval was bound to Admin c7e15f9; the renewed exact window is bound to current Admin 72e0d59 and authorized only the listed bounded phase.",
+    "deployment": "27 September read-only production aliases remain Admin7be561b, dirty storefront8c0b4bf and onboarding without Git SHA; none proves current candidate equivalence. Seven exact hosted migrations are now applied on the shared project, ledger 222 ending 20260927100000, with catalog and bounded synthetic ingress postflight passed. Exact review-branch Previews are READY from source publication, but no approved Preview environment change/rebuild or production promotion occurred in the renewed phase. Existing-user Auth/API and both public object-serving bytes passed locally; operational protected platform recovery and measured RPO/RTO remain open. No hosted mass load, real message/payment or provider effect occurred.",
+    "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet.",
+    "hosting": "Owner keeps ZAR 0 additional spend, reports Supabase Cost Control Spend Cap ON (owner testimony, not independently dashboard-verified), and wants current sites unchanged until the full gates pass. Vercel Hobby permits personal non-commercial use; a durable ZAR 0 commercial hosting route for BookingTours is not yet qualified. Preview configuration/rebuild is held."
   },
   "historical_checkpoint": {
     "updated_at_utc": "2026-09-22T09:15:55Z",
@@ -120,10 +122,27 @@
     "routing": "Astra xhigh orchestration/review and GPT-6 Sol max implementation; reduce tokens through compact tasks and evidence reuse.",
     "source_project": "ukdsrndqhsatjkmxijuj",
     "data": "Owner says the current Supabase project has no real user data at present and authorizes its bounded synthetic test use. Earlier 50 booking/customer rows were classified synthetic/demo. This does not authorize a seed, mass load, provider effect, message, paid change or production promotion without its exact action scope/window.",
-    "restore_target": "Network-disabled local Docker bt-restore-20260927-a81c is an identified isolated database/object restore environment. Scoped rows and two file hashes matched. Scoped existing-user Auth/API passed locally; operational object serving/platform recovery and measured RPO/RTO remain unproven; the current Supabase source must not be restored into itself. Other projects are excluded from this assignment.",
+    "restore_target": "Network-disabled local Docker bt-restore-20260927-a81c is an identified isolated restore environment. Scoped database rows, existing-user Auth/API authorization and two public Storage HTTP-served byte hashes matched. Private-object authorization, full protected platform recovery and measured RPO/RTO remain unproven; the current hosted source must not be restored into itself.",
     "budget_ceiling_zar": 0,
     "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window.",
-    "shared_limiter": "Existing Supabase service-only shared limiter is implemented in the seventh migration and Admin/Storefront source. No new Redis service is required. Hosted migration, effective configuration, quota/headroom and invocation behavior remain unproven; no paid resource is approved.",
-    "hosting_budget": "Owner directs ZAR 0 additional spend and branch Previews first. Supabase is the only paid service; no Vercel upgrade, other paid hosting or paid resource change is authorized. Hobby incremental platform charges are zero for bounded Preview work, while current capacity and commercial-use eligibility remain open."
+    "shared_limiter": "Seven hosted migrations including the Supabase service-only shared limiter RPC are applied, ledger222 with bounded low-role/service synthetic checks passed. Effective Admin/storefront Preview/production configuration, deployed failure behavior, invocation and quota/headroom remain open.",
+    "hosting_budget": "Owner requires ZAR 0 additional spend, Supabase as the only paid service, and current sites unchanged until full gates pass. Supabase Cost Control Spend Cap ON is owner-reported, not independently dashboard-verified. Vercel Hobby is restricted to personal non-commercial use; durable eligible commercial hosting and complete capacity/cost proof remain open. No Vercel upgrade, other paid host or paid resource change is authorized."
+  },
+  "phase1_renewed_shared_backend_approval": {
+    "status": "WITHIN_WINDOW_DATABASE_COMPLETE_PREVIEWS_HELD_AS_OF_16_46_30Z",
+    "owner": "Gideon",
+    "window_start_utc": "2026-09-27T16:11:30Z",
+    "window_end_utc": "2026-09-27T18:11:30Z",
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "source": {
+      "admin_commit": "72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5",
+      "storefront_commit": "565861037fd4f12a747254705b0c74e6ab4161ae",
+      "onboarding_commit": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb"
+    },
+    "additional_spend_ceiling_zar": 0,
+    "allowed": "Same bounded seven database migrations in two stages on the existing shared project, branch Preview configuration/rebuild and no-provider checks, after exact preflight/rehearsal.",
+    "excluded": "No Edge deployment, production environment/build or alias promotion, main push, seed or mass load, real recipients, messages, payments, provider actions or paid upgrade. No blanket release approval.",
+    "observed_outcome": "Both hosted database stages applied and seven exact ledger entries verified; bounded service/low-role ingress check passed and its synthetic row was removed. Preview environment changes/rebuilds were held over Vercel Hobby commercial-use eligibility; no Edge or production alias changes. See evidence/PHASE1_HOSTED_2026-09-27.json.",
+    "remaining_authority": "Approval expires at 18:11:30Z and does not authorize actions outside its exact scope or any later window."
   }
 }

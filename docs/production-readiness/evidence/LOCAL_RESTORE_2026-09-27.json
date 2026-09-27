@@ -1,6 +1,6 @@
 {
   "recorded_date_utc": "2026-09-27",
-  "status": "LOCAL_SCOPED_PREPARATION_ONLY",
+  "status": "LOCAL_SCOPED_DB_AUTH_API_PUBLIC_OBJECT_SERVING_PASS",
   "source_project": "ukdsrndqhsatjkmxijuj",
   "method": "Native TLS PostgreSQL archive of the authorized source project, restored in one transaction in an isolated Docker Supabase PostgreSQL 17.6.1.063 container with network disabled; separately backed-up and restored two storage objects.",
   "database_archive_sha256": "fc2fc0b745fb9c99f296f6f67e47ce19c4247adea182441122100802cb2c2ff5",
@@ -44,7 +44,8 @@
       "1088883da35a06ee79147492e4aa3e57dfafc071b4da1e343fe3b448b2dcffbb",
       "3129e4230625943f633c9a0e968fc176e8c77057c4957bf6d9c11d4b46865ffc"
     ],
-    "serving_proven": false
+    "serving_proven": true,
+    "serving_scope": "Both public objects were served from restored database metadata and retained byte copies by the official local Storage API; private-object authorization was not exercised."
   },
   "auth_api_verification": {
     "status": "LOCAL_SCOPED_PASS",
@@ -64,8 +65,8 @@
   },
   "protected_configuration": "Admin production environment backed up privately; required SETTINGS_ENCRYPTION_KEY name present. No values or backup bytes are in this repository.",
   "limits": [
-    "Existing-user Auth recovery and API authorization passed locally, but private file serving and complete application journeys were not exercised.",
-    "A bounded local Storage API serving attempt stopped before service startup at its execution cap; restored object byte hashes and public bucket flags do not prove served responses.",
+    "Existing-user Auth recovery and API authorization passed locally; two public object HTTP responses matched retained SHA-256 and byte counts, but private-object authorization and complete application journeys were not exercised.",
+    "Local Storage file-backend cache-control and content-type xattrs were synthetic scaffolding; original object metadata and protected platform configuration were not restored end to end.",
     "The identified network-disabled local environment has not run the complete platform configuration, Edge dependencies, scheduler and outbound services as an operational restore.",
     "No proof of 15-minute RPO or 60-minute RTO; this was a static snapshot without measured service recovery.",
     "Platform cron, network, Realtime and other out-of-scope service state were not backed up or restored.",
@@ -81,9 +82,31 @@
     "storage_service_started": false,
     "http_requests_made": 0,
     "object_response_hashes_verified": false,
-    "limit": "The authorized 15-minute local execution cap expired before Storage API startup. File-byte hashes and public bucket flags are established, but no Storage API serving, protected configuration, full operational recovery or RPO/RTO is proven.",
+    "limit": "The earlier capped attempt stopped before startup and is retained as history. A separate later local proof served both public objects; see storage_api_serving_verification.",
     "disposable_snapshot_image_removed": true,
     "disposable_snapshot_image_sha256": "cd41a0afa8682cb6da67174e152a9a812be49f1794732ba2e733ec2b537d8f67",
-    "original_restore_container_preserved": true
+    "original_restore_container_preserved": true,
+    "historical_prior_attempt": true
+  },
+  "storage_api_serving_verification": {
+    "status": "PASS_TWO_PUBLIC_OBJECTS_LOCAL_ONLY",
+    "private_receipt": "/private/tmp/bookingtours-storage-api-proof-20260927/receipt.json",
+    "receipt_sha256": "7bb789ce2f81fd8237af908b932cdb8d302c02b3e096f800a95b1dda44ecc260",
+    "official_storage_image": "public.ecr.aws/supabase/storage-api:v1.41.8@sha256:c74659dad510393f6f4cdaba5a973e446bb581d89dd1d9b93bcd2c868dbdf965",
+    "source_archive_sha256": "fc2fc0b745fb9c99f296f6f67e47ce19c4247adea182441122100802cb2c2ff5",
+    "restored_public_object_rows": 2,
+    "http_statuses": [
+      200,
+      200
+    ],
+    "response_bytes": [
+      115538,
+      77355
+    ],
+    "response_sha256_matches_retained_manifest": 2,
+    "isolated_network": "Disposable DB clone network none; Storage joined its namespace; zero host ports and no hosted calls.",
+    "metadata_limit": "Synthetic local no-cache/application-octet-stream xattrs were supplied on byte copies because the file backend requires xattrs; original metadata parity is unproven.",
+    "cleanup": "Disposable service, clone, Linux volume, snapshot image, downloaded Storage image and temporary credentials/files removed; original stopped bt-restore-20260927-a81c preserved.",
+    "remaining": "No private-object authorization, full protected configuration, platform restore, or measured RPO/RTO."
   }
 }

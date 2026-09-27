@@ -1,0 +1,104 @@
+{
+  "recorded_at_utc": "2026-09-27T16:46:30Z",
+  "status": "DATABASE_STAGES_APPLIED_PREVIEW_CONFIGURATION_HELD",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "candidate": {
+    "admin_commit": "72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5",
+    "storefront_commit": "565861037fd4f12a747254705b0c74e6ab4161ae",
+    "onboarding_commit": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb",
+    "source_ci_run_id": 36321231309,
+    "source_ci_result": "SUCCESS_DEPLOYED_SMOKE_SKIPPED"
+  },
+  "renewed_owner_approval": {
+    "window_start_utc": "2026-09-27T16:11:30Z",
+    "window_end_utc": "2026-09-27T18:11:30Z",
+    "additional_spend_ceiling_zar": 0,
+    "scope": "Seven reviewed migrations in two stages on the shared existing project, scoped branch Preview configuration/rebuild and bounded no-provider checks. No Edge deployment, production environment/alias mutation, seed/load, provider action or real recipient."
+  },
+  "fresh_preapply_checkpoint": {
+    "started_at_utc": "2026-09-27T16:15:55.578Z",
+    "finished_at_utc": "2026-09-27T16:17:10.109Z",
+    "private_archive": "/private/tmp/bookingtours-phase1-backup-6y0q_w15/application.dump",
+    "bytes": 2448772,
+    "sha256": "0be329f2e839920b60168be9f296567e987301d7ce901cad1cac22a9996961af",
+    "schemas": [
+      "public",
+      "app_private",
+      "auth",
+      "storage",
+      "supabase_migrations"
+    ],
+    "verified_tls": true,
+    "pg_restore_decode_passed": true,
+    "actually_restored": false,
+    "two_object_source_byte_hashes_reverified_at_utc": "2026-09-27T16:28:29Z",
+    "private_object_receipt": "/private/tmp/bookingtours-phase1-backup-6y0q_w15/object-checkpoint.json"
+  },
+  "stage_six": {
+    "rehearsal_recorded_at_utc": "2026-09-27T16:24:18.956Z",
+    "rehearsal_private_receipt": "/var/folders/hn/5xp6rl8j0dg1lx6p6ykv3rfm0000gn/T/capekayak-release-8BtDLt/rehearsal.json",
+    "rehearsal_receipt_sha256": "267ab25551c13a7182d0e94162738fdc412bdfa8fb0a1e1946d6aeb9289c0925",
+    "apply_sql_sha256": "63ae9243a5af8d7462e57c99a7bdc6822b929e352f72e5c4f8540322eb92d46b",
+    "apply_result": "PASS",
+    "ledger_before": 215,
+    "ledger_after": 221
+  },
+  "stage_shared_ingress": {
+    "rehearsal_recorded_at_utc": "2026-09-27T16:31:18.847Z",
+    "rehearsal_private_receipt": "/var/folders/hn/5xp6rl8j0dg1lx6p6ykv3rfm0000gn/T/capekayak-release-cT53mo/rehearsal.json",
+    "rehearsal_receipt_sha256": "e5901c2ae318c47d58bb722e9846a04f80213ed5ec162af55b5b358984e501d5",
+    "apply_sql_sha256": "550ad9dbf21362a902368a92d1f1e034a133a1d9e181f7fd83bd018596f240cc",
+    "apply_result": "PASS",
+    "ledger_before": 221,
+    "ledger_after": 222,
+    "latest_version": "20260927100000"
+  },
+  "postflight": {
+    "private_catalog_receipt": "/private/tmp/bookingtours-phase1-postflight-fy8wTe/catalog.json",
+    "catalog_receipt_sha256": "06448e894efe033486e0f026320879beccb66c1ed5dee79ab48f7ac88dd8fc93",
+    "catalog_ok": true,
+    "exact_seven_installed": true,
+    "ingress_rows_after_cleanup": 0,
+    "private_ingress_receipt": "/private/tmp/bookingtours-phase1-postflight-fy8wTe/ingress-probe.json",
+    "ingress_receipt_sha256": "29b91358d96bf336f1d1a6715751f5b8bfe7d8cd2c829bbdfa335eba4491e209",
+    "synthetic_service_rpc": "allowed, allowed, denied",
+    "anon_auth_table_rpc": "denied",
+    "synthetic_fixture_cleanup": "PASS_ZERO_ROWS",
+    "fixture_cleanup_verified_at_utc": "2026-09-27T16:42:07.149Z"
+  },
+  "production_aliases": {
+    "observed_after_apply": "unchanged READY; three homepage GETs returned HTTP 200",
+    "admin": "dpl_9ewxmGGuE7HWauQNS45V1vrunNoq",
+    "storefront": "dpl_34PsBxRGMGY4MQz9XcFmKD3U6krn",
+    "onboarding": "dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T"
+  },
+  "preview": {
+    "status": "HELD_NO_ENV_CHANGE_OR_REBUILD",
+    "reason": "Vercel terms restrict the observed Hobby plan to personal non-commercial use; BookingTours is a commercial three-app service. No durable eligible ZAR 0 hosting path is verified. A no-card Pro trial is temporary and not an approved permanent solution.",
+    "existing_review_previews_ready": true
+  },
+  "edge_functions_deployed": false,
+  "vercel_automation_bypass_incident": {
+    "created_at_utc": "2026-09-27T16:12:09.867Z",
+    "cause": "vercel curl generated a project deployment-protection automation bypass token before its unsupported --scope option failed",
+    "application_get_completed": false,
+    "token_value_emitted": false,
+    "exact_token_revoked": true,
+    "regenerate": false,
+    "project_token_count_after_revocation": 0,
+    "no_retry": true
+  },
+  "owner_cost_direction": {
+    "additional_spend_ceiling_zar": 0,
+    "supabase_only_paid_service": true,
+    "supabase_spend_cap_on": "OWNER_REPORTED_NOT_DASHBOARD_VERIFIED",
+    "keep_current_sites_until_full_gates": true
+  },
+  "release_verdict": "FAILED_GATE",
+  "limits": [
+    "This is a seven-migration hosted database result, not Preview, Edge, load, provider, alert, restore RPO/RTO or canary qualification.",
+    "The fresh preapply archive passed decode and source object recheck, but has not itself undergone an isolated restore.",
+    "Homepage HTTP 200 and unchanged production aliases do not qualify application journeys.",
+    "Commercial hosting eligibility and complete workload cost/capacity remain open."
+  ]
+}
