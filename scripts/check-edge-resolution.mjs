@@ -17,7 +17,7 @@ if (!/^deno 2\.9\.4\b/.test(spawnSync('deno', ['--version'], { encoding: 'utf8' 
   throw new Error('Edge checks require Deno 2.9.4');
 }
 if (names.length === 0 || root.lock?.path !== './deno.lock' || root.lock?.frozen !== true ||
-    lock.version !== '5' || Object.keys(lock.redirects ?? {}).length !== 0 ||
+    lock.version !== '4' || Object.keys(lock.redirects ?? {}).length !== 0 ||
     Object.keys(lock.remote ?? {}).length === 0) {
   throw new Error('Expected a frozen, integrity-recorded Edge graph without redirects');
 }
