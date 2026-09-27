@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GideonLangenhoven/capekayak-booking
-          ref: b29bc53992b0e516526939e94a7a14ff34fab71c
+          ref: 565861037fd4f12a747254705b0c74e6ab4161ae
           path: booking
           persist-credentials: false
       - uses: actions/checkout@v4
