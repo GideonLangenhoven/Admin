@@ -183,11 +183,18 @@
       "tree": "4bbcfecdede214497eb986cddf5eb2c4ba9ea5d3",
       "lock_sha256": "1ec6511d4909cad4efe126cfbf9610be0a504cb76403115594bc299ac862efc3",
       "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
-      "integration": "LOCAL_ACCEPTED_CANDIDATE_PINNED_IN_ADMIN_CI_NOT_PUBLISHED",
+      "integration": "HISTORICAL_ACCEPTED_CANDIDATE_UNRECOVERED; NO_LONGER_PINNED_IN_ADMIN_CI",
       "historical_merge": "cb74f5f10605dc2ce4eac5158395e88ee6c62fd3",
       "accepted_app_behavior_base": "f11b1dd94b662d8570f06e64088da8e832fbaaeb"
     },
     "historically_reviewed_mobile_commit": "2ff1d82046c73202c3146d11299cff9bc379ac54",
+    "reconstructed_review_candidate": {
+      "commit": "c09bba1d079c3786b3e1870447936185d0119d06",
+      "tree": "80ac78cb6bdfb339ba4d871a71b7f6d61c994584",
+      "lock_sha256": "9553f2343bedfd703358c314428229288ef9edb5ec97451dabcfa8720ae7d0bd",
+      "branch": "codex/storefront-release-corrections-2026-09-27",
+      "status": "PUBLISHED_LOCAL_CHECKS_PASS_HOSTED_CI_PENDING"
+    },
     "deployed": {
       "alias": "booking.bookingtours.co.za",
       "deployment_id": "dpl_Gb2ULvtZBjNej8STiNyejxfdbc5i",
@@ -210,15 +217,25 @@
       "tree": "a7f1ff19ec38b92ba450c143a30c7c6df23a8788",
       "lock_sha256": "a07a031d0faaeb23f90dfbd6f624a25d3da6485a955d10b5f38f77b58b9a076b",
       "review": "ACCEPTED_REVIEWED_SOURCE_SCOPE",
-      "integration": "LOCAL_ACCEPTED_CANDIDATE_PINNED_IN_ADMIN_CI_NOT_PUBLISHED",
+      "integration": "HISTORICAL_ACCEPTED_CANDIDATE_UNRECOVERED; NO_LONGER_PINNED_IN_ADMIN_CI",
       "accepted_app_behavior_base": "2de7de49e86313e48f705f6845454c99d1556852"
+    },
+    "reconstructed_review_candidate": {
+      "commit": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb",
+      "tree": "e8b48fb96dbd913a49a74e6bf17ad283575327b9",
+      "lock_sha256": "b179a8754d19c70d3b923a295d2257df5a19b60d8a8b307b3d9eb880935d9511",
+      "branch": "codex/onboarding-release-corrections-2026-09-27",
+      "status": "PUBLISHED_LOCAL_CHECKS_PASS_HOSTED_CI_PENDING"
     }
   },
   "cross_app_ci": {
-    "admin_companion_pin": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
-    "accepted_new_pin": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
-    "onboarding_accepted_pin": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544",
-    "pin_update": "INTEGRATED_LOCAL; companion publication/cross-repo access and actualCI run pending"
+    "admin_companion_pin": "c09bba1d079c3786b3e1870447936185d0119d06",
+    "onboarding_pin": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb",
+    "historical_unavailable_pins": {
+      "booking": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
+      "onboarding": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544"
+    },
+    "pin_update": "RECONSTRUCTED_REVIEW_BRANCHES_PUBLISHED; local CI-equivalent checks pass; hosted CI run pending"
   },
   "local_evidence": {
     "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
@@ -419,6 +436,8 @@
     "supabase/migrations/20260923100000_guide_photo_upload_recovery.sql",
     "supabase/migrations/20260923110000_exact_staff_roles_and_demo_rpc_acl.sql",
     "supabase/migrations/20260923120000_storage_exact_staff_roles.sql",
-    "supabase/migrations/20260923130000_refund_batch_acceptance.sql"
+    "supabase/migrations/20260923130000_refund_batch_acceptance.sql",
+    "supabase/migrations/20260923140000_waiver_and_client_trigger_paths.sql",
+    "supabase/migrations/20260925120000_check_ins_policy_hoisted.sql"
   ]
 }

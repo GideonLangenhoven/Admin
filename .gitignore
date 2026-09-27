@@ -53,7 +53,7 @@ secrets/
 
 # separate repos inside project
 .activityhub-onboarding-staging/
-/booking/
+/booking
 
 # backups & temp files
 .backups/

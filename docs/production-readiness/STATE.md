@@ -1,6 +1,8 @@
 # BookingTours production-readiness checkpoint
 
-Updated: 2026-09-24T04:52:00Z. Release verdict: **FAILED_GATE**. Implementation acceptance and go-to-market readiness have not been reached.
+Updated: 2026-09-27. Release verdict: **FAILED_GATE**. The current review and exact reconstructed companion pins are in [RELEASE-REVIEW-2026-09-27.md](reviews/RELEASE-REVIEW-2026-09-27.md) and [RELEASE_MANIFEST.json](RELEASE_MANIFEST.json). Local source checks now pass, but hosted CI, six unapplied migrations, effective production configuration, provider journeys, capacity, alert delivery, restore and canary qualification remain open. The checkpoint below is preserved as the **24 September historical record**.
+
+## Historical 24 September checkpoint
 
 ## Routing and active work
 

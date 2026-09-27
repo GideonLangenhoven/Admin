@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sourceFunction } from "../helpers/source-handler";
 
-const isYocoCheckoutUrl = sourceFunction("booking/app/lib/checkout-session.ts", "isYocoCheckoutUrl", {});
-const bookingCheckoutBody = sourceFunction("booking/app/lib/booking-checkout.ts", "bookingCheckoutBody", {});
-const parseBookingCheckout = sourceFunction("booking/app/lib/booking-checkout.ts", "parseBookingCheckout", { isYocoCheckoutUrl });
-const saveCheckout = sourceFunction("booking/app/lib/checkout-session.ts", "saveCheckout", { isYocoCheckoutUrl });
-
 function fixture({ free = false, soldOut = false, retry = false, email = "guest@example.invalid" } = {}) {
   const booking = { id: "booking-a", business_id: "operator-a", waiver_token: "fixture-proof", waiver_status: "PENDING", status: retry ? "HELD" : "PENDING", qty: 1, slot_id: "slot-a" };
   const writes: any[] = [];
@@ -26,7 +21,7 @@ function fixture({ free = false, soldOut = false, retry = false, email = "guest@
   const createBookingSupabase = vi.fn((business: string, id: string, token: string) => {
     expect([business,id,token]).toEqual([booking.business_id,booking.id,booking.waiver_token]); return client(true);
   });
-  const submit = sourceFunction("booking/app/book/BookingFlow.tsx", "submitBooking", {
+  const submit = sourceFunction("booking/app/book/page.tsx", "submitBooking", {
     crypto: { randomUUID: vi.fn().mockReturnValueOnce(booking.id).mockReturnValueOnce(booking.waiver_token) },
     name: " Fixture Guest ", email, phone: "820000000", dialCode: "+27", termsAccepted: true, submitting: false,
     normalizePhone: () => "27820000000", appliedPromo: {code:"SAVE",discount_type:"PERCENT",discount_value:20}, computedPromoDiscount:20,
@@ -35,7 +30,6 @@ function fixture({ free = false, soldOut = false, retry = false, email = "guest@
     embed:false, marketingOptIn:false, isCompany:false, draftBookingId:retry?booking.id:null, draftWaiverToken:retry?booking.waiver_token:null,
     tenantSupabase:client(false), createBookingSupabase, selectedAddOns:{"extra-a":2}, vouchers:[{id:"voucher-a",code:"FIXTURE1"}],
     supabase:{functions:{invoke:checkout}}, showToast,setStep,setDraftBookingId,
-    bookingCheckoutBody, parseBookingCheckout, saveCheckout,
     setSubmitting:vi.fn(),setDraftWaiverToken:vi.fn(),setBookingRef:vi.fn(),clearLocalDraft:vi.fn(),setPaymentUrl:vi.fn(),setCheckoutAmount:vi.fn(),setHoldExpiresAt:vi.fn(),
     window:{location:{assign:navigate}},sessionStorage:{setItem:vi.fn()},document:{getElementById:()=>({focus:vi.fn()})},
   });

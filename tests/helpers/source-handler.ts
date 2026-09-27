@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { Buffer } from "node:buffer";
 import { createRequire } from "node:module";
 import { webcrypto } from "node:crypto";
 import { runInNewContext } from "node:vm";
@@ -20,7 +21,7 @@ function loadSource(
   }).outputText;
   runInNewContext(source, {
     module: sandboxModule, exports: sandboxModule.exports, console, Request, Response, Headers, URL, URLSearchParams, Date,
-    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, AbortSignal, File, Blob,
+    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, AbortSignal, File, Blob, Buffer,
     process: { env: { NEXT_PUBLIC_SUPABASE_URL: "https://test.invalid", SUPABASE_SERVICE_ROLE_KEY: "fixture-".repeat(8), ...env } },
     Deno: { serve: (fn: typeof handler) => { handler = fn; }, env: { get: (key: string) => env[key] || "" } },
     require: (name: string) => {

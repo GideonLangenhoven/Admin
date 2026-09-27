@@ -33,6 +33,7 @@ try {
   await db.query(readFileSync('tests/fixtures/rollout-schema.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-policies.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-marketing.sql', 'utf8'));
+  await db.query(readFileSync('supabase/migrations/20260710120000_marketing_contact_auto_sync.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-cron.sql', 'utf8'));
   await db.query(readFileSync('tests/fixtures/rollout-platform.sql', 'utf8'));
   // Supabase-managed Storage grants and the last approved July Storage policy
@@ -466,6 +467,20 @@ try {
   }));
   // The prior check rolls back, so persist the state for the remaining checks.
   await db.query(arrivalSql,arrivalArgs(id(731),4,0,'arrival-1'));
+  await check('check-in policy hoists tenant lookup and hides foreign arrivals',async()=>{
+    const policy=(await db.query("select qual,with_check from pg_policies where schemaname='public' and tablename='slot_check_ins' and policyname='check_ins_admin'")).rows[0];
+    assert(policy);
+    assert.match(policy.qual,/SELECT current_business_ids\(\)/i);
+    assert.match(policy.with_check,/SELECT current_business_ids\(\)/i);
+    await as('authenticated',101,{},async()=>{
+      assert.equal((await db.query('select count(*)::int count from slot_check_ins')).rows[0].count,1);
+      const plan=(await db.query('explain select * from slot_check_ins')).rows.map(row=>row['QUERY PLAN']).join('\n');
+      assert.match(plan,/InitPlan/);
+    });
+    await as('authenticated',102,{},async()=>{
+      assert.equal((await db.query('select count(*)::int count from slot_check_ins')).rows[0].count,0);
+    });
+  });
   await check('arrival event replay is idempotent even when the retried target differs',()=>as('service_role',null,{},async()=>{
     const result=(await db.query(arrivalSql,arrivalArgs(id(731),6,0,'arrival-1'))).rows[0].result;
     assert.equal(result.ok,true); assert.equal(result.replay,true); assert.equal(result.arrived_count,4);
