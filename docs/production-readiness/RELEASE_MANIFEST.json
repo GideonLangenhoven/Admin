@@ -193,7 +193,7 @@
       "tree": "80ac78cb6bdfb339ba4d871a71b7f6d61c994584",
       "lock_sha256": "9553f2343bedfd703358c314428229288ef9edb5ec97451dabcfa8720ae7d0bd",
       "branch": "codex/storefront-release-corrections-2026-09-27",
-      "status": "PUBLISHED_LOCAL_CHECKS_PASS_HOSTED_CI_PENDING"
+      "status": "PUBLISHED_HOSTED_SOURCE_CI_PASS"
     },
     "deployed": {
       "alias": "booking.bookingtours.co.za",
@@ -225,7 +225,7 @@
       "tree": "e8b48fb96dbd913a49a74e6bf17ad283575327b9",
       "lock_sha256": "b179a8754d19c70d3b923a295d2257df5a19b60d8a8b307b3d9eb880935d9511",
       "branch": "codex/onboarding-release-corrections-2026-09-27",
-      "status": "PUBLISHED_LOCAL_CHECKS_PASS_HOSTED_CI_PENDING"
+      "status": "PUBLISHED_HOSTED_SOURCE_CI_PASS"
     }
   },
   "cross_app_ci": {
@@ -235,7 +235,16 @@
       "booking": "86588bcb2cbad7da202e21cc9662e012dd291ddc",
       "onboarding": "b93f053b324ad2db67e6481af6f4c9ba5f8b6544"
     },
-    "pin_update": "RECONSTRUCTED_REVIEW_BRANCHES_PUBLISHED; local CI-equivalent checks pass; hosted CI run pending"
+    "pin_update": "RECONSTRUCTED_REVIEW_BRANCHES_PUBLISHED; hosted source CI passed on Admin f11079cb610bb89fa0bbdce88e452079f26949c1",
+    "hosted_ci": {
+      "admin_commit": "f11079cb610bb89fa0bbdce88e452079f26949c1",
+      "run_id": 36297622614,
+      "conclusion": "SUCCESS",
+      "unit_tests": "1513 passed, 1 conditional skip",
+      "edge_functions": 55,
+      "database_checks": 230,
+      "deployed_smoke": "SKIPPED_BY_DEFAULT; not production qualification"
+    }
   },
   "local_evidence": {
     "admin_audit": "/private/tmp/bookingtours-admin-audit-20260923.json",
