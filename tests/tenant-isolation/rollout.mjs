@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import pg from 'pg';
 import { checkPaymentFlows } from './payment-flows.mjs';
 
@@ -102,6 +103,28 @@ try {
     where email like 'continuity-%@example.invalid'
   `)).rows[0].snapshot;
   for (const file of readdirSync('supabase/migrations').filter(x => /^\d{14}_.*\.sql$/.test(x) && x >= '20260907071000_').sort()) {
+    if (process.env.ROLLOUT_TEST_RELEASE_PLAN === '1' && file === '20260923100000_guide_photo_upload_recovery.sql') {
+      const prior = readdirSync('supabase/migrations').filter(x => /^202609\d{8}_.*\.sql$/.test(x) && x < file).sort();
+      assert.equal(prior.length, 34);
+      await db.query('create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key,name text not null,statements text[])');
+      await db.query("insert into supabase_migrations.schema_migrations(version,name) select '202608' || lpad(n::text,8,'0'),'synthetic_prior_' || n from generate_series(1,181) n");
+      for (const name of prior) await db.query('insert into supabase_migrations.schema_migrations(version,name) values($1,$2)',[name.slice(0,14),name.slice(15,-4)]);
+      const plan = JSON.parse(execFileSync(process.execPath,['scripts/release-sql.mjs','plan'],{encoding:'utf8'}));
+      await db.query(readFileSync(plan.rehearsalSqlPath,'utf8'));
+      assert.equal((await db.query('select count(*)::int count from supabase_migrations.schema_migrations')).rows[0].count,215);
+      assert.equal((await db.query("select to_regclass('public.guide_photo_uploads') object")).rows[0].object,null);
+      await db.query(readFileSync(plan.sqlPath,'utf8'));
+      assert.equal((await db.query('select count(*)::int count from supabase_migrations.schema_migrations')).rows[0].count,221);
+      console.log('APPLIED exact six-migration plan after rolled-back rehearsal');
+      const ingress = JSON.parse(execFileSync(process.execPath,['scripts/release-sql.mjs','plan','--stage','shared-ingress'],{encoding:'utf8'}));
+      await db.query(readFileSync(ingress.rehearsalSqlPath,'utf8'));
+      assert.equal((await db.query('select count(*)::int count from supabase_migrations.schema_migrations')).rows[0].count,221);
+      assert.equal((await db.query("select to_regclass('public.ingress_rate_limits') object")).rows[0].object,null);
+      await db.query(readFileSync(ingress.sqlPath,'utf8'));
+      assert.equal((await db.query('select count(*)::int count from supabase_migrations.schema_migrations')).rows[0].count,222);
+      console.log('APPLIED exact shared-ingress plan after rolled-back rehearsal');
+      break;
+    }
     await db.query(readFileSync('supabase/migrations/' + file, 'utf8'));
     console.log('APPLIED ' + file);
   }

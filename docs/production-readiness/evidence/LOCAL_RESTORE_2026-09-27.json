@@ -1,0 +1,31 @@
+{
+  "recorded_date_utc": "2026-09-27",
+  "status": "LOCAL_SCOPED_PREPARATION_ONLY",
+  "source_project": "ukdsrndqhsatjkmxijuj",
+  "method": "Native TLS PostgreSQL archive of the authorized source project, restored in one transaction in an isolated Docker Supabase PostgreSQL 17.6.1.063 container with network disabled; separately backed-up and restored two storage objects.",
+  "database_archive_sha256": "fc2fc0b745fb9c99f296f6f67e47ce19c4247adea182441122100802cb2c2ff5",
+  "database_scope": ["public", "app_private", "auth", "storage", "supabase_migrations"],
+  "database_verification": {
+    "tables": 124,
+    "rows": 6983,
+    "sorted_copy_byte_hash_mismatches": 0,
+    "owners_and_acl_preserved": true,
+    "private_result": "/private/tmp/bookingtours-release-backup-0OmuH1/database-restore-check.json"
+  },
+  "storage_verification": {
+    "objects": 2,
+    "bytes": 192893,
+    "source_and_restored_object_sha256": [
+      "1088883da35a06ee79147492e4aa3e57dfafc071b4da1e343fe3b448b2dcffbb",
+      "3129e4230625943f633c9a0e968fc176e8c77057c4957bf6d9c11d4b46865ffc"
+    ]
+  },
+  "protected_configuration": "Admin production environment backed up privately; required SETTINGS_ENCRYPTION_KEY name present. No values or backup bytes are in this repository.",
+  "limits": [
+    "No restored Auth sign-in, application API or private file-serving journey was exercised.",
+    "No isolated Supabase service target for an operational restore drill has been identified.",
+    "No proof of 15-minute RPO or 60-minute RTO; this was a static snapshot without measured service recovery.",
+    "Platform cron, network, Realtime and other out-of-scope service state were not backed up or restored.",
+    "This is a private local recovery preparation, not a candidate deployment, full production recovery or release-gate pass."
+  ]
+}

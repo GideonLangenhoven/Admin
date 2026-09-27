@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sourceExports, sourceHandler } from "../helpers/source-handler";
 
 const env = {
@@ -141,19 +141,27 @@ describe("web chat shared ingress limits", () => {
   });
 
   it("cancels a stalled request body at the deadline before tenant or limiter work", async () => {
-    const f = fixture();
-    let cancelled = false;
-    const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
-    const request = new Request("https://fixture.invalid/web-chat", {
-      method: "POST", body, duplex: "half",
-    } as RequestInit & { duplex: "half" });
-    const started = Date.now();
-    const response = await f.handler()(request);
-    expect(response.status).toBe(408);
-    expect(Date.now() - started).toBeLessThan(4000);
-    expect(cancelled).toBe(true);
-    expect(f.calls).toEqual([]);
-  }, 5000);
+    vi.useFakeTimers();
+    try {
+      const f = fixture();
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+      const request = new Request("https://fixture.invalid/web-chat", {
+        method: "POST", body, duplex: "half",
+      } as RequestInit & { duplex: "half" });
+      let settled = false;
+      const pending = f.handler()(request).then(response => { settled = true; return response; });
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const response = await pending;
+      expect(response.status).toBe(408);
+      expect(cancelled).toBe(true);
+      expect(f.calls).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("fails without issuing a chat session when the shared limiter is unavailable", async () => {
     const f = fixture(() => "error");

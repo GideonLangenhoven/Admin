@@ -1,6 +1,7 @@
 {
-  "updated_at_utc": "2026-09-24T04:52:00Z",
+  "updated_at_utc": "2026-09-27T06:02:18Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
+  "current_closeout": "docs/production-readiness/CLOSEOUT_PACKET.json; source CI on Admin86141ac passed, but current aliases are non-equivalent/unverified, six previously reviewed migrations plus the new shared-ingress migration are unapplied, and the previous 500-VU mixed/corrective smokes failed. The hosted rollback rehearsal covers the original six only. Subsequent source changes require new CI.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
   "routing_verdict": "IN_PROGRESS",

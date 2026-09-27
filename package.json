@@ -28,7 +28,8 @@
     "test:qualification:preflight": "node scripts/bt500-preflight.mjs --execute",
     "test:functionality:map": "node scripts/release-evidence-check.mjs --section6-map",
     "test:functionality:release": "node scripts/release-evidence-check.mjs --section6-release",
-    "test:handoff": "node scripts/release-evidence-check.mjs --section9"
+    "test:handoff": "node scripts/release-evidence-check.mjs --section9",
+    "test:release": "node scripts/release-evidence-check.mjs --release"
   },
   "dependencies": {
     "@date-fns/tz": "1.4.1",

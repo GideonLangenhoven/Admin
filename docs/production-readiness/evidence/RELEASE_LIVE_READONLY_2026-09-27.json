@@ -1,0 +1,60 @@
+{
+  "recorded_at_utc": "2026-09-27T06:02:18Z",
+  "scope": "read-only observations; no raw API payloads retained, so no raw-output hashes are claimed",
+  "ci": {
+    "method": "gh run view for GideonLangenhoven/Admin",
+    "run_id": 36298090450,
+    "head_sha": "86141ac8605fe64b0d5a0f7c92d945ce46dd0ec4",
+    "conclusion": "success",
+    "source_jobs": "passed",
+    "deployed_smoke": "manual job skipped",
+    "prior_run_id": 36297622614,
+    "prior_head_sha": "f11079cb610bb89fa0bbdce88e452079f26949c1"
+  },
+  "admin": {
+    "alias": "admin.bookingtours.co.za",
+    "deployment_id": "dpl_9ewxmGGuE7HWauQNS45V1vrunNoq",
+    "created_at_utc": "2026-09-25T13:45:00Z",
+    "metadata_method": "Vercel GET /v13/deployments/<ID>",
+    "git_commit": "7be561be3db6a575f8a83f027e8c9642735d71a5",
+    "git_branch": "feature/simple-view-2026-09-20",
+    "environment_names_method": "vercel env ls production and Vercel GET /v10/projects/prj_2ygdVhnjvqRXiGCOPptESKXccEkB/env; key,target,type only; pagination=null",
+    "environment_entries": 11,
+    "production_and_preview_names_absent": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "ADMIN_RECOVERY_ORIGIN", "NEXT_PUBLIC_APP_URL"],
+    "bypass_name_absent": true,
+    "limit": "Project-level name inventory is not effective invocation configuration or proof of a working shared limiter/recovery origin. No values were retained."
+  },
+  "booking": {
+    "alias": "booking.bookingtours.co.za",
+    "deployment_id": "dpl_34PsBxRGMGY4MQz9XcFmKD3U6krn",
+    "created_at_utc": "2026-09-27T04:46:00Z",
+    "metadata_method": "Vercel GET /v13/deployments/<ID>",
+    "git_commit": "8c0b4bf55957b0ce1a3b05853d5902e23c4542f8",
+    "git_branch": "scale-security-2026-07-04",
+    "git_dirty": true,
+    "bundler": "turbopack",
+    "limit": "Does not match the clean reconstructed review candidate."
+  },
+  "onboarding": {
+    "alias": "onboarding.bookingtours.co.za",
+    "deployment_id": "dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T",
+    "created_in_month": "2026-08",
+    "metadata_method": "Vercel GET /v13/deployments/<ID>",
+    "git_commit": null,
+    "bundler": "turbopack",
+    "actor": "CLI",
+    "limit": "No source SHA in observed metadata; candidate equivalence cannot be inferred."
+  },
+  "database": {
+    "project": "ukdsrndqhsatjkmxijuj",
+    "method": "supabase migration list against linked source repo, read-only",
+    "latest_applied_version": "20260922123000",
+    "candidate_forward_migrations_pending": 6,
+    "limit": "Ledger version observation does not prove migration body identity; historical July/August gaps require disposition."
+  },
+  "pull_request": {
+    "method": "gh pr list on current Admin branch",
+    "result": "no PR found",
+    "limit": "No independent PR approval process is open for this branch."
+  }
+}

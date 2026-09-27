@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
 import { executionWindow } from "./bt500-window.mjs";
+import { freshApprovalReference } from "./bt500-seed-ownership.mjs";
+import { loadBt500Execution } from "./bt500-execution-file.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const workloadPath = root + "docs/production-readiness/WORKLOAD.json";
@@ -62,7 +64,8 @@ function executionIssues(execution) {
   if (!/^[0-9a-f]{40}$/.test(execution.candidate_tree || "")) issues.push("an exact candidate_tree is required");
   if (execution.candidate_worktree_clean !== true) issues.push("candidate worktree must be clean");
   const authorizedPrelaunch = execution.environment?.classification === "user_authorized_prelaunch_no_customers"
-    && execution.approval?.reference === "user-session-2026-09-21-prelaunch-qualification";
+    && execution.environment?.supabase_project_ref === "ukdsrndqhsatjkmxijuj"
+    && freshApprovalReference(execution.approval);
   if (execution.environment?.classification !== "isolated_non_production" && !authorizedPrelaunch) {
     issues.push("environment must be isolated_non_production or the specifically approved pre-launch project");
   }
@@ -79,6 +82,7 @@ function executionIssues(execution) {
   }
   issues.push(...executionWindow(execution.window, mixedConfig(process.env)).issues);
   requiredText(execution.approval?.reference, "approval reference");
+  if (!freshApprovalReference(execution.approval) || !execution.approval?.allowed_operations?.includes("mixed_load")) issues.push("fresh exact mixed-load action approval is required");
   requiredText(execution.approval?.approved_at, "approval timestamp");
   for (const field of ["workload_and_thresholds", "metric_definitions", "realtime_scope", "cost_environment_and_window"]) {
     if (execution.approval?.[field] !== true) issues.push("approval " + field + " is required");
@@ -115,7 +119,7 @@ if (mode === "--self-test") {
   report("BT500-LAUNCH-V1 contract", contractIssues(load(workloadPath)));
 } else if (mode === "--execute") {
   const contract = contractIssues(load(workloadPath));
-  const execution = executionIssues(load(executionPath));
+  const execution = executionIssues(loadBt500Execution(root, true));
   report("BT500-LAUNCH-V1 execution preflight", [...contract, ...execution]);
 } else {
   throw new Error("Use --contract, --execute, or --self-test");

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { PassThrough } from "node:stream";
-import { sourceExports, sourceHandler } from "../helpers/source-handler";
+import { sourceExports, sourceHandler, sourceFunction } from "../helpers/source-handler";
 
 const require = createRequire(import.meta.url);
 
@@ -16,6 +16,12 @@ const production = {
   VERCEL: "1",
   UPSTASH_REDIS_REST_URL: "https://redis.example.invalid",
   UPSTASH_REDIS_REST_TOKEN: "synthetic-token",
+};
+const productionDatabase = {
+  VERCEL_ENV: "production",
+  VERCEL: "1",
+  NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key",
 };
 
 function request(path: string, body: unknown, ip = "192.0.2.44", extraHeaders: Record<string, string> = {}) {
@@ -52,7 +58,43 @@ function redis() {
   return { fetchImpl, counters };
 }
 
+function database() {
+  let now = 0;
+  const counters = new Map<string, { count: number; expires: number }>();
+  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    expect(String(input)).toBe("https://project.supabase.co/rest/v1/rpc/check_ingress_rate_limit");
+    expect(new Headers(init?.headers).get("apikey")).toBe("synthetic-service-key");
+    const { p_bucket, p_key_hash, p_limit, p_window_ms } = JSON.parse(String(init?.body));
+    expect(p_key_hash).toMatch(/^[0-9a-f]{32}$/);
+    expect(String(init?.body)).not.toContain("example.invalid");
+    expect(String(init?.body)).not.toContain("192.0.2.");
+    const key = `${p_bucket}:${p_key_hash}`;
+    let entry = counters.get(key);
+    if (!entry || entry.expires <= now) entry = { count: 0, expires: now + p_window_ms };
+    entry.count = Math.min(p_limit + 1, entry.count + 1);
+    counters.set(key, entry);
+    return Response.json({
+      allowed: entry.count <= p_limit,
+      limit: p_limit,
+      remaining: Math.max(0, p_limit - entry.count),
+      retry_after_ms: entry.count > p_limit ? entry.expires - now : 0,
+    });
+  }) as typeof fetch;
+  return { fetchImpl, counters, advance: (ms: number) => { now += ms; } };
+}
+
 describe("proxy ingress limits", () => {
+  it("observes a fetch rejection when the shared deadline has already expired", async () => {
+    const beforeDeadline = sourceFunction("proxy.ts", "beforeDeadline", {}) as (work: Promise<unknown>, signal: AbortSignal) => Promise<unknown>;
+    const controller = new AbortController();
+    controller.abort();
+    let rejectWork: (error: Error) => void = () => {};
+    const work = new Promise<never>((_resolve, reject) => { rejectWork = reject; });
+    await expect(beforeDeadline(work, controller.signal)).rejects.toThrow("deadline");
+    rejectWork(new Error("late synthetic fetch failure"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+
   it("excludes only auth routes from Next proxy and retains other API coverage", () => {
     const config = sourceExports("proxy.ts", { "next/server": { NextResponse } }).config as { matcher: string[] };
     const { getMiddlewareMatchers } = require("next/dist/build/analysis/get-page-static-info");
@@ -95,6 +137,44 @@ describe("proxy ingress limits", () => {
     expect(Number(denied.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect((await denied.json()).retry_after_ms).toBeGreaterThan(0);
   }, 20_000);
+
+  it("uses the service-only shared database when Redis is absent, with fixed first-request expiry", async () => {
+    const shared = database();
+    const first = load(productionDatabase, shared.fetchImpl);
+    const second = load(productionDatabase, shared.fetchImpl);
+    for (let i = 0; i < 5; i++) {
+      expect((await (i % 2 ? first : second)(request("/api/admin/setup-link", { action: "send", email: "one@example.invalid" }))).status).toBe(200);
+    }
+    const denied = await second(request("/api/admin/setup-link", { action: "send", email: "one@example.invalid" }));
+    expect(denied.status).toBe(429);
+    expect(denied.headers.get("Retry-After")).toBe("900");
+    expect((await first(request("/api/admin/setup-link", { action: "send", email: "two@example.invalid" }))).status).toBe(200);
+    shared.advance(60_000);
+    expect((await first(request("/api/admin/setup-link", { action: "send", email: "one@example.invalid" }))).headers.get("Retry-After")).toBe("840");
+    shared.advance(840_000);
+    expect((await first(request("/api/admin/setup-link", { action: "send", email: "one@example.invalid" }))).status).toBe(200);
+  });
+
+  it("fails closed on database outage, invalid results, and partial Redis configuration", async () => {
+    const body = { email: "staff@example.invalid" };
+    expect((await load(productionDatabase, async () => { throw new Error("synthetic outage"); })(request("/api/admin/login", body))).status).toBe(503);
+    expect((await load(productionDatabase, async () => Response.json({ allowed: true, limit: 10, remaining: 999, retry_after_ms: 0 }))(request("/api/admin/login", body))).status).toBe(503);
+    expect((await load({ ...productionDatabase, UPSTASH_REDIS_REST_URL: "http://redis.example.invalid" }, database().fetchImpl)(request("/api/admin/login", body))).status).toBe(503);
+  });
+
+  it("does not allocate input buckets after the shared IP bucket denies", async () => {
+    const buckets: string[] = [];
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      buckets.push(body.p_bucket);
+      return Response.json({ allowed: false, limit: 1200, remaining: 0, retry_after_ms: 900000 });
+    }) as typeof fetch;
+    const proxy = load(productionDatabase, fetchImpl);
+    for (let i = 0; i < 5; i++) {
+      expect((await proxy(request("/api/admin/login", { email: `rotating${i}@example.invalid` }))).status).toBe(429);
+    }
+    expect(buckets).toEqual(Array(5).fill("auth-ip"));
+  });
 
   it("buckets coerced JSON-array email through the actual login handler", async () => {
     const shared = redis();

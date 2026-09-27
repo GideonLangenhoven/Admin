@@ -17,6 +17,7 @@ if (!/^https:\/\//.test(adminBase)) throw new Error("BT500_ADMIN_BASE must be an
 if (/^https:\/\/(admin|booking|onboarding)\.bookingtours\.co\.za(?:\/|$)/.test(adminBase)) throw new Error("production application hosts are forbidden");
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}$/.test(runId)) throw new Error("BT500_RUN_ID must be 1-48 safe characters");
 if (input.marker !== MARKER) throw new Error(`credentials must use marker ${MARKER}`);
+if (!/^bt500-20260921-[0-9a-f]{16}$/.test(input.seed_marker || "") || input.run_id !== runId) throw new Error("credentials do not match the seeded run");
 if (String(input.url).replace(/\/$/, "") !== `https://${PROJECT_HOST}`) throw new Error("credentials point at an unexpected Supabase project");
 if (!input.anon_key) throw new Error("credentials are missing the anon key");
 if (input.credentials?.length !== 500) throw new Error("exactly 500 credentials are required");

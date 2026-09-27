@@ -5,13 +5,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { executionStatusAllows, mixedConfig } from "../tests/stress/bt500-mixed-config.mjs";
 import { executionWindow, stopAtWindowEnd } from "./bt500-window.mjs";
+import { freshApprovalReference, mixedCredentialIssues } from "./bt500-seed-ownership.mjs";
+import { sourceMatchesCandidate } from "./release-evidence-check.mjs";
+import { loadBt500Execution } from "./bt500-execution-file.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const execution = JSON.parse(await readFile(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"), "utf8"));
 const config = mixedConfig(process.env);
 const dryRun = process.argv.includes("--dry-run");
 const run = process.argv.includes("--run");
 if (!dryRun && !run) throw new Error("Use --dry-run or --run");
+const execution = loadBt500Execution(root, run);
 
 const contract = spawnSync(process.execPath, ["scripts/bt500-preflight.mjs", "--contract"], { cwd: root, stdio: "inherit" });
 if (contract.status !== 0) process.exit(contract.status || 1);
@@ -23,11 +26,16 @@ blockers.push(...executionWindow(execution.window, config).issues);
 if (!executionStatusAllows(config.mode, execution.status)) blockers.push(`BT500_EXECUTION.status does not approve ${config.mode} mode`);
 if (execution.candidate_worktree_clean !== true) blockers.push("candidate worktree must be recorded clean");
 if (!/^[0-9a-f]{40}$/.test(execution.candidate_commit || "") || !/^[0-9a-f]{40}$/.test(execution.candidate_tree || "")) blockers.push("exact candidate commit and tree are required");
+if (!sourceMatchesCandidate(root, execution.candidate_commit)) blockers.push("load executable source differs from frozen candidate");
+const tree = spawnSync("git", ["rev-parse", `${execution.candidate_commit}^{tree}`], { cwd: root, encoding: "utf8" });
+if (tree.status !== 0 || tree.stdout.trim() !== execution.candidate_tree) blockers.push("load candidate tree differs from frozen source");
 if (execution.environment?.classification !== "isolated_non_production"
     && !(execution.environment?.classification === "user_authorized_prelaunch_no_customers"
-      && execution.approval?.reference === "user-session-2026-09-21-prelaunch-qualification")) {
+      && execution.environment?.supabase_project_ref === "ukdsrndqhsatjkmxijuj"
+      && freshApprovalReference(execution.approval))) {
   blockers.push("target must be isolated non-production or the recorded no-customer pre-launch project");
 }
+if (!freshApprovalReference(execution.approval) || !execution.approval?.allowed_operations?.includes("mixed_load")) blockers.push("fresh exact mixed-load action approval is required");
 if (!adminBase) blockers.push("BT500_ADMIN_BASE is required");
 else {
   if (!adminBase.startsWith("https://")) blockers.push("BT500_ADMIN_BASE must use HTTPS");
@@ -74,8 +82,17 @@ const credentialsFile = process.env.BT500_CREDENTIALS_FILE || "/private/tmp/bt50
 const credentials = JSON.parse(await readFile(credentialsFile, "utf8"));
 const projectRef = execution.environment.supabase_project_ref;
 if (credentials.marker !== "bt500-20260921") throw new Error("unexpected credential marker");
-if (new URL(credentials.url).host !== `${projectRef}.supabase.co`) throw new Error("credential project does not match execution project");
+if (!/^bt500-20260921-[0-9a-f]{16}$/.test(credentials.seed_marker || "") || credentials.run_id !== runId) throw new Error("credentials do not match the exact seeded run");
+const inventoryFile = process.env.BT500_SEED_INVENTORY_FILE || `${credentialsFile}.inventory.json`;
+const inventory = JSON.parse(await readFile(inventoryFile, "utf8"));
+if (inventory.marker !== credentials.seed_marker || inventory.run_id !== runId || inventory.candidate_commit !== execution.candidate_commit || inventory.project_ref !== projectRef || inventory.execution_sha256 !== process.env.BT500_EXECUTION_SHA256 || credentials.execution_sha256 !== process.env.BT500_EXECUTION_SHA256 || inventory.teardown_completed_at_utc) throw new Error("seed inventory does not match the execution candidate, action packet or active run");
+if (new URL(credentials.url).protocol !== "https:" || new URL(credentials.url).host !== `${projectRef}.supabase.co`) throw new Error("credential HTTPS project does not match execution project");
 if (credentials.credentials?.length !== 500) throw new Error("exactly 500 credentials are required");
+const ownedUsers = new Set(inventory.owned?.auth_users?.map(user => user.id));
+const ownedBookings = new Set(inventory.owned?.bookings?.map(booking => booking.id));
+if (ownedUsers.size !== 500 || credentials.credentials.some(item => !ownedUsers.has(item.user_id) || !ownedBookings.has(item.booking_id))) throw new Error("credentials contain identities outside the seed inventory");
+const credentialIssues = mixedCredentialIssues(credentials, inventory);
+if (credentialIssues.length) throw new Error("mixed credentials blocked:\n- " + credentialIssues.join("\n- "));
 if ((await stat(credentialsFile)).mode & 0o077) throw new Error("credential file must not be readable by group or others");
 
 const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;

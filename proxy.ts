@@ -8,8 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
  * out of the `app/` directory. Keeping the implementation small and
  * self-contained avoids any cross-bundle resolution issues.
  *
- * The in-memory store is for local development only. Deployed requests
- * require Redis, and an unavailable limiter rejects API traffic.
+ * The in-memory store is for local development only. Deployed requests use
+ * configured Redis or the shared service-only PostgreSQL limiter.
  *
  * Webhook endpoints live at supabase/functions/* (different runtime)
  * and rely on signature verification + idempotency keys, not this.
@@ -66,7 +66,7 @@ function unavailable(reason: string): NextResponse {
 }
 
 async function beforeDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) throw new Error("deadline");
+  if (signal.aborted) { void work.catch(() => {}); throw new Error("deadline"); }
   let onAbort = () => {};
   const timedOut = new Promise<never>((_, reject) => {
     onAbort = () => reject(new Error("deadline"));
@@ -129,9 +129,8 @@ function rateLimit(config: RateLimitConfig, key: string): RateLimitResult {
   };
 }
 
-async function distributedRateLimit(config: RateLimitConfig, key: string, url: string, token: string): Promise<RateLimitResult> {
+async function distributedRateLimit(config: RateLimitConfig, key: string, url: string, token: string, signal: AbortSignal): Promise<RateLimitResult> {
   const redisKey = `ck:rl:${config.name}:${key}`;
-  const signal = AbortSignal.timeout(LIMITER_DEADLINE_MS);
   const res = await beforeDeadline(fetch(`${url}/multi-exec`, {
     method: "POST",
     headers: {
@@ -164,6 +163,25 @@ async function distributedRateLimit(config: RateLimitConfig, key: string, url: s
     remaining: Math.max(0, config.limit - count),
     retryAfterMs: count > config.limit ? Math.max(0, ttl) : 0,
   };
+}
+
+async function databaseRateLimit(config: RateLimitConfig, key: string, url: string, serviceKey: string, signal: AbortSignal): Promise<RateLimitResult> {
+  const res = await beforeDeadline(fetch(`${url}/rest/v1/rpc/check_ingress_rate_limit`, {
+    method: "POST",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_bucket: config.name, p_key_hash: await inputKey(key, serviceKey), p_limit: config.limit, p_window_ms: config.windowMs }),
+    cache: "no-store",
+    signal,
+  }), signal);
+  if (!res.ok) throw new Error(`Database rate limit failed: ${res.status}`);
+  const result = JSON.parse(await readBounded(res.body, REDIS_BYTES, signal));
+  if (!result || typeof result !== "object" || Array.isArray(result) || typeof result.allowed !== "boolean" ||
+      result.limit !== config.limit || !Number.isSafeInteger(result.remaining) || result.remaining < 0 || result.remaining > config.limit ||
+      !Number.isSafeInteger(result.retry_after_ms) || result.retry_after_ms < 0 || result.retry_after_ms > config.windowMs ||
+      (result.allowed && result.retry_after_ms !== 0) || (!result.allowed && (result.retry_after_ms < 1 || result.remaining !== 0))) {
+    throw new Error("Database rate limit returned invalid result");
+  }
+  return { allowed: result.allowed, limit: result.limit, remaining: result.remaining, retryAfterMs: result.retry_after_ms };
 }
 
 function getClientIp(req: NextRequest, deployed: boolean): string | null {
@@ -286,6 +304,8 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
   if (!deployed && process.env.E2E_BYPASS_RATE_LIMIT === "1") return NextResponse.next();
 
   const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
+  const redisConfigured = Boolean(process.env.UPSTASH_REDIS_REST_URL || token);
   let redisUrl = "";
   try {
     const url = new URL(process.env.UPSTASH_REDIS_REST_URL || "");
@@ -294,7 +314,16 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
     }
     redisUrl = url.origin;
   } catch { /* missing or invalid configuration is handled below */ }
-  if (deployed && (!redisUrl || !token)) return unavailable("valid HTTPS Redis URL and token required");
+  let databaseUrl = "";
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
+    if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("invalid database URL");
+    }
+    databaseUrl = url.origin;
+  } catch { /* missing or invalid configuration is handled below */ }
+  if (deployed && redisConfigured && (!redisUrl || !token)) return unavailable("invalid Redis configuration");
+  if (deployed && !redisConfigured && (!databaseUrl || !serviceKey)) return unavailable("shared database limiter configuration required");
 
   const ip = getClientIp(req, deployed);
   if (!ip) return unavailable("trusted Vercel client IP required");
@@ -326,7 +355,7 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
   const bucketString = (value: unknown) => { try { return String(value || ""); } catch { return ""; } };
   const email = bucketString(payload.email).trim().toLowerCase();
   const validEmail = email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : "";
-  const secret = token || "local-only";
+  const secret = token || serviceKey || "local-only";
   const buckets: Array<[RateLimitConfig, string]> = [];
   if (isLogin) {
     buckets.push([AUTH_IP_LIMIT, ip]);
@@ -347,13 +376,29 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
 
   let results: RateLimitResult[];
   try {
-    if (redisUrl && token) {
-      results = await Promise.all(buckets.map(([config, key]) => distributedRateLimit(config, key, redisUrl, token)));
+    const signal = AbortSignal.timeout(LIMITER_DEADLINE_MS);
+    results = [];
+    if (redisConfigured && redisUrl && token) {
+      for (const [config, key] of buckets) {
+        const result = await distributedRateLimit(config, key, redisUrl, token, signal);
+        results.push(result);
+        if (!result.allowed) break;
+      }
+    } else if (databaseUrl && serviceKey) {
+      for (const [config, key] of buckets) {
+        const result = await databaseRateLimit(config, key, databaseUrl, serviceKey, signal);
+        results.push(result);
+        if (!result.allowed) break;
+      }
     } else {
-      results = buckets.map(([config, key]) => rateLimit(config, key));
+      for (const [config, key] of buckets) {
+        const result = rateLimit(config, key);
+        results.push(result);
+        if (!result.allowed) break;
+      }
     }
   } catch {
-    if (deployed) return unavailable("Redis request failed, timed out, or returned an invalid result");
+    if (deployed) return unavailable("shared limiter failed, timed out, or returned an invalid result");
     results = buckets.map(([config, key]) => rateLimit(config, key));
   }
   if (!deployed) cleanupStores(Math.max(API_LIMIT.windowMs, AUTH_IP_LIMIT.windowMs));

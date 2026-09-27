@@ -1,9 +1,11 @@
 {
-  "updated_at_utc": "2026-09-24T04:52:00Z",
+  "updated_at_utc": "2026-09-27T07:09:47Z",
   "candidate": "PROVISIONAL_NOT_FROZEN",
   "authorized": {
     "isolated_source_changes": true,
     "local_tests_with_synthetic_data": true,
+    "bounded_synthetic_testing_on_current_source_project": true,
+    "review_branch_publication_and_source_ci": true,
     "bt500_shared_read_smoke": false,
     "bt500_marker_only_synthetic_mutation": false,
     "current_prelaunch_project_synthetic_reset_and_testing": false,
@@ -14,7 +16,7 @@
     "monitoring_receiver_supplied": false,
     "yoco_test_mode_requests": false,
     "production_mutation": false,
-    "deployment_or_push": false,
+    "production_deployment_or_promotion": false,
     "real_messages": false,
     "real_charges_or_refunds": false,
     "provider_account_changes": false,
@@ -46,17 +48,17 @@
   ],
   "missing_external_approvals": [
     "Exact current publication/deployment and migration packet after required non-production gates pass; include automatic deployment paths, window, effects, cost and recovery.",
-    "Exact hosted test window and allowed synthetic records/recipients/modes, after outbound negative guards and candidate prerequisites pass.",
+    "Exact seed, mass-load, provider and outbound test window with allowed synthetic records/recipients/modes, after outbound negative guards and candidate prerequisites pass.",
     "Separate identified isolated restore target and allowed database/Auth/file/configuration restore effects; RPO15m and RTO60m remain required.",
-    "Existing shared Redis service identity, configuration and quota/remaining allowance at ZAR0 before fail-closed ingress deployment.",
+    "A shared admission limiter with effective configuration, failure behavior and capacity verified within ZAR 0 before ingress deployment; the owner did not identify a Redis service.",
     "Capacity/data/Realtime/worker/generator quotas and remaining billable allowance for the complete BT500 workload; any paid capacity needs explicit owner decision.",
     "Approved monitoring receiver, incident owner and delivered-alert test window.",
     "Distinct24-hour limited production canary with real isolation boundary and adoption gates after exact deployed verification."
   ],
   "latest_scope_steering": {
     "request": "Continue all C01-C06 and V01-V06 requirements with authorized isolated source work and local synthetic tests. Complete concrete reviewable work before asking for an external action approval.",
-    "current_source": "Admin integrated307d6cb94e375c17f50997c12102d56188b9f487; readiness-only commits tracked separately. Source corrections remain active; no final candidate freeze.",
-    "deployment": "Local corrections are not deployed-equivalent; historical Admin alias reports ebb62b8. No push, remote migration, hosted load, provider effect or restore has been performed in the current closeout.",
+    "current_source": "Last green hosted source CI is Admin86141ac with storefrontc09bba1 and onboarding293d4e4. Further source corrections are active; no final candidate freeze.",
+    "deployment": "27 September read-only aliases report Admin7be561b, dirty storefront8c0b4bf and onboarding without Git SHA; none proves current candidate equivalence. No forward migration was applied and no current candidate was deployed or promoted. A rollback-only hosted rehearsal of the original six migration bodies and a scoped local isolated database/file restore preparation completed; neither is a full release or operational restore gate pass. No hosted mass load, real message/payment or provider effect occurred.",
     "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet."
   },
   "historical_checkpoint": {
@@ -100,10 +102,10 @@
   "current_session_confirmations": {
     "routing": "Astra xhigh orchestration/review and GPT-6 Sol max implementation; reduce tokens through compact tasks and evidence reuse.",
     "source_project": "ukdsrndqhsatjkmxijuj",
-    "data": "Owner confirms current50 booking and50 customer rows synthetic/demo. No hosted mutation follows from that confirmation alone.",
+    "data": "Owner says the current Supabase project has no real user data at present and authorizes its bounded synthetic test use. Earlier 50 booking/customer rows were classified synthetic/demo. This does not authorize a seed, mass load, provider effect, message, paid change or production promotion without its exact action scope/window.",
     "restore_target": "Supplied URL identifies source, so no separate isolated target is identified. Other projects are excluded from this assignment.",
     "budget_ceiling_zar": 0,
     "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window.",
-    "redis": "Owner selected existing service and will name it. Identity, quota and configuration remain unverified; planning only."
+    "redis": "Owner is unsure what Redis is and did not name a service. Technical shared-limiter solution, effective configuration and quota remain open; no paid resource is approved."
   }
 }

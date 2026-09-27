@@ -1,9 +1,7 @@
-# Section 9: completion rules and final handoff
+# Section 9: current handoff
 
-Handoff validation: **PASS**. Release verdict: **FAILED_GATE**.
+Handoff validation: **PASS for a failed-gate checkpoint**. Release verdict: **FAILED_GATE**. The September 22 [handoff record](evidence/SECTION9_HANDOFF.json) is historical and does not validate the current candidate.
 
-The handoff records exact deployed Admin and booking commits, local validation, 100-account continuity, the failed deployed Section 7 smoke, Section 8 recovery evidence and all external gates. The user-approved scope allows Section 9 to pass without a complete Section 7 qualification; it does not authorize a ready verdict.
+The current [closeout packet](CLOSEOUT_PACKET.json) records the last source CI pairing and missing deployment, configuration and qualification proofs. Its failed verdict is a truthful handoff, not a waiver of Section 7 or permission to deploy. `npm run test:handoff` validates this packet; `npm run test:release` is the separate final release gate.
 
-Section 6 has local continuity proof but still needs a complete deployed role matrix and genuine provider journeys. Section 7 has a successful 500-session authenticated read smoke, but the bounded deployed mixed-staff smoke failed at 500 VUs and was aborted safely. Follow-up telemetry confirms target-side queueing and a local undeployed dashboard snapshot correction now passes 188 database checks and build/type validation. Section 8 confirms exact deployed state, post-abort integrity and browser recovery; corrective-candidate approval/retest, alert delivery and an isolated restore target remain open.
-
-Run npm run test:handoff to validate the machine-readable record in evidence/SECTION9_HANDOFF.json.
+Historical Section 6 has local continuity proof but still needs current candidate-bound same-record, deployed browser role and genuine provider journeys. Section 7 retains a successful read smoke and two failed mixed/corrective smokes; no target mix or soak passed. Section 8's old deployment/recovery record applies only to the former candidate. Current Admin/storefront aliases do not match the reviewed source pairing; separate restore and alert delivery remain open.

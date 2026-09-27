@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -81,6 +82,9 @@ test("expired recorded approval cannot reach credentials, k6, or outbound invari
   const marker = path.join(dir, "k6-ran");
   writeFileSync(path.join(dir, "k6"), '#!/bin/sh\ntouch "$BT500_TEST_K6_MARKER"\nexit 99\n', { mode: 0o700 });
   try {
+    const authorityFile = path.join(dir, "execution.json");
+    const authorityBytes = readFileSync(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"));
+    writeFileSync(authorityFile, authorityBytes, { mode: 0o600 });
     const env = {
       PATH: `${dir}:${process.env.PATH}`,
       BT500_MODE: "smoke",
@@ -88,6 +92,8 @@ test("expired recorded approval cannot reach credentials, k6, or outbound invari
       BT500_RUN_ID: "synthetic-window-probe",
       BT500_ALLOW_LOAD: "YES",
       BT500_ALLOW_SHARED_PROJECT: "YES",
+      BT500_EXECUTION_FILE: authorityFile,
+      BT500_EXECUTION_SHA256: createHash("sha256").update(authorityBytes).digest("hex"),
       BT500_CREDENTIALS_FILE: path.join(dir, "missing-credentials.json"),
       BT500_TEST_K6_MARKER: marker,
     };
@@ -106,7 +112,7 @@ test("expired recorded approval cannot reach credentials, k6, or outbound invari
     assert.match(run.stderr, /execution window has expired/);
     assert.doesNotMatch(run.stderr, /ENOENT|missing-credentials/);
     assert.equal(existsSync(marker), false);
-    const preflight = spawnSync(process.execPath, ["scripts/bt500-preflight.mjs", "--execute"], { cwd: root, env: { PATH: process.env.PATH }, encoding: "utf8", timeout: 5_000 });
+    const preflight = spawnSync(process.execPath, ["scripts/bt500-preflight.mjs", "--execute"], { cwd: root, env: { PATH: process.env.PATH, BT500_EXECUTION_FILE: authorityFile, BT500_EXECUTION_SHA256: env.BT500_EXECUTION_SHA256 }, encoding: "utf8", timeout: 5_000 });
     assert.notEqual(preflight.status, 0);
     assert.match(preflight.stderr, /execution window has expired/);
   } finally {
@@ -116,6 +122,7 @@ test("expired recorded approval cannot reach credentials, k6, or outbound invari
 
 test("forced expiry and ordinary interruption preserve post-stop invariant evidence", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "bt500-window-runner-"));
+  const authorityDir = mkdtempSync(path.join(tmpdir(), "bt500-execution-authority-"));
   let signalRunner;
   try {
     for (const name of ["scripts", "tests/stress", "docs/production-readiness", "bin", "evidence"]) {
@@ -123,18 +130,48 @@ test("forced expiry and ordinary interruption preserve post-stop invariant evide
     }
     for (const name of [
       "scripts/bt500-run-mixed.mjs", "scripts/bt500-preflight.mjs", "scripts/bt500-window.mjs",
+      "scripts/bt500-seed-ownership.mjs", "scripts/bt500-execution-file.mjs", "scripts/release-evidence-check.mjs",
       "tests/stress/bt500-mixed-config.mjs", "docs/production-readiness/WORKLOAD.json",
     ]) copyFileSync(path.join(root, name), path.join(dir, name));
+    copyFileSync(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"), path.join(dir, "docs/production-readiness/BT500_EXECUTION.json"));
+    writeFileSync(path.join(dir, ".gitignore"), "bin/\nclock-shim.mjs\ncredentials*.json\nsignal-credentials.json\n*.inventory.json\nevidence/\nsignal-evidence/\n*-ran\n");
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["-c", "user.name=Local Test", "-c", "user.email=local@example.invalid", "commit", "-qm", "fixture source"], { cwd: dir });
     const execution = JSON.parse(readFileSync(path.join(root, "docs/production-readiness/BT500_EXECUTION.json"), "utf8"));
+    execution.candidate_commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+    execution.candidate_tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" }).trim();
     const start = Date.now();
+    execution.status = "APPROVED_FOR_BOUNDED_SMOKE";
+    execution.approval.reference = "synthetic-current-window";
+    execution.approval.allowed_operations = ["mixed_load"];
     execution.window = record(start - 1_000, start + 198_000);
-    writeFileSync(path.join(dir, "docs/production-readiness/BT500_EXECUTION.json"), JSON.stringify(execution));
-    const credentialsFile = path.join(dir, "credentials.json");
-    writeFileSync(credentialsFile, JSON.stringify({
-      marker: "bt500-20260921",
-      url: "https://ukdsrndqhsatjkmxijuj.supabase.co",
-      credentials: Array.from({ length: 500 }, () => ({})),
-    }), { mode: 0o600 });
+    const authorityFile = path.join(authorityDir, "execution.json");
+    const authorityBytes = JSON.stringify(execution);
+    writeFileSync(authorityFile, authorityBytes, { mode: 0o600 });
+    const authoritySha = createHash("sha256").update(authorityBytes).digest("hex");
+    function fleet(runId, filename) {
+      const credentialsFile = path.join(dir, filename);
+      const seedMarker = "bt500-20260921-0123456789abcdef";
+      writeFileSync(credentialsFile, JSON.stringify({
+        marker: "bt500-20260921", seed_marker: seedMarker, run_id: runId, execution_sha256: authoritySha,
+        url: "https://ukdsrndqhsatjkmxijuj.supabase.co",
+        credentials: Array.from({ length: 500 }, (_, i) => ({ user_id: `user-${i}`, business_id: `business-${Math.floor(i / 3)}`, booking_id: `booking-${i}`, slot_id: `slot-${i}` })),
+      }), { mode: 0o600 });
+      writeFileSync(`${credentialsFile}.inventory.json`, JSON.stringify({
+        marker: seedMarker, run_id: runId, candidate_commit: execution.candidate_commit, execution_sha256: authoritySha,
+        project_ref: execution.environment.supabase_project_ref,
+        owned: {
+          businesses: Array.from({ length: 167 }, (_, i) => ({ id: `business-${i}` })),
+          auth_users: Array.from({ length: 500 }, (_, i) => ({ id: `user-${i}` })),
+          admin_users: Array.from({ length: 500 }, (_, i) => ({ user_id: `user-${i}`, business_id: `business-${Math.floor(i / 3)}` })),
+          bookings: Array.from({ length: 500 }, (_, i) => ({ id: `booking-${i}`, business_id: `business-${Math.floor(i / 3)}`, slot_id: `slot-${i}` })),
+          slots: Array.from({ length: 500 }, (_, i) => ({ id: `slot-${i}`, business_id: `business-${Math.floor(i / 3)}` })),
+        },
+      }), { mode: 0o600 });
+      return credentialsFile;
+    }
+    const credentialsFile = fleet("synthetic-expiry", "credentials.json");
     writeFileSync(path.join(dir, "bin/k6"), '#!/bin/sh\ntouch "$BT500_TEST_K6_MARKER"\nexec sleep 5\n', { mode: 0o700 });
     writeFileSync(path.join(dir, "bin/psql"), '#!/bin/sh\ntouch "$BT500_TEST_PSQL_MARKER"\nprintf "synthetic invariant passed\\n"\n', { mode: 0o700 });
     const clockShim = path.join(dir, "clock-shim.mjs");
@@ -166,12 +203,15 @@ test("forced expiry and ordinary interruption preserve post-stop invariant evide
       BT500_RUN_ID: "synthetic-expiry",
       BT500_ALLOW_LOAD: "YES",
       BT500_ALLOW_SHARED_PROJECT: "YES",
+      BT500_EXECUTION_FILE: authorityFile,
+      BT500_EXECUTION_SHA256: authoritySha,
       BT500_CREDENTIALS_FILE: credentialsFile,
       BT500_EVIDENCE_DIR: path.join(dir, "evidence"),
       BT500_TEST_K6_MARKER: k6Marker,
       BT500_TEST_PSQL_MARKER: psqlMarker,
       DATABASE_URL: "postgresql://synthetic:synthetic@db.ukdsrndqhsatjkmxijuj.supabase.co/postgres",
     };
+    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" }).trim(), "", "synthetic source fixture must remain frozen");
     const run = spawnSync(process.execPath, ["scripts/bt500-run-mixed.mjs", "--run"], {
       cwd: dir, env, encoding: "utf8", timeout: 5_000,
     });
@@ -185,6 +225,7 @@ test("forced expiry and ordinary interruption preserve post-stop invariant evide
     assert.equal(result.invariant_exit_code, 0);
     assert.match(readFileSync(path.join(dir, "evidence/invariants.log"), "utf8"), /synthetic invariant passed/);
     assert.deepEqual(JSON.parse(readFileSync(path.join(dir, "evidence/k6-options.json"), "utf8")), {});
+    assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" }).trim(), "", "first synthetic run must not change source");
 
     const signalK6Marker = path.join(dir, "signal-k6-ran");
     const signalPsqlMarker = path.join(dir, "signal-psql-ran");
@@ -193,6 +234,7 @@ test("forced expiry and ordinary interruption preserve post-stop invariant evide
       ...env,
       NODE_OPTIONS: "",
       BT500_RUN_ID: "synthetic-signal",
+      BT500_CREDENTIALS_FILE: fleet("synthetic-signal", "signal-credentials.json"),
       BT500_EVIDENCE_DIR: signalEvidenceDir,
       BT500_TEST_K6_MARKER: signalK6Marker,
       BT500_TEST_PSQL_MARKER: signalPsqlMarker,
@@ -229,5 +271,6 @@ test("forced expiry and ordinary interruption preserve post-stop invariant evide
   } finally {
     signalRunner?.kill("SIGKILL");
     rmSync(dir, { recursive: true, force: true });
+    rmSync(authorityDir, { recursive: true, force: true });
   }
 });

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-09-27T07:09:47Z",
+  "verdict": "FAILED_GATE",
+  "candidate": {
+    "admin_commit": "86141ac8605fe64b0d5a0f7c92d945ce46dd0ec4",
+    "admin_tree": "eb3c522f8c4621d11292f72f14a0c9c74f0ea6f9",
+    "admin_lock_sha256": "e6f465440dd65b937f39e58581d4daf5fb63379860d077853995ce2a5a603b70",
+    "booking_commit": "b29bc53992b0e516526939e94a7a14ff34fab71c",
+    "booking_tree": "10376f036e6ccdc2448951781b371dcd064fc154",
+    "booking_lock_sha256": "9553f2343bedfd703358c314428229288ef9edb5ec97451dabcfa8720ae7d0bd",
+    "onboarding_commit": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb",
+    "onboarding_tree": "e8b48fb96dbd913a49a74e6bf17ad283575327b9",
+    "onboarding_lock_sha256": "b179a8754d19c70d3b923a295d2257df5a19b60d8a8b307b3d9eb880935d9511",
+    "supabase_project": "ukdsrndqhsatjkmxijuj",
+    "profile_id": "BT500-LAUNCH-V1"
+  },
+  "source_ci": {
+    "admin_commit": "86141ac8605fe64b0d5a0f7c92d945ce46dd0ec4",
+    "run_id": 36298090450,
+    "conclusion": "SUCCESS",
+    "url": "https://github.com/GideonLangenhoven/Admin/actions/runs/36298090450",
+    "scope": "Admin and companion source jobs; manual deployed smoke was skipped"
+  },
+  "observed_aliases": {
+    "admin": "dpl_9ewxmGGuE7HWauQNS45V1vrunNoq",
+    "booking": "dpl_34PsBxRGMGY4MQz9XcFmKD3U6krn",
+    "onboarding": "dpl_AUuC2Hb6ArcHKuPGNqnJS7p4Te6T",
+    "admin_git_commit": "7be561be3db6a575f8a83f027e8c9642735d71a5",
+    "booking_git_commit": "8c0b4bf55957b0ce1a3b05853d5902e23c4542f8",
+    "booking_git_dirty": true,
+    "onboarding_git_commit": null,
+    "candidate_equivalence": "NOT_MATCHING_ADMIN_OR_BOOKING; ONBOARDING_UNVERIFIED",
+    "supabase_latest_migration": "20260922123000"
+  },
+  "deployment_ids": null,
+  "config_fingerprint": null,
+  "migration_versions": ["20260923100000", "20260923110000", "20260923120000", "20260923130000", "20260923140000", "20260925120000", "20260927100000"],
+  "partial_preparation_evidence": {
+    "original_six_migration_rollback_rehearsal": {
+      "status": "PASSED_ROLLBACK_ONLY_FOR_ORIGINAL_SIX",
+      "reviewed_sql_sha256": "63ae9243a5af8d7462e57c99a7bdc6822b929e352f72e5c4f8540322eb92d46b",
+      "ledger_latest_version_after": "20260922123000",
+      "catalog_before_after_sha256": "c04be28d19595e109f5ffa09aad1bec362c5a660d40ceb18131c956be96798c2",
+      "private_receipt": "/private/tmp/capekayak-release-dsQ4QB/rehearsal.json",
+      "limit": "No migration applied; seventh shared-ingress migration was outside this rehearsal."
+    },
+    "local_scoped_restore": "evidence/LOCAL_RESTORE_2026-09-27.json; database rows and two file hashes matched, but no operational Auth/API/file-serving or RPO/RTO proof"
+  },
+  "proofs": {
+    "source_security": null,
+    "migration_rehearsal": null,
+    "deployed_provenance": null,
+    "migration_apply": null,
+    "effective_configuration": null,
+    "section6_continuity": null,
+    "section6_role_matrix": null,
+    "genuine_provider_journeys": null,
+    "financial_faults": null,
+    "outbound_guard_negatives": null,
+    "provider_double_public_jobs": null,
+    "representative_data_quota": null,
+    "realtime_browser": null,
+    "bt500_mixed_60m": null,
+    "bt500_spike_recovery": null,
+    "bt500_soak_24h": null,
+    "alert_delivery": null,
+    "isolated_restore": null,
+    "production_canary": null
+  },
+  "execution_authority": {
+    "current_project_owner_classification": "no real user data at present; authorized for bounded synthetic testing",
+    "budget_ceiling_zar": 0,
+    "exact_current_mutation_load_provider_deployment_or_restore_window": null,
+    "separate_restore_target": null,
+    "provider_destinations": "private planning inputs only",
+    "qualification_window_required_seconds_at_least": 92280,
+    "production_canary_required_seconds": 86400
+  },
+  "blockers": [
+    "Current source CI is green, but this packet and release tooling change the candidate; rerun final source CI on the final commit and update exact pins.",
+    "Six reviewed forward migrations after 20260922123000 plus the new shared-ingress limiter migration are unapplied. The hosted rollback rehearsal proves the original six only; the seven-stage package still needs exact review, rehearsal, ledger and reconciliation evidence.",
+    "Current aliases do not prove the three candidate sources, Edge versions, migration ledger or effective runtime configuration.",
+    "Shared ingress limiter and trusted recovery origin require effective configuration and failure-behavior proof within ZAR 0.",
+    "Candidate-bound role, 100-account continuity, genuine provider, financial-fault and negative outbound journeys remain open.",
+    "Representative dataset, independent generator, provider doubles, public/webhook/background traffic, browser Realtime footprint and measured quota headroom remain open.",
+    "The September 22 deployed 500-VU staff and corrective smokes failed; no passing unchanged-threshold 60-minute mix, 2x spike, recovery or 24-hour soak exists.",
+    "Alert delivery and an isolated full restore with RPO at most 15 minutes and RTO at most 60 minutes are unproven; no separate restore target is identified.",
+    "The September 22 window expired; a new exact candidate/action/target/window/abort/recovery approval packet is required before consequential execution.",
+    "A distinct approved 24-hour limited production canary and final release review have not occurred."
+  ]
+}
