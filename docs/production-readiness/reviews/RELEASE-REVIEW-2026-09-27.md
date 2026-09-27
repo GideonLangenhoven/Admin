@@ -1,5 +1,7 @@
 # Three-application release review — 27 September 2026
 
+**Historical source review.** The current candidate, CI result and still-open release gates are in [STATE.md](../STATE.md) and [CLOSEOUT_PACKET.json](../CLOSEOUT_PACKET.json). The published pairing below is retained as the earlier review record.
+
 **Verdict: not production ready.** This review reconstructs an exact, locally passing Admin/storefront/onboarding source pairing. It does not qualify production deployment or the customer-facing release.
 
 ## Corrected findings from the prior review

@@ -1,0 +1,30 @@
+{
+  "observed_at_utc": "2026-09-27T13:12:37Z",
+  "status": "VERCEL_INCREMENTAL_SPEND_SCOPED_CLEARANCE_ONLY",
+  "vercel": {
+    "team_plan": "Hobby active, observed by root through read-only team inspection",
+    "usage_costs_api": "404; no current usage or remaining build allowance measured",
+    "bounded_action": "Up to two branch Preview rebuilds and bounded requests, with no plan upgrade, add-on or paid resource",
+    "incremental_charge_conclusion": "The Hobby plan is free and cannot purchase additional on-demand usage; included-resource overages pause or rate-limit service rather than generate on-demand Vercel charges. Thus the Vercel platform incremental-spend component is compatible with ZAR 0 for this bounded action.",
+    "capacity_conclusion": "OPEN: current usage and remaining deployment/build/compute allowances were not observed. A Preview build may be rate-limited, fail, or a feature may pause on limit; no success or operational headroom is inferred.",
+    "plan_eligibility_conclusion": "OPEN: Vercel restricts Hobby to personal non-commercial use. BookingTours business use needs a separate suitability decision; this receipt does not clear commercial production use.",
+    "official_sources": [
+      "https://vercel.com/docs/plans/hobby",
+      "https://vercel.com/docs/plans",
+      "https://vercel.com/docs/limits",
+      "https://vercel.com/pricing"
+    ]
+  },
+  "supabase": {
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "organization_plan": "Pro",
+    "read_only_observed_at_utc": "2026-09-27T13:06:53.777Z",
+    "disk_size_gb": 8,
+    "filesystem_available_bytes": 7893901312,
+    "filesystem_used_bytes": 456396800,
+    "private_source": "/private/tmp/bookingtours-phase1-cost-ADFI1p/supabase.json",
+    "billing_usage_status": "OPEN: signed-in usage/billing view not available; remaining billable allowance and any incremental Supabase charges unverified."
+  },
+  "overall_conclusion": "Vercel Hobby platform spend alone is bounded at ZAR 0 without an upgrade, even though usage API returned 404. This does not establish Preview capacity, commercial-plan eligibility, or the complete phase-1 ZAR 0 cost gate across Supabase Pro.",
+  "owner_budget_steering": "Keep ZAR 0 additional spend and finish branch Previews first; Supabase is the only paid service. No Vercel Pro upgrade, other paid hosting or paid resource change is authorized."
+}

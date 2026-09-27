@@ -4,7 +4,15 @@
   "source_project": "ukdsrndqhsatjkmxijuj",
   "method": "Native TLS PostgreSQL archive of the authorized source project, restored in one transaction in an isolated Docker Supabase PostgreSQL 17.6.1.063 container with network disabled; separately backed-up and restored two storage objects.",
   "database_archive_sha256": "fc2fc0b745fb9c99f296f6f67e47ce19c4247adea182441122100802cb2c2ff5",
-  "database_scope": ["public", "app_private", "auth", "storage", "supabase_migrations"],
+  "database_archive_private_path": "/private/tmp/bookingtours-release-backup-0OmuH1/application.dump",
+  "database_archive_bytes": 2447905,
+  "database_scope": [
+    "public",
+    "app_private",
+    "auth",
+    "storage",
+    "supabase_migrations"
+  ],
   "database_verification": {
     "tables": 124,
     "rows": 6983,
@@ -12,20 +20,70 @@
     "owners_and_acl_preserved": true,
     "private_result": "/private/tmp/bookingtours-release-backup-0OmuH1/database-restore-check.json"
   },
+  "fresh_archive_comparison": {
+    "status": "READ_ONLY_ARCHIVE_DECODE_AND_SCHEMA_ACL_TOC_MATCH_ONLY",
+    "archive_private_path": "/private/tmp/bookingtours-backup-complete-pnovxz/application.dump",
+    "archive_sha256": "c51358ac5be1f9de3481783919bca51a12d36cbd6dac6b5c8937d84667622667",
+    "archive_bytes": 2448467,
+    "verified_tls": true,
+    "pg_restore_decode_passed": true,
+    "normalized_schema_acl_sha256": "afe8007896232056c1f530256e4dcb37f83a2cd66c75cada1b9b48ac2307eeae",
+    "normalized_schema_acl_bytes_each": 931967,
+    "identical_table_data_toc_sets": true,
+    "table_data_toc_entries_each": 124,
+    "identical_five_schema_entries": true,
+    "private_comparison_receipt": "/private/tmp/bookingtours-schema-compare-ee5id_47/archive-comparison-receipt.json",
+    "receipt_sha256": "a0e9926da74b965d15782730b2bf24be1ba322356dcb23d894feca12994b8fed",
+    "fresh_archive_actually_restored": false,
+    "limit": "Only random psql restriction markers were normalized. The new archive passed decode and matches the earlier actually restored archive in schema/ACL and TOC entries; its data, Auth/API, objects, platform configuration and RPO/RTO have not been restored or measured."
+  },
   "storage_verification": {
     "objects": 2,
     "bytes": 192893,
     "source_and_restored_object_sha256": [
       "1088883da35a06ee79147492e4aa3e57dfafc071b4da1e343fe3b448b2dcffbb",
       "3129e4230625943f633c9a0e968fc176e8c77057c4957bf6d9c11d4b46865ffc"
-    ]
+    ],
+    "serving_proven": false
+  },
+  "auth_api_verification": {
+    "status": "LOCAL_SCOPED_PASS",
+    "private_receipt": "/private/tmp/bookingtours-release-backup-0OmuH1/auth-api-probe/auth-api-result.json",
+    "receipt_sha256": "8cb4145118c69e36232b55c45c9c967df3cf7564af83cd545efed965b5cc3523",
+    "environment": "Network-disabled local restore clone; no public ports; task containers removed after the probe",
+    "gotrue_version": "2.192",
+    "existing_user_recovery_link_http": 200,
+    "same_user_verify_otp_http": 200,
+    "same_auth_user_id": true,
+    "email_sent": false,
+    "postgrest_version": "14.1",
+    "missing_auth_rpc_http": 401,
+    "restored_authenticated_session_rpc_http": 403,
+    "service_role_rpc_http": 200,
+    "limit": "The 401 is an unauthenticated denial, not proof of a separately minted anon-JWT role. This is a local Auth identity/API authorization probe, not full operational recovery."
   },
   "protected_configuration": "Admin production environment backed up privately; required SETTINGS_ENCRYPTION_KEY name present. No values or backup bytes are in this repository.",
   "limits": [
-    "No restored Auth sign-in, application API or private file-serving journey was exercised.",
-    "No isolated Supabase service target for an operational restore drill has been identified.",
+    "Existing-user Auth recovery and API authorization passed locally, but private file serving and complete application journeys were not exercised.",
+    "A bounded local Storage API serving attempt stopped before service startup at its execution cap; restored object byte hashes and public bucket flags do not prove served responses.",
+    "The identified network-disabled local environment has not run the complete platform configuration, Edge dependencies, scheduler and outbound services as an operational restore.",
     "No proof of 15-minute RPO or 60-minute RTO; this was a static snapshot without measured service recovery.",
     "Platform cron, network, Realtime and other out-of-scope service state were not backed up or restored.",
     "This is a private local recovery preparation, not a candidate deployment, full production recovery or release-gate pass."
-  ]
+  ],
+  "storage_api_serving_attempt": {
+    "status": "NOT_RUN_EXECUTION_CAP_EXPIRED",
+    "official_local_image": "public.ecr.aws/supabase/storage-api:v1.41.8@sha256:c74659dad510393f6f4cdaba5a973e446bb581d89dd1d9b93bcd2c868dbdf965",
+    "source": "Supabase CLI 2.78.1 default Storage API image; local Docker pull only",
+    "disposable_clone": "bt-storage-proof-db-20260927, created from stopped original; removed after cap",
+    "restored_object_rows": 2,
+    "bucket_public_flag_true_rows": 2,
+    "storage_service_started": false,
+    "http_requests_made": 0,
+    "object_response_hashes_verified": false,
+    "limit": "The authorized 15-minute local execution cap expired before Storage API startup. File-byte hashes and public bucket flags are established, but no Storage API serving, protected configuration, full operational recovery or RPO/RTO is proven.",
+    "disposable_snapshot_image_removed": true,
+    "disposable_snapshot_image_sha256": "cd41a0afa8682cb6da67174e152a9a812be49f1794732ba2e733ec2b537d8f67",
+    "original_restore_container_preserved": true
+  }
 }

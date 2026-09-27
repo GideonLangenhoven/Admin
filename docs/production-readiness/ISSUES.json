@@ -1,7 +1,7 @@
 {
   "updated_at_utc": "2026-09-27T06:02:18Z",
   "scope": "Twelve stable parent work items: C01-C06 and V01-V06. Historical issue IDs are references within these parents, not a second master list.",
-  "current_closeout": "docs/production-readiness/CLOSEOUT_PACKET.json; source CI on Admin86141ac passed, but current aliases are non-equivalent/unverified, six previously reviewed migrations plus the new shared-ingress migration are unapplied, and the previous 500-VU mixed/corrective smokes failed. The hosted rollback rehearsal covers the original six only. Subsequent source changes require new CI.",
+  "current_closeout": "docs/production-readiness/CLOSEOUT_PACKET.json; frozen Admin 72e0d59 plus storefront5658610 and onboarding293d4e4 passed hosted source CI36321231309 with deployed smoke skipped. Previous CI36304613607 failed in storefront test lint after Admin source/build passed; the test-only error was corrected. Production aliases are non-equivalent/unverified, six previously reviewed migrations plus the new shared-ingress migration are unapplied, and previous 500-VU mixed/corrective smokes failed. The hosted rollback rehearsal covers the original six only.",
   "admin_base": "52afaff997a22e715e3d51194bd2ea07dfccbc7a",
   "deployment_verdict": "FAILED_GATE",
   "routing_verdict": "IN_PROGRESS",
@@ -264,7 +264,7 @@
         "result": "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN not found among11 production project environment entries; E2E bypass also absent.",
         "method": "Read-only Vercel CLI env ls production; only required name presence retained, no values or Redis request.",
         "limit": "Not effective invocation evidence; VERCEL can be a system variable rather than a listed project variable.",
-        "minimum_next_action": "Before deploying fail-closed limiter, identify approved shared Redis service, verify available command/storage quotas within ZAR0, supply secrets through supported secret settings under exact deployment approval, and verify production/preview configuration and bounded failure behavior. No provisioning or hosted configuration change authorized by this record."
+        "minimum_next_action": "The seventh migration implements the chosen Supabase-backed shared limiter without a new Redis service. Before ingress deployment, verify hosted migration/RPC activation, effective server-only service configuration, production/preview bounded failure behavior and available quota/headroom within ZAR0. No hosted configuration change is authorized by this record."
       },
       "accepted_proxy_correction": {
         "source_commit": "38576f20f0907b0090574e903d584813492b0a5e",
@@ -641,7 +641,7 @@
       "legacy_refs": [
         "BT500-LAUNCH-V1"
       ],
-      "evidence": "The 500-session profile and staff runner exist, but provider doubles, negative outbound guards, public/webhook/background harnesses, representative data, browser Realtime footprint and quota/headroom denominators are incomplete. Current target has 50 synthetic/demo bookings versus 250000 required; the owner supplied the source project as the intended restore target and excluded the other visible project; a separate target is not identified and the ceiling remains ZAR 0.",
+      "evidence": "The 500-session profile and staff runner exist, but provider doubles, negative outbound guards, public/webhook/background harnesses, representative data, browser Realtime footprint and quota/headroom denominators are incomplete. Current target has 50 synthetic/demo bookings versus 250000 required; the owner authorizes bounded synthetic use of that source project at ZAR 0. A separate network-disabled local Docker target passed scoped database/object restoration and a later existing-user Auth recovery/API authorization probe; file serving, running protected configuration and RPO/RTO remain unproven.",
       "next": "Confirm data provenance, a separate safe target and budget; finish and verify controls before any qualifying clock.",
       "children": [
         {
@@ -667,13 +667,13 @@
           "id": "V03-SEED-OWNERSHIP-20260923",
           "severity": "gate",
           "owner": "gpt-6-sol/max",
-          "status": "OPEN_VERIFICATION_GAP",
+          "status": "LOCAL_SAFETY_VERIFIED_HOSTED_CLEANUP_OPEN",
           "version": "Admin e9bea358458ecd0d2d701731c4ca94f5ba9f589c",
           "path": "scripts/bt500-seed.mjs:81-114,135",
           "failure": "Source teardown selects/deletes by the historical marker, without a pre-run inventory proving operation ownership; --seed invokes teardown first. Its entry guard uses a target hostname and flag rather than a current action window. No seed, teardown or hosted reproduction was run.",
           "impact": "The existing harness cannot yet demonstrate preservation of pre-existing marker-labelled rows, Auth identities, relationships or pending operations.",
           "violated_criterion": "V03 safe executable harness; section4 marker alone is not isolation or mutation authority; preserve existing identities and operations.",
-          "verification": "Before hosted use, Sol reproduces with trapped synthetic client operations and adds narrow ownership/current-window guards; absent, stale, mismatched or tampered inventory must cause zero mutations. Approved exact operation-owned cleanup and interrupted retry must preserve pre-existing records. Reuse the accepted window parser and keep volume/provider prerequisites separate."
+          "verification": "Current Admin source stores a random marker and exact planned IDs before writes, binds a fresh external SHA-256 action packet and frozen source, checks every request against its UTC window, requires 500 existing Auth identities for recovery sessions, and rejects forged marker/relations or duplicate/non-distributed credentials. Automatic teardown is read-only and returns MANUAL_RECONCILIATION_REQUIRED because booking triggers and related jobs/contacts make parent deletion unsafe. Local seed/release/migration/window guards pass 13/13; fresh-context Astra accepted the narrow source safety correction. No hosted seed, session issue or cleanup was executed; owned records require deliberate manual reconciliation before any new packet/reuse."
         }
       ]
     },
@@ -697,7 +697,7 @@
         "RESTORE-01"
       ],
       "evidence": "No received alert drill or separate isolated usable restore with measured 15-minute data loss and 60-minute service recovery.",
-      "next": "A separate isolated restore target remains unidentified; the owner excludes the other visible project. Continue local recovery preparation at ZAR 0 and obtain an exact allowed target before any restore."
+      "next": "Extend the identified network-disabled local recovery environment to usable Auth/API/file serving and protected configuration, measure 15-minute RPO and 60-minute RTO, and prove delivered alerts to the incident owner. The current source project must not be restored into itself; the other visible project remains outside this assignment."
     },
     {
       "id": "V06",

@@ -1,6 +1,6 @@
 {
-  "updated_at_utc": "2026-09-27T07:09:47Z",
-  "candidate": "PROVISIONAL_NOT_FROZEN",
+  "updated_at_utc": "2026-09-27T15:56:03Z",
+  "candidate": "FROZEN_REVIEW_SOURCE_CI_PASSED_RELEASE_GATES_OPEN",
   "authorized": {
     "isolated_source_changes": true,
     "local_tests_with_synthetic_data": true,
@@ -23,6 +23,23 @@
     "paid_resource_changes": false,
     "production_or_paid_load": false,
     "destructive_existing_resource_operations": false
+  },
+  "phase1_shared_backend_approval": {
+    "status": "EXPIRED_NO_HOSTED_MIGRATION_OR_ENV_CHANGE_CONFIRMED",
+    "owner": "Gideon",
+    "approved_at_utc": "2026-09-27T08:32:36Z",
+    "window_start_utc": "2026-09-27T08:32:36Z",
+    "window_end_utc": "2026-09-27T10:32:36Z",
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "additional_spend_ceiling_zar": 0,
+    "source": {
+      "admin_commit": "c7e15f91ceca76acbec75688f9768704628f5a9e",
+      "storefront_commit": "565861037fd4f12a747254705b0c74e6ab4161ae",
+      "onboarding_commit": "293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb"
+    },
+    "allowed": "Seven reviewed database migrations in two stages after fresh preflight and rollback-only rehearsal; scoped Storefront branch Preview server key and Admin branch Preview recovery-origin configuration and rebuild; bounded no-provider, no-message, no-payment database, GET and ingress-denial checks. The database is shared with current production aliases, so policy and function changes can affect them without alias promotion.",
+    "excluded": "Edge function deployment, production environment or build changes, alias promotion, main-branch push, seed or mass load, provider effects, real recipients, paid resources, and operational restore. This was no general production mutation or release approval.",
+    "outcome": "The two-hour window expired. Root confirmed no hosted migration or environment changes in this window. No further hosted mutation is authorized by this expired approval."
   },
   "resolved_product_decisions": [
     {
@@ -49,16 +66,16 @@
   "missing_external_approvals": [
     "Exact current publication/deployment and migration packet after required non-production gates pass; include automatic deployment paths, window, effects, cost and recovery.",
     "Exact seed, mass-load, provider and outbound test window with allowed synthetic records/recipients/modes, after outbound negative guards and candidate prerequisites pass.",
-    "Separate identified isolated restore target and allowed database/Auth/file/configuration restore effects; RPO15m and RTO60m remain required.",
-    "A shared admission limiter with effective configuration, failure behavior and capacity verified within ZAR 0 before ingress deployment; the owner did not identify a Redis service.",
+    "Operational isolated restore on the identified local recovery environment or an equivalent approved isolated environment, covering database, Auth sign-in/API, object serving and protected configuration with RPO15m and RTO60m measurements.",
+    "Supabase-backed shared admission limiter effective configuration, failure behavior and capacity verified within ZAR 0 before ingress deployment; no separate Redis service is required by the candidate.",
     "Capacity/data/Realtime/worker/generator quotas and remaining billable allowance for the complete BT500 workload; any paid capacity needs explicit owner decision.",
     "Approved monitoring receiver, incident owner and delivered-alert test window.",
     "Distinct24-hour limited production canary with real isolation boundary and adoption gates after exact deployed verification."
   ],
   "latest_scope_steering": {
     "request": "Continue all C01-C06 and V01-V06 requirements with authorized isolated source work and local synthetic tests. Complete concrete reviewable work before asking for an external action approval.",
-    "current_source": "Last green hosted source CI is Admin86141ac with storefrontc09bba1 and onboarding293d4e4. Further source corrections are active; no final candidate freeze.",
-    "deployment": "27 September read-only aliases report Admin7be561b, dirty storefront8c0b4bf and onboarding without Git SHA; none proves current candidate equivalence. No forward migration was applied and no current candidate was deployed or promoted. A rollback-only hosted rehearsal of the original six migration bodies and a scoped local isolated database/file restore preparation completed; neither is a full release or operational restore gate pass. No hosted mass load, real message/payment or provider effect occurred.",
+    "current_source": "Current review source is frozen at Admin 72e0d59dc3a2275691d5f6cc11aa98453d5c2fd5, storefront 565861037fd4f12a747254705b0c74e6ab4161ae and onboarding 293d4e4a6426f9e1ccd1205e6a9b40d012a3e4eb. Hosted source CI 36321231309 passed both jobs with deployed smoke skipped. Prior CI 36304613607 failed in companion lint on storefront b29bc5; the test-only correction is in storefront5658610. The expired phase-1 approval remains bound to the earlier Admin c7e15f9 source and did not authorize this later source.",
+    "deployment": "27 September read-only aliases report Admin7be561b, dirty storefront8c0b4bf and onboarding without Git SHA; none proves current candidate equivalence. No forward migration was applied and no current candidate was deployed to production or promoted; exact review-branch Previews are READY but do not prove runtime qualification. A rollback-only hosted rehearsal of the original six migration bodies and a scoped local isolated database/file restore preparation completed; neither is a full release or operational restore gate pass. No hosted mass load, real message/payment or provider effect occurred.",
     "gate": "FAILED_GATE for historical mixed-load qualification; implementation acceptance, full non-production gates and rollout readiness remain unmet."
   },
   "historical_checkpoint": {
@@ -103,9 +120,10 @@
     "routing": "Astra xhigh orchestration/review and GPT-6 Sol max implementation; reduce tokens through compact tasks and evidence reuse.",
     "source_project": "ukdsrndqhsatjkmxijuj",
     "data": "Owner says the current Supabase project has no real user data at present and authorizes its bounded synthetic test use. Earlier 50 booking/customer rows were classified synthetic/demo. This does not authorize a seed, mass load, provider effect, message, paid change or production promotion without its exact action scope/window.",
-    "restore_target": "Supplied URL identifies source, so no separate isolated target is identified. Other projects are excluded from this assignment.",
+    "restore_target": "Network-disabled local Docker bt-restore-20260927-a81c is an identified isolated database/object restore environment. Scoped rows and two file hashes matched. Scoped existing-user Auth/API passed locally; operational object serving/platform recovery and measured RPO/RTO remain unproven; the current Supabase source must not be restored into itself. Other projects are excluded from this assignment.",
     "budget_ceiling_zar": 0,
     "provider_destinations": "Previously supplied private email/WhatsApp recipients, Yoco test mode and monitoring receiver remain approved for planning only. No current sending/transaction window.",
-    "redis": "Owner is unsure what Redis is and did not name a service. Technical shared-limiter solution, effective configuration and quota remain open; no paid resource is approved."
+    "shared_limiter": "Existing Supabase service-only shared limiter is implemented in the seventh migration and Admin/Storefront source. No new Redis service is required. Hosted migration, effective configuration, quota/headroom and invocation behavior remain unproven; no paid resource is approved.",
+    "hosting_budget": "Owner directs ZAR 0 additional spend and branch Previews first. Supabase is the only paid service; no Vercel upgrade, other paid hosting or paid resource change is authorized. Hobby incremental platform charges are zero for bounded Preview work, while current capacity and commercial-use eligibility remain open."
   }
 }
