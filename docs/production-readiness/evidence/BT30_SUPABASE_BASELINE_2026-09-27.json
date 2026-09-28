@@ -1,0 +1,24 @@
+{
+  "status": "READ_ONLY_PARTIAL",
+  "observed_at_utc": "2026-09-27T13:06:53.777Z",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "organization_plan": "pro",
+  "disk": {
+    "type": "gp3",
+    "size_gb": 8,
+    "configured_iops": 3000,
+    "configured_throughput_mibps": 125,
+    "fs_used_bytes": 456396800,
+    "fs_available_bytes": 7893901312
+  },
+  "not_observed": [
+    "actual_compute_sku",
+    "sustained_disk_iops",
+    "billing_cycle_usage_and_remaining_allowance",
+    "dashboard_spend_cap_state",
+    "capacity_at_30_active_staff"
+  ],
+  "private_source": "/private/tmp/bookingtours-phase1-cost-ADFI1p/supabase.json",
+  "private_source_sha256": "877cb2de66a7575b07e9c7ec9e7e6d477ec643f985b5e80c1fbda4f5d443cd20",
+  "conclusion": "Pro membership and provisioned disk settings do not prove compute size, effective throughput, remaining budget or pilot capacity."
+}
